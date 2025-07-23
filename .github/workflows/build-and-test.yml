@@ -1,0 +1,70 @@
+name: Build and Test Package
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, "3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+    
+    - name: Install package dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Test package imports
+      run: |
+        python -c "import image_description_toolkit; print('✓ Package imported successfully')"
+        python -c "from image_description_toolkit.workflow import main; print('✓ Workflow main function available')"
+        python -c "from image_description_toolkit import ImageDescriber; print('✓ ImageDescriber class available')"
+        python -c "from image_description_toolkit import VideoFrameExtractor; print('✓ VideoFrameExtractor class available')"
+        python -c "from image_description_toolkit import convert_heic_to_jpg; print('✓ convert_heic_to_jpg function available')"
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Check package metadata
+      run: |
+        python -m twine check dist/*
+    
+    - name: Test package installation in clean environment
+      run: |
+        # Create a clean virtual environment
+        python -m venv test_env
+        source test_env/bin/activate
+        
+        # Install the built package
+        pip install dist/*.whl
+        
+        # Test that it can be imported and basic functionality works
+        python -c "import image_description_toolkit; print('✓ Installed package imported successfully')"
+        python -c "from image_description_toolkit.workflow import main; print('✓ Workflow entry point works')"
+        
+        # Test console script entry point
+        image-description-toolkit --help
+    
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v3
+      if: matrix.python-version == '3.12'
+      with:
+        name: package-dist
+        path: dist/

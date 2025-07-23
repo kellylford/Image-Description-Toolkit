@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "image-description-toolkit"
+version = "0.1.0"
+authors = [
+    {name = "kellylford", email = "kellylford@example.com"},
+]
+description = "Experimental tools for image description interaction."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["ai", "image-description", "computer-vision", "ollama", "machine-learning"]
+dependencies = [
+    "ollama>=0.3.0",
+    "Pillow>=10.0.0",
+    "pillow-heif>=0.13.0",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.60.0",
+    "typing-extensions>=4.0.0; python_version<'3.8'",
+    "pathlib2>=2.3.5; python_version<'3.4'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0.0",
+    "pytest-mock>=3.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kellylford/Image-Description-Toolkit"
+"Bug Reports" = "https://github.com/kellylford/Image-Description-Toolkit/issues"
+"Source" = "https://github.com/kellylford/Image-Description-Toolkit"
+
+[project.scripts]
+image-description-toolkit = "image_description_toolkit.workflow:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["image_description_toolkit*"]
+
+[tool.setuptools.package-data]
+image_description_toolkit = ["*.json"]

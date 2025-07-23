@@ -1,0 +1,123 @@
+{
+  "default_model": "moondream",
+  "model_settings": {
+    "model": "moondream",
+    "temperature": 0.1,
+    "num_predict": 600,
+    "top_k": 40,
+    "top_p": 0.9,
+    "repeat_penalty": 1.3
+  },
+  "prompt_template": "Describe this image in detail, including:\n- Main subjects/objects\n- Setting/environment\n- Key colors and lighting\n- Notable activities or composition\nKeep it comprehensive and informative for metadata.",
+  "default_prompt_style": "Narrative",
+  "prompt_variations": {
+    "detailed": "Describe this image in detail, including:\n- Main subjects/objects\n- Setting/environment\n- Key colors and lighting\n- Notable activities or composition\nKeep it comprehensive and informative for metadata.",
+    "concise": "Describe this image concisely, including:\n- Main subjects/objects\n- Setting/environment\n- Key colors and lighting\n- Notable activities or composition.",
+    "Narrative": "Provide a narrative description including objects, colors and detail. Avoid interpretation, just describe.",
+    "artistic": "Analyze this image from an artistic perspective, describing:\n- Visual composition and framing\n- Color palette and lighting mood\n- Artistic style or technique\n- Emotional tone or atmosphere\n- Subject matter and symbolism",
+    "technical": "Provide a technical analysis of this image:\n- Camera settings and photographic technique\n- Lighting conditions and quality\n- Composition and framing\n- Image quality and clarity\n- Technical strengths or weaknesses",
+    "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition."
+  },
+  "output_format": {
+    "include_timestamp": false,
+    "include_model_info": true,
+    "include_file_path": false,
+    "include_metadata": false,
+    "separator": "-"
+  },
+  "available_models": {
+    "moondream": {
+      "description": "Moondream vision model - compact and efficient for image analysis",
+      "size": "1.7B parameters",
+      "requirements": "ollama pull moondream",
+      "recommended": true
+    },
+    "llama3.2-vision": {
+      "description": "Latest Llama 3.2 Vision model - high quality but larger",
+      "size": "11B parameters",
+      "requirements": "ollama pull llama3.2-vision",
+      "recommended": false
+    },
+    "llava": {
+      "description": "LLaVA model - good balance of speed and quality",
+      "size": "7B parameters",
+      "requirements": "ollama pull llava",
+      "recommended": false
+    },
+    "llava:7b": {
+      "description": "LLaVA 7B model - faster processing, lower memory usage",
+      "size": "7B parameters",
+      "requirements": "ollama pull llava:7b",
+      "recommended": false
+    },
+    "llava:13b": {
+      "description": "LLaVA 13B model - higher quality, more memory usage",
+      "size": "13B parameters",
+      "requirements": "ollama pull llava:13b",
+      "recommended": false
+    },
+    "llava:34b": {
+      "description": "LLaVA 34B model - highest quality, requires significant memory",
+      "size": "34B parameters",
+      "requirements": "ollama pull llava:34b",
+      "recommended": false
+    },
+    "bakllava": {
+      "description": "BakLLaVA model - alternative vision model",
+      "size": "7B parameters",
+      "requirements": "ollama pull bakllava",
+      "recommended": false
+    }
+  },
+  "processing_options": {
+    "default_max_image_size": 1024,
+    "default_batch_delay": 2.0,
+    "default_compression": true,
+    "extract_metadata": true,
+    "supported_formats": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".bmp",
+      ".tiff",
+      ".webp"
+    ]
+  },
+  "documentation": {
+    "overview": "This configuration file controls all aspects of the image description process. Modify settings here or use 'python config_helper.py modify' for interactive editing.",
+    "model_settings": {
+      "model": "The Ollama model to use for image analysis. Must be installed with 'ollama pull MODEL_NAME'",
+      "temperature": "Controls randomness in responses (0.0-1.0). Lower values = more consistent, higher = more creative. Recommended: 0.1-0.3 for consistent descriptions.",
+      "num_predict": "Maximum number of tokens to generate. Higher values = longer descriptions. Recommended: 200-400 for balanced length.",
+      "top_k": "Number of top tokens to consider. Lower values = more focused responses. Recommended: 40.",
+      "top_p": "Cumulative probability cutoff. Lower values = more focused responses. Recommended: 0.9.",
+      "repeat_penalty": "Penalty for repeating tokens. Higher values = less repetition. Recommended: 1.1."
+    },
+    "prompt_template": "The main prompt used to generate descriptions. You can customize this to change the style and focus of descriptions.",
+    "default_prompt_style": "Which prompt style to use by default when no --prompt-style is specified. Must match a key in prompt_variations.",
+    "prompt_variations": {
+      "description": "Pre-defined prompt variations for different use cases. Select one by using --prompt-style argument.",
+      "usage": "Use --prompt-style STYLE_NAME to select a specific style",
+      "custom_styles": "Add custom styles by editing this file or using config_helper.py modify",
+      "available_styles": "Run 'python config_helper.py styles' to see all available styles"
+    },
+    "available_models": {
+      "description": "List of supported Ollama vision models with their specifications and requirements.",
+      "usage": "Use --model MODEL_NAME to override the default model"
+    },
+    "processing_options": {
+      "default_max_image_size": "Maximum image dimension (width or height) in pixels. Larger images use more memory.",
+      "default_batch_delay": "Delay in seconds between processing images. Helps prevent memory buildup.",
+      "default_compression": "Whether to compress images before processing. Reduces memory usage.",
+      "extract_metadata": "Whether to extract EXIF metadata from images. Adds technical info to descriptions.",
+      "supported_formats": "List of image file extensions that the tool can process."
+    },
+    "output_format": {
+      "include_timestamp": "Whether to include processing timestamp for each image",
+      "include_model_info": "Whether to include model name and prompt style in output",
+      "include_file_path": "Whether to include full file path in descriptions",
+      "include_metadata": "Whether to include extracted EXIF metadata in descriptions",
+      "separator": "Character used to separate entries in the output file"
+    }
+  }
+}

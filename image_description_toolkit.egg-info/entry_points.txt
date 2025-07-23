@@ -1,0 +1,2 @@
+[console_scripts]
+image-description-toolkit = image_description_toolkit.workflow:main

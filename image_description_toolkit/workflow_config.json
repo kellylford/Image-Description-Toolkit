@@ -1,0 +1,44 @@
+{
+  "workflow": {
+    "base_output_dir": "workflow_output",
+    "preserve_structure": true,
+    "cleanup_intermediate": false,
+    "steps": {
+      "video_extraction": {
+        "enabled": true,
+        "output_subdir": "extracted_frames",
+        "config_file": "video_frame_extractor_config.json"
+      },
+      "image_conversion": {
+        "enabled": true,
+        "output_subdir": "converted_images", 
+        "quality": 95,
+        "keep_metadata": true
+      },
+      "image_description": {
+        "enabled": true,
+        "output_subdir": "descriptions",
+        "config_file": "image_describer_config.json",
+        "model": null,
+        "prompt_style": null
+      },
+      "html_generation": {
+        "enabled": true,
+        "output_subdir": "html_reports",
+        "include_details": false,
+        "title": "Image Analysis Report"
+      }
+    }
+  },
+  "file_patterns": {
+    "videos": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"],
+    "images": [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"],
+    "heic": [".heic", ".heif"],
+    "descriptions": ["image_descriptions.txt"]
+  },
+  "logging": {
+    "level": "INFO",
+    "log_to_file": true,
+    "log_filename": "workflow_{timestamp}.log"
+  }
+}
