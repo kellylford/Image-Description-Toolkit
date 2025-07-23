@@ -37,6 +37,39 @@ Image-Description-Toolkit/
 
 ## 🚀 Quick Start
 
+### Installation
+
+**Option 1: Direct use (existing method)**
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Install Ollama and a vision model
+# Download from https://ollama.ai/
+ollama pull llava:7b  # or llama3.2-vision:11b, moondream, etc.
+
+# 3. Process your media files (videos + images)
+python workflow.py path/to/your/media
+```
+
+**Option 2: Package installation (new)**
+```bash
+# 1. Install the package
+pip install -e .  # Development installation
+# OR build and install: python -m build && pip install dist/*.whl
+
+# 2. Install Ollama and a vision model  
+ollama pull llava:7b
+
+# 3. Use the console command
+image-description-toolkit path/to/your/media
+
+# 4. Or use the Python API
+python -c "from image_description_toolkit.workflow import main; import sys; sys.argv=['workflow', 'path/to/media']; main()"
+```
+
+> **📦 Packaging**: This toolkit is now properly packaged for pip installation. See [PACKAGING.md](PACKAGING.md) for detailed information about the package structure, installation options, and development workflow.
+
 ### Primary Usage (Recommended)
 
 The **workflow system** is the main way to use this toolkit:

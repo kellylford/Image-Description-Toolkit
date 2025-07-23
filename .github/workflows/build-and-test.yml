@@ -2,7 +2,7 @@ name: Build and Test Package
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, "copilot/*" ]
   pull_request:
     branches: [ main, develop ]
 

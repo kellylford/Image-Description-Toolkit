@@ -12,6 +12,11 @@ __pycache__/
 .coverage
 .pytest_cache/
 
+# Python packaging
+build/
+dist/
+*.egg-info/
+
 # Virtual environment
 .venv/
 venv/
