@@ -13,6 +13,36 @@ An AI-powered toolkit for generating descriptive text from images using local la
 - **📊 Comprehensive Logging**: Professional logging with statistics and progress tracking
 - **🛠️ Individual Script Access**: Use components separately when needed
 
+## 🔧 System Requirements
+
+**Ollama is required for vision model inference and must be installed and running for the toolkit to function.**
+
+### Install Ollama
+
+**macOS/Linux:**
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+**Windows:**
+Download and install from [https://ollama.ai/download/windows](https://ollama.ai/download/windows)
+
+### Start Ollama Server
+
+```bash
+ollama serve
+```
+
+### Verify Ollama is Running
+
+```bash
+curl http://localhost:11434/api/version
+```
+
+If Ollama is running properly, you should see a JSON response with version information.
+
+**⚠️ Important**: The Image Description Toolkit will not function unless Ollama is installed and running. Make sure to start the Ollama server before using any of the toolkit's AI-powered features.
+
 ## 📁 Project Structure
 
 ```
