@@ -84,7 +84,7 @@
     ]
   },
   "documentation": {
-    "overview": "This configuration file controls all aspects of the image description process. Modify settings here or use 'python config_helper.py modify' for interactive editing.",
+    "overview": "This configuration file controls all aspects of the image description process.",
     "model_settings": {
       "model": "The Ollama model to use for image analysis. Must be installed with 'ollama pull MODEL_NAME'",
       "temperature": "Controls randomness in responses (0.0-1.0). Lower values = more consistent, higher = more creative. Recommended: 0.1-0.3 for consistent descriptions.",
