@@ -608,7 +608,7 @@ class ComprehensiveTester:
         print(f"Failure analysis saved: {failure_file}")
         
         # Also print summary to console
-        print(f"\n❌ FAILURE SUMMARY:")
+        print(f"\nFAILURE SUMMARY:")
         error_groups = {}
         for failure in failures:
             error = failure['error_message'] or 'Unknown error'
@@ -663,8 +663,21 @@ class ComprehensiveTester:
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }}
-        h1, h2, h3 {{
+        h1, h2, h3, h4, h5 {{
             color: #333;
+        }}
+        h4 {{
+            color: #495057;
+            font-size: 1.1em;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 5px;
+        }}
+        h5 {{
+            color: #6c757d;
+            font-size: 1em;
+            margin: 15px 0 8px 0;
+            font-weight: 600;
         }}
         .header {{
             text-align: center;
@@ -725,6 +738,13 @@ class ComprehensiveTester:
             font-weight: bold;
             color: #333;
             border-bottom: 1px solid #e0e0e0;
+        }}
+        .description-header {{
+            color: #495057;
+            font-size: 1em;
+            font-weight: 600;
+            margin: 15px 0 5px 0;
+            padding: 0;
         }}
         .model-content {{
             padding: 15px;
@@ -800,7 +820,7 @@ class ComprehensiveTester:
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔍 ImageDescriber Comprehensive Test Results</h1>
+            <h1>ImageDescriber Comprehensive Test Results</h1>
             <p><strong>Test Date:</strong> {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}</p>
             <p><strong>Image Path:</strong> {self.image_path}</p>
         </div>
@@ -825,11 +845,11 @@ class ComprehensiveTester:
         </div>
         
         <div class="toc">
-            <h3>📋 Table of Contents</h3>
+            <h2>Table of Contents</h2>
             <ul>""")
             
             for prompt in sorted(results_by_prompt.keys()):
-                f.write(f'                <li><a href="#prompt-{self.sanitize_name(prompt)}">🎯 {prompt.title()} Style ({len(results_by_prompt[prompt])} models)</a></li>\n')
+                f.write(f'                <li><a href="#prompt-{self.sanitize_name(prompt)}">{prompt.title()} Style ({len(results_by_prompt[prompt])} models)</a></li>\n')
             
             f.write("""            </ul>
         </div>
@@ -840,9 +860,9 @@ class ComprehensiveTester:
                 prompt_results = results_by_prompt[prompt]
                 f.write(f"""
         <div class="prompt-section" id="prompt-{self.sanitize_name(prompt)}">
-            <div class="prompt-header">
-                🎯 {prompt.title()} Style - {len(prompt_results)} Models Tested
-            </div>
+            <h2 class="prompt-header">
+                {prompt.title()} Style - {len(prompt_results)} Models Tested
+            </h2>
             <div class="model-grid">""")
                 
                 # Sort models by average duration for this prompt
@@ -861,46 +881,87 @@ class ComprehensiveTester:
                         try:
                             with open(desc_file, 'r', encoding='utf-8') as df:
                                 content = df.read()
-                                # Parse descriptions (assuming format: filename: description)
-                                for line in content.split('\n'):
-                                    if ':' in line and not line.startswith('='):
-                                        filename, desc = line.split(':', 1)
-                                        descriptions[filename.strip()] = desc.strip()
-                        except Exception:
+                                # Parse descriptions in the format:
+                                # File: filename.jpg
+                                # Model: model_name  
+                                # Prompt Style: style
+                                # Description: actual description
+                                
+                                sections = content.split('\nFile: ')
+                                for section in sections[1:]:  # Skip header section
+                                    lines = section.split('\n')
+                                    if len(lines) >= 4:
+                                        filename = lines[0].strip()
+                                        # Find the description line
+                                        desc_start = None
+                                        for i, line in enumerate(lines):
+                                            if line.startswith('Description: '):
+                                                desc_start = i
+                                                break
+                                        
+                                        if desc_start is not None:
+                                            # Get description (may span multiple lines)
+                                            desc_lines = []
+                                            desc_lines.append(line[13:])  # Remove "Description: " prefix
+                                            
+                                            # Continue reading until next section or end
+                                            for i in range(desc_start + 1, len(lines)):
+                                                if (lines[i].startswith('File: ') or 
+                                                    lines[i].startswith('================') or
+                                                    lines[i].strip() == ''):
+                                                    break
+                                                desc_lines.append(lines[i])
+                                            
+                                            description = '\n'.join(desc_lines).strip()
+                                            if description:
+                                                descriptions[filename] = description
+                        except Exception as e:
+                            print(f"Error parsing descriptions for {model}: {e}")
                             pass
                     
                     f.write(f"""
                 <div class="model-card">
-                    <div class="model-header">
-                        🤖 {model}
-                    </div>
+                    <h3 class="model-header">
+                        {model}
+                    </h3>
                     <div class="model-content">
+                        <h4>Performance Details</h4>
                         <div class="timing-info">
-                            ⏱️ Processing Time: {duration:.1f} seconds
+                            Processing Time: {duration:.1f} seconds
                         </div>""")
                     
                     # Show sample descriptions
                     if descriptions:
+                        f.write("""
+                        <h4>Generated Descriptions</h4>""")
                         # Show first few descriptions as examples
                         sample_count = 0
-                        for filename, desc in list(descriptions.items())[:2]:  # Show first 2
-                            if desc and sample_count < 2:
+                        for filename, desc in list(descriptions.items())[:3]:  # Show first 3
+                            if desc and sample_count < 3:
                                 f.write(f"""
+                        <h5 class="description-header">{filename}</h5>
                         <div class="description">
-                            <strong>{filename}:</strong><br>
-                            {desc[:200]}{'...' if len(desc) > 200 else ''}
+                            {desc.replace('<', '&lt;').replace('>', '&gt;')}
                         </div>""")
                                 sample_count += 1
                         
-                        if len(descriptions) > 2:
+                        if len(descriptions) > 3:
                             f.write(f"""
-                        <div style="text-align: center; color: #666; font-style: italic;">
-                            ... and {len(descriptions) - 2} more descriptions
+                        <h4>Summary</h4>
+                        <div style="text-align: center; color: #666; font-style: italic; margin-top: 10px;">
+                            Total: {len(descriptions)} images described
+                        </div>""")
+                        else:
+                            f.write(f"""
+                        <h4>Summary</h4>
+                        <div style="text-align: center; color: #666; font-style: italic; margin-top: 10px;">
+                            Total: {len(descriptions)} images described
                         </div>""")
                     else:
                         f.write("""
+                        <h4>Generated Descriptions</h4>
                         <div class="description" style="border-left-color: #dc3545;">
-                            No descriptions found or failed to read description file.
+                            No descriptions found or failed to parse description file.
                         </div>""")
                     
                     f.write("""
@@ -915,10 +976,11 @@ class ComprehensiveTester:
             if image_files:
                 f.write(f"""
         <div class="prompt-section">
-            <div class="prompt-header">
-                📸 Test Images Used ({len(image_files)} images)
-            </div>
+            <h2 class="prompt-header">
+                Test Images Used ({len(image_files)} images)
+            </h2>
             <div style="padding: 20px;">
+                <h3>Image Files Overview</h3>
                 <div class="image-grid">""")
                 
                 for img_file in image_files[:12]:  # Show first 12 images

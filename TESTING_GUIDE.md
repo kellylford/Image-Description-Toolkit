@@ -291,17 +291,22 @@ Detailed Failure Information:
 
 **Content Structure:**
 ```html
-📋 Table of Contents
-├── 🎯 Artistic Style (6 models)
-├── 🎯 Detailed Style (5 models)  
-├── 🎯 Technical Style (4 models)
-└── 📸 Test Images Used
+Table of Contents
+├── Artistic Style (6 models)
+├── Detailed Style (5 models)  
+├── Technical Style (4 models)
+└── Test Images Used
 
 For each prompt style:
-├── 🤖 Model Cards (sorted by speed)
-│   ├── ⏱️ Processing Time
-│   ├── Sample Descriptions (first 2 images)
-│   └── Total Description Count
+├── Model Cards (sorted by speed)
+│   ├── Performance Details
+│   │   └── Processing Time
+│   ├── Generated Descriptions
+│   │   ├── Sample Description 1
+│   │   ├── Sample Description 2
+│   │   └── Sample Description 3
+│   └── Summary
+│       └── Total Description Count
 └── Performance Summary
 ```
 

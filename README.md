@@ -4,13 +4,43 @@ An AI-powered toolkit for generating descriptive text from images using local la
 
 ## 🌟 Features
 
-- **🔄 Unified Workflow System**: Complete pipeline from video → frames → images → descriptions → HTML reports
+## 📞 Support & Doc## 🚀 **Ready to Get Started?**
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Install Ollama and pull a vision model  
+ollama pull llava:7b
+
+# 3. Test your setup
+cd tests && python run_tests.py
+
+# 4. Find the best model for your images (recommended)
+python comprehensive_test.py tests/test_files/images
+
+# 5. Process your first media collection
+python workflow.py path/to/your/media/files
+
+# 6. Check the timestamped output directory for results!
+```
+
+**🎉 That's it!** The workflow system will handle the rest automatically. 
+
+**💡 Pro Tip**: Always run the comprehensive testing first to discover which models work best with your specific types of images. You might be surprised which models perform excellently! Comprehensive Testing Guide**: See `TESTING_GUIDE.md` for complete model testing documentation
+- **📚 Documentation**: Detailed guides available in the `docs/` directory
+- **🐛 Issues**: Report bugs or request features via [GitHub Issues](https://github.com/kellylford/Image-Description-Toolkit/issues)
+- **💬 Discussions**: Join conversations in [GitHub Discussions](https://github.com/kellylford/Image-Description-Toolkit/discussions)
+- **🧪 Testing**: Run `cd tests && python run_tests.py` to verify your setup Unified Workflow System**: Complete pipeline from video → frames → images → descriptions → HTML reports
 - **🤖 AI-Powered Descriptions**: Generate natural language descriptions using local Ollama models
+- **🧪 Comprehensive Model Testing**: Automatically test all available Ollama models with all prompt styles to find optimal combinations
+- **📊 Advanced Performance Analytics**: Detailed reporting with timing, success rates, and quality metrics across all model/prompt combinations
 - **🎥 Video Frame Extraction**: Extract frames from videos for analysis
 - **🖼️ Image Format Conversion**: Convert HEIC images to JPG automatically
 - **📄 HTML Report Generation**: Create beautiful web galleries with descriptions
 - **⚡ Batch Processing**: Handle multiple files and directories efficiently
-- **📊 Comprehensive Logging**: Professional logging with statistics and progress tracking
+- **� Interactive Visual Reports**: Comprehensive HTML reports with side-by-side model comparisons
+- **📋 Professional Logging**: Complete logging with statistics and progress tracking
 - **🛠️ Individual Script Access**: Use components separately when needed
 
 ## 🔧 System Requirements
@@ -48,6 +78,7 @@ If Ollama is running properly, you should see a JSON response with version infor
 ```
 Image-Description-Toolkit/
 ├── workflow.py                # 🎯 Main entry point - workflow wrapper
+├── comprehensive_test.py      # 🧪 Comprehensive model testing and comparison
 ├── scripts/                   # 🔧 Core processing scripts
 │   ├── workflow.py           #    Workflow orchestrator (main engine)
 │   ├── video_frame_extractor.py #    Extract frames from videos
@@ -60,6 +91,7 @@ Image-Description-Toolkit/
 │   └── video_frame_extractor_config.json # Video processing config
 ├── docs/                     # 📚 Documentation
 ├── tests/                    # 🧪 Test suite and test files
+├── TESTING_GUIDE.md          # 📋 Comprehensive testing documentation
 ├── requirements.txt          # 📦 Python dependencies
 ├── .gitignore               # 🚫 Git ignore rules
 └── README.md                # 📖 This file
@@ -85,6 +117,28 @@ python workflow.py path/to/your/media
 # 4. Find results in timestamped output directory
 # -> workflow_output_YYYYMMDD_HHMMSS/
 ```
+
+### Model Testing & Optimization (New!)
+
+Before processing large collections, use the comprehensive testing system to find the optimal AI model for your needs:
+
+```bash
+# Test all available models with all prompt styles
+python comprehensive_test.py path/to/sample/images
+
+# Generates detailed reports:
+# - comprehensive_test_visual_report.html (interactive comparison)
+# - comprehensive_test_data.csv (spreadsheet analysis)
+# - test_statistics.txt (performance analytics)
+# - failure_analysis.txt (troubleshooting)
+```
+
+This powerful testing capability:
+- **Discovers all installed Ollama models** (not just vision-labeled ones)
+- **Tests every model/prompt combination** through the complete workflow
+- **Generates comprehensive performance analytics** with timing and success rates
+- **Creates interactive HTML reports** for visual model comparison
+- **Provides data-driven model selection** based on your specific images
 
 ### Workflow Steps
 
@@ -134,6 +188,28 @@ python descriptions_to_html.py descriptions.txt report.html
 
 ## 🧪 Testing
 
+### Comprehensive Model Testing
+
+Run the comprehensive testing system to evaluate all available models:
+
+```bash
+# Test all models with sample images
+python comprehensive_test.py tests/test_files/images
+
+# Custom output directory
+python comprehensive_test.py sample_images/ --output-dir my_test_results
+```
+
+The testing system generates multiple report formats:
+- **Interactive HTML report** - Visual comparison of all models and prompts
+- **CSV data** - Raw performance data for spreadsheet analysis  
+- **Performance statistics** - Model timing and success rate analytics
+- **Failure analysis** - Detailed troubleshooting information
+
+See `TESTING_GUIDE.md` for complete testing documentation.
+
+### Basic Testing
+
 ```bash
 # Run test suite
 cd tests
@@ -144,6 +220,15 @@ python test_workflow.py
 ```
 
 ## 🛠️ Core Components
+
+### Comprehensive Testing System (`comprehensive_test.py`) **NEW!**
+Advanced model evaluation and comparison system:
+- **🤖 Model Discovery**: Automatically finds all installed Ollama models (including non-vision models like gemma2)
+- **📊 Complete Testing**: Tests every model with every prompt style through the full 4-step workflow
+- **📈 Performance Analytics**: Detailed timing, success rates, and failure analysis
+- **📋 Multiple Report Formats**: Interactive HTML, CSV data, statistics, and failure reports  
+- **🎯 Data-Driven Selection**: Make informed decisions about which models work best for your images
+- **💡 Model Discovery**: Often reveals that non-vision models work excellently for image descriptions
 
 ### Workflow System (`workflow.py` → `scripts/workflow.py`)
 The main orchestrator that provides a unified processing pipeline:
@@ -220,6 +305,19 @@ Configuration files are located in the `scripts/` directory:
 
 ## 🔧 Advanced Usage
 
+### Model Testing and Selection
+
+```bash
+# Comprehensive model testing (recommended first step)
+python comprehensive_test.py /path/to/sample/images
+
+# View results in generated HTML report
+# Open: comprehensive_test_YYYYMMDD_HHMMSS/comprehensive_test_visual_report.html
+
+# Analyze performance data in spreadsheet
+# Import: comprehensive_test_YYYYMMDD_HHMMSS/comprehensive_test_data.csv
+```
+
 ### Workflow Examples
 
 ```bash
@@ -229,7 +327,7 @@ python workflow.py /path/to/media/collection
 # Only generate descriptions and HTML (skip video/conversion)
 python workflow.py /path/to/images --steps describe,html
 
-# Use different AI model
+# Use different AI model (based on testing results)
 python workflow.py /path/to/images --model llama3.2-vision:11b
 
 # Custom output location

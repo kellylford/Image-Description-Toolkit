@@ -93,17 +93,18 @@ This single command:
 - **Discovers all installed Ollama models** (not just vision-specific ones)
 - **Tests every model with every prompt style** through the complete 4-step workflow
 - **Generates detailed performance analytics** with timing, success rates, and quality metrics
-- **Creates comprehensive reports** in multiple formats (text, CSV, statistics, failure analysis)
+- **Creates comprehensive reports** in multiple formats (text, CSV, statistics, failure analysis, interactive HTML)
 - **Organizes results** for easy comparison and analysis
 
 ### The Output
 
-The testing system generates four detailed report types:
+The testing system generates **five** detailed report types:
 
 1. **Human-readable overview** with success/failure summaries and timing
 2. **CSV data** for spreadsheet analysis and visualization
 3. **Performance statistics** comparing models and prompt styles
 4. **Failure analysis** for troubleshooting and optimization
+5. **Interactive HTML visual report** with side-by-side model comparisons
 
 ### Real Impact for Users
 
@@ -111,9 +112,10 @@ This comprehensive testing capability transforms how you approach AI model selec
 
 - **Model Discovery**: Find models you didn't know worked great for image description
 - **Performance Optimization**: Identify the fastest models for your workflow needs
-- **Quality Assessment**: Compare description quality across different models
+- **Quality Assessment**: Compare description quality across different models with interactive visual reports
 - **Reliability Testing**: See which models consistently produce results
 - **Workflow Planning**: Get accurate timing estimates for large batch jobs
+- **Visual Comparison**: Side-by-side model evaluation through clean, professional HTML reports
 
 ### Example Insights
 
@@ -139,8 +141,9 @@ ImageDescriber is completely open-source and ready to use:
 1. Install Ollama and pull a vision model: `ollama pull moondream`
 2. Clone the repository and install dependencies: `pip install -r requirements.txt`
 3. Test all models to find the best fit: `python comprehensive_test.py "sample_photos/"`
-4. Process your first batch: `python image_describer.py "your_photos/"`
-5. Generate a web gallery: `python descriptions_to_html.py --full`
+4. Review the interactive HTML report to select optimal models
+5. Process your first batch: `python image_describer.py "your_photos/"`
+6. Generate a web gallery: `python descriptions_to_html.py --full`
 
 ### Requirements
 - Python 3.8+

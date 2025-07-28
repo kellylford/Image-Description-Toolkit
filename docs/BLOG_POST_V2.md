@@ -28,6 +28,24 @@ python workflow.py vacation_media/
 
 That's it. One command processes videos, converts HEIC files, generates AI descriptions, and creates beautiful HTML galleries—all while maintaining perfect organization and comprehensive logging.
 
+### Revolutionary Model Testing & Selection
+
+Perhaps the most powerful new feature is the **comprehensive testing system** that automatically evaluates every available AI model with every prompt style on your images:
+
+```bash
+# Test all models to find the perfect combination for your images
+python comprehensive_test.py sample_photos/
+```
+
+This single command:
+- **Discovers all installed Ollama models** (including non-vision models that work great for descriptions)
+- **Tests every model/prompt combination** through the complete workflow
+- **Generates detailed performance analytics** with timing and success rates
+- **Creates interactive HTML reports** for visual model comparison
+- **Provides data-driven recommendations** for optimal model selection
+
+The testing system generates five comprehensive report formats, including an interactive HTML visual report that lets you compare actual generated descriptions side-by-side across all models and prompt styles.
+
 ### Intelligent Media Detection
 
 The workflow system automatically detects and processes:
@@ -155,6 +173,18 @@ Perfect for tracking large processing jobs and understanding performance.
 
 ## 🎨 Real-World Workflow Examples
 
+### Model Selection & Testing Workflow
+```bash
+# First: Find the best model for your specific images
+python comprehensive_test.py sample_photos/
+
+# Review the interactive HTML report to compare models
+# Open: comprehensive_test_YYYYMMDD_HHMMSS/comprehensive_test_visual_report.html
+
+# Then: Use the optimal model for your full collection
+python workflow.py photo_collection/ --model optimal_model_from_test
+```
+
 ### Family Vacation Processing
 ```bash
 # Mix of iPhone videos, HEIC photos, and traditional images
@@ -200,28 +230,35 @@ pip install -r requirements.txt
 # 2. Install Ollama and a vision model
 ollama pull llava:7b
 
-# 3. Process your first media collection
+# 3. Test models to find the best fit (recommended)
+python comprehensive_test.py path/to/sample/images/
+
+# 4. Process your first media collection with optimal settings
 python workflow.py path/to/your/media/
 
-# 4. Check the results in the timestamped output directory!
+# 5. Check the results in the timestamped output directory!
 ```
 
 ### For Existing Users
 You don't need to change anything! Your existing workflows continue to work, but you can now take advantage of:
 - **Automated processing** with the new workflow system
+- **Advanced model testing** to find optimal AI models for your specific images
 - **Better organization** with structured output directories
 - **Enhanced logging** for better tracking and debugging
 - **Mixed media support** for videos and HEIC photos
+- **Interactive visual reports** for comparing model performance
 
 ## 🌟 What This Means for Media Management
 
 ImageDescriber 2.0 represents a significant leap in automated media processing:
 
 1. **Unified Processing** - Handle any media type with one command
-2. **Professional Organization** - Never lose track of processing results
-3. **Scalable Automation** - Process thousands of files effortlessly
-4. **Complete Flexibility** - Use automation or individual tools as needed
-5. **Future-Ready** - Extensible architecture for new capabilities
+2. **Intelligent Model Selection** - Data-driven AI model optimization for your specific images
+3. **Professional Organization** - Never lose track of processing results
+4. **Scalable Automation** - Process thousands of files effortlessly
+5. **Complete Flexibility** - Use automation or individual tools as needed
+6. **Visual Analytics** - Interactive reports for model comparison and quality assessment
+7. **Future-Ready** - Extensible architecture for new capabilities
 
 ## 🔮 Looking Ahead
 
