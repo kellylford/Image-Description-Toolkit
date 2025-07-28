@@ -39,6 +39,93 @@ from datetime import datetime
 # Import our workflow utilities
 from workflow_utils import WorkflowConfig, WorkflowLogger, FileDiscovery, create_workflow_paths
 from image_describer import get_default_prompt_style
+import re
+
+
+def sanitize_name(name: str) -> str:
+    """Convert model/prompt names to filesystem-safe strings"""
+    if not name:
+        return "unknown"
+    # Remove special characters, replace with underscores
+    safe_name = re.sub(r'[^\w\-_.]', '_', str(name))
+    # Remove multiple consecutive underscores
+    safe_name = re.sub(r'_+', '_', safe_name)
+    # Remove leading/trailing underscores
+    return safe_name.strip('_').lower()
+
+
+def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
+    """Determine which model will actually be used"""
+    # Command line argument takes precedence
+    if hasattr(args, 'model') and args.model:
+        return sanitize_name(args.model)
+    
+    # Check workflow config file
+    try:
+        config = WorkflowConfig(config_file)
+        workflow_model = config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("model")
+        if workflow_model:
+            return sanitize_name(workflow_model)
+    except Exception:
+        pass
+    
+    # Fall back to image_describer_config.json default
+    try:
+        import json
+        # Try different possible paths for the config file
+        config_paths = [
+            "image_describer_config.json",
+            "scripts/image_describer_config.json"
+        ]
+        
+        for config_path in config_paths:
+            try:
+                with open(config_path, 'r') as f:
+                    img_config = json.load(f)
+                    return sanitize_name(img_config.get("model_settings", {}).get("model", "unknown"))
+            except FileNotFoundError:
+                continue
+                
+    except Exception:
+        pass
+        
+    return "unknown"
+
+
+def get_effective_prompt_style(args, config_file: str = "workflow_config.json") -> str:
+    """Determine which prompt style will actually be used"""
+    # Command line argument takes precedence
+    if hasattr(args, 'prompt_style') and args.prompt_style:
+        return sanitize_name(args.prompt_style)
+    
+    # Check workflow config file
+    try:
+        config = WorkflowConfig(config_file)
+        workflow_prompt = config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("prompt_style")
+        if workflow_prompt:
+            return sanitize_name(workflow_prompt)
+    except Exception:
+        pass
+    
+    # Fall back to image_describer_config.json default
+    try:
+        # Try different possible paths for the config file
+        config_paths = [
+            "image_describer_config.json",
+            "scripts/image_describer_config.json"
+        ]
+        
+        for config_path in config_paths:
+            try:
+                default_style = get_default_prompt_style(config_path)
+                return sanitize_name(default_style)
+            except (FileNotFoundError, ImportError):
+                continue
+                
+    except Exception:
+        pass
+        
+    return "detailed"
 
 
 class WorkflowOrchestrator:
@@ -701,9 +788,15 @@ Examples:
         if not output_dir.is_absolute():
             output_dir = (Path(original_cwd) / output_dir).resolve()
     else:
-        # Create timestamped workflow output directory
+        # Create timestamped workflow output directory with model and prompt info
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = (Path(original_cwd) / f"workflow_output_{timestamp}").resolve()
+        
+        # Get model and prompt info for directory naming
+        model_name = get_effective_model(args, args.config)
+        prompt_style = get_effective_prompt_style(args, args.config)
+        
+        # Create descriptive directory name
+        output_dir = (Path(original_cwd) / f"workflow_{model_name}_{prompt_style}_{timestamp}").resolve()
     
     # Parse workflow steps
     steps = [step.strip() for step in args.steps.split(",")]

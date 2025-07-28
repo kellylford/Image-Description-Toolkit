@@ -466,7 +466,8 @@ class ImageDescriber:
                 f.write(f"Model used: {self.model_name}\n")
                 f.write(f"Prompt style: {self.prompt_style}\n")
                 f.write(f"Directory: {directory_path}\n")
-                f.write(f"Configuration: {self.config.get('model_settings', {})}\n")
+                f.write(f"Runtime Configuration: Model='{self.model_name}', Prompt='{self.prompt_style}'\n")
+                f.write(f"Config File Model Settings: {self.config.get('model_settings', {})}\n")
                 f.write("=" * 80 + "\n\n")
             logger.info(f"Created output file: {output_file}")
         except Exception as e:
