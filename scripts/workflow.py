@@ -349,62 +349,115 @@ class WorkflowOrchestrator:
             # Get description settings
             step_config = self.config.get_step_config("image_description")
             
-            total_processed = 0
+            # Create a temporary directory to combine all images from all directories
+            # This ensures image_describer.py only runs once and doesn't overwrite descriptions
+            temp_combined_dir = self.config.base_output_dir / "temp_combined_images"
+            temp_combined_dir.mkdir(parents=True, exist_ok=True)
             
-            # Process each directory that contains images
-            for i, search_dir in enumerate(search_dirs):
+            # Preserve full directory structure in temp dir to prevent collisions
+            combined_image_list = []
+            
+            for search_dir in search_dirs:
                 dir_image_files = self.discovery.find_files_by_type(search_dir, "images")
                 if not dir_image_files:
                     continue
                     
-                self.logger.info(f"Processing {len(dir_image_files)} images from: {search_dir}")
+                self.logger.info(f"Found {len(dir_image_files)} images from: {search_dir}")
                 
-                # Build command for this directory
-                cmd = [
-                    sys.executable, "image_describer.py",
-                    str(search_dir),
-                    "--recursive",
-                    "--output-dir", str(output_dir),
-                    "--log-dir", str(self.config.base_output_dir / "logs")
-                ]
+                # Create a safe name for the source directory to use as root in temp structure
+                safe_source_name = search_dir.name.replace(" ", "_").replace(":", "")
                 
-                # Add optional parameters
-                if "config_file" in step_config:
-                    cmd.extend(["--config", step_config["config_file"]])
-                
-                if "model" in step_config and step_config["model"]:
-                    cmd.extend(["--model", step_config["model"]])
-                
-                # Handle prompt style - use config file default if not explicitly set
-                if "prompt_style" in step_config and step_config["prompt_style"]:
-                    cmd.extend(["--prompt-style", step_config["prompt_style"]])
-                else:
-                    # Get default prompt style from image describer config
-                    config_file = step_config.get("config_file", "image_describer_config.json")
-                    default_style = get_default_prompt_style(config_file)
-                    if default_style != "detailed":  # Only add if different from hardcoded default
-                        cmd.extend(["--prompt-style", default_style])
-                
-                # For first directory, create new file; for subsequent directories, the script will append automatically
-                self.logger.info(f"Running: {' '.join(cmd)}")
-                
-                result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
-                
-                # Log the subprocess output for transparency
-                if result.stdout.strip():
-                    self.logger.info(f"image_describer.py output:\n{result.stdout}")
-                if result.stderr.strip():
-                    self.logger.warning(f"image_describer.py stderr:\n{result.stderr}")
-                
-                if result.returncode == 0:
-                    self.logger.info(f"Image description completed for {search_dir}")
-                    total_processed += len(dir_image_files)
-                else:
-                    self.logger.error(f"Image description failed for {search_dir}: {result.stderr}")
-                    return {"success": False, "error": f"Failed processing {search_dir}: {result.stderr}"}
+                # Copy images while preserving their original directory structure
+                for image_file in dir_image_files:
+                    try:
+                        # Calculate relative path from search_dir to image_file
+                        relative_path = image_file.relative_to(search_dir)
+                        
+                        # Create temp path preserving directory structure under source name
+                        temp_image_path = temp_combined_dir / safe_source_name / relative_path
+                        
+                        # Ensure parent directories exist
+                        temp_image_path.parent.mkdir(parents=True, exist_ok=True)
+                        
+                        # Copy file to temp location preserving structure
+                        shutil.copy2(image_file, temp_image_path)
+                        combined_image_list.append((temp_image_path, image_file))  # (temp_path, original_path)
+                        self.logger.debug(f"Copied {image_file} to {temp_image_path}")
+                        
+                    except ValueError as e:
+                        # Handle case where image_file is not relative to search_dir
+                        self.logger.warning(f"Could not determine relative path for {image_file}: {e}")
+                        # Fallback to original flattened approach for this file
+                        safe_filename = f"{safe_source_name}_{image_file.name}"
+                        temp_image_path = temp_combined_dir / safe_source_name / safe_filename
+                        temp_image_path.parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            shutil.copy2(image_file, temp_image_path)
+                            combined_image_list.append((temp_image_path, image_file))
+                            self.logger.debug(f"Copied {image_file} to {temp_image_path} (fallback)")
+                        except Exception as e2:
+                            self.logger.warning(f"Failed to copy {image_file} (fallback): {e2}")
+                            continue
+                    except Exception as e:
+                        self.logger.warning(f"Failed to copy {image_file}: {e}")
+                        continue
             
-            # All directories processed successfully
-            self.logger.info("Image description completed successfully")
+            if not combined_image_list:
+                self.logger.info("No images were successfully prepared for processing")
+                return {"success": True, "processed": 0, "output_dir": output_dir}
+                
+            self.logger.info(f"Prepared {len(combined_image_list)} images for single processing run")
+            
+            # Build command for the combined directory - single call to image_describer.py
+            cmd = [
+                sys.executable, "image_describer.py",
+                str(temp_combined_dir),
+                "--recursive",
+                "--output-dir", str(output_dir),
+                "--log-dir", str(self.config.base_output_dir / "logs")
+            ]
+            
+            # Add optional parameters
+            if "config_file" in step_config:
+                cmd.extend(["--config", step_config["config_file"]])
+            
+            if "model" in step_config and step_config["model"]:
+                cmd.extend(["--model", step_config["model"]])
+            
+            # Handle prompt style - use config file default if not explicitly set
+            if "prompt_style" in step_config and step_config["prompt_style"]:
+                cmd.extend(["--prompt-style", step_config["prompt_style"]])
+            else:
+                # Get default prompt style from image describer config
+                config_file = step_config.get("config_file", "image_describer_config.json")
+                default_style = get_default_prompt_style(config_file)
+                if default_style != "detailed":  # Only add if different from hardcoded default
+                    cmd.extend(["--prompt-style", default_style])
+            
+            # Single call to image_describer.py with all images
+            self.logger.info(f"Running single image description process: {' '.join(cmd)}")
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
+            
+            # Log the subprocess output for transparency
+            if result.stdout.strip():
+                self.logger.info(f"image_describer.py output:\n{result.stdout}")
+            if result.stderr.strip():
+                self.logger.warning(f"image_describer.py stderr:\n{result.stderr}")
+            
+            # Clean up temporary directory
+            try:
+                shutil.rmtree(temp_combined_dir)
+                self.logger.debug(f"Cleaned up temporary directory: {temp_combined_dir}")
+            except Exception as e:
+                self.logger.warning(f"Failed to clean up temporary directory {temp_combined_dir}: {e}")
+            
+            if result.returncode == 0:
+                self.logger.info("Image description completed successfully")
+                total_processed = len(combined_image_list)
+            else:
+                self.logger.error(f"Image description failed: {result.stderr}")
+                return {"success": False, "error": f"Image description process failed: {result.stderr}"}
             
             # Check if description file was created
             target_desc_file = output_dir / "image_descriptions.txt"
