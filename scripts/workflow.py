@@ -356,18 +356,24 @@ class WorkflowOrchestrator:
             
             # Preserve full directory structure in temp dir to prevent collisions
             combined_image_list = []
+            total_files_found = 0
+            total_copy_failures = 0
             
             for search_dir in search_dirs:
                 dir_image_files = self.discovery.find_files_by_type(search_dir, "images")
                 if not dir_image_files:
                     continue
                     
+                total_files_found += len(dir_image_files)
                 self.logger.info(f"Found {len(dir_image_files)} images from: {search_dir}")
                 
                 # Create a safe name for the source directory to use as root in temp structure
                 safe_source_name = search_dir.name.replace(" ", "_").replace(":", "")
                 
                 # Copy images while preserving their original directory structure
+                files_copied_from_dir = 0
+                files_failed_from_dir = 0
+                
                 for image_file in dir_image_files:
                     try:
                         # Calculate relative path from search_dir to image_file
@@ -382,6 +388,7 @@ class WorkflowOrchestrator:
                         # Copy file to temp location preserving structure
                         shutil.copy2(image_file, temp_image_path)
                         combined_image_list.append((temp_image_path, image_file))  # (temp_path, original_path)
+                        files_copied_from_dir += 1
                         self.logger.debug(f"Copied {image_file} to {temp_image_path}")
                         
                     except ValueError as e:
@@ -394,19 +401,64 @@ class WorkflowOrchestrator:
                         try:
                             shutil.copy2(image_file, temp_image_path)
                             combined_image_list.append((temp_image_path, image_file))
+                            files_copied_from_dir += 1
                             self.logger.debug(f"Copied {image_file} to {temp_image_path} (fallback)")
                         except Exception as e2:
                             self.logger.warning(f"Failed to copy {image_file} (fallback): {e2}")
+                            files_failed_from_dir += 1
+                            total_copy_failures += 1
                             continue
                     except Exception as e:
                         self.logger.warning(f"Failed to copy {image_file}: {e}")
+                        files_failed_from_dir += 1
+                        total_copy_failures += 1
                         continue
+                
+                self.logger.info(f"Successfully copied {files_copied_from_dir}/{len(dir_image_files)} images from {search_dir}")
+                if files_failed_from_dir > 0:
+                    self.logger.warning(f"Failed to copy {files_failed_from_dir} images from {search_dir}")
+            
+            # Log comprehensive copy summary
+            self.logger.info(f"Copy Summary: Found {total_files_found} images total")
+            self.logger.info(f"Copy Summary: Successfully copied {len(combined_image_list)} images")
+            if total_copy_failures > 0:
+                self.logger.warning(f"Copy Summary: Failed to copy {total_copy_failures} images")
+                self.logger.warning(f"Copy Summary: Success rate: {(len(combined_image_list) / total_files_found * 100):.1f}%")
             
             if not combined_image_list:
                 self.logger.info("No images were successfully prepared for processing")
                 return {"success": True, "processed": 0, "output_dir": output_dir}
                 
             self.logger.info(f"Prepared {len(combined_image_list)} images for single processing run")
+            
+            # Verification step: Check that image_describer.py can find the files
+            self.logger.info("Verifying temp directory structure for image_describer.py compatibility...")
+            
+            # Test the same discovery logic that image_describer.py uses
+            discoverable_files = []
+            supported_formats = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}
+            
+            for file_path in temp_combined_dir.glob("**/*"):
+                if file_path.is_file() and file_path.suffix.lower() in supported_formats:
+                    discoverable_files.append(file_path)
+            
+            if len(discoverable_files) != len(combined_image_list):
+                self.logger.warning(f"Discovery mismatch: Copied {len(combined_image_list)} files but image_describer.py will find {len(discoverable_files)} files")
+                self.logger.warning("This may indicate a file format or path issue")
+                
+                # Log some examples of the discrepancy
+                copied_names = {temp_path.name for temp_path, _ in combined_image_list}
+                discovered_names = {f.name for f in discoverable_files}
+                
+                only_copied = copied_names - discovered_names
+                only_discovered = discovered_names - copied_names
+                
+                if only_copied:
+                    self.logger.warning(f"Files copied but not discoverable (first 5): {list(only_copied)[:5]}")
+                if only_discovered:
+                    self.logger.warning(f"Files discoverable but not in copy list (first 5): {list(only_discovered)[:5]}")
+            else:
+                self.logger.info(f"Verification successful: All {len(combined_image_list)} copied files are discoverable by image_describer.py")
             
             # Build command for the combined directory - single call to image_describer.py
             cmd = [
