@@ -1,0 +1,58 @@
+LLAMADO.BAT - Ollama Image Batch Processor
+==========================================
+
+DESCRIPTION:
+A Windows batch script for processing multiple images with Ollama vision models 
+to generate descriptions or analyze image content. Recursively processes all 
+supported image files in a directory structure.
+
+USAGE:
+llamado.bat <model> <image_directory> <prompt>
+
+PARAMETERS:
+- model           : The Ollama vision model to use (e.g., llava, llava:13b)
+- image_directory : Path to directory containing images (searches recursively)
+- prompt          : Text prompt for image analysis
+
+EXAMPLES:
+llamado.bat llava "C:\Photos\vacation" "Describe this image in detail"
+llamado.bat llava:13b "C:\Screenshots" "What text is visible in this image?"
+llamado.bat bakllava "C:\inventory" "How many items are visible in this image?"
+
+SUPPORTED IMAGE FORMATS:
+- JPEG (.jpg, .jpeg)
+- PNG (.png)
+- BMP (.bmp)
+- GIF (.gif)
+- WebP (.webp)
+- TIFF (.tiff, .tif)
+
+OUTPUT:
+Creates "ollama_output.txt" in the current directory containing:
+- Processing timestamp and configuration
+- Each processed image file path with separators
+- Model responses for each image
+- Clear formatting for easy reading
+
+FEATURES:
+- Recursive directory processing
+- Enhanced error messages with usage hints
+- Detailed output formatting with timestamps
+- Support for additional image formats (WebP, TIFF)
+- Progress indicators during processing
+
+PREREQUISITES:
+- Ollama must be installed and running
+- Vision-capable model must be available (e.g., llava, llava:13b, bakllava)
+- Images must be in supported formats
+
+NOTES:
+- Processing time varies by model size and image complexity
+- Larger models provide more detailed responses but take longer
+- Script continues processing even if individual images fail
+- Output file is created in the script's current working directory
+
+TROUBLESHOOTING:
+- "Model name required" - Ensure all three parameters are provided
+- No output - Check Ollama is running and model is installed
+- Images not found - Verify directory path and supported file formats exist
