@@ -7,7 +7,12 @@ setlocal enabledelayedexpansion
 set "MODEL=%~1"
 set "IMGDIR=%~2"
 set "PROMPT=%~3"
-set "OUTFILE=ollama_output.txt"
+
+REM Create timestamp (YYYYMMDD_HHMMSS format) using PowerShell
+for /f "delims=" %%I in ('powershell -command "Get-Date -Format 'yyyyMMdd_HHmmss'"') do set "timestamp=%%I"
+
+REM Create unique output filename with model and timestamp
+set "OUTFILE=ollama_%MODEL%_%timestamp%.txt"
 
 if "%MODEL%"=="" (
     echo Error: Model name required.
