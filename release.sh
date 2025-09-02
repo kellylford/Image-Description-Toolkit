@@ -67,7 +67,7 @@ Major features:
 - AI-powered image descriptions using local Ollama models
 - Video frame extraction and HEIC image conversion
 - Professional HTML report generation
-- Qt6 GUI viewer application
+- Qt6 GUI viewer application with Copy Image Path functionality
 - Complete documentation and testing suite
 
 See CHANGELOG.md for detailed release notes."
