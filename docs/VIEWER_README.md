@@ -6,7 +6,7 @@ A Qt6-based desktop application for browsing and viewing image descriptions gene
 
 - **Accessible Navigation**: Browse image descriptions with full screen reader support
 - **Image Preview**: View full-size images alongside their descriptions
-- **Clipboard Integration**: Copy descriptions or images to clipboard
+- **Clipboard Integration**: Copy descriptions, image file paths, or images to clipboard
 - **Keyboard Navigation**: Full keyboard and tab navigation support
 
 ## Installation
@@ -51,6 +51,7 @@ python viewer/image_viewer.py
 ### Clipboard Operations
 
 - **Copy Description**: Copies the full text description to clipboard
+- **Copy Image Path**: Copies the full file path of the selected image to clipboard
 - **Copy Image**: Copies the actual image data to clipboard for pasting into other applications
 
 ## Interface Layout
