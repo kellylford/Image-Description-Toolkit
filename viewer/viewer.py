@@ -139,6 +139,8 @@ class RedescribeDialog(QDialog):
         self.prompt_edit.setAccessibleName("Prompt Text Editor")
         self.prompt_edit.setAccessibleDescription("Edit the prompt that will be sent to the AI model.")
         self.prompt_edit.setMaximumHeight(120)
+        # Override key press to make Tab exit the field
+        self.prompt_edit.keyPressEvent = self.prompt_edit_key_press
         layout.addWidget(self.prompt_edit)
         
         # Progress bar
@@ -230,6 +232,16 @@ class RedescribeDialog(QDialog):
         self.button_box.setEnabled(not processing)
         self.model_combo.setEnabled(not processing)
         self.prompt_combo.setEnabled(not processing)
+    
+    def prompt_edit_key_press(self, event):
+        """Custom key press handler for prompt edit box"""
+        from PyQt6.QtCore import Qt
+        if event.key() == Qt.Key.Key_Tab:
+            # Tab key pressed - move focus to next widget (the buttons)
+            self.focusNextChild()
+        else:
+            # For all other keys, use the default behavior
+            QPlainTextEdit.keyPressEvent(self.prompt_edit, event)
 
 class ImageDescriptionViewer(QWidget):
     def __init__(self):
@@ -509,6 +521,24 @@ class ImageDescriptionViewer(QWidget):
             # Track that this row is being processed
             self.redescribing_rows.add(row)
             
+            # Add processing indicator to list item
+            current_item = self.list_widget.item(row)
+            if current_item:
+                current_text = current_item.text()
+                # Remove any existing emoji prefixes first
+                if current_text.startswith("🔄 "):
+                    current_text = current_text[2:]
+                elif current_text.startswith("⏳ "):
+                    current_text = current_text[2:]
+                
+                # Add processing emoji
+                processing_text = "⏳ " + current_text
+                current_item.setText(processing_text)
+                
+                # Update accessible text to indicate processing
+                accessible_text = f"Processing: {self.descriptions[row]}"
+                current_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
+            
             # Update status bar
             img_filename = os.path.basename(self.image_files[row])
             status_message = f"Redescribing {img_filename} with {model}..."
@@ -571,6 +601,17 @@ class ImageDescriptionViewer(QWidget):
         """Handle redescription error"""
         # Remove from processing set
         self.redescribing_rows.discard(row)
+        
+        # Clear processing indicator from list item
+        item = self.list_widget.item(row)
+        if item:
+            current_text = item.text()
+            # Remove processing emoji if present
+            if current_text.startswith("⏳ "):
+                original_text = current_text[2:]
+                item.setText(original_text)
+                # Restore original accessible text
+                item.setData(Qt.ItemDataRole.AccessibleTextRole, self.descriptions[row])
         
         # Update status bar
         status_message = "Redescription failed"
