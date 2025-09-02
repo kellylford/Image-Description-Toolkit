@@ -4,11 +4,152 @@
 
 import sys
 import os
+import json
+import subprocess
+from pathlib import Path
+try:
+    import ollama
+except ImportError:
+    ollama = None
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, QFileDialog, QMessageBox, QAbstractItemView, QTextEdit
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, 
+    QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, QProgressBar
 )
 from PyQt6.QtGui import QClipboard, QGuiApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+
+class RedescribeWorker(QThread):
+    """Worker thread for image redescription to avoid blocking the UI"""
+    finished = pyqtSignal(str)  # Emits the new description
+    error = pyqtSignal(str)     # Emits error message
+
+    def __init__(self, image_path, model, prompt_style):
+        super().__init__()
+        self.image_path = image_path
+        self.model = model
+        self.prompt_style = prompt_style
+
+    def run(self):
+        try:
+            # Import the ImageDescriber class
+            scripts_dir = Path(__file__).parent.parent / "scripts"
+            sys.path.insert(0, str(scripts_dir))
+            from image_describer import ImageDescriber
+
+            # Create describer instance with specified model and prompt
+            config_file = scripts_dir / "image_describer_config.json"
+            describer = ImageDescriber(
+                model_name=self.model,
+                prompt_style=self.prompt_style,
+                config_file=str(config_file)
+            )
+
+            # Generate new description
+            description = describer.get_image_description(Path(self.image_path))
+            if description:
+                self.finished.emit(description)
+            else:
+                self.error.emit("Failed to generate description")
+
+        except Exception as e:
+            self.error.emit(f"Error: {str(e)}")
+
+class RedescribeDialog(QDialog):
+    """Dialog for selecting model and prompt style for redescription"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Redescribe Image")
+        self.setModal(True)
+        self.setMinimumSize(400, 300)
+        
+        self.available_models = []
+        self.available_prompts = []
+        
+        self.init_ui()
+        self.load_available_options()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        # Model selection
+        layout.addWidget(QLabel("Select AI Model:"))
+        self.model_combo = QComboBox()
+        self.model_combo.setAccessibleName("Model Selection")
+        self.model_combo.setAccessibleDescription("Choose the AI model to use for generating the new description.")
+        layout.addWidget(self.model_combo)
+        
+        # Prompt style selection
+        layout.addWidget(QLabel("Select Prompt Style:"))
+        self.prompt_combo = QComboBox()
+        self.prompt_combo.setAccessibleName("Prompt Style Selection")
+        self.prompt_combo.setAccessibleDescription("Choose the style of description to generate.")
+        layout.addWidget(self.prompt_combo)
+        
+        # Progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        layout.addWidget(self.progress_bar)
+        
+        # Buttons
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+    
+    def load_available_options(self):
+        """Load available models and prompt styles"""
+        try:
+            # Load available models from Ollama
+            if ollama is None:
+                raise ImportError("Ollama module not available")
+            
+            models_response = ollama.list()
+            self.available_models = [model['name'] for model in models_response.get('models', [])]
+            self.model_combo.addItems(self.available_models)
+            
+            # Load prompt styles from config
+            scripts_dir = Path(__file__).parent.parent / "scripts"
+            config_file = scripts_dir / "image_describer_config.json"
+            
+            if config_file.exists():
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                prompt_variations = config.get('prompt_variations', {})
+                self.available_prompts = list(prompt_variations.keys())
+                self.prompt_combo.addItems(self.available_prompts)
+                
+                # Set default selections
+                default_model = config.get('default_model', '')
+                if default_model in self.available_models:
+                    self.model_combo.setCurrentText(default_model)
+                
+                default_prompt = config.get('default_prompt_style', 'detailed')
+                if default_prompt in self.available_prompts:
+                    self.prompt_combo.setCurrentText(default_prompt)
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Warning", f"Could not load available options: {e}")
+            # Provide fallback options
+            if not self.available_models:
+                self.model_combo.addItems(["moondream", "llava:7b", "llama3.2-vision:11b"])
+            if not self.available_prompts:
+                self.prompt_combo.addItems(["detailed", "concise", "narrative", "artistic", "technical"])
+    
+    def get_selections(self):
+        """Return the selected model and prompt style"""
+        return self.model_combo.currentText(), self.prompt_combo.currentText()
+    
+    def set_processing(self, processing=True):
+        """Show/hide progress indicator and disable/enable buttons"""
+        self.progress_bar.setVisible(processing)
+        if processing:
+            self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.button_box.setEnabled(not processing)
+        self.model_combo.setEnabled(not processing)
+        self.prompt_combo.setEnabled(not processing)
 
 class ImageDescriptionViewer(QWidget):
     def __init__(self):
@@ -88,6 +229,12 @@ class ImageDescriptionViewer(QWidget):
         self.copy_img_btn.setAccessibleDescription("Copy the selected image to the clipboard.")
         self.copy_img_btn.clicked.connect(self.copy_image_to_clipboard)
         btn_layout.addWidget(self.copy_img_btn)
+
+        self.redescribe_btn = QPushButton("Redescribe")
+        self.redescribe_btn.setAccessibleName("Redescribe Button")
+        self.redescribe_btn.setAccessibleDescription("Generate a new description for the selected image using a chosen model and prompt.")
+        self.redescribe_btn.clicked.connect(self.redescribe_image)
+        btn_layout.addWidget(self.redescribe_btn)
 
         layout.addLayout(btn_layout)
 
@@ -234,6 +381,69 @@ class ImageDescriptionViewer(QWidget):
             else:
                 QMessageBox.warning(self, "Error", "Image file not found.")
 
+    def redescribe_image(self):
+        """Open dialog to redescribe the current image with selected model and prompt"""
+        row = self.list_widget.currentRow()
+        if not (0 <= row < len(self.image_files)):
+            QMessageBox.information(self, "No Selection", "Please select an image to redescribe.")
+            return
+        
+        # Check if Ollama is available
+        try:
+            if ollama is None:
+                raise ImportError("Ollama module not available")
+            ollama.list()
+        except Exception as e:
+            QMessageBox.critical(self, "Ollama Not Available", 
+                               f"Ollama is not available or not running.\nError: {e}\n\n"
+                               "Please make sure Ollama is installed and running.")
+            return
+        
+        # Show dialog for model and prompt selection
+        dialog = RedescribeDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            model, prompt_style = dialog.get_selections()
+            
+            if not model or not prompt_style:
+                QMessageBox.warning(self, "Invalid Selection", "Please select both a model and prompt style.")
+                return
+            
+            # Show progress and start redescription
+            dialog.set_processing(True)
+            img_path = self.image_files[row]
+            
+            # Create and start worker thread
+            self.worker = RedescribeWorker(img_path, model, prompt_style)
+            self.worker.finished.connect(lambda desc: self.on_redescribe_finished(dialog, desc, row))
+            self.worker.error.connect(lambda err: self.on_redescribe_error(dialog, err))
+            self.worker.start()
+    
+    def on_redescribe_finished(self, dialog, new_description, row):
+        """Handle successful redescription"""
+        dialog.accept()
+        
+        # Update the description in memory
+        self.descriptions[row] = new_description
+        
+        # Update the list item text (truncated version)
+        from PyQt6.QtWidgets import QListWidgetItem
+        from PyQt6.QtCore import Qt
+        truncated = new_description[:100] + ("..." if len(new_description) > 100 else "")
+        
+        item = self.list_widget.item(row)
+        item.setText(truncated)
+        item.setData(Qt.ItemDataRole.AccessibleTextRole, new_description.strip())
+        
+        # Update the description display
+        self.display_description(row)
+        
+        # Show success message
+        QMessageBox.information(self, "Success", "Image has been redescribed successfully!")
+    
+    def on_redescribe_error(self, dialog, error_message):
+        """Handle redescription error"""
+        dialog.reject()
+        QMessageBox.critical(self, "Redescription Failed", f"Failed to redescribe image:\n{error_message}")
 
 
 def main():
