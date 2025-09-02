@@ -13,7 +13,7 @@ except ImportError:
     ollama = None
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, 
-    QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, QProgressBar
+    QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, QProgressBar, QStatusBar, QPlainTextEdit
 )
 from PyQt6.QtGui import QClipboard, QGuiApplication
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
@@ -23,11 +23,12 @@ class RedescribeWorker(QThread):
     finished = pyqtSignal(str)  # Emits the new description
     error = pyqtSignal(str)     # Emits error message
 
-    def __init__(self, image_path, model, prompt_style):
+    def __init__(self, image_path, model, prompt_style, custom_prompt=None):
         super().__init__()
         self.image_path = image_path
         self.model = model
         self.prompt_style = prompt_style
+        self.custom_prompt = custom_prompt
 
     def run(self):
         try:
@@ -41,21 +42,55 @@ class RedescribeWorker(QThread):
             os.chdir(scripts_dir)
             
             try:
-                from image_describer import ImageDescriber
-
-                # Create describer instance with specified model and prompt
-                describer = ImageDescriber(
-                    model_name=self.model,
-                    prompt_style=self.prompt_style,
-                    config_file="image_describer_config.json"
-                )
-
-                # Generate new description
-                description = describer.get_image_description(Path(self.image_path))
-                if description:
-                    self.finished.emit(description)
+                if self.custom_prompt:
+                    # Use custom prompt directly with ollama
+                    from image_describer import ImageDescriber
+                    describer = ImageDescriber(model_name=self.model, config_file="image_describer_config.json")
+                    
+                    # Get the image as base64
+                    image_base64 = describer.encode_image_to_base64(Path(self.image_path))
+                    if not image_base64:
+                        self.error.emit("Failed to encode image")
+                        return
+                    
+                    # Get model settings
+                    model_settings = describer.get_model_settings()
+                    
+                    # Call ollama directly with custom prompt
+                    response = ollama.chat(
+                        model=self.model,
+                        messages=[
+                            {
+                                'role': 'user',
+                                'content': self.custom_prompt,
+                                'images': [image_base64]
+                            }
+                        ],
+                        options=model_settings
+                    )
+                    
+                    description = response['message']['content'].strip()
+                    if description:
+                        self.finished.emit(description)
+                    else:
+                        self.error.emit("Failed to generate description")
                 else:
-                    self.error.emit("Failed to generate description")
+                    # Use standard ImageDescriber with prompt style
+                    from image_describer import ImageDescriber
+
+                    # Create describer instance with specified model and prompt
+                    describer = ImageDescriber(
+                        model_name=self.model,
+                        prompt_style=self.prompt_style,
+                        config_file="image_describer_config.json"
+                    )
+
+                    # Generate new description
+                    description = describer.get_image_description(Path(self.image_path))
+                    if description:
+                        self.finished.emit(description)
+                    else:
+                        self.error.emit("Failed to generate description")
             finally:
                 # Restore original working directory
                 os.chdir(original_cwd)
@@ -74,6 +109,7 @@ class RedescribeDialog(QDialog):
         
         self.available_models = []
         self.available_prompts = []
+        self.prompt_variations = {}  # Store the actual prompt texts
         
         self.init_ui()
         self.load_available_options()
@@ -94,7 +130,16 @@ class RedescribeDialog(QDialog):
         self.prompt_combo = QComboBox()
         self.prompt_combo.setAccessibleName("Prompt Style Selection")
         self.prompt_combo.setAccessibleDescription("Choose the style of description to generate.")
+        self.prompt_combo.currentTextChanged.connect(self.update_prompt_preview)
         layout.addWidget(self.prompt_combo)
+        
+        # Prompt preview and editing
+        layout.addWidget(QLabel("Prompt Text (you can edit this):"))
+        self.prompt_edit = QPlainTextEdit()
+        self.prompt_edit.setAccessibleName("Prompt Text Editor")
+        self.prompt_edit.setAccessibleDescription("Edit the prompt that will be sent to the AI model.")
+        self.prompt_edit.setMaximumHeight(120)
+        layout.addWidget(self.prompt_edit)
         
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -128,6 +173,7 @@ class RedescribeDialog(QDialog):
                     config = json.load(f)
                 
                 prompt_variations = config.get('prompt_variations', {})
+                self.prompt_variations = prompt_variations  # Store for later use
                 self.available_prompts = list(prompt_variations.keys())
                 self.prompt_combo.addItems(self.available_prompts)
                 
@@ -142,6 +188,9 @@ class RedescribeDialog(QDialog):
                 default_prompt = config.get('default_prompt_style', 'detailed')
                 if default_prompt in self.available_prompts:
                     self.prompt_combo.setCurrentText(default_prompt)
+                
+                # Set initial prompt text
+                self.update_prompt_preview()
             
         except Exception as e:
             QMessageBox.warning(self, "Warning", f"Could not load available options: {e}")
@@ -151,9 +200,27 @@ class RedescribeDialog(QDialog):
             if not self.available_prompts:
                 self.prompt_combo.addItems(["detailed", "concise", "narrative", "artistic", "technical"])
     
+    def update_prompt_preview(self):
+        """Update the prompt text preview when selection changes"""
+        current_style = self.prompt_combo.currentText()
+        if current_style in self.prompt_variations:
+            prompt_text = self.prompt_variations[current_style]
+            self.prompt_edit.setPlainText(prompt_text)
+        elif current_style:
+            # Fallback for unknown prompt styles
+            fallback_prompts = {
+                "detailed": "Describe this image in detail, including main subjects, setting, colors, and activities.",
+                "concise": "Provide a brief description of this image.",
+                "narrative": "Provide a narrative description including objects, colors and detail. Avoid interpretation, just describe.",
+                "artistic": "Analyze this image from an artistic perspective, describing composition, colors, and mood.",
+                "technical": "Provide a technical analysis of this image including photographic technique and quality."
+            }
+            prompt_text = fallback_prompts.get(current_style, "Describe this image.")
+            self.prompt_edit.setPlainText(prompt_text)
+    
     def get_selections(self):
-        """Return the selected model and prompt style"""
-        return self.model_combo.currentText(), self.prompt_combo.currentText()
+        """Return the selected model, prompt style, and custom prompt text"""
+        return self.model_combo.currentText(), self.prompt_combo.currentText(), self.prompt_edit.toPlainText()
     
     def set_processing(self, processing=True):
         """Show/hide progress indicator and disable/enable buttons"""
@@ -174,6 +241,8 @@ class ImageDescriptionViewer(QWidget):
         self.current_dir = None
         self.image_files = []
         self.descriptions = []
+        self.descriptions_updated = []  # Track which descriptions have been updated
+        self.redescribing_rows = set()  # Track which rows are currently being redescribed
         self.init_ui()
 
     def init_ui(self):
@@ -251,6 +320,13 @@ class ImageDescriptionViewer(QWidget):
 
         layout.addLayout(btn_layout)
 
+        # Status bar
+        self.status_bar = QStatusBar()
+        self.status_bar.setAccessibleName("Status Bar")
+        self.status_bar.setAccessibleDescription("Shows current operation status and progress.")
+        self.status_bar.showMessage("Ready")
+        layout.addWidget(self.status_bar)
+
     def change_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Workflow Output Directory")
         if dir_path:
@@ -262,6 +338,8 @@ class ImageDescriptionViewer(QWidget):
         self.dir_label.setText(f"Loaded: {dir_path}")
         self.image_files = []
         self.descriptions = []
+        self.descriptions_updated = []  # Reset updated tracking
+        self.redescribing_rows = set()  # Reset redescribing tracking
         self.list_widget.clear()
         if os.path.isfile(html_path):
             try:
@@ -279,6 +357,7 @@ class ImageDescriptionViewer(QWidget):
                     }.get(m.group(0), m.group(0)), desc)
                     self.image_files.append(os.path.join(dir_path, img_path))
                     self.descriptions.append(desc.strip())
+                    self.descriptions_updated.append(False)  # Track that this is original description
                     truncated = desc[:100] + ("..." if len(desc) > 100 else "")
                     item = QListWidgetItem(truncated)
                     from PyQt6.QtCore import Qt
@@ -401,6 +480,12 @@ class ImageDescriptionViewer(QWidget):
             QMessageBox.information(self, "No Selection", "Please select an image to redescribe.")
             return
         
+        # Check if this image is already being redescribed
+        if row in self.redescribing_rows:
+            QMessageBox.information(self, "Already Processing", 
+                                  "This image is already being redescribed. Please wait for it to complete.")
+            return
+        
         # Check if Ollama is available
         try:
             if ollama is None:
@@ -415,48 +500,76 @@ class ImageDescriptionViewer(QWidget):
         # Show dialog for model and prompt selection
         dialog = RedescribeDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            model, prompt_style = dialog.get_selections()
+            model, prompt_style, custom_prompt = dialog.get_selections()
             
-            if not model or not prompt_style:
-                QMessageBox.warning(self, "Invalid Selection", "Please select both a model and prompt style.")
+            if not model:
+                QMessageBox.warning(self, "Invalid Selection", "Please select a model.")
                 return
             
-            # Show progress and start redescription
-            dialog.set_processing(True)
+            # Track that this row is being processed
+            self.redescribing_rows.add(row)
+            
+            # Update status bar
+            img_filename = os.path.basename(self.image_files[row])
+            self.status_bar.showMessage(f"Redescribing {img_filename} with {model}...")
+            
             img_path = self.image_files[row]
             
             # Create and start worker thread
-            self.worker = RedescribeWorker(img_path, model, prompt_style)
-            self.worker.finished.connect(lambda desc: self.on_redescribe_finished(dialog, desc, row))
-            self.worker.error.connect(lambda err: self.on_redescribe_error(dialog, err))
+            self.worker = RedescribeWorker(img_path, model, prompt_style, custom_prompt)
+            self.worker.finished.connect(lambda desc: self.on_redescribe_finished(desc, row))
+            self.worker.error.connect(lambda err: self.on_redescribe_error(err, row))
             self.worker.start()
     
-    def on_redescribe_finished(self, dialog, new_description, row):
+    def on_redescribe_finished(self, new_description, row):
         """Handle successful redescription"""
-        dialog.accept()
+        # Remove from processing set
+        self.redescribing_rows.discard(row)
+        
+        # Update status bar
+        self.status_bar.showMessage("Redescription completed successfully!")
         
         # Update the description in memory
         self.descriptions[row] = new_description
+        self.descriptions_updated[row] = True  # Mark as updated
         
-        # Update the list item text (truncated version)
+        # Update the list item text with emoji marker
         from PyQt6.QtWidgets import QListWidgetItem
         from PyQt6.QtCore import Qt
-        truncated = new_description[:100] + ("..." if len(new_description) > 100 else "")
+        emoji_prefix = "🔄 "  # Emoji to indicate updated description
+        truncated = new_description[:97] + ("..." if len(new_description) > 97 else "")
+        display_text = emoji_prefix + truncated
         
         item = self.list_widget.item(row)
-        item.setText(truncated)
+        item.setText(display_text)
         item.setData(Qt.ItemDataRole.AccessibleTextRole, new_description.strip())
         
-        # Update the description display
-        self.display_description(row)
+        # Update the description display if this row is currently selected
+        if self.list_widget.currentRow() == row:
+            self.display_description(row)
         
-        # Show success message
-        QMessageBox.information(self, "Success", "Image has been redescribed successfully!")
+        # Clear status message after a few seconds
+        QApplication.processEvents()
+        import threading
+        def clear_status():
+            import time
+            time.sleep(3)
+            self.status_bar.showMessage("Ready")
+        threading.Thread(target=clear_status, daemon=True).start()
     
-    def on_redescribe_error(self, dialog, error_message):
+    def on_redescribe_error(self, error_message, row):
         """Handle redescription error"""
-        dialog.reject()
+        # Remove from processing set
+        self.redescribing_rows.discard(row)
+        
+        # Update status bar
+        self.status_bar.showMessage("Redescription failed")
+        
+        # Show error message
         QMessageBox.critical(self, "Redescription Failed", f"Failed to redescribe image:\n{error_message}")
+        
+        # Clear status message
+        self.status_bar.showMessage("Ready")
 
 
 def main():
