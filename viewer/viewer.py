@@ -322,7 +322,7 @@ class ImageDescriptionViewer(QWidget):
 
         # Status bar
         self.status_bar = QStatusBar()
-        self.status_bar.setAccessibleName("Status Bar")
+        self.status_bar.setAccessibleName("Status: Ready")
         self.status_bar.setAccessibleDescription("Shows current operation status and progress.")
         self.status_bar.showMessage("Ready")
         layout.addWidget(self.status_bar)
@@ -511,7 +511,10 @@ class ImageDescriptionViewer(QWidget):
             
             # Update status bar
             img_filename = os.path.basename(self.image_files[row])
-            self.status_bar.showMessage(f"Redescribing {img_filename} with {model}...")
+            status_message = f"Redescribing {img_filename} with {model}..."
+            self.status_bar.showMessage(status_message)
+            # Update accessible name for screen readers
+            self.status_bar.setAccessibleName(f"Status: {status_message}")
             
             img_path = self.image_files[row]
             
@@ -527,7 +530,10 @@ class ImageDescriptionViewer(QWidget):
         self.redescribing_rows.discard(row)
         
         # Update status bar
-        self.status_bar.showMessage("Redescription completed successfully!")
+        status_message = "Redescription completed successfully!"
+        self.status_bar.showMessage(status_message)
+        # Update accessible name for screen readers
+        self.status_bar.setAccessibleName(f"Status: {status_message}")
         
         # Update the description in memory
         self.descriptions[row] = new_description
@@ -542,7 +548,9 @@ class ImageDescriptionViewer(QWidget):
         
         item = self.list_widget.item(row)
         item.setText(display_text)
-        item.setData(Qt.ItemDataRole.AccessibleTextRole, new_description.strip())
+        # Include "Updated" status in accessible text for screen readers
+        accessible_text = f"Updated: {new_description.strip()}"
+        item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
         
         # Update the description display if this row is currently selected
         if self.list_widget.currentRow() == row:
@@ -554,7 +562,9 @@ class ImageDescriptionViewer(QWidget):
         def clear_status():
             import time
             time.sleep(3)
-            self.status_bar.showMessage("Ready")
+            ready_message = "Ready"
+            self.status_bar.showMessage(ready_message)
+            self.status_bar.setAccessibleName(f"Status: {ready_message}")
         threading.Thread(target=clear_status, daemon=True).start()
     
     def on_redescribe_error(self, error_message, row):
@@ -563,13 +573,17 @@ class ImageDescriptionViewer(QWidget):
         self.redescribing_rows.discard(row)
         
         # Update status bar
-        self.status_bar.showMessage("Redescription failed")
+        status_message = "Redescription failed"
+        self.status_bar.showMessage(status_message)
+        self.status_bar.setAccessibleName(f"Status: {status_message}")
         
         # Show error message
         QMessageBox.critical(self, "Redescription Failed", f"Failed to redescribe image:\n{error_message}")
         
         # Clear status message
-        self.status_bar.showMessage("Ready")
+        ready_message = "Ready"
+        self.status_bar.showMessage(ready_message)
+        self.status_bar.setAccessibleName(f"Status: {ready_message}")
 
 
 def main():
