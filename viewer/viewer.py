@@ -77,10 +77,16 @@ class ImageDescriptionViewer(QWidget):
         self.copy_desc_btn.clicked.connect(self.copy_description)
         btn_layout.addWidget(self.copy_desc_btn)
 
+        self.copy_img_path_btn = QPushButton("Copy Image Path")
+        self.copy_img_path_btn.setAccessibleName("Copy Image Path Button")
+        self.copy_img_path_btn.setAccessibleDescription("Copy the selected image file path to the clipboard.")
+        self.copy_img_path_btn.clicked.connect(self.copy_image_file_path)
+        btn_layout.addWidget(self.copy_img_path_btn)
+
         self.copy_img_btn = QPushButton("Copy Image")
         self.copy_img_btn.setAccessibleName("Copy Image Button")
         self.copy_img_btn.setAccessibleDescription("Copy the selected image to the clipboard.")
-        self.copy_img_btn.clicked.connect(self.copy_image_path)
+        self.copy_img_btn.clicked.connect(self.copy_image_to_clipboard)
         btn_layout.addWidget(self.copy_img_btn)
 
         layout.addLayout(btn_layout)
@@ -200,7 +206,17 @@ class ImageDescriptionViewer(QWidget):
             clipboard.setText(self.descriptions[row], mode=QClipboard.Mode.Clipboard)
             # Removed success message - clipboard operation is silent
 
-    def copy_image_path(self):
+    def copy_image_file_path(self):
+        row = self.list_widget.currentRow()
+        if 0 <= row < len(self.image_files):
+            img_path = self.image_files[row]
+            clipboard = QGuiApplication.clipboard()
+            clipboard.clear()
+            from PyQt6.QtGui import QClipboard
+            clipboard.setText(img_path, mode=QClipboard.Mode.Clipboard)
+            # Removed success message - clipboard operation is silent
+
+    def copy_image_to_clipboard(self):
         row = self.list_widget.currentRow()
         if 0 <= row < len(self.image_files):
             from PyQt6.QtGui import QImage, QPixmap, QClipboard, QGuiApplication
