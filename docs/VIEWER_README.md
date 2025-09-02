@@ -7,7 +7,12 @@ A Qt6-based desktop application for browsing and viewing image descriptions gene
 - **Accessible Navigation**: Browse image descriptions with full screen reader support
 - **Image Preview**: View full-size images alongside their descriptions
 - **Clipboard Integration**: Copy descriptions, image file paths, or images to clipboard
-- **AI Redescription**: Generate new descriptions using different models and prompt styles
+- **AI Redescription**: Generate new descriptions using different models and fully customizable prompts
+  - Real-time model detection from your Ollama installation
+  - Visual status indicators (⏳ processing, 🔄 updated) 
+  - Editable prompt text with predefined styles or custom prompts
+  - Background processing with progress tracking
+  - Screen reader announcements for accessibility
 - **Keyboard Navigation**: Full keyboard and tab navigation support
 
 ## Installation
@@ -57,26 +62,78 @@ python viewer/image_viewer.py
 
 ### AI Redescription
 
-- **Redescribe Button**: Generate a new description for the selected image
-- **Model Selection**: Choose from available Ollama models (moondream, llava:7b, llama3.2-vision:11b, etc.)
-- **Prompt Styles**: Select from different description styles (detailed, concise, narrative, artistic, technical, colorful)
-- **Live Updates**: New descriptions immediately update the interface
-- **Background Processing**: Redescription runs in background without blocking the UI
+The Redescribe feature allows you to generate new descriptions for any image using different AI models and customizable prompts. This feature integrates seamlessly with the existing Image Description Toolkit scripts without modifying them.
 
-**Requirements for Redescription:**
-- Ollama must be installed and running
-- At least one vision model must be available (e.g., `ollama pull moondream`)
-- The `scripts/` directory must be accessible relative to the viewer
+#### How to Use Redescribe
+
+1. **Select an Image**: Click on any image in the left panel
+2. **Click Redescribe**: Press the "Redescribe" button in the bottom toolbar
+3. **Configure Options**: In the dialog that opens:
+   - **Model Selection**: Choose from available Ollama models on your system
+   - **Prompt Style**: Select a predefined style (detailed, concise, narrative, etc.)
+   - **Custom Prompt**: View and edit the actual prompt text that will be sent to the AI
+4. **Start Processing**: Click "OK" to begin redescription
+
+#### Visual Status Indicators
+
+The viewer provides clear feedback during the redescription process:
+
+- **⏳ Processing**: Shows while the AI is generating a new description
+- **🔄 Updated**: Marks images that have been successfully redescribed
+- **Status Bar**: Displays progress messages and completion notifications
+- **Prevention System**: Blocks multiple simultaneous requests on the same image
+
+#### Advanced Features
+
+- **Prompt Editing**: View and modify the complete prompt text before submission
+- **Custom Prompts**: Create entirely custom prompts or modify existing ones
+- **Model Detection**: Automatically detects all available Ollama models
+- **Background Processing**: Long descriptions run without freezing the interface
+- **Status Tracking**: Clear visual and accessible feedback for screen readers
+- **Error Handling**: Graceful handling of model or connection issues
+
+#### Accessibility Support
+
+- **Screen Reader Announcements**: Status changes are announced to assistive technology
+- **Keyboard Navigation**: Tab through dialog elements, Tab key moves focus instead of inserting tabs in prompt box
+- **Accessible Labels**: All controls have appropriate accessible names and descriptions
+- **Processing Announcements**: Screen readers announce "Processing: [description]" for active redescriptions
+
+#### Requirements for Redescription
+
+- **Ollama**: Must be installed and running (`ollama serve`)
+- **Vision Models**: At least one vision model must be available:
+  ```bash
+  ollama pull moondream        # Lightweight, fast
+  ollama pull llava:7b         # Balanced performance
+  ollama pull llama3.2-vision:11b  # High quality
+  ```
+- **Dependencies**: The viewer uses the existing `scripts/image_describer.py` and configuration files
+
+#### Technical Integration
+
+The Redescribe feature works by:
+1. **Importing** the existing `ImageDescriber` class from `scripts/image_describer.py`
+2. **Using** configuration from `scripts/image_describer_config.json`
+3. **Calling** the same `describe_image()` methods used by command-line workflows
+4. **Preserving** all original functionality - no scripts are modified
+
+This approach ensures compatibility with existing workflows while providing a user-friendly GUI interface.
 
 ## Interface Layout
 
 The viewer uses a split-panel layout:
 
-- **Left Panel**: List of images (max width 400px)
+- **Left Panel**: List of images with status indicators (max width 400px)
+  - Image filenames for visual clarity
+  - ⏳ emoji for images currently being processed
+  - 🔄 emoji for images with updated descriptions
+  - Full descriptions available to screen readers
 - **Right Panel**: 
   - Image preview area (scalable, maintains aspect ratio)
   - Full description text box (read-only)
   - Action buttons: Copy Description, Copy Image Path, Copy Image, Redescribe
+- **Status Bar**: Progress messages and completion notifications
 
 ## Supported Formats
 
@@ -97,6 +154,20 @@ The viewer works with workflow output directories that contain:
 **App won't start**: Ensure PyQt6 is installed and you're using Python 3.8+
 
 **No images/descriptions load**: Verify the selected directory contains `html_reports/image_descriptions.html`
+
+**Redescribe button not working**: 
+- Check that Ollama is running (`ollama serve` in terminal)
+- Verify vision models are installed (`ollama list` to see available models)
+- Install a vision model if none available (`ollama pull moondream`)
+
+**No models in dropdown**: Ensure Ollama service is running and has vision-capable models installed
+
+**Redescribe gets stuck on processing**: 
+- Check Ollama logs for errors
+- Verify the model isn't out of memory
+- Try a smaller model like `moondream` for faster processing
+
+**Status indicators not updating**: The viewer automatically updates status - if stuck, restart the application
 
 **Clipboard not working**: Some clipboard operations may require the app to have focus in your window manager
 
