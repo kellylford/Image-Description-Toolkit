@@ -57,6 +57,7 @@ This is the first stable release of the Image Description Toolkit, featuring a c
 - Accessibility features and keyboard navigation
 - Support for viewing descriptions alongside images
 - Professional GUI for non-technical users
+- **Copy Image Path**: New button to copy image file paths to clipboard for easy reference
 
 #### 🔧 Technical Features
 
