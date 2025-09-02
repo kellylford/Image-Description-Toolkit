@@ -34,22 +34,31 @@ class RedescribeWorker(QThread):
             # Import the ImageDescriber class
             scripts_dir = Path(__file__).parent.parent / "scripts"
             sys.path.insert(0, str(scripts_dir))
-            from image_describer import ImageDescriber
+            
+            # Change to scripts directory so config file is found correctly
+            import os
+            original_cwd = os.getcwd()
+            os.chdir(scripts_dir)
+            
+            try:
+                from image_describer import ImageDescriber
 
-            # Create describer instance with specified model and prompt
-            config_file = scripts_dir / "image_describer_config.json"
-            describer = ImageDescriber(
-                model_name=self.model,
-                prompt_style=self.prompt_style,
-                config_file=str(config_file)
-            )
+                # Create describer instance with specified model and prompt
+                describer = ImageDescriber(
+                    model_name=self.model,
+                    prompt_style=self.prompt_style,
+                    config_file="image_describer_config.json"
+                )
 
-            # Generate new description
-            description = describer.get_image_description(Path(self.image_path))
-            if description:
-                self.finished.emit(description)
-            else:
-                self.error.emit("Failed to generate description")
+                # Generate new description
+                description = describer.get_image_description(Path(self.image_path))
+                if description:
+                    self.finished.emit(description)
+                else:
+                    self.error.emit("Failed to generate description")
+            finally:
+                # Restore original working directory
+                os.chdir(original_cwd)
 
         except Exception as e:
             self.error.emit(f"Error: {str(e)}")
@@ -106,7 +115,8 @@ class RedescribeDialog(QDialog):
                 raise ImportError("Ollama module not available")
             
             models_response = ollama.list()
-            self.available_models = [model['name'] for model in models_response.get('models', [])]
+            # Fix: models have .model attribute, not ['name'] key
+            self.available_models = [model.model for model in models_response['models']]
             self.model_combo.addItems(self.available_models)
             
             # Load prompt styles from config
@@ -123,8 +133,11 @@ class RedescribeDialog(QDialog):
                 
                 # Set default selections
                 default_model = config.get('default_model', '')
-                if default_model in self.available_models:
-                    self.model_combo.setCurrentText(default_model)
+                # Try to match default model with available models (handles version tags)
+                for model in self.available_models:
+                    if default_model in model:
+                        self.model_combo.setCurrentText(model)
+                        break
                 
                 default_prompt = config.get('default_prompt_style', 'detailed')
                 if default_prompt in self.available_prompts:
@@ -132,7 +145,7 @@ class RedescribeDialog(QDialog):
             
         except Exception as e:
             QMessageBox.warning(self, "Warning", f"Could not load available options: {e}")
-            # Provide fallback options
+            # Provide fallback options only if we couldn't load real ones
             if not self.available_models:
                 self.model_combo.addItems(["moondream", "llava:7b", "llama3.2-vision:11b"])
             if not self.available_prompts:
