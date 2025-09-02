@@ -7,6 +7,7 @@ A Qt6-based desktop application for browsing and viewing image descriptions gene
 - **Accessible Navigation**: Browse image descriptions with full screen reader support
 - **Image Preview**: View full-size images alongside their descriptions
 - **Clipboard Integration**: Copy descriptions, image file paths, or images to clipboard
+- **AI Redescription**: Generate new descriptions using different models and prompt styles
 - **Keyboard Navigation**: Full keyboard and tab navigation support
 
 ## Installation
@@ -54,6 +55,19 @@ python viewer/image_viewer.py
 - **Copy Image Path**: Copies the full file path of the selected image to clipboard
 - **Copy Image**: Copies the actual image data to clipboard for pasting into other applications
 
+### AI Redescription
+
+- **Redescribe Button**: Generate a new description for the selected image
+- **Model Selection**: Choose from available Ollama models (moondream, llava:7b, llama3.2-vision:11b, etc.)
+- **Prompt Styles**: Select from different description styles (detailed, concise, narrative, artistic, technical, colorful)
+- **Live Updates**: New descriptions immediately update the interface
+- **Background Processing**: Redescription runs in background without blocking the UI
+
+**Requirements for Redescription:**
+- Ollama must be installed and running
+- At least one vision model must be available (e.g., `ollama pull moondream`)
+- The `scripts/` directory must be accessible relative to the viewer
+
 ## Interface Layout
 
 The viewer uses a split-panel layout:
@@ -62,7 +76,7 @@ The viewer uses a split-panel layout:
 - **Right Panel**: 
   - Image preview area (scalable, maintains aspect ratio)
   - Full description text box (read-only)
-  - Copy buttons
+  - Action buttons: Copy Description, Copy Image Path, Copy Image, Redescribe
 
 ## Supported Formats
 
@@ -87,3 +101,10 @@ The viewer works with workflow output directories that contain:
 **Clipboard not working**: Some clipboard operations may require the app to have focus in your window manager
 
 **Images not displaying**: Check that image files exist in the expected subdirectories and aren't corrupted
+
+**Redescribe button disabled/not working**: 
+- Ensure Ollama is installed and running (`ollama serve`)
+- Verify you have vision models installed (`ollama list`)
+- Check that the scripts directory is accessible from the viewer location
+
+**Redescribe fails with "Model not available"**: Install the desired model with `ollama pull <model-name>`
