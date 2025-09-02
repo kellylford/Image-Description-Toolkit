@@ -31,7 +31,7 @@ python viewer/image_viewer.py
 
 ### Loading a Workflow Output
 
-1. Click the **"Change Directory"** button
+1. Activate the **"Change Directory"** button
 2. Navigate to and select a completed workflow output directory (e.g., `workflow_moondream_narrative_20250901_223412`)
 3. The viewer will automatically parse the HTML report and load all images and descriptions
 
