@@ -6,6 +6,8 @@ import sys
 import os
 import json
 import subprocess
+import re
+import time
 from pathlib import Path
 try:
     import ollama
@@ -13,10 +15,205 @@ except ImportError:
     ollama = None
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, 
-    QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, QProgressBar, QStatusBar, QPlainTextEdit
+    QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, QProgressBar, QStatusBar, QPlainTextEdit, QCheckBox
 )
-from PyQt6.QtGui import QClipboard, QGuiApplication
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QClipboard, QGuiApplication, QPixmap, QImage
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QFileSystemWatcher
+
+class DescriptionFileParser:
+    """Parser for live description text files"""
+    
+    def __init__(self):
+        self.entries = []
+        self.last_modified = 0
+        self.current_progress = {"current": 0, "total": 0}
+    
+    def parse_file(self, file_path: Path) -> list:
+        """Parse the descriptions file and return list of entries"""
+        entries = []
+        
+        if not file_path.exists():
+            return entries
+        
+        try:
+            # Check if file has been modified
+            stat = file_path.stat()
+            if stat.st_mtime <= self.last_modified:
+                return self.entries
+            
+            self.last_modified = stat.st_mtime
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Split by separator lines
+            separator = '-' * 80
+            sections = content.split(separator)
+            
+            # Skip header section (first section before any separator)
+            for section in sections[1:]:
+                if not section.strip():
+                    continue
+                
+                entry = self._parse_entry(section.strip())
+                if entry:
+                    entries.append(entry)
+            
+            self.entries = entries
+            self._update_progress_from_entries(entries)
+            return entries
+            
+        except Exception as e:
+            print(f"Error parsing descriptions file: {e}")
+            return self.entries
+    
+    def _parse_entry(self, section: str) -> dict:
+        """Parse a single entry section"""
+        lines = section.split('\n')
+        entry = {
+            'file_path': '',
+            'relative_path': '',
+            'description': '',
+            'model': '',
+            'prompt_style': '',
+            'metadata': {}
+        }
+        
+        description_started = False
+        description_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                if description_started:
+                    description_lines.append('')
+                continue
+            
+            if line.startswith('File: '):
+                entry['relative_path'] = line[6:].strip()
+            elif line.startswith('Path: '):
+                entry['file_path'] = line[6:].strip()
+            elif line.startswith('Model: '):
+                entry['model'] = line[7:].strip()
+            elif line.startswith('Prompt Style: '):
+                entry['prompt_style'] = line[14:].strip()
+            elif line.startswith('Description: '):
+                description_started = True
+                description_lines.append(line[13:].strip())
+            elif line.startswith('Timestamp: '):
+                entry['metadata']['timestamp'] = line[11:].strip()
+            elif description_started and not line.startswith(('Timestamp:', 'File:', 'Path:', 'Model:', 'Prompt Style:')):
+                description_lines.append(line)
+        
+        if description_lines:
+            entry['description'] = '\n'.join(description_lines).strip()
+        
+        return entry if entry['description'] else None
+    
+    def _update_progress_from_entries(self, entries):
+        """Update progress tracking from parsed entries"""
+        self.current_progress["current"] = len(entries)
+        # Try to extract total from log files if available
+    
+    def get_progress(self) -> dict:
+        """Get current progress information"""
+        return self.current_progress.copy()
+
+
+class WorkflowMonitor(QThread):
+    """Monitor workflow progress from log files"""
+    progress_updated = pyqtSignal(dict)  # Emits progress info
+    
+    def __init__(self, workflow_dir: Path):
+        super().__init__()
+        self.workflow_dir = workflow_dir
+        self.running = False
+        self.log_file = None
+        self._find_log_file()
+    
+    def _find_log_file(self):
+        """Find the image describer log file"""
+        logs_dir = self.workflow_dir / "logs"
+        if not logs_dir.exists():
+            return
+        
+        # Find the most recent image_describer log
+        log_files = list(logs_dir.glob("image_describer_*.log"))
+        if log_files:
+            self.log_file = max(log_files, key=lambda f: f.stat().st_mtime)
+    
+    def run(self):
+        """Monitor log file for progress updates"""
+        self.running = True
+        
+        while self.running:
+            if self.log_file and self.log_file.exists():
+                try:
+                    progress = self._parse_progress()
+                    if progress:
+                        self.progress_updated.emit(progress)
+                except Exception as e:
+                    print(f"Error monitoring progress: {e}")
+            
+            self.msleep(2000)  # Check every 2 seconds
+    
+    def _parse_progress(self) -> dict:
+        """Parse progress from log file"""
+        try:
+            with open(self.log_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Look for "Describing image X of Y" patterns
+            pattern = r'Describing image (\d+) of (\d+):'
+            matches = list(re.finditer(pattern, content))
+            
+            if matches:
+                last_match = matches[-1]
+                current = int(last_match.group(1))
+                total = int(last_match.group(2))
+                
+                # Check if workflow is still active
+                lines = content.split('\n')
+                last_lines = lines[-10:]  # Check last 10 lines
+                recent_timestamp = None
+                
+                for line in reversed(last_lines):
+                    if ' - INFO - ' in line and 'Describing image' in line:
+                        # Extract timestamp from log line
+                        timestamp_match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                        if timestamp_match:
+                            timestamp_str = timestamp_match.group(1)
+                            try:
+                                from datetime import datetime
+                                recent_timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                                break
+                            except:
+                                pass
+                
+                # Determine if workflow is still active (recent activity within 5 minutes)
+                is_active = False
+                if recent_timestamp:
+                    from datetime import datetime, timedelta
+                    now = datetime.now()
+                    is_active = (now - recent_timestamp) < timedelta(minutes=5)
+                
+                return {
+                    'current': current,
+                    'total': total,
+                    'active': is_active,
+                    'last_update': recent_timestamp.isoformat() if recent_timestamp else None
+                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error parsing progress: {e}")
+            return None
+    
+    def stop(self):
+        """Stop monitoring"""
+        self.running = False
+
 
 class RedescribeWorker(QThread):
     """Worker thread for image redescription to avoid blocking the UI"""
@@ -255,18 +452,52 @@ class ImageDescriptionViewer(QWidget):
         self.descriptions = []
         self.descriptions_updated = []  # Track which descriptions have been updated
         self.redescribing_rows = set()  # Track which rows are currently being redescribed
+        
+        # Live monitoring components
+        self.live_mode = False
+        self.description_parser = DescriptionFileParser()
+        self.workflow_monitor = None
+        self.file_watcher = QFileSystemWatcher()
+        self.file_watcher.fileChanged.connect(self.on_file_changed)
+        self.refresh_timer = QTimer()
+        self.refresh_timer.timeout.connect(self.refresh_live_content)
+        
+        # Focus management for accessibility
+        self.last_focused_widget = None
+        self.preserve_selection = True
+        self.updating_content = False
+        
+        # Progress tracking
+        self.progress_info = {"current": 0, "total": 0, "active": False}
+        
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # Directory selection
+        # Directory selection and mode controls
         dir_layout = QHBoxLayout()
         self.dir_label = QLabel("No directory loaded.")
         self.dir_label.setAccessibleName("Directory Label")
         self.dir_label.setAccessibleDescription("Shows the currently loaded workflow output directory.")
         dir_layout.addWidget(self.dir_label)
+        
+        # Live mode checkbox
+        self.live_mode_checkbox = QCheckBox("Live Mode")
+        self.live_mode_checkbox.setAccessibleName("Live Mode Toggle")
+        self.live_mode_checkbox.setAccessibleDescription("Enable live monitoring of workflow progress. Updates descriptions in real-time as they are generated.")
+        self.live_mode_checkbox.stateChanged.connect(self.toggle_live_mode)
+        dir_layout.addWidget(self.live_mode_checkbox)
+        
+        # Refresh button (for live mode)
+        self.refresh_btn = QPushButton("Refresh")
+        self.refresh_btn.setAccessibleName("Refresh Button")
+        self.refresh_btn.setAccessibleDescription("Manually refresh the live content to check for new descriptions. Will preserve your current position.")
+        self.refresh_btn.clicked.connect(self.manual_refresh)
+        self.refresh_btn.setVisible(False)
+        dir_layout.addWidget(self.refresh_btn)
+        
         self.change_dir_btn = QPushButton("Change Directory")
         self.change_dir_btn.setAccessibleName("Change Directory Button")
         self.change_dir_btn.setAccessibleDescription("Button to change the loaded workflow output directory.")
@@ -339,20 +570,243 @@ class ImageDescriptionViewer(QWidget):
         self.status_bar.showMessage("Ready")
         layout.addWidget(self.status_bar)
 
+    def toggle_live_mode(self, checked):
+        """Toggle between live mode and HTML mode"""
+        self.live_mode = checked
+        self.refresh_btn.setVisible(checked)
+        
+        if checked:
+            self.status_bar.showMessage("Live mode enabled - monitoring for updates")
+            if self.current_dir:
+                self.start_live_monitoring()
+        else:
+            self.status_bar.showMessage("Live mode disabled - using final HTML output")
+            self.stop_live_monitoring()
+            # Reload from HTML if available
+            if self.current_dir:
+                self.load_descriptions(self.current_dir)
+    
+    def start_live_monitoring(self):
+        """Start monitoring the descriptions file for changes"""
+        if not self.current_dir:
+            return
+        
+        descriptions_file = Path(self.current_dir) / "descriptions" / "image_descriptions.txt"
+        
+        if descriptions_file.exists():
+            # Add file to watcher
+            self.file_watcher.addPath(str(descriptions_file))
+            
+            # Start workflow monitor
+            if self.workflow_monitor:
+                self.workflow_monitor.stop()
+                self.workflow_monitor.wait()
+            
+            self.workflow_monitor = WorkflowMonitor(Path(self.current_dir))
+            self.workflow_monitor.progress_updated.connect(self.update_progress)
+            self.workflow_monitor.start()
+            
+            # Start refresh timer for regular updates
+            self.refresh_timer.start(15000)  # Refresh every 15 seconds (less aggressive)
+            
+            # Load initial content
+            self.refresh_live_content()
+        else:
+            self.status_bar.showMessage("Descriptions file not found - live mode unavailable")
+            self.live_mode_checkbox.setChecked(False)
+    
+    def stop_live_monitoring(self):
+        """Stop monitoring for live updates"""
+        if self.workflow_monitor:
+            self.workflow_monitor.stop()
+            self.workflow_monitor.wait()
+            self.workflow_monitor = None
+        
+        self.refresh_timer.stop()
+        self.file_watcher.removePaths(self.file_watcher.files())
+        
+        # Reset title to remove progress
+        self.setWindowTitle("Image Description Viewer")
+    
+    def update_progress(self, progress_info):
+        """Update progress information and title bar"""
+        self.progress_info = progress_info
+        self.update_title()
+    
+    def update_title(self):
+        """Update window title with progress information for screen readers"""
+        base_title = "Image Description Viewer"
+        
+        if self.live_mode and self.progress_info.get("total", 0) > 0:
+            current = self.progress_info.get("current", 0)
+            total = self.progress_info.get("total", 0)
+            active = self.progress_info.get("active", False)
+            
+            status = "Processing" if active else "Completed"
+            title = f"{base_title} - {status}: {current} of {total} images"
+            
+            if active:
+                title += " (Live)"
+            
+            self.setWindowTitle(title)
+        else:
+            self.setWindowTitle(base_title)
+    
+    def on_file_changed(self, path):
+        """Handle file system changes with focus preservation"""
+        if self.live_mode and not self.updating_content:
+            # Only update if user isn't actively interacting
+            focused_widget = QApplication.focusWidget()
+            if focused_widget in [self.list_widget, self.description_text]:
+                # User is actively navigating - defer update
+                QTimer.singleShot(5000, self.refresh_live_content)  # Try again in 5 seconds
+            else:
+                # Safe to update
+                QTimer.singleShot(1000, self.refresh_live_content)
+    
+    def refresh_live_content(self):
+        """Refresh content from live descriptions file with focus preservation"""
+        if not self.live_mode or not self.current_dir:
+            return
+        
+        # Check if user is actively interacting - if so, defer update
+        focused_widget = QApplication.focusWidget()
+        if focused_widget in [self.list_widget, self.description_text]:
+            # User is actively using the interface - don't disrupt them
+            return
+        
+        descriptions_file = Path(self.current_dir) / "descriptions" / "image_descriptions.txt"
+        
+        if not descriptions_file.exists():
+            return
+        
+        try:
+            # Set updating flag to prevent recursive updates
+            self.updating_content = True
+            
+            # Save current state before updating
+            current_row = self.list_widget.currentRow()
+            current_item_count = self.list_widget.count()
+            was_focused_on_list = focused_widget == self.list_widget
+            
+            # Parse the file
+            entries = self.description_parser.parse_file(descriptions_file)
+            
+            if not entries:
+                return
+            
+            # Check if there are actually new entries to avoid unnecessary updates
+            if len(entries) == current_item_count:
+                # No new entries, just update progress info
+                parser_progress = self.description_parser.get_progress()
+                if parser_progress["current"] > 0:
+                    self.progress_info.update(parser_progress)
+                    self.update_title()
+                return
+            
+            # Update progress from parser
+            parser_progress = self.description_parser.get_progress()
+            if parser_progress["current"] > 0:
+                self.progress_info.update(parser_progress)
+                self.update_title()
+            
+            # Only add new entries, don't clear existing ones
+            # This prevents jumping back to the top
+            new_entries = entries[current_item_count:]
+            
+            if new_entries:
+                # Base directory for resolving image paths
+                base_dir = Path(self.current_dir)
+                
+                # Add only new entries
+                for entry in new_entries:
+                    # Resolve image path
+                    rel_path = entry['relative_path']
+                    
+                    # Try different possible locations
+                    possible_paths = [
+                        base_dir / "temp_combined_images" / rel_path,
+                        base_dir / "converted_images" / rel_path,
+                        base_dir / "extracted_frames" / rel_path,
+                        base_dir / rel_path
+                    ]
+                    
+                    image_path = None
+                    for possible_path in possible_paths:
+                        if possible_path.exists():
+                            image_path = str(possible_path)
+                            break
+                    
+                    if not image_path:
+                        # Use the first possibility even if it doesn't exist
+                        image_path = str(possible_paths[0])
+                    
+                    self.image_files.append(image_path)
+                    self.descriptions.append(entry['description'])
+                    self.descriptions_updated.append(False)
+                    
+                    # Create list item
+                    truncated = entry['description'][:100] + ("..." if len(entry['description']) > 100 else "")
+                    from PyQt6.QtWidgets import QListWidgetItem
+                    item = QListWidgetItem(truncated)
+                    item.setData(Qt.ItemDataRole.AccessibleTextRole, entry['description'].strip())
+                    self.list_widget.addItem(item)
+                
+                # Update status quietly (no focus disruption)
+                count = len(entries)
+                active_status = " (Active)" if self.progress_info.get("active", False) else ""
+                self.status_bar.showMessage(f"Live mode: {count} descriptions loaded{active_status}")
+                
+                # Preserve current selection - don't change focus or selection unless there was nothing selected
+                if current_row >= 0:
+                    # Keep current selection
+                    self.list_widget.setCurrentRow(current_row)
+                elif not was_focused_on_list and len(entries) == len(new_entries):
+                    # This is the first load - set initial selection but don't steal focus
+                    self.list_widget.setCurrentRow(0)
+                    
+        except Exception as e:
+            self.status_bar.showMessage(f"Error refreshing live content: {e}")
+        finally:
+            # Clear updating flag
+            self.updating_content = False
+
     def change_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Workflow Output Directory")
         if dir_path:
             self.load_descriptions(dir_path)
 
     def load_descriptions(self, dir_path):
-        html_path = os.path.join(dir_path, "html_reports", "image_descriptions.html")
+        """Load descriptions from either HTML or live file based on mode"""
         self.current_dir = dir_path
         self.dir_label.setText(f"Loaded: {dir_path}")
+        
+        # Stop any existing monitoring
+        self.stop_live_monitoring()
+        
+        # Check if live mode should be auto-enabled
+        descriptions_file = Path(dir_path) / "descriptions" / "image_descriptions.txt"
+        html_file = Path(dir_path) / "html_reports" / "image_descriptions.html"
+        
+        # Auto-enable live mode if descriptions file exists but HTML doesn't
+        if descriptions_file.exists() and not html_file.exists():
+            self.live_mode_checkbox.setChecked(True)
+            self.live_mode = True
+        
+        if self.live_mode:
+            self.start_live_monitoring()
+        else:
+            self.load_html_descriptions(dir_path)
+    
+    def load_html_descriptions(self, dir_path):
+        """Load descriptions from HTML file (original behavior)"""
+        html_path = os.path.join(dir_path, "html_reports", "image_descriptions.html")
         self.image_files = []
         self.descriptions = []
         self.descriptions_updated = []  # Reset updated tracking
         self.redescribing_rows = set()  # Reset redescribing tracking
         self.list_widget.clear()
+        
         if os.path.isfile(html_path):
             try:
                 with open(html_path, "r", encoding="utf-8") as f:
@@ -378,15 +832,56 @@ class ImageDescriptionViewer(QWidget):
                 if self.descriptions:
                     self.list_widget.setCurrentRow(0)
                     # Set focus to the list so users can immediately start navigating
-                    self.list_widget.setFocus()
+                    # But only if no other widget currently has focus
+                    if not QApplication.focusWidget():
+                        self.list_widget.setFocus()
                 else:
                     QMessageBox.information(self, "No Descriptions", "No image descriptions found in HTML report.")
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to parse HTML report: {e}")
         else:
+            # Try live mode if HTML not available
+            descriptions_file = Path(dir_path) / "descriptions" / "image_descriptions.txt"
+            if descriptions_file.exists():
+                reply = QMessageBox.question(self, "HTML Not Found", 
+                                           "HTML report not found, but live descriptions file is available. Switch to live mode?",
+                                           QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.live_mode_checkbox.setChecked(True)
+                    self.live_mode = True
+                    self.start_live_monitoring()
+                    return
+            
             QMessageBox.warning(self, "Error", "HTML report not found. Please select a valid workflow output directory.")
 
+    def manual_refresh(self):
+        """Manually refresh content, preserving focus and position"""
+        focused_widget = QApplication.focusWidget()
+        current_row = self.list_widget.currentRow()
+        
+        # Force refresh by temporarily clearing the last modified time
+        if hasattr(self.description_parser, 'last_modified'):
+            self.description_parser.last_modified = 0
+        
+        # Do the refresh
+        self.refresh_live_content()
+        
+        # Restore focus and position
+        if current_row >= 0 and current_row < self.list_widget.count():
+            self.list_widget.setCurrentRow(current_row)
+        
+        if focused_widget:
+            focused_widget.setFocus()
+        
+        # Update status to show manual refresh happened
+        self.status_bar.showMessage("Manually refreshed - content updated")
+        QTimer.singleShot(3000, lambda: self.status_bar.showMessage("Ready"))
+
     def display_description(self, row):
+        # Don't update if we're in the middle of content updates
+        if self.updating_content:
+            return
+            
         # Show description
         if 0 <= row < len(self.descriptions):
             description = self.descriptions[row]
@@ -404,24 +899,39 @@ class ImageDescriptionViewer(QWidget):
             
             processed_description = '\n'.join(processed_lines)
             
-            self.description_text.setPlainText(processed_description)
+            # Only update text if it's actually different to avoid cursor jumping
+            if self.description_text.toPlainText() != processed_description:
+                # Save cursor position if description_text has focus
+                cursor_position = None
+                if self.description_text.hasFocus():
+                    cursor = self.description_text.textCursor()
+                    cursor_position = cursor.position()
+                
+                self.description_text.setPlainText(processed_description)
+                
+                # Restore cursor position if we saved it
+                if cursor_position is not None:
+                    cursor = self.description_text.textCursor()
+                    cursor.setPosition(min(cursor_position, len(processed_description)))
+                    self.description_text.setTextCursor(cursor)
+                else:
+                    # Only move to beginning if not focused
+                    cursor = self.description_text.textCursor()
+                    cursor.movePosition(cursor.MoveOperation.Start)
+                    self.description_text.setTextCursor(cursor)
             
             # Update accessible description for screen readers without stealing focus
             self.description_text.setAccessibleDescription(f"Image description with {len(description)} characters: {description}")
             
-            # Move cursor to beginning for reading, but don't steal focus
-            cursor = self.description_text.textCursor()
-            cursor.movePosition(cursor.MoveOperation.Start)
-            self.description_text.setTextCursor(cursor)
-            
         else:
-            self.description_text.clear()
-            self.description_text.setAccessibleDescription("No description selected.")
+            if self.description_text.toPlainText():  # Only clear if there's content
+                self.description_text.clear()
+                self.description_text.setAccessibleDescription("No description selected.")
+                
         # Show image preview
         if 0 <= row < len(self.image_files):
             img_path = self.image_files[row]
             filename = os.path.basename(img_path)
-            from PyQt6.QtGui import QPixmap
             if os.path.isfile(img_path):
                 pixmap = QPixmap(img_path)
                 if not pixmap.isNull():
@@ -470,14 +980,12 @@ class ImageDescriptionViewer(QWidget):
     def copy_image_to_clipboard(self):
         row = self.list_widget.currentRow()
         if 0 <= row < len(self.image_files):
-            from PyQt6.QtGui import QImage, QPixmap, QClipboard, QGuiApplication
             img_path = self.image_files[row]
             if os.path.isfile(img_path):
                 image = QImage(img_path)
                 if not image.isNull():
                     clipboard = QGuiApplication.clipboard()
                     clipboard.clear()
-                    from PyQt6.QtGui import QClipboard
                     clipboard.setImage(image, mode=QClipboard.Mode.Clipboard)
                     # Removed success message - clipboard operation is silent
                 else:
@@ -625,6 +1133,11 @@ class ImageDescriptionViewer(QWidget):
         ready_message = "Ready"
         self.status_bar.showMessage(ready_message)
         self.status_bar.setAccessibleName(f"Status: {ready_message}")
+
+    def closeEvent(self, event):
+        """Handle application closing to clean up resources"""
+        self.stop_live_monitoring()
+        event.accept()
 
 
 def main():
