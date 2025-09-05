@@ -57,14 +57,6 @@ This is the first stable release of the Image Description Toolkit, featuring a c
 - Accessibility features and keyboard navigation
 - Support for viewing descriptions alongside images
 - Professional GUI for non-technical users
-- **Copy Image Path**: New button to copy image file paths to clipboard for easy reference
-- **AI Redescription**: Generate new descriptions using different models and customizable prompts
-  - Real-time model detection from Ollama installation
-  - Visual status indicators (⏳ processing, 🔄 updated) 
-  - Editable prompt text with predefined styles or custom prompts
-  - Background processing with progress tracking
-  - Screen reader announcements for accessibility
-  - Seamless integration with existing toolkit functionality
 
 #### 🔧 Technical Features
 
