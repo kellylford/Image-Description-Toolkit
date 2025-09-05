@@ -17,7 +17,8 @@
     "artistic": "Analyze this image from an artistic perspective, describing:\n- Visual composition and framing\n- Color palette and lighting mood\n- Artistic style or technique\n- Emotional tone or atmosphere\n- Subject matter and symbolism",
     "technical": "Provide a technical analysis of this image:\n- Camera settings and photographic technique\n- Lighting conditions and quality\n- Composition and framing\n- Image quality and clarity\n- Technical strengths or weaknesses",
     "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition.",
-    "social": "Describe and evaluate the image for social media suitability. Focus on:\n- Visual appeal and engagement\n- Composition and framing\n- Color vibrancy and contrast\n- Subject matter relevance\n- Overall impression and shareability"
+    "social": "Describe and evaluate the image for social media suitability. Focus on:\n- Visual appeal and engagement\n- Composition and framing\n- Color vibrancy and contrast\n- Subject matter relevance\n- Overall impression and shareability",
+    "detailed_copy": "Describe this image in detail, including:\n- Main subjects/objects\n- Setting/environment\n- Key colors and lighting\n- Notable activities or composition\nKeep it comprehensive and informative for metadata."
   },
   "output_format": {
     "include_timestamp": false,
