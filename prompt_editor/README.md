@@ -14,6 +14,8 @@ A user-friendly Qt6 application for editing image description prompts and config
 ### Default Settings
 - **Default prompt style** - Set which prompt style to use by default
 - **Default AI model** - Choose which Ollama model to use for image descriptions
+- **Live model discovery** - Automatically detects installed Ollama models
+- **Model refresh** - Update model list when new models are installed
 - **Visual selection** - Dropdown menus show available options with descriptions
 
 ### File Operations
@@ -35,12 +37,17 @@ A user-friendly Qt6 application for editing image description prompts and config
 ### Prerequisites
 - Python 3.8 or higher
 - PyQt6 (automatically installed with requirements)
+- Ollama installed and running (for model selection)
 
 ### Setup
 1. Ensure you're in the project root directory
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
+   ```
+3. Ensure Ollama is installed and running:
+   ```bash
+   ollama --version
    ```
 
 ## Usage
@@ -187,9 +194,16 @@ Where each workflow config references different prompt files:
 - Look for error messages in the status bar
 
 **Model dropdown is empty**
-- Configuration file needs an `available_models` section
-- Use "Reload" to refresh after updating the config file manually
-- Ensure the JSON format is valid
+- Ensure Ollama is installed and running: `ollama --version`
+- Try clicking the refresh button (🔄) next to the model dropdown
+- Install vision models: `ollama pull moondream` or `ollama pull llava`
+- Check Ollama service status: `ollama list`
+
+**Model selection shows "Ollama not available"**
+- Install Ollama from https://ollama.ai
+- Start the Ollama service
+- Verify Python ollama package: `pip install ollama`
+- Restart the prompt editor after installing Ollama
 
 ## Development
 

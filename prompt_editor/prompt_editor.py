@@ -11,9 +11,14 @@ manually edit JSON. Features include:
 - Add new prompt styles
 - Delete existing prompts
 - Set default prompt style
+- Set default AI model from installed Ollama models
+- Save and Save As functionality for creating custom configurations
+- Open different configuration files
 - Backup and restore functionality
 - Input validation and error handling
 - Accessible design with screen reader support
+- Real-time window title updates showing current file and modification status
+- Live model discovery from Ollama installation
 """
 
 import sys
@@ -31,6 +36,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction, QFont, QTextCharFormat, QTextCursor
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+
+# Import ollama for model discovery
+try:
+    import ollama
+except ImportError:
+    ollama = None
 
 
 class PromptEditorMainWindow(QMainWindow):
@@ -122,7 +133,8 @@ class PromptEditorMainWindow(QMainWindow):
         self.setTabOrder(self.delete_prompt_btn, self.duplicate_prompt_btn)
         self.setTabOrder(self.duplicate_prompt_btn, self.default_prompt_combo)
         self.setTabOrder(self.default_prompt_combo, self.default_model_combo)
-        self.setTabOrder(self.default_model_combo, self.save_btn)
+        self.setTabOrder(self.default_model_combo, self.refresh_models_btn)
+        self.setTabOrder(self.refresh_models_btn, self.save_btn)
         self.setTabOrder(self.save_btn, self.save_as_btn)
         self.setTabOrder(self.save_as_btn, self.reload_btn)
         
@@ -183,11 +195,20 @@ class PromptEditorMainWindow(QMainWindow):
         self.default_prompt_combo.currentTextChanged.connect(self.on_default_changed)
         default_form.addRow("Default Style:", self.default_prompt_combo)
         
-        # Default model
+        # Default model with refresh button
+        model_layout = QHBoxLayout()
         self.default_model_combo = QComboBox()
         self.default_model_combo.setAccessibleDescription("Select which AI model to use as default")
         self.default_model_combo.currentTextChanged.connect(self.on_default_changed)
-        default_form.addRow("Default Model:", self.default_model_combo)
+        model_layout.addWidget(self.default_model_combo)
+        
+        self.refresh_models_btn = QPushButton("🔄")
+        self.refresh_models_btn.setMaximumWidth(30)
+        self.refresh_models_btn.setAccessibleDescription("Refresh available models from Ollama")
+        self.refresh_models_btn.clicked.connect(self.populate_model_combo)
+        model_layout.addWidget(self.refresh_models_btn)
+        
+        default_form.addRow("Default Model:", model_layout)
         
         default_layout.addLayout(default_form)
         
@@ -421,30 +442,53 @@ class PromptEditorMainWindow(QMainWindow):
             self.default_prompt_combo.setCurrentText(default_style)
     
     def populate_model_combo(self):
-        """Populate the default model combo box"""
+        """Populate the default model combo box with installed Ollama models"""
         self.default_model_combo.clear()
-        available_models = self.config_data.get('available_models', {})
         
-        # Add models with descriptions for user clarity
-        for model_name, model_info in available_models.items():
-            description = model_info.get('description', '')
-            recommended = model_info.get('recommended', False)
-            display_text = f"{model_name}"
-            if recommended:
-                display_text += " (Recommended)"
-            if description:
-                display_text += f" - {description}"
+        try:
+            # Get models from Ollama
+            if ollama is None:
+                raise ImportError("Ollama module not available")
             
-            self.default_model_combo.addItem(display_text, model_name)
-        
-        # Set current default
-        default_model = self.config_data.get('default_model', '')
-        if default_model:
-            # Find the index of the model
-            for i in range(self.default_model_combo.count()):
-                if self.default_model_combo.itemData(i) == default_model:
-                    self.default_model_combo.setCurrentIndex(i)
-                    break
+            models_response = ollama.list()
+            available_models = [model.model for model in models_response['models']]
+            
+            if not available_models:
+                self.default_model_combo.addItem("No models installed", None)
+                self.default_model_combo.setEnabled(False)
+                return
+            
+            self.default_model_combo.setEnabled(True)
+            
+            # Add models to combo box
+            for model_name in sorted(available_models):
+                # Check if we have info about this model in config
+                model_info = self.config_data.get('available_models', {}).get(model_name, {})
+                description = model_info.get('description', '')
+                recommended = model_info.get('recommended', False)
+                
+                display_text = f"{model_name}"
+                if recommended:
+                    display_text += " (Recommended)"
+                if description:
+                    display_text += f" - {description}"
+                
+                self.default_model_combo.addItem(display_text, model_name)
+            
+            # Set current default
+            default_model = self.config_data.get('default_model', '')
+            if default_model:
+                # Find the index of the model
+                for i in range(self.default_model_combo.count()):
+                    if self.default_model_combo.itemData(i) == default_model:
+                        self.default_model_combo.setCurrentIndex(i)
+                        break
+                        
+        except Exception as e:
+            # Fallback to config-based models if Ollama is not available
+            print(f"Warning: Could not load models from Ollama: {e}")
+            self.default_model_combo.addItem("Ollama not available - check installation", None)
+            self.default_model_combo.setEnabled(False)
     
     def on_prompt_selected(self, current, previous):
         """Handle prompt selection change"""
