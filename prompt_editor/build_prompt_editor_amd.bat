@@ -29,7 +29,7 @@ pyinstaller --onefile ^
     --workpath "build\prompt_editor_amd64" ^
     --specpath "build" ^
     --add-data "scripts;scripts" ^
-    --icon "viewer\icon.ico" ^
+    --target-architecture amd64 ^
     prompt_editor\prompt_editor.py
 
 if errorlevel 1 (
