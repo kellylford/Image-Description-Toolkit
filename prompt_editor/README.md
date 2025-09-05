@@ -195,7 +195,7 @@ Where each workflow config references different prompt files:
 
 **Model dropdown is empty**
 - Ensure Ollama is installed and running: `ollama --version`
-- Try clicking the refresh button (🔄) next to the model dropdown
+- Try clicking the "Refresh" button next to the model dropdown
 - Install vision models: `ollama pull moondream` or `ollama pull llava`
 - Check Ollama service status: `ollama list`
 

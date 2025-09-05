@@ -202,8 +202,8 @@ class PromptEditorMainWindow(QMainWindow):
         self.default_model_combo.currentTextChanged.connect(self.on_default_changed)
         model_layout.addWidget(self.default_model_combo)
         
-        self.refresh_models_btn = QPushButton("🔄")
-        self.refresh_models_btn.setMaximumWidth(30)
+        self.refresh_models_btn = QPushButton("Refresh")
+        self.refresh_models_btn.setMaximumWidth(60)
         self.refresh_models_btn.setAccessibleDescription("Refresh available models from Ollama")
         self.refresh_models_btn.clicked.connect(self.populate_model_combo)
         model_layout.addWidget(self.refresh_models_btn)
