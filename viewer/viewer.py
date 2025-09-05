@@ -9,6 +9,40 @@ import subprocess
 import re
 import time
 from pathlib import Path
+
+def get_scripts_directory():
+    """Get the scripts directory path, handling both development and bundled scenarios."""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller executable
+        print(f"Running as bundled executable from: {sys.executable}")
+        
+        # First try: Scripts directory should be bundled alongside the executable
+        base_dir = Path(sys.executable).parent
+        scripts_dir = base_dir / "scripts"
+        print(f"Checking for scripts at: {scripts_dir}")
+        
+        # If scripts not found next to executable, try in the bundled resources
+        if not scripts_dir.exists():
+            print("Scripts not found next to executable, checking bundled resources...")
+            # PyInstaller stores bundled data in sys._MEIPASS
+            if hasattr(sys, '_MEIPASS'):
+                scripts_dir = Path(sys._MEIPASS) / "scripts"
+                print(f"Checking bundled scripts at: {scripts_dir}")
+        
+        if scripts_dir.exists():
+            print(f"Found scripts directory at: {scripts_dir}")
+        else:
+            print(f"WARNING: Scripts directory not found! Tried: {base_dir / 'scripts'}")
+            if hasattr(sys, '_MEIPASS'):
+                print(f"Also tried: {Path(sys._MEIPASS) / 'scripts'}")
+        
+        return scripts_dir
+    else:
+        # Running in development mode
+        scripts_dir = Path(__file__).parent.parent / "scripts"
+        print(f"Development mode - scripts directory: {scripts_dir}")
+        return scripts_dir
+
 try:
     import ollama
 except ImportError:
@@ -230,7 +264,7 @@ class RedescribeWorker(QThread):
     def run(self):
         try:
             # Import the ImageDescriber class
-            scripts_dir = Path(__file__).parent.parent / "scripts"
+            scripts_dir = get_scripts_directory()
             sys.path.insert(0, str(scripts_dir))
             
             # Change to scripts directory so config file is found correctly
@@ -364,7 +398,7 @@ class RedescribeDialog(QDialog):
             self.model_combo.addItems(self.available_models)
             
             # Load prompt styles from config
-            scripts_dir = Path(__file__).parent.parent / "scripts"
+            scripts_dir = get_scripts_directory()
             config_file = scripts_dir / "image_describer_config.json"
             
             if config_file.exists():
