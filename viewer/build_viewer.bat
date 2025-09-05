@@ -49,84 +49,47 @@ if exist *.spec del *.spec
 REM Create dist directory structure
 mkdir dist
 
-REM Build for current architecture first
-echo ========================================
-echo Building for current architecture (%ARCH%)
-echo ========================================
+REM Always build for both AMD64 and ARM64 architectures
+set BUILD_ARCHITECTURES=amd64 arm64
 
-REM Determine architecture suffix
-set ARCH_SUFFIX=amd64
-if /i "%ARCH%"=="amd64" set ARCH_SUFFIX=amd64
-if /i "%ARCH%"=="x86_64" set ARCH_SUFFIX=amd64
-if /i "%ARCH%"=="x86" set ARCH_SUFFIX=x86
-if /i "%ARCH%"=="i386" set ARCH_SUFFIX=x86
-if /i "%ARCH%"=="i686" set ARCH_SUFFIX=x86
-if /i "%ARCH%"=="arm64" set ARCH_SUFFIX=arm64
-if /i "%ARCH%"=="aarch64" set ARCH_SUFFIX=arm64
-
-echo Architecture suffix: %ARCH_SUFFIX%
-
-python -m PyInstaller ^
-    --onefile ^
-    --windowed ^
-    --name ImageDescriptionViewer-%ARCH_SUFFIX% ^
-    --distpath dist/%ARCH_SUFFIX% ^
-    --add-data "../scripts;scripts" ^
-    --hidden-import PyQt6.QtCore ^
-    --hidden-import PyQt6.QtGui ^
-    --hidden-import PyQt6.QtWidgets ^
-    --hidden-import PyQt6.QtSvg ^
-    --collect-all PyQt6 ^
-    viewer.py
-
-if errorlevel 1 (
-    echo.
-    echo ERROR: Build failed for %ARCH_SUFFIX%!
-    pause
-    exit /b 1
-)
-
-echo Build completed for %ARCH_SUFFIX%!
-
-REM Clean up intermediate files before next build
-if exist build rmdir /s /q build
-if exist *.spec del *.spec
-
-REM If we're on AMD64, also try to build for ARM64 (cross-compilation)
-if /i "%ARCH_SUFFIX%"=="amd64" (
+for %%A in (%BUILD_ARCHITECTURES%) do (
     echo.
     echo ========================================
-    echo Attempting cross-compilation for ARM64
+    echo Building for %%A architecture
     echo ========================================
-    echo Note: This may not work depending on your Python installation
-    echo.
     
-    REM Try to build ARM64 version (this may fail on some systems)
+    REM Set target architecture flags
+    set TARGET_FLAGS=
+    if /i "%%A"=="arm64" set TARGET_FLAGS=--target-architecture arm64
+    
     python -m PyInstaller ^
         --onefile ^
         --windowed ^
-        --name ImageDescriptionViewer-arm64 ^
-        --distpath dist/arm64 ^
+        --name ImageDescriptionViewer-%%A ^
+        --distpath dist/%%A ^
         --add-data "../scripts;scripts" ^
         --hidden-import PyQt6.QtCore ^
         --hidden-import PyQt6.QtGui ^
         --hidden-import PyQt6.QtWidgets ^
         --hidden-import PyQt6.QtSvg ^
         --collect-all PyQt6 ^
-        --target-architecture arm64 ^
+        !TARGET_FLAGS! ^
         viewer.py
     
     if errorlevel 1 (
-        echo WARNING: ARM64 cross-compilation failed
-        echo This is normal - ARM64 builds typically require an ARM64 system
-        echo Only %ARCH_SUFFIX% build is available
+        echo.
+        echo WARNING: Build failed for %%A architecture!
+        echo This may be due to cross-compilation limitations.
+        echo Continuing with other architectures...
     ) else (
-        echo ARM64 cross-compilation successful!
+        echo Build completed successfully for %%A!
     )
     
-    REM Clean up intermediate files
+    REM Clean up intermediate files before next build
     if exist build rmdir /s /q build
     if exist *.spec del *.spec
+    
+    echo.
 )
 
 echo.
@@ -205,8 +168,12 @@ if exist *.spec del *.spec
 
 echo.
 echo ========================================
-echo BUILD COMPLETED SUCCESSFULLY!
+echo BUILD PROCESS COMPLETED!
 echo ========================================
+echo.
+echo Note: Cross-compilation may not work on all systems.
+echo ARM64 builds typically require an ARM64 host system.
+echo AMD64 builds should work on most systems.
 echo.
 echo Available builds in 'dist' folder:
 for /d %%D in (dist\*) do (
