@@ -101,6 +101,21 @@ class PromptEditorMainWindow(QMainWindow):
         # Set initial splitter sizes (30% left, 70% right)
         splitter.setSizes([300, 600])
         
+        # Set proper tab order for accessibility
+        self.set_tab_order()
+        
+    def set_tab_order(self):
+        """Set the logical tab order for keyboard navigation"""
+        # Tab order: List -> Name Edit -> Text Edit -> Buttons
+        self.setTabOrder(self.prompt_list, self.prompt_name_edit)
+        self.setTabOrder(self.prompt_name_edit, self.prompt_text_edit)
+        self.setTabOrder(self.prompt_text_edit, self.add_prompt_btn)
+        self.setTabOrder(self.add_prompt_btn, self.delete_prompt_btn)
+        self.setTabOrder(self.delete_prompt_btn, self.duplicate_prompt_btn)
+        self.setTabOrder(self.duplicate_prompt_btn, self.default_prompt_combo)
+        self.setTabOrder(self.default_prompt_combo, self.save_btn)
+        self.setTabOrder(self.save_btn, self.reload_btn)
+        
     def create_left_panel(self):
         """Create the left panel with prompt list and controls"""
         left_widget = QWidget()
@@ -114,6 +129,13 @@ class PromptEditorMainWindow(QMainWindow):
         self.prompt_list.setAccessibleName("Prompt List")
         self.prompt_list.setAccessibleDescription("List of available prompt styles. Select one to edit.")
         self.prompt_list.currentItemChanged.connect(self.on_prompt_selected)
+        # Improve focus visibility
+        self.prompt_list.setStyleSheet("""
+            QListWidget:focus {
+                border: 2px solid #0078d4;
+                background-color: #f0f8ff;
+            }
+        """)
         list_layout.addWidget(self.prompt_list)
         
         # Prompt list buttons
@@ -186,6 +208,13 @@ class PromptEditorMainWindow(QMainWindow):
         self.prompt_name_edit = QLineEdit()
         self.prompt_name_edit.setAccessibleDescription("Edit the name/key for this prompt style")
         self.prompt_name_edit.textChanged.connect(self.on_prompt_name_changed)
+        # Improve focus visibility
+        self.prompt_name_edit.setStyleSheet("""
+            QLineEdit:focus {
+                border: 2px solid #0078d4;
+                background-color: #f0f8ff;
+            }
+        """)
         name_layout.addWidget(self.prompt_name_edit)
         
         right_layout.addWidget(name_group)
@@ -198,6 +227,13 @@ class PromptEditorMainWindow(QMainWindow):
         self.prompt_text_edit.setAccessibleDescription("Edit the prompt text that will be sent to the AI model")
         self.prompt_text_edit.setTabChangesFocus(True)  # Tab advances focus instead of inserting tabs
         self.prompt_text_edit.textChanged.connect(self.on_prompt_text_changed)
+        # Improve focus visibility
+        self.prompt_text_edit.setStyleSheet("""
+            QTextEdit:focus {
+                border: 2px solid #0078d4;
+                background-color: #f0f8ff;
+            }
+        """)
         
         # Set a monospace font for better editing
         font = QFont("Consolas", 10)
