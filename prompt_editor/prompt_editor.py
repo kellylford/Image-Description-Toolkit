@@ -54,9 +54,19 @@ class PromptEditorMainWindow(QMainWindow):
         
         # Load initial data
         self.load_config()
+        self.update_window_title()
         
         # Remove auto-save timer - only save when user explicitly requests it
         # Auto-save was causing unwanted file modifications without user consent
+        
+    def update_window_title(self):
+        """Update the window title to show current file"""
+        file_name = self.config_file.name
+        base_title = "Image Description Prompt Editor"
+        if self.modified:
+            self.setWindowTitle(f"{base_title} - {file_name} *")
+        else:
+            self.setWindowTitle(f"{base_title} - {file_name}")
         
     def find_config_file(self):
         """Find the image_describer_config.json file"""
@@ -111,8 +121,10 @@ class PromptEditorMainWindow(QMainWindow):
         self.setTabOrder(self.add_prompt_btn, self.delete_prompt_btn)
         self.setTabOrder(self.delete_prompt_btn, self.duplicate_prompt_btn)
         self.setTabOrder(self.duplicate_prompt_btn, self.default_prompt_combo)
-        self.setTabOrder(self.default_prompt_combo, self.save_btn)
-        self.setTabOrder(self.save_btn, self.reload_btn)
+        self.setTabOrder(self.default_prompt_combo, self.default_model_combo)
+        self.setTabOrder(self.default_model_combo, self.save_btn)
+        self.setTabOrder(self.save_btn, self.save_as_btn)
+        self.setTabOrder(self.save_as_btn, self.reload_btn)
         
     def create_left_panel(self):
         """Create the left panel with prompt list and controls"""
@@ -160,14 +172,23 @@ class PromptEditorMainWindow(QMainWindow):
         left_layout.addWidget(list_group)
         
         # Default prompt group
-        default_group = QGroupBox("Default Prompt")
+        default_group = QGroupBox("Default Settings")
         default_layout = QVBoxLayout(default_group)
         
         default_form = QFormLayout()
+        
+        # Default prompt style
         self.default_prompt_combo = QComboBox()
         self.default_prompt_combo.setAccessibleDescription("Select which prompt style to use as default")
         self.default_prompt_combo.currentTextChanged.connect(self.on_default_changed)
         default_form.addRow("Default Style:", self.default_prompt_combo)
+        
+        # Default model
+        self.default_model_combo = QComboBox()
+        self.default_model_combo.setAccessibleDescription("Select which AI model to use as default")
+        self.default_model_combo.currentTextChanged.connect(self.on_default_changed)
+        default_form.addRow("Default Model:", self.default_model_combo)
+        
         default_layout.addLayout(default_form)
         
         left_layout.addWidget(default_group)
@@ -176,11 +197,21 @@ class PromptEditorMainWindow(QMainWindow):
         action_group = QGroupBox("Actions")
         action_layout = QVBoxLayout(action_group)
         
-        self.save_btn = QPushButton("Save Changes")
-        self.save_btn.setAccessibleDescription("Save all changes to the configuration file")
+        # Save buttons in horizontal layout
+        save_layout = QHBoxLayout()
+        
+        self.save_btn = QPushButton("Save")
+        self.save_btn.setAccessibleDescription("Save changes to the current configuration file")
         self.save_btn.clicked.connect(self.save_config)
         self.save_btn.setEnabled(False)
-        action_layout.addWidget(self.save_btn)
+        save_layout.addWidget(self.save_btn)
+        
+        self.save_as_btn = QPushButton("Save As...")
+        self.save_as_btn.setAccessibleDescription("Save configuration to a new file")
+        self.save_as_btn.clicked.connect(self.save_as_config)
+        save_layout.addWidget(self.save_as_btn)
+        
+        action_layout.addLayout(save_layout)
         
         self.reload_btn = QPushButton("Reload from File")
         self.reload_btn.setAccessibleDescription("Discard changes and reload from configuration file")
@@ -269,6 +300,18 @@ class PromptEditorMainWindow(QMainWindow):
         save_action.triggered.connect(self.save_config)
         file_menu.addAction(save_action)
         
+        save_as_action = QAction("Save As...", self)
+        save_as_action.setShortcut("Ctrl+Shift+S")
+        save_as_action.triggered.connect(self.save_as_config)
+        file_menu.addAction(save_as_action)
+        
+        file_menu.addSeparator()
+        
+        open_action = QAction("Open...", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.triggered.connect(self.open_config)
+        file_menu.addAction(open_action)
+        
         reload_action = QAction("Reload", self)
         reload_action.setShortcut("F5")
         reload_action.triggered.connect(self.reload_config)
@@ -334,6 +377,7 @@ class PromptEditorMainWindow(QMainWindow):
             
             self.populate_prompt_list()
             self.populate_default_combo()
+            self.populate_model_combo()
             self.modified = False
             self.update_ui_state()
             self.status_bar.showMessage(f"Loaded configuration from {self.config_file.name}")
@@ -375,6 +419,32 @@ class PromptEditorMainWindow(QMainWindow):
         default_style = self.config_data.get('default_prompt_style', '')
         if default_style in prompt_variations:
             self.default_prompt_combo.setCurrentText(default_style)
+    
+    def populate_model_combo(self):
+        """Populate the default model combo box"""
+        self.default_model_combo.clear()
+        available_models = self.config_data.get('available_models', {})
+        
+        # Add models with descriptions for user clarity
+        for model_name, model_info in available_models.items():
+            description = model_info.get('description', '')
+            recommended = model_info.get('recommended', False)
+            display_text = f"{model_name}"
+            if recommended:
+                display_text += " (Recommended)"
+            if description:
+                display_text += f" - {description}"
+            
+            self.default_model_combo.addItem(display_text, model_name)
+        
+        # Set current default
+        default_model = self.config_data.get('default_model', '')
+        if default_model:
+            # Find the index of the model
+            for i in range(self.default_model_combo.count()):
+                if self.default_model_combo.itemData(i) == default_model:
+                    self.default_model_combo.setCurrentIndex(i)
+                    break
     
     def on_prompt_selected(self, current, previous):
         """Handle prompt selection change"""
@@ -438,16 +508,15 @@ class PromptEditorMainWindow(QMainWindow):
         """Mark the configuration as modified"""
         if not self.modified:
             self.modified = True
-            self.setWindowTitle("Image Description Prompt Editor *")
+            self.update_window_title()
             self.save_btn.setEnabled(True)
     
     def update_ui_state(self):
         """Update UI state based on current data"""
+        self.update_window_title()
         if self.modified:
-            self.setWindowTitle("Image Description Prompt Editor *")
             self.save_btn.setEnabled(True)
         else:
-            self.setWindowTitle("Image Description Prompt Editor")
             self.save_btn.setEnabled(False)
     
     def add_new_prompt(self):
@@ -469,6 +538,7 @@ class PromptEditorMainWindow(QMainWindow):
             
             self.populate_prompt_list()
             self.populate_default_combo()
+            self.populate_model_combo()
             
             # Select the new prompt
             for i in range(self.prompt_list.count()):
@@ -506,6 +576,7 @@ class PromptEditorMainWindow(QMainWindow):
         
         self.populate_prompt_list()
         self.populate_default_combo()
+        self.populate_model_combo()
         
         # Select the new prompt
         for i in range(self.prompt_list.count()):
@@ -540,6 +611,7 @@ class PromptEditorMainWindow(QMainWindow):
             
             self.populate_prompt_list()
             self.populate_default_combo()
+            self.populate_model_combo()
             self.clear_editor()
             self.mark_modified()
     
@@ -567,6 +639,10 @@ class PromptEditorMainWindow(QMainWindow):
             # Update default prompt style
             self.config_data['default_prompt_style'] = self.default_prompt_combo.currentText()
             
+            # Update default model
+            if self.default_model_combo.currentData():
+                self.config_data['default_model'] = self.default_model_combo.currentData()
+            
             # Create backup before saving
             if self.config_file.exists():
                 backup_path = self.config_file.with_suffix('.bak')
@@ -582,9 +658,11 @@ class PromptEditorMainWindow(QMainWindow):
             # Block signals during UI updates to prevent marking as modified
             self.prompt_list.blockSignals(True)
             self.default_prompt_combo.blockSignals(True)
+            self.default_model_combo.blockSignals(True)
             
             self.populate_prompt_list()
             self.populate_default_combo()
+            self.populate_model_combo()
             
             # Re-select current prompt
             if self.current_prompt_name:
@@ -597,12 +675,99 @@ class PromptEditorMainWindow(QMainWindow):
             # Restore signals
             self.prompt_list.blockSignals(False)
             self.default_prompt_combo.blockSignals(False)
+            self.default_model_combo.blockSignals(False)
             
             self.status_bar.showMessage("Configuration saved successfully", 3000)
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save configuration:\n{e}")
     
+    def save_as_config(self):
+        """Save the configuration to a new file"""
+        try:
+            # Get file path from user
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Configuration As",
+                str(self.config_file.parent / "custom_prompts.json"),
+                "JSON files (*.json);;All files (*.*)"
+            )
+            
+            if not file_path:
+                return
+            
+            # Update the current prompt if one is being edited
+            if self.current_prompt_name and self.prompt_name_edit.text().strip():
+                new_name = self.prompt_name_edit.text().strip()
+                new_text = self.prompt_text_edit.toPlainText()
+                
+                # Handle name change
+                if new_name != self.current_prompt_name:
+                    # Remove old entry
+                    self.config_data['prompt_variations'].pop(self.current_prompt_name, None)
+                    
+                    # Update default if it was pointing to the old name
+                    if self.config_data.get('default_prompt_style') == self.current_prompt_name:
+                        self.config_data['default_prompt_style'] = new_name
+                
+                # Set new/updated entry
+                self.config_data['prompt_variations'][new_name] = new_text
+                self.current_prompt_name = new_name
+            
+            # Update default prompt style and model
+            self.config_data['default_prompt_style'] = self.default_prompt_combo.currentText()
+            if self.default_model_combo.currentData():
+                self.config_data['default_model'] = self.default_model_combo.currentData()
+            
+            # Save to the new file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config_data, f, indent=2, ensure_ascii=False)
+            
+            # Update current file reference
+            self.config_file = Path(file_path)
+            self.modified = False
+            self.update_ui_state()
+            self.update_window_title()
+            
+            self.status_bar.showMessage(f"Configuration saved as {file_path}", 3000)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save configuration:\n{e}")
+    
+    def open_config(self):
+        """Open a different configuration file"""
+        if self.modified:
+            reply = QMessageBox.question(self, "Open Configuration",
+                                       "You have unsaved changes. Are you sure you want to open a different file?",
+                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        
+        try:
+            # Get file path from user
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Open Configuration",
+                str(self.config_file.parent),
+                "JSON files (*.json);;All files (*.*)"
+            )
+            
+            if not file_path:
+                return
+            
+            # Update current file reference
+            self.config_file = Path(file_path)
+            
+            # Load the new configuration
+            self.load_config()
+            self.clear_editor()
+            self.update_window_title()
+            
+            self.status_bar.showMessage(f"Opened {file_path}", 3000)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to open configuration:\n{e}")
+
     def reload_config(self):
         """Reload configuration from file"""
         if self.modified:
