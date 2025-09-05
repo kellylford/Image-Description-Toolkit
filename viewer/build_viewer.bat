@@ -32,9 +32,10 @@ if errorlevel 1 (
 
 echo.
 echo Detecting system architecture...
-set ARCH=unknown
-for /f "tokens=2 delims==" %%a in ('wmic os get osarchitecture /value ^| find "="') do set ARCH=%%a
-echo Current architecture: %ARCH%
+
+REM Use Python to detect architecture - more reliable than wmic
+for /f "usebackq tokens=*" %%i in (`python -c "import platform; print(platform.machine().lower())"`) do set ARCH=%%i
+echo Detected architecture: %ARCH%
 
 echo.
 echo Building standalone executables for multiple architectures...
@@ -54,10 +55,16 @@ echo Building for current architecture (%ARCH%)
 echo ========================================
 
 REM Determine architecture suffix
-set ARCH_SUFFIX=unknown
-if /i "%ARCH%"=="64-bit" set ARCH_SUFFIX=amd64
-if /i "%ARCH%"=="32-bit" set ARCH_SUFFIX=x86
-if /i "%ARCH%"=="ARM64" set ARCH_SUFFIX=arm64
+set ARCH_SUFFIX=amd64
+if /i "%ARCH%"=="amd64" set ARCH_SUFFIX=amd64
+if /i "%ARCH%"=="x86_64" set ARCH_SUFFIX=amd64
+if /i "%ARCH%"=="x86" set ARCH_SUFFIX=x86
+if /i "%ARCH%"=="i386" set ARCH_SUFFIX=x86
+if /i "%ARCH%"=="i686" set ARCH_SUFFIX=x86
+if /i "%ARCH%"=="arm64" set ARCH_SUFFIX=arm64
+if /i "%ARCH%"=="aarch64" set ARCH_SUFFIX=arm64
+
+echo Architecture suffix: %ARCH_SUFFIX%
 
 python -m PyInstaller ^
     --onefile ^
