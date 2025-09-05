@@ -55,10 +55,8 @@ class PromptEditorMainWindow(QMainWindow):
         # Load initial data
         self.load_config()
         
-        # Set up auto-save timer
-        self.auto_save_timer = QTimer()
-        self.auto_save_timer.timeout.connect(self.auto_save)
-        self.auto_save_timer.start(30000)  # Auto-save every 30 seconds
+        # Remove auto-save timer - only save when user explicitly requests it
+        # Auto-save was causing unwanted file modifications without user consent
         
     def find_config_file(self):
         """Find the image_describer_config.json file"""
@@ -604,15 +602,6 @@ class PromptEditorMainWindow(QMainWindow):
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save configuration:\n{e}")
-    
-    def auto_save(self):
-        """Auto-save if modified"""
-        if self.modified:
-            try:
-                self.save_config()
-                self.status_bar.showMessage("Auto-saved", 2000)
-            except Exception:
-                pass  # Ignore auto-save errors
     
     def reload_config(self):
         """Reload configuration from file"""
