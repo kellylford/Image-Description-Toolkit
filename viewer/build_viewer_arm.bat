@@ -1,17 +1,5 @@
 @echo off
-echo Building Image Description Viewer...
-echo.
-
-REM Get architecture using Python
-for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
-
-REM Map architecture names
-if "%ARCH%"=="aarch64" set ARCH=arm64
-if "%ARCH%"=="arm64" set ARCH=arm64
-if "%ARCH%"=="amd64" set ARCH=amd64
-if "%ARCH%"=="x86_64" set ARCH=amd64
-
-echo Detected architecture: %ARCH%
+echo Building Image Description Viewer for ARM64...
 echo.
 
 REM Check if PyInstaller is installed
@@ -30,40 +18,42 @@ REM Create output directory
 if not exist "dist" mkdir dist
 if not exist "dist\viewer" mkdir dist\viewer
 
-REM Build the executable
-echo Building viewer executable...
+REM Build the executable for ARM64
+echo Building ARM64 viewer executable...
 echo.
 
 pyinstaller --onefile ^
     --windowed ^
-    --name "viewer_%ARCH%" ^
+    --name "viewer_arm64" ^
     --distpath "dist\viewer" ^
-    --workpath "build\viewer_%ARCH%" ^
+    --workpath "build\viewer_arm64" ^
     --specpath "build" ^
     --add-data "../scripts;scripts" ^
     --hidden-import PyQt6.QtCore ^
     --hidden-import PyQt6.QtGui ^
     --hidden-import PyQt6.QtWidgets ^
+    --target-architecture arm64 ^
     viewer.py
 
 if errorlevel 1 (
-    echo Build failed!
+    echo ARM64 build failed!
+    echo Note: Cross-compilation to ARM64 may require an ARM64 host system.
     pause
     exit /b 1
 )
 
 echo.
-echo Build completed successfully!
-echo Executable created: dist\viewer\viewer_%ARCH%.exe
+echo ARM64 build completed successfully!
+echo Executable created: dist\viewer\viewer_arm64.exe
 echo.
 
 REM Test the executable
-echo Testing executable...
+echo Testing ARM64 executable...
 echo.
 cd dist\viewer
-start "" "viewer_%ARCH%.exe"
+start "" "viewer_arm64.exe"
 cd ..\..
 
 echo.
-echo Build and test completed!
+echo ARM64 build and test completed!
 pause
