@@ -1,6 +1,20 @@
-# Workflow output directories (timestamped)
-workflow_output_*/
-workflow_output
+# ==================================================
+# Image Description Toolkit - Git Ignore Rules
+# ==================================================
+
+# Workflow output directories (all patterns)
+# These are created when scripts run and contain processed images/descriptions
+workflow_*/
+workflow_output*/
+comprehensive_test*
+*_workflow_*
+*_test_*
+
+# PyInstaller build artifacts
+# Generated when building standalone executables
+build/
+dist/
+*.spec
 
 # Python cache and temporary files
 __pycache__/
@@ -11,27 +25,67 @@ __pycache__/
 *.so
 .coverage
 .pytest_cache/
+*.egg-info/
+.tox/
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
 env/
+ENV/
 
-# IDE files
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
 
-# OS files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# Log files
+# Log files and directories
 *.log
 logs/
-/comprehensive_test_20250728_085248
-/comprehensive_test_20250728_102305
-/comprehensive_test_20250728_115411
-/workflow_moondream_narrative_20250801_095758
-/comprehensive_test*
+log/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# Configuration overrides (keep templates)
+*_local.json
+*_override.json
+
+# Test output and artifacts
+test_output/
+test_results/
+
+# Documentation build outputs
+docs/_build/
+docs/build/
+
+# Package manager artifacts
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Application specific temp files
+*.pid
+*.seed
+*.uuid
+
+# Windows build artifacts
+*.exe.config
+*.exe.manifest
