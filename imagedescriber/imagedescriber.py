@@ -1269,7 +1269,14 @@ class ImageDescriberGUI(QMainWindow):
     
     def update_window_title(self):
         """Update the window title"""
-        title = "ImageDescriber"
+        # Start with filter status
+        filter_display = {
+            "all": "All",
+            "described": "Described", 
+            "batch": "Batch"
+        }
+        title = f"[{filter_display.get(self.filter_mode, 'All')}] ImageDescriber"
+        
         if self.current_workspace_file:
             title += f" - {Path(self.current_workspace_file).name}"
             if not self.workspace.saved:
@@ -2022,6 +2029,9 @@ class ImageDescriberGUI(QMainWindow):
         
         # Refresh the view with filter applied
         self.refresh_view()
+        
+        # Update window title to show current filter
+        self.update_window_title()
 
     def process_all(self):
         """Process all images and extract video frames"""
