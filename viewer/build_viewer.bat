@@ -3,7 +3,7 @@ echo Building Image Description Viewer...
 echo.
 
 REM Get architecture using Python
-for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
+for /f "tokens=*" %%i in ('C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/python.exe -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
 
 REM Map architecture names
 if "%ARCH%"=="aarch64" set ARCH=arm64
@@ -15,10 +15,10 @@ echo Detected architecture: %ARCH%
 echo.
 
 REM Check if PyInstaller is installed
-python -c "import PyInstaller" 2>nul
+C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/python.exe -c "import PyInstaller" 2>nul
 if errorlevel 1 (
     echo PyInstaller not found. Installing...
-    pip install pyinstaller
+    C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/pip.exe install pyinstaller
     if errorlevel 1 (
         echo Failed to install PyInstaller. Exiting.
         pause
@@ -34,13 +34,13 @@ REM Build the executable
 echo Building viewer executable...
 echo.
 
-pyinstaller --onefile ^
+C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/pyinstaller.exe --onefile ^
     --windowed ^
     --name "viewer_%ARCH%" ^
     --distpath "dist\viewer" ^
     --workpath "build\viewer_%ARCH%" ^
     --specpath "build" ^
-    --add-data "../scripts;scripts" ^
+    --add-data "C:\Users\kelly\GitHub\Image-Description-Toolkit\scripts;scripts" ^
     --hidden-import PyQt6.QtCore ^
     --hidden-import PyQt6.QtGui ^
     --hidden-import PyQt6.QtWidgets ^
