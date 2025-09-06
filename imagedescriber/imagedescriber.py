@@ -2294,8 +2294,8 @@ class ImageDescriberGUI(QMainWindow):
         )
         
         # Connect signals for live updates
-        worker.finished.connect(lambda fp, desc, model, prompt, custom: self._on_process_all_item_complete(fp, desc, model, prompt, custom))
-        worker.error.connect(lambda fp, error: self._on_process_all_item_failed(fp, error))
+        worker.processing_complete.connect(lambda fp, desc, model, prompt, custom: self._on_process_all_item_complete(fp, desc, model, prompt, custom))
+        worker.processing_failed.connect(lambda fp, error: self._on_process_all_item_failed(fp, error))
         
         # Store reference and start
         self.workers.append(worker)
@@ -2371,12 +2371,12 @@ class ImageDescriberGUI(QMainWindow):
                 return
             
             # Use existing ConvertImage functionality
-            from scripts.ConvertImage import convert_heic_to_jpeg
+            from scripts.ConvertImage import convert_heic_to_jpg
             
             for item in heic_items:
                 try:
                     # Convert the file
-                    output_path = convert_heic_to_jpeg(item.file_path)
+                    output_path = convert_heic_to_jpg(item.file_path)
                     if output_path and os.path.exists(output_path):
                         # Add converted file to workspace
                         converted_item = ImageItem(output_path, "image")
