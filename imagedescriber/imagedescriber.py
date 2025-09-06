@@ -45,16 +45,143 @@ from PyQt6.QtWidgets import (
     QMenuBar, QMenu, QFileDialog, QMessageBox, QDialog, QDialogButtonBox,
     QComboBox, QProgressBar, QStatusBar, QTreeWidget, QTreeWidgetItem,
     QInputDialog, QPlainTextEdit, QCheckBox, QPushButton, QFormLayout,
-    QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup, QGroupBox
+    QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup, QGroupBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QMutex, QMutexLocker
 from PyQt6.QtGui import (
     QAction, QKeySequence, QClipboard, QGuiApplication, QPixmap, QImage,
-    QFont, QColor
+    QFont, QColor, QDoubleValidator, QIntValidator
 )
 
 # Document format for ImageDescriber workspace
 WORKSPACE_VERSION = "1.0"
+
+
+# ================================
+# ACCESSIBILITY IMPROVEMENTS
+# ================================
+
+class AccessibleTreeWidget(QTreeWidget):
+    """Enhanced QTreeWidget with better accessibility support"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAccessibilityMode(True)
+    
+    def setAccessibilityMode(self, enabled=True):
+        """Enable enhanced accessibility features"""
+        if enabled:
+            # Ensure proper focus policy
+            self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            
+            # Enable better keyboard navigation
+            self.setSelectionBehavior(QTreeWidget.SelectionBehavior.SelectRows)
+            self.setUniformRowHeights(True)
+            
+            # Connect to selection changes for better announcements
+            self.itemSelectionChanged.connect(self._announce_selection)
+    
+    def _announce_selection(self):
+        """Provide enhanced announcements for screen readers"""
+        current = self.currentItem()
+        if current:
+            # Get accessible description from the item
+            accessible_desc = current.data(0, Qt.ItemDataRole.AccessibleDescriptionRole)
+            if accessible_desc:
+                # Set it as the widget's accessible description for immediate announcement
+                self.setAccessibleDescription(f"Selected: {accessible_desc}")
+
+
+class AccessibleNumericInput(QLineEdit):
+    """Accessible numeric input that replaces QSpinBox/QDoubleSpinBox"""
+    
+    def __init__(self, parent=None, is_integer=False, minimum=None, maximum=None, suffix=""):
+        super().__init__(parent)
+        self.is_integer = is_integer
+        self.suffix = suffix
+        self._setup_validation(minimum, maximum)
+        self._setup_accessibility()
+        
+    def _setup_validation(self, minimum, maximum):
+        """Setup input validation"""
+        if self.is_integer:
+            validator = QIntValidator()
+            if minimum is not None:
+                validator.setBottom(int(minimum))
+            if maximum is not None:
+                validator.setTop(int(maximum))
+        else:
+            validator = QDoubleValidator()
+            if minimum is not None:
+                validator.setBottom(minimum)
+            if maximum is not None:
+                validator.setTop(maximum)
+            validator.setDecimals(2)
+        
+        self.setValidator(validator)
+        
+    def _setup_accessibility(self):
+        """Setup accessibility features"""
+        # Improve focus policy and keyboard handling
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+        # Add placeholder text to help users understand the format
+        if self.is_integer:
+            self.setPlaceholderText(f"Enter number{self.suffix}")
+        else:
+            self.setPlaceholderText(f"Enter decimal number{self.suffix}")
+    
+    def setValue(self, value):
+        """Set the numeric value"""
+        if self.is_integer:
+            self.setText(str(int(value)))
+        else:
+            self.setText(f"{value:.1f}")
+    
+    def value(self):
+        """Get the numeric value"""
+        text = self.text()
+        if not text:
+            return 0.0 if not self.is_integer else 0
+        
+        try:
+            if self.is_integer:
+                return int(text)
+            else:
+                return float(text)
+        except ValueError:
+            return 0.0 if not self.is_integer else 0
+
+
+class AccessibleTextEdit(QPlainTextEdit):
+    """Text edit with proper Tab key handling for accessibility"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_accessibility()
+    
+    def _setup_accessibility(self):
+        """Setup accessibility and keyboard handling"""
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+    def keyPressEvent(self, event):
+        """Override to handle Tab key properly for accessibility"""
+        if event.key() == Qt.Key.Key_Tab:
+            # Tab should move to next widget, not insert tab character
+            self.focusNextChild()
+            event.accept()
+        elif event.key() == Qt.Key.Key_Backtab:
+            # Shift+Tab should move to previous widget
+            self.focusPreviousChild()
+            event.accept()
+        else:
+            # For all other keys, use default behavior
+            super().keyPressEvent(event)
+
+
+# ================================
+# EXISTING CLASSES (UNCHANGED)
+# ================================
 
 
 class ImageDescription:
@@ -658,9 +785,11 @@ class ProcessingDialog(QDialog):
         self.custom_checkbox = QCheckBox("Use custom prompt")
         layout.addWidget(self.custom_checkbox)
         
-        self.custom_prompt = QPlainTextEdit()
+        self.custom_prompt = AccessibleTextEdit()
         self.custom_prompt.setMaximumHeight(100)
         self.custom_prompt.setEnabled(False)
+        self.custom_prompt.setAccessibleName("Custom Prompt")
+        self.custom_prompt.setAccessibleDescription("Enter custom prompt text. Tab key moves to next field.")
         layout.addWidget(self.custom_prompt)
         
         self.custom_checkbox.toggled.connect(self.custom_prompt.setEnabled)
@@ -815,43 +944,43 @@ class VideoProcessingDialog(QDialog):
         extraction_layout.addRow("", self.scene_detection_radio)
         
         # Time interval settings
-        self.time_interval = QDoubleSpinBox()
-        self.time_interval.setRange(0.1, 3600.0)
+        self.time_interval = AccessibleNumericInput(minimum=0.1, maximum=3600.0, suffix=" seconds")
         self.time_interval.setValue(5.0)
-        self.time_interval.setSuffix(" seconds")
+        self.time_interval.setAccessibleName("Time Interval")
+        self.time_interval.setAccessibleDescription("Interval between frame extractions in seconds")
         extraction_layout.addRow("Time Interval:", self.time_interval)
         
         # Scene detection settings
-        self.scene_threshold = QDoubleSpinBox()
-        self.scene_threshold.setRange(1.0, 100.0)
+        self.scene_threshold = AccessibleNumericInput(minimum=1.0, maximum=100.0, suffix="%")
         self.scene_threshold.setValue(30.0)
-        self.scene_threshold.setSuffix("%")
+        self.scene_threshold.setAccessibleName("Scene Change Threshold")
+        self.scene_threshold.setAccessibleDescription("Percentage threshold for detecting scene changes")
         extraction_layout.addRow("Scene Change Threshold:", self.scene_threshold)
         
-        self.min_scene_duration = QDoubleSpinBox()
-        self.min_scene_duration.setRange(0.1, 60.0)
+        self.min_scene_duration = AccessibleNumericInput(minimum=0.1, maximum=60.0, suffix=" seconds")
         self.min_scene_duration.setValue(1.0)
-        self.min_scene_duration.setSuffix(" seconds")
+        self.min_scene_duration.setAccessibleName("Minimum Scene Duration")
+        self.min_scene_duration.setAccessibleDescription("Minimum duration for a scene in seconds")
         extraction_layout.addRow("Min Scene Duration:", self.min_scene_duration)
         
         # Time range
-        self.start_time = QDoubleSpinBox()
-        self.start_time.setRange(0.0, 86400.0)
+        self.start_time = AccessibleNumericInput(minimum=0.0, maximum=86400.0, suffix=" seconds")
         self.start_time.setValue(0.0)
-        self.start_time.setSuffix(" seconds")
+        self.start_time.setAccessibleName("Start Time")
+        self.start_time.setAccessibleDescription("Start time for frame extraction in seconds")
         extraction_layout.addRow("Start Time:", self.start_time)
         
-        self.end_time = QDoubleSpinBox()
-        self.end_time.setRange(0.0, 86400.0)
+        self.end_time = AccessibleNumericInput(minimum=0.0, maximum=86400.0, suffix=" seconds")
         self.end_time.setValue(0.0)
-        self.end_time.setSuffix(" seconds (0 = end)")
+        self.end_time.setAccessibleName("End Time")
+        self.end_time.setAccessibleDescription("End time for frame extraction in seconds (0 means end of video)")
         extraction_layout.addRow("End Time:", self.end_time)
         
         # Max frames limit
-        self.max_frames = QSpinBox()
-        self.max_frames.setRange(0, 10000)
+        self.max_frames = AccessibleNumericInput(is_integer=True, minimum=0, maximum=10000, suffix=" frames")
         self.max_frames.setValue(0)
-        self.max_frames.setSuffix(" (0 = no limit)")
+        self.max_frames.setAccessibleName("Maximum Frames")
+        self.max_frames.setAccessibleDescription("Maximum number of frames to extract (0 means no limit)")
         extraction_layout.addRow("Max Frames:", self.max_frames)
         
         layout.addWidget(extraction_group)
@@ -874,10 +1003,12 @@ class VideoProcessingDialog(QDialog):
         processing_layout.addRow(self.custom_checkbox)
         
         # Custom prompt
-        self.custom_prompt = QPlainTextEdit()
+        self.custom_prompt = AccessibleTextEdit()
         self.custom_prompt.setMaximumHeight(100)
         self.custom_prompt.setPlaceholderText("Enter custom prompt (used when 'Custom' is selected)")
         self.custom_prompt.setEnabled(False)  # Start disabled
+        self.custom_prompt.setAccessibleName("Custom Prompt")
+        self.custom_prompt.setAccessibleDescription("Enter custom prompt text. Tab key moves to next field.")
         processing_layout.addRow("Custom Prompt:", self.custom_prompt)
         
         # Connect checkbox to enable/disable custom prompt
@@ -1063,7 +1194,7 @@ class ImageDescriberGUI(QMainWindow):
         left_layout = QVBoxLayout(left_panel)
         
         left_layout.addWidget(QLabel("Images:"))
-        self.image_tree = QTreeWidget()
+        self.image_tree = AccessibleTreeWidget()
         self.image_tree.setHeaderLabels(["File", "Status"])
         self.image_tree.setAccessibleName("Image List")
         self.image_tree.setAccessibleDescription("List of images in the workspace. Use arrow keys to navigate, P to process selected image, B to mark for batch.")
@@ -1083,7 +1214,7 @@ class ImageDescriberGUI(QMainWindow):
         right_layout = QVBoxLayout(right_panel)
         
         right_layout.addWidget(QLabel("Descriptions:"))
-        self.description_tree = QTreeWidget()
+        self.description_tree = AccessibleTreeWidget()
         self.description_tree.setHeaderLabels(["Description", "Model", "Created"])
         self.description_tree.setAccessibleName("Description List")
         self.description_tree.setAccessibleDescription("List of descriptions for the selected image. Use arrow keys to navigate and view different descriptions.")
