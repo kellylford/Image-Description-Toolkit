@@ -510,6 +510,56 @@ class ProcessingWorker(QThread):
             return image_data  # Return original if resize fails
 
 
+class WorkflowProcessWorker(QThread):
+    """Worker thread for running the proven workflow system"""
+    progress_updated = pyqtSignal(str)
+    workflow_complete = pyqtSignal(str, str)  # input_dir, output_dir
+    workflow_failed = pyqtSignal(str)  # error
+    
+    def __init__(self, cmd, input_dir, output_dir):
+        super().__init__()
+        self.cmd = cmd
+        self.input_dir = str(input_dir)
+        self.output_dir = str(output_dir)
+    
+    def run(self):
+        """Run the workflow command and monitor progress"""
+        try:
+            import subprocess
+            
+            # Start the workflow process
+            self.progress_updated.emit("Starting workflow process...")
+            
+            process = subprocess.Popen(
+                self.cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                universal_newlines=True
+            )
+            
+            # Monitor output for progress
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    line = output.strip()
+                    if line:
+                        # Emit progress updates
+                        self.progress_updated.emit(f"Workflow: {line}")
+            
+            # Check if process completed successfully
+            return_code = process.poll()
+            if return_code == 0:
+                self.workflow_complete.emit(self.input_dir, self.output_dir)
+            else:
+                self.workflow_failed.emit(f"Workflow process failed with code {return_code}")
+                
+        except Exception as e:
+            self.workflow_failed.emit(f"Error running workflow: {str(e)}")
+
+
 class ConversionWorker(QThread):
     """Worker thread for file conversions"""
     progress_updated = pyqtSignal(str)
@@ -2211,41 +2261,73 @@ class ImageDescriberGUI(QMainWindow):
         self._start_comprehensive_processing(model, prompt_style, custom_prompt)
     
     def _start_comprehensive_processing(self, model, prompt_style, custom_prompt):
-        """Start comprehensive processing with live updates like the viewer app"""
-        self.status_bar.showMessage("Starting comprehensive processing...")
+        """Start comprehensive processing using the proven workflow system"""
+        if not self.workspace.directory_path:
+            QMessageBox.warning(self, "No Directory", "Please load a directory first.")
+            return
         
-        # Step 1: Convert HEIC files first
-        heic_items = [item for item in self.workspace.items.values() 
-                     if item.item_type == "image" and item.file_path.lower().endswith(('.heic', '.heif'))]
-        
-        if heic_items:
-            self.status_bar.showMessage(f"Converting {len(heic_items)} HEIC files...")
-            self.convert_heic_files()
-            # Refresh view to show converted files
-            self.refresh_view()
-        
-        # Step 2: Extract video frames (using default settings)
-        video_items = [item for item in self.workspace.items.values() if item.item_type == "video"]
-        if video_items:
-            self.status_bar.showMessage(f"Extracting frames from {len(video_items)} videos...")
-            for video_item in video_items:
-                self._extract_video_frames_with_defaults(video_item.file_path)
-            # Refresh view to show extracted frames
-            self.refresh_view()
-        
-        # Step 3: Process all images (including converted HEIC and extracted frames)
-        all_image_items = []
-        for item in self.workspace.items.values():
-            if item.item_type == "image" or item.item_type == "extracted_frame":
-                # Only process if no descriptions exist (avoid re-processing)
-                if not item.descriptions:
-                    all_image_items.append(item.file_path)
-        
-        if all_image_items:
-            self.status_bar.showMessage(f"Processing {len(all_image_items)} images with live updates...")
-            self._process_images_with_live_updates(all_image_items, model, prompt_style, custom_prompt)
-        else:
-            self.status_bar.showMessage("All items already have descriptions. Process All complete.", 5000)
+        try:
+            # Use the existing proven workflow system instead of reinventing
+            import subprocess
+            import sys
+            from pathlib import Path
+            
+            input_dir = Path(self.workspace.directory_path)
+            output_dir = input_dir / "workflow_output"
+            
+            # Build workflow command with current settings
+            cmd = [
+                sys.executable, 
+                str(Path(__file__).parent.parent / "scripts" / "workflow.py"),
+                str(input_dir),
+                "--output-dir", str(output_dir),
+                "--steps", "video,convert,describe",  # Skip HTML for now
+                "--model", model,
+                "--prompt-style", prompt_style
+            ]
+            
+            if custom_prompt:
+                cmd.extend(["--custom-prompt", custom_prompt])
+            
+            self.status_bar.showMessage("Starting comprehensive processing with proven workflow...")
+            
+            # Start the workflow as a background process
+            self._start_workflow_process(cmd, input_dir, output_dir)
+            
+        except Exception as e:
+            self.status_bar.showMessage(f"Error starting workflow: {str(e)}", 5000)
+    
+    def _start_workflow_process(self, cmd, input_dir, output_dir):
+        """Start the workflow process and monitor for completion"""
+        try:
+            # Create a worker to run the workflow
+            self.workflow_worker = WorkflowProcessWorker(cmd, input_dir, output_dir)
+            self.workflow_worker.progress_updated.connect(self._on_workflow_progress)
+            self.workflow_worker.workflow_complete.connect(self._on_workflow_complete)
+            self.workflow_worker.workflow_failed.connect(self._on_workflow_failed)
+            
+            self.workflow_worker.start()
+            
+        except Exception as e:
+            self.status_bar.showMessage(f"Error starting workflow process: {str(e)}", 5000)
+    
+    def _on_workflow_progress(self, message):
+        """Handle workflow progress updates"""
+        self.status_bar.showMessage(message, 2000)
+    
+    def _on_workflow_complete(self, input_dir, output_dir):
+        """Handle workflow completion - reload directory to show new files"""
+        try:
+            # Reload the directory to pick up new converted images and descriptions
+            self.load_directory_path(str(input_dir))
+            self.status_bar.showMessage("Comprehensive processing complete! Directory reloaded with new content.", 5000)
+            
+        except Exception as e:
+            self.status_bar.showMessage(f"Workflow completed but reload failed: {str(e)}", 5000)
+    
+    def _on_workflow_failed(self, error):
+        """Handle workflow failure"""
+        self.status_bar.showMessage(f"Workflow failed: {error}", 5000)
     
     def _extract_video_frames_with_defaults(self, video_path):
         """Extract video frames using default settings"""
