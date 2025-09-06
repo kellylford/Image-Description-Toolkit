@@ -692,7 +692,7 @@ class ProcessingDialog(QDialog):
                 
                 # If no models found, add some common vision models as options
                 if not available_models:
-                    default_models = ['moondream', 'gemma2', 'llava']
+                    default_models = ['moondream', 'gemma3', 'llava']
                     for model in default_models:
                         self.model_combo.addItem(model)
                     
@@ -703,7 +703,7 @@ class ProcessingDialog(QDialog):
                 
             else:
                 # Ollama not available, add default options
-                default_models = ['moondream', 'gemma2', 'llava']
+                default_models = ['moondream', 'gemma3', 'llava']
                 for model in default_models:
                     self.model_combo.addItem(model)
                 print("Warning: Ollama not available. Please install Ollama and vision models.")
@@ -1530,11 +1530,11 @@ class ImageDescriberGUI(QMainWindow):
                             models.append(model_name)
                 
                 if not models:
-                    models = ['moondream', 'gemma2', 'llava']
+                    models = ['moondream', 'gemma3', 'llava']
             else:
-                models = ['moondream', 'gemma2', 'llava']
+                models = ['moondream', 'gemma3', 'llava']
         except Exception:
-            models = ['moondream', 'gemma2', 'llava']
+            models = ['moondream', 'gemma3', 'llava']
         
         # Get available prompts - same as ProcessingDialog
         prompts = ['detailed', 'concise', 'Narrative', 'artistic', 'technical', 'colorful', 'social', 'Custom']
