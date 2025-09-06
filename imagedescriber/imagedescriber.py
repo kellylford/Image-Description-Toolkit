@@ -1436,6 +1436,7 @@ class ImageDescriberGUI(QMainWindow):
                 return
         
         self.workspace = ImageWorkspace()
+        self.workspace.saved = True  # Mark new workspace as saved to avoid unsaved changes loop
         self.current_workspace_file = None
         self.batch_queue.clear()
         self.image_tree.clear()
@@ -2165,56 +2166,250 @@ class ImageDescriberGUI(QMainWindow):
         self.update_window_title()
 
     def process_all(self):
-        """Process all images and extract video frames"""
+        """Process all images with automatic HEIC conversion and video frame extraction"""
         if not self.workspace.items:
             QMessageBox.information(self, "No Items", "No images or videos found in workspace.")
             return
         
-        # Show processing dialog first
+        # Count what needs processing
+        image_count = sum(1 for item in self.workspace.items.values() if item.item_type == "image")
+        video_count = sum(1 for item in self.workspace.items.values() if item.item_type == "video")
+        heic_count = sum(1 for item in self.workspace.items.values() 
+                        if item.item_type == "image" and item.file_path.lower().endswith(('.heic', '.heif')))
+        
+        # Show confirmation with what will be processed
+        message = f"Process All will:\n\n"
+        if heic_count > 0:
+            message += f"• Convert {heic_count} HEIC files to JPEG\n"
+        if video_count > 0:
+            message += f"• Extract frames from {video_count} videos (using default settings)\n"
+        if image_count > 0:
+            message += f"• Generate descriptions for {image_count} images\n"
+        message += f"\nDescriptions will appear as they are generated (like the viewer app).\n\nContinue?"
+        
+        reply = QMessageBox.question(
+            self, "Process All", message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        # Show processing dialog for AI model/prompt selection
         dialog = ProcessingDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            model, prompt_style, custom_prompt = dialog.get_selections()
-            
-            # Optional verification
-            if not getattr(self, '_skip_verification', True):
-                if not self.check_ollama_status():
-                    return
-                if not self.verify_model_available(model):
-                    return
-            
-            # Collect all items for processing
-            all_items = []
-            video_items = []
-            
-            for item in self.workspace.items.values():
-                if item.item_type == "image":
-                    all_items.append(item)
-                elif item.item_type == "video":
-                    video_items.append(item)
-            
-            # Extract frames from videos first
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        
+        model, prompt_style, custom_prompt = dialog.get_selections()
+        
+        # Optional verification
+        if not getattr(self, '_skip_verification', True):
+            if not self.check_ollama_status():
+                return
+            if not self.verify_model_available(model):
+                return
+        
+        # Start comprehensive processing
+        self._start_comprehensive_processing(model, prompt_style, custom_prompt)
+    
+    def _start_comprehensive_processing(self, model, prompt_style, custom_prompt):
+        """Start comprehensive processing with live updates"""
+        self.status_bar.showMessage("Starting comprehensive processing...")
+        
+        # Step 1: Convert HEIC files
+        heic_items = [item for item in self.workspace.items.values() 
+                     if item.item_type == "image" and item.file_path.lower().endswith(('.heic', '.heif'))]
+        
+        if heic_items:
+            self.status_bar.showMessage(f"Converting {len(heic_items)} HEIC files...")
+            self.convert_heic_files()
+            # Note: conversion happens synchronously, so we can continue
+        
+        # Step 2: Extract video frames (using default settings)
+        video_items = [item for item in self.workspace.items.values() if item.item_type == "video"]
+        if video_items:
+            self.status_bar.showMessage(f"Extracting frames from {len(video_items)} videos...")
             for video_item in video_items:
                 if not video_item.extracted_frames:
-                    # TODO: Implement automatic video frame extraction
-                    pass
+                    self._extract_frames_with_defaults(video_item.file_path)
+        
+        # Step 3: Process all images (including newly converted and extracted frames)
+        self._process_all_images_live(model, prompt_style, custom_prompt)
+    
+    def _extract_frames_with_defaults(self, video_path):
+        """Extract frames using default settings (5 second intervals)"""
+        try:
+            import cv2
+            import os
+            from pathlib import Path
             
-            # Process all images (including extracted frames)
-            if all_items:
-                self.batch_total = len(all_items)
-                self.batch_completed = 0
-                self.batch_processing = True
-                self.update_window_title()
+            # Default settings: 5 second intervals, no time limits
+            time_interval = 5.0
+            start_time = 0.0
+            end_time = 0.0  # 0 means end of video
+            max_frames = 0  # 0 means no limit
+            
+            # Create output directory
+            output_dir = os.path.join(os.path.dirname(video_path), 
+                                    f"{Path(video_path).stem}_frames")
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Extract frames
+            cap = cv2.VideoCapture(video_path)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            duration = total_frames / fps if fps > 0 else 0
+            
+            if end_time == 0:
+                end_time = duration
+            
+            extracted_paths = []
+            frame_interval = int(fps * time_interval)
+            frame_count = 0
+            saved_count = 0
+            
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
                 
-                for item in all_items:
-                    worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
-                    worker.progress_updated.connect(self.on_processing_progress)
-                    worker.processing_complete.connect(self.on_batch_item_complete)
-                    worker.processing_failed.connect(self.on_batch_item_failed)
+                current_time = frame_count / fps
+                if current_time < start_time:
+                    frame_count += 1
+                    continue
+                if current_time > end_time:
+                    break
+                
+                if frame_count % frame_interval == 0:
+                    if max_frames > 0 and saved_count >= max_frames:
+                        break
                     
-                    self.processing_workers.append(worker)
-                    worker.start()
+                    # Save frame
+                    frame_filename = f"frame_{saved_count:04d}.jpg"
+                    frame_path = os.path.join(output_dir, frame_filename)
+                    cv2.imwrite(frame_path, frame)
+                    
+                    # Add to workspace
+                    frame_item = ImageItem(frame_path, "extracted_frame")
+                    frame_item.parent_video = video_path
+                    self.workspace.add_item(frame_item)
+                    extracted_paths.append(frame_path)
+                    
+                    saved_count += 1
                 
-                self.update_stop_button_state()
+                frame_count += 1
+            
+            cap.release()
+            
+            # Update video item with extracted frames
+            video_item = self.workspace.get_item(video_path)
+            if video_item:
+                video_item.extracted_frames = extracted_paths
+            
+            self.workspace.mark_modified()
+            self.refresh_view()
+            
+        except Exception as e:
+            self.status_bar.showMessage(f"Frame extraction failed: {str(e)}", 5000)
+    
+    def _process_all_images_live(self, model, prompt_style, custom_prompt):
+        """Process all images with live updates like the viewer"""
+        # Get all processable images
+        all_images = []
+        for item in self.workspace.items.values():
+            if item.item_type in ["image", "extracted_frame"]:
+                all_images.append(item)
+        
+        if not all_images:
+            self.status_bar.showMessage("No images to process", 3000)
+            return
+        
+        # Set up batch processing with live updates
+        self.batch_total = len(all_images)
+        self.batch_completed = 0
+        self.batch_processing = True
+        self.update_window_title()
+        
+        self.status_bar.showMessage(f"Processing {len(all_images)} images with live updates...")
+        
+        # Process images one by one to show live updates
+        for item in all_images:
+            worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
+            worker.progress_updated.connect(self.on_processing_progress)
+            worker.processing_complete.connect(self._on_live_processing_complete)
+            worker.processing_failed.connect(self._on_live_processing_failed)
+            
+            self.processing_workers.append(worker)
+            worker.start()
+        
+        self.update_stop_button_state()
+    
+    def _on_live_processing_complete(self, file_path: str, description: str, model: str, prompt_style: str, custom_prompt: str):
+        """Handle processing completion with live updates"""
+        # Call the regular completion handler
+        self.on_processing_complete(file_path, description, model, prompt_style, custom_prompt)
+        
+        # Update batch progress
+        self.batch_completed += 1
+        self.update_window_title()
+        
+        # Refresh view immediately to show new description (like viewer app)
+        self.refresh_view()
+        
+        # Auto-select the newly processed item if nothing else is selected
+        current_item = self.image_tree.currentItem()
+        if not current_item:
+            # Find and select the processed item
+            for i in range(self.image_tree.topLevelItemCount()):
+                item = self.image_tree.topLevelItem(i)
+                item_path = item.data(0, Qt.ItemDataRole.UserRole)
+                if item_path == file_path:
+                    self.image_tree.setCurrentItem(item)
+                    break
+        
+        # Show status update
+        self.status_bar.showMessage(
+            f"Processed {self.batch_completed} of {self.batch_total}: {Path(file_path).name}", 
+            2000
+        )
+        
+        # Check if batch is complete
+        if self.batch_completed >= self.batch_total:
+            self.batch_processing = False
+            total_processed = self.batch_total
+            self.batch_total = 0
+            self.batch_completed = 0
+            self.update_window_title()
+            self.status_bar.showMessage(f"Process All complete: {total_processed} items processed", 5000)
+            
+            # Show completion dialog
+            self.show_batch_completion_dialog(total_processed, has_errors=False)
+    
+    def _on_live_processing_failed(self, file_path: str, error: str):
+        """Handle processing failure with live updates"""
+        # Call the regular failure handler
+        self.on_processing_failed(file_path, error)
+        
+        # Update batch progress
+        self.batch_completed += 1
+        self.update_window_title()
+        
+        # Show status update
+        self.status_bar.showMessage(
+            f"Failed {self.batch_completed} of {self.batch_total}: {Path(file_path).name}", 
+            3000
+        )
+        
+        # Check if batch is complete
+        if self.batch_completed >= self.batch_total:
+            self.batch_processing = False
+            total_processed = self.batch_total
+            self.batch_total = 0
+            self.batch_completed = 0
+            self.update_window_title()
+            self.status_bar.showMessage(f"Process All finished with errors: {total_processed} items processed", 5000)
+            
+            # Show completion dialog
+            self.show_batch_completion_dialog(total_processed, has_errors=True)
 
     def show_all_descriptions_dialog(self):
         """Show all descriptions in a single list for easy browsing"""
