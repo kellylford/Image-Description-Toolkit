@@ -256,13 +256,13 @@ class ImageItem:
 
 class ImageWorkspace:
     """Document model for ImageDescriber workspace"""
-    def __init__(self):
+    def __init__(self, new_workspace=False):
         self.version = WORKSPACE_VERSION
         self.directory_path = ""
         self.items: Dict[str, ImageItem] = {}
         self.created = datetime.now().isoformat()
         self.modified = self.created
-        self.saved = False
+        self.saved = new_workspace  # New workspaces start as saved
         
     def add_item(self, item: ImageItem):
         self.items[item.file_path] = item
@@ -1435,8 +1435,7 @@ class ImageDescriberGUI(QMainWindow):
             if reply == QMessageBox.StandardButton.No:
                 return
         
-        self.workspace = ImageWorkspace()
-        self.workspace.saved = True  # Mark new workspace as saved to avoid unsaved changes loop
+        self.workspace = ImageWorkspace(new_workspace=True)  # Explicitly mark as new workspace
         self.current_workspace_file = None
         self.batch_queue.clear()
         self.image_tree.clear()
@@ -2212,104 +2211,184 @@ class ImageDescriberGUI(QMainWindow):
         self._start_comprehensive_processing(model, prompt_style, custom_prompt)
     
     def _start_comprehensive_processing(self, model, prompt_style, custom_prompt):
-        """Start comprehensive processing with live updates"""
+        """Start comprehensive processing with live updates like the viewer app"""
         self.status_bar.showMessage("Starting comprehensive processing...")
         
-        # Step 1: Convert HEIC files
+        # Step 1: Convert HEIC files first
         heic_items = [item for item in self.workspace.items.values() 
                      if item.item_type == "image" and item.file_path.lower().endswith(('.heic', '.heif'))]
         
         if heic_items:
             self.status_bar.showMessage(f"Converting {len(heic_items)} HEIC files...")
             self.convert_heic_files()
-            # Note: conversion happens synchronously, so we can continue
+            # Refresh view to show converted files
+            self.refresh_view()
         
         # Step 2: Extract video frames (using default settings)
         video_items = [item for item in self.workspace.items.values() if item.item_type == "video"]
         if video_items:
             self.status_bar.showMessage(f"Extracting frames from {len(video_items)} videos...")
             for video_item in video_items:
-                if not video_item.extracted_frames:
-                    self._extract_frames_with_defaults(video_item.file_path)
+                self._extract_video_frames_with_defaults(video_item.file_path)
+            # Refresh view to show extracted frames
+            self.refresh_view()
         
-        # Step 3: Process all images (including newly converted and extracted frames)
-        self._process_all_images_live(model, prompt_style, custom_prompt)
+        # Step 3: Process all images (including converted HEIC and extracted frames)
+        all_image_items = []
+        for item in self.workspace.items.values():
+            if item.item_type == "image" or item.item_type == "extracted_frame":
+                # Only process if no descriptions exist (avoid re-processing)
+                if not item.descriptions:
+                    all_image_items.append(item.file_path)
+        
+        if all_image_items:
+            self.status_bar.showMessage(f"Processing {len(all_image_items)} images with live updates...")
+            self._process_images_with_live_updates(all_image_items, model, prompt_style, custom_prompt)
+        else:
+            self.status_bar.showMessage("All items already have descriptions. Process All complete.", 5000)
     
-    def _extract_frames_with_defaults(self, video_path):
-        """Extract frames using default settings (5 second intervals)"""
+    def _extract_video_frames_with_defaults(self, video_path):
+        """Extract video frames using default settings"""
         try:
-            import cv2
-            import os
-            from pathlib import Path
+            # Use default settings: 5 second intervals, full video duration
+            self.extract_video_frames(
+                video_path=video_path,
+                time_interval=5.0,
+                start_time=0.0,
+                end_time=0.0,  # 0 means full video
+                max_frames=0,  # 0 means no limit
+                use_scene_detection=False
+            )
+        except Exception as e:
+            self.status_bar.showMessage(f"Error extracting frames from {Path(video_path).name}: {str(e)}", 5000)
+    
+    def _process_images_with_live_updates(self, image_paths, model, prompt_style, custom_prompt):
+        """Process images with live updates like the viewer app"""
+        if not image_paths:
+            return
+        
+        # Set up live processing with immediate UI updates
+        self.processing_items.update(image_paths)
+        self.refresh_view()  # Show processing indicators immediately
+        
+        # Start processing first image
+        self._current_process_all_queue = image_paths.copy()
+        self._current_process_all_model = model
+        self._current_process_all_prompt = prompt_style
+        self._current_process_all_custom = custom_prompt
+        
+        # Process first image
+        if self._current_process_all_queue:
+            first_image = self._current_process_all_queue.pop(0)
+            self.status_bar.showMessage(f"Processing {Path(first_image).name}... ({len(image_paths) - len(self._current_process_all_queue)} of {len(image_paths)})")
+            self._process_single_for_process_all(first_image)
+    
+    def _process_single_for_process_all(self, file_path):
+        """Process a single image as part of Process All with live updates"""
+        # Create and start worker thread
+        worker = ProcessingWorker(
+            file_path, 
+            self._current_process_all_model, 
+            self._current_process_all_prompt, 
+            self._current_process_all_custom
+        )
+        
+        # Connect signals for live updates
+        worker.finished.connect(lambda fp, desc, model, prompt, custom: self._on_process_all_item_complete(fp, desc, model, prompt, custom))
+        worker.error.connect(lambda fp, error: self._on_process_all_item_failed(fp, error))
+        
+        # Store reference and start
+        self.workers.append(worker)
+        worker.start()
+    
+    def _on_process_all_item_complete(self, file_path, description, model, prompt_style, custom_prompt):
+        """Handle completion of single item in Process All - with live updates"""
+        # Add description to workspace
+        workspace_item = self.workspace.get_item(file_path)
+        if workspace_item:
+            desc = ImageDescription(description, model, prompt_style, custom_prompt=custom_prompt)
+            workspace_item.descriptions.append(desc)
+            self.workspace.mark_modified()
+        
+        # Remove from processing items
+        self.processing_items.discard(file_path)
+        
+        # Refresh view immediately to show new description (like viewer app)
+        self.refresh_view()
+        
+        # Update status
+        remaining = len(self._current_process_all_queue)
+        total = len(getattr(self, '_current_process_all_queue', [])) + 1
+        processed = total - remaining
+        
+        if remaining > 0:
+            # Process next image
+            next_image = self._current_process_all_queue.pop(0)
+            self.status_bar.showMessage(f"Processing {Path(next_image).name}... ({processed} of {total} complete)")
+            self._process_single_for_process_all(next_image)
+        else:
+            # All done
+            self.status_bar.showMessage(f"Process All complete! {processed} images processed.", 5000)
+            # Clean up
+            if hasattr(self, '_current_process_all_queue'):
+                delattr(self, '_current_process_all_queue')
+            if hasattr(self, '_current_process_all_model'):
+                delattr(self, '_current_process_all_model')
+            if hasattr(self, '_current_process_all_prompt'):
+                delattr(self, '_current_process_all_prompt')
+            if hasattr(self, '_current_process_all_custom'):
+                delattr(self, '_current_process_all_custom')
+    
+    def _on_process_all_item_failed(self, file_path, error):
+        """Handle failure of single item in Process All"""
+        # Remove from processing items
+        self.processing_items.discard(file_path)
+        
+        # Refresh view to remove processing indicator
+        self.refresh_view()
+        
+        # Log error but continue processing
+        self.status_bar.showMessage(f"Error processing {Path(file_path).name}: {error}", 3000)
+        
+        # Continue with next image
+        remaining = len(getattr(self, '_current_process_all_queue', []))
+        if remaining > 0:
+            next_image = self._current_process_all_queue.pop(0)
+            self.status_bar.showMessage(f"Processing {Path(next_image).name}... (continuing after error)")
+            self._process_single_for_process_all(next_image)
+        else:
+            # All done (even with errors)
+            self.status_bar.showMessage("Process All complete (some items had errors).", 5000)
+    
+    def convert_heic_files(self):
+        """Convert HEIC files to JPEG format using existing functionality"""
+        try:
+            # Get all HEIC files
+            heic_items = [item for item in self.workspace.items.values() 
+                         if item.item_type == "image" and item.file_path.lower().endswith(('.heic', '.heif'))]
             
-            # Default settings: 5 second intervals, no time limits
-            time_interval = 5.0
-            start_time = 0.0
-            end_time = 0.0  # 0 means end of video
-            max_frames = 0  # 0 means no limit
+            if not heic_items:
+                return
             
-            # Create output directory
-            output_dir = os.path.join(os.path.dirname(video_path), 
-                                    f"{Path(video_path).stem}_frames")
-            os.makedirs(output_dir, exist_ok=True)
+            # Use existing ConvertImage functionality
+            from scripts.ConvertImage import convert_heic_to_jpeg
             
-            # Extract frames
-            cap = cv2.VideoCapture(video_path)
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            duration = total_frames / fps if fps > 0 else 0
-            
-            if end_time == 0:
-                end_time = duration
-            
-            extracted_paths = []
-            frame_interval = int(fps * time_interval)
-            frame_count = 0
-            saved_count = 0
-            
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                
-                current_time = frame_count / fps
-                if current_time < start_time:
-                    frame_count += 1
-                    continue
-                if current_time > end_time:
-                    break
-                
-                if frame_count % frame_interval == 0:
-                    if max_frames > 0 and saved_count >= max_frames:
-                        break
-                    
-                    # Save frame
-                    frame_filename = f"frame_{saved_count:04d}.jpg"
-                    frame_path = os.path.join(output_dir, frame_filename)
-                    cv2.imwrite(frame_path, frame)
-                    
-                    # Add to workspace
-                    frame_item = ImageItem(frame_path, "extracted_frame")
-                    frame_item.parent_video = video_path
-                    self.workspace.add_item(frame_item)
-                    extracted_paths.append(frame_path)
-                    
-                    saved_count += 1
-                
-                frame_count += 1
-            
-            cap.release()
-            
-            # Update video item with extracted frames
-            video_item = self.workspace.get_item(video_path)
-            if video_item:
-                video_item.extracted_frames = extracted_paths
+            for item in heic_items:
+                try:
+                    # Convert the file
+                    output_path = convert_heic_to_jpeg(item.file_path)
+                    if output_path and os.path.exists(output_path):
+                        # Add converted file to workspace
+                        converted_item = ImageItem(output_path, "image")
+                        self.workspace.add_item(converted_item)
+                        self.status_bar.showMessage(f"Converted {Path(item.file_path).name}", 2000)
+                except Exception as e:
+                    self.status_bar.showMessage(f"Failed to convert {Path(item.file_path).name}: {str(e)}", 3000)
             
             self.workspace.mark_modified()
-            self.refresh_view()
             
         except Exception as e:
-            self.status_bar.showMessage(f"Frame extraction failed: {str(e)}", 5000)
+            self.status_bar.showMessage(f"HEIC conversion error: {str(e)}", 5000)
     
     def _process_all_images_live(self, model, prompt_style, custom_prompt):
         """Process all images with live updates like the viewer"""
