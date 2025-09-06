@@ -2375,13 +2375,22 @@ class ImageDescriberGUI(QMainWindow):
             
             for item in heic_items:
                 try:
-                    # Convert the file
-                    output_path = convert_heic_to_jpg(item.file_path)
-                    if output_path and os.path.exists(output_path):
-                        # Add converted file to workspace
-                        converted_item = ImageItem(output_path, "image")
-                        self.workspace.add_item(converted_item)
-                        self.status_bar.showMessage(f"Converted {Path(item.file_path).name}", 2000)
+                    # Convert the file (returns True/False, not path)
+                    success = convert_heic_to_jpg(item.file_path)
+                    if success:
+                        # Generate the expected output path
+                        input_path = Path(item.file_path)
+                        output_path = input_path.with_suffix('.jpg')
+                        
+                        if output_path.exists():
+                            # Add converted file to workspace
+                            converted_item = ImageItem(str(output_path), "image")
+                            self.workspace.add_item(converted_item)
+                            self.status_bar.showMessage(f"Converted {input_path.name}", 2000)
+                        else:
+                            self.status_bar.showMessage(f"Conversion succeeded but file not found: {output_path.name}", 3000)
+                    else:
+                        self.status_bar.showMessage(f"Failed to convert {Path(item.file_path).name}", 3000)
                 except Exception as e:
                     self.status_bar.showMessage(f"Failed to convert {Path(item.file_path).name}: {str(e)}", 3000)
             
