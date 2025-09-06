@@ -1025,6 +1025,9 @@ class ImageDescriberGUI(QMainWindow):
         # Filter settings
         self.filter_mode: str = "all"  # "all" or "described"
         
+        # Processing control
+        self.stop_processing_requested: bool = False
+        
         # UI setup
         self.setup_ui()
         self.setup_menus()
@@ -1158,6 +1161,11 @@ class ImageDescriberGUI(QMainWindow):
         batch_process_action = QAction("Process Batch", self)
         batch_process_action.triggered.connect(self.process_batch)
         process_menu.addAction(batch_process_action)
+        
+        self.stop_processing_action = QAction("Stop Processing", self)
+        self.stop_processing_action.setEnabled(False)  # Disabled by default
+        self.stop_processing_action.triggered.connect(self.stop_processing)
+        process_menu.addAction(self.stop_processing_action)
         
         process_menu.addSeparator()
         
@@ -1553,6 +1561,49 @@ class ImageDescriberGUI(QMainWindow):
             self._skip_verification = False
             self.status_bar.showMessage("Model verification enabled", 3000)
     
+    def stop_processing(self):
+        """Stop all active processing gracefully"""
+        self.stop_processing_requested = True
+        self.stop_processing_action.setEnabled(False)
+        
+        # Stop all active workers
+        for worker in self.processing_workers[:]:  # Use slice copy to avoid modification during iteration
+            try:
+                worker.terminate()
+                worker.wait()  # Wait for thread to actually stop
+            except:
+                pass
+        
+        for worker in self.conversion_workers[:]:
+            try:
+                worker.terminate()
+                worker.wait()
+            except:
+                pass
+        
+        # Clear worker lists
+        self.processing_workers.clear()
+        self.conversion_workers.clear()
+        
+        # Clear processing state
+        self.processing_items.clear()
+        
+        # Reset batch processing state
+        if self.batch_processing:
+            self.batch_processing = False
+            self.batch_total = 0
+            self.batch_completed = 0
+            self.update_window_title()
+        
+        # Update UI
+        self.refresh_view()
+        self.status_bar.showMessage("Processing stopped by user", 3000)
+    
+    def update_stop_button_state(self):
+        """Enable/disable stop button based on active workers"""
+        has_active_workers = bool(self.processing_workers or self.conversion_workers)
+        self.stop_processing_action.setEnabled(has_active_workers)
+    
     def process_selected(self):
         """Process the currently selected image or video"""
         current_item = self.image_tree.currentItem()
@@ -1592,6 +1643,7 @@ class ImageDescriberGUI(QMainWindow):
             
             self.processing_workers.append(worker)
             worker.start()
+            self.update_stop_button_state()
             
             # Refresh view to show processing indicator
             self.refresh_view()
@@ -1761,21 +1813,28 @@ class ImageDescriberGUI(QMainWindow):
                 if not self.verify_model_available(model):
                     return
             
-            # Process each batch item
-            self.batch_total = len(batch_items)
-            self.batch_completed = 0
-            self.batch_processing = True
-            self.update_window_title()
-            
-            for item in batch_items:
-                worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
-                worker.progress_updated.connect(self.on_processing_progress)
-                worker.processing_complete.connect(self.on_batch_item_complete)
-                worker.processing_failed.connect(self.on_batch_item_failed)
+        # Process each batch item
+        self.batch_total = len(batch_items)
+        self.batch_completed = 0
+        self.batch_processing = True
+        self.stop_processing_requested = False  # Reset stop flag
+        self.update_window_title()
+        
+        for item in batch_items:
+            # Check if stop was requested
+            if self.stop_processing_requested:
+                break
                 
-                self.processing_workers.append(worker)
-                worker.start()
-    
+            worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
+            worker.progress_updated.connect(self.on_processing_progress)
+            worker.processing_complete.connect(self.on_batch_item_complete)
+            worker.processing_failed.connect(self.on_batch_item_failed)
+            
+            self.processing_workers.append(worker)
+            worker.start()
+        
+        self.update_stop_button_state()
+
     def convert_heic_files(self):
         """Convert all HEIC files in the workspace"""
         heic_items = [item for item in self.workspace.items.values() 
@@ -1962,6 +2021,8 @@ class ImageDescriberGUI(QMainWindow):
                     
                     self.processing_workers.append(worker)
                     worker.start()
+                
+                self.update_stop_button_state()
 
     def show_all_descriptions_dialog(self):
         """Show all descriptions in a single list for easy browsing"""
@@ -2007,6 +2068,12 @@ class ImageDescriberGUI(QMainWindow):
         # Update UI
         self.refresh_view()
         
+        # Remove completed worker from list
+        sender_worker = self.sender()
+        if sender_worker in self.processing_workers:
+            self.processing_workers.remove(sender_worker)
+        self.update_stop_button_state()
+        
         # If this is the currently selected image, refresh descriptions
         current_item = self.image_tree.currentItem()
         if current_item and current_item.data(0, Qt.ItemDataRole.UserRole) == file_path:
@@ -2018,6 +2085,13 @@ class ImageDescriberGUI(QMainWindow):
         """Handle processing failure"""
         # Remove from processing set
         self.processing_items.discard(file_path)
+        
+        # Remove failed worker from list
+        sender_worker = self.sender()
+        if sender_worker in self.processing_workers:
+            self.processing_workers.remove(sender_worker)
+        self.update_stop_button_state()
+        
         self.refresh_view()  # Update display
         
         error_msg = f"Failed to process {Path(file_path).name}:\n{error}"
