@@ -50,7 +50,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QMutex, QMutexLocker
 from PyQt6.QtGui import (
     QAction, QKeySequence, QClipboard, QGuiApplication, QPixmap, QImage,
-    QFont
+    QFont, QColor
 )
 
 # Document format for ImageDescriber workspace
@@ -1023,7 +1023,7 @@ class ImageDescriberGUI(QMainWindow):
         self.batch_processing: bool = False
         
         # Filter settings
-        self.filter_mode: str = "all"  # "all" or "described"
+        self.filter_mode: str = "all"  # "all", "described", or "batch"
         
         # Processing control
         self.stop_processing_requested: bool = False
@@ -1162,6 +1162,10 @@ class ImageDescriberGUI(QMainWindow):
         batch_process_action.triggered.connect(self.process_batch)
         process_menu.addAction(batch_process_action)
         
+        clear_batch_action = QAction("Clear Batch Processing", self)
+        clear_batch_action.triggered.connect(self.clear_batch_selection)
+        process_menu.addAction(clear_batch_action)
+        
         self.stop_processing_action = QAction("Stop Processing", self)
         self.stop_processing_action.setEnabled(False)  # Disabled by default
         self.stop_processing_action.triggered.connect(self.stop_processing)
@@ -1245,6 +1249,11 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_described_action.setCheckable(True)
         self.filter_described_action.triggered.connect(lambda: self.set_filter("described"))
         filter_menu.addAction(self.filter_described_action)
+        
+        self.filter_batch_action = QAction("Show Batch Items Only", self)
+        self.filter_batch_action.setCheckable(True)
+        self.filter_batch_action.triggered.connect(lambda: self.set_filter("batch"))
+        filter_menu.addAction(self.filter_batch_action)
         
         view_menu.addSeparator()
         
@@ -1392,6 +1401,8 @@ class ImageDescriberGUI(QMainWindow):
             # Apply filter
             if self.filter_mode == "described" and not item.descriptions:
                 continue
+            elif self.filter_mode == "batch" and not item.batch_marked:
+                continue
                 
             # Create top-level item
             tree_item = QTreeWidgetItem(self.image_tree)
@@ -1419,15 +1430,24 @@ class ImageDescriberGUI(QMainWindow):
                 tree_item.setText(1, "No descriptions")
                 if file_path not in self.processing_items:
                     accessibility_desc += " - no descriptions"
+            
+            # Add batch indicator
+            if item.batch_marked:
+                if file_path not in self.processing_items:  # Don't duplicate if already has 'p'
+                    display_name = f"b {display_name}"
+                    accessibility_desc = f"b {accessibility_desc} - marked for batch processing"
+                else:
+                    accessibility_desc += " - marked for batch processing"
                     
             tree_item.setText(0, display_name)
             tree_item.setData(0, Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
             tree_item.setData(0, Qt.ItemDataRole.UserRole, file_path)
             
-            # Mark batch items
+            # Mark batch items with accessible colors
             if item.batch_marked:
-                tree_item.setBackground(0, Qt.GlobalColor.yellow)
-                tree_item.setBackground(1, Qt.GlobalColor.yellow)
+                # Use light blue background (#E3F2FD) which provides good contrast with black text
+                tree_item.setBackground(0, QColor(227, 242, 253))  # Light blue
+                tree_item.setBackground(1, QColor(227, 242, 253))
             
             # Add extracted frames as children for videos
             if item.item_type == "video" and item.extracted_frames:
@@ -1470,6 +1490,35 @@ class ImageDescriberGUI(QMainWindow):
         """Update the batch queue label"""
         batch_count = sum(1 for item in self.workspace.items.values() if item.batch_marked)
         self.batch_label.setText(f"Batch Queue: {batch_count} items")
+    
+    def clear_batch_selection(self):
+        """Clear all batch marked items"""
+        for item in self.workspace.items.values():
+            item.batch_marked = False
+        self.update_batch_label()
+        self.refresh_view()
+    
+    def show_batch_completion_dialog(self, total_processed: int, has_errors: bool = False):
+        """Show batch completion confirmation dialog"""
+        if has_errors:
+            title = "Batch Processing Finished with Errors"
+            message = f"Batch processing completed with some errors.\n{total_processed} items were processed.\n\nWould you like to clear the batch selection?"
+        else:
+            title = "Batch Processing Complete"
+            message = f"Batch processing completed successfully.\n{total_processed} items were processed.\n\nWould you like to clear the batch selection?"
+        
+        reply = QMessageBox.question(
+            self, 
+            title,
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.clear_batch_selection()
+        
+        return reply == QMessageBox.StandardButton.Yes
     
     # Event handlers
     def on_image_selection_changed(self):
@@ -1783,10 +1832,11 @@ class ImageDescriberGUI(QMainWindow):
             workspace_item.batch_marked = not workspace_item.batch_marked
             self.workspace.mark_modified()
             
-            # Update UI
+            # Update UI with accessible colors
             if workspace_item.batch_marked:
-                current_item.setBackground(0, Qt.GlobalColor.yellow)
-                current_item.setBackground(1, Qt.GlobalColor.yellow)
+                # Use light blue background (#E3F2FD) which provides good contrast with black text
+                current_item.setBackground(0, QColor(227, 242, 253))  # Light blue
+                current_item.setBackground(1, QColor(227, 242, 253))
             else:
                 current_item.setBackground(0, Qt.GlobalColor.transparent)
                 current_item.setBackground(1, Qt.GlobalColor.transparent)
@@ -1968,6 +2018,7 @@ class ImageDescriberGUI(QMainWindow):
         # Update checkable actions
         self.filter_all_action.setChecked(mode == "all")
         self.filter_described_action.setChecked(mode == "described")
+        self.filter_batch_action.setChecked(mode == "batch")
         
         # Refresh the view with filter applied
         self.refresh_view()
@@ -2131,10 +2182,14 @@ You can check Ollama logs for more details."""
         # Check if batch is complete
         if self.batch_completed >= self.batch_total:
             self.batch_processing = False
+            total_processed = self.batch_total
             self.batch_total = 0
             self.batch_completed = 0
             self.update_window_title()
-            self.status_bar.showMessage(f"Batch processing complete: {self.batch_total} items processed", 5000)
+            self.status_bar.showMessage(f"Batch processing complete: {total_processed} items processed", 5000)
+            
+            # Show confirmation dialog for clearing batch selection
+            self.show_batch_completion_dialog(total_processed, has_errors=False)
 
     def on_batch_item_failed(self, file_path: str, error: str):
         """Handle batch item failure"""
@@ -2148,10 +2203,14 @@ You can check Ollama logs for more details."""
         # Check if batch is complete
         if self.batch_completed >= self.batch_total:
             self.batch_processing = False
+            total_processed = self.batch_total
             self.batch_total = 0
             self.batch_completed = 0
             self.update_window_title()
-            self.status_bar.showMessage(f"Batch processing finished with errors: {self.batch_completed} of {self.batch_total} completed", 5000)
+            self.status_bar.showMessage(f"Batch processing finished with errors: {total_processed} items processed", 5000)
+            
+            # Show confirmation dialog for clearing batch selection
+            self.show_batch_completion_dialog(total_processed, has_errors=True)
     
     def on_conversion_complete(self, original_path: str, converted_paths: list):
         """Handle successful conversion completion"""
