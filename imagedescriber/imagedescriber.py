@@ -944,6 +944,62 @@ class VideoProcessingDialog(QDialog):
         self.prompt_combo.addItems(prompts)
 
 
+class AllDescriptionsDialog(QDialog):
+    """Dialog to show all descriptions in a single list for easy browsing"""
+    
+    def __init__(self, descriptions_data, parent=None):
+        super().__init__(parent)
+        self.descriptions_data = descriptions_data
+        self.setWindowTitle("All Descriptions")
+        self.setModal(True)
+        self.resize(800, 600)
+        
+        layout = QVBoxLayout(self)
+        
+        # Instructions
+        instructions = QLabel("Use arrow keys to navigate through all descriptions:")
+        layout.addWidget(instructions)
+        
+        # List widget
+        self.list_widget = QListWidget()
+        self.list_widget.setAccessibleName("All Descriptions List")
+        self.list_widget.setAccessibleDescription("List of all image descriptions. Use arrow keys to navigate.")
+        
+        # Populate list
+        for desc_data in descriptions_data:
+            item = QListWidgetItem(f"{desc_data['file_name']}: {desc_data['display_text'][:100]}...")
+            item.setData(Qt.ItemDataRole.UserRole, desc_data)
+            # Set full text for screen readers
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, 
+                        f"{desc_data['file_name']}: {desc_data['display_text']}")
+            self.list_widget.addItem(item)
+        
+        self.list_widget.itemSelectionChanged.connect(self.on_selection_changed)
+        layout.addWidget(self.list_widget)
+        
+        # Text area for full description
+        self.text_area = QTextEdit()
+        self.text_area.setReadOnly(True)
+        self.text_area.setAccessibleName("Full Description Text")
+        layout.addWidget(self.text_area)
+        
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        button_box.rejected.connect(self.close)
+        layout.addWidget(button_box)
+        
+        # Set initial selection
+        if self.list_widget.count() > 0:
+            self.list_widget.setCurrentRow(0)
+    
+    def on_selection_changed(self):
+        """Handle selection change in the list"""
+        current_item = self.list_widget.currentItem()
+        if current_item:
+            desc_data = current_item.data(Qt.ItemDataRole.UserRole)
+            self.text_area.setText(desc_data['description'].text)
+
+
 class ImageDescriberGUI(QMainWindow):
     """Main ImageDescriber application window"""
     
@@ -960,6 +1016,14 @@ class ImageDescriberGUI(QMainWindow):
         self.conversion_workers: List[ConversionWorker] = []
         self.batch_queue: List[str] = []
         self.processing_items: set = set()  # Track items being processed
+        
+        # Batch processing tracking
+        self.batch_total: int = 0
+        self.batch_completed: int = 0
+        self.batch_processing: bool = False
+        
+        # Filter settings
+        self.filter_mode: str = "all"  # "all" or "described"
         
         # UI setup
         self.setup_ui()
@@ -1113,6 +1177,12 @@ class ImageDescriberGUI(QMainWindow):
         extract_frames_action.triggered.connect(self.extract_video_frames)
         process_menu.addAction(extract_frames_action)
         
+        process_menu.addSeparator()
+        
+        process_all_action = QAction("Process All", self)
+        process_all_action.triggered.connect(self.process_all)
+        process_menu.addAction(process_all_action)
+        
         # Descriptions menu
         desc_menu = menubar.addMenu("Descriptions")
         
@@ -1151,6 +1221,29 @@ class ImageDescriberGUI(QMainWindow):
         collapse_action = QAction("Collapse All", self)
         collapse_action.triggered.connect(self.collapse_all)
         view_menu.addAction(collapse_action)
+        
+        view_menu.addSeparator()
+        
+        # Filter submenu
+        filter_menu = view_menu.addMenu("Filter")
+        
+        self.filter_all_action = QAction("Show All", self)
+        self.filter_all_action.setCheckable(True)
+        self.filter_all_action.setChecked(True)
+        self.filter_all_action.triggered.connect(lambda: self.set_filter("all"))
+        filter_menu.addAction(self.filter_all_action)
+        
+        self.filter_described_action = QAction("Show Described Only", self)
+        self.filter_described_action.setCheckable(True)
+        self.filter_described_action.triggered.connect(lambda: self.set_filter("described"))
+        filter_menu.addAction(self.filter_described_action)
+        
+        view_menu.addSeparator()
+        
+        # Show all descriptions in list
+        show_all_descriptions_action = QAction("Show All Descriptions in List", self)
+        show_all_descriptions_action.triggered.connect(self.show_all_descriptions_dialog)
+        view_menu.addAction(show_all_descriptions_action)
     
     def setup_shortcuts(self):
         """Setup keyboard shortcuts"""
@@ -1168,6 +1261,10 @@ class ImageDescriberGUI(QMainWindow):
             title += f" - {Path(self.workspace.directory_path).name}"
             if not self.workspace.saved:
                 title += " *"
+        
+        # Add batch processing progress if active
+        if self.batch_processing:
+            title += f" - Batch Processing: {self.batch_completed} of {self.batch_total}"
         
         self.setWindowTitle(title)
     
@@ -1282,6 +1379,10 @@ class ImageDescriberGUI(QMainWindow):
         for file_path, item in self.workspace.items.items():
             # Skip extracted frames - they'll be shown as children
             if item.item_type == "extracted_frame":
+                continue
+            
+            # Apply filter
+            if self.filter_mode == "described" and not item.descriptions:
                 continue
                 
             # Create top-level item
@@ -1661,11 +1762,16 @@ class ImageDescriberGUI(QMainWindow):
                     return
             
             # Process each batch item
+            self.batch_total = len(batch_items)
+            self.batch_completed = 0
+            self.batch_processing = True
+            self.update_window_title()
+            
             for item in batch_items:
                 worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
                 worker.progress_updated.connect(self.on_processing_progress)
-                worker.processing_complete.connect(self.on_processing_complete)
-                worker.processing_failed.connect(self.on_processing_failed)
+                worker.processing_complete.connect(self.on_batch_item_complete)
+                worker.processing_failed.connect(self.on_batch_item_failed)
                 
                 self.processing_workers.append(worker)
                 worker.start()
@@ -1795,6 +1901,88 @@ class ImageDescriberGUI(QMainWindow):
     def collapse_all(self):
         """Collapse all tree items"""
         self.image_tree.collapseAll()
+
+    def set_filter(self, mode: str):
+        """Set the filter mode and refresh view"""
+        self.filter_mode = mode
+        
+        # Update checkable actions
+        self.filter_all_action.setChecked(mode == "all")
+        self.filter_described_action.setChecked(mode == "described")
+        
+        # Refresh the view with filter applied
+        self.refresh_view()
+
+    def process_all(self):
+        """Process all images and extract video frames"""
+        if not self.workspace.items:
+            QMessageBox.information(self, "No Items", "No images or videos found in workspace.")
+            return
+        
+        # Show processing dialog first
+        dialog = ProcessingDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            model, prompt_style, custom_prompt = dialog.get_selections()
+            
+            # Optional verification
+            if not getattr(self, '_skip_verification', True):
+                if not self.check_ollama_status():
+                    return
+                if not self.verify_model_available(model):
+                    return
+            
+            # Collect all items for processing
+            all_items = []
+            video_items = []
+            
+            for item in self.workspace.items.values():
+                if item.item_type == "image":
+                    all_items.append(item)
+                elif item.item_type == "video":
+                    video_items.append(item)
+            
+            # Extract frames from videos first
+            for video_item in video_items:
+                if not video_item.extracted_frames:
+                    # TODO: Implement automatic video frame extraction
+                    pass
+            
+            # Process all images (including extracted frames)
+            if all_items:
+                self.batch_total = len(all_items)
+                self.batch_completed = 0
+                self.batch_processing = True
+                self.update_window_title()
+                
+                for item in all_items:
+                    worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
+                    worker.progress_updated.connect(self.on_processing_progress)
+                    worker.processing_complete.connect(self.on_batch_item_complete)
+                    worker.processing_failed.connect(self.on_batch_item_failed)
+                    
+                    self.processing_workers.append(worker)
+                    worker.start()
+
+    def show_all_descriptions_dialog(self):
+        """Show all descriptions in a single list for easy browsing"""
+        # Collect all descriptions from all items
+        all_descriptions = []
+        for item in self.workspace.items.values():
+            for desc in item.descriptions:
+                all_descriptions.append({
+                    'file_path': item.file_path,
+                    'file_name': Path(item.file_path).name,
+                    'description': desc,
+                    'display_text': f"{desc.model if desc.model else 'Unknown'} {desc.prompt_style if desc.prompt_style else 'default'}: {desc.text}"
+                })
+        
+        if not all_descriptions:
+            QMessageBox.information(self, "No Descriptions", "No descriptions found in workspace.")
+            return
+        
+        # Create dialog
+        dialog = AllDescriptionsDialog(all_descriptions, self)
+        dialog.exec()
     
     # Worker event handlers
     def on_processing_progress(self, message: str):
@@ -1856,6 +2044,40 @@ You can check Ollama logs for more details."""
         msg_box.exec()
         
         self.status_bar.showMessage("Processing failed", 3000)
+
+    def on_batch_item_complete(self, file_path: str, description: str, model: str, prompt_style: str, custom_prompt: str):
+        """Handle batch item completion"""
+        # Call the regular completion handler first
+        self.on_processing_complete(file_path, description, model, prompt_style, custom_prompt)
+        
+        # Update batch progress
+        self.batch_completed += 1
+        self.update_window_title()
+        
+        # Check if batch is complete
+        if self.batch_completed >= self.batch_total:
+            self.batch_processing = False
+            self.batch_total = 0
+            self.batch_completed = 0
+            self.update_window_title()
+            self.status_bar.showMessage(f"Batch processing complete: {self.batch_total} items processed", 5000)
+
+    def on_batch_item_failed(self, file_path: str, error: str):
+        """Handle batch item failure"""
+        # Call the regular failure handler first
+        self.on_processing_failed(file_path, error)
+        
+        # Update batch progress
+        self.batch_completed += 1
+        self.update_window_title()
+        
+        # Check if batch is complete
+        if self.batch_completed >= self.batch_total:
+            self.batch_processing = False
+            self.batch_total = 0
+            self.batch_completed = 0
+            self.update_window_title()
+            self.status_bar.showMessage(f"Batch processing finished with errors: {self.batch_completed} of {self.batch_total} completed", 5000)
     
     def on_conversion_complete(self, original_path: str, converted_paths: list):
         """Handle successful conversion completion"""
