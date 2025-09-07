@@ -2126,40 +2126,63 @@ class ImageDescriberGUI(QMainWindow):
             )
             return
         
-        # Get description text from user
-        description_text, ok = QInputDialog.getMultiLineText(
-            self, "Add Manual Description", 
-            "Enter your description for this image:",
-            ""
-        )
+        # Create a custom dialog with proper Tab handling
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add Manual Description")
+        dialog.setModal(True)
+        dialog.resize(500, 300)
         
-        if ok and description_text.strip():
-            file_path = current_image_item.data(0, Qt.ItemDataRole.UserRole)
-            workspace_item = self.workspace.get_item(file_path)
+        layout = QVBoxLayout(dialog)
+        
+        # Add label
+        label = QLabel("Enter your description for this image:")
+        layout.addWidget(label)
+        
+        # Add text edit with proper Tab handling (using AccessibleTextEdit)
+        text_edit = AccessibleTextEdit()
+        text_edit.setPlaceholderText("Enter description here...")
+        layout.addWidget(text_edit)
+        
+        # Add buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+        
+        # Show dialog and get result
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            description_text = text_edit.toPlainText().strip()
             
-            if workspace_item:
-                # Create manual description with "manual" as model and prompt_style
-                manual_desc = ImageDescription(
-                    text=description_text.strip(),
-                    model="manual",
-                    prompt_style="manual"
-                )
+            if description_text:
+                file_path = current_image_item.data(0, Qt.ItemDataRole.UserRole)
+                workspace_item = self.workspace.get_item(file_path)
                 
-                workspace_item.add_description(manual_desc)
-                self.workspace.mark_modified()
-                
-                # Refresh the descriptions view
-                self.load_descriptions_for_image(file_path)
-                
-                # Select the newly added description
-                for i in range(self.description_tree.topLevelItemCount()):
-                    item = self.description_tree.topLevelItem(i)
-                    if item.data(0, Qt.ItemDataRole.UserRole) == manual_desc.id:
-                        self.description_tree.setCurrentItem(item)
-                        self.description_text.setPlainText(description_text.strip())
-                        break
-                
-                self.status_bar.showMessage("Manual description added successfully", 3000)
+                if workspace_item:
+                    # Create manual description with "manual" as model and prompt_style
+                    manual_desc = ImageDescription(
+                        text=description_text,
+                        model="manual",
+                        prompt_style="manual"
+                    )
+                    
+                    workspace_item.add_description(manual_desc)
+                    self.workspace.mark_modified()
+                    
+                    # Refresh BOTH the descriptions view AND the main view (for count update)
+                    self.load_descriptions_for_image(file_path)
+                    self.refresh_view()  # This updates the description count in the tree
+                    
+                    # Select the newly added description
+                    for i in range(self.description_tree.topLevelItemCount()):
+                        item = self.description_tree.topLevelItem(i)
+                        if item.data(0, Qt.ItemDataRole.UserRole) == manual_desc.id:
+                            self.description_tree.setCurrentItem(item)
+                            self.description_text.setPlainText(description_text)
+                            break
+                    
+                    self.status_bar.showMessage("Manual description added successfully", 3000)
+            else:
+                QMessageBox.information(self, "Empty Description", "Please enter a description.")
     
     def edit_description(self):
         """Edit the selected description"""
