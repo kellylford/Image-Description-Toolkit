@@ -45,7 +45,8 @@ from PyQt6.QtWidgets import (
     QMenuBar, QMenu, QFileDialog, QMessageBox, QDialog, QDialogButtonBox,
     QComboBox, QProgressBar, QStatusBar, QTreeWidget, QTreeWidgetItem,
     QInputDialog, QPlainTextEdit, QCheckBox, QPushButton, QFormLayout,
-    QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup, QGroupBox, QLineEdit
+    QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup, QGroupBox, QLineEdit,
+    QTextEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QMutex, QMutexLocker
 from PyQt6.QtGui import (
@@ -168,11 +169,20 @@ class AccessibleTextEdit(QPlainTextEdit):
         """Override to handle Tab key properly for accessibility"""
         if event.key() == Qt.Key.Key_Tab:
             # Tab should move to next widget, not insert tab character
-            self.focusNextChild()
+            # Use the parent widget's focus navigation
+            parent = self.parent()
+            if parent:
+                parent.focusNextPrevChild(True)  # True = forward
+            else:
+                self.focusNextChild()
             event.accept()
         elif event.key() == Qt.Key.Key_Backtab:
             # Shift+Tab should move to previous widget
-            self.focusPreviousChild()
+            parent = self.parent()
+            if parent:
+                parent.focusNextPrevChild(False)  # False = backward
+            else:
+                self.focusPreviousChild()
             event.accept()
         else:
             # For all other keys, use default behavior
@@ -1159,7 +1169,7 @@ class AllDescriptionsDialog(QDialog):
         layout.addWidget(self.list_widget)
         
         # Text area for full description
-        self.text_area = QTextEdit()
+        self.text_area = AccessibleTextEdit()
         self.text_area.setReadOnly(True)
         self.text_area.setAccessibleName("Full Description Text")
         layout.addWidget(self.text_area)
@@ -1279,6 +1289,12 @@ class ImageDescriberGUI(QMainWindow):
         self.description_text.setReadOnly(True)
         self.description_text.setAccessibleName("Description Text")
         self.description_text.setAccessibleDescription("Displays the full image description. Use arrow keys to navigate through the text.")
+        # Enable text selection and copy with Ctrl+C (like viewer app)
+        self.description_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        # Set focus policy to ensure it can receive focus for screen readers
+        self.description_text.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        # Set word wrap for better readability
+        self.description_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         right_layout.addWidget(self.description_text)
         
         splitter.addWidget(right_panel)
@@ -1380,8 +1396,14 @@ class ImageDescriberGUI(QMainWindow):
         desc_menu = menubar.addMenu("Descriptions")
         
         add_manual_desc_action = QAction("Add Manual Description", self)
+        add_manual_desc_action.setShortcut(QKeySequence("M"))
         add_manual_desc_action.triggered.connect(self.add_manual_description)
         desc_menu.addAction(add_manual_desc_action)
+        
+        followup_question_action = QAction("Ask Follow-up Question", self)
+        followup_question_action.setShortcut(QKeySequence("F"))
+        followup_question_action.triggered.connect(self.ask_followup_question)
+        desc_menu.addAction(followup_question_action)
         
         desc_menu.addSeparator()
         
@@ -1473,9 +1495,16 @@ class ImageDescriberGUI(QMainWindow):
             if not self.workspace.saved:
                 title += " *"
         
-        # Add batch processing progress if active
+        # Add processing status
         if self.batch_processing:
             title += f" - Batch Processing: {self.batch_completed} of {self.batch_total}"
+        elif self.processing_items:
+            # Show individual processing status
+            num_processing = len(self.processing_items)
+            if num_processing == 1:
+                title += " - Processing 1 item..."
+            else:
+                title += f" - Processing {num_processing} items..."
         
         self.setWindowTitle(title)
     
@@ -1738,11 +1767,14 @@ class ImageDescriberGUI(QMainWindow):
                 if workspace_item:
                     for desc in workspace_item.descriptions:
                         if desc.id == desc_id:
-                            self.description_text.setPlainText(desc.text)
-                            # Update accessibility description with character count
+                            # Format text for better screen reader accessibility
+                            formatted_text = self.format_description_for_accessibility(desc.text)
+                            self.description_text.setPlainText(formatted_text)
+                            # Update accessibility description with character count and preview
                             char_count = len(desc.text)
+                            preview = formatted_text[:200] + "..." if len(formatted_text) > 200 else formatted_text
                             self.description_text.setAccessibleDescription(
-                                f"Image description with {char_count} characters: {desc.text}"
+                                f"Image description with {char_count} characters from {desc.model}: {preview}"
                             )
                             return
             
@@ -1758,17 +1790,27 @@ class ImageDescriberGUI(QMainWindow):
         
         workspace_item = self.workspace.get_item(file_path)
         if workspace_item and workspace_item.descriptions:
-            for i, desc in enumerate(workspace_item.descriptions):
+            # Sort descriptions by creation time to ensure chronological order
+            # This ensures follow-ups appear after their original descriptions
+            sorted_descriptions = sorted(workspace_item.descriptions, key=lambda d: d.created)
+            
+            for i, desc in enumerate(sorted_descriptions):
                 tree_item = QTreeWidgetItem(self.description_tree)
                 
                 # Show model and prompt type FIRST - simplified format
                 model_text = desc.model if desc.model else "Unknown Model"
-                if desc.custom_prompt:
-                    prompt_text = "custom"
+                
+                # Check prompt_style first to properly handle follow-ups
+                if desc.prompt_style == "follow-up":
+                    prompt_text = "Follow-up"  # Capitalized for better readability
+                elif desc.prompt_style == "manual":
+                    prompt_text = "Manual"
+                elif desc.custom_prompt and desc.prompt_style == "custom":
+                    prompt_text = "Custom"
                 elif desc.prompt_style:
-                    prompt_text = desc.prompt_style
+                    prompt_text = desc.prompt_style.title()  # Capitalize first letter
                 else:
-                    prompt_text = "default"
+                    prompt_text = "Default"
                 
                 # Show description preview after model info
                 desc_preview = desc.text[:100] + "..." if len(desc.text) > 100 else desc.text
@@ -1879,6 +1921,7 @@ class ImageDescriberGUI(QMainWindow):
             
             # Start processing
             self.processing_items.add(file_path)  # Mark as processing
+            self.update_window_title()  # Update title to show processing status
             worker = ProcessingWorker(file_path, model, prompt_style, custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
@@ -1888,8 +1931,22 @@ class ImageDescriberGUI(QMainWindow):
             worker.start()
             self.update_stop_button_state()
             
+            # Preserve current selection before refresh
+            current_item = self.image_tree.currentItem()
+            current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+            
             # Refresh view to show processing indicator
             self.refresh_view()
+            
+            # Restore focus after refresh
+            if current_file_path:
+                def restore_focus():
+                    for i in range(self.image_tree.topLevelItemCount()):
+                        item = self.image_tree.topLevelItem(i)
+                        if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
+                            self.image_tree.setCurrentItem(item)
+                            break
+                QTimer.singleShot(0, restore_focus)
     
     def process_video(self, file_path: str):
         """Process a video file with frame extraction options"""
@@ -2177,12 +2234,203 @@ class ImageDescriberGUI(QMainWindow):
                         item = self.description_tree.topLevelItem(i)
                         if item.data(0, Qt.ItemDataRole.UserRole) == manual_desc.id:
                             self.description_tree.setCurrentItem(item)
-                            self.description_text.setPlainText(description_text)
+                            # Format text for better screen reader accessibility
+                            formatted_text = self.format_description_for_accessibility(description_text)
+                            self.description_text.setPlainText(formatted_text)
                             break
                     
                     self.status_bar.showMessage("Manual description added successfully", 3000)
             else:
                 QMessageBox.information(self, "Empty Description", "Please enter a description.")
+    
+    def format_description_for_accessibility(self, text: str) -> str:
+        """Format description text for better screen reader accessibility"""
+        if not text:
+            return text
+        
+        # Split long sentences at sentence boundaries for better navigation
+        # Replace periods followed by spaces with periods and newlines
+        formatted = text.replace('. ', '.\n')
+        
+        # Also split on other sentence endings
+        formatted = formatted.replace('! ', '!\n')
+        formatted = formatted.replace('? ', '?\n')
+        
+        # Remove any double newlines that might have been created
+        formatted = formatted.replace('\n\n', '\n')
+        
+        # Remove leading/trailing whitespace from each line
+        lines = [line.strip() for line in formatted.split('\n') if line.strip()]
+        
+        # Join with single newlines and apply viewer's technique for blank lines
+        joined_text = '\n'.join(lines)
+        
+        # Process the text to ensure blank lines are properly handled for screen readers
+        # (technique learned from the viewer app)
+        processed_lines = []
+        for line in joined_text.split('\n'):
+            if line.strip() == '':  # If line is empty or just whitespace
+                processed_lines.append('\u00A0')  # Use non-breaking space for screen readers
+            else:
+                processed_lines.append(line)
+        
+        return '\n'.join(processed_lines)
+    
+    def ask_followup_question(self):
+        """Ask a follow-up question about an existing description using the same AI engine"""
+        current_image_item = self.image_tree.currentItem()
+        
+        if not current_image_item:
+            QMessageBox.information(
+                self, "No Image Selected",
+                "Please select an image first to ask a follow-up question."
+            )
+            return
+        
+        file_path = current_image_item.data(0, Qt.ItemDataRole.UserRole)
+        workspace_item = self.workspace.get_item(file_path)
+        
+        if not workspace_item or not workspace_item.descriptions:
+            QMessageBox.information(
+                self, "No Descriptions Found",
+                "This image has no existing descriptions. Please add a description first."
+            )
+            return
+        
+        # Filter out manual descriptions (only AI-generated descriptions can have follow-ups)
+        ai_descriptions = [desc for desc in workspace_item.descriptions if desc.model != "manual"]
+        
+        if not ai_descriptions:
+            QMessageBox.information(
+                self, "No AI Descriptions Found",
+                "This image has no AI-generated descriptions. Follow-up questions can only be asked about AI-generated descriptions."
+            )
+            return
+        
+        # Get currently selected description (if any) to pre-select in combo box
+        current_desc_item = self.description_tree.currentItem()
+        current_desc_id = current_desc_item.data(0, Qt.ItemDataRole.UserRole) if current_desc_item else None
+        
+        # Create follow-up dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Ask Follow-up Question")
+        dialog.setModal(True)
+        dialog.resize(600, 500)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Description selection section
+        desc_label = QLabel("Select description to ask follow-up question about:")
+        layout.addWidget(desc_label)
+        
+        desc_combo = QComboBox()
+        default_index = 0  # Default to first item if no match found
+        
+        for i, desc in enumerate(ai_descriptions):
+            preview = desc.text[:100] + "..." if len(desc.text) > 100 else desc.text
+            desc_combo.addItem(f"{desc.model} - {preview}", desc)
+            
+            # Check if this is the currently selected description
+            if current_desc_id and desc.id == current_desc_id:
+                default_index = i
+        
+        desc_combo.setCurrentIndex(default_index)
+        layout.addWidget(desc_combo)
+        
+        # Selected description display
+        layout.addWidget(QLabel("Full description:"))
+        desc_display = QTextEdit()
+        desc_display.setReadOnly(True)
+        desc_display.setMaximumHeight(150)
+        desc_display.setAccessibleName("Selected Description Display")
+        desc_display.setAccessibleDescription("Full text of the selected description. Use arrow keys to navigate through the text.")
+        # Apply viewer app's accessibility settings
+        desc_display.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        desc_display.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        desc_display.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        layout.addWidget(desc_display)
+        
+        # Update description display when selection changes
+        def update_description():
+            selected_desc = desc_combo.currentData()
+            if selected_desc:
+                # Format text for better screen reader accessibility
+                formatted_text = self.format_description_for_accessibility(selected_desc.text)
+                desc_display.setPlainText(formatted_text)
+                # Update accessible description with dynamic content
+                desc_display.setAccessibleDescription(f"Description from {selected_desc.model}: {formatted_text[:200]}{'...' if len(formatted_text) > 200 else ''}")
+        
+        desc_combo.currentTextChanged.connect(update_description)
+        update_description()  # Set initial text
+        
+        # Follow-up question section
+        layout.addWidget(QLabel("Enter your follow-up question:"))
+        info_label = QLabel("This will create a new 'Follow-up' description using the same AI model.")
+        info_label.setStyleSheet("color: #666; font-style: italic; margin-bottom: 5px;")
+        layout.addWidget(info_label)
+        question_edit = AccessibleTextEdit()
+        question_edit.setPlaceholderText("e.g., What colors are prominent in this image? Can you describe the lighting? What mood does this convey?")
+        question_edit.setMaximumHeight(100)
+        layout.addWidget(question_edit)
+        
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+        
+        # Set explicit tab order to ensure proper navigation
+        dialog.setTabOrder(desc_combo, desc_display)
+        dialog.setTabOrder(desc_display, question_edit)
+        dialog.setTabOrder(question_edit, button_box)
+        
+        # Show dialog and process if accepted
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            selected_desc = desc_combo.currentData()
+            follow_up_question = question_edit.toPlainText().strip()
+            
+            if not follow_up_question:
+                QMessageBox.information(self, "Empty Question", "Please enter a follow-up question.")
+                return
+            
+            # Create a custom prompt that includes the original description and the follow-up question
+            custom_prompt = f"""Here is the original description of this image:
+"{selected_desc.text}"
+
+Follow-up question: {follow_up_question}
+
+Please answer the follow-up question about this image, taking into account the context from the original description."""
+            
+            # Start processing with the same model as the original description
+            self.processing_items.add(file_path)
+            self.update_window_title()  # Update title to show processing status
+            worker = ProcessingWorker(file_path, selected_desc.model, "follow-up", custom_prompt)
+            worker.progress_updated.connect(self.on_processing_progress)
+            worker.processing_complete.connect(self.on_processing_complete)
+            worker.processing_failed.connect(self.on_processing_failed)
+            
+            self.processing_workers.append(worker)
+            worker.start()
+            self.update_stop_button_state()
+            
+            # Preserve current selection before refresh
+            current_item = self.image_tree.currentItem()
+            current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+            
+            # Refresh view to show processing indicator
+            self.refresh_view()
+            
+            # Restore focus after refresh
+            if current_file_path:
+                def restore_focus():
+                    for i in range(self.image_tree.topLevelItemCount()):
+                        item = self.image_tree.topLevelItem(i)
+                        if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
+                            self.image_tree.setCurrentItem(item)
+                            break
+                QTimer.singleShot(0, restore_focus)
+            
+            self.status_bar.showMessage(f"Processing follow-up question with {selected_desc.model}...", 3000)
     
     def edit_description(self):
         """Edit the selected description"""
@@ -2199,14 +2447,39 @@ class ImageDescriberGUI(QMainWindow):
         if workspace_item:
             for desc in workspace_item.descriptions:
                 if desc.id == desc_id:
-                    new_text, ok = QInputDialog.getMultiLineText(
-                        self, "Edit Description", "Description:", desc.text
-                    )
-                    if ok:
-                        desc.text = new_text
-                        self.workspace.mark_modified()
-                        self.load_descriptions_for_image(file_path)
-                        self.description_text.setPlainText(new_text)
+                    # Create custom dialog with proper Tab handling
+                    dialog = QDialog(self)
+                    dialog.setWindowTitle("Edit Description")
+                    dialog.setModal(True)
+                    dialog.resize(500, 300)
+                    
+                    layout = QVBoxLayout(dialog)
+                    
+                    # Add label
+                    label = QLabel("Description:")
+                    layout.addWidget(label)
+                    
+                    # Add text edit with proper Tab handling
+                    text_edit = AccessibleTextEdit()
+                    text_edit.setPlainText(desc.text)
+                    layout.addWidget(text_edit)
+                    
+                    # Add buttons
+                    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+                    button_box.accepted.connect(dialog.accept)
+                    button_box.rejected.connect(dialog.reject)
+                    layout.addWidget(button_box)
+                    
+                    # Show dialog and get result
+                    if dialog.exec() == QDialog.DialogCode.Accepted:
+                        new_text = text_edit.toPlainText()
+                        if new_text.strip():
+                            desc.text = new_text
+                            self.workspace.mark_modified()
+                            self.load_descriptions_for_image(file_path)
+                            # Format text for better screen reader accessibility
+                            formatted_text = self.format_description_for_accessibility(new_text)
+                            self.description_text.setPlainText(formatted_text)
                     break
     
     def delete_description(self):
@@ -2469,6 +2742,7 @@ class ImageDescriberGUI(QMainWindow):
         
         # Remove from processing items
         self.processing_items.discard(file_path)
+        self.update_window_title()  # Update title to remove processing status
         
         # Refresh view immediately to show new description (like viewer app)
         self.refresh_view()
@@ -2697,8 +2971,25 @@ class ImageDescriberGUI(QMainWindow):
         workspace_item.add_description(desc)
         self.workspace.mark_modified()
         
+        # PRESERVE FOCUS: Remember currently selected item before refresh
+        current_item = self.image_tree.currentItem()
+        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        
         # Update UI
         self.refresh_view()
+        
+        # RESTORE FOCUS: Find and select the same item after refresh
+        if current_file_path:
+            # Use QTimer.singleShot to ensure focus restoration happens after UI update
+            def restore_focus():
+                for i in range(self.image_tree.topLevelItemCount()):
+                    item = self.image_tree.topLevelItem(i)
+                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
+                        self.image_tree.setCurrentItem(item)
+                        self.image_tree.scrollToItem(item)  # Ensure it's visible
+                        break
+            
+            QTimer.singleShot(0, restore_focus)
         
         # Remove completed worker from list
         sender_worker = self.sender()
@@ -2707,16 +2998,20 @@ class ImageDescriberGUI(QMainWindow):
         self.update_stop_button_state()
         
         # If this is the currently selected image, refresh descriptions
-        current_item = self.image_tree.currentItem()
-        if current_item and current_item.data(0, Qt.ItemDataRole.UserRole) == file_path:
+        if current_file_path == file_path:
             self.load_descriptions_for_image(file_path)
         
         self.status_bar.showMessage(f"Processing complete: {Path(file_path).name}", 3000)
     
     def on_processing_failed(self, file_path: str, error: str):
         """Handle processing failure"""
+        # Preserve focus
+        current_item = self.image_tree.currentItem()
+        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        
         # Remove from processing set
         self.processing_items.discard(file_path)
+        self.update_window_title()  # Update title to remove processing status
         
         # Remove failed worker from list
         sender_worker = self.sender()
@@ -2725,6 +3020,19 @@ class ImageDescriberGUI(QMainWindow):
         self.update_stop_button_state()
         
         self.refresh_view()  # Update display
+        
+        # Restore focus - find and select the same item after refresh
+        if current_file_path:
+            # Use QTimer.singleShot to ensure focus restoration happens after UI update
+            def restore_focus():
+                for i in range(self.image_tree.topLevelItemCount()):
+                    item = self.image_tree.topLevelItem(i)
+                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
+                        self.image_tree.setCurrentItem(item)
+                        self.image_tree.scrollToItem(item)  # Ensure it's visible
+                        break
+            
+            QTimer.singleShot(0, restore_focus)
         
         error_msg = f"Failed to process {Path(file_path).name}:\n{error}"
         
