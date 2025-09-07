@@ -2854,7 +2854,7 @@ You can check Ollama logs for more details."""
 
     def closeEvent(self, event):
         """Handle application close - check for unsaved changes"""
-        if self.workspace and self.workspace.is_modified():
+        if self.workspace and not self.workspace.saved:
             # Ask user if they want to save changes
             reply = QMessageBox.question(
                 self, 
