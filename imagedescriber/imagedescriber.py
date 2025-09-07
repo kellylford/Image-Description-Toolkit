@@ -2155,21 +2155,47 @@ class ImageDescriberGUI(QMainWindow):
             worker.start()
     
     def extract_video_frames(self):
-        """Extract frames from all videos in the workspace"""
-        video_items = [item for item in self.workspace.items.values() if item.item_type == "video"]
+        """Extract frames from selected video or batch-marked videos"""
+        # First check if there's a currently selected video
+        current_item = self.image_tree.currentItem()
+        if current_item:
+            file_path = current_item.data(0, Qt.ItemDataRole.UserRole)
+            workspace_item = self.workspace.get_item(file_path)
+            
+            if workspace_item and workspace_item.item_type == "video":
+                # Extract frames from the selected video
+                self.extract_frames_from_video(file_path)
+                return
         
-        if not video_items:
-            QMessageBox.information(self, "No Videos", "No video files found in workspace.")
+        # No video selected, check for batch-marked videos
+        batch_videos = [item for item in self.workspace.items.values() 
+                       if item.item_type == "video" and item.batch_marked]
+        
+        if batch_videos:
+            # Extract frames from all batch-marked videos
+            for item in batch_videos:
+                self.extract_frames_from_video(item.file_path)
             return
         
-        for item in video_items:
-            worker = ConversionWorker(item.file_path, "video")
-            worker.progress_updated.connect(self.on_processing_progress)
-            worker.conversion_complete.connect(self.on_conversion_complete)
-            worker.conversion_failed.connect(self.on_processing_failed)
-            
-            self.conversion_workers.append(worker)
-            worker.start()
+        # No selection and no batch-marked videos
+        video_count = len([item for item in self.workspace.items.values() if item.item_type == "video"])
+        if video_count == 0:
+            QMessageBox.information(self, "No Videos", "No video files found in workspace.")
+        else:
+            QMessageBox.information(
+                self, "No Video Selected", 
+                "Please select a video or mark videos for batch processing before extracting frames."
+            )
+    
+    def extract_frames_from_video(self, file_path: str):
+        """Extract frames from a single video file"""
+        worker = ConversionWorker(file_path, "video")
+        worker.progress_updated.connect(self.on_processing_progress)
+        worker.conversion_complete.connect(self.on_conversion_complete)
+        worker.conversion_failed.connect(self.on_processing_failed)
+        
+        self.conversion_workers.append(worker)
+        worker.start()
     
     # Description management
     def add_manual_description(self):
@@ -3120,6 +3146,10 @@ You can check Ollama logs for more details."""
     
     def on_video_extraction_complete(self, video_path: str, extracted_frames: list, processing_config: dict):
         """Handle completion of video frame extraction"""
+        # PRESERVE FOCUS: Remember currently selected item before refresh
+        current_item = self.image_tree.currentItem()
+        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        
         # Add extracted frames to workspace
         workspace_item = self.workspace.get_item(video_path)
         if workspace_item:
@@ -3134,6 +3164,19 @@ You can check Ollama logs for more details."""
         self.workspace.mark_modified()
         self.refresh_view()
         
+        # RESTORE FOCUS: Find and select the same item after refresh
+        if current_file_path:
+            # Use QTimer.singleShot to ensure focus restoration happens after UI update
+            def restore_focus():
+                for i in range(self.image_tree.topLevelItemCount()):
+                    item = self.image_tree.topLevelItem(i)
+                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
+                        self.image_tree.setCurrentItem(item)
+                        self.image_tree.scrollToItem(item)  # Ensure it's visible
+                        break
+            
+            QTimer.singleShot(0, restore_focus)
+        
         # If immediate processing is requested, start processing frames
         if processing_config.get("process_immediately", False):
             self.process_extracted_frames(extracted_frames, processing_config)
@@ -3146,6 +3189,10 @@ You can check Ollama logs for more details."""
         prompt_style = processing_config["prompt_style"]
         custom_prompt = processing_config["custom_prompt"]
         
+        # PRESERVE FOCUS: Remember currently selected item before processing
+        current_item = self.image_tree.currentItem()
+        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        
         # Process each frame
         for frame_path in frame_paths:
             self.processing_items.add(frame_path)  # Mark as processing
@@ -3157,8 +3204,24 @@ You can check Ollama logs for more details."""
             self.processing_workers.append(worker)
             worker.start()
         
+        # Update title to show processing status
+        self.update_window_title()
+        
         # Refresh view to show processing indicators
         self.refresh_view()
+        
+        # RESTORE FOCUS: Find and select the same item after refresh
+        if current_file_path:
+            # Use QTimer.singleShot to ensure focus restoration happens after UI update
+            def restore_focus():
+                for i in range(self.image_tree.topLevelItemCount()):
+                    item = self.image_tree.topLevelItem(i)
+                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
+                        self.image_tree.setCurrentItem(item)
+                        self.image_tree.scrollToItem(item)  # Ensure it's visible
+                        break
+            
+            QTimer.singleShot(0, restore_focus)
 
     def closeEvent(self, event):
         """Handle application close - check for unsaved changes"""
