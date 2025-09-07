@@ -1216,6 +1216,9 @@ class ImageDescriberGUI(QMainWindow):
         # Filter settings
         self.filter_mode: str = "all"  # "all", "described", or "batch"
         
+        # Navigation mode settings
+        self.navigation_mode: str = "tree"  # "tree" or "master_detail"
+        
         # Processing control
         self.stop_processing_requested: bool = False
         
@@ -1231,28 +1234,37 @@ class ImageDescriberGUI(QMainWindow):
         """Setup the user interface"""
         self.setWindowTitle("ImageDescriber")
         self.setMinimumSize(1000, 700)
-        
+
         # Central widget with splitter
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         layout = QVBoxLayout(central_widget)
-        
+
         # Status bar
         self.status_bar = QStatusBar()
         self.status_bar.setAccessibleName("Status Bar")
         self.status_bar.setAccessibleDescription("Shows current operation status and progress.")
         self.status_bar.showMessage("Ready - Model verification disabled by default")
         self.setStatusBar(self.status_bar)
+
+        # Create both UI layouts but show only one at a time
+        self.setup_tree_view_ui(layout)
+        self.setup_master_detail_ui(layout)
         
-        # Main splitter
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        layout.addWidget(splitter)
-        
-        # Left panel - Image list
+        # Start with tree view
+        self.switch_navigation_mode("tree")
+
+    def setup_tree_view_ui(self, parent_layout):
+        """Setup the traditional tree view UI"""
+        # Main splitter for tree view
+        self.tree_splitter = QSplitter(Qt.Orientation.Horizontal)
+        parent_layout.addWidget(self.tree_splitter)
+
+        # Left panel - Image tree
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        
+
         left_layout.addWidget(QLabel("Images:"))
         self.image_tree = AccessibleTreeWidget()
         self.image_tree.setHeaderLabels(["File", "Status"])
@@ -1262,17 +1274,17 @@ class ImageDescriberGUI(QMainWindow):
         # Enable proper focus tracking
         self.image_tree.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         left_layout.addWidget(self.image_tree)
-        
+
         # Batch info
         self.batch_label = QLabel("Batch Queue: 0 items")
         left_layout.addWidget(self.batch_label)
-        
-        splitter.addWidget(left_panel)
-        
+
+        self.tree_splitter.addWidget(left_panel)
+
         # Right panel - Descriptions
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        
+
         right_layout.addWidget(QLabel("Descriptions:"))
         self.description_tree = AccessibleTreeWidget()
         self.description_tree.setHeaderLabels(["Description", "Model", "Created"])
@@ -1282,7 +1294,7 @@ class ImageDescriberGUI(QMainWindow):
         # Enable proper focus tracking
         self.description_tree.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         right_layout.addWidget(self.description_tree)
-        
+
         # Description text
         right_layout.addWidget(QLabel("Description Text:"))
         self.description_text = QTextEdit()
@@ -1296,12 +1308,96 @@ class ImageDescriberGUI(QMainWindow):
         # Set word wrap for better readability
         self.description_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         right_layout.addWidget(self.description_text)
-        
-        splitter.addWidget(right_panel)
-        
+
+        self.tree_splitter.addWidget(right_panel)
+
         # Set splitter proportions
-        splitter.setSizes([400, 600])
+        self.tree_splitter.setSizes([400, 600])
+
+    def setup_master_detail_ui(self, parent_layout):
+        """Setup the master-detail view UI"""
+        # Main splitter for master-detail view
+        self.master_detail_splitter = QSplitter(Qt.Orientation.Horizontal)
+        parent_layout.addWidget(self.master_detail_splitter)
+
+        # Left panel - Media list (videos + standalone images)
+        media_panel = QWidget()
+        media_layout = QVBoxLayout(media_panel)
+
+        media_layout.addWidget(QLabel("Media Files:"))
+        self.media_list = QListWidget()
+        self.media_list.setAccessibleName("Media List")
+        self.media_list.setAccessibleDescription("List of all media files (videos and images). Select to view frames or descriptions.")
+        self.media_list.itemSelectionChanged.connect(self.on_media_selection_changed)
+        self.media_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        media_layout.addWidget(self.media_list)
+
+        # Batch info (shared with tree view)
+        self.batch_label_md = QLabel("Batch Queue: 0 items")
+        media_layout.addWidget(self.batch_label_md)
+
+        self.master_detail_splitter.addWidget(media_panel)
+
+        # Right side - Frames/Details and descriptions
+        right_side = QWidget()
+        right_side_layout = QVBoxLayout(right_side)
+
+        # Frames/Details panel
+        right_side_layout.addWidget(QLabel("Frames/Details:"))
+        self.frames_list = QListWidget()
+        self.frames_list.setAccessibleName("Frames List")
+        self.frames_list.setAccessibleDescription("List of frames from selected video or details for selected image.")
+        self.frames_list.itemSelectionChanged.connect(self.on_frame_selection_changed)
+        self.frames_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        right_side_layout.addWidget(self.frames_list)
+
+        # Descriptions panel (reuse tree widget)
+        right_side_layout.addWidget(QLabel("Descriptions:"))
+        self.description_tree_md = AccessibleTreeWidget()
+        self.description_tree_md.setHeaderLabels(["Description", "Model", "Created"])
+        self.description_tree_md.setAccessibleName("Description List")
+        self.description_tree_md.setAccessibleDescription("List of descriptions for the selected frame or image.")
+        self.description_tree_md.itemSelectionChanged.connect(self.on_description_selection_changed_md)
+        self.description_tree_md.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        right_side_layout.addWidget(self.description_tree_md)
+
+        # Description text (separate from tree view)
+        right_side_layout.addWidget(QLabel("Description Text:"))
+        self.description_text_md = QTextEdit()
+        self.description_text_md.setReadOnly(True)
+        self.description_text_md.setAccessibleName("Description Text")
+        self.description_text_md.setAccessibleDescription("Displays the full description. Use arrow keys to navigate through the text.")
+        self.description_text_md.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.description_text_md.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.description_text_md.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        right_side_layout.addWidget(self.description_text_md)
+
+        self.master_detail_splitter.addWidget(right_side)
+
+        # Set splitter proportions (media list smaller, details larger)
+        self.master_detail_splitter.setSizes([300, 700])
+
+    def switch_navigation_mode(self, mode):
+        """Switch between tree view and master-detail view"""
+        self.navigation_mode = mode
         
+        # Update menu checkboxes (only if they exist - they're created in setup_menus)
+        if hasattr(self, 'tree_view_action'):
+            self.tree_view_action.setChecked(mode == "tree")
+        if hasattr(self, 'master_detail_action'):
+            self.master_detail_action.setChecked(mode == "master_detail")
+        
+        if mode == "tree":
+            self.tree_splitter.setVisible(True)
+            self.master_detail_splitter.setVisible(False)
+            # Update current data
+            self.refresh_view()
+        elif mode == "master_detail":
+            self.tree_splitter.setVisible(False)
+            self.master_detail_splitter.setVisible(True)
+            # Update master-detail view
+            self.refresh_master_detail_view()
+
     def setup_menus(self):
         """Setup application menus"""
         menubar = self.menuBar()
@@ -1463,6 +1559,22 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_batch_action.setCheckable(True)
         self.filter_batch_action.triggered.connect(lambda: self.set_filter("batch"))
         filter_menu.addAction(self.filter_batch_action)
+        
+        view_menu.addSeparator()
+        
+        # Navigation mode submenu
+        navigation_menu = view_menu.addMenu("Navigation Mode")
+        
+        self.tree_view_action = QAction("Tree View", self)
+        self.tree_view_action.setCheckable(True)
+        self.tree_view_action.setChecked(True)  # Default mode
+        self.tree_view_action.triggered.connect(lambda: self.switch_navigation_mode("tree"))
+        navigation_menu.addAction(self.tree_view_action)
+        
+        self.master_detail_action = QAction("Master-Detail View", self)
+        self.master_detail_action.setCheckable(True)
+        self.master_detail_action.triggered.connect(lambda: self.switch_navigation_mode("master_detail"))
+        navigation_menu.addAction(self.master_detail_action)
         
         view_menu.addSeparator()
         
@@ -1708,11 +1820,218 @@ class ImageDescriberGUI(QMainWindow):
         
         self.image_tree.expandAll()
         self.update_batch_label()
+        
+        # Also refresh master-detail view if it's the current mode
+        if self.navigation_mode == "master_detail":
+            self.refresh_master_detail_view()
     
     def update_batch_label(self):
         """Update the batch queue label"""
         batch_count = sum(1 for item in self.workspace.items.values() if item.batch_marked)
         self.batch_label.setText(f"Batch Queue: {batch_count} items")
+        # Also update master-detail batch label
+        if hasattr(self, 'batch_label_md'):
+            self.batch_label_md.setText(f"Batch Queue: {batch_count} items")
+
+    def refresh_master_detail_view(self):
+        """Refresh the master-detail view"""
+        # Clear media list
+        self.media_list.clear()
+        
+        # Populate media list with videos and standalone images
+        for file_path, item in self.workspace.items.items():
+            # Skip extracted frames - they'll be shown in frames list
+            if item.item_type == "extracted_frame":
+                continue
+                
+            # Apply filter
+            if self.filter_mode == "described" and not item.descriptions:
+                continue
+            elif self.filter_mode == "batch" and not item.batch_marked:
+                continue
+            
+            # Create list item
+            file_name = Path(file_path).name
+            display_name = file_name
+            accessibility_desc = file_name
+            
+            # Add type indicator
+            if item.item_type == "video":
+                display_name = f"📹 {display_name}"
+                accessibility_desc = f"Video: {accessibility_desc}"
+                # Add frame count info
+                if item.extracted_frames:
+                    frame_count = len(item.extracted_frames)
+                    display_name += f" ({frame_count} frames)"
+                    accessibility_desc += f" with {frame_count} extracted frames"
+            else:
+                display_name = f"🖼️ {display_name}"
+                accessibility_desc = f"Image: {accessibility_desc}"
+            
+            # Add processing indicator
+            if file_path in self.processing_items:
+                display_name = f"⏳ {display_name}"
+                accessibility_desc = f"Processing: {accessibility_desc}"
+            
+            # Add description count
+            if item.descriptions:
+                desc_count = len(item.descriptions)
+                display_name += f" ({desc_count} desc)"
+                accessibility_desc += f" with {desc_count} descriptions"
+            else:
+                accessibility_desc += " with no descriptions"
+            
+            # Add batch indicator
+            if item.batch_marked:
+                display_name = f"✓ {display_name}"
+                accessibility_desc = f"Batch marked: {accessibility_desc}"
+            
+            list_item = QListWidgetItem(display_name)
+            list_item.setData(Qt.ItemDataRole.UserRole, file_path)
+            list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
+            self.media_list.addItem(list_item)
+        
+        # Clear frames list and descriptions initially
+        self.frames_list.clear()
+        self.description_tree_md.clear()
+        self.description_text_md.clear()
+        
+        self.update_batch_label()
+
+    def on_media_selection_changed(self):
+        """Handle media selection change in master-detail view"""
+        current_item = self.media_list.currentItem()
+        if not current_item:
+            self.frames_list.clear()
+            self.description_tree_md.clear()
+            self.description_text_md.clear()
+            return
+            
+        file_path = current_item.data(Qt.ItemDataRole.UserRole)
+        workspace_item = self.workspace.get_item(file_path)
+        
+        if not workspace_item:
+            return
+        
+        # Clear frames list and descriptions
+        self.frames_list.clear()
+        self.description_tree_md.clear()
+        self.description_text_md.clear()
+        
+        if workspace_item.item_type == "video":
+            # Show extracted frames
+            for frame_path in workspace_item.extracted_frames:
+                frame_item = self.workspace.get_item(frame_path)
+                if not frame_item:
+                    continue
+                    
+                frame_name = Path(frame_path).name
+                display_name = f"📷 {frame_name}"
+                accessibility_desc = f"Frame: {frame_name}"
+                
+                # Add processing indicator
+                if frame_path in self.processing_items:
+                    display_name = f"⏳ {display_name}"
+                    accessibility_desc = f"Processing: {accessibility_desc}"
+                
+                # Add description count
+                if frame_item.descriptions:
+                    desc_count = len(frame_item.descriptions)
+                    display_name += f" ({desc_count} desc)"
+                    accessibility_desc += f" with {desc_count} descriptions"
+                else:
+                    accessibility_desc += " with no descriptions"
+                
+                list_item = QListWidgetItem(display_name)
+                list_item.setData(Qt.ItemDataRole.UserRole, frame_path)
+                list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
+                self.frames_list.addItem(list_item)
+        else:
+            # For standalone images, show the image itself in frames list
+            file_name = Path(file_path).name
+            display_name = f"🖼️ {file_name}"
+            accessibility_desc = f"Image: {file_name}"
+            
+            # Add processing indicator
+            if file_path in self.processing_items:
+                display_name = f"⏳ {display_name}"
+                accessibility_desc = f"Processing: {accessibility_desc}"
+            
+            # Add description count
+            if workspace_item.descriptions:
+                desc_count = len(workspace_item.descriptions)
+                display_name += f" ({desc_count} desc)"
+                accessibility_desc += f" with {desc_count} descriptions"
+            else:
+                accessibility_desc += " with no descriptions"
+            
+            list_item = QListWidgetItem(display_name)
+            list_item.setData(Qt.ItemDataRole.UserRole, file_path)
+            list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
+            self.frames_list.addItem(list_item)
+            
+            # Auto-select the image to show its descriptions
+            self.frames_list.setCurrentItem(list_item)
+
+    def on_frame_selection_changed(self):
+        """Handle frame selection change in master-detail view"""
+        current_item = self.frames_list.currentItem()
+        if not current_item:
+            self.description_tree_md.clear()
+            self.description_text_md.clear()
+            return
+            
+        file_path = current_item.data(Qt.ItemDataRole.UserRole)
+        self.load_descriptions_for_image_md(file_path)
+
+    def on_description_selection_changed_md(self):
+        """Handle description selection change in master-detail view"""
+        current_item = self.description_tree_md.currentItem()
+        if current_item:
+            description_text = current_item.data(0, Qt.ItemDataRole.UserRole)
+            if description_text:
+                self.description_text_md.setText(description_text)
+        else:
+            self.description_text_md.clear()
+
+    def load_descriptions_for_image_md(self, file_path: str):
+        """Load descriptions for the selected image in master-detail view"""
+        self.description_tree_md.clear()
+        self.description_text_md.clear()
+        
+        workspace_item = self.workspace.get_item(file_path)
+        if not workspace_item or not workspace_item.descriptions:
+            return
+        
+        # Load descriptions (same logic as tree view)
+        for i, desc in enumerate(workspace_item.descriptions):
+            item = QTreeWidgetItem(self.description_tree_md)
+            
+            # Truncate description for display
+            truncated = desc.text[:50] + "..." if len(desc.text) > 50 else desc.text
+            truncated = truncated.replace('\n', ' ')  # Remove newlines for display
+            
+            # Handle date formatting (desc.created can be string or datetime)
+            if hasattr(desc.created, 'strftime'):
+                # It's a datetime object
+                created_date = desc.created.strftime("%Y-%m-%d %H:%M")
+            else:
+                # It's a string, extract date part
+                created_date = desc.created.split('T')[0] if 'T' in desc.created else desc.created
+            
+            item.setText(0, truncated)
+            item.setText(1, desc.model)
+            item.setText(2, created_date)
+            item.setData(0, Qt.ItemDataRole.UserRole, desc.text)
+            
+            # Set accessibility description
+            accessibility_desc = f"Description {i+1}: {desc.text[:100]}..." if len(desc.text) > 100 else f"Description {i+1}: {desc.text}"
+            item.setData(0, Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
+        
+        # Select first description if available
+        if self.description_tree_md.topLevelItemCount() > 0:
+            first_item = self.description_tree_md.topLevelItem(0)
+            self.description_tree_md.setCurrentItem(first_item)
     
     def clear_batch_selection(self):
         """Clear all batch marked items"""
@@ -1743,6 +2062,27 @@ class ImageDescriberGUI(QMainWindow):
         
         return reply == QMessageBox.StandardButton.Yes
     
+    # Helper methods for navigation mode compatibility
+    def get_current_selected_file_path(self):
+        """Get currently selected file path regardless of navigation mode"""
+        if self.navigation_mode == "tree":
+            current_item = self.image_tree.currentItem()
+            if current_item:
+                return current_item.data(0, Qt.ItemDataRole.UserRole)
+        elif self.navigation_mode == "master_detail":
+            # In master-detail, we need the selected frame/image, not the media item
+            current_frame = self.frames_list.currentItem()
+            if current_frame:
+                return current_frame.data(Qt.ItemDataRole.UserRole)
+        return None
+    
+    def refresh_current_view(self):
+        """Refresh the currently active view"""
+        if self.navigation_mode == "tree":
+            self.refresh_view()
+        elif self.navigation_mode == "master_detail":
+            self.refresh_master_detail_view()
+
     # Event handlers
     def on_image_selection_changed(self):
         """Handle image selection change"""
@@ -2200,9 +2540,9 @@ class ImageDescriberGUI(QMainWindow):
     # Description management
     def add_manual_description(self):
         """Add a manual description entered by the user"""
-        current_image_item = self.image_tree.currentItem()
+        file_path = self.get_current_selected_file_path()
         
-        if not current_image_item:
+        if not file_path:
             QMessageBox.information(
                 self, "No Image Selected",
                 "Please select an image first to add a manual description."
@@ -2237,7 +2577,6 @@ class ImageDescriberGUI(QMainWindow):
             description_text = text_edit.toPlainText().strip()
             
             if description_text:
-                file_path = current_image_item.data(0, Qt.ItemDataRole.UserRole)
                 workspace_item = self.workspace.get_item(file_path)
                 
                 if workspace_item:
@@ -2252,18 +2591,26 @@ class ImageDescriberGUI(QMainWindow):
                     self.workspace.mark_modified()
                     
                     # Refresh BOTH the descriptions view AND the main view (for count update)
-                    self.load_descriptions_for_image(file_path)
-                    self.refresh_view()  # This updates the description count in the tree
-                    
-                    # Select the newly added description
-                    for i in range(self.description_tree.topLevelItemCount()):
-                        item = self.description_tree.topLevelItem(i)
-                        if item.data(0, Qt.ItemDataRole.UserRole) == manual_desc.id:
-                            self.description_tree.setCurrentItem(item)
-                            # Format text for better screen reader accessibility
-                            formatted_text = self.format_description_for_accessibility(description_text)
-                            self.description_text.setPlainText(formatted_text)
-                            break
+                    if self.navigation_mode == "tree":
+                        self.load_descriptions_for_image(file_path)
+                        self.refresh_view()  # This updates the description count in the tree
+                        
+                        # Select the newly added description
+                        for i in range(self.description_tree.topLevelItemCount()):
+                            item = self.description_tree.topLevelItem(i)
+                            if item.data(0, Qt.ItemDataRole.UserRole) == description_text:
+                                self.description_tree.setCurrentItem(item)
+                                break
+                    elif self.navigation_mode == "master_detail":
+                        self.load_descriptions_for_image_md(file_path)
+                        self.refresh_master_detail_view()  # This updates the description count
+                        
+                        # Select the newly added description
+                        for i in range(self.description_tree_md.topLevelItemCount()):
+                            item = self.description_tree_md.topLevelItem(i)
+                            if item.data(0, Qt.ItemDataRole.UserRole) == description_text:
+                                self.description_tree_md.setCurrentItem(item)
+                                break
                     
                     self.status_bar.showMessage("Manual description added successfully", 3000)
             else:
