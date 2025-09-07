@@ -140,6 +140,41 @@ If crashes persist, consider implementing a simpler "Process Directory" that:
 - Refreshes view when complete
 - Provides the core functionality without complexity
 
+## 🐛 Tracked Issues for Future Implementation
+
+### Issue #1: Focus not preserved in image list after processing
+**Priority**: Medium  
+**Problem**: When user navigates to an image, presses 'p' to process, and completes the dialog, focus returns to the top of the image list instead of staying on the processed image.  
+**Expected**: Focus should remain on the image that was just processed.  
+**Impact**: Poor UX for keyboard navigation and screen reader users.
+
+### Issue #2: Add 'M' keyboard shortcut for manual descriptions
+**Priority**: Low  
+**Problem**: When focus is on image list or description list, should allow 'M' key to trigger manual description dialog.  
+**Expected**: Press 'M' to quickly add manual description without using menu.  
+**Impact**: Improved keyboard workflow efficiency.
+
+### Issue #3: Follow-up questions for existing descriptions
+**Priority**: Medium  
+**Problem**: No way to ask follow-up questions about existing AI descriptions.  
+**Expected**: Add "Follow-up" menu item on description that uses same AI engine and allows follow-up questions.  
+**Requirements**: 
+- Use same model/settings as original description
+- Provide edit box for follow-up question (Tab key must not be trapped)
+- Context should include original description
+
+### Issue #4: Title bar should show processing status
+**Priority**: Low  
+**Problem**: When processing single image (triggered with 'p'), title bar doesn't indicate processing.  
+**Expected**: Title bar should show "Processing..." while retaining other info.  
+**Impact**: User feedback during processing operations.
+
+### Issue #5: Tab key still trapped in manual prompt edit box
+**Priority**: High  
+**Problem**: Despite fixes, Tab key is still being trapped in some edit boxes instead of moving focus.  
+**Expected**: Tab should ALWAYS move focus, never insert tabs in ANY edit box.  
+**Notes**: This was fixed in viewer app but still occurring in main app. Needs comprehensive fix across all text inputs.
+
 ## 🔗 Key Files to Review
 
 - **Main GUI**: `imagedescriber/imagedescriber.py` (lines 2200-2400 for Process All)
