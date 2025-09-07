@@ -1379,6 +1379,12 @@ class ImageDescriberGUI(QMainWindow):
         # Descriptions menu
         desc_menu = menubar.addMenu("Descriptions")
         
+        add_manual_desc_action = QAction("Add Manual Description", self)
+        add_manual_desc_action.triggered.connect(self.add_manual_description)
+        desc_menu.addAction(add_manual_desc_action)
+        
+        desc_menu.addSeparator()
+        
         edit_desc_action = QAction("Edit Description", self)
         edit_desc_action.triggered.connect(self.edit_description)
         desc_menu.addAction(edit_desc_action)
@@ -2109,6 +2115,52 @@ class ImageDescriberGUI(QMainWindow):
             worker.start()
     
     # Description management
+    def add_manual_description(self):
+        """Add a manual description entered by the user"""
+        current_image_item = self.image_tree.currentItem()
+        
+        if not current_image_item:
+            QMessageBox.information(
+                self, "No Image Selected",
+                "Please select an image first to add a manual description."
+            )
+            return
+        
+        # Get description text from user
+        description_text, ok = QInputDialog.getMultiLineText(
+            self, "Add Manual Description", 
+            "Enter your description for this image:",
+            ""
+        )
+        
+        if ok and description_text.strip():
+            file_path = current_image_item.data(0, Qt.ItemDataRole.UserRole)
+            workspace_item = self.workspace.get_item(file_path)
+            
+            if workspace_item:
+                # Create manual description with "manual" as model and prompt_style
+                manual_desc = ImageDescription(
+                    text=description_text.strip(),
+                    model="manual",
+                    prompt_style="manual"
+                )
+                
+                workspace_item.add_description(manual_desc)
+                self.workspace.mark_modified()
+                
+                # Refresh the descriptions view
+                self.load_descriptions_for_image(file_path)
+                
+                # Select the newly added description
+                for i in range(self.description_tree.topLevelItemCount()):
+                    item = self.description_tree.topLevelItem(i)
+                    if item.data(0, Qt.ItemDataRole.UserRole) == manual_desc.id:
+                        self.description_tree.setCurrentItem(item)
+                        self.description_text.setPlainText(description_text.strip())
+                        break
+                
+                self.status_bar.showMessage("Manual description added successfully", 3000)
+    
     def edit_description(self):
         """Edit the selected description"""
         current_desc_item = self.description_tree.currentItem()
