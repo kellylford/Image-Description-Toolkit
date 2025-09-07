@@ -34,6 +34,13 @@ Transform the Process All workflow to work like the viewer app with live updates
 - New workspaces start with `saved=True` to prevent endless unsaved changes warnings
 - Properly integrated with File → New Workspace functionality
 
+### 4. Manual Description Feature (WORKING)
+- **Add Manual Description**: New option in Descriptions menu
+- **User Input**: Multi-line dialog for entering custom descriptions
+- **Integration**: Manual descriptions appear in tree view with "manual manual: [text]" format
+- **Workflow**: Select image → Descriptions → Add Manual Description → Enter text
+- **Auto-selection**: Newly added descriptions are automatically selected for viewing
+
 ## 🔧 Process All Implementation Status
 
 ### Current Implementation Approach
