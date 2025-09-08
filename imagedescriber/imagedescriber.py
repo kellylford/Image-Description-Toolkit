@@ -1101,8 +1101,8 @@ class VideoProcessingDialog(QDialog):
         self.end_time = AccessibleNumericInput(minimum=0.0, maximum=86400.0, suffix=" seconds")
         self.end_time.setValue(0.0)
         self.end_time.setAccessibleName("End Time")
-        self.end_time.setAccessibleDescription("End time for frame extraction in seconds (0 means end of video)")
-        extraction_layout.addRow("End Time:", self.end_time)
+        self.end_time.setAccessibleDescription("End time for frame extraction in seconds (0 or empty means end of video)")
+        extraction_layout.addRow("End Time (0=end):", self.end_time)
         
         # Max frames limit
         self.max_frames = AccessibleNumericInput(is_integer=True, minimum=0, maximum=10000, suffix=" frames")
@@ -1116,6 +1116,11 @@ class VideoProcessingDialog(QDialog):
         # Processing options
         processing_group = QGroupBox("Processing Options")
         processing_layout = QFormLayout(processing_group)
+        
+        # Processing checkbox first
+        self.process_after_extraction = QCheckBox("Process frames immediately after extraction")
+        self.process_after_extraction.setChecked(True)
+        processing_layout.addRow(self.process_after_extraction)
         
         # Model selection
         self.model_combo = QComboBox()
@@ -1141,11 +1146,6 @@ class VideoProcessingDialog(QDialog):
         
         # Connect checkbox to enable/disable custom prompt
         self.custom_checkbox.toggled.connect(self.custom_prompt.setEnabled)
-        
-        # Processing options
-        self.process_after_extraction = QCheckBox("Process frames immediately after extraction")
-        self.process_after_extraction.setChecked(True)
-        processing_layout.addRow(self.process_after_extraction)
         
         layout.addWidget(processing_group)
         
@@ -1196,11 +1196,17 @@ class VideoProcessingDialog(QDialog):
         """Populate the model combo box"""
         self.model_combo.clear()
         self.model_combo.addItems(models)
+        # Set default to moondream if available
+        if "moondream" in models:
+            self.model_combo.setCurrentText("moondream")
     
     def populate_prompts(self, prompts):
         """Populate the prompt combo box"""
         self.prompt_combo.clear()
         self.prompt_combo.addItems(prompts)
+        # Set default to Narrative if available
+        if "Narrative" in prompts:
+            self.prompt_combo.setCurrentText("Narrative")
 
 
 class AllDescriptionsDialog(QDialog):
@@ -1654,8 +1660,8 @@ class ImageDescriberGUI(QMainWindow):
         # Additional shortcuts not in menus
         pass
     
-    def update_window_title(self):
-        """Update the window title"""
+    def update_window_title(self, custom_status=None):
+        """Update the window title with optional custom status message"""
         # Start with filter status
         filter_display = {
             "all": "All",
@@ -1673,8 +1679,10 @@ class ImageDescriberGUI(QMainWindow):
             if not self.workspace.saved:
                 title += " *"
         
-        # Add processing status
-        if self.batch_processing:
+        # Add processing status - use custom status if provided
+        if custom_status:
+            title += f" - {custom_status}"
+        elif self.batch_processing:
             title += f" - Batch Processing: {self.batch_completed} of {self.batch_total}"
         elif self.processing_items:
             # Show individual processing status
@@ -1805,52 +1813,38 @@ class ImageDescriberGUI(QMainWindow):
             elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
                 
-            # Create top-level item
+            # Create top-level item - start with just the filename
             file_name = Path(file_path).name
             display_name = file_name
-            accessibility_desc = file_name
             
-            # Add processing indicator
-            if file_path in self.processing_items:
-                display_name = f"⏳ {display_name}"
-                accessibility_desc = f"Processing: {accessibility_desc}"
+            # Build prefix indicators in order
+            prefix_parts = []
             
-            # Add description indicator
+            # 1. Batch marker
+            if item.batch_marked:
+                prefix_parts.append("✓")
+                
+            # 2. Description count (only if descriptions exist)
             if item.descriptions:
                 desc_count = len(item.descriptions)
-                if file_path not in self.processing_items:  # Don't duplicate if already has processing indicator
-                    display_name = f"📝 {display_name} ({desc_count} desc)"
-                    accessibility_desc = f"{accessibility_desc} - has {desc_count} descriptions"
-                else:
-                    display_name += f" ({desc_count} desc)"
-                    accessibility_desc += f" - has {desc_count} descriptions"
-            else:
-                if file_path not in self.processing_items:
-                    accessibility_desc += " - no descriptions"
+                prefix_parts.append(f"d{desc_count}")
+                
+            # 3. Processing indicator
+            if file_path in self.processing_items:
+                prefix_parts.append("p")
+                
+            # 4. Video extraction status
+            if item.item_type == "video" and item.extracted_frames:
+                frame_count = len(item.extracted_frames)
+                prefix_parts.append(f"E{frame_count}")
             
-            # Add batch indicator
-            if item.batch_marked:
-                if file_path not in self.processing_items:
-                    display_name = f"✓ {display_name}"
-                    accessibility_desc = f"Batch marked: {accessibility_desc}"
-                else:
-                    display_name = f"✓ {display_name}"
-                    accessibility_desc = f"Batch marked: {accessibility_desc}"
+            # Combine prefix and filename
+            if prefix_parts:
+                prefix = "".join(prefix_parts)
+                display_name = f"{prefix} {file_name}"
             
-            # Add video indicator
-            if item.item_type == "video":
-                display_name = f"🎬 {display_name}"
-                accessibility_desc = f"Video: {accessibility_desc}"
-                if item.extracted_frames:
-                    frame_count = len(item.extracted_frames)
-                    display_name += f" ({frame_count} frames)"
-                    accessibility_desc += f" with {frame_count} extracted frames"
-            else:
-                display_name = f"🖼️ {display_name}"
-                accessibility_desc = f"Image: {accessibility_desc}"
-                    
+            # Create list item
             list_item = QListWidgetItem(display_name)
-            list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
             
             # Mark batch items with accessible colors
@@ -1863,34 +1857,29 @@ class ImageDescriberGUI(QMainWindow):
             # Add extracted frames as children for videos
             if item.item_type == "video" and item.extracted_frames:
                 for frame_path in item.extracted_frames:
-                    frame_item = QListWidgetItem()
                     frame_name = Path(frame_path).name
                     
-                    # Build frame display name with indicators and indentation
-                    frame_display = f"    └─ {frame_name}"
-                    frame_accessibility = f"{frame_name} - frame from {file_name}"
-                    
-                    # Add processing indicator for frame
-                    if frame_path in self.processing_items:
-                        frame_display = f"    └─ ⏳ {frame_name}"
-                        frame_accessibility = f"Processing: {frame_name} - frame from {file_name}"
+                    # Build frame prefix indicators
+                    frame_prefix_parts = []
                     
                     # Check if frame has descriptions
                     frame_workspace_item = self.workspace.get_item(frame_path)
                     if frame_workspace_item and frame_workspace_item.descriptions:
                         desc_count = len(frame_workspace_item.descriptions)
-                        if frame_path not in self.processing_items:
-                            frame_display = f"    └─ 📝 {frame_name} ({desc_count} desc)"
-                            frame_accessibility = f"{frame_name} - frame from {file_name} with {desc_count} descriptions"
-                        else:
-                            frame_display += f" ({desc_count} desc)"
-                            frame_accessibility += f" with {desc_count} descriptions"
-                    else:
-                        if frame_path not in self.processing_items:
-                            frame_accessibility += " with no descriptions"
+                        frame_prefix_parts.append(f"d{desc_count}")
                     
-                    frame_item.setText(frame_display)
-                    frame_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, frame_accessibility)
+                    # Add processing indicator for frame
+                    if frame_path in self.processing_items:
+                        frame_prefix_parts.append("p")
+                    
+                    # Build display name with indentation
+                    if frame_prefix_parts:
+                        prefix = "".join(frame_prefix_parts)
+                        frame_display = f"    └─ {prefix} {frame_name}"
+                    else:
+                        frame_display = f"    └─ {frame_name}"
+                    
+                    frame_item = QListWidgetItem(frame_display)
                     frame_item.setData(Qt.ItemDataRole.UserRole, frame_path)
                     
                     # Mark batch frames with same color as parent
@@ -2375,8 +2364,8 @@ class ImageDescriberGUI(QMainWindow):
             self.update_stop_button_state()
             
             # Preserve current selection before refresh
-            current_item = self.image_tree.currentItem()
-            current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+            current_item = self.image_list.currentItem()
+            current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
             
             # Refresh view to show processing indicator
             self.refresh_view()
@@ -2384,10 +2373,10 @@ class ImageDescriberGUI(QMainWindow):
             # Restore focus after refresh
             if current_file_path:
                 def restore_focus():
-                    for i in range(self.image_tree.topLevelItemCount()):
-                        item = self.image_tree.topLevelItem(i)
-                        if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
-                            self.image_tree.setCurrentItem(item)
+                    for i in range(self.image_list.count()):
+                        item = self.image_list.item(i)
+                        if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
+                            self.image_list.setCurrentItem(item)
                             break
                 QTimer.singleShot(0, restore_focus)
     
@@ -2402,6 +2391,11 @@ class ImageDescriberGUI(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             extraction_config = dialog.get_extraction_config()
             processing_config = dialog.get_processing_config()
+            
+            # Mark video as processing and update UI
+            self.processing_items.add(file_path)
+            self.update_window_title()  # Show processing status in title
+            self.refresh_view()  # Show processing indicator in list
             
             # Start video processing with frame extraction
             worker = VideoProcessingWorker(file_path, extraction_config, processing_config)
@@ -2600,9 +2594,9 @@ class ImageDescriberGUI(QMainWindow):
     def extract_video_frames(self):
         """Extract frames from selected video or batch-marked videos"""
         # First check if there's a currently selected video
-        current_item = self.image_tree.currentItem()
+        current_item = self.image_list.currentItem()
         if current_item:
-            file_path = current_item.data(0, Qt.ItemDataRole.UserRole)
+            file_path = current_item.data(Qt.ItemDataRole.UserRole)
             workspace_item = self.workspace.get_item(file_path)
             
             if workspace_item and workspace_item.item_type == "video":
@@ -2890,8 +2884,8 @@ Please answer the follow-up question about this image, taking into account the c
             self.update_stop_button_state()
             
             # Preserve current selection before refresh
-            current_item = self.image_tree.currentItem()
-            current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+            current_item = self.image_list.currentItem()
+            current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
             
             # Refresh view to show processing indicator
             self.refresh_view()
@@ -2899,10 +2893,10 @@ Please answer the follow-up question about this image, taking into account the c
             # Restore focus after refresh
             if current_file_path:
                 def restore_focus():
-                    for i in range(self.image_tree.topLevelItemCount()):
-                        item = self.image_tree.topLevelItem(i)
-                        if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
-                            self.image_tree.setCurrentItem(item)
+                    for i in range(self.image_list.count()):
+                        item = self.image_list.item(i)
+                        if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
+                            self.image_list.setCurrentItem(item)
                             break
                 QTimer.singleShot(0, restore_focus)
             
@@ -2992,9 +2986,9 @@ Please answer the follow-up question about this image, taking into account the c
     
     def copy_image(self):
         """Copy the selected image to clipboard"""
-        current_item = self.image_tree.currentItem()
+        current_item = self.image_list.currentItem()
         if current_item:
-            file_path = current_item.data(0, Qt.ItemDataRole.UserRole)
+            file_path = current_item.data(Qt.ItemDataRole.UserRole)
             try:
                 # Load image and copy to clipboard
                 pixmap = QPixmap(file_path)
@@ -3008,9 +3002,9 @@ Please answer the follow-up question about this image, taking into account the c
     
     def copy_image_path(self):
         """Copy the selected image path to clipboard"""
-        current_item = self.image_tree.currentItem()
+        current_item = self.image_list.currentItem()
         if current_item:
-            file_path = current_item.data(0, Qt.ItemDataRole.UserRole)
+            file_path = current_item.data(Qt.ItemDataRole.UserRole)
             QGuiApplication.clipboard().setText(file_path)
             self.status_bar.showMessage("Image path copied to clipboard", 2000)
     
@@ -3351,15 +3345,16 @@ Please answer the follow-up question about this image, taking into account the c
         self.refresh_view()
         
         # Auto-select the newly processed item if nothing else is selected
-        current_item = self.image_tree.currentItem()
+        current_item = self.image_list.currentItem()
         if not current_item:
             # Find and select the processed item
-            for i in range(self.image_tree.topLevelItemCount()):
-                item = self.image_tree.topLevelItem(i)
-                item_path = item.data(0, Qt.ItemDataRole.UserRole)
-                if item_path == file_path:
-                    self.image_tree.setCurrentItem(item)
-                    break
+            for i in range(self.image_list.count()):
+                item = self.image_list.item(i)
+                if item:
+                    item_path = item.data(Qt.ItemDataRole.UserRole)
+                    if item_path == file_path:
+                        self.image_list.setCurrentItem(item)
+                        break
         
         # Show status update
         self.status_bar.showMessage(
@@ -3447,25 +3442,41 @@ Please answer the follow-up question about this image, taking into account the c
         workspace_item.add_description(desc)
         self.workspace.mark_modified()
         
-        # PRESERVE FOCUS: Remember currently selected item before refresh
-        current_item = self.image_tree.currentItem()
-        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        # Update window title to reflect current processing status
+        remaining_processing = len(self.processing_items)
+        if remaining_processing > 0:
+            self.update_window_title(f"Processing: {remaining_processing} items remaining")
+        else:
+            # All processing complete - clear custom status
+            self.update_window_title()
         
-        # Update UI
-        self.refresh_view()
+        # Update UI - but DON'T restore focus during batch frame processing
+        # Only restore focus if this was a single item or the last item in a batch
+        is_frame_processing = any("frame_" in str(item) for item in self.processing_items)
         
-        # RESTORE FOCUS: Find and select the same item after refresh
-        if current_file_path:
-            # Use QTimer.singleShot to ensure focus restoration happens after UI update
-            def restore_focus():
-                for i in range(self.image_tree.topLevelItemCount()):
-                    item = self.image_tree.topLevelItem(i)
-                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
-                        self.image_tree.setCurrentItem(item)
-                        self.image_tree.scrollToItem(item)  # Ensure it's visible
-                        break
+        if is_frame_processing and remaining_processing > 0:
+            # Still processing frames - just refresh without focus restoration to prevent jumping
+            self.refresh_view()
+        else:
+            # Single item processing or batch complete - safe to restore focus
+            # PRESERVE FOCUS: Remember currently selected item before refresh
+            current_item = self.image_list.currentItem()
+            current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
             
-            QTimer.singleShot(0, restore_focus)
+            self.refresh_view()
+            
+            # RESTORE FOCUS: Find and select the same item after refresh
+            if current_file_path:
+                # Use QTimer.singleShot to ensure focus restoration happens after UI update
+                def restore_focus():
+                    for i in range(self.image_list.count()):
+                        item = self.image_list.item(i)
+                        if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
+                            self.image_list.setCurrentItem(item)
+                            self.image_list.scrollToItem(item)  # Ensure it's visible
+                            break
+                
+                QTimer.singleShot(0, restore_focus)
         
         # Remove completed worker from list
         sender_worker = self.sender()
@@ -3482,12 +3493,19 @@ Please answer the follow-up question about this image, taking into account the c
     def on_processing_failed(self, file_path: str, error: str):
         """Handle processing failure"""
         # Preserve focus
-        current_item = self.image_tree.currentItem()
-        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        current_item = self.image_list.currentItem()
+        current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
         
         # Remove from processing set
         self.processing_items.discard(file_path)
-        self.update_window_title()  # Update title to remove processing status
+        
+        # Update window title to reflect current processing status
+        remaining_processing = len(self.processing_items)
+        if remaining_processing > 0:
+            self.update_window_title(f"Processing: {remaining_processing} items remaining")
+        else:
+            # All processing complete - clear custom status
+            self.update_window_title()
         
         # Remove failed worker from list
         sender_worker = self.sender()
@@ -3501,11 +3519,11 @@ Please answer the follow-up question about this image, taking into account the c
         if current_file_path:
             # Use QTimer.singleShot to ensure focus restoration happens after UI update
             def restore_focus():
-                for i in range(self.image_tree.topLevelItemCount()):
-                    item = self.image_tree.topLevelItem(i)
-                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
-                        self.image_tree.setCurrentItem(item)
-                        self.image_tree.scrollToItem(item)  # Ensure it's visible
+                for i in range(self.image_list.count()):
+                    item = self.image_list.item(i)
+                    if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
+                        self.image_list.setCurrentItem(item)
+                        self.image_list.scrollToItem(item)  # Ensure it's visible
                         break
             
             QTimer.singleShot(0, restore_focus)
@@ -3596,9 +3614,13 @@ You can check Ollama logs for more details."""
     
     def on_video_extraction_complete(self, video_path: str, extracted_frames: list, processing_config: dict):
         """Handle completion of video frame extraction"""
+        # Remove video from processing items and mark as extracted
+        if video_path in self.processing_items:
+            self.processing_items.remove(video_path)
+        
         # PRESERVE FOCUS: Remember currently selected item before refresh
-        current_item = self.image_tree.currentItem()
-        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        current_item = self.image_list.currentItem()
+        current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
         
         # Add extracted frames to workspace
         workspace_item = self.workspace.get_item(video_path)
@@ -3612,17 +3634,20 @@ You can check Ollama logs for more details."""
                 self.workspace.add_item(frame_item)
         
         self.workspace.mark_modified()
+        
+        # Update title and refresh view
+        self.update_window_title()
         self.refresh_view()
         
         # RESTORE FOCUS: Find and select the same item after refresh
         if current_file_path:
             # Use QTimer.singleShot to ensure focus restoration happens after UI update
             def restore_focus():
-                for i in range(self.image_tree.topLevelItemCount()):
-                    item = self.image_tree.topLevelItem(i)
-                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
-                        self.image_tree.setCurrentItem(item)
-                        self.image_tree.scrollToItem(item)  # Ensure it's visible
+                for i in range(self.image_list.count()):
+                    item = self.image_list.item(i)
+                    if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
+                        self.image_list.setCurrentItem(item)
+                        self.image_list.scrollToItem(item)  # Ensure it's visible
                         break
             
             QTimer.singleShot(0, restore_focus)
@@ -3639,15 +3664,31 @@ You can check Ollama logs for more details."""
         prompt_style = processing_config["prompt_style"]
         custom_prompt = processing_config["custom_prompt"]
         
+        # Sort frame paths to ensure sequential processing (frame_0001, frame_0002, etc.)
+        frame_paths = sorted(frame_paths)
+        
         # PRESERVE FOCUS: Remember currently selected item before processing
-        current_item = self.image_tree.currentItem()
-        current_file_path = current_item.data(0, Qt.ItemDataRole.UserRole) if current_item else None
+        current_selection = self.image_list.currentRow()
+        current_item = self.image_list.currentItem()
+        current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
+        
+        # Track frame processing for accurate title bar progress
+        total_frames = len(frame_paths)
         
         # Process each frame
-        for frame_path in frame_paths:
+        for i, frame_path in enumerate(frame_paths):
             self.processing_items.add(frame_path)  # Mark as processing
             worker = ProcessingWorker(frame_path, model, prompt_style, custom_prompt)
-            worker.progress_updated.connect(self.on_processing_progress)
+            
+            # Enhanced progress callback to show frame progress
+            def make_progress_callback(frame_index, total):
+                def on_progress(message):
+                    # Update window title with frame progress
+                    progress_msg = f"Processing: {frame_index + 1} of {total} frames - {message}"
+                    self.update_window_title(progress_msg)
+                return on_progress
+            
+            worker.progress_updated.connect(make_progress_callback(i, total_frames))
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
             
@@ -3655,7 +3696,7 @@ You can check Ollama logs for more details."""
             worker.start()
         
         # Update title to show processing status
-        self.update_window_title()
+        self.update_window_title(f"Processing: {total_frames} frames")
         
         # Refresh view to show processing indicators
         self.refresh_view()
@@ -3664,11 +3705,11 @@ You can check Ollama logs for more details."""
         if current_file_path:
             # Use QTimer.singleShot to ensure focus restoration happens after UI update
             def restore_focus():
-                for i in range(self.image_tree.topLevelItemCount()):
-                    item = self.image_tree.topLevelItem(i)
-                    if item.data(0, Qt.ItemDataRole.UserRole) == current_file_path:
-                        self.image_tree.setCurrentItem(item)
-                        self.image_tree.scrollToItem(item)  # Ensure it's visible
+                for i in range(self.image_list.count()):
+                    item = self.image_list.item(i)
+                    if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
+                        self.image_list.setCurrentItem(item)
+                        self.image_list.scrollToItem(item)  # Ensure it's visible
                         break
             
             QTimer.singleShot(0, restore_focus)
