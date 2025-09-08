@@ -164,35 +164,49 @@ If crashes persist, consider implementing a simpler "Process Directory" that:
 
 ## 🐛 Tracked Issues for Future Implementation
 
-### Issue #1: Video processing not showing in window title
+### Issue #1: Video processing not showing in window title ✅ FIXED
 **Priority**: Medium  
-**Problem**: When videos are being extracted, the window title should show processing status but currently doesn't.  
-**Expected**: Window title should indicate "Extracting frames..." or similar during video frame extraction.  
-**Impact**: Users don't get feedback about video processing operations.
+**Status**: COMPLETED - Videos being extracted now show processing status in window title  
+**Solution**: Modified process_video() to add video to processing_items and call update_window_title()  
 
-### Issue #2: Video extraction status indicators missing
+### Issue #2: Video extraction status indicators missing ✅ FIXED
 **Priority**: Medium  
-**Problem**: After frames have been extracted, the video should be prefaced with an "E" and the number of frames that were extracted. While frames are being extracted, the video should get a "p" (processing indicator), just as images do.  
-**Expected**: "E5 video.mp4" after extraction of 5 frames, "p video.mp4" during extraction.  
-**Impact**: No visual feedback about extraction status or results.
+**Status**: COMPLETED - Videos show "E{count}" prefix after extraction, "⏳" during processing  
+**Solution**: Updated refresh_view() to add "E{frame_count}" for extracted videos and processing indicators  
 
-### Issue #3: Frame processing title bar not updating correctly
+### Issue #3: Frame processing title bar not updating correctly ✅ FIXED
 **Priority**: Medium  
-**Problem**: When frames are being processed after using the option to extract frames and process them, the title bar is not updating as frames are being processed. It always shows the same number.  
-**Expected**: Title bar should show current progress like "Processing: 3 of 5 frames".  
-**Impact**: Inaccurate progress feedback during batch frame processing.
+**Status**: COMPLETED - Window title shows accurate progress like "Processing: 3 of 5 frames"  
+**Solution**: Enhanced process_extracted_frames() with progress callbacks and modified update_window_title() to accept custom status messages  
 
-### Issue #4: Title bar truncation with ellipsis
+### Issue #4: Title bar truncation with ellipsis ✅ IMPROVED
 **Priority**: Medium  
-**Problem**: Sometimes the title bar has truncation and shows "...". Visually this is fine but for accessibility should not happen.  
-**Expected**: Full text should always be available to screen readers, even if visually truncated.  
-**Impact**: Screen readers may not get complete status information.
+**Status**: IMPROVED - Custom status messages prevent truncation during processing  
+**Solution**: update_window_title() now accepts custom_status parameter to prioritize processing messages  
 
-### Issue #5: Focus loss during frame processing
+### Issue #5: Focus loss during frame processing ✅ FIXED  
 **Priority**: High  
-**Problem**: When frame processing is happening after extracting frames from a video, focus is getting lost and jumping to the top of the list again each time a frame is processed.  
-**Expected**: Focus should remain stable during processing so user can read descriptions as they become available and potentially ask follow-up questions while other processing continues.  
-**Impact**: Major accessibility issue - prevents users from interacting with results while processing continues.
+**Status**: COMPLETED - Focus now remains stable during processing operations  
+**Solution**: Modified on_processing_complete() to avoid focus restoration during batch frame processing, only restore focus when all processing is complete
+
+### Issue #6: Frame processing order ✅ FIXED
+**Priority**: Medium
+**Status**: COMPLETED - Frames now process sequentially from first to last
+**Solution**: Added sorting of frame_paths in process_extracted_frames() to ensure sequential processing
+
+### Issue #7: Video dialog layout and defaults ✅ FIXED
+**Priority**: Medium
+**Status**: COMPLETED - Fixed dialog layout, defaults, and clarity
+**Solutions**: 
+- Moved "Process frames immediately" checkbox to top of processing section
+- Set default model to "moondream" and prompt to "Narrative" to match main app
+- Clarified end time label as "End Time (0=end)" to indicate 0 means end of video
+
+### Issue #6: Focus not preserved in image list after processing
+**Priority**: Medium  
+**Problem**: When user navigates to an image, presses 'p' to process, and completes the dialog, focus returns to the top of the image list instead of staying on the processed image.  
+**Expected**: Focus should remain on the image that was just processed.  
+**Impact**: Poor UX for keyboard navigation and screen reader users.
 
 ### Issue #6: Focus not preserved in image list after processing
 **Priority**: Medium  
