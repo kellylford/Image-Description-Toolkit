@@ -1,19 +1,27 @@
 # ImageDescriber Current Status
-**Date**: September 6, 2025  
+**Date**: September 8, 2025  
 **Branch**: main  
-**Status**: Process All enhancements in progress - currently experiencing crashes
+**Status**: Major accessibility improvements completed - List widget implementation working
 
-## 🎯 What We Were Working On
+## 🎯 Latest Achievements
 
-### Primary Goal
-Transform the Process All workflow to work like the viewer app with live updates - the main user workflow: "open app, process all, read descriptions as they roll in"
+### Major Accessibility Overhaul (COMPLETED ✅)
+**Date**: September 8, 2025
+**Goal**: Replace problematic tree widgets with accessible list widgets for better screen reader support
 
-### Key Requirements Addressed
-1. **Live Updates**: Show descriptions immediately as each image is processed (like viewer app)
-2. **Comprehensive Processing**: Automatic HEIC conversion + video frame extraction + image description
-3. **Accessibility Improvements**: Fixed Qt6 tree view, numeric inputs, and Tab key behavior
-4. **Window Title Filter Status**: Shows [All]/[Described]/[Batch] status
-5. **New Workspace Bug**: Fixed endless "unsaved changes" loop
+#### What Was Implemented
+1. **QTreeWidget → QListWidget Conversion**: Replaced both image tree and description tree with flat list widgets
+2. **Visual Hierarchy Maintained**: Used indentation with `└─` characters to show video frames under parent videos
+3. **Master-Detail View Hidden**: Removed menu option (code preserved) to focus users on accessible tree view
+4. **Emoji Visual Indicators**: Added 🎬 (video), 📝 (has descriptions), 🖼️ (image), ⏳ (processing), ✓ (batch marked)
+5. **Complete Method Updates**: Updated all selection handling, data access, and UI refresh methods
+6. **Preserved All Functionality**: Batch processing, descriptions, video frame extraction, etc. all maintained
+
+#### Accessibility Benefits
+- **Linear Navigation**: Screen readers can navigate through flat list linearly
+- **Clear State Information**: Each item announces its type, status, and description count
+- **No Expand/Collapse Complexity**: Eliminates confusing tree navigation for screen readers
+- **Preserved Visual Structure**: Frames still appear logically under parent videos
 
 ## ✅ Successfully Completed Features
 
@@ -70,15 +78,21 @@ Attempted to create comprehensive processing with live updates by:
 **Concern**: The sequential processing approach may be causing GUI thread blocking
 **Alternative**: Could use the existing proven workflow system instead of reimplementing
 
-## 📁 File Changes Made
+## 📁 Recent File Changes
 
-### Modified Files
-1. **`imagedescriber/imagedescriber.py`** (116 insertions, 34 deletions)
-   - Added custom accessibility classes
-   - Enhanced Process All workflow
-   - Fixed new workspace handling
-   - Added window title filter status
+### September 8, 2025 - Accessibility Overhaul
+**Commit**: `1c6716d` - "Improve accessibility by replacing tree widgets with list widgets"
 
+**Modified Files**:
+1. **`imagedescriber/imagedescriber.py`** (239 insertions, 136 deletions)
+   - Replaced QTreeWidget with QListWidget for image list and description list
+   - Updated all selection handling and data access methods  
+   - Added emoji visual indicators (🎬📝🖼️⏳✓)
+   - Maintained visual hierarchy with indentation for video frames
+   - Hidden master-detail view menu option (code preserved)
+   - Preserved all existing functionality including batch processing
+
+### Previous Changes
 2. **`scripts/video_frame_extractor_config.json`** (timestamp update only)
    - Automatic config update from workflow runs
 
@@ -111,7 +125,14 @@ Revert to simpler approach:
 
 ## 🧪 Testing Status
 
-### Accessibility Features: ✅ WORKING
+### List Widget Accessibility Implementation: ✅ WORKING
+- QListWidget successfully replaced QTreeWidget for both image and description lists
+- Visual hierarchy maintained with indentation for video frames
+- All selection handling and data access methods updated
+- Emoji indicators working for visual distinction
+- Batch processing and description functionality preserved
+
+### Previous Accessibility Features: ✅ WORKING
 - Custom tree widget announces items to screen reader
 - Numeric inputs work with keyboard navigation
 - Tab key properly moves focus in text areas
@@ -120,10 +141,11 @@ Revert to simpler approach:
 - Filter status displays correctly in title bar
 - Updates appropriately when filters change
 
-### Process All: ❌ CRASHING
-- App becomes unresponsive during comprehensive processing
-- Crashes occur despite multiple bug fixes
-- Root cause still unknown
+### Video Frame Processing: ⚠️ NEEDS ATTENTION
+- Basic functionality working but several UX/accessibility issues identified
+- Focus management problems during processing
+- Title bar status updates incomplete
+- See tracked issues for details
 
 ## 📋 Immediate Next Steps
 
@@ -142,7 +164,37 @@ If crashes persist, consider implementing a simpler "Process Directory" that:
 
 ## 🐛 Tracked Issues for Future Implementation
 
-### Issue #1: Focus not preserved in image list after processing
+### Issue #1: Video processing not showing in window title
+**Priority**: Medium  
+**Problem**: When videos are being extracted, the window title should show processing status but currently doesn't.  
+**Expected**: Window title should indicate "Extracting frames..." or similar during video frame extraction.  
+**Impact**: Users don't get feedback about video processing operations.
+
+### Issue #2: Video extraction status indicators missing
+**Priority**: Medium  
+**Problem**: After frames have been extracted, the video should be prefaced with an "E" and the number of frames that were extracted. While frames are being extracted, the video should get a "p" (processing indicator), just as images do.  
+**Expected**: "E5 video.mp4" after extraction of 5 frames, "p video.mp4" during extraction.  
+**Impact**: No visual feedback about extraction status or results.
+
+### Issue #3: Frame processing title bar not updating correctly
+**Priority**: Medium  
+**Problem**: When frames are being processed after using the option to extract frames and process them, the title bar is not updating as frames are being processed. It always shows the same number.  
+**Expected**: Title bar should show current progress like "Processing: 3 of 5 frames".  
+**Impact**: Inaccurate progress feedback during batch frame processing.
+
+### Issue #4: Title bar truncation with ellipsis
+**Priority**: Medium  
+**Problem**: Sometimes the title bar has truncation and shows "...". Visually this is fine but for accessibility should not happen.  
+**Expected**: Full text should always be available to screen readers, even if visually truncated.  
+**Impact**: Screen readers may not get complete status information.
+
+### Issue #5: Focus loss during frame processing
+**Priority**: High  
+**Problem**: When frame processing is happening after extracting frames from a video, focus is getting lost and jumping to the top of the list again each time a frame is processed.  
+**Expected**: Focus should remain stable during processing so user can read descriptions as they become available and potentially ask follow-up questions while other processing continues.  
+**Impact**: Major accessibility issue - prevents users from interacting with results while processing continues.
+
+### Issue #6: Focus not preserved in image list after processing
 **Priority**: Medium  
 **Problem**: When user navigates to an image, presses 'p' to process, and completes the dialog, focus returns to the top of the image list instead of staying on the processed image.  
 **Expected**: Focus should remain on the image that was just processed.  
