@@ -333,14 +333,47 @@ class ImageItem:
 
 
 class ImageWorkspace:
-    """Document model for ImageDescriber workspace"""
+    """Document model for ImageDescriber workspace - Enhanced for multiple directories"""
     def __init__(self, new_workspace=False):
         self.version = WORKSPACE_VERSION
-        self.directory_path = ""
+        self.directory_path = ""  # Keep for backward compatibility
+        self.directory_paths: List[str] = []  # New: support multiple directories
         self.items: Dict[str, ImageItem] = {}
         self.created = datetime.now().isoformat()
         self.modified = self.created
         self.saved = new_workspace  # New workspaces start as saved
+        
+    def add_directory(self, directory_path: str):
+        """Add a directory to the workspace"""
+        abs_path = str(Path(directory_path).resolve())
+        if abs_path not in self.directory_paths:
+            self.directory_paths.append(abs_path)
+            self.mark_modified()
+            
+        # Update legacy field for compatibility
+        if not self.directory_path:
+            self.directory_path = abs_path
+    
+    def remove_directory(self, directory_path: str):
+        """Remove a directory from the workspace"""
+        abs_path = str(Path(directory_path).resolve())
+        if abs_path in self.directory_paths:
+            self.directory_paths.remove(abs_path)
+            self.mark_modified()
+            
+            # Remove items from this directory
+            items_to_remove = [path for path, item in self.items.items() 
+                             if Path(path).resolve().is_relative_to(Path(abs_path))]
+            for item_path in items_to_remove:
+                del self.items[item_path]
+    
+    def get_all_directories(self) -> List[str]:
+        """Get all directories in workspace"""
+        dirs = []
+        if self.directory_path and self.directory_path not in dirs:
+            dirs.append(self.directory_path)
+        dirs.extend([d for d in self.directory_paths if d not in dirs])
+        return dirs
         
     def add_item(self, item: ImageItem):
         self.items[item.file_path] = item
@@ -361,7 +394,8 @@ class ImageWorkspace:
     def to_dict(self) -> dict:
         return {
             "version": self.version,
-            "directory_path": self.directory_path,
+            "directory_path": self.directory_path,  # Legacy compatibility
+            "directory_paths": self.directory_paths,  # New multi-directory support
             "items": {path: item.to_dict() for path, item in self.items.items()},
             "created": self.created,
             "modified": self.modified
@@ -370,6 +404,18 @@ class ImageWorkspace:
     @classmethod
     def from_dict(cls, data: dict):
         workspace = cls()
+        workspace.version = data.get("version", WORKSPACE_VERSION)
+        workspace.directory_path = data.get("directory_path", "")
+        workspace.directory_paths = data.get("directory_paths", [])
+        # Ensure backward compatibility
+        if workspace.directory_path and workspace.directory_path not in workspace.directory_paths:
+            workspace.directory_paths.append(workspace.directory_path)
+        workspace.items = {path: ImageItem.from_dict(item_data) 
+                          for path, item_data in data.get("items", {}).items()}
+        workspace.created = data.get("created", workspace.created)
+        workspace.modified = data.get("modified", workspace.modified)
+        workspace.saved = True
+        return workspace
         workspace.version = data.get("version", WORKSPACE_VERSION)
         workspace.directory_path = data.get("directory_path", "")
         workspace.items = {path: ImageItem.from_dict(item_data) 
@@ -885,6 +931,268 @@ class VideoProcessingWorker(QThread):
             frame_num += 1
         
         return extracted_paths
+
+
+class DirectorySelectionDialog(QDialog):
+    """Dialog for selecting directory with options for recursive search and multiple directories"""
+    def __init__(self, existing_directories: List[str], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Image Directory")
+        self.setModal(True)
+        self.resize(600, 400)
+        
+        self.selected_directory = ""
+        self.recursive_search = False
+        self.add_to_existing = False
+        
+        layout = QVBoxLayout(self)
+        
+        # Directory selection
+        dir_group = QGroupBox("Directory Selection")
+        dir_layout = QVBoxLayout(dir_group)
+        
+        self.dir_label = QLabel("No directory selected")
+        dir_layout.addWidget(self.dir_label)
+        
+        self.browse_button = QPushButton("Browse for Directory...")
+        self.browse_button.clicked.connect(self.browse_directory)
+        dir_layout.addWidget(self.browse_button)
+        
+        layout.addWidget(dir_group)
+        
+        # Options
+        options_group = QGroupBox("Options")
+        options_layout = QVBoxLayout(options_group)
+        
+        self.recursive_checkbox = QCheckBox("Search subdirectories recursively")
+        self.recursive_checkbox.setToolTip("When checked, searches all subdirectories for images")
+        options_layout.addWidget(self.recursive_checkbox)
+        
+        self.add_to_existing_checkbox = QCheckBox("Add to existing workspace")
+        if existing_directories:
+            self.add_to_existing_checkbox.setToolTip(f"Add to existing directories:\n" + 
+                                                    "\n".join([f"{Path(d).name}" for d in existing_directories[:5]]))
+        else:
+            self.add_to_existing_checkbox.setToolTip("No existing directories in workspace")
+            self.add_to_existing_checkbox.setEnabled(False)
+        options_layout.addWidget(self.add_to_existing_checkbox)
+        
+        layout.addWidget(options_group)
+        
+        # Existing directories display
+        if existing_directories:
+            existing_group = QGroupBox(f"Current Workspace Directories ({len(existing_directories)})")
+            existing_layout = QVBoxLayout(existing_group)
+            
+            for directory in existing_directories[:10]:  # Show max 10
+                dir_item = QLabel(f"{Path(directory).name}")
+                dir_item.setToolTip(directory)
+                existing_layout.addWidget(dir_item)
+            
+            if len(existing_directories) > 10:
+                more_label = QLabel(f"... and {len(existing_directories) - 10} more")
+                more_label.setStyleSheet("color: gray; font-style: italic;")
+                existing_layout.addWidget(more_label)
+            
+            layout.addWidget(existing_group)
+        
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | 
+                                     QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Initially disable OK until directory is selected
+        self.ok_button = button_box.button(QDialogButtonBox.StandardButton.Ok)
+        self.ok_button.setEnabled(False)
+        
+        layout.addWidget(button_box)
+    
+    def browse_directory(self):
+        """Browse for directory"""
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select Image Directory", str(Path.home())
+        )
+        
+        if directory:
+            self.selected_directory = directory
+            self.dir_label.setText(f"{Path(directory).name}")
+            self.dir_label.setToolTip(directory)
+            self.ok_button.setEnabled(True)
+    
+    def accept(self):
+        """Accept dialog and store settings"""
+        self.recursive_search = self.recursive_checkbox.isChecked()
+        self.add_to_existing = self.add_to_existing_checkbox.isChecked()
+        super().accept()
+
+
+class WorkspaceDirectoryManager(QDialog):
+    """Dialog for managing multiple directories in workspace"""
+    def __init__(self, workspace: 'ImageWorkspace', parent=None):
+        super().__init__(parent)
+        self.workspace = workspace
+        self.setWindowTitle("Workspace Directory Manager")
+        self.setModal(True)
+        self.resize(700, 500)
+        
+        layout = QVBoxLayout(self)
+        
+        # Info header
+        info_label = QLabel(f"Managing {len(self.workspace.items)} items across {len(self.workspace.get_all_directories())} directories")
+        info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+        
+        # Directory list
+        self.directory_list = QTreeWidget()
+        self.directory_list.setHeaderLabels(["Directory", "Files", "Path"])
+        self.directory_list.setAlternatingRowColors(True)
+        self.directory_list.setRootIsDecorated(False)
+        
+        # Populate directory list
+        self.populate_directory_list()
+        
+        layout.addWidget(self.directory_list)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        self.add_button = QPushButton("Add Directory...")
+        self.add_button.clicked.connect(self.add_directory)
+        button_layout.addWidget(self.add_button)
+        
+        self.remove_button = QPushButton("Remove Selected")
+        self.remove_button.clicked.connect(self.remove_directory)
+        self.remove_button.setEnabled(False)
+        button_layout.addWidget(self.remove_button)
+        
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.refresh_directory)
+        button_layout.addWidget(self.refresh_button)
+        
+        button_layout.addStretch()
+        
+        self.close_button = QPushButton("Close")
+        self.close_button.clicked.connect(self.accept)
+        button_layout.addWidget(self.close_button)
+        
+        layout.addLayout(button_layout)
+        
+        # Selection handling
+        self.directory_list.itemSelectionChanged.connect(self.on_selection_changed)
+    
+    def populate_directory_list(self):
+        """Populate the directory list with current workspace directories"""
+        self.directory_list.clear()
+        
+        for directory in self.workspace.get_all_directories():
+            dir_path = Path(directory)
+            
+            # Count files in this directory
+            file_count = sum(1 for item_path in self.workspace.items.keys() 
+                           if Path(item_path).parent == dir_path or 
+                              str(Path(item_path).resolve()).startswith(str(dir_path.resolve())))
+            
+            # Create tree item
+            item = QTreeWidgetItem([
+                dir_path.name,
+                str(file_count),
+                str(directory)
+            ])
+            
+            # Set tooltips
+            item.setToolTip(0, str(directory))
+            item.setToolTip(1, f"{file_count} files from this directory")
+            item.setToolTip(2, str(directory))
+            
+            self.directory_list.addTopLevelItem(item)
+        
+        # Resize columns to content
+        for i in range(3):
+            self.directory_list.resizeColumnToContents(i)
+    
+    def on_selection_changed(self):
+        """Handle selection change"""
+        has_selection = bool(self.directory_list.selectedItems())
+        self.remove_button.setEnabled(has_selection and len(self.workspace.get_all_directories()) > 1)
+    
+    def add_directory(self):
+        """Add a new directory"""
+        dialog = DirectorySelectionDialog(self.workspace.get_all_directories(), self)
+        dialog.add_to_existing_checkbox.setChecked(True)
+        dialog.add_to_existing_checkbox.setEnabled(False)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            directory = dialog.selected_directory
+            recursive = dialog.recursive_search
+            
+            if directory:
+                # Add to workspace
+                self.workspace.add_directory(directory)
+                
+                # Load images (this will be handled by the parent)
+                self.parent().load_images_from_directory(directory, recursive=recursive)
+                
+                # Refresh the list
+                self.populate_directory_list()
+    
+    def remove_directory(self):
+        """Remove selected directory"""
+        selected_items = self.directory_list.selectedItems()
+        if not selected_items:
+            return
+        
+        directory = selected_items[0].text(2)
+        dir_name = Path(directory).name
+        
+        # Count files that will be removed
+        files_to_remove = [path for path, item in self.workspace.items.items() 
+                          if Path(path).resolve().is_relative_to(Path(directory).resolve())]
+        
+        # Confirm removal
+        reply = QMessageBox.question(
+            self, "Remove Directory",
+            f"Remove directory '{dir_name}' from workspace?\n\n"
+            f"This will remove {len(files_to_remove)} files from the workspace.\n"
+            f"The actual files will not be deleted from disk.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.workspace.remove_directory(directory)
+            self.populate_directory_list()
+            
+            # Update selection state
+            self.on_selection_changed()
+    
+    def refresh_directory(self):
+        """Refresh selected directory"""
+        selected_items = self.directory_list.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "Refresh", 
+                                  "Please select a directory to refresh.")
+            return
+        
+        directory = selected_items[0].text(2)
+        
+        # Ask for recursive option
+        reply = QMessageBox.question(
+            self, "Refresh Directory",
+            f"Refresh directory '{Path(directory).name}'?\n\n"
+            f"Search subdirectories recursively?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Cancel:
+            recursive = reply == QMessageBox.StandardButton.Yes
+            
+            # Reload images from this directory
+            self.parent().load_images_from_directory(directory, recursive=recursive)
+            
+            # Refresh the list
+            self.populate_directory_list()
 
 
 class ProcessingDialog(QDialog):
@@ -1509,6 +1817,21 @@ class ImageDescriberGUI(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
+        # Workspace menu
+        workspace_menu = menubar.addMenu("Workspace")
+        
+        manage_dirs_action = QAction("Manage Directories...", self)
+        manage_dirs_action.triggered.connect(self.manage_directories)
+        manage_dirs_action.setToolTip("Add, remove, or view directories in workspace")
+        workspace_menu.addAction(manage_dirs_action)
+        
+        workspace_menu.addSeparator()
+        
+        add_dir_action = QAction("Add Directory...", self)
+        add_dir_action.triggered.connect(self.add_directory)
+        add_dir_action.setToolTip("Add another directory to current workspace")
+        workspace_menu.addAction(add_dir_action)
+        
         # Processing menu
         process_menu = menubar.addMenu("Processing")
         
@@ -1555,9 +1878,9 @@ class ImageDescriberGUI(QMainWindow):
         
         process_menu.addSeparator()
         
-        process_all_action = QAction("Process All", self)
-        process_all_action.triggered.connect(self.process_all)
-        process_menu.addAction(process_all_action)
+        add_all_to_batch_action = QAction("Add All to Batch", self)
+        add_all_to_batch_action.triggered.connect(self.add_all_to_batch)
+        process_menu.addAction(add_all_to_batch_action)
         
         # Descriptions menu
         desc_menu = menubar.addMenu("Descriptions")
@@ -1601,14 +1924,6 @@ class ImageDescriberGUI(QMainWindow):
         refresh_action.setShortcut(QKeySequence.StandardKey.Refresh)
         refresh_action.triggered.connect(self.refresh_view)
         view_menu.addAction(refresh_action)
-        
-        expand_action = QAction("Expand All", self)
-        expand_action.triggered.connect(self.expand_all)
-        view_menu.addAction(expand_action)
-        
-        collapse_action = QAction("Collapse All", self)
-        collapse_action.triggered.connect(self.collapse_all)
-        view_menu.addAction(collapse_action)
         
         view_menu.addSeparator()
         
@@ -1674,8 +1989,14 @@ class ImageDescriberGUI(QMainWindow):
             title += f" - {Path(self.current_workspace_file).name}"
             if not self.workspace.saved:
                 title += " *"
-        elif self.workspace.directory_path:
-            title += f" - {Path(self.workspace.directory_path).name}"
+        else:
+            # Show directory information
+            all_dirs = self.workspace.get_all_directories()
+            if len(all_dirs) == 1:
+                title += f" - {Path(all_dirs[0]).name}"
+            elif len(all_dirs) > 1:
+                title += f" - {len(all_dirs)} directories"
+            
             if not self.workspace.saved:
                 title += " *"
         
@@ -1770,32 +2091,112 @@ class ImageDescriberGUI(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to save workspace:\n{str(e)}")
     
     def load_image_directory(self):
-        """Load images from a directory"""
-        directory = QFileDialog.getExistingDirectory(
-            self, "Select Image Directory", self.workspace.directory_path or str(Path.home())
-        )
+        """Load images from a directory with options for recursive search"""
+        # Create custom dialog for directory selection with options
+        dialog = DirectorySelectionDialog(self.workspace.get_all_directories(), self)
         
-        if directory:
-            self.workspace.directory_path = directory
-            self.workspace.mark_modified()
-            self.load_images_from_directory(directory)
-            self.refresh_view()
-            self.update_window_title()
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            directory = dialog.selected_directory
+            recursive = dialog.recursive_search
+            add_to_existing = dialog.add_to_existing
+            
+            if directory:
+                if not add_to_existing:
+                    # Clear existing directories if not adding
+                    self.workspace.directory_paths.clear()
+                    self.workspace.items.clear()
+                
+                self.workspace.add_directory(directory)
+                self.load_images_from_directory(directory, recursive=recursive)
+                self.refresh_view()
+                self.update_window_title()
     
-    def load_images_from_directory(self, directory: str):
-        """Load all images from directory into workspace"""
+    def load_images_from_directory(self, directory: str, recursive: bool = False):
+        """Load all images from directory into workspace
+        
+        Args:
+            directory: Directory path to scan
+            recursive: If True, search subdirectories recursively
+        """
         directory_path = Path(directory)
         
         # Supported extensions
         image_exts = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.heic', '.heif'}
         video_exts = {'.mp4', '.mov', '.avi', '.mkv', '.wmv'}
+        all_exts = image_exts | video_exts
         
-        for file_path in directory_path.iterdir():
-            if file_path.is_file() and file_path.suffix.lower() in (image_exts | video_exts):
-                if str(file_path) not in self.workspace.items:
-                    item_type = "video" if file_path.suffix.lower() in video_exts else "image"
-                    item = ImageItem(str(file_path), item_type)
-                    self.workspace.add_item(item)
+        # Count files for progress tracking
+        file_paths = []
+        if recursive:
+            # Use rglob for recursive search
+            for ext in all_exts:
+                file_paths.extend(directory_path.rglob(f"*{ext}"))
+        else:
+            # Use iterdir for single directory
+            file_paths = [f for f in directory_path.iterdir() 
+                         if f.is_file() and f.suffix.lower() in all_exts]
+        
+        # Show progress dialog for large operations
+        if len(file_paths) > 10:
+            from PyQt6.QtWidgets import QProgressDialog
+            progress = QProgressDialog(f"Loading images from {directory_path.name}...", 
+                                     "Cancel", 0, len(file_paths), self)
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.show()
+        else:
+            progress = None
+        
+        loaded_count = 0
+        for i, file_path in enumerate(file_paths):
+            if progress and progress.wasCanceled():
+                break
+                
+            if str(file_path) not in self.workspace.items:
+                item_type = "video" if file_path.suffix.lower() in video_exts else "image"
+                item = ImageItem(str(file_path), item_type)
+                self.workspace.add_item(item)
+                loaded_count += 1
+            
+            if progress:
+                progress.setValue(i + 1)
+                QApplication.processEvents()
+        
+        if progress:
+            progress.close()
+        
+        # Show summary
+        search_type = "recursively" if recursive else "in directory"
+        QMessageBox.information(self, "Directory Loaded", 
+                               f"Loaded {loaded_count} new files {search_type}\n"
+                               f"Total files in workspace: {len(self.workspace.items)}")
+        
+        self.workspace.mark_modified()
+    
+    def add_directory(self):
+        """Add another directory to the current workspace"""
+        dialog = DirectorySelectionDialog(self.workspace.get_all_directories(), self)
+        dialog.add_to_existing_checkbox.setChecked(True)
+        dialog.add_to_existing_checkbox.setEnabled(False)  # Force adding to existing
+        dialog.setWindowTitle("Add Directory to Workspace")
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            directory = dialog.selected_directory
+            recursive = dialog.recursive_search
+            
+            if directory:
+                self.workspace.add_directory(directory)
+                self.load_images_from_directory(directory, recursive=recursive)
+                self.refresh_view()
+                self.update_window_title()
+    
+    def manage_directories(self):
+        """Show dialog to manage workspace directories"""
+        dialog = WorkspaceDirectoryManager(self.workspace, self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Refresh view if directories were modified
+            self.refresh_view()
+            self.update_window_title()
     
     # UI update methods
     def refresh_view(self):
@@ -1822,8 +2223,8 @@ class ImageDescriberGUI(QMainWindow):
             
             # 1. Batch marker
             if item.batch_marked:
-                prefix_parts.append("✓")
-                
+                prefix_parts.append("b")
+            
             # 2. Description count (only if descriptions exist)
             if item.descriptions:
                 desc_count = len(item.descriptions)
@@ -1875,9 +2276,9 @@ class ImageDescriberGUI(QMainWindow):
                     # Build display name with indentation
                     if frame_prefix_parts:
                         prefix = "".join(frame_prefix_parts)
-                        frame_display = f"    └─ {prefix} {frame_name}"
+                        frame_display = f"    {prefix} {frame_name}"
                     else:
-                        frame_display = f"    └─ {frame_name}"
+                        frame_display = f"    {frame_name}"
                     
                     frame_item = QListWidgetItem(frame_display)
                     frame_item.setData(Qt.ItemDataRole.UserRole, frame_path)
@@ -1926,7 +2327,6 @@ class ImageDescriberGUI(QMainWindow):
             
             # Add type indicator
             if item.item_type == "video":
-                display_name = f"📹 {display_name}"
                 accessibility_desc = f"Video: {accessibility_desc}"
                 # Add frame count info
                 if item.extracted_frames:
@@ -1934,12 +2334,10 @@ class ImageDescriberGUI(QMainWindow):
                     display_name += f" ({frame_count} frames)"
                     accessibility_desc += f" with {frame_count} extracted frames"
             else:
-                display_name = f"🖼️ {display_name}"
                 accessibility_desc = f"Image: {accessibility_desc}"
             
             # Add processing indicator
             if file_path in self.processing_items:
-                display_name = f"⏳ {display_name}"
                 accessibility_desc = f"Processing: {accessibility_desc}"
             
             # Add description count
@@ -1950,9 +2348,8 @@ class ImageDescriberGUI(QMainWindow):
             else:
                 accessibility_desc += " with no descriptions"
             
-            # Add batch indicator
+            # Add batch indicator to accessibility description only
             if item.batch_marked:
-                display_name = f"✓ {display_name}"
                 accessibility_desc = f"Batch marked: {accessibility_desc}"
             
             list_item = QListWidgetItem(display_name)
@@ -1995,12 +2392,11 @@ class ImageDescriberGUI(QMainWindow):
                     continue
                     
                 frame_name = Path(frame_path).name
-                display_name = f"📷 {frame_name}"
+                display_name = frame_name
                 accessibility_desc = f"Frame: {frame_name}"
                 
                 # Add processing indicator
                 if frame_path in self.processing_items:
-                    display_name = f"⏳ {display_name}"
                     accessibility_desc = f"Processing: {accessibility_desc}"
                 
                 # Add description count
@@ -2018,12 +2414,11 @@ class ImageDescriberGUI(QMainWindow):
         else:
             # For standalone images, show the image itself in frames list
             file_name = Path(file_path).name
-            display_name = f"🖼️ {file_name}"
+            display_name = file_name
             accessibility_desc = f"Image: {file_name}"
             
             # Add processing indicator
             if file_path in self.processing_items:
-                display_name = f"⏳ {display_name}"
                 accessibility_desc = f"Processing: {accessibility_desc}"
             
             # Add description count
@@ -2520,16 +2915,54 @@ class ImageDescriberGUI(QMainWindow):
             workspace_item.batch_marked = not workspace_item.batch_marked
             self.workspace.mark_modified()
             
-            # Update UI with accessible colors
+            # Update UI colors directly without full refresh for better performance
             if workspace_item.batch_marked:
                 # Use light blue background (#E3F2FD) which provides good contrast with black text
-                current_item.setBackground(0, QColor(227, 242, 253))  # Light blue
-                current_item.setBackground(1, QColor(227, 242, 253))
+                current_item.setBackground(QColor(227, 242, 253))  # Light blue
             else:
-                current_item.setBackground(0, Qt.GlobalColor.transparent)
-                current_item.setBackground(1, Qt.GlobalColor.transparent)
+                current_item.setBackground(Qt.GlobalColor.transparent)
             
+            # Update the batch count label
             self.update_batch_label()
+    
+    def add_all_to_batch(self):
+        """Add all images in the workspace to batch processing"""
+        if not self.workspace.items:
+            QMessageBox.information(self, "No Images", "No images found in the workspace.")
+            return
+        
+        # Count how many items will be added
+        count = 0
+        for item in self.workspace.items.values():
+            # Skip extracted frames - they should be processed with their parent videos
+            if item.item_type == "extracted_frame":
+                continue
+            if not item.batch_marked:
+                count += 1
+        
+        if count == 0:
+            QMessageBox.information(self, "All Marked", "All images are already marked for batch processing.")
+            return
+        
+        # Confirm the action
+        reply = QMessageBox.question(
+            self, "Add All to Batch",
+            f"This will add {count} items to the batch queue.\n\nContinue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # Mark all items for batch processing
+            for item in self.workspace.items.values():
+                # Skip extracted frames
+                if item.item_type == "extracted_frame":
+                    continue
+                item.batch_marked = True
+            
+            self.workspace.mark_modified()
+            self.refresh_view()  # Refresh to show all the batch markings
+            
+            QMessageBox.information(self, "Batch Updated", f"Added {count} items to batch queue.")
     
     def process_batch(self):
         """Process all batch-marked images"""
@@ -2562,6 +2995,9 @@ class ImageDescriberGUI(QMainWindow):
             # Check if stop was requested
             if self.stop_processing_requested:
                 break
+            
+            # Add to processing items to show "p" indicator
+            self.processing_items.add(item.file_path)
                 
             worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
@@ -2571,6 +3007,8 @@ class ImageDescriberGUI(QMainWindow):
             self.processing_workers.append(worker)
             worker.start()
         
+        # Refresh view to show processing indicators
+        self.refresh_view()
         self.update_stop_button_state()
 
     def convert_heic_files(self):
@@ -3009,14 +3447,6 @@ Please answer the follow-up question about this image, taking into account the c
             self.status_bar.showMessage("Image path copied to clipboard", 2000)
     
     # View operations
-    def expand_all(self):
-        """Expand all tree items - not applicable for list view"""
-        pass
-    
-    def collapse_all(self):
-        """Collapse all tree items - not applicable for list view"""
-        pass
-
     def set_filter(self, mode: str):
         """Set the filter mode and refresh view"""
         self.filter_mode = mode
@@ -3047,11 +3477,11 @@ Please answer the follow-up question about this image, taking into account the c
         # Show confirmation with what will be processed
         message = f"Process All will:\n\n"
         if heic_count > 0:
-            message += f"• Convert {heic_count} HEIC files to JPEG\n"
+            message += f"Convert {heic_count} HEIC files to JPEG\n"
         if video_count > 0:
-            message += f"• Extract frames from {video_count} videos (using default settings)\n"
+            message += f"Extract frames from {video_count} videos (using default settings)\n"
         if image_count > 0:
-            message += f"• Generate descriptions for {image_count} images\n"
+            message += f"Generate descriptions for {image_count} images\n"
         message += f"\nDescriptions will appear as they are generated (like the viewer app).\n\nContinue?"
         
         reply = QMessageBox.question(

@@ -1,0 +1,153 @@
+{
+  "version": "1.0",
+  "directory_path": "C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\tests\\test_files\\images",
+  "items": {
+    "C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\tests\\test_files\\images\\blue_landscape.jpg": {
+      "file_path": "C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\tests\\test_files\\images\\blue_landscape.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1757414153266",
+          "text": "The image presents a striking blue landscape with the words \"Blue Landscape\" written in white text at the bottom. The color of the background is predominantly blue, which creates a sense of tranquility and calmness. The contrast between the blue background and the white text adds visual interest to the composition. The overall atmosphere evokes feelings of serenity and peacefulness, making it an ideal backdrop for various artistic expressions or even as a calming element in interior design.",
+          "model": "moondream",
+          "prompt_style": "artistic",
+          "created": "2025-09-09T11:35:53.266228",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414157306",
+          "text": "The image shows an edited photograph of a blue landscape. The background is a solid, dark blue color that fills the entire frame. In the center of the image, there's white text that reads \"Blue Landscape\". This text stands out against the blue backdrop and adds a sense of depth to the photo. The image also contains some technical details such as camera settings, lighting conditions, composition, framing, and overall quality.",
+          "model": "moondream",
+          "prompt_style": "technical",
+          "created": "2025-09-09T11:35:57.305985",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414161711",
+          "text": "The image features a large blue square with white text that reads \"Blue Landscape\". The background of the image is a light gray color, which contrasts nicely with the blue square and draws attention to it. The use of white text against the blue background creates a striking visual effect, making the message clear and easy to read. Additionally, the contrast between the blue square and the light gray background adds depth and dimension to the image, enhancing its overall composition and impact on the viewer.",
+          "model": "moondream",
+          "prompt_style": "colorful",
+          "created": "2025-09-09T11:36:01.711744",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414167038",
+          "text": "The image is a vibrant blue square with white text that reads \"Blue Landscape\". The color of the background is a solid shade of blue, which contrasts nicely with the white text. The composition of the image is simple yet effective - the text is placed centrally within the frame, making it easy to read and understand. The use of white text against a blue background creates a strong visual impact that draws attention to the message being conveyed. Overall, this image appears to be well-suited for social media platforms due to its clear communication of the intended message and visually appealing design.",
+          "model": "moondream",
+          "prompt_style": "social",
+          "created": "2025-09-09T11:36:07.038150",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414229755",
+          "text": "Okay, let's break down this image in detail, providing a comprehensive description suitable for metadata:\n\n**Overall Impression:**\n\nThe image is a solid, uniform expanse of deep, saturated blue. It\u2019s a minimalist composition that evokes a sense of vastness, depth, and perhaps a slightly melancholic or contemplative mood.\n\n**Main Subjects/Objects:**\n\n*   **The Blue Field:** The dominant subject is the field itself. It\u2019s a single, unbroken area of blue. There are no discernible objects within the field.\n\n**Setting/Environment:**\n\n*   **Landscape:** The image represents a landscape, specifically a field or meadow. The flatness and uniformity suggest a relatively open area.\n*   **Terrain:** The terrain is flat and appears to be a grassy field.\n*   **Atmosphere:** The image creates a sense of atmospheric depth, suggesting a distant horizon.\n\n**Key Colors and Lighting:**\n\n*   **Dominant Color:** The primary color is a deep, rich blue. It\u2019s not a bright, cheerful blue; it leans towards a darker, more serious tone.\n*   **Color Temperature:** The color temperature is cool, contributing to the image's mood.\n*   **Lighting:** The lighting is even and diffused. There are no strong highlights or shadows. This creates a flat, uniform illumination across the entire field.\n\n**Notable Activities or Composition:**\n\n*   **Minimalist Composition:** The image is a prime example of minimalism. The single, unbroken field emphasizes the vastness and emptiness of the landscape.\n*   **Horizon Line:** The horizon line is visible, but it\u2019s not sharply defined. This adds to the sense of depth and distance.\n*   **Lack of Detail:** The absence of detail is a key element. It forces the viewer to focus on the color and the overall impression.\n\n**Technical Notes (Inferred):**\n\n*   **Image Type:** Likely a photograph.\n*   **Possible Intent:** The image could be used to represent concepts like isolation, tranquility, or the sublime. It\u2019s a powerful tool for creating a specific mood.\n\n**Overall, this image is a striking example of how a simple, carefully composed scene can have a significant impact.**\n\nDo you want me to analyze this image in a different way, such as discussing its potential artistic or symbolic meaning?",
+          "model": "gemma3",
+          "prompt_style": "detailed",
+          "created": "2025-09-09T11:37:09.755309",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414255987",
+          "text": "Here's a concise description of the image:\n\n**Subject:** The image is a solid, dark blue landscape.\n\n**Setting/Environment:** It depicts a stylized, somewhat abstract landscape, likely a mountainous region with a prominent, dark blue sky. The composition suggests a dramatic, possibly stormy, atmosphere.\n\n**Key Colors and Lighting:** The dominant color is a deep, saturated blue. The lighting appears to be overcast or coming from a low angle, casting shadows and emphasizing the depth of the landscape.\n\n**Notable Activities or Composition:** The image is a simple, minimalist landscape. It\u2019s a study in color and form, focusing on the interplay of dark blue and the implied depth of the terrain.",
+          "model": "gemma3",
+          "prompt_style": "concise",
+          "created": "2025-09-09T11:37:35.987920",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414281064",
+          "text": "Here's a detailed description of the image, focusing solely on the visual elements:\n\n**Overall Impression:**\n\nThe image is a solid, uniform expanse of dark blue. It appears to be a digitally created background, likely intended for use in graphic design or video production.\n\n**Color and Tone:**\n\n*   **Dominant Color:** The primary color is a deep, saturated dark blue. It\u2019s not a bright, airy blue; it leans towards a more somber, almost navy tone.\n*   **Value:** The value (lightness or darkness) is consistently low, creating a dark and somewhat moody atmosphere.\n\n**Texture and Detail:**\n\n*   **Surface:** The surface appears smooth and flat, with no visible texture or brushstrokes. It\u2019s a completely uniform color.\n*   **Edges:** The edges of the image are clean and sharp, with no visible bleed or gradients.\n\n**Technical Aspects:**\n\n*   **Resolution:** The image appears to be high resolution, allowing for detailed work.\n*   **Format:** It is likely a digital image file, such as a JPEG or PNG.\n\n**In essence, the image is a simple, solid block of dark blue, with no discernible features or objects within it.**",
+          "model": "gemma3",
+          "prompt_style": "Narrative",
+          "created": "2025-09-09T11:38:01.064389",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414329101",
+          "text": "Okay, let's analyze this image from an artistic perspective.\n\n**1. Visual Composition and Framing:**\n\n*   **Minimalist and Abstract:** The image is fundamentally minimalist. It\u2019s a large, solid expanse of color, creating a very simple, almost geometric composition.\n*   **Horizon Line:** There is a clear, horizontal horizon line that divides the image roughly in half. This creates a sense of depth and perspective, though it's a very basic one.\n*   **Framing:** The image is framed by the edges of the screen or canvas. The lack of any other elements creates a sense of isolation and focus entirely on the color field.\n\n**2. Color Palette and Lighting Mood:**\n\n*   **Color Palette:** The dominant color is a deep, saturated blue. It\u2019s not a bright, cheerful blue; it leans towards a cooler, more contemplative shade.\n*   **Lighting Mood:** The lighting is flat and even. There are no shadows or highlights. This creates a mood that is calm, serene, and slightly melancholic. The lack of light emphasizes the flatness and the color's intensity.\n\n**3. Artistic Style or Technique:**\n\n*   **Color Field Painting:** This image strongly evokes the style of Color Field painting, popularized by artists like Mark Rothko and Barnett Newman. Color Field painting focuses on large areas of color to evoke emotion and contemplation.\n*   **Abstract Expressionism:** It also has elements of Abstract Expressionism, particularly in its emphasis on pure color and its rejection of representational imagery.\n\n**4. Emotional Tone or Atmosphere:**\n\n*   **Serenity and Contemplation:** The overall atmosphere is one of quiet contemplation. The deep blue color is often associated with calmness, depth, and introspection.\n*   **Melancholy:** The color and the flatness of the image can also evoke a sense of melancholy or sadness. It\u2019s a feeling of being lost in thought or feeling a quiet sense of longing.\n*   **Space and Depth:** The horizon line creates a sense of vastness and space, which can be both comforting and slightly unsettling.\n\n**5. Subject Matter and Symbolism:**\n\n*   **No Concrete Subject:** There is no recognizable subject matter. This is key to the image's power. The absence of objects or figures forces the viewer to engage with the color itself.\n*   **Symbolic Potential:** Blue is often associated with:\n    *   **Water:** The horizon line could represent a body of water, symbolizing the subconscious, emotions, or the unknown.\n    *   **Infinity:** The expanse of color can also suggest infinity, eternity, or the boundless nature of the universe.\n    *   **Spirituality:** Blue is frequently used in spiritual contexts to represent peace, wisdom, and connection to the divine.\n\n**In conclusion:** This image is a powerful example of minimalist art that uses color",
+          "model": "gemma3",
+          "prompt_style": "artistic",
+          "created": "2025-09-09T11:38:49.101451",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414370483",
+          "text": "Okay, let's break down the technical aspects of this image. Given that it's a solid, uniform green, the analysis will focus on the *creation* of the image rather than a traditional landscape.\n\n**1. Camera Settings and Photographic Technique:**\n\n*   **Likely Digital Creation:** This image is almost certainly a digitally created image. The lack of visible grain, imperfections, or camera shake strongly suggests it wasn't captured by a traditional camera.\n*   **Software Used:** It was likely created using software like Adobe Photoshop, GIMP, or similar image editing programs.\n*   **Layering:** The green color was likely created using multiple layers, allowing for precise control over color and blending.\n*   **Brush Tool:** The green color was likely applied using a large brush tool, creating a smooth, even tone.\n\n**2. Lighting Conditions and Quality:**\n\n*   **Artificial Lighting:** The image is lit by artificial light. The evenness of the green suggests a diffused light source, likely a softbox or similar lighting setup.\n*   **No Shadows:** The absence of shadows is a key indicator of artificial lighting. This is a deliberate choice to create a flat, uniform appearance.\n\n**3. Composition and Framing:**\n\n*   **Full Frame:** The image fills the entire frame, with no visible borders or edges.\n*   **Centered:** The green color is centered within the frame, creating a symmetrical composition.\n*   **Simple:** The composition is extremely simple, focusing solely on the color and its distribution.\n\n**4. Image Quality and Clarity:**\n\n*   **High Resolution:** The image is likely created at a high resolution, allowing for detailed work and scaling without loss of quality.\n*   **Sharpness:** The image is sharp and clear, with no blurring or distortion.\n*   **Color Accuracy:** The green color is accurately represented, with no color shifts or imbalances.\n\n**5. Technical Strengths or Weaknesses:**\n\n*   **Strengths:**\n    *   **Clean and Professional:** The image is technically flawless, with no visible flaws or imperfections.\n    *   **Precise Control:** The digital nature allows for precise control over every aspect of the image, from color to composition.\n    *   **Versatile:** The image can be used for a wide range of purposes, such as backgrounds, textures, or graphic design elements.\n*   **Weaknesses:**\n    *   **Lack of Naturalism:** The image lacks the natural variations and imperfections found in real-world photographs.\n    *   **Static:** The image is static and lacks dynamism.\n\n**In summary:** This image is a technically well-executed digital creation, demonstrating the power and flexibility of digital image editing tools. It's a perfect example of how digital tools can be used to create a clean, controlled, and visually appealing image.",
+          "model": "gemma3",
+          "prompt_style": "technical",
+          "created": "2025-09-09T11:39:30.483565",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414420582",
+          "text": "Okay, let's delve into a rich, descriptive interpretation of this image, focusing on the interplay of color, light, and atmosphere.\n\n**The Image: A Deep, Murmuring Blue Landscape**\n\nThe dominant impression is one of profound depth and quiet contemplation. It\u2019s not a bright, cheerful blue; instead, it\u2019s a blue that feels ancient, weathered, and imbued with a subtle, almost melancholic beauty. \n\n**Color Palette & Relationships:**\n\n*   **The Blue:** The primary color is a complex, layered blue. It\u2019s not a single hue, but a blend of deep indigo, Prussian blue, and a touch of teal. There are subtle shifts in tone \u2013 darker, almost bruised blues in the foreground, gradually lightening towards the horizon, where the blue becomes a softer, more ethereal shade. The blue isn't flat; it has a velvety quality, suggesting a vastness that seems to absorb light.\n*   **Subtle Greens & Browns:**  Within the blue, there are hints of muted greens and browns, like the shadows of distant trees or the earth beneath a dense forest. These colors are not sharply defined but bleed into the blue, creating a sense of depth and complexity. They are cool and subdued, reinforcing the overall mood.\n*   **White Highlights:**  Small, diffused white highlights\u2014perhaps from distant clouds or reflected light\u2014add a touch of luminosity, preventing the image from feeling entirely dark and heavy. They are carefully placed, acting as subtle beacons within the blue expanse.\n\n**Lighting & Atmosphere:**\n\n*   **Diffuse Light:** The lighting is soft, diffused, and seemingly coming from an unseen source. It doesn\u2019t cast harsh shadows, but instead, creates a gentle, enveloping glow. This contributes to the feeling of serenity and mystery.\n*   **Depth & Perspective:** The color variations\u2014the darker blues in the foreground, the lighter blues in the distance\u2014create a strong sense of depth and perspective. It feels as though you are looking out over a vast, rolling landscape.\n*   **Mood & Composition:** The overall effect is one of quiet contemplation, solitude, and perhaps even a touch of sadness. The blue evokes a sense of vastness, timelessness, and the power of nature. The composition is balanced and harmonious, inviting the viewer to lose themselves in the scene.\n\n**Overall Impression:**\n\nThis isn't just a blue landscape; it's a carefully constructed mood. It\u2019s a space that feels both expansive and intimate, inviting the viewer to pause, reflect, and connect with the profound beauty of the natural world. It\u2019s a landscape that speaks of secrets, memories, and the enduring power of color.\n\n---\n\nWould you like me to analyze a different image, or perhaps explore a specific aspect of the description in more detail (e.g., the psychological impact of the color blue)?",
+          "model": "gemma3",
+          "prompt_style": "colorful",
+          "created": "2025-09-09T11:40:20.582771",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414462939",
+          "text": "Okay, let's analyze this image for social media suitability.\n\n**Summary:**\n\nThe image is a solid, dark blue landscape. It appears to be a stylized, almost abstract representation of a mountainous or coastal scene. It\u2019s a very simple, minimalist image.\n\n**Evaluation for Social Media Suitability:**\n\nHere's a breakdown of the image's strengths and weaknesses for use on social media platforms:\n\n**1. Visual Appeal and Engagement:**\n\n* **Strengths:** The dark blue color is inherently calming and visually interesting. It has a sophisticated, slightly moody feel. The abstract nature of the image can be intriguing.\n* **Weaknesses:** It\u2019s *very* simple. Without any additional elements, it can quickly become visually boring. It lacks a clear focal point, and the lack of detail might not immediately grab attention in a fast-scrolling feed.\n\n**2. Composition and Framing:**\n\n* **Strengths:** The image is well-composed in terms of balance. The dark blue color fills the entire frame, creating a sense of depth.\n* **Weaknesses:** The lack of a strong compositional element (rule of thirds, leading lines, etc.) makes it feel somewhat static. It needs something to draw the eye.\n\n**3. Color Vibrancy and Contrast:**\n\n* **Strengths:** The contrast between the dark blue and the background (presumably white or light) is good, ensuring the image is legible.\n* **Weaknesses:** The color palette is limited. While the dark blue is pleasant, it\u2019s not particularly exciting or dynamic.\n\n**4. Subject Matter Relevance:**\n\n* **Strengths:** The image is universally appealing. Landscapes are popular on social media.\n* **Weaknesses:** It\u2019s extremely generic. There\u2019s nothing specific about the landscape that would make it stand out or connect with a particular audience.\n\n**5. Overall Impression and Shareability:**\n\n* **Overall Impression:** The image has a serene, almost meditative quality. It\u2019s a solid, visually pleasing background or image.\n* **Shareability:**  It\u2019s unlikely to go viral. It's suitable for backgrounds, mood boards, or as a simple, understated image. However, it\u2019s not designed to generate strong engagement or conversation.\n\n**Recommendations for Improvement (if used on social media):**\n\n* **Add a Focal Point:** Introduce a subtle element \u2013 a small silhouette, a texture, or a light source \u2013 to create a point of interest.\n* **Layering:** Add a slightly transparent layer over the image to create depth and visual interest.\n* **Contextualize:** If posting with a caption, provide context.  For example, \"Finding peace in the mountains\" or \"Coastal serenity.\"\n* **Consider a Filter:** A subtle filter could enhance the color and add a stylistic touch.\n\n**In conclusion:** This image is technically well",
+          "model": "gemma3",
+          "prompt_style": "social",
+          "created": "2025-09-09T11:41:02.939880",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414530785",
+          "text": "The image displays a computer screen with a blue landscape background. At the center of the screen is a text overlay that reads \"Blue landscape\" in white font. The background features what appears to be a serene, natural scene with varying shades of blue, suggesting depth and distance, which could represent a sky or a body of water. The lighting on the image is soft and diffused, giving it a calm and tranquil atmosphere. There are no other objects or subjects in the image, and there are no notable activities or composition elements visible. The style of the image is simple and minimalistic, with a focus on the textual description and the background landscape.",
+          "model": "llava",
+          "prompt_style": "detailed",
+          "created": "2025-09-09T11:42:10.784986",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414552766",
+          "text": "The image displays a simple graphic with text on it. The main subject is the text \"blue landscape,\" which is written in white font against a blue background that resembles a sky. The setting appears to be a digital or graphic representation rather than an actual environment. There are no notable activities or composition elements, as the image is static and lacks any dynamic elements. The key colors are blue for the background and white for the text, with no additional colors or lighting effects visible in this image.",
+          "model": "llava",
+          "prompt_style": "concise",
+          "created": "2025-09-09T11:42:32.766583",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414573429",
+          "text": "The image displays a computer screen with a blue background that transitions to gray at the bottom. On this background, there is white text that reads \"blue landscape.\" The style of the image appears to be a simple digital graphic or screenshot, possibly from a presentation or a computer program. There are no other objects or details visible in the image.",
+          "model": "llava",
+          "prompt_style": "Narrative",
+          "created": "2025-09-09T11:42:53.429609",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414623455",
+          "text": "The image you've provided appears to be a digital artwork rather than a photograph of a physical landscape. It features a stylized representation of a blue landscape with a clear sky, which is likely intended to evoke the feeling of a serene outdoor environment. Here's an analysis from an artistic perspective:\n\n- **Visual Composition and Framing**: The image has a centered composition, which draws the viewer's attention directly to the landscape. The use of a blue gradient for the sky creates a sense of depth and space, while the darker tones at the bottom suggest ground or land. The framing is simple yet effective, with no distracting elements outside the central focus.\n\n- **Color Palette and Lighting Mood**: The color palette is quite limited, focusing on shades of blue and gray. This gives the image a cool and calm atmosphere. The lighting mood appears soft and diffused, which contributes to the tranquil feel of the scene.\n\n- **Artistic Style or Technique**: The style of this artwork leans towards minimalism with its simplicity and lack of detail. It's a flat design with no textures or intricate details, which is characteristic of digital art that aims for a clean and modern aesthetic.\n\n- **Emotional Tone or Atmosphere**: The emotional tone of the image is peaceful and serene. The absence of any human elements or signs of activity suggests a quiet moment in nature, possibly evoking feelings of calmness or solitude.\n\n- **Subject Matter and Symbolism**: The subject matter is abstract and open to interpretation. It could symbolize tranquility, the beauty of nature, or the vastness of the universe. The blue landscape might also represent a dream or an idealized version of reality.\n\nOverall, this image uses color, composition, and simplicity to create a visually appealing piece that evokes a sense of peacefulness and could be interpreted in various ways depending on the viewer's perspective.",
+          "model": "llava",
+          "prompt_style": "artistic",
+          "created": "2025-09-09T11:43:43.455529",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414689691",
+          "text": "The image you've provided appears to be a screenshot from a computer displaying a landscape scene. Here's a technical analysis of the image:\n\n1. **Camera Settings and Photographic Technique**:\n   - **Exposure**: The exposure seems balanced, with no overexposed or underexposed areas. This suggests that the photographer used appropriate settings to capture the scene without losing detail in either the shadows or highlights.\n   - **Focus**: The focus appears to be sharp, particularly on the text \"Blue landscape\" and the word \"landscape,\" which are likely in the foreground. The rest of the image is slightly soft, indicating a shallow depth of field was used.\n   - **White Balance**: The white balance seems accurate for the natural light conditions, with no obvious color casts.\n   - **ISO, Aperture, and Shutter Speed**: Without additional information, it's not possible to determine the ISO, aperture, or shutter speed settings used in this photograph. However, given the clarity of the text and the overall quality of the image, it can be assumed that the photographer chose appropriate settings for the lighting conditions at the time of capture.\n\n2. **Lighting Conditions and Quality**:\n   - **Natural Light**: The natural light appears to be diffused, suggesting either an overcast sky or a shaded area. This soft lighting is often desirable in landscape photography as it reduces harsh shadows and allows for more even illumination of the scene.\n   - **Color Temperature**: The color temperature seems neutral, which is typical for natural light conditions.\n\n3. **Composition and Framing**:\n   - **Rule of Thirds**: The text \"Blue landscape\" is placed according to the rule of thirds, which creates a balanced composition by dividing the image into nine equal parts with four lines and three columns.\n   - **Leading Lines**: There are no obvious leading lines in this image that draw the viewer's eye towards the text or any other specific point of interest.\n   - **Symmetry and Asymmetry**: The image is symmetrical along the vertical axis, with the text acting as a dividing line. This symmetry can create a sense of balance and calmness in the scene.\n\n4. **Image Quality and Clarity**:\n   - **Resolution**: The resolution appears to be high enough for the text to be legible, but it's not possible to determine if there are any other details that could benefit from higher resolution.\n   - **Sharpness**: The image is sharp in the areas of focus (text and landscape), but the rest of the image is slightly soft, which may be due to a shallow depth of field or motion blur during capture.\n   - **Color Depth**: The color depth seems adequate for the scene",
+          "model": "llava",
+          "prompt_style": "technical",
+          "created": "2025-09-09T11:44:49.691309",
+          "custom_prompt": ""
+        },
+        {
+          "id": "1757414726002",
+          "text": "The image presents a striking contrast between the cool blues of the landscape and the warm, inviting tones of the sky. Dominating the scene is a vast expanse of blue, from the deepest hues at the bottom to the lighter shades that gradually fade into the distance. This blue palette is punctuated by the darker tones of the land, which appear as patches of green and brown, adding depth and texture to the composition.\n\nThe sky, a soft gradient of light blues, serves as a serene backdrop, its lighter shades providing a sense of openness and vastness. The color relationships between the blue landscape and the sky create a harmonious balance, with the cooler tones of the land complementing the warmer hues of the sky.\n\nThe lighting in the image is soft and diffused, casting gentle shadows and highlighting the contours of the landscape. This creates a peaceful and tranquil atmosphere, inviting the viewer to imagine themselves standing on the land, looking out towards the horizon. The overall visual effect is one of calmness and natural beauty, with each element - from the deep blue of the landscape to the lighter blues of the sky - contributing to a sense of serene tranquility.",
+          "model": "llava",
+          "prompt_style": "colorful",
+          "created": "2025-09-09T11:45:26.002497",
+          "custom_prompt": ""
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": []
+    }
+  },
+  "created": "2025-09-09T11:35:39.024517",
+  "modified": "2025-09-09T11:35:53.266281"
+}
