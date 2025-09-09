@@ -39,6 +39,11 @@ try:
 except ImportError:
     cv2 = None
 
+try:
+    import openai
+except ImportError:
+    openai = None
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QLabel, QTextEdit, QSplitter,
@@ -56,6 +61,198 @@ from PyQt6.QtGui import (
 
 # Document format for ImageDescriber workspace
 WORKSPACE_VERSION = "1.0"
+
+
+# ================================
+# AI PROVIDER ABSTRACTION
+# ================================
+
+class AIProvider:
+    """Base class for AI providers"""
+    
+    def __init__(self):
+        pass
+    
+    def is_available(self) -> bool:
+        """Check if this provider is available"""
+        raise NotImplementedError
+    
+    def get_models(self) -> List[str]:
+        """Get list of available models"""
+        raise NotImplementedError
+    
+    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
+        """Process image with AI model"""
+        raise NotImplementedError
+    
+    def get_provider_name(self) -> str:
+        """Get human-readable provider name"""
+        raise NotImplementedError
+
+
+class OllamaProvider(AIProvider):
+    """Ollama provider implementation"""
+    
+    def is_available(self) -> bool:
+        return ollama is not None
+    
+    def get_models(self) -> List[str]:
+        """Get list of available Ollama models"""
+        if not self.is_available():
+            return []
+        
+        try:
+            models_response = ollama.list()
+            available_models = []
+            
+            if 'models' in models_response:
+                for model in models_response['models']:
+                    model_name = model.get('name', '')
+                    if model_name:
+                        available_models.append(model_name)
+            
+            # If no models found, add some common vision models as fallback
+            if not available_models:
+                available_models = ['moondream', 'gemma3', 'llava']
+            
+            return available_models
+            
+        except Exception as e:
+            print(f"Error getting Ollama models: {e}")
+            return ['moondream', 'gemma3', 'llava']  # Fallback defaults
+    
+    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
+        """Process image using Ollama"""
+        if not self.is_available():
+            raise Exception("Ollama is not available")
+        
+        # Encode to base64
+        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        
+        # Call Ollama
+        response = ollama.chat(
+            model=model,
+            messages=[{
+                'role': 'user',
+                'content': prompt,
+                'images': [image_base64]
+            }],
+            options={
+                'temperature': kwargs.get('temperature', 0.1),
+                'num_predict': kwargs.get('num_predict', 600)
+            }
+        )
+        
+        if 'message' in response and 'content' in response['message']:
+            content = response['message']['content']
+            if content and content.strip():
+                return content.strip()
+            else:
+                raise Exception("Empty response from Ollama model")
+        else:
+            raise Exception(f"Unexpected response format from Ollama: {response}")
+    
+    def get_provider_name(self) -> str:
+        return "Ollama"
+
+
+class OpenAIProvider(AIProvider):
+    """OpenAI provider implementation"""
+    
+    def __init__(self):
+        super().__init__()
+        self.client = None
+        self.api_key = self._load_api_key()
+        if self.api_key and openai:
+            try:
+                self.client = openai.OpenAI(api_key=self.api_key)
+            except Exception as e:
+                print(f"Error initializing OpenAI client: {e}")
+                self.client = None
+    
+    def _load_api_key(self) -> Optional[str]:
+        """Load OpenAI API key from openai.txt file"""
+        key_file = Path("openai.txt")
+        if key_file.exists():
+            try:
+                return key_file.read_text().strip()
+            except Exception as e:
+                print(f"Error reading OpenAI key file: {e}")
+                return None
+        return None
+    
+    def is_available(self) -> bool:
+        return openai is not None and self.client is not None
+    
+    def get_models(self) -> List[str]:
+        """Get list of available OpenAI vision models"""
+        if not self.is_available():
+            return []
+        
+        # OpenAI vision models (as of 2025)
+        return [
+            'gpt-4o',
+            'gpt-4o-mini', 
+            'gpt-4-vision-preview'
+        ]
+    
+    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
+        """Process image using OpenAI"""
+        if not self.is_available():
+            raise Exception("OpenAI is not available or API key not found")
+        
+        # Encode to base64
+        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[{
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'text',
+                            'text': prompt
+                        },
+                        {
+                            'type': 'image_url',
+                            'image_url': {
+                                'url': f"data:image/jpeg;base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }],
+                max_tokens=kwargs.get('num_predict', 600),
+                temperature=kwargs.get('temperature', 0.1)
+            )
+            
+            if response.choices and response.choices[0].message.content:
+                return response.choices[0].message.content.strip()
+            else:
+                raise Exception("Empty response from OpenAI model")
+                
+        except Exception as e:
+            raise Exception(f"OpenAI API error: {str(e)}")
+    
+    def get_provider_name(self) -> str:
+        return "OpenAI"
+
+
+# Global provider instances
+_ollama_provider = OllamaProvider()
+_openai_provider = OpenAIProvider()
+
+def get_available_providers() -> Dict[str, AIProvider]:
+    """Get all available AI providers"""
+    providers = {}
+    
+    if _ollama_provider.is_available():
+        providers['ollama'] = _ollama_provider
+    
+    if _openai_provider.is_available():
+        providers['openai'] = _openai_provider
+    
+    return providers
 
 
 # ================================
@@ -265,12 +462,13 @@ class AccessibleTextEdit(QPlainTextEdit):
 class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
-                 created: str = "", custom_prompt: str = ""):
+                 created: str = "", custom_prompt: str = "", provider: str = ""):
         self.text = text
         self.model = model
         self.prompt_style = prompt_style
         self.created = created or datetime.now().isoformat()
         self.custom_prompt = custom_prompt
+        self.provider = provider
         self.id = f"{int(time.time() * 1000)}"  # Unique ID
     
     def to_dict(self) -> dict:
@@ -280,7 +478,8 @@ class ImageDescription:
             "model": self.model,
             "prompt_style": self.prompt_style,
             "created": self.created,
-            "custom_prompt": self.custom_prompt
+            "custom_prompt": self.custom_prompt,
+            "provider": self.provider
         }
     
     @classmethod
@@ -290,7 +489,8 @@ class ImageDescription:
             model=data.get("model", ""),
             prompt_style=data.get("prompt_style", ""),
             created=data.get("created", ""),
-            custom_prompt=data.get("custom_prompt", "")
+            custom_prompt=data.get("custom_prompt", ""),
+            provider=data.get("provider", "")
         )
         desc.id = data.get("id", desc.id)
         return desc
@@ -429,12 +629,13 @@ class ImageWorkspace:
 class ProcessingWorker(QThread):
     """Worker thread for AI processing"""
     progress_updated = pyqtSignal(str)
-    processing_complete = pyqtSignal(str, str, str, str, str)  # file_path, description, model, prompt_style, custom_prompt
+    processing_complete = pyqtSignal(str, str, str, str, str, str)  # file_path, description, provider, model, prompt_style, custom_prompt
     processing_failed = pyqtSignal(str, str)  # file_path, error
     
-    def __init__(self, file_path: str, model: str, prompt_style: str, custom_prompt: str = ""):
+    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = ""):
         super().__init__()
         self.file_path = file_path
+        self.provider = provider
         self.model = model
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
@@ -459,14 +660,14 @@ class ProcessingWorker(QThread):
                     prompt_text = "Describe this image."
             
             # Emit progress
-            self.progress_updated.emit(f"Processing {Path(self.file_path).name} with {self.model}...")
+            self.progress_updated.emit(f"Processing {Path(self.file_path).name} with {self.provider} {self.model}...")
             
-            # Process the image with Ollama
-            description = self.process_with_ollama(self.file_path, prompt_text)
+            # Process the image with selected provider
+            description = self.process_with_ai(self.file_path, prompt_text)
             
             # Emit success
             self.processing_complete.emit(
-                self.file_path, description, self.model, self.prompt_style, self.custom_prompt
+                self.file_path, description, self.provider, self.model, self.prompt_style, self.custom_prompt
             )
             
         except Exception as e:
@@ -504,10 +705,15 @@ class ProcessingWorker(QThread):
             }
         }
     
-    def process_with_ollama(self, image_path: str, prompt: str) -> str:
-        """Process image with Ollama"""
-        if not ollama:
-            raise Exception("Ollama not available")
+    def process_with_ai(self, image_path: str, prompt: str) -> str:
+        """Process image with selected AI provider"""
+        # Get available providers
+        providers = get_available_providers()
+        
+        if self.provider not in providers:
+            raise Exception(f"Provider '{self.provider}' not available")
+        
+        provider = providers[self.provider]
         
         try:
             # Check if it's a HEIC file and convert if needed
@@ -529,38 +735,24 @@ class ProcessingWorker(QThread):
             if len(image_data) > max_size:
                 image_data = self.resize_image_data(image_data, max_size)
             
-            # Encode to base64
-            image_base64 = base64.b64encode(image_data).decode('utf-8')
-            
-            print(f"Processing {path_obj.name} with model {self.model}")
+            print(f"Processing {path_obj.name} with {self.provider} {self.model}")
             print(f"Image size: {len(image_data)} bytes")
             print(f"Prompt: {prompt[:100]}...")
             
-            # Call Ollama with proper error handling
-            response = ollama.chat(
+            # Process with the selected provider
+            description = provider.process_image(
+                image_data=image_data,
+                prompt=prompt,
                 model=self.model,
-                messages=[{
-                    'role': 'user',
-                    'content': prompt,
-                    'images': [image_base64]
-                }],
-                options={
-                    'temperature': 0.1,
-                    'num_predict': 600
-                }
+                temperature=0.1,
+                num_predict=600
             )
             
-            if 'message' in response and 'content' in response['message']:
-                content = response['message']['content']
-                if content and content.strip():
-                    return content.strip()
-                else:
-                    raise Exception("Empty response from model")
-            else:
-                raise Exception(f"Unexpected response format: {response}")
+            return description
                 
         except Exception as e:
-            print(f"Ollama processing error: {str(e)}")
+            print(f"AI processing error: {str(e)}")
+            print(f"Provider: {self.provider}")
             print(f"Model: {self.model}")
             print(f"Image path: {image_path}")
             
@@ -571,7 +763,7 @@ class ProcessingWorker(QThread):
             except:
                 pass
             
-            raise Exception(f"Ollama processing failed: {str(e)}")
+            raise Exception(f"AI processing failed: {str(e)}")
     
     def convert_heic_to_jpeg(self, heic_path: str) -> str:
         """Convert HEIC file to JPEG"""
@@ -1201,15 +1393,23 @@ class ProcessingDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Processing Options")
         self.setModal(True)
-        self.resize(400, 300)
+        self.resize(400, 350)
         
         layout = QVBoxLayout(self)
+        
+        # Provider selection
+        layout.addWidget(QLabel("AI Provider:"))
+        self.provider_combo = QComboBox()
+        self.populate_providers()
+        layout.addWidget(self.provider_combo)
         
         # Model selection
         layout.addWidget(QLabel("AI Model:"))
         self.model_combo = QComboBox()
-        self.populate_models()
         layout.addWidget(self.model_combo)
+        
+        # Connect provider change to update models
+        self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
         
         # Prompt style selection
         layout.addWidget(QLabel("Prompt Style:"))
@@ -1230,6 +1430,12 @@ class ProcessingDialog(QDialog):
         
         self.custom_checkbox.toggled.connect(self.custom_prompt.setEnabled)
         
+        # Provider status info
+        self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
+        self.status_label.setStyleSheet("color: #666; font-size: 11px;")
+        layout.addWidget(self.status_label)
+        
         # Buttons
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -1237,61 +1443,86 @@ class ProcessingDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        
+        # Initialize models for default provider
+        self.on_provider_changed()
     
-    def populate_models(self):
-        """Populate available Ollama models"""
+    def populate_providers(self):
+        """Populate available AI providers"""
+        self.provider_combo.clear()
+        
+        providers = get_available_providers()
+        
+        for provider_key, provider in providers.items():
+            display_name = provider.get_provider_name()
+            self.provider_combo.addItem(display_name, provider_key)
+        
+        if not providers:
+            self.provider_combo.addItem("No providers available", "none")
+            self.status_label.setText("No AI providers available. Please install Ollama or configure OpenAI.")
+    
+    def on_provider_changed(self):
+        """Handle provider selection change"""
+        current_data = self.provider_combo.currentData()
+        if not current_data or current_data == "none":
+            self.model_combo.clear()
+            self.status_label.setText("No providers available.")
+            return
+        
+        # Update models for selected provider
+        self.populate_models(current_data)
+        
+        # Update status information
+        providers = get_available_providers()
+        if current_data in providers:
+            provider = providers[current_data]
+            if current_data == "ollama":
+                self.status_label.setText("Ollama: Local AI processing. Install models with 'ollama pull <model_name>'")
+            elif current_data == "openai":
+                self.status_label.setText("OpenAI: Cloud AI processing. Requires API key in openai.txt file.")
+            else:
+                self.status_label.setText(f"Using {provider.get_provider_name()} provider")
+    
+    def populate_models(self, provider_key: str):
+        """Populate models for selected provider"""
         self.model_combo.clear()
         
-        try:
-            if ollama:
-                # Get list of installed models
-                models_response = ollama.list()
-                available_models = []
-                
-                if 'models' in models_response:
-                    for model in models_response['models']:
-                        model_name = model.get('name', '')
-                        if model_name:
-                            available_models.append(model_name)
-                            self.model_combo.addItem(model_name)
-                
-                # If no models found, add some common vision models as options
-                if not available_models:
-                    default_models = ['moondream', 'gemma3', 'llava']
-                    for model in default_models:
-                        self.model_combo.addItem(model)
-                    
-                    # Show warning
-                    print("Warning: No Ollama models detected. Please install vision models with 'ollama pull <model_name>'")
-                
-                print(f"Found {len(available_models)} Ollama models: {available_models}")
-                
-            else:
-                # Ollama not available, add default options
-                default_models = ['moondream', 'gemma3', 'llava']
-                for model in default_models:
-                    self.model_combo.addItem(model)
-                print("Warning: Ollama not available. Please install Ollama and vision models.")
-                
-        except Exception as e:
-            print(f"Error loading Ollama models: {e}")
-            # Add fallback models
-            default_models = ['moondream', 'llava', 'llama3.2-vision', 'bakllava']
-            for model in default_models:
-                self.model_combo.addItem(model)
+        providers = get_available_providers()
+        if provider_key not in providers:
+            self.model_combo.addItem("No models available")
+            return
         
-        # Set default model from config if available
-        try:
-            config = self.load_config()
-            default_model = config.get("default_model", "moondream")
-            
-            # Find and select the default model
-            for i in range(self.model_combo.count()):
-                if self.model_combo.itemText(i) == default_model:
-                    self.model_combo.setCurrentIndex(i)
-                    break
-        except Exception:
-            pass
+        provider = providers[provider_key]
+        models = provider.get_models()
+        
+        if models:
+            for model in models:
+                self.model_combo.addItem(model)
+            print(f"Found {len(models)} {provider.get_provider_name()} models: {models}")
+        else:
+            self.model_combo.addItem("No models available")
+            if provider_key == "ollama":
+                print("Warning: No Ollama models detected. Please install vision models with 'ollama pull <model_name>'")
+            elif provider_key == "openai":
+                print("Warning: OpenAI models not available. Check API key in openai.txt")
+    
+    def get_selected_provider(self) -> str:
+        """Get the selected provider key"""
+        return self.provider_combo.currentData() or "none"
+    
+    def get_selected_model(self) -> str:
+        """Get the selected model"""
+        return self.model_combo.currentText()
+    
+    def get_selected_prompt_style(self) -> str:
+        """Get the selected prompt style"""
+        return self.prompt_combo.currentText()
+    
+    def get_custom_prompt(self) -> str:
+        """Get custom prompt if enabled"""
+        if self.custom_checkbox.isChecked():
+            return self.custom_prompt.toPlainText()
+        return ""
     
     def populate_prompts(self):
         """Populate prompt styles from config"""
@@ -1345,11 +1576,12 @@ class ProcessingDialog(QDialog):
         return {}
     
     def get_selections(self):
-        """Get selected model, prompt style, and custom prompt"""
-        model = self.model_combo.currentText()
-        prompt_style = self.prompt_combo.currentText()
-        custom_prompt = self.custom_prompt.toPlainText() if self.custom_checkbox.isChecked() else ""
-        return model, prompt_style, custom_prompt
+        """Get selected provider, model, prompt style, and custom prompt"""
+        provider = self.get_selected_provider()
+        model = self.get_selected_model()
+        prompt_style = self.get_selected_prompt_style()
+        custom_prompt = self.get_custom_prompt()
+        return provider, model, prompt_style, custom_prompt
 
 
 class VideoProcessingDialog(QDialog):
@@ -2737,19 +2969,12 @@ class ImageDescriberGUI(QMainWindow):
         # Show processing dialog first
         dialog = ProcessingDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            model, prompt_style, custom_prompt = dialog.get_selections()
+            provider, model, prompt_style, custom_prompt = dialog.get_selections()
             
-            # Optional verification - user can skip if they know their setup works
-            if not getattr(self, '_skip_verification', True):  # Default to skip
-                if not self.check_ollama_status():
-                    return
-                if not self.verify_model_available(model):
-                    return
-            
-            # Start processing
+            # Start processing (skip old verification logic for now)
             self.processing_items.add(file_path)  # Mark as processing
             self.update_window_title()  # Update title to show processing status
-            worker = ProcessingWorker(file_path, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(file_path, provider, model, prompt_style, custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -2975,14 +3200,7 @@ class ImageDescriberGUI(QMainWindow):
         # Show processing dialog first
         dialog = ProcessingDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            model, prompt_style, custom_prompt = dialog.get_selections()
-            
-            # Optional verification - user can skip if they know their setup works
-            if not getattr(self, '_skip_verification', True):  # Default to skip
-                if not self.check_ollama_status():
-                    return
-                if not self.verify_model_available(model):
-                    return
+            provider, model, prompt_style, custom_prompt = dialog.get_selections()
             
         # Process each batch item
         self.batch_total = len(batch_items)
@@ -2999,7 +3217,7 @@ class ImageDescriberGUI(QMainWindow):
             # Add to processing items to show "p" indicator
             self.processing_items.add(item.file_path)
                 
-            worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_batch_item_complete)
             worker.processing_failed.connect(self.on_batch_item_failed)
@@ -3309,10 +3527,10 @@ Follow-up question: {follow_up_question}
 
 Please answer the follow-up question about this image, taking into account the context from the original description."""
             
-            # Start processing with the same model as the original description
+            # Start processing with the same provider and model as the original description
             self.processing_items.add(file_path)
             self.update_window_title()  # Update title to show processing status
-            worker = ProcessingWorker(file_path, selected_desc.model, "follow-up", custom_prompt)
+            worker = ProcessingWorker(file_path, selected_desc.provider or "ollama", selected_desc.model, "follow-up", custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -3496,7 +3714,7 @@ Please answer the follow-up question about this image, taking into account the c
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         
-        model, prompt_style, custom_prompt = dialog.get_selections()
+        provider, model, prompt_style, custom_prompt = dialog.get_selections()
         
         # Optional verification
         if not getattr(self, '_skip_verification', True):
@@ -3506,9 +3724,9 @@ Please answer the follow-up question about this image, taking into account the c
                 return
         
         # Start comprehensive processing
-        self._start_comprehensive_processing(model, prompt_style, custom_prompt)
+        self._start_comprehensive_processing(provider, model, prompt_style, custom_prompt)
     
-    def _start_comprehensive_processing(self, model, prompt_style, custom_prompt):
+    def _start_comprehensive_processing(self, provider, model, prompt_style, custom_prompt):
         """Start comprehensive processing using the proven workflow system"""
         if not self.workspace.directory_path:
             QMessageBox.warning(self, "No Directory", "Please load a directory first.")
@@ -3592,7 +3810,7 @@ Please answer the follow-up question about this image, taking into account the c
         except Exception as e:
             self.status_bar.showMessage(f"Error extracting frames from {Path(video_path).name}: {str(e)}", 5000)
     
-    def _process_images_with_live_updates(self, image_paths, model, prompt_style, custom_prompt):
+    def _process_images_with_live_updates(self, image_paths, provider, model, prompt_style, custom_prompt):
         """Process images with live updates like the viewer app"""
         if not image_paths:
             return
@@ -3603,6 +3821,7 @@ Please answer the follow-up question about this image, taking into account the c
         
         # Start processing first image
         self._current_process_all_queue = image_paths.copy()
+        self._current_process_all_provider = provider
         self._current_process_all_model = model
         self._current_process_all_prompt = prompt_style
         self._current_process_all_custom = custom_prompt
@@ -3618,25 +3837,26 @@ Please answer the follow-up question about this image, taking into account the c
         # Create and start worker thread
         worker = ProcessingWorker(
             file_path, 
+            self._current_process_all_provider,
             self._current_process_all_model, 
             self._current_process_all_prompt, 
             self._current_process_all_custom
         )
         
         # Connect signals for live updates
-        worker.processing_complete.connect(lambda fp, desc, model, prompt, custom: self._on_process_all_item_complete(fp, desc, model, prompt, custom))
+        worker.processing_complete.connect(lambda fp, desc, provider, model, prompt, custom: self._on_process_all_item_complete(fp, desc, provider, model, prompt, custom))
         worker.processing_failed.connect(lambda fp, error: self._on_process_all_item_failed(fp, error))
         
         # Store reference and start
         self.workers.append(worker)
         worker.start()
     
-    def _on_process_all_item_complete(self, file_path, description, model, prompt_style, custom_prompt):
+    def _on_process_all_item_complete(self, file_path, description, provider, model, prompt_style, custom_prompt):
         """Handle completion of single item in Process All - with live updates"""
         # Add description to workspace
         workspace_item = self.workspace.get_item(file_path)
         if workspace_item:
-            desc = ImageDescription(description, model, prompt_style, custom_prompt=custom_prompt)
+            desc = ImageDescription(description, model, prompt_style, custom_prompt=custom_prompt, provider=provider)
             workspace_item.descriptions.append(desc)
             self.workspace.mark_modified()
         
@@ -3730,7 +3950,7 @@ Please answer the follow-up question about this image, taking into account the c
         except Exception as e:
             self.status_bar.showMessage(f"HEIC conversion error: {str(e)}", 5000)
     
-    def _process_all_images_live(self, model, prompt_style, custom_prompt):
+    def _process_all_images_live(self, provider, model, prompt_style, custom_prompt):
         """Process all images with live updates like the viewer"""
         # Get all processable images
         all_images = []
@@ -3752,7 +3972,7 @@ Please answer the follow-up question about this image, taking into account the c
         
         # Process images one by one to show live updates
         for item in all_images:
-            worker = ProcessingWorker(item.file_path, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self._on_live_processing_complete)
             worker.processing_failed.connect(self._on_live_processing_failed)
@@ -3762,10 +3982,10 @@ Please answer the follow-up question about this image, taking into account the c
         
         self.update_stop_button_state()
     
-    def _on_live_processing_complete(self, file_path: str, description: str, model: str, prompt_style: str, custom_prompt: str):
+    def _on_live_processing_complete(self, file_path: str, description: str, provider: str, model: str, prompt_style: str, custom_prompt: str):
         """Handle processing completion with live updates"""
         # Call the regular completion handler
-        self.on_processing_complete(file_path, description, model, prompt_style, custom_prompt)
+        self.on_processing_complete(file_path, description, provider, model, prompt_style, custom_prompt)
         
         # Update batch progress
         self.batch_completed += 1
@@ -3857,7 +4077,7 @@ Please answer the follow-up question about this image, taking into account the c
         """Handle processing progress updates"""
         self.status_bar.showMessage(message)
     
-    def on_processing_complete(self, file_path: str, description: str, model: str, prompt_style: str, custom_prompt: str):
+    def on_processing_complete(self, file_path: str, description: str, provider: str, model: str, prompt_style: str, custom_prompt: str):
         """Handle successful processing completion"""
         # Remove from processing set
         self.processing_items.discard(file_path)
@@ -3868,7 +4088,7 @@ Please answer the follow-up question about this image, taking into account the c
             self.workspace.add_item(workspace_item)
         
         # Add the new description
-        desc = ImageDescription(description, model, prompt_style, custom_prompt=custom_prompt)
+        desc = ImageDescription(description, model, prompt_style, custom_prompt=custom_prompt, provider=provider)
         workspace_item.add_description(desc)
         self.workspace.mark_modified()
         
@@ -3983,10 +4203,10 @@ You can check Ollama logs for more details."""
         
         self.status_bar.showMessage("Processing failed", 3000)
 
-    def on_batch_item_complete(self, file_path: str, description: str, model: str, prompt_style: str, custom_prompt: str):
+    def on_batch_item_complete(self, file_path: str, description: str, provider: str, model: str, prompt_style: str, custom_prompt: str):
         """Handle batch item completion"""
         # Call the regular completion handler first
-        self.on_processing_complete(file_path, description, model, prompt_style, custom_prompt)
+        self.on_processing_complete(file_path, description, provider, model, prompt_style, custom_prompt)
         
         # Update batch progress
         self.batch_completed += 1

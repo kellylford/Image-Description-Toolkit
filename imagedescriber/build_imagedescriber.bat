@@ -24,7 +24,7 @@ if not exist "%PYTHON_EXE%" (
 )
 
 REM Detect architecture
-for /f "tokens=*" %%i in ('"%PYTHON_EXE%" -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
+for /f "tokens=*" %%i in ('"%PYTHON_EXE%" -c "import platform; print(platform.machine().lower())"') do set "ARCH=%%i"
 
 if "%ARCH%"=="amd64" (
     set "ARCH_NAME=AMD64"

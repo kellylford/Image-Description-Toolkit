@@ -69,6 +69,13 @@ log/
 *_local.json
 *_override.json
 
+# API Keys and secrets (NEVER commit these)
+openai.txt
+openai_key.txt
+api_keys.txt
+*.key
+secrets.json
+
 # Test output and artifacts
 test_output/
 test_results/
