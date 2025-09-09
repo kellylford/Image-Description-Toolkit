@@ -105,9 +105,20 @@ class OllamaProvider(AIProvider):
             models_response = ollama.list()
             available_models = []
             
-            if 'models' in models_response:
+            # Handle both old dict format and new object format
+            if hasattr(models_response, 'models'):
+                # New format: models_response.models is a list of model objects
+                for model in models_response.models:
+                    if hasattr(model, 'model'):
+                        model_name = model.model
+                    else:
+                        model_name = getattr(model, 'name', '')
+                    if model_name:
+                        available_models.append(model_name)
+            elif 'models' in models_response:
+                # Old dict format: models_response['models'] 
                 for model in models_response['models']:
-                    model_name = model.get('name', '')
+                    model_name = model.get('model', model.get('name', ''))
                     if model_name:
                         available_models.append(model_name)
             
@@ -192,8 +203,7 @@ class OpenAIProvider(AIProvider):
         # OpenAI vision models (as of 2025)
         return [
             'gpt-4o',
-            'gpt-4o-mini', 
-            'gpt-4-vision-preview'
+            'gpt-4o-mini'
         ]
     
     def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
@@ -505,6 +515,7 @@ class ImageItem:
         self.batch_marked = False
         self.parent_video = None  # For extracted frames
         self.extracted_frames: List[str] = []  # For videos
+        self.display_name = ""  # Custom display name for this version
         
     def add_description(self, description: ImageDescription):
         self.descriptions.append(description)
@@ -519,7 +530,8 @@ class ImageItem:
             "descriptions": [d.to_dict() for d in self.descriptions],
             "batch_marked": self.batch_marked,
             "parent_video": self.parent_video,
-            "extracted_frames": self.extracted_frames
+            "extracted_frames": self.extracted_frames,
+            "display_name": self.display_name
         }
     
     @classmethod
@@ -529,6 +541,7 @@ class ImageItem:
         item.batch_marked = data.get("batch_marked", False)
         item.parent_video = data.get("parent_video")
         item.extracted_frames = data.get("extracted_frames", [])
+        item.display_name = data.get("display_name", "")
         return item
 
 
@@ -1726,6 +1739,7 @@ class VideoProcessingDialog(QDialog):
     def get_processing_config(self):
         """Get the processing configuration"""
         return {
+            "provider": "ollama",  # Default to ollama for video processing for now
             "model": self.model_combo.currentText(),
             "prompt_style": self.prompt_combo.currentText(),
             "custom_prompt": self.custom_prompt.toPlainText() if self.custom_checkbox.isChecked() else "",
@@ -1828,7 +1842,7 @@ class ImageDescriberGUI(QMainWindow):
         self.batch_processing: bool = False
         
         # Filter settings
-        self.filter_mode: str = "all"  # "all", "described", or "batch"
+        self.filter_mode: str = "all"  # "all", "described", "batch", or "videos"
         
         # Navigation mode settings
         self.navigation_mode: str = "tree"  # "tree" or "master_detail"
@@ -2108,11 +2122,12 @@ class ImageDescriberGUI(QMainWindow):
         extract_frames_action.triggered.connect(self.extract_video_frames)
         process_menu.addAction(extract_frames_action)
         
-        process_menu.addSeparator()
+        rename_action = QAction("Rename Item", self)
+        rename_action.setShortcut(QKeySequence("R"))
+        rename_action.triggered.connect(self.rename_item)
+        process_menu.addAction(rename_action)
         
-        add_all_to_batch_action = QAction("Add All to Batch", self)
-        add_all_to_batch_action.triggered.connect(self.add_all_to_batch)
-        process_menu.addAction(add_all_to_batch_action)
+        process_menu.addSeparator()
         
         # Descriptions menu
         desc_menu = menubar.addMenu("Descriptions")
@@ -2178,6 +2193,11 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_batch_action.triggered.connect(lambda: self.set_filter("batch"))
         filter_menu.addAction(self.filter_batch_action)
         
+        self.filter_videos_action = QAction("Show Videos Only", self)
+        self.filter_videos_action.setCheckable(True)
+        self.filter_videos_action.triggered.connect(lambda: self.set_filter("videos"))
+        filter_menu.addAction(self.filter_videos_action)
+        
         view_menu.addSeparator()
         
         # Navigation mode submenu
@@ -2213,7 +2233,8 @@ class ImageDescriberGUI(QMainWindow):
         filter_display = {
             "all": "All",
             "described": "Described", 
-            "batch": "Batch"
+            "batch": "Batch",
+            "videos": "Videos"
         }
         title = f"[{filter_display.get(self.filter_mode, 'All')}] ImageDescriber"
         
@@ -2445,10 +2466,14 @@ class ImageDescriberGUI(QMainWindow):
                 continue
             elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
+            elif self.filter_mode == "videos" and item.item_type != "video":
+                continue
                 
-            # Create top-level item - start with just the filename
+            # Create top-level item - start with filename or custom name
             file_name = Path(file_path).name
-            display_name = file_name
+            # Use custom display name if set, otherwise use filename
+            base_name = item.display_name if item.display_name else file_name
+            display_name = base_name
             
             # Build prefix indicators in order
             prefix_parts = []
@@ -2471,10 +2496,10 @@ class ImageDescriberGUI(QMainWindow):
                 frame_count = len(item.extracted_frames)
                 prefix_parts.append(f"E{frame_count}")
             
-            # Combine prefix and filename
+            # Combine prefix and display name
             if prefix_parts:
                 prefix = "".join(prefix_parts)
-                display_name = f"{prefix} {file_name}"
+                display_name = f"{prefix} {base_name}"
             
             # Create list item
             list_item = QListWidgetItem(display_name)
@@ -2551,11 +2576,15 @@ class ImageDescriberGUI(QMainWindow):
                 continue
             elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
+            elif self.filter_mode == "videos" and item.item_type != "video":
+                continue
             
             # Create list item
             file_name = Path(file_path).name
-            display_name = file_name
-            accessibility_desc = file_name
+            # Use custom display name if set, otherwise use filename  
+            base_name = item.display_name if item.display_name else file_name
+            display_name = base_name
+            accessibility_desc = base_name
             
             # Add type indicator
             if item.item_type == "video":
@@ -2803,6 +2832,41 @@ class ImageDescriberGUI(QMainWindow):
         elif self.navigation_mode == "master_detail":
             self.refresh_master_detail_view()
 
+    def rename_item(self):
+        """Rename the currently selected item"""
+        file_path = self.get_current_selected_file_path()
+        if not file_path:
+            QMessageBox.information(self, "Rename", "Please select an item to rename.")
+            return
+            
+        item = self.workspace.get_item(file_path)
+        if not item:
+            QMessageBox.warning(self, "Rename", "Selected item not found in workspace.")
+            return
+        
+        # Get current display name or filename
+        current_name = item.display_name if item.display_name else Path(file_path).name
+        
+        # Show rename dialog
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "Rename Item", 
+            "Enter new display name:\n(This only changes how the item appears in the workspace)",
+            text=current_name
+        )
+        
+        if ok and new_name.strip():
+            # Update the display name
+            item.display_name = new_name.strip()
+            
+            # Mark workspace as modified
+            self.workspace.modified = True
+            
+            # Refresh the current view to show the new name
+            self.refresh_current_view()
+            
+            self.statusBar().showMessage(f"Renamed item to '{new_name.strip()}'", 3000)
+
     # Event handlers
     def on_image_selection_changed(self):
         """Handle image selection change"""
@@ -3033,9 +3097,20 @@ class ImageDescriberGUI(QMainWindow):
         try:
             if ollama:
                 models_response = ollama.list()
-                if 'models' in models_response:
+                # Handle both old dict format and new object format  
+                if hasattr(models_response, 'models'):
+                    # New format: models_response.models is a list of model objects
+                    for model in models_response.models:
+                        if hasattr(model, 'model'):
+                            model_name = model.model
+                        else:
+                            model_name = getattr(model, 'name', '')
+                        if model_name:
+                            models.append(model_name)
+                elif 'models' in models_response:
+                    # Old dict format: models_response['models']
                     for model in models_response['models']:
-                        model_name = model.get('name', '')
+                        model_name = model.get('model', model.get('name', ''))
                         if model_name:
                             models.append(model_name)
                 
@@ -3149,45 +3224,6 @@ class ImageDescriberGUI(QMainWindow):
             
             # Update the batch count label
             self.update_batch_label()
-    
-    def add_all_to_batch(self):
-        """Add all images in the workspace to batch processing"""
-        if not self.workspace.items:
-            QMessageBox.information(self, "No Images", "No images found in the workspace.")
-            return
-        
-        # Count how many items will be added
-        count = 0
-        for item in self.workspace.items.values():
-            # Skip extracted frames - they should be processed with their parent videos
-            if item.item_type == "extracted_frame":
-                continue
-            if not item.batch_marked:
-                count += 1
-        
-        if count == 0:
-            QMessageBox.information(self, "All Marked", "All images are already marked for batch processing.")
-            return
-        
-        # Confirm the action
-        reply = QMessageBox.question(
-            self, "Add All to Batch",
-            f"This will add {count} items to the batch queue.\n\nContinue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            # Mark all items for batch processing
-            for item in self.workspace.items.values():
-                # Skip extracted frames
-                if item.item_type == "extracted_frame":
-                    continue
-                item.batch_marked = True
-            
-            self.workspace.mark_modified()
-            self.refresh_view()  # Refresh to show all the batch markings
-            
-            QMessageBox.information(self, "Batch Updated", f"Added {count} items to batch queue.")
     
     def process_batch(self):
         """Process all batch-marked images"""
@@ -3337,7 +3373,8 @@ class ImageDescriberGUI(QMainWindow):
                     manual_desc = ImageDescription(
                         text=description_text,
                         model="manual",
-                        prompt_style="manual"
+                        prompt_style="manual",
+                        provider="manual"
                     )
                     
                     workspace_item.add_description(manual_desc)
@@ -3673,6 +3710,7 @@ Please answer the follow-up question about this image, taking into account the c
         self.filter_all_action.setChecked(mode == "all")
         self.filter_described_action.setChecked(mode == "described")
         self.filter_batch_action.setChecked(mode == "batch")
+        self.filter_videos_action.setChecked(mode == "videos")
         
         # Refresh the view with filter applied
         self.refresh_view()
@@ -4310,6 +4348,7 @@ You can check Ollama logs for more details."""
     
     def process_extracted_frames(self, frame_paths: list, processing_config: dict):
         """Process all extracted frames with the specified configuration"""
+        provider = processing_config.get("provider", "ollama")  # Default to ollama for backward compatibility
         model = processing_config["model"]
         prompt_style = processing_config["prompt_style"]
         custom_prompt = processing_config["custom_prompt"]
@@ -4328,7 +4367,7 @@ You can check Ollama logs for more details."""
         # Process each frame
         for i, frame_path in enumerate(frame_paths):
             self.processing_items.add(frame_path)  # Mark as processing
-            worker = ProcessingWorker(frame_path, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(frame_path, provider, model, prompt_style, custom_prompt)
             
             # Enhanced progress callback to show frame progress
             def make_progress_callback(frame_index, total):
@@ -4363,6 +4402,13 @@ You can check Ollama logs for more details."""
                         break
             
             QTimer.singleShot(0, restore_focus)
+
+    def keyPressEvent(self, event):
+        """Handle global key presses"""
+        if event.key() == Qt.Key.Key_F2:
+            self.rename_item()
+        else:
+            super().keyPressEvent(event)
 
     def closeEvent(self, event):
         """Handle application close - check for unsaved changes"""
