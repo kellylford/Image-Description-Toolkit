@@ -233,6 +233,8 @@ Items in the tree view show status with accessible prefixes:
 |-----|--------|-------|
 | P | Process selected image | Works on currently selected item |
 | B | Toggle batch marking | Adds/removes from batch queue |
+| R | Rename item | Change display name in workspace |
+| F2 | Rename item | Alternative rename shortcut |
 | Ctrl+N | New workspace | Starts fresh project |
 | Ctrl+O | Open workspace | Load existing .idw file |
 | Ctrl+S | Save workspace | Save current project |

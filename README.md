@@ -140,6 +140,23 @@ This powerful testing capability:
 - **Creates interactive HTML reports** for visual model comparison
 - **Provides data-driven model selection** based on your specific images
 
+### GUI Application (Project Management)
+
+For ongoing project management and iterative description work:
+
+```bash
+# Launch the ImageDescriber GUI
+cd imagedescriber
+python imagedescriber.py
+
+# Features:
+# - Create/save/load workspace projects (.idw files)
+# - Batch processing with enterprise-level controls  
+# - Advanced filtering (all/described/batch/videos)
+# - Full keyboard navigation (R/F2=rename, P=process, B=batch)
+# - Support for both Ollama local and OpenAI cloud AI
+```
+
 ### Workflow Steps
 
 The workflow automatically handles:
@@ -260,6 +277,18 @@ Generate natural language descriptions using local Ollama models:
 - **🏠 Local Processing**: No cloud dependencies, complete privacy
 - **📊 EXIF Integration**: Include camera settings, GPS, timestamps in output
 - **🧠 Memory Optimization**: Smart processing for large image collections
+
+### ImageDescriber GUI (`imagedescriber/imagedescriber.py`)
+Professional graphical interface for managing image description projects:
+- **📁 Workspace System**: Save/load projects as `.idw` files for long-term management
+- **🎯 Batch Processing**: Enterprise-level controls for processing multiple images
+- **🔍 Advanced Filtering**: View all, described, batch-marked, or videos-only items
+- **♿ Accessibility**: WCAG-compliant design with full keyboard navigation and screen reader support  
+- **⌨️ Keyboard Shortcuts**: R/F2 for rename, P for process, B for batch marking
+- **📝 Rename Functionality**: Custom display names within workspace (files unchanged)
+- **🎥 Video Support**: Frame extraction and management integrated
+- **📊 Real-time Status**: Live processing indicators and description counts
+- **🌐 Dual AI Support**: Both Ollama local and OpenAI cloud providers
 
 ### HTML Report Generator (`scripts/descriptions_to_html.py`)
 Create beautiful web galleries from descriptions:
