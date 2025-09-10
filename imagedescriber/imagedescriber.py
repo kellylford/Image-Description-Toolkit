@@ -3780,9 +3780,14 @@ Please answer the follow-up question about this image, taking into account the c
             output_dir = input_dir / "workflow_output"
             
             # Build workflow command with current settings
+            if getattr(sys, 'frozen', False):
+                workflow_path = Path(sys._MEIPASS) / "scripts" / "workflow.py"
+            else:
+                workflow_path = Path(__file__).parent.parent / "scripts" / "workflow.py"
+            
             cmd = [
                 sys.executable, 
-                str(Path(__file__).parent.parent / "scripts" / "workflow.py"),
+                str(workflow_path),
                 str(input_dir),
                 "--output-dir", str(output_dir),
                 "--steps", "video,convert,describe",  # Skip HTML for now
