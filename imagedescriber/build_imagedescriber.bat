@@ -38,51 +38,60 @@ if "%ARCH%"=="amd64" (
 )
 
 echo Detected architecture: %ARCH_NAME%
+echo.
 
-REM Set output directory
-set "OUTPUT_DIR=%ROOT_DIR%\dist\imagedescriber_%ARCH_NAME%"
+REM Ask user what to build
+echo What would you like to build?
+echo [1] Current architecture only (%ARCH_NAME%)
+echo [2] AMD64 only
+echo [3] ARM64 only  
+echo [4] Both AMD64 and ARM64
+echo.
+set /p choice="Enter your choice (1-4): "
 
-REM Clean previous build
-if exist "%OUTPUT_DIR%" (
-    echo Cleaning previous build...
-    rmdir /s /q "%OUTPUT_DIR%"
-)
+if "%choice%"=="1" goto build_current
+if "%choice%"=="2" goto build_amd64
+if "%choice%"=="3" goto build_arm64
+if "%choice%"=="4" goto build_both
+goto build_current
 
-REM Create output directory
-mkdir "%OUTPUT_DIR%"
-
-echo Building with PyInstaller...
-
-REM Build the executable
-"%PYTHON_EXE%" -m PyInstaller ^
-    --name "ImageDescriber" ^
-    --onefile ^
-    --windowed ^
-    --distpath "%OUTPUT_DIR%" ^
-    --workpath "%ROOT_DIR%\build\imagedescriber" ^
-    --specpath "%ROOT_DIR%\build\imagedescriber" ^
-    --add-data "%ROOT_DIR%\scripts;scripts" ^
-    --hidden-import "ollama" ^
-    --hidden-import "pillow_heif" ^
-    --hidden-import "cv2" ^
-    --clean ^
-    "%SCRIPT_DIR%\imagedescriber.py"
-
-if %ERRORLEVEL% equ 0 (
-    echo.
-    echo ✓ Build successful!
-    echo Single executable created at: %OUTPUT_DIR%\ImageDescriber.exe
-    echo.
-    echo To run the application:
-    echo   "%OUTPUT_DIR%\ImageDescriber.exe"
-    echo.
-    echo Note: First startup may be slower as the executable extracts dependencies.
-    echo.
+:build_current
+if "%ARCH%"=="amd64" (
+    call "%SCRIPT_DIR%build_imagedescriber_amd.bat"
 ) else (
-    echo.
-    echo ✗ Build failed!
-    echo Check the output above for errors.
-    echo.
+    call "%SCRIPT_DIR%build_imagedescriber_arm.bat"
 )
+goto end
 
+:build_amd64
+call "%SCRIPT_DIR%build_imagedescriber_amd.bat"
+goto end
+
+:build_arm64
+call "%SCRIPT_DIR%build_imagedescriber_arm.bat"
+goto end
+
+:build_both
+echo.
+echo Building both architectures...
+echo.
+echo ========================================
+echo Building AMD64...
+echo ========================================
+call "%SCRIPT_DIR%build_imagedescriber_amd.bat"
+echo.
+echo ========================================
+echo Building ARM64...
+echo ========================================
+call "%SCRIPT_DIR%build_imagedescriber_arm.bat"
+echo.
+echo ========================================
+echo Build Summary
+echo ========================================
+echo Both builds completed.
+echo Check the output above for any errors.
+echo.
 pause
+goto end
+
+:end
