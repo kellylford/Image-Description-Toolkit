@@ -1842,7 +1842,7 @@ class ImageDescriberGUI(QMainWindow):
         self.batch_processing: bool = False
         
         # Filter settings
-        self.filter_mode: str = "all"  # "all", "described", "batch", or "videos"
+        self.filter_mode: str = "all"  # "all", "described", "batch", "videos", or "images"
         
         # Navigation mode settings
         self.navigation_mode: str = "tree"  # "tree" or "master_detail"
@@ -2198,6 +2198,11 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_videos_action.triggered.connect(lambda: self.set_filter("videos"))
         filter_menu.addAction(self.filter_videos_action)
         
+        self.filter_images_action = QAction("Show Images Only", self)
+        self.filter_images_action.setCheckable(True)
+        self.filter_images_action.triggered.connect(lambda: self.set_filter("images"))
+        filter_menu.addAction(self.filter_images_action)
+        
         view_menu.addSeparator()
         
         # Navigation mode submenu
@@ -2234,7 +2239,8 @@ class ImageDescriberGUI(QMainWindow):
             "all": "All",
             "described": "Described", 
             "batch": "Batch",
-            "videos": "Videos"
+            "videos": "Videos",
+            "images": "Images"
         }
         title = f"[{filter_display.get(self.filter_mode, 'All')}] ImageDescriber"
         
@@ -2468,6 +2474,8 @@ class ImageDescriberGUI(QMainWindow):
                 continue
             elif self.filter_mode == "videos" and item.item_type != "video":
                 continue
+            elif self.filter_mode == "images" and item.item_type == "video":
+                continue
                 
             # Create top-level item - start with filename or custom name
             file_name = Path(file_path).name
@@ -2577,6 +2585,8 @@ class ImageDescriberGUI(QMainWindow):
             elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
             elif self.filter_mode == "videos" and item.item_type != "video":
+                continue
+            elif self.filter_mode == "images" and item.item_type == "video":
                 continue
             
             # Create list item
@@ -3711,6 +3721,7 @@ Please answer the follow-up question about this image, taking into account the c
         self.filter_described_action.setChecked(mode == "described")
         self.filter_batch_action.setChecked(mode == "batch")
         self.filter_videos_action.setChecked(mode == "videos")
+        self.filter_images_action.setChecked(mode == "images")
         
         # Refresh the view with filter applied
         self.refresh_view()
