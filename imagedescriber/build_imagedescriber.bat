@@ -24,7 +24,10 @@ if not exist "%PYTHON_EXE%" (
 )
 
 REM Detect architecture
-for /f "tokens=*" %%i in ('"%PYTHON_EXE%" -c "import platform; print(platform.machine().lower())"') do set "ARCH=%%i"
+for /f "tokens=*" %%i in ('%PYTHON_EXE% -c "import platform; print(platform.machine().lower())"') do set "ARCH=%%i"
+
+REM Fallback if architecture detection failed
+if "%ARCH%"=="" set "ARCH=amd64"
 
 if "%ARCH%"=="amd64" (
     set "ARCH_NAME=AMD64"
@@ -53,7 +56,7 @@ echo Building with PyInstaller...
 REM Build the executable
 "%PYTHON_EXE%" -m PyInstaller ^
     --name "ImageDescriber" ^
-    --onedir ^
+    --onefile ^
     --windowed ^
     --distpath "%OUTPUT_DIR%" ^
     --workpath "%ROOT_DIR%\build\imagedescriber" ^
@@ -68,11 +71,12 @@ REM Build the executable
 if %ERRORLEVEL% equ 0 (
     echo.
     echo ✓ Build successful!
-    echo Executable created at: %OUTPUT_DIR%\ImageDescriber\
+    echo Single executable created at: %OUTPUT_DIR%\ImageDescriber.exe
     echo.
     echo To run the application:
-    echo   cd "%OUTPUT_DIR%\ImageDescriber"
-    echo   ImageDescriber.exe
+    echo   "%OUTPUT_DIR%\ImageDescriber.exe"
+    echo.
+    echo Note: First startup may be slower as the executable extracts dependencies.
     echo.
 ) else (
     echo.
