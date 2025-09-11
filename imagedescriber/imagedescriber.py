@@ -1842,7 +1842,10 @@ class ImageDescriberGUI(QMainWindow):
         self.batch_processing: bool = False
         
         # Filter settings
-        self.filter_mode: str = "all"  # "all", "described", "batch", "videos", or "images"
+        self.filter_mode: str = "all"  # "all", "described", "batch", "videos", "images", or "processing"
+        
+        # Sorting settings
+        self.sort_order: str = "filename"  # "filename" or "date"
         
         # Navigation mode settings
         self.navigation_mode: str = "tree"  # "tree" or "master_detail"
@@ -2203,6 +2206,27 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_images_action.triggered.connect(lambda: self.set_filter("images"))
         filter_menu.addAction(self.filter_images_action)
         
+        self.filter_processing_action = QAction("Show Processing Only", self)
+        self.filter_processing_action.setCheckable(True)
+        self.filter_processing_action.triggered.connect(lambda: self.set_filter("processing"))
+        filter_menu.addAction(self.filter_processing_action)
+        
+        view_menu.addSeparator()
+        
+        # Sort submenu
+        sort_menu = view_menu.addMenu("Sort by")
+        
+        self.sort_filename_action = QAction("Filename", self)
+        self.sort_filename_action.setCheckable(True)
+        self.sort_filename_action.setChecked(True)  # Default
+        self.sort_filename_action.triggered.connect(lambda: self.set_sort_order("filename"))
+        sort_menu.addAction(self.sort_filename_action)
+        
+        self.sort_date_action = QAction("Date", self)
+        self.sort_date_action.setCheckable(True)
+        self.sort_date_action.triggered.connect(lambda: self.set_sort_order("date"))
+        sort_menu.addAction(self.sort_date_action)
+        
         view_menu.addSeparator()
         
         # Navigation mode submenu
@@ -2240,7 +2264,8 @@ class ImageDescriberGUI(QMainWindow):
             "described": "Described", 
             "batch": "Batch",
             "videos": "Videos",
-            "images": "Images"
+            "images": "Images",
+            "processing": "Processing"
         }
         title = f"[{filter_display.get(self.filter_mode, 'All')}] ImageDescriber"
         
@@ -2462,6 +2487,9 @@ class ImageDescriberGUI(QMainWindow):
         """Refresh the image list view"""
         self.image_list.clear()
         
+        # Collect items to display
+        items_to_display = []
+        
         for file_path, item in self.workspace.items.items():
             # Skip extracted frames - they'll be shown as children
             if item.item_type == "extracted_frame":
@@ -2476,7 +2504,25 @@ class ImageDescriberGUI(QMainWindow):
                 continue
             elif self.filter_mode == "images" and item.item_type == "video":
                 continue
+            elif self.filter_mode == "processing" and file_path not in self.processing_items:
+                continue
                 
+            items_to_display.append((file_path, item))
+        
+        # Sort items based on current sort order
+        if self.sort_order == "filename":
+            items_to_display.sort(key=lambda x: Path(x[0]).name.lower())
+        elif self.sort_order == "date":
+            # Sort by file modification time (most recent first)
+            def get_file_date(file_path):
+                try:
+                    return Path(file_path).stat().st_mtime
+                except:
+                    return 0
+            items_to_display.sort(key=lambda x: get_file_date(x[0]), reverse=True)
+        
+        # Add sorted and filtered items to the list
+        for file_path, item in items_to_display:
             # Create top-level item - start with filename or custom name
             file_name = Path(file_path).name
             # Use custom display name if set, otherwise use filename
@@ -2520,16 +2566,32 @@ class ImageDescriberGUI(QMainWindow):
             
             self.image_list.addItem(list_item)
             
-            # Add extracted frames as children for videos
+            # Add extracted frames as children for videos (also sorted)
             if item.item_type == "video" and item.extracted_frames:
+                frame_items = []
+                
                 for frame_path in item.extracted_frames:
+                    frame_workspace_item = self.workspace.get_item(frame_path)
+                    frame_items.append((frame_path, frame_workspace_item))
+                
+                # Sort frames based on current sort order  
+                if self.sort_order == "filename":
+                    frame_items.sort(key=lambda x: Path(x[0]).name.lower())
+                elif self.sort_order == "date":
+                    def get_file_date(file_path):
+                        try:
+                            return Path(file_path).stat().st_mtime
+                        except:
+                            return 0
+                    frame_items.sort(key=lambda x: get_file_date(x[0]), reverse=True)
+                
+                for frame_path, frame_workspace_item in frame_items:
                     frame_name = Path(frame_path).name
                     
                     # Build frame prefix indicators
                     frame_prefix_parts = []
                     
                     # Check if frame has descriptions
-                    frame_workspace_item = self.workspace.get_item(frame_path)
                     if frame_workspace_item and frame_workspace_item.descriptions:
                         desc_count = len(frame_workspace_item.descriptions)
                         frame_prefix_parts.append(f"d{desc_count}")
@@ -2573,6 +2635,9 @@ class ImageDescriberGUI(QMainWindow):
         # Clear media list
         self.media_list.clear()
         
+        # Collect items to display
+        items_to_display = []
+        
         # Populate media list with videos and standalone images
         for file_path, item in self.workspace.items.items():
             # Skip extracted frames - they'll be shown in frames list
@@ -2588,7 +2653,25 @@ class ImageDescriberGUI(QMainWindow):
                 continue
             elif self.filter_mode == "images" and item.item_type == "video":
                 continue
-            
+            elif self.filter_mode == "processing" and file_path not in self.processing_items:
+                continue
+                
+            items_to_display.append((file_path, item))
+        
+        # Sort items based on current sort order
+        if self.sort_order == "filename":
+            items_to_display.sort(key=lambda x: Path(x[0]).name.lower())
+        elif self.sort_order == "date":
+            # Sort by file modification time (most recent first)
+            def get_file_date(file_path):
+                try:
+                    return Path(file_path).stat().st_mtime
+                except:
+                    return 0
+            items_to_display.sort(key=lambda x: get_file_date(x[0]), reverse=True)
+        
+        # Add sorted and filtered items to the list
+        for file_path, item in items_to_display:
             # Create list item
             file_name = Path(file_path).name
             # Use custom display name if set, otherwise use filename  
@@ -3722,12 +3805,27 @@ Please answer the follow-up question about this image, taking into account the c
         self.filter_batch_action.setChecked(mode == "batch")
         self.filter_videos_action.setChecked(mode == "videos")
         self.filter_images_action.setChecked(mode == "images")
+        self.filter_processing_action.setChecked(mode == "processing")
         
         # Refresh the view with filter applied
         self.refresh_view()
         
         # Update window title to show current filter
         self.update_window_title()
+
+    def set_sort_order(self, order: str):
+        """Set the sort order and refresh view"""
+        self.sort_order = order
+        
+        # Update checkable actions
+        self.sort_filename_action.setChecked(order == "filename")
+        self.sort_date_action.setChecked(order == "date")
+        
+        # Refresh the view with new sort order applied
+        self.refresh_view()
+        
+        # Show temporary status message
+        self.status_bar.showMessage(f"Sorted by {order}", 2000)
 
     def process_all(self):
         """Process all images with automatic HEIC conversion and video frame extraction"""
