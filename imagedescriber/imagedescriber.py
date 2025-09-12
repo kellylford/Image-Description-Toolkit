@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 """
 ImageDescriber - AI-Powered Image Description GUI
 
@@ -337,6 +337,11 @@ class HuggingFaceProvider(AIProvider):
                 # Special handling for MiniCPM models
                 self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
                 model = AutoModelForCausalLM.from_pretrained(model_name, **common_args)
+            elif "git" in model_name.lower():
+                # Special handling for GIT models
+                from transformers import GitProcessor, GitForCausalLM
+                self.processor = GitProcessor.from_pretrained(model_name, trust_remote_code=True)
+                model = GitForCausalLM.from_pretrained(model_name, **common_args)
             else:
                 # Generic approach for other models
                 self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
@@ -372,7 +377,7 @@ class HuggingFaceProvider(AIProvider):
             
             # Indicate we're now processing the image
             if progress_callback:
-                progress_callback(f"Processing image with {model}...", "Generating description")
+                progress_callback(f"Processing with {model}...", "Generating description")
             
             # Convert image data to PIL Image
             image = Image.open(io.BytesIO(image_data)).convert('RGB')
@@ -382,7 +387,15 @@ class HuggingFaceProvider(AIProvider):
             
             try:
                 if "blip2" in model.lower():
-                    inputs = self.processor(image, prompt, return_tensors="pt").to(device)
+                    # BLIP-2 models work better with Q&A format or caption mode
+                    if prompt and len(prompt.strip()) > 0:
+                        # Convert prompt to Q&A format for better results
+                        qa_prompt = f"Question: {prompt} Answer:"
+                        inputs = self.processor(images=image, text=qa_prompt, return_tensors="pt").to(device)
+                    else:
+                        # Caption mode - just the image
+                        inputs = self.processor(images=image, return_tensors="pt").to(device)
+                    
                     with torch.no_grad():
                         generated_ids = self.model.generate(**inputs, max_new_tokens=200)
                     generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
@@ -401,6 +414,12 @@ class HuggingFaceProvider(AIProvider):
                         sampling=True,
                         temperature=0.7
                     )
+                elif "git" in model.lower():
+                    # GIT models work differently - they generate captions without prompts
+                    pixel_values = self.processor(images=image, return_tensors="pt").pixel_values.to(device)
+                    with torch.no_grad():
+                        generated_ids = self.model.generate(pixel_values=pixel_values, max_length=50)
+                    generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
                 else:
                     # Generic processing
                     inputs = self.processor(image, prompt, return_tensors="pt").to(device)
@@ -420,6 +439,10 @@ class HuggingFaceProvider(AIProvider):
             # Clean up the response
             if prompt in generated_text:
                 generated_text = generated_text.replace(prompt, "").strip()
+            
+            # For BLIP-2, also clean up Q&A format
+            if "blip2" in model.lower() and "Answer:" in generated_text:
+                generated_text = generated_text.split("Answer:")[-1].strip()
             
             return generated_text or "No description generated"
             
@@ -872,7 +895,7 @@ class ProcessingWorker(QThread):
                     prompt_text = "Describe this image."
             
             # Emit progress
-            self.progress_updated.emit(self.file_path, f"Processing {Path(self.file_path).name} with {self.provider} {self.model}...")
+            self.progress_updated.emit(self.file_path, f"Processing with {self.provider} {self.model}...")
             
             # Process the image with selected provider
             description = self.process_with_ai(self.file_path, prompt_text)
@@ -1094,7 +1117,7 @@ class WorkflowProcessWorker(QThread):
 
 class ConversionWorker(QThread):
     """Worker thread for file conversions"""
-    progress_updated = pyqtSignal(str)
+    progress_updated = pyqtSignal(str, str)  # file_path, message
     conversion_complete = pyqtSignal(str, list)  # original_path, converted_paths
     conversion_failed = pyqtSignal(str, str)  # original_path, error
     
@@ -1118,7 +1141,7 @@ class ConversionWorker(QThread):
             from PIL import Image
             import pillow_heif
             
-            self.progress_updated.emit(f"Converting {Path(self.file_path).name}...")
+            self.progress_updated.emit(self.file_path, "Converting to JPG...")
             
             # Register HEIF opener
             pillow_heif.register_heif_opener()
@@ -1142,7 +1165,7 @@ class ConversionWorker(QThread):
         try:
             import cv2
             
-            self.progress_updated.emit(f"Extracting frames from {Path(self.file_path).name}...")
+            self.progress_updated.emit(self.file_path, "Extracting video frames...")
             
             cap = cv2.VideoCapture(self.file_path)
             frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -3398,10 +3421,15 @@ class ImageDescriberGUI(QMainWindow):
         # Processing control
         self.stop_processing_requested: bool = False
         
+        # Clipboard handling
+        self.clipboard = QApplication.clipboard()
+        self.paste_counter = 0  # For generating unique names
+        
         # UI setup
         self.setup_ui()
         self.setup_menus()
         self.setup_shortcuts()
+        self.setup_clipboard_monitoring()
         
         # Update window title
         self.update_window_title()
@@ -3837,6 +3865,202 @@ class ImageDescriberGUI(QMainWindow):
         """Setup keyboard shortcuts"""
         # Additional shortcuts not in menus
         pass
+    
+    def setup_clipboard_monitoring(self):
+        """Setup clipboard monitoring for paste functionality"""
+        # Connect to clipboard change signal
+        self.clipboard.dataChanged.connect(self.on_clipboard_changed)
+        
+    def on_clipboard_changed(self):
+        """Handle clipboard content changes - called when clipboard content changes"""
+        # We don't auto-paste on clipboard change, only on explicit Ctrl+V
+        pass
+    
+    def keyPressEvent(self, event):
+        """Handle global key presses including Ctrl+V for paste"""
+        if event.key() == Qt.Key.Key_V and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            # Handle Ctrl+V paste
+            self.handle_paste_from_clipboard()
+        elif event.key() == Qt.Key.Key_F2:
+            self.rename_item()
+        elif event.key() == Qt.Key.Key_F:
+            # Check if we're in a chat session for followup
+            current_item = self.image_list.currentItem()
+            if current_item and current_item.data(Qt.ItemDataRole.UserRole + 1) == "chat_session":
+                self.chat_followup()
+            else:
+                # Regular followup processing for images
+                self.followup_processing()
+        else:
+            super().keyPressEvent(event)
+    
+    def handle_paste_from_clipboard(self):
+        """Handle Ctrl+V paste operation - extract image/video from clipboard and add to workspace"""
+        try:
+            mimeData = self.clipboard.mimeData()
+            
+            # Check if clipboard has image data
+            if mimeData.hasImage():
+                # Get the image from clipboard
+                image = self.clipboard.image()
+                if not image.isNull():
+                    self.process_pasted_image(image)
+                    return
+            
+            # Check for file URLs (drag & drop or copy from file manager)
+            if mimeData.hasUrls():
+                urls = mimeData.urls()
+                if urls:
+                    # Process first URL if it's a local file
+                    url = urls[0]
+                    if url.isLocalFile():
+                        file_path = url.toLocalFile()
+                        if self.is_supported_media_file(file_path):
+                            self.add_file_to_workspace(file_path, is_pasted=True)
+                            return
+            
+            # If we get here, no supported content was found
+            self.status_bar.showMessage("No image or supported media found in clipboard", 3000)
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Paste Error", f"Failed to paste from clipboard:\n{e}")
+    
+    def process_pasted_image(self, qimage):
+        """Process a QImage from clipboard and save it to workspace"""
+        try:
+            # Generate unique filename
+            self.paste_counter += 1
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"pasted_image_{self.paste_counter}_{timestamp}.png"
+            
+            # Create temp directory if it doesn't exist
+            temp_dir = Path(tempfile.gettempdir()) / "ImageDescriber_Pasted"
+            temp_dir.mkdir(exist_ok=True)
+            
+            # Save the image to temp file
+            temp_file_path = temp_dir / filename
+            success = qimage.save(str(temp_file_path), "PNG")
+            
+            if success:
+                # Add to workspace and process
+                self.add_file_to_workspace(str(temp_file_path), is_pasted=True)
+                self.status_bar.showMessage(f"Pasted image added as {filename}", 3000)
+            else:
+                raise Exception("Failed to save image to temporary file")
+                
+        except Exception as e:
+            QMessageBox.warning(self, "Paste Error", f"Failed to process pasted image:\n{e}")
+    
+    def is_supported_media_file(self, file_path):
+        """Check if file is a supported image or video format"""
+        ext = Path(file_path).suffix.lower()
+        image_exts = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.heic', '.heif'}
+        video_exts = {'.mp4', '.mov', '.avi', '.mkv', '.wmv'}
+        return ext in (image_exts | video_exts)
+    
+    def add_file_to_workspace(self, file_path, is_pasted=False):
+        """Add a file to the current workspace and optionally trigger processing"""
+        try:
+            # Check if already in workspace
+            if file_path in self.workspace.items:
+                self.status_bar.showMessage(f"File already in workspace: {Path(file_path).name}", 3000)
+                return
+            
+            # Determine file type
+            ext = Path(file_path).suffix.lower()
+            video_exts = {'.mp4', '.mov', '.avi', '.mkv', '.wmv'}
+            item_type = "video" if ext in video_exts else "image"
+            
+            # Create and add the item
+            item = ImageItem(file_path, item_type)
+            self.workspace.add_item(item)
+            
+            # Refresh the display
+            self.refresh_view()
+            
+            # Select the new item
+            for i in range(self.image_list.count()):
+                list_item = self.image_list.item(i)
+                if list_item.data(Qt.ItemDataRole.UserRole) == file_path:
+                    self.image_list.setCurrentItem(list_item)
+                    break
+            
+            # If it's a pasted item, trigger immediate processing with defaults
+            if is_pasted:
+                self.trigger_automatic_processing(file_path)
+                
+        except Exception as e:
+            QMessageBox.warning(self, "Add File Error", f"Failed to add file to workspace:\n{e}")
+    
+    def trigger_automatic_processing(self, file_path):
+        """Trigger automatic processing of a pasted file with current defaults"""
+        try:
+            # Load configuration defaults
+            config = self.load_prompt_config()
+            default_prompt_style = config.get("default_prompt_style", "Narrative")
+            prompt_variations = config.get("prompt_variations", {})
+            model_settings = config.get("model_settings", {})
+            
+            # Get default prompt text
+            if default_prompt_style in prompt_variations:
+                custom_prompt = prompt_variations[default_prompt_style]
+            else:
+                custom_prompt = config.get("prompt_template", "Describe this image in detail.")
+            
+            # Get default model from config
+            config_model = model_settings.get("model", "moondream")
+            
+            # Find first available provider with models
+            providers = {
+                "Ollama": OllamaProvider(),
+                "OpenAI": OpenAIProvider(), 
+                "HuggingFace": HuggingFaceProvider()
+            }
+            
+            provider_instance = None
+            provider_name = None
+            model_name = None
+            
+            for name, instance in providers.items():
+                if instance.is_available():
+                    try:
+                        models = instance.get_models()
+                        if models and len(models) > 0:
+                            provider_instance = instance
+                            provider_name = name
+                            # Try to use config model first, fallback to first available
+                            if name == "Ollama" and config_model in models:
+                                model_name = config_model
+                            else:
+                                model_name = models[0]
+                            break
+                    except Exception:
+                        continue
+            
+            if not provider_instance or not model_name:
+                self.status_bar.showMessage("No AI providers available - pasted image added without processing", 3000)
+                return
+            
+            # Start processing directly without dialog
+            self.processing_items.add(file_path)
+            self.update_window_title()
+            
+            worker = ProcessingWorker(file_path, provider_name, model_name, default_prompt_style, custom_prompt)
+            worker.progress_updated.connect(self.on_processing_progress)
+            worker.processing_complete.connect(self.on_processing_complete)
+            worker.processing_failed.connect(self.on_processing_failed)
+            
+            self.processing_workers.append(worker)
+            worker.start()
+            
+            self.status_bar.showMessage(f"Auto-processing with {provider_name}: {model_name} ({default_prompt_style})", 5000)
+            
+            # Refresh view to show processing indicator
+            self.refresh_view()
+                
+        except Exception as e:
+            # Don't show error dialog for auto-processing failures, just status message
+            self.status_bar.showMessage(f"Auto-processing failed: {str(e)[:100]}...", 5000)
     
     def update_window_title(self, custom_status=None):
         """Update the window title with optional custom status message"""
@@ -6125,15 +6349,22 @@ Please answer the follow-up question about this image, taking into account the c
                 break
     
     # Worker event handlers
-    def on_processing_progress(self, file_path: str, message: str):
-        """Handle processing progress updates"""
-        self.status_bar.showMessage(message)
-        
-        # Store the detailed status for this file
-        self.processing_status[file_path] = message
-        
-        # Update only the specific item without losing focus
-        self.update_specific_item_display(file_path)
+    def on_processing_progress(self, *args):
+        """Handle processing progress updates - supports both (file_path, message) and (message) formats"""
+        if len(args) == 2:
+            # New format: file_path, message
+            file_path, message = args
+            self.status_bar.showMessage(message)
+            
+            # Store the detailed status for this file
+            self.processing_status[file_path] = message
+            
+            # Update only the specific item without losing focus
+            self.update_specific_item_display(file_path)
+        else:
+            # Old format: just message (for workflow, conversion, etc.)
+            message = args[0]
+            self.status_bar.showMessage(message)
     
     def on_processing_complete(self, file_path: str, description: str, provider: str, model: str, prompt_style: str, custom_prompt: str):
         """Handle successful processing completion"""
@@ -6810,21 +7041,6 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
             lines.append("")
         
         return "\n".join(lines)
-
-    def keyPressEvent(self, event):
-        """Handle global key presses"""
-        if event.key() == Qt.Key.Key_F2:
-            self.rename_item()
-        elif event.key() == Qt.Key.Key_F:
-            # Check if we're in a chat session for followup
-            current_item = self.image_list.currentItem()
-            if current_item and current_item.data(Qt.ItemDataRole.UserRole + 1) == "chat_session":
-                self.chat_followup()
-            else:
-                # Regular followup processing for images
-                self.followup_processing()
-        else:
-            super().keyPressEvent(event)
 
     def closeEvent(self, event):
         """Handle application close - check for unsaved changes"""
