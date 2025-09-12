@@ -25,6 +25,7 @@ import time
 import base64
 import tempfile
 import shutil
+import webbrowser
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -51,7 +52,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QProgressBar, QStatusBar, QTreeWidget, QTreeWidgetItem,
     QInputDialog, QPlainTextEdit, QCheckBox, QPushButton, QFormLayout,
     QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup, QGroupBox, QLineEdit,
-    QTextEdit
+    QTextEdit, QTabWidget, QScrollArea, QFrame
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QMutex, QMutexLocker
 from PyQt6.QtGui import (
@@ -1819,6 +1820,1016 @@ class AllDescriptionsDialog(QDialog):
             self.text_area.setText(desc_data['description'].text)
 
 
+class ModelManagerDialog(QDialog):
+    """Dialog for managing Ollama models - browse, search, and install"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Model Manager")
+        self.setModal(True)
+        self.resize(900, 700)
+        
+        # Track installation processes
+        self.installation_processes = {}
+        
+        layout = QVBoxLayout(self)
+        
+        # Create tab widget for different views
+        self.tab_widget = QTabWidget()
+        layout.addWidget(self.tab_widget)
+        
+        # Tab 1: Installed Models
+        self.setup_installed_tab()
+        
+        # Tab 2: Available Models  
+        self.setup_available_tab()
+        
+        # Tab 3: Model Search
+        self.setup_search_tab()
+        
+        # Status bar at bottom
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet("padding: 5px; border-top: 1px solid #ccc;")
+        layout.addWidget(self.status_label)
+        
+        # Close button
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        button_box.rejected.connect(self.close)
+        layout.addWidget(button_box)
+        
+        # Load initial data
+        self.installed_models = []  # List to store installed model names
+        self.refresh_installed_models()
+        
+        # Initialize the comprehensive model database
+        self.init_model_database()
+        
+        # Trigger initial filter display
+        self.filter_installed_models()
+        self.filter_available_models()
+    
+    def init_model_database(self):
+        """Initialize comprehensive model database with categories"""
+        self.model_database = {
+            "Vision Models": [
+                {
+                    "name": "moondream",
+                    "description": "A small vision language model (1.7B params) designed to run efficiently on edge devices. Perfect for basic image understanding tasks with minimal resource requirements.",
+                    "size": "~1.7GB",
+                    "capabilities": "Image understanding, basic Q&A, efficient on CPU, low memory usage",
+                    "use_cases": "Quick image descriptions, edge devices, resource-constrained environments"
+                },
+                {
+                    "name": "llava", 
+                    "description": "Large Language and Vision Assistant. The original and most popular multimodal model with excellent image analysis capabilities.",
+                    "size": "~4.1GB",
+                    "capabilities": "Advanced image analysis, detailed descriptions, complex visual reasoning",
+                    "use_cases": "Professional image analysis, detailed descriptions, visual Q&A"
+                },
+                {
+                    "name": "llava:7b",
+                    "description": "7B parameter version of LLaVA. Provides an excellent balance between performance and resource usage for most applications.",
+                    "size": "~4.1GB",
+                    "capabilities": "High-quality image descriptions, visual reasoning, good performance/size ratio",
+                    "use_cases": "General-purpose vision tasks, balanced performance needs"
+                },
+                {
+                    "name": "llava:13b",
+                    "description": "13B parameter version of LLaVA. Offers the highest quality results but requires more computational resources and memory.",
+                    "size": "~7.3GB", 
+                    "capabilities": "Excellent image analysis, very detailed descriptions, advanced reasoning, professional quality",
+                    "use_cases": "High-quality image analysis, professional applications, detailed reports"
+                },
+                {
+                    "name": "llava:34b",
+                    "description": "34B parameter version of LLaVA. The largest and most capable version, suitable for professional applications with high-end hardware.",
+                    "size": "~19GB",
+                    "capabilities": "Professional-grade image analysis, extremely detailed descriptions, sophisticated reasoning",
+                    "use_cases": "Professional/research applications, highest quality requirements"
+                },
+                {
+                    "name": "bakllava",
+                    "description": "BakLLaVA is an improved vision-language model based on LLaVA architecture with enhanced training methodology and better performance.",
+                    "size": "~4.1GB",
+                    "capabilities": "Enhanced image understanding, improved visual Q&A, detailed descriptions, stable performance",
+                    "use_cases": "Improved LLaVA alternative, stable image analysis"
+                },
+                {
+                    "name": "llava-llama3",
+                    "description": "LLaVA model based on Llama 3 architecture. Combines the visual capabilities of LLaVA with the improved language understanding of Llama 3.",
+                    "size": "~4.1GB",
+                    "capabilities": "Modern architecture, improved language understanding, excellent vision-language integration",
+                    "use_cases": "Latest architecture benefits, improved language reasoning"
+                },
+                {
+                    "name": "llava-phi3",
+                    "description": "Compact vision model based on Microsoft's Phi-3 architecture. Offers good performance in a smaller package.",
+                    "size": "~2.2GB",
+                    "capabilities": "Compact size, efficient processing, good balance of capabilities and resource usage",
+                    "use_cases": "Resource-efficient vision tasks, smaller deployments"
+                },
+                {
+                    "name": "llama3.2-vision",
+                    "description": "Meta's latest vision model based on Llama 3.2. State-of-the-art multimodal capabilities with excellent performance.",
+                    "size": "~7.8GB",
+                    "capabilities": "State-of-the-art vision understanding, advanced reasoning, latest architecture",
+                    "use_cases": "Cutting-edge vision tasks, latest model capabilities"
+                }
+            ],
+            "Language Models": [
+                {
+                    "name": "llama3.2",
+                    "description": "Meta's latest language model with improved reasoning and instruction following capabilities.",
+                    "size": "~4.1GB",
+                    "capabilities": "Advanced text generation, reasoning, instruction following, multilingual",
+                    "use_cases": "General text generation, chatbots, content creation"
+                },
+                {
+                    "name": "llama3.1",
+                    "description": "Previous generation Llama model with excellent performance for text tasks.",
+                    "size": "~4.1GB",
+                    "capabilities": "Text generation, reasoning, creative writing, analysis",
+                    "use_cases": "Text generation, analysis, creative tasks"
+                },
+                {
+                    "name": "gemma2",
+                    "description": "Google's Gemma 2 model with improved efficiency and performance.",
+                    "size": "~3.3GB",
+                    "capabilities": "Efficient text generation, good reasoning, compact size",
+                    "use_cases": "Efficient text tasks, resource-conscious applications"
+                },
+                {
+                    "name": "qwen2.5",
+                    "description": "Alibaba's Qwen 2.5 model with strong multilingual capabilities.",
+                    "size": "~4.1GB",
+                    "capabilities": "Multilingual text generation, reasoning, cultural understanding",
+                    "use_cases": "Multilingual applications, international content"
+                },
+                {
+                    "name": "phi3",
+                    "description": "Microsoft's Phi-3 small language model with impressive capabilities for its size.",
+                    "size": "~2.2GB",
+                    "capabilities": "Compact size, efficient reasoning, good performance per parameter",
+                    "use_cases": "Resource-efficient text tasks, edge deployment"
+                }
+            ],
+            "Code Models": [
+                {
+                    "name": "codellama",
+                    "description": "Meta's specialized model for code generation and understanding based on Llama 2.",
+                    "size": "~4.1GB",
+                    "capabilities": "Code generation, completion, explanation, debugging assistance",
+                    "use_cases": "Programming assistance, code review, learning programming"
+                },
+                {
+                    "name": "codegemma",
+                    "description": "Google's specialized code model based on Gemma architecture.",
+                    "size": "~3.3GB",
+                    "capabilities": "Code generation, completion, multiple programming languages",
+                    "use_cases": "Programming tasks, code completion, development assistance"
+                },
+                {
+                    "name": "starcoder2",
+                    "description": "Advanced code generation model with support for many programming languages.",
+                    "size": "~4.1GB",
+                    "capabilities": "Multi-language code generation, repository-level understanding",
+                    "use_cases": "Professional development, code generation, refactoring"
+                },
+                {
+                    "name": "deepseek-coder",
+                    "description": "Specialized coding model with strong performance on programming tasks.",
+                    "size": "~4.1GB",
+                    "capabilities": "Code generation, debugging, algorithm design, competitive programming",
+                    "use_cases": "Complex programming tasks, algorithm development"
+                }
+            ],
+            "Embedding Models": [
+                {
+                    "name": "nomic-embed-text",
+                    "description": "High-quality text embedding model for semantic search and similarity tasks.",
+                    "size": "~274MB",
+                    "capabilities": "Text embeddings, semantic search, similarity comparison, clustering",
+                    "use_cases": "Search applications, document similarity, text clustering"
+                },
+                {
+                    "name": "mxbai-embed-large",
+                    "description": "Large embedding model with excellent performance for various text tasks.",
+                    "size": "~669MB",
+                    "capabilities": "High-quality embeddings, multilingual support, various text lengths",
+                    "use_cases": "Professional search systems, multilingual applications"
+                },
+                {
+                    "name": "all-minilm",
+                    "description": "Compact embedding model suitable for various similarity tasks.",
+                    "size": "~133MB",
+                    "capabilities": "Compact embeddings, fast processing, good general performance",
+                    "use_cases": "Resource-efficient similarity tasks, quick prototyping"
+                }
+            ],
+            "Specialized Models": [
+                {
+                    "name": "dolphin-mistral",
+                    "description": "Uncensored chat model based on Mistral with enhanced conversational abilities.",
+                    "size": "~4.1GB",
+                    "capabilities": "Uncensored conversations, creative writing, roleplay, open discussions",
+                    "use_cases": "Open conversations, creative projects, research"
+                },
+                {
+                    "name": "neural-chat",
+                    "description": "Model optimized for conversational AI with friendly and helpful responses.",
+                    "size": "~4.1GB",
+                    "capabilities": "Conversational AI, helpful responses, balanced personality",
+                    "use_cases": "Chatbots, virtual assistants, customer service"
+                },
+                {
+                    "name": "wizardlm",
+                    "description": "Model trained with complex instruction following for advanced reasoning tasks.",
+                    "size": "~4.1GB",
+                    "capabilities": "Complex reasoning, instruction following, problem solving",
+                    "use_cases": "Complex analysis tasks, educational applications"
+                },
+                {
+                    "name": "orca-mini",
+                    "description": "Compact model with strong reasoning abilities trained on high-quality data.",
+                    "size": "~2.2GB",
+                    "capabilities": "Strong reasoning in compact size, logical thinking, problem solving",
+                    "use_cases": "Efficient reasoning tasks, educational applications"
+                }
+            ]
+        }
+    
+    def filter_installed_models(self):
+        """Filter installed models by selected category"""
+        category = self.installed_category_combo.currentText()
+        
+        # Clear current display
+        self.installed_text.clear()
+        
+        if not self.installed_models:
+            self.installed_text.setPlainText("No models are currently installed.\n\nUse the 'Available Models' tab to browse and install models.")
+            return
+        
+        if category == "All Categories":
+            # Show all installed models
+            text = "Installed Models:\n\n"
+            for i, model in enumerate(self.installed_models, 1):
+                # Find model details from database
+                model_details = self.find_model_in_database(model)
+                if model_details:
+                    text += f"{i}. {model}\n"
+                    text += f"   Category: {model_details['category']}\n"
+                    text += f"   Description: {model_details['info']['description']}\n"
+                    text += f"   Size: {model_details['info']['size']}\n"
+                    text += f"   Capabilities: {model_details['info']['capabilities']}\n\n"
+                else:
+                    # Model not in database - show basic info
+                    text += f"{i}. {model}\n"
+                    text += f"   Status: Installed locally\n\n"
+        else:
+            # Filter by category
+            filtered_models = []
+            for model in self.installed_models:
+                model_details = self.find_model_in_database(model)
+                if model_details and model_details['category'] == category:
+                    filtered_models.append((model, model_details))
+            
+            if filtered_models:
+                text = f"Installed {category}:\n\n"
+                for i, (model, details) in enumerate(filtered_models, 1):
+                    text += f"{i}. {model}\n"
+                    text += f"   Description: {details['info']['description']}\n"
+                    text += f"   Size: {details['info']['size']}\n"
+                    text += f"   Capabilities: {details['info']['capabilities']}\n\n"
+            else:
+                text = f"No installed models found in category: {category}"
+        
+        self.installed_text.setPlainText(text)
+    
+    def filter_available_models(self):
+        """Filter available models by selected category"""
+        category = self.available_category_combo.currentText()
+        
+        # Clear current display
+        self.available_text.clear()
+        
+        if category == "All Categories":
+            # Show all available models
+            text = "Available Models for Installation:\n\n"
+            for category_name, models in self.model_database.items():
+                text += f"=== {category_name} ===\n\n"
+                for i, model in enumerate(models, 1):
+                    text += f"{i}. {model['name']}\n"
+                    text += f"   Description: {model['description']}\n"
+                    text += f"   Size: {model['size']}\n"
+                    text += f"   Capabilities: {model['capabilities']}\n"
+                    text += f"   Use Cases: {model['use_cases']}\n\n"
+                text += "\n"
+        else:
+            # Show specific category
+            if category in self.model_database:
+                models = self.model_database[category]
+                text = f"Available {category}:\n\n"
+                for i, model in enumerate(models, 1):
+                    text += f"{i}. {model['name']}\n"
+                    text += f"   Description: {model['description']}\n"
+                    text += f"   Size: {model['size']}\n"
+                    text += f"   Capabilities: {model['capabilities']}\n"
+                    text += f"   Use Cases: {model['use_cases']}\n\n"
+            else:
+                text = f"No models found in category: {category}"
+        
+        self.available_text.setPlainText(text)
+    
+    def find_model_in_database(self, model_name):
+        """Find a model in the database and return its details with category"""
+        for category, models in self.model_database.items():
+            for model_info in models:
+                if model_info['name'] == model_name or model_name.startswith(model_info['name']):
+                    return {
+                        'category': category,
+                        'info': model_info
+                    }
+        return None
+        
+    def setup_installed_tab(self):
+        """Setup the installed models tab"""
+        installed_widget = QWidget()
+        layout = QVBoxLayout(installed_widget)
+        
+        # Header with refresh button
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("Installed Models:"))
+        
+        # Category filter for installed models
+        header_layout.addWidget(QLabel("Category:"))
+        self.installed_category_combo = QComboBox()
+        self.installed_category_combo.addItems([
+            "All Categories",
+            "Vision Models", 
+            "Language Models",
+            "Code Models",
+            "Embedding Models",
+            "Specialized Models"
+        ])
+        self.installed_category_combo.currentTextChanged.connect(self.filter_installed_models)
+        self.installed_category_combo.setAccessibleName("Installed Models Category Filter")
+        self.installed_category_combo.setAccessibleDescription("Filter installed models by category")
+        header_layout.addWidget(self.installed_category_combo)
+        
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh_installed_models)
+        header_layout.addWidget(refresh_btn)
+        header_layout.addStretch()
+        
+        layout.addLayout(header_layout)
+        
+        # Models overview text area
+        layout.addWidget(QLabel("Models Overview:"))
+        self.installed_text = QTextEdit()
+        self.installed_text.setReadOnly(True)
+        self.installed_text.setAccessibleName("Installed Models Overview")
+        self.installed_text.setAccessibleDescription("Overview of installed models filtered by category. Use arrow keys to navigate through the text.")
+        self.installed_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.installed_text.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.installed_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        layout.addWidget(self.installed_text)
+        
+        # Models list
+        self.installed_list = QListWidget()
+        self.installed_list.setAccessibleName("Installed Models List")
+        self.installed_list.setAccessibleDescription("List of locally installed Ollama models")
+        self.installed_list.itemSelectionChanged.connect(self.on_installed_selection_changed)
+        layout.addWidget(self.installed_list)
+        
+        # Model details area
+        layout.addWidget(QLabel("Model Details:"))
+        self.installed_details = QTextEdit()
+        self.installed_details.setReadOnly(True)
+        self.installed_details.setMaximumHeight(150)
+        self.installed_details.setAccessibleName("Installed Model Details")
+        self.installed_details.setAccessibleDescription("Details about the selected installed model. Use arrow keys to navigate through the text.")
+        self.installed_details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.installed_details.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.installed_details.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        layout.addWidget(self.installed_details)
+        
+        # Action buttons for installed models
+        installed_buttons = QHBoxLayout()
+        
+        self.delete_btn = QPushButton("Delete Model")
+        self.delete_btn.clicked.connect(self.delete_selected_model)
+        self.delete_btn.setEnabled(False)
+        installed_buttons.addWidget(self.delete_btn)
+        
+        installed_buttons.addStretch()
+        layout.addLayout(installed_buttons)
+        
+        self.tab_widget.addTab(installed_widget, "Installed")
+    
+    def setup_available_tab(self):
+        """Setup the available models tab"""
+        available_widget = QWidget()
+        layout = QVBoxLayout(available_widget)
+        
+        # Header with load button
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("Available Models:"))
+        
+        # Category filter for available models
+        header_layout.addWidget(QLabel("Category:"))
+        self.available_category_combo = QComboBox()
+        self.available_category_combo.addItems([
+            "All Categories",
+            "Vision Models",
+            "Language Models", 
+            "Code Models",
+            "Embedding Models",
+            "Specialized Models"
+        ])
+        self.available_category_combo.currentTextChanged.connect(self.filter_available_models)
+        self.available_category_combo.setAccessibleName("Available Models Category Filter")
+        self.available_category_combo.setAccessibleDescription("Filter available models by category")
+        header_layout.addWidget(self.available_category_combo)
+        
+        load_btn = QPushButton("Load Available Models")
+        load_btn.clicked.connect(self.load_available_models)
+        header_layout.addWidget(load_btn)
+        header_layout.addStretch()
+        
+        layout.addLayout(header_layout)
+        
+        # Available models overview text area
+        layout.addWidget(QLabel("Available Models Overview:"))
+        self.available_text = QTextEdit()
+        self.available_text.setReadOnly(True)
+        self.available_text.setAccessibleName("Available Models Overview")
+        self.available_text.setAccessibleDescription("Overview of available models filtered by category. Use arrow keys to navigate through the text.")
+        self.available_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.available_text.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.available_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        layout.addWidget(self.available_text)
+        
+        # Available models list
+        self.available_list = QListWidget()
+        self.available_list.setAccessibleName("Available Models List")
+        self.available_list.setAccessibleDescription("List of popular vision models available for download")
+        self.available_list.itemSelectionChanged.connect(self.on_available_selection_changed)
+        layout.addWidget(self.available_list)
+        
+        # Model info area
+        layout.addWidget(QLabel("Model Information:"))
+        self.available_details = QTextEdit()
+        self.available_details.setReadOnly(True)
+        self.available_details.setMaximumHeight(150)
+        self.available_details.setAccessibleName("Available Model Information")
+        self.available_details.setAccessibleDescription("Information about the selected available model. Use arrow keys to navigate through the text.")
+        self.available_details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.available_details.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.available_details.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        layout.addWidget(self.available_details)
+        
+        # Install button
+        available_buttons = QHBoxLayout()
+        
+        self.install_btn = QPushButton("Install Selected Model")
+        self.install_btn.clicked.connect(self.install_selected_model)
+        self.install_btn.setEnabled(False)
+        available_buttons.addWidget(self.install_btn)
+        
+        available_buttons.addStretch()
+        layout.addLayout(available_buttons)
+        
+        # Load popular models initially
+        self.load_enhanced_popular_models()
+        
+        self.tab_widget.addTab(available_widget, "Available")
+    
+    def setup_search_tab(self):
+        """Setup the search tab"""
+        search_widget = QWidget()
+        layout = QVBoxLayout(search_widget)
+        
+        # Search input
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("Search models:"))
+        
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Enter search term (e.g., 'vision', 'llava', 'moondream')")
+        self.search_input.returnPressed.connect(self.search_models)
+        search_layout.addWidget(self.search_input)
+        
+        search_btn = QPushButton("Search")
+        search_btn.clicked.connect(self.search_models)
+        search_layout.addWidget(search_btn)
+        
+        layout.addLayout(search_layout)
+        
+        # Search results
+        layout.addWidget(QLabel("Search Results:"))
+        self.search_results = QListWidget()
+        self.search_results.setAccessibleName("Search Results List")
+        self.search_results.setAccessibleDescription("Search results for Ollama models")
+        self.search_results.itemSelectionChanged.connect(self.on_search_selection_changed)
+        layout.addWidget(self.search_results)
+        
+        # Search result details
+        layout.addWidget(QLabel("Model Details:"))
+        self.search_details = QTextEdit()
+        self.search_details.setReadOnly(True)
+        self.search_details.setMaximumHeight(150)
+        self.search_details.setAccessibleName("Search Result Details")
+        self.search_details.setAccessibleDescription("Details about the selected search result. Use arrow keys to navigate through the text.")
+        self.search_details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.search_details.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.search_details.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        layout.addWidget(self.search_details)
+        
+        # Install from search
+        search_buttons = QHBoxLayout()
+        
+        self.install_search_btn = QPushButton("Install Selected Model")
+        self.install_search_btn.clicked.connect(self.install_search_selected_model)
+        self.install_search_btn.setEnabled(False)
+        search_buttons.addWidget(self.install_search_btn)
+        
+        search_buttons.addStretch()
+        layout.addLayout(search_buttons)
+        
+        self.tab_widget.addTab(search_widget, "Search")
+    
+    def refresh_installed_models(self):
+        """Refresh the list of installed models"""
+        self.installed_list.clear()
+        self.installed_details.clear()
+        self.delete_btn.setEnabled(False)
+        self.installed_models = []  # Reset the models list
+        
+        try:
+            if not ollama:
+                self.status_label.setText("Ollama Python package not available")
+                if hasattr(self, 'installed_text'):
+                    self.installed_text.setPlainText("Error: Ollama Python package is not installed.\n\nPlease install it with: pip install ollama")
+                return
+            
+            self.status_label.setText("Loading installed models...")
+            
+            # Test Ollama connection first
+            try:
+                # Get installed models
+                models_response = ollama.list()
+            except Exception as conn_error:
+                error_msg = str(conn_error).lower()
+                if "connection" in error_msg or "refused" in error_msg:
+                    self.status_label.setText("Ollama server not running")
+                    if hasattr(self, 'installed_text'):
+                        self.installed_text.setPlainText("Error: Cannot connect to Ollama server.\n\nPlease ensure Ollama is running:\n1. Open a terminal/command prompt\n2. Run: ollama serve\n3. Or start Ollama from your system tray")
+                elif "timeout" in error_msg:
+                    self.status_label.setText("Ollama connection timeout")
+                    if hasattr(self, 'installed_text'):
+                        self.installed_text.setPlainText("Error: Ollama server connection timed out.\n\nThe server may be busy or not responding properly.")
+                else:
+                    self.status_label.setText(f"Ollama error: {str(conn_error)}")
+                    if hasattr(self, 'installed_text'):
+                        self.installed_text.setPlainText(f"Error connecting to Ollama:\n{str(conn_error)}\n\nPlease check that Ollama is properly installed and running.")
+                return
+            
+            models = []
+            
+            if hasattr(models_response, 'models'):
+                for model in models_response.models:
+                    if hasattr(model, 'model'):
+                        models.append(model)
+                    elif hasattr(model, 'name'):
+                        # Create a model-like object for consistency
+                        class ModelInfo:
+                            def __init__(self, name):
+                                self.model = name
+                                self.name = name
+                        models.append(ModelInfo(model.name))
+            elif 'models' in models_response:
+                for model in models_response['models']:
+                    class ModelInfo:
+                        def __init__(self, data):
+                            self.model = data.get('model', data.get('name', ''))
+                            self.name = self.model
+                            self.size = data.get('size', 0)
+                            self.modified_at = data.get('modified_at', '')
+                    models.append(ModelInfo(model))
+            
+            # Populate list and store model names
+            for model in models:
+                model_name = getattr(model, 'model', getattr(model, 'name', 'Unknown'))
+                self.installed_models.append(model_name)  # Store the model name
+                
+                # Create list item
+                item = QListWidgetItem(model_name)
+                item.setData(Qt.ItemDataRole.UserRole, model)
+                
+                # Add visual indicator for vision models
+                if any(vision_term in model_name.lower() for vision_term in ['llava', 'moondream', 'vision', 'bakllava']):
+                    item.setText(f"👁️ {model_name} (Vision)")
+                    item.setData(Qt.ItemDataRole.AccessibleTextRole, f"Vision model {model_name}")
+                else:
+                    item.setData(Qt.ItemDataRole.AccessibleTextRole, f"Model {model_name}")
+                
+                self.installed_list.addItem(item)
+            
+            self.status_label.setText(f"Found {len(models)} installed models")
+            
+            # Trigger filter update if filter methods exist
+            if hasattr(self, 'filter_installed_models'):
+                self.filter_installed_models()
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "connection" in error_msg or "refused" in error_msg:
+                self.status_label.setText("Ollama server not running")
+                if hasattr(self, 'installed_text'):
+                    self.installed_text.setPlainText("Error: Cannot connect to Ollama server.\n\nPlease ensure Ollama is running:\n1. Open a terminal/command prompt\n2. Run: ollama serve\n3. Or start Ollama from your system tray")
+            elif "timeout" in error_msg:
+                self.status_label.setText("Ollama connection timeout")
+                if hasattr(self, 'installed_text'):
+                    self.installed_text.setPlainText("Error: Ollama server connection timed out.\n\nThe server may be busy or not responding properly.")
+            elif "not found" in error_msg or "no such file" in error_msg:
+                self.status_label.setText("Ollama not installed")
+                if hasattr(self, 'installed_text'):
+                    self.installed_text.setPlainText("Error: Ollama is not installed on this system.\n\nPlease install Ollama from: https://ollama.ai")
+            else:
+                self.status_label.setText(f"Error loading models: {str(e)}")
+                if hasattr(self, 'installed_text'):
+                    self.installed_text.setPlainText(f"Error loading models:\n{str(e)}\n\nPlease check your Ollama installation and try again.")
+    
+    def load_available_models(self):
+        """Load available models using ollama search (if possible)"""
+        self.status_label.setText("Checking for search capability...")
+        
+        try:
+            # Check if search command is available
+            result = subprocess.run(['ollama', 'search', '--help'], 
+                                  capture_output=True, text=True, timeout=5)
+            
+            if result.returncode == 0:
+                self.status_label.setText("Search capability detected")
+                # Search is available - could implement actual search here
+            else:
+                self.status_label.setText("Search not available in this Ollama version - showing curated list")
+                
+        except subprocess.TimeoutExpired:
+            self.status_label.setText("Search check timed out - showing curated list")
+        except FileNotFoundError:
+            self.status_label.setText("Ollama not found - showing curated list")
+        except Exception as e:
+            self.status_label.setText(f"Search unavailable - showing curated list")
+        
+        # Always show the enhanced curated list
+        self.load_enhanced_popular_models()
+    
+    def load_enhanced_popular_models(self):
+        """Load an enhanced curated list of popular vision models"""
+        enhanced_models = [
+            {
+                "name": "moondream",
+                "description": "A small vision language model (1.7B params) designed to run efficiently on edge devices. Great for basic image understanding tasks with minimal resource requirements.",
+                "size": "~1.7GB",
+                "capabilities": "Image understanding, basic Q&A, efficient on CPU"
+            },
+            {
+                "name": "llava", 
+                "description": "Large Language and Vision Assistant. The original and most popular multimodal model with excellent image analysis capabilities.",
+                "size": "~4.1GB",
+                "capabilities": "Advanced image analysis, detailed descriptions, complex visual reasoning"
+            },
+            {
+                "name": "llava:7b",
+                "description": "7B parameter version of LLaVA. Provides an excellent balance between performance and resource usage for most applications.",
+                "size": "~4.1GB",
+                "capabilities": "High-quality image descriptions, visual reasoning, good performance/size ratio"
+            },
+            {
+                "name": "llava:13b",
+                "description": "13B parameter version of LLaVA. Offers the highest quality results but requires more computational resources and memory.",
+                "size": "~7.3GB", 
+                "capabilities": "Excellent image analysis, very detailed descriptions, advanced reasoning, professional quality"
+            },
+            {
+                "name": "llava:34b",
+                "description": "34B parameter version of LLaVA. The largest and most capable version, suitable for professional applications with high-end hardware.",
+                "size": "~19GB",
+                "capabilities": "Professional-grade image analysis, extremely detailed descriptions, sophisticated reasoning"
+            },
+            {
+                "name": "bakllava",
+                "description": "BakLLaVA is an improved vision-language model based on LLaVA architecture with enhanced training methodology and better performance.",
+                "size": "~4.1GB",
+                "capabilities": "Enhanced image understanding, improved visual Q&A, detailed descriptions, stable performance"
+            },
+            {
+                "name": "llava-llama3",
+                "description": "LLaVA model based on Llama 3 architecture. Combines the visual capabilities of LLaVA with the improved language understanding of Llama 3.",
+                "size": "~4.1GB",
+                "capabilities": "Modern architecture, improved language understanding, excellent vision-language integration"
+            },
+            {
+                "name": "llava-phi3",
+                "description": "Compact vision model based on Microsoft's Phi-3 architecture. Offers good performance in a smaller package.",
+                "size": "~2.2GB",
+                "capabilities": "Compact size, efficient processing, good balance of capabilities and resource usage"
+            }
+        ]
+        
+        self.available_list.clear()
+        for model_info in enhanced_models:
+            # Create display name with visual indicator
+            display_name = f"👁️ {model_info['name']}"
+            
+            # Add recommendation badges
+            if model_info['name'] == 'llava:7b':
+                display_name += " ⭐ Recommended"
+            elif model_info['name'] == 'moondream':
+                display_name += " 🚀 Lightweight"
+            elif model_info['name'] == 'llava:13b':
+                display_name += " 💎 High Quality"
+            
+            item = QListWidgetItem(display_name)
+            item.setData(Qt.ItemDataRole.UserRole, model_info)
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, f"Vision model {model_info['name']}")
+            self.available_list.addItem(item)
+    
+    def search_models(self):
+        """Search for models using the search term"""
+        search_term = self.search_input.text().strip()
+        if not search_term:
+            QMessageBox.information(self, "Search", "Please enter a search term.")
+            return
+        
+        self.search_results.clear()
+        self.search_details.clear()
+        self.install_search_btn.setEnabled(False)
+        
+        self.status_label.setText(f"Searching for '{search_term}'...")
+        
+        try:
+            # Try to use ollama search if available
+            result = subprocess.run(['ollama', 'search', search_term], 
+                                  capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0:
+                # Parse the search results
+                lines = result.stdout.strip().split('\n')
+                
+                # Skip header line if present
+                model_lines = [line for line in lines if line.strip() and not line.startswith('NAME')]
+                
+                if model_lines:
+                    for line in model_lines:
+                        # Parse model line (format may vary)
+                        parts = line.split()
+                        if parts:
+                            model_name = parts[0]
+                            item = QListWidgetItem(model_name)
+                            item.setData(Qt.ItemDataRole.UserRole, {'name': model_name, 'search_line': line})
+                            self.search_results.addItem(item)
+                    
+                    self.status_label.setText(f"Found {len(model_lines)} models matching '{search_term}'")
+                else:
+                    self.status_label.setText(f"No models found matching '{search_term}'")
+                    self.search_results.addItem(QListWidgetItem("No models found"))
+            else:
+                # Search command failed - show alternative
+                self.show_search_alternative(search_term)
+                
+        except subprocess.TimeoutExpired:
+            self.status_label.setText("Search timed out")
+            self.show_search_alternative(search_term)
+        except FileNotFoundError:
+            self.status_label.setText("Ollama command not found - is Ollama installed?")
+            self.show_search_alternative(search_term)
+        except Exception as e:
+            self.status_label.setText(f"Search unavailable in this Ollama version")
+            self.show_search_alternative(search_term)
+    
+    def show_search_alternative(self, search_term):
+        """Show alternative search results when ollama search is not available"""
+        self.search_results.clear()
+        
+        # Add informational message
+        info_item = QListWidgetItem("🔍 Search not available in this Ollama version")
+        info_item.setData(Qt.ItemDataRole.UserRole, None)
+        self.search_results.addItem(info_item)
+        
+        # Show alternative instructions
+        alt_item = QListWidgetItem("💡 Try browsing available models in the 'Available' tab")
+        alt_item.setData(Qt.ItemDataRole.UserRole, None)
+        self.search_results.addItem(alt_item)
+        
+        # Try to match against our curated list
+        curated_matches = []
+        enhanced_models = [
+            "moondream", "llava", "llava:7b", "llava:13b", "llava:34b", 
+            "bakllava", "llava-llama3", "llava-phi3"
+        ]
+        
+        for model_name in enhanced_models:
+            if search_term.lower() in model_name.lower():
+                curated_matches.append(model_name)
+        
+        if curated_matches:
+            match_item = QListWidgetItem("--- Matches from curated list ---")
+            match_item.setData(Qt.ItemDataRole.UserRole, None)
+            self.search_results.addItem(match_item)
+            
+            for match in curated_matches:
+                item = QListWidgetItem(f"👁️ {match}")
+                item.setData(Qt.ItemDataRole.UserRole, {'name': match, 'source': 'curated'})
+                self.search_results.addItem(item)
+            
+            self.status_label.setText(f"Found {len(curated_matches)} matches in curated models")
+        else:
+            # Suggest manual model name entry
+            manual_item = QListWidgetItem(f"📝 Try installing '{search_term}' directly")
+            manual_item.setData(Qt.ItemDataRole.UserRole, {'name': search_term, 'source': 'manual'})
+            self.search_results.addItem(manual_item)
+            
+            self.status_label.setText("No matches found - you can try installing the exact model name")
+    
+    def on_installed_selection_changed(self):
+        """Handle selection change in installed models"""
+        current_item = self.installed_list.currentItem()
+        if current_item:
+            model = current_item.data(Qt.ItemDataRole.UserRole)
+            self.delete_btn.setEnabled(True)
+            
+            # Show model details
+            details = f"Model: {getattr(model, 'model', 'Unknown')}\n"
+            if hasattr(model, 'size'):
+                details += f"Size: {self.format_size(model.size)}\n"
+            if hasattr(model, 'modified_at'):
+                details += f"Modified: {model.modified_at}\n"
+            
+            self.installed_details.setPlainText(details)
+        else:
+            self.delete_btn.setEnabled(False)
+            self.installed_details.clear()
+    
+    def on_available_selection_changed(self):
+        """Handle selection change in available models"""
+        current_item = self.available_list.currentItem()
+        if current_item:
+            model_info = current_item.data(Qt.ItemDataRole.UserRole)
+            self.install_btn.setEnabled(True)
+            
+            # Show model information
+            details = f"Model: {model_info['name']}\n"
+            details += f"Description: {model_info['description']}\n"
+            details += f"Estimated Size: {model_info['size']}\n"
+            details += f"Capabilities: {model_info['capabilities']}\n"
+            
+            self.available_details.setPlainText(details)
+        else:
+            self.install_btn.setEnabled(False)
+            self.available_details.clear()
+    
+    def on_search_selection_changed(self):
+        """Handle selection change in search results"""
+        current_item = self.search_results.currentItem()
+        if current_item:
+            model_data = current_item.data(Qt.ItemDataRole.UserRole)
+            if model_data and 'name' in model_data:
+                self.install_search_btn.setEnabled(True)
+                
+                # Show search result details
+                details = f"Model: {model_data['name']}\n"
+                if 'search_line' in model_data:
+                    details += f"Search Result: {model_data['search_line']}\n"
+                
+                self.search_details.setPlainText(details)
+            else:
+                self.install_search_btn.setEnabled(False)
+                self.search_details.clear()
+        else:
+            self.install_search_btn.setEnabled(False)
+            self.search_details.clear()
+    
+    def install_selected_model(self):
+        """Install the selected model from available list"""
+        current_item = self.available_list.currentItem()
+        if current_item:
+            model_info = current_item.data(Qt.ItemDataRole.UserRole)
+            self.install_model(model_info['name'])
+    
+    def install_search_selected_model(self):
+        """Install the selected model from search results"""
+        current_item = self.search_results.currentItem()
+        if current_item:
+            model_data = current_item.data(Qt.ItemDataRole.UserRole)
+            if model_data and 'name' in model_data:
+                self.install_model(model_data['name'])
+    
+    def install_model(self, model_name):
+        """Install a model using ollama pull"""
+        reply = QMessageBox.question(
+            self, "Install Model",
+            f"Install model '{model_name}'?\n\n"
+            f"This will download the model which may be several GB in size.\n"
+            f"The download may take some time depending on your internet connection.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self.status_label.setText(f"Installing {model_name}...")
+                
+                # Start installation process
+                process = subprocess.Popen(
+                    ['ollama', 'pull', model_name],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    universal_newlines=True
+                )
+                
+                self.installation_processes[model_name] = process
+                
+                # Show progress dialog
+                progress_dialog = QMessageBox(self)
+                progress_dialog.setWindowTitle("Installing Model")
+                progress_dialog.setText(f"Installing {model_name}...\n\nThis may take several minutes.")
+                progress_dialog.setStandardButtons(QMessageBox.StandardButton.Cancel)
+                progress_dialog.setIcon(QMessageBox.Icon.Information)
+                
+                # Check if we can monitor the process (simplified version)
+                # In a full implementation, we'd use QThread for proper async handling
+                if progress_dialog.exec() == QMessageBox.StandardButton.Cancel:
+                    # User cancelled
+                    if model_name in self.installation_processes:
+                        self.installation_processes[model_name].terminate()
+                        del self.installation_processes[model_name]
+                    self.status_label.setText("Installation cancelled")
+                else:
+                    # Wait for completion (simplified)
+                    return_code = process.wait()
+                    if return_code == 0:
+                        self.status_label.setText(f"Successfully installed {model_name}")
+                        self.refresh_installed_models()
+                        QMessageBox.information(self, "Success", f"Model '{model_name}' installed successfully!")
+                    else:
+                        self.status_label.setText(f"Installation of {model_name} failed")
+                        QMessageBox.warning(self, "Installation Failed", f"Failed to install '{model_name}'.")
+                
+            except FileNotFoundError:
+                QMessageBox.critical(self, "Error", "Ollama command not found. Please ensure Ollama is installed and in your PATH.")
+                self.status_label.setText("Ollama not found")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Installation failed: {str(e)}")
+                self.status_label.setText(f"Installation error: {str(e)}")
+    
+    def delete_selected_model(self):
+        """Delete the selected installed model"""
+        current_item = self.installed_list.currentItem()
+        if current_item:
+            model = current_item.data(Qt.ItemDataRole.UserRole)
+            model_name = getattr(model, 'model', getattr(model, 'name', 'Unknown'))
+            
+            reply = QMessageBox.question(
+                self, "Delete Model",
+                f"Delete model '{model_name}'?\n\n"
+                f"This will permanently remove the model from your system.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    self.status_label.setText(f"Deleting {model_name}...")
+                    
+                    result = subprocess.run(['ollama', 'rm', model_name], 
+                                          capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        self.status_label.setText(f"Successfully deleted {model_name}")
+                        self.refresh_installed_models()
+                        QMessageBox.information(self, "Success", f"Model '{model_name}' deleted successfully!")
+                    else:
+                        self.status_label.setText(f"Failed to delete {model_name}")
+                        QMessageBox.warning(self, "Deletion Failed", f"Failed to delete '{model_name}': {result.stderr}")
+                        
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Deletion failed: {str(e)}")
+                    self.status_label.setText(f"Deletion error: {str(e)}")
+    
+    def format_size(self, size_bytes):
+        """Format file size in human readable format"""
+        if size_bytes == 0:
+            return "Unknown size"
+        
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.1f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.1f} TB"
+
+
 class ImageDescriberGUI(QMainWindow):
     """Main ImageDescriber application window"""
     
@@ -2250,6 +3261,36 @@ class ImageDescriberGUI(QMainWindow):
         show_all_descriptions_action = QAction("Show All Descriptions in List", self)
         show_all_descriptions_action.triggered.connect(self.show_all_descriptions_dialog)
         view_menu.addAction(show_all_descriptions_action)
+        
+        view_menu.addSeparator()
+        
+        # Properties menu item
+        properties_action = QAction("Properties", self)
+        properties_action.triggered.connect(self.show_image_properties)
+        view_menu.addAction(properties_action)
+        
+        # Help menu
+        help_menu = menubar.addMenu("Help")
+        
+        model_manager_action = QAction("Model Manager", self)
+        model_manager_action.triggered.connect(self.show_model_manager)
+        help_menu.addAction(model_manager_action)
+        
+        help_menu.addSeparator()
+        
+        readme_action = QAction("Readme", self)
+        readme_action.triggered.connect(self.open_readme)
+        help_menu.addAction(readme_action)
+        
+        download_ollama_action = QAction("Download Ollama", self)
+        download_ollama_action.triggered.connect(self.open_ollama_download)
+        help_menu.addAction(download_ollama_action)
+        
+        help_menu.addSeparator()
+        
+        about_action = QAction("About", self)
+        about_action.triggered.connect(self.show_about_dialog)
+        help_menu.addAction(about_action)
     
     def setup_shortcuts(self):
         """Setup keyboard shortcuts"""
@@ -4516,6 +5557,392 @@ You can check Ollama logs for more details."""
                         break
             
             QTimer.singleShot(0, restore_focus)
+
+    def open_readme(self):
+        """Open the GitHub README file for the imagedescriber directory"""
+        try:
+            # Determine the current branch dynamically
+            try:
+                # Try to get current branch from git
+                result = subprocess.run(
+                    ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                    capture_output=True,
+                    text=True,
+                    cwd=Path(__file__).parent.parent  # Go to repo root
+                )
+                if result.returncode == 0:
+                    current_branch = result.stdout.strip()
+                else:
+                    current_branch = "main"  # fallback
+            except:
+                current_branch = "main"  # fallback if git not available
+            
+            # Build the GitHub URL
+            readme_url = f"https://github.com/kellylford/Image-Description-Toolkit/blob/{current_branch}/imagedescriber/README.md"
+            
+            # Open in default browser
+            webbrowser.open(readme_url)
+            self.status_bar.showMessage("Opening README in browser...", 3000)
+            
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Error",
+                f"Failed to open README:\n{str(e)}\n\n"
+                f"You can manually visit:\n"
+                f"https://github.com/kellylford/Image-Description-Toolkit/blob/main/imagedescriber/README.md"
+            )
+
+    def open_ollama_download(self):
+        """Open the Ollama download page"""
+        try:
+            webbrowser.open("https://ollama.ai/download")
+            self.status_bar.showMessage("Opening Ollama download page...", 3000)
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Error",
+                f"Failed to open Ollama download page:\n{str(e)}\n\n"
+                f"You can manually visit: https://ollama.ai/download"
+            )
+
+    def show_about_dialog(self):
+        """Show the About dialog with version information"""
+        try:
+            # Read version from VERSION file
+            version_file = Path(__file__).parent.parent / "VERSION"
+            if version_file.exists():
+                version = version_file.read_text().strip()
+            else:
+                version = "Unknown"
+        except:
+            version = "Unknown"
+        
+        about_text = f"""<h2>ImageDescriber</h2>
+<p><strong>Version:</strong> {version}</p>
+<p><strong>Part of:</strong> Image Description Toolkit</p>
+
+<p>AI-powered image description application with support for:</p>
+<ul>
+<li>Multiple AI providers (Ollama, OpenAI)</li>
+<li>Batch processing</li>
+<li>Video frame extraction</li>
+<li>Document-based workspaces</li>
+<li>Accessibility features</li>
+</ul>
+
+<p><strong>GitHub Repository:</strong><br>
+<a href="https://github.com/kellylford/Image-Description-Toolkit">
+https://github.com/kellylford/Image-Description-Toolkit</a></p>
+
+<p>© 2025 Image Description Toolkit</p>"""
+        
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("About ImageDescriber")
+        msg_box.setTextFormat(Qt.TextFormat.RichText)
+        msg_box.setText(about_text)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.exec()
+
+    def show_model_manager(self):
+        """Show the Model Manager dialog"""
+        try:
+            dialog = ModelManagerDialog(self)
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Model Manager Error",
+                f"Failed to open Model Manager:\n{str(e)}\n\n"
+                f"Please ensure Ollama is installed and accessible."
+            )
+
+    def show_image_properties(self):
+        """Show properties and metadata for the currently selected image"""
+        file_path = self.get_current_selected_file_path()
+        
+        if not file_path:
+            QMessageBox.information(
+                self, "No Image Selected",
+                "Please select an image first to view its properties."
+            )
+            return
+        
+        # Check if file exists
+        if not Path(file_path).exists():
+            QMessageBox.warning(
+                self, "File Not Found",
+                f"The selected file does not exist:\n{file_path}"
+            )
+            return
+        
+        # Extract properties
+        properties = self.extract_image_properties(file_path)
+        
+        # Create properties dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Properties - {Path(file_path).name}")
+        dialog.setModal(True)
+        dialog.resize(600, 500)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Create scrollable text area for properties
+        properties_text = QTextEdit()
+        properties_text.setReadOnly(True)
+        properties_text.setAccessibleName("Image Properties")
+        properties_text.setAccessibleDescription("List of image properties and metadata. Use arrow keys to navigate.")
+        properties_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        properties_text.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        properties_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        
+        # Format properties as text
+        properties_text.setPlainText(self.format_properties_text(properties))
+        
+        layout.addWidget(properties_text)
+        
+        # Close button
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        button_box.rejected.connect(dialog.close)
+        layout.addWidget(button_box)
+        
+        dialog.exec()
+
+    def extract_image_properties(self, file_path: str) -> dict:
+        """Extract comprehensive properties from an image file"""
+        properties = {}
+        file_path_obj = Path(file_path)
+        
+        try:
+            # Basic file properties
+            stat = file_path_obj.stat()
+            file_size = stat.st_size
+            
+            properties["File Properties"] = {
+                "File name": file_path_obj.name,
+                "File path": str(file_path_obj),
+                "File size": self.format_file_size(file_size),
+                "File type": file_path_obj.suffix.upper().lstrip('.') or "Unknown",
+                "Date created": self.format_timestamp(stat.st_ctime),
+                "Date modified": self.format_timestamp(stat.st_mtime)
+            }
+            
+            # Try to load image with PIL for detailed properties
+            try:
+                # Handle HEIC files
+                if file_path_obj.suffix.lower() in ['.heic', '.heif']:
+                    try:
+                        import pillow_heif
+                        pillow_heif.register_heif_opener()
+                    except ImportError:
+                        properties["Error"] = {"HEIC Support": "pillow_heif not available for HEIC files"}
+                        return properties
+                
+                from PIL import Image
+                from PIL.ExifTags import TAGS, GPSTAGS
+                
+                with Image.open(file_path) as img:
+                    # Basic image properties
+                    properties["Image Properties"] = {
+                        "Dimensions": f"{img.width} x {img.height} pixels",
+                        "Color mode": img.mode,
+                        "Format": img.format or "Unknown",
+                        "Has transparency": "Yes" if img.mode in ('RGBA', 'LA') or 'transparency' in img.info else "No"
+                    }
+                    
+                    # Additional format-specific info
+                    if hasattr(img, 'info') and img.info:
+                        info_props = {}
+                        
+                        # DPI/Resolution
+                        if 'dpi' in img.info:
+                            dpi = img.info['dpi']
+                            if isinstance(dpi, tuple):
+                                info_props["Resolution (DPI)"] = f"{dpi[0]} x {dpi[1]}"
+                            else:
+                                info_props["Resolution (DPI)"] = str(dpi)
+                        
+                        # JPEG quality
+                        if 'quality' in img.info:
+                            info_props["JPEG Quality"] = str(img.info['quality'])
+                        
+                        # PNG info
+                        if img.format == 'PNG':
+                            if 'gamma' in img.info:
+                                info_props["Gamma"] = str(img.info['gamma'])
+                            if 'transparency' in img.info:
+                                info_props["Transparency"] = str(img.info['transparency'])
+                        
+                        # GIF info
+                        if img.format == 'GIF':
+                            if hasattr(img, 'is_animated'):
+                                info_props["Animated"] = "Yes" if img.is_animated else "No"
+                                if img.is_animated and hasattr(img, 'n_frames'):
+                                    info_props["Frame count"] = str(img.n_frames)
+                        
+                        if info_props:
+                            properties["Format Details"] = info_props
+                    
+                    # EXIF data
+                    if hasattr(img, '_getexif') and img._getexif():
+                        exif_data = {}
+                        exif = img._getexif()
+                        
+                        for tag_id, value in exif.items():
+                            tag = TAGS.get(tag_id, tag_id)
+                            
+                            # Format specific EXIF values
+                            if tag == "DateTime":
+                                exif_data["Date taken"] = str(value)
+                            elif tag == "Make":
+                                exif_data["Camera make"] = str(value)
+                            elif tag == "Model":
+                                exif_data["Camera model"] = str(value)
+                            elif tag == "ExifImageWidth":
+                                exif_data["EXIF width"] = f"{value} pixels"
+                            elif tag == "ExifImageHeight":
+                                exif_data["EXIF height"] = f"{value} pixels"
+                            elif tag == "Orientation":
+                                orientation_map = {
+                                    1: "Normal", 2: "Mirrored horizontal", 3: "Rotated 180°",
+                                    4: "Mirrored vertical", 5: "Mirrored horizontal, rotated 270°",
+                                    6: "Rotated 90°", 7: "Mirrored horizontal, rotated 90°", 8: "Rotated 270°"
+                                }
+                                exif_data["Orientation"] = orientation_map.get(value, f"Unknown ({value})")
+                            elif tag == "Flash":
+                                flash_map = {0: "No flash", 1: "Flash fired", 5: "Flash fired, no return",
+                                           7: "Flash fired, return detected", 9: "Flash fired, compulsory",
+                                           13: "Flash fired, compulsory, no return", 15: "Flash fired, compulsory, return detected",
+                                           16: "No flash, compulsory", 24: "No flash, auto", 25: "Flash fired, auto",
+                                           29: "Flash fired, auto, no return", 31: "Flash fired, auto, return detected"}
+                                exif_data["Flash"] = flash_map.get(value, f"Unknown flash mode ({value})")
+                            elif tag == "ISOSpeedRatings":
+                                exif_data["ISO"] = str(value)
+                            elif tag == "FNumber":
+                                if isinstance(value, tuple) and len(value) == 2:
+                                    f_number = value[0] / value[1] if value[1] != 0 else value[0]
+                                    exif_data["Aperture"] = f"f/{f_number:.1f}"
+                                else:
+                                    exif_data["Aperture"] = str(value)
+                            elif tag == "ExposureTime":
+                                if isinstance(value, tuple) and len(value) == 2:
+                                    if value[1] == 1:
+                                        exif_data["Shutter speed"] = f"{value[0]}s"
+                                    else:
+                                        exif_data["Shutter speed"] = f"{value[0]}/{value[1]}s"
+                                else:
+                                    exif_data["Shutter speed"] = str(value)
+                            elif tag == "FocalLength":
+                                if isinstance(value, tuple) and len(value) == 2:
+                                    focal = value[0] / value[1] if value[1] != 0 else value[0]
+                                    exif_data["Focal length"] = f"{focal:.1f}mm"
+                                else:
+                                    exif_data["Focal length"] = str(value)
+                            elif tag == "GPSInfo":
+                                # GPS data is complex, extract basic coordinates if available
+                                gps_data = {}
+                                for gps_tag_id, gps_value in value.items():
+                                    gps_tag = GPSTAGS.get(gps_tag_id, gps_tag_id)
+                                    if gps_tag in ["GPSLatitude", "GPSLongitude", "GPSLatitudeRef", "GPSLongitudeRef"]:
+                                        gps_data[gps_tag] = gps_value
+                                
+                                if len(gps_data) >= 4:  # Need all 4 components for coordinates
+                                    try:
+                                        lat = self.convert_gps_coordinate(gps_data.get("GPSLatitude", []))
+                                        lon = self.convert_gps_coordinate(gps_data.get("GPSLongitude", []))
+                                        lat_ref = gps_data.get("GPSLatitudeRef", "")
+                                        lon_ref = gps_data.get("GPSLongitudeRef", "")
+                                        
+                                        if lat_ref == "S":
+                                            lat = -lat
+                                        if lon_ref == "W":
+                                            lon = -lon
+                                        
+                                        exif_data["GPS coordinates"] = f"{lat:.6f}, {lon:.6f}"
+                                    except:
+                                        exif_data["GPS data"] = "Present but could not parse"
+                            elif isinstance(value, (str, int, float)) and len(str(value)) < 100:
+                                # Include other simple EXIF tags
+                                exif_data[str(tag)] = str(value)
+                        
+                        if exif_data:
+                            properties["EXIF Metadata"] = exif_data
+                    
+                    # Color profile information
+                    if hasattr(img, 'info') and 'icc_profile' in img.info:
+                        try:
+                            import io
+                            from PIL import ImageCms
+                            icc_profile = img.info['icc_profile']
+                            profile = ImageCms.ImageCmsProfile(io.BytesIO(icc_profile))
+                            properties["Color Profile"] = {
+                                "Profile description": profile.profile.profile_description.strip(),
+                                "Color space": profile.profile.colorspace,
+                                "Device class": profile.profile.device_class
+                            }
+                        except Exception:
+                            properties["Color Profile"] = {"ICC Profile": "Present but could not parse"}
+            
+            except Exception as e:
+                properties["Image Analysis Error"] = {"Error": f"Could not analyze image: {str(e)}"}
+        
+        except Exception as e:
+            properties["File Access Error"] = {"Error": f"Could not access file: {str(e)}"}
+        
+        return properties
+
+    def convert_gps_coordinate(self, coord_tuple):
+        """Convert GPS coordinate from EXIF format to decimal degrees"""
+        if not coord_tuple or len(coord_tuple) != 3:
+            return 0.0
+        
+        degrees = coord_tuple[0]
+        minutes = coord_tuple[1]
+        seconds = coord_tuple[2]
+        
+        # Handle tuple format (numerator, denominator)
+        if isinstance(degrees, tuple):
+            degrees = degrees[0] / degrees[1] if degrees[1] != 0 else degrees[0]
+        if isinstance(minutes, tuple):
+            minutes = minutes[0] / minutes[1] if minutes[1] != 0 else minutes[0]
+        if isinstance(seconds, tuple):
+            seconds = seconds[0] / seconds[1] if seconds[1] != 0 else seconds[0]
+        
+        return degrees + minutes/60 + seconds/3600
+
+    def format_file_size(self, size_bytes: int) -> str:
+        """Format file size in human-readable format"""
+        if size_bytes < 1024:
+            return f"{size_bytes} bytes"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+    def format_timestamp(self, timestamp: float) -> str:
+        """Format timestamp as readable date/time"""
+        try:
+            from datetime import datetime
+            return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            return "Unknown"
+
+    def format_properties_text(self, properties: dict) -> str:
+        """Format properties dictionary as readable text"""
+        lines = []
+        
+        for category, props in properties.items():
+            lines.append(f"=== {category} ===")
+            lines.append("")
+            
+            if isinstance(props, dict):
+                for key, value in props.items():
+                    lines.append(f"{key}: {value}")
+            else:
+                lines.append(str(props))
+            
+            lines.append("")
+        
+        return "\n".join(lines)
 
     def keyPressEvent(self, event):
         """Handle global key presses"""
