@@ -553,6 +553,7 @@ class ImageWorkspace:
         self.directory_path = ""  # Keep for backward compatibility
         self.directory_paths: List[str] = []  # New: support multiple directories
         self.items: Dict[str, ImageItem] = {}
+        self.chat_sessions: Dict[str, dict] = {}  # New: chat sessions storage
         self.created = datetime.now().isoformat()
         self.modified = self.created
         self.saved = new_workspace  # New workspaces start as saved
@@ -611,6 +612,7 @@ class ImageWorkspace:
             "directory_path": self.directory_path,  # Legacy compatibility
             "directory_paths": self.directory_paths,  # New multi-directory support
             "items": {path: item.to_dict() for path, item in self.items.items()},
+            "chat_sessions": getattr(self, 'chat_sessions', {}),  # Include chat sessions
             "created": self.created,
             "modified": self.modified
         }
@@ -626,16 +628,11 @@ class ImageWorkspace:
             workspace.directory_paths.append(workspace.directory_path)
         workspace.items = {path: ImageItem.from_dict(item_data) 
                           for path, item_data in data.get("items", {}).items()}
+        workspace.chat_sessions = data.get("chat_sessions", {})  # Load chat sessions
         workspace.created = data.get("created", workspace.created)
         workspace.modified = data.get("modified", workspace.modified)
         workspace.saved = True
         return workspace
-        workspace.version = data.get("version", WORKSPACE_VERSION)
-        workspace.directory_path = data.get("directory_path", "")
-        workspace.items = {path: ImageItem.from_dict(item_data) 
-                          for path, item_data in data.get("items", {}).items()}
-        workspace.created = data.get("created", workspace.created)
-        workspace.modified = data.get("modified", workspace.modified)
         workspace.saved = True
         return workspace
 
@@ -1139,6 +1136,100 @@ class VideoProcessingWorker(QThread):
         return extracted_paths
 
 
+class ChatProcessingWorker(QThread):
+    """Worker thread for processing chat messages with AI"""
+    chat_response = pyqtSignal(str, str)  # chat_id, response
+    chat_failed = pyqtSignal(str, str)    # chat_id, error
+    
+    def __init__(self, chat_session: dict, message: str):
+        super().__init__()
+        self.chat_session = chat_session
+        self.message = message
+        self._stop_requested = False
+        
+    def stop(self):
+        """Request the worker to stop"""
+        self._stop_requested = True
+        
+    def run(self):
+        try:
+            if self._stop_requested:
+                return
+                
+            response = self.process_chat_with_ai(self.chat_session, self.message)
+            
+            if not self._stop_requested:
+                self.chat_response.emit(self.chat_session['id'], response)
+        except Exception as e:
+            if not self._stop_requested:
+                self.chat_failed.emit(self.chat_session['id'], str(e))
+    
+    def process_chat_with_ai(self, chat_session: dict, message: str) -> str:
+        """Process chat message with AI provider"""
+        provider = chat_session['provider']
+        model = chat_session['model']
+        
+        # For chat, use just the current message for now to avoid context issues
+        # We can enhance this later once basic functionality is working
+        full_prompt = message
+        
+        if provider == "ollama":
+            return self.process_with_ollama(model, full_prompt)
+        elif provider == "openai":
+            return self.process_with_openai(model, full_prompt)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+    
+    def process_with_ollama(self, model: str, prompt: str) -> str:
+        """Process with Ollama"""
+        try:
+            import ollama
+            
+            # Use ollama.generate for simpler text generation (more reliable than chat)
+            response = ollama.generate(
+                model=model,
+                prompt=prompt
+            )
+            
+            if self._stop_requested:
+                return "Processing stopped"
+            
+            if hasattr(response, 'response'):
+                return response.response
+            elif isinstance(response, dict) and 'response' in response:
+                return response['response']
+            else:
+                return str(response)
+                
+        except Exception as e:
+            raise Exception(f"Ollama processing failed: {str(e)}")
+    
+    def process_with_openai(self, model: str, prompt: str) -> str:
+        """Process with OpenAI"""
+        try:
+            # Try different ways to import OpenAI client
+            try:
+                from openai import OpenAI
+                client = OpenAI()
+            except ImportError:
+                import openai
+                client = openai
+            
+            if self._stop_requested:
+                return "Processing stopped"
+            
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1000
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            raise Exception(f"OpenAI processing failed: {str(e)}")
+
+
 class DirectorySelectionDialog(QDialog):
     """Dialog for selecting directory with options for recursive search and multiple directories"""
     def __init__(self, existing_directories: List[str], parent=None):
@@ -1596,6 +1687,164 @@ class ProcessingDialog(QDialog):
         prompt_style = self.get_selected_prompt_style()
         custom_prompt = self.get_custom_prompt()
         return provider, model, prompt_style, custom_prompt
+
+
+class ChatDialog(QDialog):
+    """Dialog for starting a new chat session with an AI model"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Start Chat Session")
+        self.setModal(True)
+        self.resize(450, 400)
+        
+        layout = QVBoxLayout(self)
+        
+        # Header
+        header_label = QLabel("Start a new chat session with an AI model")
+        header_label.setStyleSheet("font-weight: bold; font-size: 12px; padding: 10px;")
+        layout.addWidget(header_label)
+        
+        # Provider selection
+        layout.addWidget(QLabel("AI Provider:"))
+        self.provider_combo = QComboBox()
+        self.populate_providers()
+        layout.addWidget(self.provider_combo)
+        
+        # Model selection
+        layout.addWidget(QLabel("AI Model:"))
+        self.model_combo = QComboBox()
+        layout.addWidget(self.model_combo)
+        
+        # Connect provider change to update models
+        self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
+        
+        # Initial prompt
+        layout.addWidget(QLabel("Initial Prompt:"))
+        self.prompt_text = AccessibleTextEdit()
+        self.prompt_text.setMaximumHeight(150)
+        self.prompt_text.setAccessibleName("Initial Chat Prompt")
+        self.prompt_text.setAccessibleDescription("Enter your initial question or prompt to start the chat conversation")
+        self.prompt_text.setPlaceholderText("Enter your question or prompt here...")
+        layout.addWidget(self.prompt_text)
+        
+        # Chat session name (optional)
+        layout.addWidget(QLabel("Session Name (optional):"))
+        self.session_name = QLineEdit()
+        self.session_name.setAccessibleName("Chat Session Name")
+        self.session_name.setAccessibleDescription("Optional name for this chat session")
+        self.session_name.setPlaceholderText("Leave blank for auto-generated name")
+        layout.addWidget(self.session_name)
+        
+        # Provider status info
+        self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
+        self.status_label.setStyleSheet("color: #666; font-size: 11px;")
+        layout.addWidget(self.status_label)
+        
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        
+        # Initialize with first provider
+        self.on_provider_changed()
+        
+        # Set focus to prompt text
+        self.prompt_text.setFocus()
+    
+    def populate_providers(self):
+        """Populate provider combo box"""
+        self.provider_combo.clear()
+        
+        # Add available providers
+        providers = ["ollama", "openai"]
+        for provider in providers:
+            self.provider_combo.addItem(provider.upper(), provider)
+    
+    def on_provider_changed(self):
+        """Update models when provider changes"""
+        provider = self.get_selected_provider()
+        self.populate_models(provider)
+        self.update_status_info(provider)
+    
+    def populate_models(self, provider):
+        """Populate model combo based on provider"""
+        self.model_combo.clear()
+        
+        if provider == "ollama":
+            try:
+                import ollama
+                models_response = ollama.list()
+                
+                models = []
+                if hasattr(models_response, 'models'):
+                    for model in models_response.models:
+                        if hasattr(model, 'model'):
+                            models.append(model.model)
+                        elif hasattr(model, 'name'):
+                            models.append(model.name)
+                elif 'models' in models_response:
+                    for model in models_response['models']:
+                        models.append(model.get('model', model.get('name', 'Unknown')))
+                
+                if models:
+                    for model in sorted(models):
+                        self.model_combo.addItem(model)
+                else:
+                    self.model_combo.addItem("No models found")
+                    
+            except Exception as e:
+                self.model_combo.addItem(f"Error loading models: {str(e)}")
+                
+        elif provider == "openai":
+            # Add common OpenAI models
+            openai_models = [
+                "gpt-4",
+                "gpt-4-turbo", 
+                "gpt-3.5-turbo",
+                "gpt-4o",
+                "gpt-4o-mini"
+            ]
+            for model in openai_models:
+                self.model_combo.addItem(model)
+    
+    def update_status_info(self, provider):
+        """Update status information for the selected provider"""
+        if provider == "ollama":
+            self.status_label.setText("Using local Ollama models. Make sure Ollama is running.")
+        elif provider == "openai":
+            self.status_label.setText("Using OpenAI API. Requires API key configuration.")
+        else:
+            self.status_label.setText("")
+    
+    def get_selected_provider(self):
+        """Get the currently selected provider"""
+        return self.provider_combo.currentData() or "ollama"
+    
+    def get_selected_model(self):
+        """Get the currently selected model"""
+        return self.model_combo.currentText()
+    
+    def get_initial_prompt(self):
+        """Get the initial prompt text"""
+        return self.prompt_text.toPlainText().strip()
+    
+    def get_session_name(self):
+        """Get the session name"""
+        return self.session_name.text().strip()
+    
+    def get_chat_config(self):
+        """Get all chat configuration"""
+        return {
+            'provider': self.get_selected_provider(),
+            'model': self.get_selected_model(),
+            'initial_prompt': self.get_initial_prompt(),
+            'session_name': self.get_session_name()
+        }
 
 
 class VideoProcessingDialog(QDialog):
@@ -3120,6 +3369,13 @@ class ImageDescriberGUI(QMainWindow):
         
         process_menu.addSeparator()
         
+        chat_action = QAction("Chat with Model (C)", self)
+        chat_action.setShortcut(QKeySequence("C"))
+        chat_action.triggered.connect(self.start_chat_session)
+        process_menu.addAction(chat_action)
+        
+        process_menu.addSeparator()
+        
         skip_verification_action = QAction("Skip Model Verification", self)
         skip_verification_action.setCheckable(True)
         skip_verification_action.setChecked(True)  # Default to checked (skip verification)
@@ -3657,6 +3913,29 @@ class ImageDescriberGUI(QMainWindow):
                     
                     self.image_list.addItem(frame_item)
         
+        # Add chat sessions to the list
+        if hasattr(self.workspace, 'chat_sessions'):
+            for chat_id, chat_session in self.workspace.chat_sessions.items():
+                chat_name = chat_session.get('name', 'Chat Session')
+                timestamp = chat_session.get('timestamp', '')
+                conversation_count = len(chat_session.get('conversation', []))
+                
+                # Build chat display name with indicators
+                display_name = f"💬 {chat_name}"
+                if conversation_count > 0:
+                    display_name = f"c{conversation_count} {display_name}"
+                
+                # Create chat item
+                chat_item = QListWidgetItem(display_name)
+                chat_item.setData(Qt.ItemDataRole.UserRole, chat_id)
+                chat_item.setData(Qt.ItemDataRole.UserRole + 1, "chat_session")  # Mark as chat
+                chat_item.setToolTip(f"Chat session: {chat_name}\nProvider: {chat_session.get('provider', 'Unknown')}\nModel: {chat_session.get('model', 'Unknown')}\nMessages: {conversation_count}")
+                
+                # Set chat icon and styling
+                chat_item.setForeground(QColor(0, 100, 200))  # Blue color for chats
+                
+                self.image_list.addItem(chat_item)
+        
         self.update_batch_label()
         
         # Also refresh master-detail view if it's the current mode
@@ -4006,18 +4285,72 @@ class ImageDescriberGUI(QMainWindow):
         """Handle image selection change"""
         current_item = self.image_list.currentItem()
         if current_item:
-            file_path = current_item.data(Qt.ItemDataRole.UserRole)
-            self.load_descriptions_for_image(file_path)
+            # Check if this is a chat session
+            item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
+            if item_type == "chat_session":
+                chat_id = current_item.data(Qt.ItemDataRole.UserRole)
+                self.display_chat_conversation(chat_id)
+            else:
+                # Regular image file
+                file_path = current_item.data(Qt.ItemDataRole.UserRole)
+                self.load_descriptions_for_image(file_path)
+    
+    def display_chat_conversation(self, chat_id: str):
+        """Display chat conversation in the description area"""
+        if not hasattr(self.workspace, 'chat_sessions') or chat_id not in self.workspace.chat_sessions:
+            self.description_list.clear()
+            self.description_text.setPlainText("Chat session not found.")
+            return
+        
+        chat_session = self.workspace.chat_sessions[chat_id]
+        
+        # Clear description list and populate with conversation
+        self.description_list.clear()
+        
+        for i, msg in enumerate(chat_session['conversation']):
+            if msg['type'] == 'user':
+                item_text = f"👤 User: {msg['content'][:100]}..."
+                full_text = f"User ({msg['timestamp']}):\n{msg['content']}"
+            else:
+                provider_model = f"{msg.get('provider', 'AI').upper()} {msg.get('model', 'Model')}"
+                item_text = f"🤖 {provider_model}: {msg['content'][:100]}..."
+                full_text = f"{provider_model} ({msg['timestamp']}):\n{msg['content']}"
+            
+            list_item = QListWidgetItem(item_text)
+            list_item.setData(Qt.ItemDataRole.UserRole, i)  # Store message index
+            list_item.setData(Qt.ItemDataRole.UserRole + 1, full_text)  # Store full text
+            list_item.setToolTip(full_text)
+            
+            # Color coding
+            if msg['type'] == 'user':
+                list_item.setForeground(QColor(0, 100, 0))  # Green for user
+            else:
+                list_item.setForeground(QColor(0, 0, 150))  # Blue for AI
+            
+            self.description_list.addItem(list_item)
+        
+        # If there are messages, select the last one
+        if self.description_list.count() > 0:
+            self.description_list.setCurrentRow(self.description_list.count() - 1)
     
     def on_description_selection_changed(self):
         """Handle description selection change"""
         current_item = self.description_list.currentItem()
         
         if current_item:
+            # Check if we're in a chat session
+            image_item = self.image_list.currentItem()
+            if image_item and image_item.data(Qt.ItemDataRole.UserRole + 1) == "chat_session":
+                # This is a chat message selection
+                full_text = current_item.data(Qt.ItemDataRole.UserRole + 1)
+                self.description_text.setPlainText(full_text)
+                self.description_text.setAccessibleDescription(f"Chat message: {full_text[:200]}...")
+                return
+            
+            # Regular description handling
             desc_id = current_item.data(Qt.ItemDataRole.UserRole)
             
             # Find the description
-            image_item = self.image_list.currentItem()
             if image_item:
                 file_path = image_item.data(Qt.ItemDataRole.UserRole)
                 workspace_item = self.workspace.get_item(file_path)
@@ -4398,6 +4731,182 @@ class ImageDescriberGUI(QMainWindow):
         # Refresh view to show processing indicators
         self.refresh_view()
         self.update_stop_button_state()
+    
+    def start_chat_session(self):
+        """Start a new chat session with an AI model"""
+        dialog = ChatDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            config = dialog.get_chat_config()
+            
+            if not config['initial_prompt']:
+                QMessageBox.warning(self, "No Prompt", "Please enter an initial prompt to start the chat.")
+                return
+            
+            # Create chat session
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            session_name = config['session_name'] or f"{config['provider'].upper()} {config['model']} Chat"
+            
+            # Create a unique chat ID
+            chat_id = f"chat_{int(datetime.now().timestamp())}"
+            
+            # Create chat session data
+            chat_session = {
+                'id': chat_id,
+                'name': session_name,
+                'provider': config['provider'],
+                'model': config['model'],
+                'timestamp': timestamp,
+                'conversation': [],
+                'is_chat': True
+            }
+            
+            # Add initial prompt to conversation
+            chat_session['conversation'].append({
+                'type': 'user',
+                'content': config['initial_prompt'],
+                'timestamp': timestamp
+            })
+            
+            # Add to workspace as a special chat item
+            self.workspace.chat_sessions = getattr(self.workspace, 'chat_sessions', {})
+            self.workspace.chat_sessions[chat_id] = chat_session
+            self.workspace.mark_modified()
+            
+            # Add to image list as a chat entry
+            chat_item = QListWidgetItem(f"💬 {session_name} ({timestamp})")
+            chat_item.setData(Qt.ItemDataRole.UserRole, chat_id)
+            chat_item.setData(Qt.ItemDataRole.UserRole + 1, "chat_session")  # Mark as chat
+            chat_item.setToolTip(f"Chat session: {session_name}\nProvider: {config['provider']}\nModel: {config['model']}")
+            
+            # Set chat icon and styling
+            chat_item.setForeground(QColor(0, 100, 200))  # Blue color for chats
+            
+            self.image_list.addItem(chat_item)
+            self.image_list.setCurrentItem(chat_item)
+            
+            # Start processing the initial prompt
+            self.process_chat_message(chat_id, config['initial_prompt'])
+    
+    def process_chat_message(self, chat_id, message):
+        """Process a chat message and get AI response"""
+        if not hasattr(self.workspace, 'chat_sessions') or chat_id not in self.workspace.chat_sessions:
+            QMessageBox.warning(self, "Chat Error", "Chat session not found.")
+            return
+        
+        chat_session = self.workspace.chat_sessions[chat_id]
+        
+        # Initialize chat workers list if not exists
+        if not hasattr(self, 'chat_workers'):
+            self.chat_workers = []
+        
+        # Start processing worker for chat
+        worker = ChatProcessingWorker(chat_session, message)
+        worker.chat_response.connect(self.on_chat_response)
+        worker.chat_failed.connect(self.on_chat_failed)
+        worker.finished.connect(lambda: self.cleanup_chat_worker(worker))
+        
+        # Track the worker to prevent premature destruction
+        self.chat_workers.append(worker)
+        worker.start()
+        
+        # Show processing indicator
+        self.show_chat_processing(chat_id)
+    
+    def cleanup_chat_worker(self, worker):
+        """Clean up finished chat worker"""
+        if hasattr(self, 'chat_workers') and worker in self.chat_workers:
+            self.chat_workers.remove(worker)
+            worker.deleteLater()
+    
+    def on_chat_response(self, chat_id, response):
+        """Handle chat response from AI"""
+        if not hasattr(self.workspace, 'chat_sessions') or chat_id not in self.workspace.chat_sessions:
+            return
+        
+        chat_session = self.workspace.chat_sessions[chat_id]
+        
+        # Add AI response to conversation
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        chat_session['conversation'].append({
+            'type': 'assistant',
+            'content': response,
+            'timestamp': timestamp,
+            'provider': chat_session['provider'],
+            'model': chat_session['model']
+        })
+        
+        self.workspace.mark_modified()
+        
+        # Update the display if this chat is selected
+        current_item = self.image_list.currentItem()
+        if current_item and current_item.data(Qt.ItemDataRole.UserRole) == chat_id:
+            self.display_chat_conversation(chat_id)
+        
+        # Hide processing indicator
+        self.hide_chat_processing(chat_id)
+    
+    def on_chat_failed(self, chat_id, error):
+        """Handle chat processing failure"""
+        QMessageBox.warning(self, "Chat Error", f"Failed to get response: {error}")
+        self.hide_chat_processing(chat_id)
+    
+    def show_chat_processing(self, chat_id):
+        """Show processing indicator for chat"""
+        # Find the chat item in the list and add processing indicator
+        for i in range(self.image_list.count()):
+            item = self.image_list.item(i)
+            if item.data(Qt.ItemDataRole.UserRole) == chat_id:
+                original_text = item.text()
+                if not original_text.endswith(" (processing...)"):
+                    item.setText(original_text + " (processing...)")
+                break
+    
+    def hide_chat_processing(self, chat_id):
+        """Hide processing indicator for chat"""
+        for i in range(self.image_list.count()):
+            item = self.image_list.item(i)
+            if item.data(Qt.ItemDataRole.UserRole) == chat_id:
+                original_text = item.text()
+                if original_text.endswith(" (processing...)"):
+                    item.setText(original_text.replace(" (processing...)", ""))
+                break
+    
+    def chat_followup(self):
+        """Ask a followup question in the current chat session"""
+        current_item = self.image_list.currentItem()
+        if not current_item or current_item.data(Qt.ItemDataRole.UserRole + 1) != "chat_session":
+            QMessageBox.information(self, "No Chat Session", "Please select a chat session to ask a followup question.")
+            return
+        
+        chat_id = current_item.data(Qt.ItemDataRole.UserRole)
+        
+        # Get followup question from user
+        followup_text, ok = QInputDialog.getText(
+            self, 
+            "Chat Followup", 
+            "Enter your followup question:",
+            QLineEdit.EchoMode.Normal,
+            ""
+        )
+        
+        if ok and followup_text.strip():
+            # Add user message to conversation
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            chat_session = self.workspace.chat_sessions[chat_id]
+            
+            chat_session['conversation'].append({
+                'type': 'user',
+                'content': followup_text.strip(),
+                'timestamp': timestamp
+            })
+            
+            self.workspace.mark_modified()
+            
+            # Update display
+            self.display_chat_conversation(chat_id)
+            
+            # Process the followup message
+            self.process_chat_message(chat_id, followup_text.strip())
 
     def convert_heic_files(self):
         """Convert all HEIC files in the workspace"""
@@ -5948,6 +6457,14 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
         """Handle global key presses"""
         if event.key() == Qt.Key.Key_F2:
             self.rename_item()
+        elif event.key() == Qt.Key.Key_F:
+            # Check if we're in a chat session for followup
+            current_item = self.image_list.currentItem()
+            if current_item and current_item.data(Qt.ItemDataRole.UserRole + 1) == "chat_session":
+                self.chat_followup()
+            else:
+                # Regular followup processing for images
+                self.followup_processing()
         else:
             super().keyPressEvent(event)
 
