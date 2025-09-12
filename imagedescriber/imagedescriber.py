@@ -249,9 +249,207 @@ class OpenAIProvider(AIProvider):
         return "OpenAI"
 
 
+class HuggingFaceProvider(AIProvider):
+    """Hugging Face Transformers provider for local vision models"""
+    
+    def __init__(self):
+        super().__init__()
+        self.current_model = None
+        self.processor = None
+        self.device = None
+        self.available_models = {
+            "Salesforce/blip2-opt-2.7b": "BLIP-2 OPT 2.7B (Fast, good quality)",
+            "Salesforce/blip2-flan-t5-xl": "BLIP-2 Flan-T5 XL (Better instruction following)",
+            "Salesforce/instructblip-vicuna-7b": "InstructBLIP Vicuna 7B (Instruction-tuned)",
+            "llava-hf/llava-1.5-7b-hf": "LLaVA 1.5 7B (Conversational)",
+            "microsoft/git-base-coco": "GIT Base COCO (Lightweight)",
+            "openbmb/MiniCPM-V-2": "MiniCPM-V 2 (Efficient)"
+        }
+        
+    def is_available(self) -> bool:
+        """Check if Hugging Face transformers is available"""
+        try:
+            import transformers
+            import torch
+            return True
+        except ImportError:
+            return False
+    
+    def get_models(self) -> List[str]:
+        """Get list of available Hugging Face vision models"""
+        if not self.is_available():
+            return []
+        return list(self.available_models.keys())
+    
+    def get_device(self):
+        """Get the best available device for inference"""
+        if self.device is not None:
+            return self.device
+            
+        try:
+            import torch
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                self.device = "mps"  # Apple Silicon
+            else:
+                self.device = "cpu"
+        except Exception:
+            self.device = "cpu"
+        
+        return self.device
+    
+    def load_model(self, model_name: str, progress_callback=None):
+        """Load a specific Hugging Face model with optional progress reporting"""
+        if self.current_model == model_name:
+            return  # Already loaded
+            
+        try:
+            import torch
+            from transformers import AutoProcessor, AutoModelForCausalLM, BlipProcessor, BlipForConditionalGeneration
+            
+            if progress_callback:
+                progress_callback(f"Downloading/Loading model: {model_name}...", "This may take several minutes for first-time downloads")
+            
+            device = self.get_device()
+            
+            # Common loading arguments
+            common_args = {
+                "torch_dtype": torch.float16 if device != "cpu" else torch.float32,
+                "device_map": "auto" if device != "cpu" else None,
+                "trust_remote_code": True  # Allow custom code execution for models that need it
+            }
+            
+            # Different model architectures need different loading approaches
+            if "blip2" in model_name.lower():
+                from transformers import Blip2Processor, Blip2ForConditionalGeneration
+                self.processor = Blip2Processor.from_pretrained(model_name, trust_remote_code=True)
+                model = Blip2ForConditionalGeneration.from_pretrained(model_name, **common_args)
+            elif "blip" in model_name.lower() and "instruct" in model_name.lower():
+                from transformers import InstructBlipProcessor, InstructBlipForConditionalGeneration
+                self.processor = InstructBlipProcessor.from_pretrained(model_name, trust_remote_code=True)
+                model = InstructBlipForConditionalGeneration.from_pretrained(model_name, **common_args)
+            elif "llava" in model_name.lower():
+                from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+                self.processor = LlavaNextProcessor.from_pretrained(model_name, trust_remote_code=True)
+                model = LlavaNextForConditionalGeneration.from_pretrained(model_name, **common_args)
+            elif "minicpm" in model_name.lower() or "cpm" in model_name.lower():
+                # Special handling for MiniCPM models
+                self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+                model = AutoModelForCausalLM.from_pretrained(model_name, **common_args)
+            else:
+                # Generic approach for other models
+                self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+                model = AutoModelForCausalLM.from_pretrained(model_name, **common_args)
+            
+            if device == "cpu":
+                model = model.to(device)
+                
+            self.model = model
+            self.current_model = model_name
+            
+            if progress_callback:
+                progress_callback(f"Model {model_name} loaded successfully", "Ready for processing")
+            
+        except Exception as e:
+            raise Exception(f"Failed to load Hugging Face model {model_name}: {str(e)}")
+    
+    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
+        """Process image with Hugging Face model"""
+        if not self.is_available():
+            raise Exception("Hugging Face transformers is not available")
+        
+        try:
+            from PIL import Image
+            import torch
+            import io
+            
+            # Get progress callback if provided
+            progress_callback = kwargs.get('progress_callback')
+            
+            # Load the requested model if not already loaded
+            self.load_model(model, progress_callback)
+            
+            # Indicate we're now processing the image
+            if progress_callback:
+                progress_callback(f"Processing image with {model}...", "Generating description")
+            
+            # Convert image data to PIL Image
+            image = Image.open(io.BytesIO(image_data)).convert('RGB')
+            
+            # Process with the loaded model
+            device = self.get_device()
+            
+            try:
+                if "blip2" in model.lower():
+                    inputs = self.processor(image, prompt, return_tensors="pt").to(device)
+                    with torch.no_grad():
+                        generated_ids = self.model.generate(**inputs, max_new_tokens=200)
+                    generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+                elif "instruct" in model.lower():
+                    inputs = self.processor(images=image, text=prompt, return_tensors="pt").to(device)
+                    with torch.no_grad():
+                        generated_ids = self.model.generate(**inputs, max_new_tokens=200)
+                    generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+                elif "minicpm" in model.lower() or "cpm" in model.lower():
+                    # MiniCPM models have their own chat interface
+                    msgs = [{'role': 'user', 'content': prompt}]
+                    generated_text = self.model.chat(
+                        image=image,
+                        msgs=msgs,
+                        tokenizer=self.processor.tokenizer,
+                        sampling=True,
+                        temperature=0.7
+                    )
+                else:
+                    # Generic processing
+                    inputs = self.processor(image, prompt, return_tensors="pt").to(device)
+                    with torch.no_grad():
+                        outputs = self.model.generate(**inputs, max_new_tokens=200)
+                    generated_text = self.processor.decode(outputs[0], skip_special_tokens=True)
+            except Exception as processing_error:
+                # Fallback to generic processing if specific method fails
+                try:
+                    inputs = self.processor(image, prompt, return_tensors="pt").to(device)
+                    with torch.no_grad():
+                        outputs = self.model.generate(**inputs, max_new_tokens=200)
+                    generated_text = self.processor.batch_decode(outputs, skip_special_tokens=True)[0].strip()
+                except Exception:
+                    raise processing_error  # Re-raise original error
+            
+            # Clean up the response
+            if prompt in generated_text:
+                generated_text = generated_text.replace(prompt, "").strip()
+            
+            return generated_text or "No description generated"
+            
+        except Exception as e:
+            raise Exception(f"Hugging Face processing failed: {str(e)}")
+    
+    def get_provider_name(self) -> str:
+        return "Hugging Face"
+    
+    def unload_model(self):
+        """Unload current model to free memory"""
+        if self.model is not None:
+            del self.model
+            del self.processor
+            self.model = None
+            self.processor = None
+            self.current_model = None
+            
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+
 # Global provider instances
 _ollama_provider = OllamaProvider()
 _openai_provider = OpenAIProvider()
+_huggingface_provider = HuggingFaceProvider()
 
 def get_available_providers() -> Dict[str, AIProvider]:
     """Get all available AI providers"""
@@ -262,6 +460,9 @@ def get_available_providers() -> Dict[str, AIProvider]:
     
     if _openai_provider.is_available():
         providers['openai'] = _openai_provider
+        
+    if _huggingface_provider.is_available():
+        providers['huggingface'] = _huggingface_provider
     
     return providers
 
@@ -639,7 +840,7 @@ class ImageWorkspace:
 
 class ProcessingWorker(QThread):
     """Worker thread for AI processing"""
-    progress_updated = pyqtSignal(str)
+    progress_updated = pyqtSignal(str, str)  # file_path, message
     processing_complete = pyqtSignal(str, str, str, str, str, str)  # file_path, description, provider, model, prompt_style, custom_prompt
     processing_failed = pyqtSignal(str, str)  # file_path, error
     
@@ -671,7 +872,7 @@ class ProcessingWorker(QThread):
                     prompt_text = "Describe this image."
             
             # Emit progress
-            self.progress_updated.emit(f"Processing {Path(self.file_path).name} with {self.provider} {self.model}...")
+            self.progress_updated.emit(self.file_path, f"Processing {Path(self.file_path).name} with {self.provider} {self.model}...")
             
             # Process the image with selected provider
             description = self.process_with_ai(self.file_path, prompt_text)
@@ -751,12 +952,16 @@ class ProcessingWorker(QThread):
             print(f"Prompt: {prompt[:100]}...")
             
             # Process with the selected provider
+            def progress_callback(message, details=""):
+                self.progress_updated.emit(self.file_path, f"{message}")
+            
             description = provider.process_image(
                 image_data=image_data,
                 prompt=prompt,
                 model=self.model,
                 temperature=0.1,
-                num_predict=600
+                num_predict=600,
+                progress_callback=progress_callback
             )
             
             return description
@@ -1177,6 +1382,8 @@ class ChatProcessingWorker(QThread):
             return self.process_with_ollama(model, full_prompt)
         elif provider == "openai":
             return self.process_with_openai(model, full_prompt)
+        elif provider == "huggingface":
+            return self.process_with_huggingface(model, full_prompt)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     
@@ -1207,27 +1414,51 @@ class ChatProcessingWorker(QThread):
     def process_with_openai(self, model: str, prompt: str) -> str:
         """Process with OpenAI"""
         try:
-            # Try different ways to import OpenAI client
-            try:
-                from openai import OpenAI
-                client = OpenAI()
-            except ImportError:
-                import openai
-                client = openai
+            # Use the global OpenAI provider that handles API key loading
+            global _openai_provider
+            
+            if not _openai_provider.is_available():
+                raise Exception("OpenAI is not available or API key not found. Please ensure openai.txt file contains your API key.")
             
             if self._stop_requested:
                 return "Processing stopped"
             
-            response = client.chat.completions.create(
+            response = _openai_provider.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1000
             )
             
-            return response.choices[0].message.content
+            if response.choices and response.choices[0].message:
+                return response.choices[0].message.content
+            else:
+                raise Exception("Empty response from OpenAI")
             
         except Exception as e:
-            raise Exception(f"OpenAI processing failed: {str(e)}")
+            if "API key" in str(e).lower():
+                raise Exception(f"OpenAI API key error: {str(e)}. Please check that openai.txt file exists and contains a valid API key.")
+            else:
+                raise Exception(f"OpenAI processing failed: {str(e)}")
+    
+    def process_with_huggingface(self, model: str, prompt: str) -> str:
+        """Process with Hugging Face (text-only for chat)"""
+        try:
+            # Use the global HuggingFace provider, but for chat we need text generation
+            # For now, return a message explaining this is primarily for image processing
+            global _huggingface_provider
+            
+            if not _huggingface_provider.is_available():
+                raise Exception("Hugging Face transformers is not available. Please install: pip install transformers torch")
+            
+            if self._stop_requested:
+                return "Processing stopped"
+            
+            # For chat-only mode, we'd need different models (like GPT-2, FLAN-T5, etc.)
+            # For now, return an informational message
+            return f"Hugging Face chat mode not fully implemented yet. The selected model '{model}' is primarily designed for image processing. For text chat, consider using Ollama or OpenAI providers, or we can add text-only Hugging Face models like FLAN-T5 or GPT-2."
+            
+        except Exception as e:
+            raise Exception(f"Hugging Face processing failed: {str(e)}")
 
 
 class DirectorySelectionDialog(QDialog):
@@ -1556,35 +1787,54 @@ class ProcessingDialog(QDialog):
         """Populate available AI providers"""
         self.provider_combo.clear()
         
-        providers = get_available_providers()
+        # Always show all providers for consistency with ProcessingDialog
+        all_providers = {
+            'ollama': _ollama_provider,
+            'openai': _openai_provider,
+            'huggingface': _huggingface_provider
+        }
         
-        for provider_key, provider in providers.items():
+        for provider_key, provider in all_providers.items():
             display_name = provider.get_provider_name()
+            if not provider.is_available():
+                display_name += " (Not Available)"
             self.provider_combo.addItem(display_name, provider_key)
-        
-        if not providers:
-            self.provider_combo.addItem("No providers available", "none")
-            self.status_label.setText("No AI providers available. Please install Ollama or configure OpenAI.")
     
     def on_provider_changed(self):
         """Handle provider selection change"""
         current_data = self.provider_combo.currentData()
-        if not current_data or current_data == "none":
+        if not current_data:
             self.model_combo.clear()
-            self.status_label.setText("No providers available.")
+            self.status_label.setText("No provider selected.")
             return
         
         # Update models for selected provider
         self.populate_models(current_data)
         
-        # Update status information
-        providers = get_available_providers()
-        if current_data in providers:
-            provider = providers[current_data]
+        # Update status information based on provider availability
+        all_providers = {
+            'ollama': _ollama_provider,
+            'openai': _openai_provider,
+            'huggingface': _huggingface_provider
+        }
+        
+        if current_data in all_providers:
+            provider = all_providers[current_data]
             if current_data == "ollama":
-                self.status_label.setText("Ollama: Local AI processing. Install models with 'ollama pull <model_name>'")
+                if provider.is_available():
+                    self.status_label.setText("Ollama: Local AI processing. Install models with 'ollama pull <model_name>'")
+                else:
+                    self.status_label.setText("Ollama not available. Please install Ollama from https://ollama.ai")
             elif current_data == "openai":
-                self.status_label.setText("OpenAI: Cloud AI processing. Requires API key in openai.txt file.")
+                if provider.is_available():
+                    self.status_label.setText("OpenAI: Cloud AI processing. Requires API key in openai.txt file.")
+                else:
+                    self.status_label.setText("OpenAI not available. Install with: pip install openai. Requires API key in openai.txt file.")
+            elif current_data == "huggingface":
+                if provider.is_available():
+                    self.status_label.setText("Hugging Face: Local AI models. Models download automatically on first use. Requires: pip install transformers torch")
+                else:
+                    self.status_label.setText("Hugging Face not available. Install with: pip install transformers torch accelerate")
             else:
                 self.status_label.setText(f"Using {provider.get_provider_name()} provider")
     
@@ -1610,6 +1860,8 @@ class ProcessingDialog(QDialog):
                 print("Warning: No Ollama models detected. Please install vision models with 'ollama pull <model_name>'")
             elif provider_key == "openai":
                 print("Warning: OpenAI models not available. Check API key in openai.txt")
+            elif provider_key == "huggingface":
+                print("Warning: Hugging Face models not available. Check that transformers and torch are installed.")
     
     def get_selected_provider(self) -> str:
         """Get the selected provider key"""
@@ -1760,10 +2012,19 @@ class ChatDialog(QDialog):
         """Populate provider combo box"""
         self.provider_combo.clear()
         
-        # Add available providers
-        providers = ["ollama", "openai"]
-        for provider in providers:
-            self.provider_combo.addItem(provider.upper(), provider)
+        # Always show all providers, regardless of availability
+        # This allows users to see what's possible and get setup instructions
+        all_providers = {
+            'ollama': _ollama_provider,
+            'openai': _openai_provider,
+            'huggingface': _huggingface_provider
+        }
+        
+        for provider_key, provider in all_providers.items():
+            display_name = provider.get_provider_name()
+            if not provider.is_available():
+                display_name += " (Not Available)"
+            self.provider_combo.addItem(display_name, provider_key)
     
     def on_provider_changed(self):
         """Update models when provider changes"""
@@ -1811,13 +2072,36 @@ class ChatDialog(QDialog):
             ]
             for model in openai_models:
                 self.model_combo.addItem(model)
+                
+        elif provider == "huggingface":
+            # Add Hugging Face vision models
+            global _huggingface_provider
+            if _huggingface_provider.is_available():
+                models = _huggingface_provider.get_models()
+                for model in models:
+                    # Show just the model name part for cleaner display
+                    display_name = model.split('/')[-1] if '/' in model else model
+                    self.model_combo.addItem(display_name, model)  # Store full name as data
+            else:
+                self.model_combo.addItem("Install: pip install transformers torch")
     
     def update_status_info(self, provider):
         """Update status information for the selected provider"""
         if provider == "ollama":
-            self.status_label.setText("Using local Ollama models. Make sure Ollama is running.")
+            if _ollama_provider.is_available():
+                self.status_label.setText("Using local Ollama models. Make sure Ollama is running.")
+            else:
+                self.status_label.setText("Ollama not available. Please install Ollama from https://ollama.ai")
         elif provider == "openai":
-            self.status_label.setText("Using OpenAI API. Requires API key configuration.")
+            if _openai_provider.is_available():
+                self.status_label.setText("Using OpenAI API. Requires API key configuration.")
+            else:
+                self.status_label.setText("OpenAI not available. Install with: pip install openai. Requires API key in openai.txt file.")
+        elif provider == "huggingface":
+            if _huggingface_provider.is_available():
+                self.status_label.setText("Using Hugging Face vision models. Models download automatically. GPU recommended.")
+            else:
+                self.status_label.setText("Hugging Face not available. Install with: pip install transformers torch accelerate")
         else:
             self.status_label.setText("")
     
@@ -2676,7 +2960,7 @@ class ModelManagerDialog(QDialog):
                 
                 # Add visual indicator for vision models
                 if any(vision_term in model_name.lower() for vision_term in ['llava', 'moondream', 'vision', 'bakllava']):
-                    item.setText(f"👁️ {model_name} (Vision)")
+                    item.setText(f"Vision: {model_name} (Vision)")
                     item.setData(Qt.ItemDataRole.AccessibleTextRole, f"Vision model {model_name}")
                 else:
                     item.setData(Qt.ItemDataRole.AccessibleTextRole, f"Model {model_name}")
@@ -2789,15 +3073,15 @@ class ModelManagerDialog(QDialog):
         self.available_list.clear()
         for model_info in enhanced_models:
             # Create display name with visual indicator
-            display_name = f"👁️ {model_info['name']}"
+            display_name = f"Vision: {model_info['name']}"
             
             # Add recommendation badges
             if model_info['name'] == 'llava:7b':
-                display_name += " ⭐ Recommended"
+                display_name += " (Recommended)"
             elif model_info['name'] == 'moondream':
-                display_name += " 🚀 Lightweight"
+                display_name += " (Lightweight)"
             elif model_info['name'] == 'llava:13b':
-                display_name += " 💎 High Quality"
+                display_name += " (High Quality)"
             
             item = QListWidgetItem(display_name)
             item.setData(Qt.ItemDataRole.UserRole, model_info)
@@ -2862,12 +3146,12 @@ class ModelManagerDialog(QDialog):
         self.search_results.clear()
         
         # Add informational message
-        info_item = QListWidgetItem("🔍 Search not available in this Ollama version")
+        info_item = QListWidgetItem("Search not available in this Ollama version")
         info_item.setData(Qt.ItemDataRole.UserRole, None)
         self.search_results.addItem(info_item)
         
         # Show alternative instructions
-        alt_item = QListWidgetItem("💡 Try browsing available models in the 'Available' tab")
+        alt_item = QListWidgetItem("Tip: Try browsing available models in the 'Available' tab")
         alt_item.setData(Qt.ItemDataRole.UserRole, None)
         self.search_results.addItem(alt_item)
         
@@ -2888,14 +3172,14 @@ class ModelManagerDialog(QDialog):
             self.search_results.addItem(match_item)
             
             for match in curated_matches:
-                item = QListWidgetItem(f"👁️ {match}")
+                item = QListWidgetItem(f"Vision: {match}")
                 item.setData(Qt.ItemDataRole.UserRole, {'name': match, 'source': 'curated'})
                 self.search_results.addItem(item)
             
             self.status_label.setText(f"Found {len(curated_matches)} matches in curated models")
         else:
             # Suggest manual model name entry
-            manual_item = QListWidgetItem(f"📝 Try installing '{search_term}' directly")
+            manual_item = QListWidgetItem(f"Manual: Try installing '{search_term}' directly")
             manual_item.setData(Qt.ItemDataRole.UserRole, {'name': search_term, 'source': 'manual'})
             self.search_results.addItem(manual_item)
             
@@ -3095,6 +3379,7 @@ class ImageDescriberGUI(QMainWindow):
         self.conversion_workers: List[ConversionWorker] = []
         self.batch_queue: List[str] = []
         self.processing_items: set = set()  # Track items being processed
+        self.processing_status: dict = {}  # Track detailed status for each processing item
         
         # Batch processing tracking
         self.batch_total: int = 0
@@ -3840,7 +4125,15 @@ class ImageDescriberGUI(QMainWindow):
                 
             # 3. Processing indicator
             if file_path in self.processing_items:
-                prefix_parts.append("p")
+                # Get detailed status if available
+                if file_path in self.processing_status:
+                    status_msg = self.processing_status[file_path]
+                    # Truncate long status messages for display
+                    if len(status_msg) > 50:
+                        status_msg = status_msg[:47] + "..."
+                    prefix_parts.append(f"p [{status_msg}]")
+                else:
+                    prefix_parts.append("p")
                 
             # 4. Video extraction status
             if item.item_type == "video" and item.extracted_frames:
@@ -3921,7 +4214,7 @@ class ImageDescriberGUI(QMainWindow):
                 conversation_count = len(chat_session.get('conversation', []))
                 
                 # Build chat display name with indicators
-                display_name = f"💬 {chat_name}"
+                display_name = f"Chat: {chat_name}"
                 if conversation_count > 0:
                     display_name = f"c{conversation_count} {display_name}"
                 
@@ -4309,11 +4602,11 @@ class ImageDescriberGUI(QMainWindow):
         
         for i, msg in enumerate(chat_session['conversation']):
             if msg['type'] == 'user':
-                item_text = f"👤 User: {msg['content'][:100]}..."
+                item_text = f"User: {msg['content'][:100]}..."
                 full_text = f"User ({msg['timestamp']}):\n{msg['content']}"
             else:
                 provider_model = f"{msg.get('provider', 'AI').upper()} {msg.get('model', 'Model')}"
-                item_text = f"🤖 {provider_model}: {msg['content'][:100]}..."
+                item_text = f"AI {provider_model}: {msg['content'][:100]}..."
                 full_text = f"{provider_model} ({msg['timestamp']}):\n{msg['content']}"
             
             list_item = QListWidgetItem(item_text)
@@ -4773,7 +5066,7 @@ class ImageDescriberGUI(QMainWindow):
             self.workspace.mark_modified()
             
             # Add to image list as a chat entry
-            chat_item = QListWidgetItem(f"💬 {session_name} ({timestamp})")
+            chat_item = QListWidgetItem(f"Chat: {session_name} ({timestamp})")
             chat_item.setData(Qt.ItemDataRole.UserRole, chat_id)
             chat_item.setData(Qt.ItemDataRole.UserRole + 1, "chat_session")  # Mark as chat
             chat_item.setToolTip(f"Chat session: {session_name}\nProvider: {config['provider']}\nModel: {config['model']}")
@@ -5774,15 +6067,79 @@ Please answer the follow-up question about this image, taking into account the c
         dialog = AllDescriptionsDialog(all_descriptions, self)
         dialog.exec()
     
+    def get_display_name(self, item, file_path: str) -> str:
+        """Generate display name for an item with all prefixes"""
+        file_name = os.path.basename(file_path)
+        
+        # Use custom display name if set, otherwise use filename
+        base_name = item.display_name if item.display_name else file_name
+        display_name = base_name
+        
+        # Build prefix indicators in order
+        prefix_parts = []
+        
+        # 1. Batch marker
+        if item.batch_marked:
+            prefix_parts.append("b")
+        
+        # 2. Description count (only if descriptions exist)
+        if item.descriptions:
+            desc_count = len(item.descriptions)
+            prefix_parts.append(f"d{desc_count}")
+            
+        # 3. Processing indicator
+        if file_path in self.processing_items:
+            # Get detailed status if available
+            if file_path in self.processing_status:
+                status_msg = self.processing_status[file_path]
+                # Truncate long status messages for display
+                if len(status_msg) > 50:
+                    status_msg = status_msg[:47] + "..."
+                prefix_parts.append(f"p [{status_msg}]")
+            else:
+                prefix_parts.append("p")
+            
+        # 4. Video extraction status
+        if item.item_type == "video" and item.extracted_frames:
+            frame_count = len(item.extracted_frames)
+            prefix_parts.append(f"E{frame_count}")
+        
+        # Combine prefix and display name
+        if prefix_parts:
+            prefix = "".join(prefix_parts)
+            display_name = f"{prefix} {base_name}"
+            
+        return display_name
+    
+    def update_specific_item_display(self, file_path: str):
+        """Update display text for a specific item without losing focus"""
+        # Find the item in the current list
+        for i in range(self.image_list.count()):
+            item = self.image_list.item(i)
+            if item and item.data(Qt.ItemDataRole.UserRole) == file_path:
+                # Get the workspace item to rebuild the display name
+                workspace_item = self.workspace.get_item(file_path)
+                if workspace_item:
+                    display_name = self.get_display_name(workspace_item, file_path)
+                    item.setText(display_name)
+                break
+    
     # Worker event handlers
-    def on_processing_progress(self, message: str):
+    def on_processing_progress(self, file_path: str, message: str):
         """Handle processing progress updates"""
         self.status_bar.showMessage(message)
+        
+        # Store the detailed status for this file
+        self.processing_status[file_path] = message
+        
+        # Update only the specific item without losing focus
+        self.update_specific_item_display(file_path)
     
     def on_processing_complete(self, file_path: str, description: str, provider: str, model: str, prompt_style: str, custom_prompt: str):
         """Handle successful processing completion"""
-        # Remove from processing set
+        # Remove from processing set and status
         self.processing_items.discard(file_path)
+        self.processing_status.pop(file_path, None)  # Remove status entry
         
         workspace_item = self.workspace.get_item(file_path)
         if not workspace_item:
@@ -5848,8 +6205,9 @@ Please answer the follow-up question about this image, taking into account the c
         current_item = self.image_list.currentItem()
         current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
         
-        # Remove from processing set
+        # Remove from processing set and status
         self.processing_items.discard(file_path)
+        self.processing_status.pop(file_path, None)  # Remove status entry
         
         # Update window title to reflect current processing status
         remaining_processing = len(self.processing_items)
