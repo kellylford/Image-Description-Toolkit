@@ -2154,6 +2154,329 @@ class ChatDialog(QDialog):
         }
 
 
+class ChatWindow(QDialog):
+    """Dedicated chat window with message input and conversation history"""
+    
+    # Signal for when user sends a message
+    message_sent = pyqtSignal(str, str)  # chat_id, message
+    
+    def __init__(self, chat_session, parent=None):
+        super().__init__(parent)
+        self.chat_session = chat_session
+        self.chat_id = chat_session['id']
+        
+        self.setWindowTitle(f"Chat: {chat_session['name']}")
+        self.setModal(False)  # Allow multiple chat windows
+        self.resize(800, 600)
+        
+        # Make window resizable
+        self.setMinimumSize(600, 400)
+        
+        self.setup_ui()
+        self.load_conversation()
+        
+        # Set initial focus to input box
+        self.input_box.setFocus()
+    
+    def setup_ui(self):
+        """Set up the chat window UI"""
+        layout = QVBoxLayout(self)
+        
+        # Header with chat info
+        header_layout = QHBoxLayout()
+        
+        header_label = QLabel(f"Chat: {self.chat_session['name']}")
+        header_label.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
+        header_layout.addWidget(header_label)
+        
+        info_label = QLabel(f"{self.chat_session['provider'].upper()} {self.chat_session['model']}")
+        info_label.setStyleSheet("color: #666; font-size: 12px; padding: 5px;")
+        header_layout.addWidget(info_label)
+        
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
+        
+        # Main content area with splitter
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        layout.addWidget(splitter)
+        
+        # Chat history area
+        history_widget = QWidget()
+        history_layout = QVBoxLayout(history_widget)
+        history_layout.setContentsMargins(0, 0, 0, 0)
+        
+        history_label = QLabel("Conversation History:")
+        history_label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
+        history_layout.addWidget(history_label)
+        
+        # Chat history list
+        self.history_list = QListWidget()
+        self.history_list.setAccessibleName("Chat History")
+        self.history_list.setAccessibleDescription("List of messages in this conversation. Use arrow keys to navigate, Tab to move to input box.")
+        self.history_list.setAlternatingRowColors(True)
+        self.history_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        
+        # Connect selection change to show full message
+        self.history_list.currentItemChanged.connect(self.on_history_selection_changed)
+        
+        history_layout.addWidget(self.history_list)
+        
+        # Message detail area (shows full text of selected message)
+        self.message_detail = AccessibleTextEdit()
+        self.message_detail.setAccessibleName("Message Detail")
+        self.message_detail.setAccessibleDescription("Full text of the selected message")
+        self.message_detail.setReadOnly(True)
+        self.message_detail.setMaximumHeight(150)
+        history_layout.addWidget(self.message_detail)
+        
+        splitter.addWidget(history_widget)
+        
+        # Input area
+        input_widget = QWidget()
+        input_layout = QVBoxLayout(input_widget)
+        input_layout.setContentsMargins(0, 0, 0, 0)
+        
+        input_label = QLabel("Your Message:")
+        input_label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
+        input_layout.addWidget(input_label)
+        
+        # Message input box
+        self.input_box = AccessibleTextEdit()
+        self.input_box.setAccessibleName("Message Input")
+        self.input_box.setAccessibleDescription("Type your message here. Press Ctrl+Enter to send, Tab to navigate to history.")
+        self.input_box.setPlaceholderText("Type your message here...")
+        self.input_box.setMaximumHeight(100)
+        
+        # Override keyPressEvent for input box to handle Ctrl+Enter
+        def input_key_press(event):
+            if event.key() == Qt.Key.Key_Return and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                self.send_message()
+            else:
+                AccessibleTextEdit.keyPressEvent(self.input_box, event)
+        
+        self.input_box.keyPressEvent = input_key_press
+        input_layout.addWidget(self.input_box)
+        
+        # Button area
+        button_layout = QHBoxLayout()
+        
+        self.send_button = QPushButton("Send Message")
+        self.send_button.setAccessibleName("Send Message")
+        self.send_button.setAccessibleDescription("Send your message to the AI")
+        self.send_button.clicked.connect(self.send_message)
+        self.send_button.setDefault(True)
+        
+        self.clear_button = QPushButton("Clear Input")
+        self.clear_button.setAccessibleName("Clear Input")
+        self.clear_button.setAccessibleDescription("Clear the message input box")
+        self.clear_button.clicked.connect(self.clear_input)
+        
+        button_layout.addWidget(self.send_button)
+        button_layout.addWidget(self.clear_button)
+        button_layout.addStretch()
+        
+        input_layout.addLayout(button_layout)
+        
+        splitter.addWidget(input_widget)
+        
+        # Set splitter proportions (70% history, 30% input)
+        splitter.setSizes([420, 180])
+        
+        # Set up tab order for accessibility - just between input and history
+        self.setTabOrder(self.input_box, self.history_list)
+        self.setTabOrder(self.history_list, self.input_box)
+        # Make send/clear buttons not part of main tab flow
+        self.send_button.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        self.clear_button.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        # Message detail is read-only and not part of main navigation
+        self.message_detail.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    
+    def get_short_model_name(self, model_name):
+        """Extract short, readable model name from full model name"""
+        if not model_name:
+            return "Unknown"
+        
+        # Common model name mappings
+        model_mappings = {
+            'llama': 'Llama',
+            'moondream': 'Moondream', 
+            'mistral': 'Mistral',
+            'phi': 'Phi',
+            'gemma': 'Gemma',
+            'qwen': 'Qwen',
+            'gpt-4': 'GPT-4',
+            'gpt-3.5': 'GPT-3.5',
+            'gpt-4o': 'GPT-4o',
+            'claude': 'Claude',
+            'blip': 'BLIP',
+            'git-base': 'GIT',
+            'instructblip': 'InstructBLIP'
+        }
+        
+        model_lower = model_name.lower()
+        
+        # Check for exact matches first
+        for key, value in model_mappings.items():
+            if key in model_lower:
+                return value
+        
+        # If no mapping found, try to extract a reasonable short name
+        # Remove common prefixes and suffixes
+        short_name = model_name
+        if '/' in short_name:
+            short_name = short_name.split('/')[-1]  # Take last part after slash
+        
+        # Remove version numbers and common suffixes
+        for suffix in ['-chat', '-instruct', '-base', '-7b', '-13b', '-70b', '-2.7b', '-opt']:
+            if suffix in short_name.lower():
+                short_name = short_name.replace(suffix, '').replace(suffix.upper(), '')
+        
+        # Capitalize first letter
+        return short_name.capitalize()
+    
+    def load_conversation(self):
+        """Load the conversation history into the list"""
+        self.history_list.clear()
+        
+        for i, msg in enumerate(self.chat_session.get('conversation', [])):
+            if msg['type'] == 'user':
+                # For display: "You: message content (timestamp)"
+                display_text = f"You: {msg['content']} ({msg['timestamp']})"
+                full_text = f"You: {msg['content']} ({msg['timestamp']})"
+                color = QColor(0, 120, 0)  # Green for user
+                accessible_desc = "Your message"
+            else:
+                provider = msg.get('provider', 'AI')
+                model = msg.get('model', 'Model')
+                short_model = self.get_short_model_name(model)
+                
+                # For display: "ShortModel: message content (timestamp)"
+                display_text = f"{short_model}: {msg['content']} ({msg['timestamp']})"
+                full_text = f"{short_model}: {msg['content']} ({msg['timestamp']})"
+                color = QColor(0, 0, 150)  # Blue for AI
+                accessible_desc = f"AI response from {short_model}"
+            
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.UserRole, full_text)
+            # Set full text for screen readers - this is what accessibility tools will read
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, full_text)
+            # Set accessible description for additional context
+            item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessible_desc)
+            
+            item.setForeground(color)
+            item.setToolTip(full_text)
+            
+            self.history_list.addItem(item)
+        
+        # Select the last message if any exist
+        if self.history_list.count() > 0:
+            self.history_list.setCurrentRow(self.history_list.count() - 1)
+    
+    def on_history_selection_changed(self, current, previous):
+        """Handle history selection change"""
+        if current:
+            full_text = current.data(Qt.ItemDataRole.UserRole)
+            self.message_detail.setPlainText(full_text)
+            
+            # Update accessibility for screen readers
+            char_count = len(full_text)
+            preview = full_text[:200] + "..." if len(full_text) > 200 else full_text
+            self.message_detail.setAccessibleDescription(
+                f"Selected message with {char_count} characters: {preview}"
+            )
+            
+            # Announce to screen reader when AI message is selected
+            if "AI" in full_text or any(model in full_text for model in ["Llama", "Moondream", "GPT", "Claude", "BLIP"]):
+                # Extract just the message content for announcement
+                if ": " in full_text:
+                    message_content = full_text.split(": ", 1)[1].split(" (")[0]  # Remove timestamp
+                    self.announce_to_screen_reader(f"AI message: {message_content}")
+        else:
+            self.message_detail.clear()
+            self.message_detail.setAccessibleDescription("No message selected.")
+    
+    def send_message(self):
+        """Send the message in the input box"""
+        message = self.input_box.toPlainText().strip()
+        if not message:
+            return
+        
+        # Clear input box
+        self.input_box.clear()
+        
+        # Add user message to conversation display immediately
+        self.add_message_to_display('user', message)
+        
+        # Emit signal to parent to process the message
+        self.message_sent.emit(self.chat_id, message)
+        
+        # Announce message sent to screen reader
+        self.announce_to_screen_reader(f"Message sent: {message}")
+    
+    def clear_input(self):
+        """Clear the input box"""
+        self.input_box.clear()
+        self.input_box.setFocus()
+    
+    def add_message_to_display(self, msg_type, content, timestamp=None, provider=None, model=None):
+        """Add a new message to the display"""
+        if not timestamp:
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        if msg_type == 'user':
+            # Show "You: message content (timestamp)"
+            display_text = f"You: {content} ({timestamp})"
+            full_text = f"You: {content} ({timestamp})"
+            color = QColor(0, 120, 0)  # Green for user
+            accessible_desc = "Your message"
+        else:
+            short_model = self.get_short_model_name(model)
+            # Show "ShortModel: message content (timestamp)"
+            display_text = f"{short_model}: {content} ({timestamp})"
+            full_text = f"{short_model}: {content} ({timestamp})"
+            color = QColor(0, 0, 150)  # Blue for AI
+            accessible_desc = f"AI response from {short_model}"
+        
+        item = QListWidgetItem(display_text)
+        item.setData(Qt.ItemDataRole.UserRole, full_text)
+        # Set full text for screen readers
+        item.setData(Qt.ItemDataRole.AccessibleTextRole, full_text)
+        # Set accessible description for additional context
+        item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessible_desc)
+        
+        item.setForeground(color)
+        item.setToolTip(full_text)
+        
+        self.history_list.addItem(item)
+        
+        # Select the new message
+        self.history_list.setCurrentRow(self.history_list.count() - 1)
+        
+        # For AI responses, announce to screen reader
+        if msg_type != 'user':
+            self.announce_to_screen_reader(f"AI response received: {content}")
+    
+    def announce_to_screen_reader(self, text):
+        """Announce text to screen reader"""
+        try:
+            # Set a temporary status on the window title - screen readers will announce title changes
+            self.setWindowTitle(f"Chat: {self.chat_session['name']} - {text[:50]}...")
+            
+            # Reset title after a moment
+            QTimer.singleShot(3000, lambda: self.setWindowTitle(f"Chat: {self.chat_session['name']}"))
+            
+        except Exception:
+            # Fallback: just update window title
+            self.setWindowTitle(f"Chat: {self.chat_session['name']} - {text[:50]}...")
+            QTimer.singleShot(3000, lambda: self.setWindowTitle(f"Chat: {self.chat_session['name']}"))
+    
+    def update_conversation_data(self, conversation):
+        """Update the conversation data and refresh display"""
+        self.chat_session['conversation'] = conversation
+        self.load_conversation()
+
+
 class VideoProcessingDialog(QDialog):
     """Dialog for configuring video frame extraction and processing options"""
     
@@ -3687,6 +4010,10 @@ class ImageDescriberGUI(QMainWindow):
         chat_action.triggered.connect(self.start_chat_session)
         process_menu.addAction(chat_action)
         
+        view_chats_action = QAction("View Chat Sessions", self)
+        view_chats_action.triggered.connect(self.view_chat_sessions)
+        process_menu.addAction(view_chats_action)
+        
         process_menu.addSeparator()
         
         skip_verification_action = QAction("Skip Model Verification", self)
@@ -3866,6 +4193,49 @@ class ImageDescriberGUI(QMainWindow):
         # Additional shortcuts not in menus
         pass
     
+    def get_short_model_name(self, model_name):
+        """Extract short, readable model name from full model name"""
+        if not model_name:
+            return "Unknown"
+        
+        # Common model name mappings
+        model_mappings = {
+            'llama': 'Llama',
+            'moondream': 'Moondream', 
+            'mistral': 'Mistral',
+            'phi': 'Phi',
+            'gemma': 'Gemma',
+            'qwen': 'Qwen',
+            'gpt-4': 'GPT-4',
+            'gpt-3.5': 'GPT-3.5',
+            'gpt-4o': 'GPT-4o',
+            'claude': 'Claude',
+            'blip': 'BLIP',
+            'git-base': 'GIT',
+            'instructblip': 'InstructBLIP'
+        }
+        
+        model_lower = model_name.lower()
+        
+        # Check for exact matches first
+        for key, value in model_mappings.items():
+            if key in model_lower:
+                return value
+        
+        # If no mapping found, try to extract a reasonable short name
+        # Remove common prefixes and suffixes
+        short_name = model_name
+        if '/' in short_name:
+            short_name = short_name.split('/')[-1]  # Take last part after slash
+        
+        # Remove version numbers and common suffixes
+        for suffix in ['-chat', '-instruct', '-base', '-7b', '-13b', '-70b', '-2.7b', '-opt']:
+            if suffix in short_name.lower():
+                short_name = short_name.replace(suffix, '').replace(suffix.upper(), '')
+        
+        # Capitalize first letter
+        return short_name.capitalize()
+    
     def setup_clipboard_monitoring(self):
         """Setup clipboard monitoring for paste functionality"""
         # Connect to clipboard change signal
@@ -3884,13 +4254,8 @@ class ImageDescriberGUI(QMainWindow):
         elif event.key() == Qt.Key.Key_F2:
             self.rename_item()
         elif event.key() == Qt.Key.Key_F:
-            # Check if we're in a chat session for followup
-            current_item = self.image_list.currentItem()
-            if current_item and current_item.data(Qt.ItemDataRole.UserRole + 1) == "chat_session":
-                self.chat_followup()
-            else:
-                # Regular followup processing for images
-                self.followup_processing()
+            # Regular followup processing for images (chat sessions handle their own followup)
+            self.followup_processing()
         else:
             super().keyPressEvent(event)
     
@@ -4806,7 +5171,12 @@ class ImageDescriberGUI(QMainWindow):
             item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
             if item_type == "chat_session":
                 chat_id = current_item.data(Qt.ItemDataRole.UserRole)
-                self.display_chat_conversation(chat_id)
+                # Open or bring chat window to front instead of showing in description area
+                self.open_existing_chat_session(chat_id)
+                # Clear description area since we're opening chat window
+                self.description_list.clear()
+                self.description_text.setPlainText("Chat session opened in separate window.")
+                self.description_text.setAccessibleDescription("Chat session opened in separate window.")
             else:
                 # Regular image file
                 file_path = current_item.data(Qt.ItemDataRole.UserRole)
@@ -5284,25 +5654,201 @@ class ImageDescriberGUI(QMainWindow):
                 'timestamp': timestamp
             })
             
-            # Add to workspace as a special chat item
+            # Add to workspace chat sessions
             self.workspace.chat_sessions = getattr(self.workspace, 'chat_sessions', {})
             self.workspace.chat_sessions[chat_id] = chat_session
             self.workspace.mark_modified()
             
-            # Add to image list as a chat entry
-            chat_item = QListWidgetItem(f"Chat: {session_name} ({timestamp})")
-            chat_item.setData(Qt.ItemDataRole.UserRole, chat_id)
-            chat_item.setData(Qt.ItemDataRole.UserRole + 1, "chat_session")  # Mark as chat
-            chat_item.setToolTip(f"Chat session: {session_name}\nProvider: {config['provider']}\nModel: {config['model']}")
+            # Refresh the view to show the new chat session in the list
+            self.refresh_view()
             
-            # Set chat icon and styling
-            chat_item.setForeground(QColor(0, 100, 200))  # Blue color for chats
+            # Select the new chat session in the list
+            for i in range(self.image_list.count()):
+                item = self.image_list.item(i)
+                if item and item.data(Qt.ItemDataRole.UserRole) == chat_id:
+                    self.image_list.setCurrentItem(item)
+                    break
             
-            self.image_list.addItem(chat_item)
-            self.image_list.setCurrentItem(chat_item)
+            # Initialize chat windows dict if not exists
+            if not hasattr(self, 'chat_windows'):
+                self.chat_windows = {}
+            
+            # Create and show new chat window
+            chat_window = ChatWindow(chat_session, self)
+            chat_window.message_sent.connect(self.handle_chat_message)
+            
+            # Store the window reference
+            self.chat_windows[chat_id] = chat_window
+            
+            # Clean up window reference when closed (but keep chat in image list)
+            def cleanup_window():
+                if chat_id in self.chat_windows:
+                    del self.chat_windows[chat_id]
+            chat_window.finished.connect(cleanup_window)
+            
+            # Show the window
+            chat_window.show()
             
             # Start processing the initial prompt
             self.process_chat_message(chat_id, config['initial_prompt'])
+    
+    def handle_chat_message(self, chat_id, message):
+        """Handle a message sent from a chat window"""
+        if not hasattr(self.workspace, 'chat_sessions') or chat_id not in self.workspace.chat_sessions:
+            return
+        
+        # Add user message to conversation
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        chat_session = self.workspace.chat_sessions[chat_id]
+        
+        chat_session['conversation'].append({
+            'type': 'user',
+            'content': message,
+            'timestamp': timestamp
+        })
+        
+        self.workspace.mark_modified()
+        
+        # Process the message
+        self.process_chat_message(chat_id, message)
+    
+    def open_existing_chat_session(self, chat_id):
+        """Open an existing chat session in a new window"""
+        if not hasattr(self.workspace, 'chat_sessions') or chat_id not in self.workspace.chat_sessions:
+            QMessageBox.warning(self, "Chat Error", "Chat session not found.")
+            return
+        
+        # Check if window is already open
+        if hasattr(self, 'chat_windows') and chat_id in self.chat_windows:
+            # Bring existing window to front
+            self.chat_windows[chat_id].raise_()
+            self.chat_windows[chat_id].activateWindow()
+            return
+        
+        # Initialize chat windows dict if not exists
+        if not hasattr(self, 'chat_windows'):
+            self.chat_windows = {}
+        
+        # Get chat session data
+        chat_session = self.workspace.chat_sessions[chat_id]
+        
+        # Create and show chat window
+        chat_window = ChatWindow(chat_session, self)
+        chat_window.message_sent.connect(self.handle_chat_message)
+        
+        # Store the window reference
+        self.chat_windows[chat_id] = chat_window
+        
+        # Clean up window reference when closed
+        def cleanup_window():
+            if chat_id in self.chat_windows:
+                del self.chat_windows[chat_id]
+        chat_window.finished.connect(cleanup_window)
+        
+        # Show the window
+        chat_window.show()
+        
+        # Select the chat in the image list so user knows which chat is active
+        for i in range(self.image_list.count()):
+            item = self.image_list.item(i)
+            if item and item.data(Qt.ItemDataRole.UserRole) == chat_id:
+                self.image_list.setCurrentItem(item)
+                break
+    
+    def view_chat_sessions(self):
+        """Show a dialog to view and reopen existing chat sessions"""
+        if not hasattr(self.workspace, 'chat_sessions') or not self.workspace.chat_sessions:
+            QMessageBox.information(self, "No Chat Sessions", "No chat sessions found in the current workspace.")
+            return
+        
+        # Create dialog to show chat sessions
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Chat Sessions")
+        dialog.setModal(True)
+        dialog.resize(600, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Header
+        header_label = QLabel("Select a chat session to open:")
+        header_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(header_label)
+        
+        # Chat sessions list
+        sessions_list = QListWidget()
+        sessions_list.setAccessibleName("Chat Sessions List")
+        sessions_list.setAccessibleDescription("List of available chat sessions. Double-click or press Enter to open.")
+        
+        # Populate with chat sessions
+        for chat_id, session in self.workspace.chat_sessions.items():
+            display_text = f"{session['name']} ({session['timestamp']})"
+            short_model = self.get_short_model_name(session['model'])
+            provider_info = f"{session['provider'].upper()} {short_model}"
+            msg_count = len(session.get('conversation', []))
+            tooltip = f"Session: {session['name']}\nProvider: {provider_info}\nMessages: {msg_count}\nCreated: {session['timestamp']}"
+            
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.UserRole, chat_id)
+            item.setToolTip(tooltip)
+            
+            # Add status indicator if window is already open
+            if hasattr(self, 'chat_windows') and chat_id in self.chat_windows:
+                item.setText(display_text + " (Already Open)")
+                item.setForeground(QColor(0, 150, 0))  # Green for open sessions
+            
+            sessions_list.addItem(item)
+        
+        layout.addWidget(sessions_list)
+        
+        # Info label
+        info_label = QLabel("Double-click a session to open it, or use the buttons below.")
+        info_label.setStyleSheet("color: #666; font-size: 11px;")
+        layout.addWidget(info_label)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        open_button = QPushButton("Open Session")
+        open_button.setAccessibleName("Open Chat Session")
+        open_button.setAccessibleDescription("Open the selected chat session")
+        open_button.setDefault(True)
+        
+        close_button = QPushButton("Close")
+        close_button.setAccessibleName("Close Dialog")
+        
+        button_layout.addWidget(open_button)
+        button_layout.addStretch()
+        button_layout.addWidget(close_button)
+        
+        layout.addLayout(button_layout)
+        
+        # Connect signals
+        def open_selected_session():
+            current_item = sessions_list.currentItem()
+            if current_item:
+                chat_id = current_item.data(Qt.ItemDataRole.UserRole)
+                self.open_existing_chat_session(chat_id)
+                dialog.accept()
+        
+        open_button.clicked.connect(open_selected_session)
+        close_button.clicked.connect(dialog.reject)
+        sessions_list.itemDoubleClicked.connect(lambda: open_selected_session())
+        
+        # Handle Enter key
+        def handle_enter(event):
+            if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+                open_selected_session()
+            else:
+                QListWidget.keyPressEvent(sessions_list, event)
+        
+        sessions_list.keyPressEvent = handle_enter
+        
+        # Select first item if any
+        if sessions_list.count() > 0:
+            sessions_list.setCurrentRow(0)
+            sessions_list.setFocus()
+        
+        dialog.exec()
     
     def process_chat_message(self, chat_id, message):
         """Process a chat message and get AI response"""
@@ -5354,17 +5900,40 @@ class ImageDescriberGUI(QMainWindow):
         
         self.workspace.mark_modified()
         
-        # Update the display if this chat is selected
-        current_item = self.image_list.currentItem()
-        if current_item and current_item.data(Qt.ItemDataRole.UserRole) == chat_id:
-            self.display_chat_conversation(chat_id)
+        # Update the chat window if it's open
+        if hasattr(self, 'chat_windows') and chat_id in self.chat_windows:
+            chat_window = self.chat_windows[chat_id]
+            # Add the AI response to the window display
+            chat_window.add_message_to_display(
+                'assistant', 
+                response, 
+                timestamp, 
+                chat_session['provider'], 
+                chat_session['model']
+            )
         
-        # Hide processing indicator
+        # Hide processing indicator (this might not be needed anymore but keeping for compatibility)
         self.hide_chat_processing(chat_id)
     
     def on_chat_failed(self, chat_id, error):
         """Handle chat processing failure"""
-        QMessageBox.warning(self, "Chat Error", f"Failed to get response: {error}")
+        # Show error in chat window if it's open
+        if hasattr(self, 'chat_windows') and chat_id in self.chat_windows:
+            chat_window = self.chat_windows[chat_id]
+            # Add error message to the chat window
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            chat_window.add_message_to_display(
+                'assistant', 
+                f"Error: {error}", 
+                timestamp, 
+                "System", 
+                "Error"
+            )
+        else:
+            # Fallback to message box if window is not open
+            QMessageBox.warning(self, "Chat Error", f"Failed to get response: {error}")
+        
         self.hide_chat_processing(chat_id)
     
     def show_chat_processing(self, chat_id):
@@ -5388,43 +5957,6 @@ class ImageDescriberGUI(QMainWindow):
                     item.setText(original_text.replace(" (processing...)", ""))
                 break
     
-    def chat_followup(self):
-        """Ask a followup question in the current chat session"""
-        current_item = self.image_list.currentItem()
-        if not current_item or current_item.data(Qt.ItemDataRole.UserRole + 1) != "chat_session":
-            QMessageBox.information(self, "No Chat Session", "Please select a chat session to ask a followup question.")
-            return
-        
-        chat_id = current_item.data(Qt.ItemDataRole.UserRole)
-        
-        # Get followup question from user
-        followup_text, ok = QInputDialog.getText(
-            self, 
-            "Chat Followup", 
-            "Enter your followup question:",
-            QLineEdit.EchoMode.Normal,
-            ""
-        )
-        
-        if ok and followup_text.strip():
-            # Add user message to conversation
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            chat_session = self.workspace.chat_sessions[chat_id]
-            
-            chat_session['conversation'].append({
-                'type': 'user',
-                'content': followup_text.strip(),
-                'timestamp': timestamp
-            })
-            
-            self.workspace.mark_modified()
-            
-            # Update display
-            self.display_chat_conversation(chat_id)
-            
-            # Process the followup message
-            self.process_chat_message(chat_id, followup_text.strip())
-
     def convert_heic_files(self):
         """Convert all HEIC files in the workspace"""
         heic_items = [item for item in self.workspace.items.values() 
