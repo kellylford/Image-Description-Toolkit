@@ -1686,37 +1686,6 @@ class ChatProcessingWorker(QThread):
         except Exception as e:
             raise Exception(f"Hugging Face processing failed: {str(e)}")
 
-    def build_followup_context_prompt(self, workspace_item, reference_description, follow_up_question):
-        """Build a context-aware prompt for image follow-up questions"""
-        try:
-            # Start with base context
-            base_prompt = f"""You are viewing an image that has been previously described. Here are the existing descriptions for context:
-
-Recent descriptions:"""
-            
-            # Add recent AI descriptions for context
-            ai_descriptions = [desc for desc in workspace_item.descriptions if desc.model != "manual"] if workspace_item.descriptions else []
-            recent_descriptions = sorted(ai_descriptions, key=lambda d: d.created)[-3:]  # Last 3 descriptions
-            
-            for desc in recent_descriptions:
-                short_model = self.get_short_model_name(desc.model)
-                base_prompt += f"\n\n{short_model}: {desc.text}"
-            
-            # Add the follow-up question
-            base_prompt += f"""
-
-Based on the image and the context above, please answer this follow-up question:
-{follow_up_question}
-
-Please provide a focused, direct answer to the specific question asked. You can reference or build upon the previous descriptions if relevant."""
-            
-            return base_prompt
-            
-        except Exception as e:
-            print(f"Error building follow-up context prompt: {e}")
-            # Fallback to simple question
-            return f"Please answer this question about the image: {follow_up_question}"
-
     def ensure_workspace_saved_for_chat(self):
         """Ensure workspace is saved when using chat features"""
         if not self.current_workspace_file:
@@ -4630,6 +4599,7 @@ class ImageDescriberGUI(QMainWindow):
             
             # If it's a pasted item, trigger immediate processing with defaults
             if is_pasted:
+                print(f"DEBUG: Triggering automatic processing for pasted file: {file_path}")
                 self.trigger_automatic_processing(file_path)
                 
         except Exception as e:
@@ -4637,6 +4607,7 @@ class ImageDescriberGUI(QMainWindow):
     
     def trigger_automatic_processing(self, file_path):
         """Trigger automatic processing of a pasted file with current defaults"""
+        print(f"DEBUG: trigger_automatic_processing called for {file_path}")
         try:
             # Load configuration defaults
             config = self.load_prompt_config()
@@ -4664,10 +4635,13 @@ class ImageDescriberGUI(QMainWindow):
             provider_name = None
             model_name = None
             
+            print(f"DEBUG: Checking providers for automatic processing...")
             for name, instance in providers.items():
+                print(f"DEBUG: Checking provider {name}, available: {instance.is_available()}")
                 if instance.is_available():
                     try:
                         models = instance.get_models()
+                        print(f"DEBUG: Provider {name} has {len(models) if models else 0} models")
                         if models and len(models) > 0:
                             provider_instance = instance
                             provider_name = name
@@ -4676,8 +4650,10 @@ class ImageDescriberGUI(QMainWindow):
                                 model_name = config_model
                             else:
                                 model_name = models[0]
+                            print(f"DEBUG: Selected provider {name} with model {model_name}")
                             break
-                    except Exception:
+                    except Exception as e:
+                        print(f"DEBUG: Error checking provider {name}: {e}")
                         continue
             
             if not provider_instance or not model_name:
@@ -5114,6 +5090,25 @@ class ImageDescriberGUI(QMainWindow):
         # Also refresh master-detail view if it's the current mode
         if self.navigation_mode == "master_detail":
             self.refresh_master_detail_view()
+    
+    def refresh_view_preserving_chat_selection(self, active_chat_id):
+        """Refresh the image list view while preserving chat selection"""
+        # Store current selection if it's a chat
+        current_item = self.image_list.currentItem()
+        current_chat_id = None
+        if current_item and current_item.data(Qt.ItemDataRole.UserRole) == active_chat_id:
+            current_chat_id = active_chat_id
+        
+        # Do the normal refresh
+        self.refresh_view()
+        
+        # Restore chat selection if it was active
+        if current_chat_id:
+            for i in range(self.image_list.count()):
+                item = self.image_list.item(i)
+                if item and item.data(Qt.ItemDataRole.UserRole) == current_chat_id:
+                    self.image_list.setCurrentItem(item)
+                    break
     
     def update_batch_label(self):
         """Update the batch queue label"""
@@ -6010,8 +6005,8 @@ class ImageDescriberGUI(QMainWindow):
         # Auto-save the workspace to persist chat history
         if self.current_workspace_file:
             self.save_workspace_to_file(self.current_workspace_file)
-            # Refresh the view to update conversation count
-            self.refresh_view()
+            # Refresh the view to update conversation count, but preserve chat selection
+            self.refresh_view_preserving_chat_selection(chat_id)
         else:
             # If no workspace file is set, prompt user to save or create auto-save
             self.ensure_workspace_saved_for_chat()
@@ -6496,42 +6491,110 @@ Please answer the follow-up question about this image, taking into account the c
         # Add current question
         context_parts.append(f"New follow-up question: {follow_up_question}")
         context_parts.append("")
-        context_parts.append("Please answer the new follow-up question about this image, taking into account all the previous context and conversation history.")
+        context_parts.append("IMPORTANT: Please examine the image directly to answer this new question. Use the conversation history above only as context, but focus on what you can actually see in the image to provide specific, detailed information based on your direct visual analysis.")
         
         return "\n".join(context_parts)
     
     def ask_followup_question(self):
-        """Ask a follow-up question - for chats continue conversation, for images add new description"""
-        current_item = self.image_list.currentItem()
+        """Ask a follow-up question - show selection dialog to choose what to follow up on"""
+        # Check if there are any items or chats to follow up on
+        available_items = []
         
-        if not current_item:
+        # Add chat sessions
+        if hasattr(self.workspace, 'chat_sessions'):
+            for chat_id, chat_session in self.workspace.chat_sessions.items():
+                chat_name = chat_session.get('name', 'Chat Session')
+                conversation_count = len(chat_session.get('conversation', []))
+                available_items.append({
+                    'type': 'chat',
+                    'id': chat_id,
+                    'name': f"Chat: {chat_name} ({conversation_count} messages)",
+                    'data': chat_session
+                })
+        
+        # Add images with descriptions
+        for file_path, item in self.workspace.items.items():
+            if item.descriptions:  # Only items with descriptions
+                item_name = item.display_name if item.display_name else Path(file_path).name
+                desc_count = len(item.descriptions)
+                available_items.append({
+                    'type': 'image',
+                    'id': file_path,
+                    'name': f"Image: {item_name} ({desc_count} descriptions)",
+                    'data': item
+                })
+        
+        if not available_items:
             QMessageBox.information(
-                self, "No Item Selected",
-                "Please select an image or chat session first to ask a follow-up question."
+                self, "No Items Available",
+                "No chat sessions or described images available for follow-up questions.\n\n"
+                "Create a chat session or add descriptions to images first."
             )
             return
         
-        # Check if this is a chat session
-        item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
-        if item_type == "chat_session":
+        # Show selection dialog
+        self.show_followup_selection_dialog(available_items)
+
+    def show_followup_selection_dialog(self, available_items):
+        """Show dialog to select what to ask a follow-up question about"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Ask Follow-up Question")
+        dialog.setModal(True)
+        dialog.resize(500, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Header
+        header_label = QLabel("Select what you want to ask a follow-up question about:")
+        header_label.setStyleSheet("font-weight: bold; font-size: 12px; padding: 10px;")
+        layout.addWidget(header_label)
+        
+        # Selection list
+        selection_list = QListWidget()
+        selection_list.setAccessibleName("Follow-up Items")
+        selection_list.setAccessibleDescription("List of available chats and images to ask follow-up questions about")
+        
+        for item in available_items:
+            list_item = QListWidgetItem(item['name'])
+            list_item.setData(Qt.ItemDataRole.UserRole, item)
+            selection_list.addItem(list_item)
+        
+        # Set selection mode and select first item by default
+        selection_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        if available_items:
+            selection_list.setCurrentRow(0)
+        
+        layout.addWidget(selection_list)
+        
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+        
+        # Set tab order
+        dialog.setTabOrder(selection_list, button_box)
+        
+        # Show dialog and process selection
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            current_item = selection_list.currentItem()
+            if current_item:
+                selected_item = current_item.data(Qt.ItemDataRole.UserRole)
+                self.handle_followup_selection(selected_item)
+            else:
+                QMessageBox.information(self, "No Selection", "Please select an item to ask a follow-up question about.")
+
+    def handle_followup_selection(self, selected_item):
+        """Handle the selected item for follow-up question"""
+        if selected_item['type'] == 'chat':
             # For chat sessions, open the chat window to continue the conversation
-            chat_id = current_item.data(Qt.ItemDataRole.UserRole)
+            chat_id = selected_item['id']
             self.open_existing_chat_session(chat_id)
-            return
-        
-        # For images, show follow-up dialog that adds to existing descriptions
-        file_path = current_item.data(Qt.ItemDataRole.UserRole)
-        workspace_item = self.workspace.get_item(file_path)
-        
-        if not workspace_item:
-            QMessageBox.information(
-                self, "Item Not Found",
-                "Selected item not found in workspace."
-            )
-            return
-        
-        # Show image follow-up dialog
-        self.show_image_followup_dialog(file_path, workspace_item)
+        elif selected_item['type'] == 'image':
+            # For images, show follow-up dialog that adds to existing descriptions
+            file_path = selected_item['id']
+            workspace_item = selected_item['data']
+            self.show_image_followup_dialog(file_path, workspace_item)
     
     def show_image_followup_dialog(self, file_path: str, workspace_item):
         """Show dialog for asking follow-up questions about an image"""
@@ -6674,11 +6737,21 @@ Please answer the follow-up question about this image, taking into account the c
             # Create context-aware prompt using existing method
             custom_prompt = self.build_followup_context_prompt(workspace_item, latest_desc, follow_up_question)
             
+            # Debug output for follow-up
+            print("=== IMAGE FOLLOW-UP DEBUG ===")
+            print(f"Image path: {file_path}")
+            print(f"Provider: {selected_provider}")
+            print(f"Model: {selected_model}")
+            print(f"Follow-up question: {follow_up_question}")
+            print(f"Custom prompt length: {len(custom_prompt)} characters")
+            print(f"Custom prompt preview: {custom_prompt[:200]}...")
+            print("============================")
+            
             # Process as a follow-up description (gets added to image descriptions)
             self.processing_items.add(file_path)
             self.update_window_title()
             
-            worker = ProcessingWorker(file_path, selected_provider, selected_model, "custom", custom_prompt)
+            worker = ProcessingWorker(file_path, selected_provider, selected_model, "follow-up", custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
