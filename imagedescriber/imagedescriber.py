@@ -1397,21 +1397,224 @@ class ChatProcessingWorker(QThread):
         provider = chat_session['provider']
         model = chat_session['model']
         
-        # For chat, use just the current message for now to avoid context issues
-        # We can enhance this later once basic functionality is working
-        full_prompt = message
+        # Build conversation context from chat history
+        conversation_context = self.build_conversation_context(chat_session, message)
         
         if provider == "ollama":
-            return self.process_with_ollama(model, full_prompt)
+            return self.process_with_ollama_chat(model, chat_session, conversation_context)
         elif provider == "openai":
-            return self.process_with_openai(model, full_prompt)
+            return self.process_with_openai_chat(model, chat_session, conversation_context)
         elif provider == "huggingface":
-            return self.process_with_huggingface(model, full_prompt)
+            return self.process_with_huggingface_chat(model, chat_session, conversation_context)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     
+    def build_conversation_context(self, chat_session: dict, current_message: str) -> str:
+        """Build conversation context from chat history for providers that use simple prompts"""
+        conversation = chat_session.get('conversation', [])
+        provider = chat_session['provider']
+        
+        # Get context limits based on provider
+        context_config = self.get_context_config(provider)
+        max_messages = context_config['max_messages']
+        max_chars = context_config['max_chars']
+        
+        # Get recent conversation history (excluding the current message which isn't added yet)
+        recent_messages = conversation[-max_messages:] if len(conversation) > max_messages else conversation
+        
+        # Build context string
+        context_parts = []
+        
+        # Add conversation history
+        if recent_messages:
+            context_parts.append("Previous conversation:")
+            
+            # Add messages, but truncate if too long
+            total_chars = 0
+            messages_to_include = []
+            
+            # Work backwards to prioritize recent messages
+            for msg in reversed(recent_messages):
+                msg_text = f"{'User' if msg['type'] == 'user' else 'Assistant'}: {msg['content']}"
+                msg_chars = len(msg_text)
+                
+                if total_chars + msg_chars > max_chars:
+                    # If this message would exceed the limit, try to include a truncated version
+                    remaining_chars = max_chars - total_chars
+                    if remaining_chars > 100:  # Only include if we have reasonable space
+                        truncated_content = msg['content'][:remaining_chars-50] + "... [truncated]"
+                        msg_text = f"{'User' if msg['type'] == 'user' else 'Assistant'}: {truncated_content}"
+                        messages_to_include.insert(0, msg_text)
+                    break
+                
+                messages_to_include.insert(0, msg_text)
+                total_chars += msg_chars
+            
+            context_parts.extend(messages_to_include)
+            context_parts.append("")  # Empty line for separation
+        
+        # Add current message
+        context_parts.append(f"User: {current_message}")
+        context_parts.append("Assistant:")
+        
+        return "\n".join(context_parts)
+    
+    def get_context_config(self, provider: str) -> dict:
+        """Get context configuration based on provider type"""
+        if provider == "ollama":
+            # Local models - more generous with context
+            return {
+                'max_messages': 20,
+                'max_chars': 8000,  # ~2000 tokens
+                'strategy': 'generous'
+            }
+        elif provider == "openai":
+            # Paid API - more conservative
+            return {
+                'max_messages': 15,
+                'max_chars': 4000,  # ~1000 tokens
+                'strategy': 'conservative'
+            }
+        elif provider == "huggingface":
+            # Variable - moderate approach
+            return {
+                'max_messages': 12,
+                'max_chars': 3000,  # ~750 tokens
+                'strategy': 'moderate'
+            }
+        else:
+            # Default conservative approach
+            return {
+                'max_messages': 10,
+                'max_chars': 2000,
+                'strategy': 'conservative'
+            }
+    
+    def build_openai_messages(self, chat_session: dict, current_message: str) -> list:
+        """Build OpenAI-format messages array with conversation history"""
+        conversation = chat_session.get('conversation', [])
+        
+        # Use context config for OpenAI
+        context_config = self.get_context_config('openai')
+        max_messages = context_config['max_messages']
+        
+        # Get recent conversation history
+        recent_messages = conversation[-max_messages:] if len(conversation) > max_messages else conversation
+        
+        # Build OpenAI messages format
+        messages = []
+        
+        # Add system message if this is the start of conversation
+        if not recent_messages:
+            messages.append({
+                "role": "system",
+                "content": "You are a helpful AI assistant. Please provide clear, accurate, and helpful responses to the user's questions."
+            })
+        
+        # Add conversation history with token awareness
+        total_estimated_tokens = 0
+        max_tokens = 3000  # Conservative limit for context
+        
+        for msg in recent_messages:
+            estimated_tokens = len(msg['content']) // 4  # Rough estimate: 4 chars per token
+            if total_estimated_tokens + estimated_tokens > max_tokens:
+                # Truncate older messages if needed
+                break
+                
+            if msg['type'] == 'user':
+                messages.append({"role": "user", "content": msg['content']})
+            else:
+                messages.append({"role": "assistant", "content": msg['content']})
+            
+            total_estimated_tokens += estimated_tokens
+        
+        # Add current message
+        messages.append({"role": "user", "content": current_message})
+        
+        return messages
+    
+    def process_with_ollama_chat(self, model: str, chat_session: dict, context: str) -> str:
+        """Process chat with Ollama using conversation context"""
+        try:
+            import ollama
+            
+            # Use ollama.generate with full conversation context
+            response = ollama.generate(
+                model=model,
+                prompt=context
+            )
+            
+            if self._stop_requested:
+                return "Processing stopped"
+            
+            if hasattr(response, 'response'):
+                return response.response
+            elif isinstance(response, dict) and 'response' in response:
+                return response['response']
+            else:
+                return str(response)
+                
+        except Exception as e:
+            raise Exception(f"Ollama processing failed: {str(e)}")
+    
+    def process_with_openai_chat(self, model: str, chat_session: dict, context: str) -> str:
+        """Process chat with OpenAI using conversation history"""
+        try:
+            # Use the global OpenAI provider that handles API key loading
+            global _openai_provider
+            
+            if not _openai_provider.is_available():
+                raise Exception("OpenAI is not available or API key not found. Please ensure openai.txt file contains your API key.")
+            
+            if self._stop_requested:
+                return "Processing stopped"
+            
+            # Extract the current message from the context
+            # The context ends with "User: {message}\nAssistant:"
+            current_message = context.split("User: ")[-1].split("\nAssistant:")[0].strip()
+            
+            # Build OpenAI messages format
+            messages = self.build_openai_messages(chat_session, current_message)
+            
+            response = _openai_provider.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=1000
+            )
+            
+            if response.choices and response.choices[0].message:
+                return response.choices[0].message.content
+            else:
+                raise Exception("Empty response from OpenAI")
+            
+        except Exception as e:
+            if "API key" in str(e).lower():
+                raise Exception(f"OpenAI API key error: {str(e)}. Please check that openai.txt file exists and contains a valid API key.")
+            else:
+                raise Exception(f"OpenAI processing failed: {str(e)}")
+    
+    def process_with_huggingface_chat(self, model: str, chat_session: dict, context: str) -> str:
+        """Process chat with Hugging Face using conversation context"""
+        try:
+            # Use the global HuggingFace provider, but for chat we need text generation
+            global _huggingface_provider
+            
+            if not _huggingface_provider.is_available():
+                raise Exception("Hugging Face transformers is not available. Please install: pip install transformers torch")
+            
+            if self._stop_requested:
+                return "Processing stopped"
+            
+            # For now, return an informational message about chat support
+            # In the future, this could be enhanced to use text generation models
+            return f"Hugging Face chat mode not fully implemented yet. The selected model '{model}' is primarily designed for image processing. For text chat, consider using Ollama or OpenAI providers, or we can add text-only Hugging Face models like FLAN-T5 or GPT-2."
+            
+        except Exception as e:
+            raise Exception(f"Hugging Face processing failed: {str(e)}")
+    
+    # Keep original methods for backward compatibility with image descriptions
     def process_with_ollama(self, model: str, prompt: str) -> str:
-        """Process with Ollama"""
+        """Process with Ollama (for image descriptions)"""
         try:
             import ollama
             
@@ -1435,7 +1638,7 @@ class ChatProcessingWorker(QThread):
             raise Exception(f"Ollama processing failed: {str(e)}")
     
     def process_with_openai(self, model: str, prompt: str) -> str:
-        """Process with OpenAI"""
+        """Process with OpenAI (for image descriptions)"""
         try:
             # Use the global OpenAI provider that handles API key loading
             global _openai_provider
@@ -1464,7 +1667,7 @@ class ChatProcessingWorker(QThread):
                 raise Exception(f"OpenAI processing failed: {str(e)}")
     
     def process_with_huggingface(self, model: str, prompt: str) -> str:
-        """Process with Hugging Face (text-only for chat)"""
+        """Process with Hugging Face (for image descriptions)"""
         try:
             # Use the global HuggingFace provider, but for chat we need text generation
             # For now, return a message explaining this is primarily for image processing
@@ -1482,6 +1685,55 @@ class ChatProcessingWorker(QThread):
             
         except Exception as e:
             raise Exception(f"Hugging Face processing failed: {str(e)}")
+
+    def build_followup_context_prompt(self, workspace_item, reference_description, follow_up_question):
+        """Build a context-aware prompt for image follow-up questions"""
+        try:
+            # Start with base context
+            base_prompt = f"""You are viewing an image that has been previously described. Here are the existing descriptions for context:
+
+Recent descriptions:"""
+            
+            # Add recent AI descriptions for context
+            ai_descriptions = [desc for desc in workspace_item.descriptions if desc.model != "manual"] if workspace_item.descriptions else []
+            recent_descriptions = sorted(ai_descriptions, key=lambda d: d.created)[-3:]  # Last 3 descriptions
+            
+            for desc in recent_descriptions:
+                short_model = self.get_short_model_name(desc.model)
+                base_prompt += f"\n\n{short_model}: {desc.text}"
+            
+            # Add the follow-up question
+            base_prompt += f"""
+
+Based on the image and the context above, please answer this follow-up question:
+{follow_up_question}
+
+Please provide a focused, direct answer to the specific question asked. You can reference or build upon the previous descriptions if relevant."""
+            
+            return base_prompt
+            
+        except Exception as e:
+            print(f"Error building follow-up context prompt: {e}")
+            # Fallback to simple question
+            return f"Please answer this question about the image: {follow_up_question}"
+
+    def ensure_workspace_saved_for_chat(self):
+        """Ensure workspace is saved when using chat features"""
+        if not self.current_workspace_file:
+            # Create a default workspace file for chat sessions
+            from datetime import datetime
+            default_name = f"chat_workspace_{datetime.now().strftime('%Y%m%d_%H%M%S')}.idw"
+            default_path = Path.home() / "Documents" / default_name
+            
+            try:
+                self.save_workspace_to_file(str(default_path))
+                self.current_workspace_file = str(default_path)
+                self.status_bar.showMessage(f"Auto-saved workspace to {default_path.name}", 3000)
+                self.refresh_view()
+            except Exception as e:
+                # If auto-save fails, show warning but don't block chat
+                print(f"Warning: Could not auto-save workspace: {e}")
+                self.status_bar.showMessage("Warning: Chat history may not persist - please save workspace manually", 5000)
 
 
 class DirectorySelectionDialog(QDialog):
@@ -2144,6 +2396,27 @@ class ChatDialog(QDialog):
         """Get the session name"""
         return self.session_name.text().strip()
     
+    def set_provider_model(self, provider: str, model: str):
+        """Set the provider and model selection"""
+        # Find and set provider
+        provider_index = self.provider_combo.findText(provider)
+        if provider_index >= 0:
+            self.provider_combo.setCurrentIndex(provider_index)
+            # Update models for this provider
+            self.on_provider_changed()
+            # Find and set model
+            model_index = self.model_combo.findText(model)
+            if model_index >= 0:
+                self.model_combo.setCurrentIndex(model_index)
+    
+    def set_initial_prompt(self, prompt: str):
+        """Set the initial prompt text"""
+        self.prompt_text.setPlainText(prompt)
+    
+    def set_session_name(self, name: str):
+        """Set the session name"""
+        self.session_name.setText(name)
+    
     def get_chat_config(self):
         """Get all chat configuration"""
         return {
@@ -2243,13 +2516,14 @@ class ChatWindow(QDialog):
         # Message input box
         self.input_box = AccessibleTextEdit()
         self.input_box.setAccessibleName("Message Input")
-        self.input_box.setAccessibleDescription("Type your message here. Press Ctrl+Enter to send, Tab to navigate to history.")
+        self.input_box.setAccessibleDescription("Type your message here. Press Enter to send, Tab to navigate to send button and history.")
         self.input_box.setPlaceholderText("Type your message here...")
         self.input_box.setMaximumHeight(100)
         
-        # Override keyPressEvent for input box to handle Ctrl+Enter
+        # Override keyPressEvent for input box to handle Enter key
         def input_key_press(event):
-            if event.key() == Qt.Key.Key_Return and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            if event.key() == Qt.Key.Key_Return and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+                # Enter sends message (unless Shift+Enter for new line)
                 self.send_message()
             else:
                 AccessibleTextEdit.keyPressEvent(self.input_box, event)
@@ -2282,12 +2556,16 @@ class ChatWindow(QDialog):
         # Set splitter proportions (70% history, 30% input)
         splitter.setSizes([420, 180])
         
-        # Set up tab order for accessibility - just between input and history
-        self.setTabOrder(self.input_box, self.history_list)
+        # Set up proper tab order for accessibility: input → send → clear → history
+        self.setTabOrder(self.input_box, self.send_button)
+        self.setTabOrder(self.send_button, self.clear_button)
+        self.setTabOrder(self.clear_button, self.history_list)
         self.setTabOrder(self.history_list, self.input_box)
-        # Make send/clear buttons not part of main tab flow
-        self.send_button.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        self.clear_button.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        
+        # Keep send and clear buttons in tab flow (remove ClickFocus restriction)
+        self.send_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.clear_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
         # Message detail is read-only and not part of main navigation
         self.message_detail.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     
@@ -4375,11 +4653,11 @@ class ImageDescriberGUI(QMainWindow):
             # Get default model from config
             config_model = model_settings.get("model", "moondream")
             
-            # Find first available provider with models
+            # Find first available provider with models (use global instances)
             providers = {
-                "Ollama": OllamaProvider(),
-                "OpenAI": OpenAIProvider(), 
-                "HuggingFace": HuggingFaceProvider()
+                "ollama": _ollama_provider,
+                "openai": _openai_provider,
+                "huggingface": _huggingface_provider
             }
             
             provider_instance = None
@@ -4394,7 +4672,7 @@ class ImageDescriberGUI(QMainWindow):
                             provider_instance = instance
                             provider_name = name
                             # Try to use config model first, fallback to first available
-                            if name == "Ollama" and config_model in models:
+                            if name == "ollama" and config_model in models:
                                 model_name = config_model
                             else:
                                 model_name = models[0]
@@ -4403,7 +4681,20 @@ class ImageDescriberGUI(QMainWindow):
                         continue
             
             if not provider_instance or not model_name:
-                self.status_bar.showMessage("No AI providers available - pasted image added without processing", 3000)
+                # Debug information for troubleshooting
+                available_providers = []
+                for name, instance in providers.items():
+                    try:
+                        if instance.is_available():
+                            models = instance.get_models()
+                            available_providers.append(f"{name}: {len(models) if models else 0} models")
+                        else:
+                            available_providers.append(f"{name}: not available")
+                    except Exception as e:
+                        available_providers.append(f"{name}: error - {e}")
+                
+                debug_info = "; ".join(available_providers)
+                self.status_bar.showMessage(f"No AI providers available for auto-processing. Status: {debug_info}", 5000)
                 return
             
             # Start processing directly without dialog
@@ -5171,12 +5462,8 @@ class ImageDescriberGUI(QMainWindow):
             item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
             if item_type == "chat_session":
                 chat_id = current_item.data(Qt.ItemDataRole.UserRole)
-                # Open or bring chat window to front instead of showing in description area
-                self.open_existing_chat_session(chat_id)
-                # Clear description area since we're opening chat window
-                self.description_list.clear()
-                self.description_text.setPlainText("Chat session opened in separate window.")
-                self.description_text.setAccessibleDescription("Chat session opened in separate window.")
+                # Display chat conversation in the description area
+                self.display_chat_conversation(chat_id)
             else:
                 # Regular image file
                 file_path = current_item.data(Qt.ItemDataRole.UserRole)
@@ -5196,12 +5483,20 @@ class ImageDescriberGUI(QMainWindow):
         
         for i, msg in enumerate(chat_session['conversation']):
             if msg['type'] == 'user':
-                item_text = f"User: {msg['content'][:100]}..."
-                full_text = f"User ({msg['timestamp']}):\n{msg['content']}"
+                # Truncate long messages for the list view
+                preview = msg['content'][:100] + "..." if len(msg['content']) > 100 else msg['content']
+                item_text = f"You: {preview}"
+                full_text = f"You: {msg['content']} ({msg['timestamp']})"
             else:
-                provider_model = f"{msg.get('provider', 'AI').upper()} {msg.get('model', 'Model')}"
-                item_text = f"AI {provider_model}: {msg['content'][:100]}..."
-                full_text = f"{provider_model} ({msg['timestamp']}):\n{msg['content']}"
+                # Use short model name for better readability
+                provider = msg.get('provider', 'AI')
+                model = msg.get('model', 'Model')
+                short_model = self.get_short_model_name(f"{provider}_{model}")
+                
+                # Truncate long messages for the list view
+                preview = msg['content'][:100] + "..." if len(msg['content']) > 100 else msg['content']
+                item_text = f"{short_model}: {preview}"
+                full_text = f"{short_model}: {msg['content']} ({msg['timestamp']})"
             
             list_item = QListWidgetItem(item_text)
             list_item.setData(Qt.ItemDataRole.UserRole, i)  # Store message index
@@ -5624,73 +5919,76 @@ class ImageDescriberGUI(QMainWindow):
         dialog = ChatDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             config = dialog.get_chat_config()
-            
-            if not config['initial_prompt']:
-                QMessageBox.warning(self, "No Prompt", "Please enter an initial prompt to start the chat.")
-                return
-            
-            # Create chat session
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            session_name = config['session_name'] or f"{config['provider'].upper()} {config['model']} Chat"
-            
-            # Create a unique chat ID
-            chat_id = f"chat_{int(datetime.now().timestamp())}"
-            
-            # Create chat session data
-            chat_session = {
-                'id': chat_id,
-                'name': session_name,
-                'provider': config['provider'],
-                'model': config['model'],
-                'timestamp': timestamp,
-                'conversation': [],
-                'is_chat': True
-            }
-            
-            # Add initial prompt to conversation
-            chat_session['conversation'].append({
-                'type': 'user',
-                'content': config['initial_prompt'],
-                'timestamp': timestamp
-            })
-            
-            # Add to workspace chat sessions
-            self.workspace.chat_sessions = getattr(self.workspace, 'chat_sessions', {})
-            self.workspace.chat_sessions[chat_id] = chat_session
-            self.workspace.mark_modified()
-            
-            # Refresh the view to show the new chat session in the list
-            self.refresh_view()
-            
-            # Select the new chat session in the list
-            for i in range(self.image_list.count()):
-                item = self.image_list.item(i)
-                if item and item.data(Qt.ItemDataRole.UserRole) == chat_id:
-                    self.image_list.setCurrentItem(item)
-                    break
-            
-            # Initialize chat windows dict if not exists
-            if not hasattr(self, 'chat_windows'):
-                self.chat_windows = {}
-            
-            # Create and show new chat window
-            chat_window = ChatWindow(chat_session, self)
-            chat_window.message_sent.connect(self.handle_chat_message)
-            
-            # Store the window reference
-            self.chat_windows[chat_id] = chat_window
-            
-            # Clean up window reference when closed (but keep chat in image list)
-            def cleanup_window():
-                if chat_id in self.chat_windows:
-                    del self.chat_windows[chat_id]
-            chat_window.finished.connect(cleanup_window)
-            
-            # Show the window
-            chat_window.show()
-            
-            # Start processing the initial prompt
-            self.process_chat_message(chat_id, config['initial_prompt'])
+            self.create_chat_session_from_config(config)
+    
+    def create_chat_session_from_config(self, config):
+        """Create and start a chat session from configuration"""
+        if not config['initial_prompt']:
+            QMessageBox.warning(self, "No Prompt", "Please enter an initial prompt to start the chat.")
+            return
+        
+        # Create chat session
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        session_name = config['session_name'] or f"{config['provider'].upper()} {config['model']} Chat"
+        
+        # Create a unique chat ID
+        chat_id = f"chat_{int(datetime.now().timestamp())}"
+        
+        # Create chat session data
+        chat_session = {
+            'id': chat_id,
+            'name': session_name,
+            'provider': config['provider'],
+            'model': config['model'],
+            'timestamp': timestamp,
+            'conversation': [],
+            'is_chat': True
+        }
+        
+        # Add initial prompt to conversation
+        chat_session['conversation'].append({
+            'type': 'user',
+            'content': config['initial_prompt'],
+            'timestamp': timestamp
+        })
+        
+        # Add to workspace chat sessions
+        self.workspace.chat_sessions = getattr(self.workspace, 'chat_sessions', {})
+        self.workspace.chat_sessions[chat_id] = chat_session
+        self.workspace.mark_modified()
+        
+        # Refresh the view to show the new chat session in the list
+        self.refresh_view()
+        
+        # Select the new chat session in the list
+        for i in range(self.image_list.count()):
+            item = self.image_list.item(i)
+            if item and item.data(Qt.ItemDataRole.UserRole) == chat_id:
+                self.image_list.setCurrentItem(item)
+                break
+        
+        # Initialize chat windows dict if not exists
+        if not hasattr(self, 'chat_windows'):
+            self.chat_windows = {}
+        
+        # Create and show new chat window
+        chat_window = ChatWindow(chat_session, self)
+        chat_window.message_sent.connect(self.handle_chat_message)
+        
+        # Store the window reference
+        self.chat_windows[chat_id] = chat_window
+        
+        # Clean up window reference when closed (but keep chat in image list)
+        def cleanup_window():
+            if chat_id in self.chat_windows:
+                del self.chat_windows[chat_id]
+        chat_window.finished.connect(cleanup_window)
+        
+        # Show the window
+        chat_window.show()
+        
+        # Start processing the initial prompt
+        self.process_chat_message(chat_id, config['initial_prompt'])
     
     def handle_chat_message(self, chat_id, message):
         """Handle a message sent from a chat window"""
@@ -5708,6 +6006,15 @@ class ImageDescriberGUI(QMainWindow):
         })
         
         self.workspace.mark_modified()
+        
+        # Auto-save the workspace to persist chat history
+        if self.current_workspace_file:
+            self.save_workspace_to_file(self.current_workspace_file)
+            # Refresh the view to update conversation count
+            self.refresh_view()
+        else:
+            # If no workspace file is set, prompt user to save or create auto-save
+            self.ensure_workspace_saved_for_chat()
         
         # Process the message
         self.process_chat_message(chat_id, message)
@@ -5899,6 +6206,15 @@ class ImageDescriberGUI(QMainWindow):
         })
         
         self.workspace.mark_modified()
+        
+        # Auto-save the workspace to persist chat history
+        if self.current_workspace_file:
+            self.save_workspace_to_file(self.current_workspace_file)
+            # Refresh the view to update conversation count
+            self.refresh_view()
+        else:
+            # If no workspace file is set, prompt user to save or create auto-save
+            self.ensure_workspace_saved_for_chat()
         
         # Update the chat window if it's open
         if hasattr(self, 'chat_windows') and chat_id in self.chat_windows:
@@ -6131,101 +6447,205 @@ class ImageDescriberGUI(QMainWindow):
         
         return '\n'.join(processed_lines)
     
-    def ask_followup_question(self):
-        """Ask a follow-up question about an existing description using the same AI engine"""
-        current_image_item = self.image_list.currentItem()
+    def build_followup_context_prompt(self, workspace_item, selected_desc, follow_up_question):
+        """Build a context-aware prompt for follow-up questions that includes previous Q&As"""
+        # Get all descriptions for this image, sorted by creation time
+        all_descriptions = sorted(workspace_item.descriptions, key=lambda d: d.created)
         
-        if not current_image_item:
+        # Find the index of the selected description
+        selected_index = -1
+        for i, desc in enumerate(all_descriptions):
+            if desc.id == selected_desc.id:
+                selected_index = i
+                break
+        
+        if selected_index == -1:
+            # Fallback to simple prompt if we can't find the description
+            return f"""Here is the original description of this image:
+"{selected_desc.text}"
+
+Follow-up question: {follow_up_question}
+
+Please answer the follow-up question about this image, taking into account the context from the original description."""
+        
+        # Build context with original description and relevant follow-ups
+        context_parts = []
+        context_parts.append("Here is the conversation history about this image:")
+        context_parts.append("")
+        
+        # Add the original description
+        context_parts.append(f"Original description ({selected_desc.model}):")
+        context_parts.append(f'"{selected_desc.text}"')
+        context_parts.append("")
+        
+        # Add any follow-up Q&As that came after the selected description
+        follow_ups_found = 0
+        for desc in all_descriptions[selected_index + 1:]:
+            if desc.prompt_style == "follow-up" and desc.custom_prompt:
+                # Extract the question from the custom prompt
+                if "Follow-up question:" in desc.custom_prompt:
+                    question_part = desc.custom_prompt.split("Follow-up question:")[1].split("\n")[0].strip()
+                    context_parts.append(f"Follow-up question: {question_part}")
+                    context_parts.append(f"Answer ({desc.model}): {desc.text}")
+                    context_parts.append("")
+                    follow_ups_found += 1
+                    # Limit context to avoid token bloat
+                    if follow_ups_found >= 3:  # Include up to 3 previous follow-ups
+                        break
+        
+        # Add current question
+        context_parts.append(f"New follow-up question: {follow_up_question}")
+        context_parts.append("")
+        context_parts.append("Please answer the new follow-up question about this image, taking into account all the previous context and conversation history.")
+        
+        return "\n".join(context_parts)
+    
+    def ask_followup_question(self):
+        """Ask a follow-up question - for chats continue conversation, for images add new description"""
+        current_item = self.image_list.currentItem()
+        
+        if not current_item:
             QMessageBox.information(
-                self, "No Image Selected",
-                "Please select an image first to ask a follow-up question."
+                self, "No Item Selected",
+                "Please select an image or chat session first to ask a follow-up question."
             )
             return
         
-        file_path = current_image_item.data(Qt.ItemDataRole.UserRole)
+        # Check if this is a chat session
+        item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
+        if item_type == "chat_session":
+            # For chat sessions, open the chat window to continue the conversation
+            chat_id = current_item.data(Qt.ItemDataRole.UserRole)
+            self.open_existing_chat_session(chat_id)
+            return
+        
+        # For images, show follow-up dialog that adds to existing descriptions
+        file_path = current_item.data(Qt.ItemDataRole.UserRole)
         workspace_item = self.workspace.get_item(file_path)
         
-        if not workspace_item or not workspace_item.descriptions:
+        if not workspace_item:
             QMessageBox.information(
-                self, "No Descriptions Found",
-                "This image has no existing descriptions. Please add a description first."
+                self, "Item Not Found",
+                "Selected item not found in workspace."
             )
             return
         
-        # Filter out manual descriptions (only AI-generated descriptions can have follow-ups)
-        ai_descriptions = [desc for desc in workspace_item.descriptions if desc.model != "manual"]
+        # Show image follow-up dialog
+        self.show_image_followup_dialog(file_path, workspace_item)
+    
+    def show_image_followup_dialog(self, file_path: str, workspace_item):
+        """Show dialog for asking follow-up questions about an image"""
+        # Filter AI-generated descriptions only
+        ai_descriptions = [desc for desc in workspace_item.descriptions if desc.model != "manual"] if workspace_item.descriptions else []
         
         if not ai_descriptions:
             QMessageBox.information(
                 self, "No AI Descriptions Found",
-                "This image has no AI-generated descriptions. Follow-up questions can only be asked about AI-generated descriptions."
+                "This image has no AI-generated descriptions. Please add a description first before asking follow-up questions."
             )
             return
         
-        # Get currently selected description (if any) to pre-select in combo box
-        current_desc_item = self.description_list.currentItem()
-        current_desc_id = current_desc_item.data(Qt.ItemDataRole.UserRole) if current_desc_item else None
-        
         # Create follow-up dialog
         dialog = QDialog(self)
-        dialog.setWindowTitle("Ask Follow-up Question")
+        dialog.setWindowTitle(f"Ask Follow-up Question - {Path(file_path).name}")
         dialog.setModal(True)
-        dialog.resize(600, 500)
+        dialog.resize(600, 400)
         
         layout = QVBoxLayout(dialog)
         
-        # Description selection section
-        desc_label = QLabel("Select description to ask follow-up question about:")
-        layout.addWidget(desc_label)
+        # Header
+        header_label = QLabel(f"Ask a follow-up question about {Path(file_path).name}")
+        header_label.setStyleSheet("font-weight: bold; font-size: 12px; padding: 10px;")
+        layout.addWidget(header_label)
         
-        desc_combo = QComboBox()
-        default_index = 0  # Default to first item if no match found
+        # Show recent descriptions for context
+        context_label = QLabel("Recent descriptions (for context):")
+        layout.addWidget(context_label)
         
-        for i, desc in enumerate(ai_descriptions):
-            preview = desc.text[:100] + "..." if len(desc.text) > 100 else desc.text
-            desc_combo.addItem(f"{desc.model} - {preview}", desc)
-            
-            # Check if this is the currently selected description
-            if current_desc_id and desc.id == current_desc_id:
-                default_index = i
+        # Context display (recent descriptions)
+        context_display = QTextEdit()
+        context_display.setReadOnly(True)
+        context_display.setMaximumHeight(120)
+        context_display.setAccessibleName("Recent Descriptions")
+        context_display.setAccessibleDescription("Recent AI descriptions of this image for context")
         
-        desc_combo.setCurrentIndex(default_index)
-        layout.addWidget(desc_combo)
+        # Show last 2-3 descriptions for context
+        recent_descriptions = sorted(ai_descriptions, key=lambda d: d.created)[-3:]
+        context_text = []
+        for desc in recent_descriptions:
+            short_model = self.get_short_model_name(desc.model)
+            context_text.append(f"• {short_model}: {desc.text[:200]}{'...' if len(desc.text) > 200 else ''}")
         
-        # Selected description display
-        layout.addWidget(QLabel("Full description:"))
-        desc_display = QTextEdit()
-        desc_display.setReadOnly(True)
-        desc_display.setMaximumHeight(150)
-        desc_display.setAccessibleName("Selected Description Display")
-        desc_display.setAccessibleDescription("Full text of the selected description. Use arrow keys to navigate through the text.")
-        # Apply viewer app's accessibility settings
-        desc_display.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
-        desc_display.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        desc_display.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
-        layout.addWidget(desc_display)
+        context_display.setPlainText("\n\n".join(context_text))
+        layout.addWidget(context_display)
         
-        # Update description display when selection changes
-        def update_description():
-            selected_desc = desc_combo.currentData()
-            if selected_desc:
-                # Format text for better screen reader accessibility
-                formatted_text = self.format_description_for_accessibility(selected_desc.text)
-                desc_display.setPlainText(formatted_text)
-                # Update accessible description with dynamic content
-                desc_display.setAccessibleDescription(f"Description from {selected_desc.model}: {formatted_text[:200]}{'...' if len(formatted_text) > 200 else ''}")
+        # Provider/Model selection (use latest description's settings as default)
+        latest_desc = sorted(ai_descriptions, key=lambda d: d.created)[-1]  # Get most recent
         
-        desc_combo.currentTextChanged.connect(update_description)
-        update_description()  # Set initial text
+        provider_label = QLabel("AI Provider:")
+        layout.addWidget(provider_label)
+        provider_combo = QComboBox()
         
-        # Follow-up question section
-        layout.addWidget(QLabel("Enter your follow-up question:"))
-        info_label = QLabel("This will create a new 'Follow-up' description using the same AI model.")
-        info_label.setStyleSheet("color: #666; font-style: italic; margin-bottom: 5px;")
-        layout.addWidget(info_label)
+        # Populate provider combo
+        all_providers = {
+            'ollama': _ollama_provider,
+            'openai': _openai_provider,
+            'huggingface': _huggingface_provider
+        }
+        
+        for provider_key, provider in all_providers.items():
+            display_name = provider.get_provider_name()
+            if not provider.is_available():
+                display_name += " (Not Available)"
+            provider_combo.addItem(display_name, provider_key)
+        
+        # Set to latest description's provider
+        provider_index = provider_combo.findData(latest_desc.provider or "ollama")
+        if provider_index >= 0:
+            provider_combo.setCurrentIndex(provider_index)
+        layout.addWidget(provider_combo)
+        
+        model_label = QLabel("AI Model:")
+        layout.addWidget(model_label)
+        model_combo = QComboBox()
+        
+        # Populate model combo for current provider
+        def populate_models_for_provider(provider_key):
+            model_combo.clear()
+            if provider_key in all_providers:
+                provider = all_providers[provider_key]
+                if provider.is_available():
+                    try:
+                        models = provider.get_models()
+                        for model in models:
+                            model_combo.addItem(model)
+                    except Exception as e:
+                        model_combo.addItem("Error loading models")
+                else:
+                    model_combo.addItem("Provider not available")
+        
+        # Initial model population
+        current_provider = provider_combo.currentData() or "ollama"
+        populate_models_for_provider(current_provider)
+        
+        # Set to latest description's model
+        model_index = model_combo.findText(latest_desc.model)
+        if model_index >= 0:
+            model_combo.setCurrentIndex(model_index)
+        layout.addWidget(model_combo)
+        
+        # Connect provider change to update models
+        provider_combo.currentTextChanged.connect(lambda: populate_models_for_provider(provider_combo.currentData()))
+        
+        # Follow-up question
+        question_label = QLabel("Your follow-up question:")
+        layout.addWidget(question_label)
+        
         question_edit = AccessibleTextEdit()
-        question_edit.setPlaceholderText("e.g., What colors are prominent in this image? Can you describe the lighting? What mood does this convey?")
-        question_edit.setMaximumHeight(100)
+        question_edit.setAccessibleName("Follow-up Question")
+        question_edit.setAccessibleDescription("Enter your follow-up question about this image")
+        question_edit.setPlaceholderText("e.g., What colors are most prominent? Can you describe the lighting? What mood does this convey?")
+        question_edit.setMaximumHeight(80)
         layout.addWidget(question_edit)
         
         # Buttons
@@ -6234,32 +6654,31 @@ class ImageDescriberGUI(QMainWindow):
         button_box.rejected.connect(dialog.reject)
         layout.addWidget(button_box)
         
-        # Set explicit tab order to ensure proper navigation
-        dialog.setTabOrder(desc_combo, desc_display)
-        dialog.setTabOrder(desc_display, question_edit)
+        # Set tab order
+        dialog.setTabOrder(context_display, provider_combo)
+        dialog.setTabOrder(provider_combo, model_combo)
+        dialog.setTabOrder(model_combo, question_edit)
         dialog.setTabOrder(question_edit, button_box)
         
         # Show dialog and process if accepted
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            selected_desc = desc_combo.currentData()
             follow_up_question = question_edit.toPlainText().strip()
             
             if not follow_up_question:
                 QMessageBox.information(self, "Empty Question", "Please enter a follow-up question.")
                 return
             
-            # Create a custom prompt that includes the original description and the follow-up question
-            custom_prompt = f"""Here is the original description of this image:
-"{selected_desc.text}"
-
-Follow-up question: {follow_up_question}
-
-Please answer the follow-up question about this image, taking into account the context from the original description."""
+            selected_provider = provider_combo.currentData() or "ollama"
+            selected_model = model_combo.currentText()
             
-            # Start processing with the same provider and model as the original description
+            # Create context-aware prompt using existing method
+            custom_prompt = self.build_followup_context_prompt(workspace_item, latest_desc, follow_up_question)
+            
+            # Process as a follow-up description (gets added to image descriptions)
             self.processing_items.add(file_path)
-            self.update_window_title()  # Update title to show processing status
-            worker = ProcessingWorker(file_path, selected_desc.provider or "ollama", selected_desc.model, "follow-up", custom_prompt)
+            self.update_window_title()
+            
+            worker = ProcessingWorker(file_path, selected_provider, selected_model, "custom", custom_prompt)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -6268,24 +6687,48 @@ Please answer the follow-up question about this image, taking into account the c
             worker.start()
             self.update_stop_button_state()
             
-            # Preserve current selection before refresh
-            current_item = self.image_list.currentItem()
-            current_file_path = current_item.data(Qt.ItemDataRole.UserRole) if current_item else None
-            
             # Refresh view to show processing indicator
             self.refresh_view()
             
-            # Restore focus after refresh
-            if current_file_path:
-                def restore_focus():
-                    for i in range(self.image_list.count()):
-                        item = self.image_list.item(i)
-                        if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
-                            self.image_list.setCurrentItem(item)
-                            break
-                QTimer.singleShot(0, restore_focus)
+            self.status_bar.showMessage(f"Processing follow-up question with {selected_model}...", 3000)
+    
+    def start_image_chat_session(self, file_path: str, workspace_item):
+        """Start a new chat session focused on an image"""
+        # Get the best description to use as context (prefer AI-generated)
+        descriptions = workspace_item.descriptions if workspace_item.descriptions else []
+        ai_descriptions = [desc for desc in descriptions if desc.model != "manual"]
+        
+        # Build initial context about the image
+        image_name = Path(file_path).name
+        context_parts = [f"I'd like to ask questions about the image '{image_name}'."]
+        
+        if ai_descriptions:
+            # Use the most recent AI description as context
+            latest_desc = max(ai_descriptions, key=lambda d: d.created)
+            context_parts.append(f"Here's what I know about this image: {latest_desc.text}")
+            context_parts.append("What would you like to know about this image?")
             
-            self.status_bar.showMessage(f"Processing follow-up question with {selected_desc.model}...", 3000)
+            # Use the same provider/model as the latest description
+            provider = latest_desc.provider or "ollama"
+            model = latest_desc.model
+        else:
+            context_parts.append("What would you like to know about this image?")
+            # Default to Ollama if no previous descriptions
+            provider = "ollama"
+            model = "llama3.2-vision"  # Good default for image Q&A
+        
+        initial_prompt = "\n".join(context_parts)
+        
+        # Create chat dialog with pre-filled context
+        dialog = ChatDialog(self)
+        dialog.set_provider_model(provider, model)
+        dialog.set_initial_prompt(initial_prompt)
+        dialog.set_session_name(f"Questions about {image_name}")
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Start the chat session normally
+            config = dialog.get_chat_config()
+            self.create_chat_session_from_config(config)
     
     def edit_description(self):
         """Edit the selected description"""
