@@ -49,9 +49,19 @@ REM Build the executable for AMD64
     --workpath "%ROOT_DIR%\build\imagedescriber_amd64" ^
     --specpath "%ROOT_DIR%\build\imagedescriber_amd64" ^
     --add-data "%ROOT_DIR%\scripts;scripts" ^
+    --add-data "%SCRIPT_DIR%\ai_providers.py;." ^
+    --add-data "%SCRIPT_DIR%\data_models.py;." ^
+    --add-data "%SCRIPT_DIR%\worker_threads.py;." ^
+    --add-data "%SCRIPT_DIR%\ui_components.py;." ^
+    --add-data "%SCRIPT_DIR%\dialogs.py;." ^
     --hidden-import "ollama" ^
     --hidden-import "pillow_heif" ^
     --hidden-import "cv2" ^
+    --hidden-import "ai_providers" ^
+    --hidden-import "data_models" ^
+    --hidden-import "worker_threads" ^
+    --hidden-import "ui_components" ^
+    --hidden-import "dialogs" ^
     --target-architecture amd64 ^
     --clean ^
     "%SCRIPT_DIR%\imagedescriber.py"

@@ -66,12 +66,6 @@ from ai_providers import (
     get_available_providers, _ollama_provider, _openai_provider, _huggingface_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
-from worker_threads import (
-    ProcessingWorker, WorkflowProcessWorker, ConversionWorker, 
-    VideoProcessingWorker, ChatProcessingWorker
-)
-from ui_components import AccessibleTreeWidget, AccessibleNumericInput, AccessibleTextEdit
-from dialogs import DirectorySelectionDialog, ProcessingDialog, ChatWindow
 
 
 # ================================
