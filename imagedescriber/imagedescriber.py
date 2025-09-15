@@ -3972,7 +3972,7 @@ class ImageDescriberGUI(QMainWindow):
         self.batch_processing: bool = False
         
         # Filter settings
-        self.filter_mode: str = "all"  # "all", "described", "batch", "videos", "images", or "processing"
+        self.filter_mode: str = "all"  # "all", "described", "undescribed", "batch", "videos", "images", or "processing"
         
         # Sorting settings
         self.sort_order: str = "filename"  # "filename" or "date"
@@ -4336,6 +4336,11 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_described_action.setCheckable(True)
         self.filter_described_action.triggered.connect(lambda: self.set_filter("described"))
         filter_menu.addAction(self.filter_described_action)
+        
+        self.filter_undescribed_action = QAction("Show Undescribed Only", self)
+        self.filter_undescribed_action.setCheckable(True)
+        self.filter_undescribed_action.triggered.connect(lambda: self.set_filter("undescribed"))
+        filter_menu.addAction(self.filter_undescribed_action)
         
         self.filter_batch_action = QAction("Show Batch Items Only", self)
         self.filter_batch_action.setCheckable(True)
@@ -4956,6 +4961,8 @@ class ImageDescriberGUI(QMainWindow):
             # Apply filter
             if self.filter_mode == "described" and not item.descriptions:
                 continue
+            elif self.filter_mode == "undescribed" and item.descriptions:
+                continue
             elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
             elif self.filter_mode == "videos" and item.item_type != "video":
@@ -5158,6 +5165,8 @@ class ImageDescriberGUI(QMainWindow):
                 
             # Apply filter
             if self.filter_mode == "described" and not item.descriptions:
+                continue
+            elif self.filter_mode == "undescribed" and item.descriptions:
                 continue
             elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
@@ -6968,6 +6977,7 @@ Please answer the follow-up question about this image, taking into account the c
         # Update checkable actions
         self.filter_all_action.setChecked(mode == "all")
         self.filter_described_action.setChecked(mode == "described")
+        self.filter_undescribed_action.setChecked(mode == "undescribed")
         self.filter_batch_action.setChecked(mode == "batch")
         self.filter_videos_action.setChecked(mode == "videos")
         self.filter_images_action.setChecked(mode == "images")
