@@ -216,9 +216,28 @@ def handle_resume_workflow(args):
         
         if not remaining_steps:
             print("✅ Workflow appears to be complete - nothing to resume")
+            print("If you believe this is incorrect, you can:")
+            print("  1. Delete the descriptions file to force re-description")
+            print("  2. Check the log files for any errors")
+            print("  3. Run the workflow from scratch with a new output directory")
             return 0
         
-        print(f"Steps to resume: {', '.join(remaining_steps)}")
+        print(f"📋 Steps to resume: {', '.join(remaining_steps)}")
+        
+        # Provide more detailed feedback about what will be done
+        for step in remaining_steps:
+            if step == 'describe':
+                desc_file = resume_dir / "descriptions" / "image_descriptions.txt"
+                if desc_file.exists():
+                    print(f"   → Description step: Will continue from existing {desc_file}")
+                else:
+                    print(f"   → Description step: Will create new descriptions file")
+            elif step == 'html':
+                print(f"   → HTML step: Will generate reports from descriptions")
+            elif step == 'video':
+                print(f"   → Video step: Will extract frames from videos")
+            elif step == 'convert':
+                print(f"   → Convert step: Will convert HEIC images to JPG")
         
         # Create orchestrator with resume directory as output
         orchestrator = WorkflowOrchestrator(args.config, base_output_dir=resume_dir)
@@ -319,6 +338,123 @@ def parse_workflow_log(log_file):
     return params
 
 
+def check_descriptions_completeness(workflow_dir, descriptions_file):
+    """
+    Check if the descriptions file contains entries for all available images
+    
+    Args:
+        workflow_dir: Path to workflow directory
+        descriptions_file: Path to descriptions file
+        
+    Returns:
+        bool: True if descriptions are incomplete and need to be regenerated
+    """
+    try:
+        # Ensure we're working with Path objects
+        workflow_dir = Path(workflow_dir)
+        descriptions_file = Path(descriptions_file)
+        
+        # Count existing descriptions
+        with open(descriptions_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Count "File: " entries in the descriptions file
+        existing_descriptions = content.count('\nFile: ')
+        # Add 1 if the file starts with "File: " (first entry won't have preceding newline)
+        if content.startswith('File: '):
+            existing_descriptions += 1
+        
+        # Count total images available for description across all relevant directories
+        # Use a set to avoid counting duplicates and track unique images
+        unique_images = set()
+        supported_formats = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}
+        
+        # Check original input directory (from workflow log)
+        workflow_logs = list((workflow_dir / "logs").glob("workflow_*.log"))
+        original_input_dir = None
+        
+        if workflow_logs:
+            try:
+                with open(workflow_logs[0], 'r', encoding='utf-8') as f:
+                    log_content = f.read()
+                    import re
+                    input_match = re.search(r'Input directory: (.+)', log_content)
+                    if input_match:
+                        original_input_dir = Path(input_match.group(1).strip())
+            except Exception:
+                pass
+        
+        # Priority order: converted_images > extracted_frames > original input
+        # This matches the workflow's processing logic
+        
+        # First, add images from converted_images directory (highest priority)
+        converted_dir = workflow_dir / "converted_images"
+        if converted_dir.exists():
+            for file_path in converted_dir.rglob("*"):
+                if file_path.is_file() and file_path.suffix.lower() in supported_formats:
+                    # Use relative path from converted_dir as unique identifier
+                    relative_path = file_path.relative_to(converted_dir)
+                    unique_images.add(('converted', str(relative_path)))
+        
+        # Then, add images from extracted_frames directory
+        frames_dir = workflow_dir / "extracted_frames"
+        if frames_dir.exists():
+            for file_path in frames_dir.rglob("*"):
+                if file_path.is_file() and file_path.suffix.lower() in supported_formats:
+                    relative_path = file_path.relative_to(frames_dir)
+                    # Only add if we don't already have a converted version
+                    frame_id = ('frames', str(relative_path))
+                    # Check if this might be a duplicate of a converted image
+                    stem_name = file_path.stem.lower()
+                    is_duplicate = any(
+                        source == 'converted' and stem_name in path.lower() 
+                        for source, path in unique_images
+                    )
+                    if not is_duplicate:
+                        unique_images.add(frame_id)
+        
+        # Finally, add images from original input directory (lowest priority)
+        if original_input_dir and original_input_dir.exists():
+            for file_path in original_input_dir.rglob("*"):
+                if file_path.is_file() and file_path.suffix.lower() in supported_formats:
+                    try:
+                        relative_path = file_path.relative_to(original_input_dir)
+                        # Only add if we don't already have processed versions
+                        stem_name = file_path.stem.lower()
+                        is_duplicate = any(
+                            stem_name in path.lower() 
+                            for source, path in unique_images
+                        )
+                        if not is_duplicate:
+                            unique_images.add(('original', str(relative_path)))
+                    except ValueError:
+                        # Handle case where file_path is not relative to original_input_dir
+                        continue
+        
+        total_images = len(unique_images)
+        
+        print(f"Descriptions check: Found {existing_descriptions} descriptions for {total_images} images")
+        
+        # If we have significantly fewer descriptions than images, we need to continue
+        # Use a threshold to account for potential edge cases
+        completion_threshold = 0.95  # 95% completion
+        if total_images > 0 and (existing_descriptions / total_images) < completion_threshold:
+            print(f"Descriptions incomplete: {existing_descriptions}/{total_images} = {existing_descriptions/total_images:.1%}")
+            return True
+        
+        if total_images == 0:
+            print("Warning: No images found to describe")
+            return False
+        
+        print(f"Descriptions appear complete: {existing_descriptions}/{total_images}")
+        return False
+        
+    except Exception as e:
+        print(f"Warning: Could not check description completeness: {e}")
+        # If we can't check, assume incomplete to be safe
+        return True
+
+
 def analyze_workflow_completion(workflow_dir, original_params):
     """Analyze workflow directory to determine which steps still need to be completed"""
     remaining_steps = []
@@ -344,9 +480,10 @@ def analyze_workflow_completion(workflow_dir, original_params):
             if not descriptions_file.exists():
                 remaining_steps.append('describe')
             else:
-                # Check if descriptions seem complete
-                # TODO: Could add more sophisticated checking here
-                pass
+                # Check if descriptions are actually complete by comparing with available images
+                needs_describe = check_descriptions_completeness(workflow_dir, descriptions_file)
+                if needs_describe:
+                    remaining_steps.append('describe')
         
         elif step == 'html':
             # Check if HTML reports are complete
