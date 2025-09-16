@@ -19,6 +19,7 @@ Features:
 import sys
 import os
 import json
+import re
 import subprocess
 import threading
 import time
@@ -49,7 +50,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QLabel, QTextEdit, QSplitter,
     QMenuBar, QMenu, QFileDialog, QMessageBox, QDialog, QDialogButtonBox,
-    QComboBox, QProgressBar, QStatusBar, QTreeWidget, QTreeWidgetItem,
+    QComboBox, QProgressBar, QProgressDialog, QStatusBar, QTreeWidget, QTreeWidgetItem,
     QInputDialog, QPlainTextEdit, QCheckBox, QPushButton, QFormLayout,
     QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup, QGroupBox, QLineEdit,
     QTextEdit, QTabWidget, QScrollArea, QFrame
@@ -675,7 +676,7 @@ class AccessibleTextEdit(QPlainTextEdit):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
     def keyPressEvent(self, event):
-        """Override to handle Tab key properly for accessibility"""
+        """Override to handle Tab key properly for accessibility and pass special keys to parent"""
         if event.key() == Qt.Key.Key_Tab:
             # Tab should move to next widget, not insert tab character
             # Use the parent widget's focus navigation
@@ -693,6 +694,19 @@ class AccessibleTextEdit(QPlainTextEdit):
             else:
                 self.focusPreviousChild()
             event.accept()
+        elif event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            # Pass Z key to parent ImageDescriber for auto-rename functionality
+            print("DEBUG: AccessibleTreeWidget received Z key, passing to parent")
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, 'auto_rename_item'):
+                    print("DEBUG: Found ImageDescriber parent, calling auto_rename_item")
+                    parent.auto_rename_item()
+                    event.accept()
+                    return
+                parent = parent.parent()
+            # If no parent with auto_rename_item found, use default behavior
+            super().keyPressEvent(event)
         else:
             # For all other keys, use default behavior
             super().keyPressEvent(event)
@@ -2132,8 +2146,8 @@ class ProcessingDialog(QDialog):
                     self.prompt_combo.addItem(prompt_name)
                 print(f"Loaded {len(prompt_data)} prompt styles: {list(prompt_data.keys())}")
             else:
-                # Add defaults if no prompts found
-                default_prompts = ["detailed", "concise", "Narrative", "artistic", "technical", "colorful", "social"]
+                # Add defaults if no prompts found - must match config file case exactly
+                default_prompts = ["detailed", "concise", "Narrative", "artistic", "technical", "colorful", "Social"]
                 for prompt in default_prompts:
                     self.prompt_combo.addItem(prompt)
                 print("Warning: No prompts found in config, using defaults")
@@ -4255,6 +4269,20 @@ class ImageDescriberGUI(QMainWindow):
         
         process_menu.addSeparator()
         
+        # Workflow integration
+        self.import_workflow_action = QAction("Import Workflow...", self)
+        self.import_workflow_action.triggered.connect(self.import_workflow_results)
+        self.import_workflow_action.setToolTip("Import results from workflow processing")
+        process_menu.addAction(self.import_workflow_action)
+        
+        self.update_workflow_action = QAction("Update from Workflow...", self)
+        self.update_workflow_action.triggered.connect(self.update_from_workflow)
+        self.update_workflow_action.setToolTip("Update workspace with new workflow results")
+        self.update_workflow_action.setEnabled(False)  # Initially disabled
+        process_menu.addAction(self.update_workflow_action)
+        
+        process_menu.addSeparator()
+        
         skip_verification_action = QAction("Skip Model Verification", self)
         skip_verification_action.setCheckable(True)
         skip_verification_action.setChecked(True)  # Default to checked (skip verification)
@@ -4492,6 +4520,7 @@ class ImageDescriberGUI(QMainWindow):
     
     def keyPressEvent(self, event):
         """Handle global key presses including Ctrl+V for paste"""
+        print(f"DEBUG: ImageDescriber keyPressEvent called with key: {event.key()}")
         if event.key() == Qt.Key.Key_V and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             # Handle Ctrl+V paste
             self.handle_paste_from_clipboard()
@@ -4500,6 +4529,10 @@ class ImageDescriberGUI(QMainWindow):
         elif event.key() == Qt.Key.Key_F:
             # Regular followup processing for images (chat sessions handle their own followup)
             self.followup_processing()
+        elif event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            # Auto-rename using AI-generated caption (hidden feature)
+            print("DEBUG: Z key pressed in ImageDescriber, calling auto_rename_item")
+            self.auto_rename_item()
         else:
             super().keyPressEvent(event)
     
@@ -4783,6 +4816,7 @@ class ImageDescriberGUI(QMainWindow):
                 # Load the workspace content
                 self.refresh_view()
                 self.update_window_title()
+                self.update_menu_states()  # Update menu states after loading workspace
                 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to open workspace:\n{str(e)}")
@@ -5480,6 +5514,178 @@ class ImageDescriberGUI(QMainWindow):
             self.refresh_current_view()
             
             self.statusBar().showMessage(f"Renamed item to '{new_name.strip()}'", 3000)
+
+    def auto_rename_item(self):
+        """Auto-rename the currently selected item using AI-generated caption (hidden feature)"""
+        print("DEBUG: auto_rename_item called")
+        file_path = self.get_current_selected_file_path()
+        print(f"DEBUG: file_path = {file_path}")
+        if not file_path:
+            print("DEBUG: No file path, returning")
+            return
+            
+        item = self.workspace.get_item(file_path)
+        print(f"DEBUG: item = {item}")
+        if not item:
+            print("DEBUG: No item found, returning")
+            return
+        
+        # Only work with image files
+        if not self._is_image_file(file_path):
+            print("DEBUG: Not an image file, returning")
+            return
+        
+        print("DEBUG: All checks passed, proceeding with caption generation")
+        
+        # Store current selection and focus
+        current_selection = self.image_list.currentRow()
+        
+        try:
+            # Show brief status message
+            self.statusBar().showMessage("Generating AI caption...", 0)
+            print("DEBUG: Status message set")
+            
+            # Process events to show the status message
+            QApplication.processEvents()
+            
+            # Generate short caption using fast model
+            print("DEBUG: Calling _generate_short_caption")
+            caption = self._generate_short_caption(file_path)
+            print(f"DEBUG: Generated caption: '{caption}'")
+            
+            if caption:
+                # Sanitize caption for use as display name
+                sanitized_caption = self._sanitize_caption_for_display(caption)
+                
+                # Update the display name
+                item.display_name = sanitized_caption
+                
+                # Mark workspace as modified
+                self.workspace.modified = True
+                
+                # Refresh the current view to show the new name
+                self.refresh_current_view()
+                
+                # Restore selection and focus
+                if current_selection >= 0 and current_selection < self.image_list.count():
+                    self.image_list.setCurrentRow(current_selection)
+                    self.image_list.setFocus()
+                
+                self.statusBar().showMessage(f"Auto-renamed to: {sanitized_caption}", 3000)
+            else:
+                self.statusBar().showMessage("Failed to generate caption", 3000)
+                
+        except Exception as e:
+            self.statusBar().showMessage(f"Error during auto-rename: {str(e)}", 3000)
+            # Restore selection and focus even on error
+            if current_selection >= 0 and current_selection < self.image_list.count():
+                self.image_list.setCurrentRow(current_selection)
+                self.image_list.setFocus()
+
+    def _generate_short_caption(self, image_path: str) -> str:
+        """Generate a short caption suitable for display name using fast AI model"""
+        print(f"DEBUG: _generate_short_caption called with {image_path}")
+        try:
+            # Use microsoft/git-base-coco model for fast captioning
+            model_name = "microsoft/git-base-coco"
+            print(f"DEBUG: Using model {model_name}")
+            
+            # Check if HuggingFace provider is available and has the model
+            print(f"DEBUG: HuggingFace available: {self.huggingface_provider.is_available()}")
+            if not self.huggingface_provider.is_available():
+                # Fallback to Ollama if HuggingFace not available
+                if not self.ollama_provider.is_available():
+                    return ""
+                
+                # Use a fast Ollama model as fallback
+                available_models = self.ollama_provider.get_available_models()
+                vision_models = [m for m in available_models if any(keyword in m.lower() for keyword in ['moondream', 'llava', 'phi', 'minicpm'])]
+                if not vision_models:
+                    return ""
+                model_name = vision_models[0]
+                
+                # Create a prompt for short captioning
+                prompt = "Describe this image in 3-5 words. Be concise and focus on the main subject."
+                
+                # Generate caption using Ollama
+                caption = self.ollama_provider.describe_image(image_path, prompt, model_name)
+            else:
+                # Use HuggingFace microsoft/git-base-coco model
+                available_models = self.huggingface_provider.get_available_models()
+                if model_name not in available_models:
+                    # Fallback to Ollama if microsoft/git-base-coco not available
+                    if self.ollama_provider.is_available():
+                        available_ollama_models = self.ollama_provider.get_available_models()
+                        vision_models = [m for m in available_ollama_models if any(keyword in m.lower() for keyword in ['moondream', 'llava', 'phi', 'minicpm'])]
+                        if vision_models:
+                            prompt = "Describe this image in 3-5 words. Be concise and focus on the main subject."
+                            caption = self.ollama_provider.describe_image(image_path, prompt, vision_models[0])
+                        else:
+                            return ""
+                    else:
+                        return ""
+                else:
+                    # Use the microsoft model with HuggingFace provider
+                    # Use Narrative prompt style as requested
+                    prompt = self.get_prompt_text("Narrative")
+                    caption = self.huggingface_provider.describe_image(image_path, prompt, model_name)
+            
+            return caption.strip()
+            
+        except Exception as e:
+            print(f"Error generating caption: {e}")
+            return ""
+    
+    def _sanitize_caption_for_display(self, caption: str) -> str:
+        """Sanitize AI-generated caption for use as display name"""
+        if not caption:
+            return "AI Caption"
+        
+        # Remove common AI response prefixes
+        prefixes_to_remove = [
+            "this image shows",
+            "the image shows",
+            "this is a",
+            "this shows",
+            "i can see",
+            "the photo shows",
+            "the picture shows",
+            "here is",
+            "this depicts",
+            "the scene shows"
+        ]
+        
+        caption_lower = caption.lower().strip()
+        for prefix in prefixes_to_remove:
+            if caption_lower.startswith(prefix):
+                caption = caption[len(prefix):].strip()
+                break
+        
+        # Remove punctuation from the end
+        caption = caption.rstrip('.,!?;:')
+        
+        # Capitalize first letter
+        if caption:
+            caption = caption[0].upper() + caption[1:]
+        
+        # Limit length
+        if len(caption) > 50:
+            caption = caption[:47] + "..."
+        
+        return caption if caption else "AI Caption"
+
+    def update_menu_states(self):
+        """Update menu item states based on workspace state"""
+        # Enable/disable Update from Workflow based on whether a workflow was imported
+        if hasattr(self, 'update_workflow_action') and self.workspace:
+            has_imported_workflow = bool(getattr(self.workspace, 'imported_workflow_dir', None))
+            self.update_workflow_action.setEnabled(has_imported_workflow)
+
+    def _is_image_file(self, file_path: str) -> bool:
+        """Check if file is a supported image format"""
+        ext = Path(file_path).suffix.lower()
+        image_exts = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.heic', '.heif'}
+        return ext in image_exts
 
     # Event handlers
     def on_image_selection_changed(self):
@@ -8187,6 +8393,264 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
         else:
             # No changes or no workspace, close normally
             event.accept()
+
+    def import_workflow_results(self):
+        """Import results from a workflow processing directory"""
+        from pathlib import Path
+        
+        # Select workflow directory
+        workflow_dir = QFileDialog.getExistingDirectory(
+            self, 
+            "Select Workflow Results Directory",
+            str(Path.home()),
+            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
+        )
+        
+        if not workflow_dir:
+            return
+            
+        try:
+            # Validate workflow directory structure
+            workflow_path = Path(workflow_dir)
+            descriptions_file = workflow_path / "descriptions" / "image_descriptions.txt"
+            converted_images_dir = workflow_path / "converted_images"
+            
+            if not descriptions_file.exists():
+                QMessageBox.warning(self, "Invalid Workflow Directory", 
+                                  f"Could not find descriptions file:\n{descriptions_file}")
+                return
+                
+            if not converted_images_dir.exists():
+                QMessageBox.warning(self, "Invalid Workflow Directory",
+                                  f"Could not find converted images directory:\n{converted_images_dir}")
+                return
+            
+            # Start import process
+            self._import_workflow_with_progress(workflow_path, is_update=False)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", f"Failed to import workflow results:\n{e}")
+
+    def _import_workflow_with_progress(self, workflow_path, descriptions_file=None, converted_images_dir=None, is_update=False):
+        """Import workflow results with progress indication"""
+        import re
+        from datetime import datetime
+        
+        # Support both old and new calling patterns
+        if descriptions_file is None:
+            descriptions_file = workflow_path / "descriptions" / "image_descriptions.txt"
+        if converted_images_dir is None:
+            converted_images_dir = workflow_path / "converted_images"
+        
+        # Validate files exist
+        if not descriptions_file.exists():
+            error_msg = f"Could not find descriptions file:\n{descriptions_file}"
+            title = "Update Error" if is_update else "Invalid Workflow Directory"
+            QMessageBox.warning(self, title, error_msg)
+            return
+            
+        if not converted_images_dir.exists():
+            error_msg = f"Could not find converted images directory:\n{converted_images_dir}"
+            title = "Update Error" if is_update else "Invalid Workflow Directory"
+            QMessageBox.warning(self, title, error_msg)
+            return
+        
+        # Create progress dialog
+        action_name = "Updating" if is_update else "Importing"
+        progress = QProgressDialog(f"{action_name} workflow results...", "Cancel", 0, 100, self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.show()
+        
+        try:
+            # Parse descriptions file
+            progress.setLabelText("Parsing descriptions file...")
+            progress.setValue(10)
+            QApplication.processEvents()
+            
+            descriptions_data = self._parse_workflow_descriptions(descriptions_file)
+            
+            if progress.wasCanceled():
+                return
+                
+            # Create or update workspace
+            progress.setLabelText("Setting up workspace...")
+            progress.setValue(20)
+            QApplication.processEvents()
+            
+            if not self.workspace:
+                self.new_workspace()
+            
+            # Import images and descriptions
+            total_items = len(descriptions_data)
+            imported_count = 0
+            skipped_count = 0
+            
+            for i, (file_path, description_info) in enumerate(descriptions_data.items()):
+                if progress.wasCanceled():
+                    break
+                    
+                progress.setLabelText(f"Importing image {i+1} of {total_items}...")
+                progress.setValue(20 + int((i / total_items) * 70))
+                QApplication.processEvents()
+                
+                # Find corresponding image in converted_images
+                image_file = self._find_workflow_image(converted_images_dir, file_path)
+                
+                if image_file:
+                    # Import this image and description
+                    if self._import_single_workflow_item(image_file, description_info):
+                        imported_count += 1
+                    else:
+                        skipped_count += 1
+                else:
+                    skipped_count += 1
+                    print(f"Warning: Could not find image file for {file_path}")
+            
+            # Refresh UI
+            progress.setLabelText("Updating display...")
+            progress.setValue(95)
+            QApplication.processEvents()
+            
+            self.refresh_view()
+            
+            progress.setValue(100)
+            
+            # Save the workflow directory for future updates (only for new imports)
+            if not is_update:
+                self.workspace.imported_workflow_dir = str(workflow_path)
+                self.workspace.mark_modified()
+                # Update menu states
+                self.update_menu_states()
+            
+            # Show summary
+            action_name = "Update" if is_update else "Import"
+            title = f"{action_name} Complete"
+            message = f"Successfully {'updated' if is_update else 'imported'} {imported_count} images from workflow.\n"
+            message += f"Skipped: {skipped_count}\n"
+            message += f"Workflow directory: {workflow_path.name}"
+            
+            QMessageBox.information(self, title, message)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", f"Error during import:\n{e}")
+        finally:
+            progress.close()
+
+    def _parse_workflow_descriptions(self, descriptions_file):
+        """Parse workflow descriptions.txt file and return structured data"""
+        descriptions_data = {}
+        
+        with open(descriptions_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Split by separator lines
+        sections = content.split('--------------------------------------------------------------------------------')
+        
+        for section in sections:
+            section = section.strip()
+            if not section or 'Generated on:' in section:
+                continue
+                
+            # Extract file path
+            file_match = re.search(r'File: (.+)', section)
+            if not file_match:
+                continue
+                
+            file_path = file_match.group(1).strip()
+            
+            # Extract model
+            model_match = re.search(r'Model: (.+)', section)
+            model = model_match.group(1).strip() if model_match else "unknown"
+            
+            # Extract prompt style
+            prompt_match = re.search(r'Prompt Style: (.+)', section)
+            prompt_style = prompt_match.group(1).strip() if prompt_match else "unknown"
+            
+            # Extract description (everything after "Description:")
+            desc_match = re.search(r'Description: (.+)', section, re.DOTALL)
+            description = desc_match.group(1).strip() if desc_match else ""
+            
+            descriptions_data[file_path] = {
+                'model': model,
+                'prompt_style': prompt_style,
+                'description': description,
+                'created': datetime.now().isoformat()
+            }
+        
+        return descriptions_data
+
+    def _find_workflow_image(self, converted_images_dir, original_path):
+        """Find the converted image file corresponding to the original path"""
+        from pathlib import Path
+        
+        # Extract just the filename from the original path
+        original_filename = Path(original_path).name
+        
+        # First, try to find an exact match by filename
+        for image_file in converted_images_dir.glob('*'):
+            if image_file.name.lower() == original_filename.lower():
+                return image_file
+        
+        # If no exact match, return first available image (for testing)
+        # In production, might need more sophisticated matching
+        image_files = list(converted_images_dir.glob('*.jpg')) + list(converted_images_dir.glob('*.png'))
+        return image_files[0] if image_files else None
+
+    def _import_single_workflow_item(self, image_file, description_info):
+        """Import a single image and its description into the workspace"""
+        try:
+            # Create ImageItem
+            item = ImageItem(str(image_file), "image")
+            
+            # Create ImageDescription
+            from data_models import ImageDescription
+            description = ImageDescription(
+                text=description_info['description'],
+                model=description_info['model'],
+                prompt_style=description_info['prompt_style'],
+                created=description_info['created'],
+                provider="workflow_import"
+            )
+            
+            item.add_description(description)
+            
+            # Add to workspace
+            self.workspace.add_item(item)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error importing {image_file}: {e}")
+            return False
+
+    def update_from_workflow(self):
+        """Update workspace with new results from the previously imported workflow directory"""
+        if not self.workspace:
+            QMessageBox.warning(self, "No Workspace", "Please create or open a workspace first.")
+            return
+            
+        # Check if we have a saved workflow directory
+        if not hasattr(self.workspace, 'imported_workflow_dir') or not self.workspace.imported_workflow_dir:
+            QMessageBox.information(self, "No Workflow Import", 
+                                  "No workflow has been imported yet. Use 'Import Workflow...' first.")
+            return
+        
+        workflow_path = Path(self.workspace.imported_workflow_dir)
+        
+        # Check if the workflow directory still exists
+        if not workflow_path.exists():
+            QMessageBox.warning(self, "Workflow Directory Not Found", 
+                              f"The previously imported workflow directory no longer exists:\n{workflow_path}\n\n"
+                              f"Use 'Import Workflow...' to select a new workflow directory.")
+            return
+        
+        try:
+            # Import/update from the saved workflow directory
+            self._import_workflow_with_progress(workflow_path, is_update=True)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Update Error", f"Failed to update from workflow:\n{e}")
 
 
 def main():

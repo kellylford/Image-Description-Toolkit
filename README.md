@@ -23,6 +23,9 @@ python comprehensive_test.py tests/test_files/images
 python workflow.py path/to/your/media/files
 
 # 6. Check the timestamped output directory for results!
+
+# ✨ Bonus: Resume interrupted workflows
+python workflow.py --resume workflow_output_directory
 ```
 
 **🎉 That's it!** The workflow system will handle the rest automatically. 
