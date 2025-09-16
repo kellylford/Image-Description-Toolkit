@@ -35,6 +35,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import time
 
 # Import our workflow utilities
 from workflow_utils import WorkflowConfig, WorkflowLogger, FileDiscovery, create_workflow_paths
@@ -1565,7 +1566,13 @@ class WorkflowOrchestrator:
     
     def _describe_images_with_idw(self, input_dir: Path, output_dir: Path, idw_integration) -> Dict[str, Any]:
         """
-        Run image description with real-time IDW updates
+        Process images individually with real-time IDW updates after each image
+        
+        This provides:
+        - Real-time monitoring (IDW updates after each image)
+        - Resumability (can restart from where it left off)
+        - Individual progress tracking
+        - Support for large batches
         
         Args:
             input_dir: Input directory containing images
@@ -1577,7 +1584,7 @@ class WorkflowOrchestrator:
         """
         try:
             # Get items to process from IDW
-            items_to_process = idw_integration.get_next_items_to_process(batch_size=100)
+            items_to_process = idw_integration.get_next_items_to_process(batch_size=1000)
             
             if not items_to_process:
                 self.logger.info("No items to process - all items complete")
@@ -1588,61 +1595,270 @@ class WorkflowOrchestrator:
                     "description_file": None
                 }
             
-            total_processed = 0
+            # Import AI processing capability - use direct Ollama API
+            import requests
+            import base64
             
-            # Process each item and update IDW in real-time
-            for item in items_to_process:
+            # Get model and prompt configuration
+            model = self.config.config["workflow"]["steps"]["image_description"]["model"]
+            prompt_style = self.config.config["workflow"]["steps"]["image_description"]["prompt_style"]
+            
+            # Simple prompt mapping
+            prompt_map = {
+                "narrative": "Describe this image in a narrative, storytelling style. Focus on the scene, mood, and details as if telling a story.",
+                "detailed": "Provide a detailed description of this image, including all visible elements, colors, composition, and context.",
+                "concise": "Provide a brief, concise description of this image.",
+                "artistic": "Describe this image from an artistic perspective, focusing on composition, style, and aesthetic elements.",
+                "technical": "Provide a technical description of this image, including camera settings, lighting, and photographic aspects if visible."
+            }
+            prompt_text = prompt_map.get(prompt_style.lower(), "Describe this image in detail.")
+            
+            # Test Ollama availability
+            try:
+                response = requests.get("http://localhost:11434/api/tags", timeout=5)
+                if response.status_code != 200:
+                    raise Exception("Ollama not responding")
+                
+                # Check if model is available (use flexible matching like the main validation)
+                models_data = response.json()
+                available_models = [model['name'] for model in models_data.get('models', [])]
+                
+                # Find the actual model name to use (similar to validate_model_availability)
+                actual_model = model  # Start with the requested model
+                model_found = False
+                
+                if model in available_models:
+                    # Exact match
+                    model_found = True
+                else:
+                    # Check for base name matches (e.g., "gemma3" matches "gemma3:latest")
+                    for available_model in available_models:
+                        if ":" in available_model:
+                            base_name = available_model.split(":")[0]
+                            if base_name == model:
+                                actual_model = available_model  # Use the full model name with tag
+                                model_found = True
+                                break
+                
+                if not model_found:
+                    self.logger.error(f"Model {model} not available. Available: {available_models[:3] if available_models else 'None'}")
+                    return {"success": False, "error": f"Model {model} not available", "processed": 0}
+                    
+            except Exception as e:
+                self.logger.error(f"Could not connect to Ollama: {e}")
+                return {"success": False, "error": f"Ollama connection failed: {e}", "processed": 0}
+            
+            total_processed = 0
+            total_failed = 0
+            
+            self.logger.info(f"Processing {len(items_to_process)} items individually with real-time IDW updates")
+            
+            # Process each item individually with immediate IDW updates
+            for i, item in enumerate(items_to_process, 1):
                 item_id = item["item_id"]
-                original_file = item["original_file"]
+                display_file = Path(item["display_file"])
                 
-                self.logger.info(f"Processing: {item_id}")
+                self.logger.info(f"[{i}/{len(items_to_process)}] Processing: {item_id}")
                 
-                # Mark as processing
+                if not display_file.exists():
+                    # File doesn't exist, mark as failed
+                    idw_integration.mark_item_failed(item_id, f"File not found: {display_file}")
+                    self.logger.error(f"❌ Failed: {item_id} - File not found")
+                    total_failed += 1
+                    continue
+                
+                # Mark as processing immediately
                 idw_integration.mark_item_processing(item_id)
                 
                 try:
-                    # Use the existing describe_images method but capture result
-                    step_result = self.describe_images(Path(original_file).parent, output_dir)
+                    # Process the individual image with direct Ollama API
+                    self.logger.info(f"Generating description for: {display_file.name}")
                     
-                    if step_result["success"]:
-                        # Extract description from the generated file
-                        desc_file = step_result.get("description_file")
-                        if desc_file and Path(desc_file).exists():
-                            # Read the description from the file
-                            with open(desc_file, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                            
-                            # Parse to get description for this specific file
-                            description = self._extract_description_for_file(content, Path(original_file).name)
-                            
-                            # Mark as completed in IDW
-                            idw_integration.mark_item_completed(item_id, description)
-                            total_processed += 1
-                            self.logger.info(f"✅ Completed: {item_id}")
-                        else:
-                            raise Exception("Description file not created")
+                    # Read and encode image
+                    with open(display_file, 'rb') as img_file:
+                        image_data = img_file.read()
+                    image_base64 = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # Make Ollama API request
+                    api_data = {
+                        "model": actual_model,  # Use the resolved model name
+                        "prompt": prompt_text,
+                        "images": [image_base64],
+                        "stream": False
+                    }
+                    
+                    response = requests.post(
+                        "http://localhost:11434/api/generate",
+                        json=api_data,
+                        timeout=120  # 2 minute timeout per image
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        description = result.get('response', '').strip()
                     else:
-                        raise Exception(step_result.get("error", "Description failed"))
+                        description = f"Error: HTTP {response.status_code}"
+                    
+                    if description and not description.startswith("Error"):
+                        # Mark as completed with description immediately
+                        idw_integration.mark_item_completed(item_id, description)
+                        total_processed += 1
+                        self.logger.info(f"✅ [{i}/{len(items_to_process)}] Completed: {item_id}")
+                    else:
+                        # Mark as failed
+                        error_msg = f"AI processing failed: {description}" if description else "No description generated"
+                        idw_integration.mark_item_failed(item_id, error_msg)
+                        self.logger.error(f"❌ Failed: {item_id} - {error_msg}")
+                        total_failed += 1
                         
                 except Exception as e:
-                    error_msg = str(e)
+                    # Mark as failed with error
+                    error_msg = f"Processing error: {str(e)}"
                     idw_integration.mark_item_failed(item_id, error_msg)
                     self.logger.error(f"❌ Failed: {item_id} - {error_msg}")
+                    total_failed += 1
+            
+            self.logger.info(f"Individual processing complete: {total_processed} processed, {total_failed} failed")
             
             return {
                 "success": True,
                 "processed": total_processed,
                 "output_dir": output_dir,
-                "description_file": None  # IDW contains all descriptions
+                "description_file": None,  # Individual processing doesn't create a single file
+                "failed": total_failed
             }
             
         except Exception as e:
-            self.logger.error(f"Error in IDW-integrated image description: {e}")
+            self.logger.error(f"Error in individual image processing: {e}")
             return {
                 "success": False,
                 "error": str(e),
                 "processed": 0
             }
+    
+    def _describe_images_batch_fallback(self, input_dir: Path, output_dir: Path, idw_integration) -> Dict[str, Any]:
+        """Fallback to batch processing if individual processing fails"""
+        self.logger.info("Using batch processing fallback")
+        
+        # Mark items as processing
+        items_to_process = idw_integration.get_next_items_to_process(batch_size=100)
+        
+        for item in items_to_process:
+            item_id = item["item_id"]
+            idw_integration.mark_item_processing(item_id)
+            self.logger.info(f"Processing: {item_id}")
+        
+        # Run the normal image description process
+        step_result = self.describe_images(input_dir, output_dir)
+        
+        if step_result["success"]:
+            # Parse the results and update IDW for each item
+            desc_file = step_result.get("description_file")
+            total_processed = 0
+            
+            if desc_file and Path(desc_file).exists():
+                # Read descriptions and match them to IDW items
+                descriptions = self._parse_description_file(desc_file)
+                
+                for item in items_to_process:
+                    item_id = item["item_id"]
+                    display_file = Path(item["display_file"])
+                    
+                    # Find matching description
+                    file_key = self._find_description_key(descriptions, display_file)
+                    
+                    if file_key and file_key in descriptions:
+                        description = descriptions[file_key]
+                        idw_integration.mark_item_completed(item_id, description)
+                        total_processed += 1
+                        self.logger.info(f"✅ Completed: {item_id}")
+                    else:
+                        idw_integration.mark_item_failed(item_id, "Description not found in results")
+                        self.logger.error(f"❌ Failed: {item_id} - Description not found")
+            
+            return {
+                "success": True,
+                "processed": total_processed,
+                "output_dir": output_dir,
+                "description_file": desc_file
+            }
+        else:
+            # Mark all items as failed
+            for item in items_to_process:
+                item_id = item["item_id"]
+                idw_integration.mark_item_failed(item_id, step_result.get("error", "Description processing failed"))
+                self.logger.error(f"❌ Failed: {item_id} - Processing failed")
+            
+            return step_result
+    
+    def _parse_description_file(self, desc_file: Path) -> Dict[str, str]:
+        """Parse the image descriptions file and return a dict mapping file paths to descriptions"""
+        descriptions = {}
+        
+        try:
+            with open(desc_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Parse the file format from image_describer.py
+            current_file = None
+            current_description = []
+            in_description = False
+            
+            for line in content.split('\n'):
+                line = line.strip()
+                
+                if line.startswith('File: '):
+                    # Save previous description if we have one
+                    if current_file and current_description:
+                        descriptions[current_file] = '\n'.join(current_description).strip()
+                    
+                    # Start new file
+                    current_file = line[6:].strip()  # Remove "File: " prefix
+                    current_description = []
+                    in_description = False
+                    
+                elif line.startswith('Description: ') and current_file:
+                    # Start of description
+                    desc_text = line[13:].strip()  # Remove "Description: " prefix
+                    current_description = [desc_text] if desc_text else []
+                    in_description = True
+                    
+                elif line.startswith('----'):
+                    # End of current file block
+                    if current_file and current_description:
+                        descriptions[current_file] = '\n'.join(current_description).strip()
+                    current_file = None
+                    current_description = []
+                    in_description = False
+                    
+                elif in_description and current_file:
+                    # Continue description
+                    current_description.append(line)
+            
+            # Handle last file if no separator at end
+            if current_file and current_description:
+                descriptions[current_file] = '\n'.join(current_description).strip()
+                
+        except Exception as e:
+            self.logger.error(f"Error parsing description file: {e}")
+        
+        return descriptions
+    
+    def _find_description_key(self, descriptions: Dict[str, str], temp_file: Path) -> str:
+        """Find the matching key in descriptions dict for a temp file"""
+        temp_name = temp_file.name
+        
+        # Try exact matches first
+        for key in descriptions.keys():
+            if Path(key).name == temp_name:
+                return key
+        
+        # Try partial matches (in case of path differences)
+        for key in descriptions.keys():
+            if temp_name in key or key.endswith(temp_name):
+                return key
+        
+        return None
     
     def _extract_description_for_file(self, content: str, filename: str) -> str:
         """Extract description for a specific file from description file content"""
@@ -1865,14 +2081,13 @@ Examples:
         if not output_dir.is_absolute():
             output_dir = (Path(original_cwd) / output_dir).resolve()
     else:
-        # Create timestamped workflow output directory with model and prompt info
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+        # Create workflow output directory with model and prompt info
         # Get model and prompt info for directory naming
         model_name = get_effective_model(args, args.config)
         prompt_style = get_effective_prompt_style(args, args.config)
         
-        # Create descriptive directory name
+        # Create descriptive directory name with timestamp for unique runs
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = (Path(original_cwd) / f"workflow_{model_name}_{prompt_style}_{timestamp}").resolve()
     
     # Parse workflow steps
@@ -2122,15 +2337,27 @@ Examples:
             print(f"\n🔄 Starting IDW-integrated workflow...")
             print(f"� Input directory: {input_dir}")
             
-            # Generate IDW file in the output directory
-            idw_filename = f"workflow_{datetime.now().strftime('%Y%m%d_%H%M%S')}.idw"
+            # Generate default IDW and HTML filenames based on model and prompt
+            raw_model_name = args.model or orchestrator.config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("model", "default")
+            sanitized_model_name = sanitize_name(raw_model_name)
+            prompt_style = args.prompt_style or orchestrator.config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("prompt_style", "default")
+            
+            # Create base filename from sanitized model and prompt
+            base_filename = f"{sanitized_model_name}_{prompt_style.lower()}"
+            
+            # Generate default output files in the output directory
+            idw_filename = f"{base_filename}.idw"
+            html_filename = f"{base_filename}.html"
+            
             idw_path = output_dir / idw_filename
+            html_path = output_dir / html_filename
             print(f"💾 IDW output file: {idw_path}")
+            print(f"📊 HTML output file: {html_path}")
             
             # Create processing configuration
             processing_config = {
-                "model": args.model or orchestrator.config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("model"),
-                "prompt_style": args.prompt_style or orchestrator.config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("prompt_style"),
+                "model": raw_model_name,  # Use raw model name for actual processing
+                "prompt_style": prompt_style,
                 "provider": "ollama",
                 "custom_prompt": None,
                 "conversion_settings": {
@@ -2141,9 +2368,8 @@ Examples:
             
             # Check for existing IDW file to resume
             existing_idw = None
-            for existing_file in output_dir.glob("workflow_*.idw"):
-                existing_idw = existing_file
-                break
+            if idw_path.exists():
+                existing_idw = idw_path
             
             # Initialize IDW integration
             if existing_idw and existing_idw.exists():
@@ -2172,9 +2398,8 @@ Examples:
             if results['success']:
                 print(f"✅ IDW file created: {idw_path}")
                 
-                # Generate HTML from IDW
+                # Generate HTML from IDW using the predefined filename
                 if "html" in steps:
-                    html_path = idw_path.with_suffix('.html')
                     if export_html_from_idw(idw_path, html_path):
                         print(f"✅ HTML report from IDW: {html_path}")
                 
