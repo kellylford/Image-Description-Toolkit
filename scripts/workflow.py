@@ -41,6 +41,12 @@ from workflow_utils import WorkflowConfig, WorkflowLogger, FileDiscovery, create
 from image_describer import get_default_prompt_style
 import re
 
+# Import ollama for model validation
+try:
+    import ollama
+except ImportError:
+    ollama = None
+
 
 def sanitize_name(name: str) -> str:
     """Convert model/prompt names to filesystem-safe strings"""
@@ -126,6 +132,229 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
         pass
         
     return "detailed"
+
+
+def validate_model_availability(model_name: str) -> tuple[bool, list[str]]:
+    """
+    Validate that the specified model is available in Ollama
+    
+    Args:
+        model_name: Name of the model to validate
+        
+    Returns:
+        Tuple of (is_valid, available_models)
+    """
+    if not ollama:
+        # If ollama module is not available, we can't validate but shouldn't block
+        return True, []
+    
+    try:
+        # Check if Ollama is running
+        models_response = ollama.list()
+        
+        # Handle both old and new ollama response formats
+        if hasattr(models_response, 'models'):
+            # New format: models_response.models is a list of Model objects
+            available_models = [model.model for model in models_response.models]
+        else:
+            # Old format: models_response is a dict with 'models' key
+            available_models = [model['name'] for model in models_response.get('models', [])]
+        
+        # Check if the specified model is available
+        is_valid = model_name in available_models
+        return is_valid, available_models
+        
+    except Exception as e:
+        # If we can't connect to Ollama, we can't validate but shouldn't block
+        # The actual image_describer.py will handle this error appropriately
+        return True, []
+
+
+def handle_resume_workflow(args):
+    """Handle workflow resume functionality"""
+    resume_dir = Path(args.resume)
+    
+    if not resume_dir.exists():
+        print(f"Error: Resume directory does not exist: {resume_dir}")
+        sys.exit(1)
+    
+    if not resume_dir.is_dir():
+        print(f"Error: Resume path is not a directory: {resume_dir}")
+        sys.exit(1)
+    
+    # Validate workflow directory structure
+    descriptions_file = resume_dir / "descriptions" / "image_descriptions.txt"
+    logs_dir = resume_dir / "logs"
+    
+    if not logs_dir.exists():
+        print(f"Error: Invalid workflow directory - missing logs: {logs_dir}")
+        sys.exit(1)
+    
+    print(f"Resuming workflow from: {resume_dir}")
+    
+    try:
+        # Find the original workflow log to extract parameters
+        workflow_logs = list(logs_dir.glob("workflow_*.log"))
+        if not workflow_logs:
+            print("Error: Could not find original workflow log file")
+            sys.exit(1)
+        
+        # Parse original workflow parameters
+        original_params = parse_workflow_log(workflow_logs[0])
+        
+        if not original_params:
+            print("Error: Could not extract original workflow parameters")
+            sys.exit(1)
+        
+        print(f"Original input directory: {original_params.get('input_dir')}")
+        print(f"Original steps: {original_params.get('steps', [])}")
+        print(f"Original model: {original_params.get('model', 'default')}")
+        print(f"Original prompt style: {original_params.get('prompt_style', 'default')}")
+        
+        # Determine which steps need to be resumed
+        remaining_steps = analyze_workflow_completion(resume_dir, original_params)
+        
+        if not remaining_steps:
+            print("✅ Workflow appears to be complete - nothing to resume")
+            return 0
+        
+        print(f"Steps to resume: {', '.join(remaining_steps)}")
+        
+        # Create orchestrator with resume directory as output
+        orchestrator = WorkflowOrchestrator(args.config, base_output_dir=resume_dir)
+        
+        # Override configuration with original parameters
+        if original_params.get('model'):
+            orchestrator.config.config["workflow"]["steps"]["image_description"]["model"] = original_params['model']
+        if original_params.get('prompt_style'):
+            orchestrator.config.config["workflow"]["steps"]["image_description"]["prompt_style"] = original_params['prompt_style']
+        
+        # Set logging level
+        if args.verbose:
+            orchestrator.logger.logger.setLevel(logging.DEBUG)
+        
+        # Resume workflow
+        input_dir = Path(original_params['input_dir'])
+        if not input_dir.exists():
+            print(f"Warning: Original input directory no longer exists: {input_dir}")
+            input_dir_input = input("Enter new input directory path (or press Enter to abort): ").strip()
+            if not input_dir_input:
+                print("Resume aborted")
+                sys.exit(1)
+            input_dir = Path(input_dir_input)
+            if not input_dir.exists():
+                print(f"Error: New input directory does not exist: {input_dir}")
+                sys.exit(1)
+        
+        orchestrator.logger.info(f"Resuming workflow with steps: {', '.join(remaining_steps)}")
+        print(f"Resuming workflow with steps: {', '.join(remaining_steps)}")
+        
+        results = orchestrator.run_workflow(input_dir, resume_dir, remaining_steps)
+        
+        # Log and print summary
+        orchestrator.logger.info("\n" + "="*60)
+        orchestrator.logger.info("RESUME WORKFLOW SUMMARY")
+        orchestrator.logger.info("="*60)
+        orchestrator.logger.info(f"Input directory: {results['input_dir']}")
+        orchestrator.logger.info(f"Output directory: {results['output_dir']}")
+        orchestrator.logger.info(f"Overall success: {'✅ YES' if results['success'] else '❌ NO'}")
+        orchestrator.logger.info(f"Steps completed: {', '.join(results['steps_completed']) if results['steps_completed'] else 'None'}")
+        
+        if results['steps_failed']:
+            orchestrator.logger.warning(f"Steps failed: {', '.join(results['steps_failed'])}")
+        
+        print("\n" + "="*60)
+        print("RESUME WORKFLOW SUMMARY")
+        print("="*60)
+        print(f"Input directory: {results['input_dir']}")
+        print(f"Output directory: {results['output_dir']}")
+        print(f"Overall success: {'✅ YES' if results['success'] else '❌ NO'}")
+        print(f"Steps completed: {', '.join(results['steps_completed']) if results['steps_completed'] else 'None'}")
+        
+        if results['steps_failed']:
+            print(f"Steps failed: {', '.join(results['steps_failed'])}")
+        
+        # Exit with appropriate code
+        sys.exit(0 if results['success'] else 1)
+        
+    except KeyboardInterrupt:
+        print("\nWorkflow resume interrupted by user")
+        sys.exit(130)
+    except Exception as e:
+        print(f"Error during resume: {e}")
+        sys.exit(1)
+
+
+def parse_workflow_log(log_file):
+    """Parse workflow log file to extract original parameters"""
+    params = {}
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Extract input directory
+        input_match = re.search(r'Input directory: (.+)', content)
+        if input_match:
+            params['input_dir'] = input_match.group(1).strip()
+        
+        # Extract steps
+        steps_match = re.search(r'Starting workflow with steps: (.+)', content)
+        if steps_match:
+            params['steps'] = [step.strip() for step in steps_match.group(1).split(',')]
+        
+        # Extract model (look in image_describer log if available)
+        model_match = re.search(r'Model: (.+)', content)
+        if model_match:
+            params['model'] = model_match.group(1).strip()
+        
+        # Extract prompt style
+        prompt_match = re.search(r'Prompt Style: (.+)', content)
+        if prompt_match:
+            params['prompt_style'] = prompt_match.group(1).strip()
+            
+    except Exception as e:
+        print(f"Warning: Error parsing workflow log: {e}")
+        
+    return params
+
+
+def analyze_workflow_completion(workflow_dir, original_params):
+    """Analyze workflow directory to determine which steps still need to be completed"""
+    remaining_steps = []
+    original_steps = original_params.get('steps', ['video', 'convert', 'describe', 'html'])
+    
+    # Check each step completion
+    for step in original_steps:
+        if step == 'video':
+            # Check if video extraction is complete
+            extracted_frames_dir = workflow_dir / "extracted_frames"
+            if not extracted_frames_dir.exists() or not any(extracted_frames_dir.glob('*')):
+                remaining_steps.append('video')
+        
+        elif step == 'convert':
+            # Check if image conversion is complete
+            converted_images_dir = workflow_dir / "converted_images"
+            if not converted_images_dir.exists() or not any(converted_images_dir.glob('*')):
+                remaining_steps.append('convert')
+        
+        elif step == 'describe':
+            # Check if descriptions are complete
+            descriptions_file = workflow_dir / "descriptions" / "image_descriptions.txt"
+            if not descriptions_file.exists():
+                remaining_steps.append('describe')
+            else:
+                # Check if descriptions seem complete
+                # TODO: Could add more sophisticated checking here
+                pass
+        
+        elif step == 'html':
+            # Check if HTML reports are complete
+            html_dir = workflow_dir / "html_reports"
+            if not html_dir.exists() or not any(html_dir.glob('*.html')):
+                remaining_steps.append('html')
+    
+    return remaining_steps
 
 
 class WorkflowOrchestrator:
@@ -825,6 +1054,7 @@ Examples:
     
     parser.add_argument(
         "input_dir",
+        nargs='?',  # Make input_dir optional
         help="Input directory containing media files to process"
     )
     
@@ -868,11 +1098,27 @@ Examples:
     )
     
     parser.add_argument(
+        "--resume",
+        help="Resume processing from a previous workflow directory"
+    )
+    
+    parser.add_argument(
         "--original-cwd",
         help=argparse.SUPPRESS  # Hidden argument for wrapper communication
     )
     
     args = parser.parse_args()
+    
+    # Validate that either input_dir or resume is provided
+    if not args.input_dir and not args.resume:
+        parser.error("Either input_dir or --resume must be provided")
+    
+    if args.input_dir and args.resume:
+        parser.error("Cannot specify both input_dir and --resume")
+    
+    # Handle resume functionality
+    if args.resume:
+        return handle_resume_workflow(args)
     
     # Handle original working directory if called from wrapper
     original_cwd = args.original_cwd if args.original_cwd else os.getcwd()
@@ -938,7 +1184,68 @@ Examples:
             orchestrator.config.config["workflow"]["steps"]["image_description"]["model"] = args.model
         
         if args.prompt_style:
-            orchestrator.config.config["workflow"]["steps"]["image_description"]["prompt_style"] = args.prompt_style
+            # Validate and correct prompt style case to match image_describer.py expectations
+            valid_prompt_styles = {
+                "detailed": "detailed",
+                "concise": "concise", 
+                "narrative": "Narrative",  # Convert lowercase to proper case
+                "artistic": "artistic",
+                "technical": "technical",
+                "colorful": "colorful",
+                "social": "Social"  # Convert lowercase to proper case
+            }
+            
+            corrected_style = valid_prompt_styles.get(args.prompt_style.lower(), args.prompt_style)
+            orchestrator.config.config["workflow"]["steps"]["image_description"]["prompt_style"] = corrected_style
+            
+            if corrected_style != args.prompt_style:
+                print(f"Note: Corrected prompt style '{args.prompt_style}' to '{corrected_style}' for compatibility")
+        
+        # Validate model availability if describe step is included
+        if "describe" in steps:
+            # Determine which model will be used
+            if args.model:
+                model_to_validate = args.model
+            else:
+                # Get the model from config
+                model_to_validate = orchestrator.config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("model")
+                if not model_to_validate:
+                    # Fall back to image_describer_config.json
+                    try:
+                        config_paths = [
+                            "image_describer_config.json",
+                            "scripts/image_describer_config.json"
+                        ]
+                        for config_path in config_paths:
+                            try:
+                                with open(config_path, 'r', encoding='utf-8') as f:
+                                    img_config = json.load(f)
+                                    model_to_validate = img_config.get("model_settings", {}).get("model")
+                                    if model_to_validate:
+                                        break
+                            except FileNotFoundError:
+                                continue
+                    except Exception:
+                        model_to_validate = None
+            
+            # Validate the model if we found one
+            if model_to_validate:
+                print(f"Validating model availability: {model_to_validate}")
+                is_valid, available_models = validate_model_availability(model_to_validate)
+                
+                if not is_valid and available_models:
+                    orchestrator.logger.error(f"Model '{model_to_validate}' is not available in Ollama")
+                    orchestrator.logger.error(f"Available models: {', '.join(available_models)}")
+                    orchestrator.logger.info(f"You can install the model with: ollama pull {model_to_validate}")
+                    print(f"Error: Model '{model_to_validate}' is not available in Ollama")
+                    print(f"Available models: {', '.join(available_models)}")
+                    print(f"You can install the model with: ollama pull {model_to_validate}")
+                    sys.exit(1)
+                elif is_valid and available_models:
+                    print(f"✅ Model '{model_to_validate}' is available")
+                    orchestrator.logger.info(f"Validated model: {model_to_validate}")
+            else:
+                print("Warning: Could not determine which model will be used for validation")
         
         # Set logging level
         if args.verbose:

@@ -126,6 +126,22 @@ python workflow.py media --verbose
 python workflow.py media --dry-run
 ```
 
+### Resume Interrupted Workflows
+```bash
+# Resume a workflow that was interrupted (power loss, crash, etc.)
+python workflow.py --resume workflow_gemma3_narrative_20250916_110009
+
+# The resume feature will:
+# - Analyze the existing workflow directory
+# - Determine which steps are already complete
+# - Continue only with remaining steps
+# - Preserve all original settings (model, prompt style, etc.)
+
+# If the workflow is already complete
+python workflow.py --resume complete_workflow
+# Output: ✅ Workflow appears to be complete - nothing to resume
+```
+
 ## 🔧 Backward Compatibility
 
 **All existing scripts work unchanged!** The workflow system is purely additive:
