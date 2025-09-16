@@ -2,13 +2,34 @@
 # Image Description Toolkit - Git Ignore Rules
 # ==================================================
 
-# Workflow output directories (all patterns)
+# Workflow output directories and files (all patterns)
 # These are created when scripts run and contain processed images/descriptions
 workflow_*/
 workflow_output*/
-comprehensive_test*
+comprehensive_test*/
 *_workflow_*
 *_test_*
+
+# IDW and output files
+*.idw
+*.bak
+workflow_results.*
+batch_*.html
+batch_*.idw
+batch_*.bak
+
+# Test directories and files
+workflow_test_*/
+test_integration*/
+temp_*/
+debug_*.py
+test_temp_*
+clipboard_test_*
+
+# Application specific output files
+image_descriptions.txt
+image_descriptions.html
+*.uuid
 
 # PyInstaller build artifacts
 # Generated when building standalone executables

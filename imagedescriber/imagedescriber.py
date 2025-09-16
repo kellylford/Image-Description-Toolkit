@@ -8495,7 +8495,7 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
                 QApplication.processEvents()
                 
                 # Find corresponding image in converted_images
-                image_file = self._find_workflow_image(converted_images_dir, file_path)
+                image_file = self._find_workflow_image(workflow_path, file_path)
                 
                 if image_file:
                     # Import this image and description
@@ -8580,22 +8580,86 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
         
         return descriptions_data
 
-    def _find_workflow_image(self, converted_images_dir, original_path):
-        """Find the converted image file corresponding to the original path"""
+    def _find_workflow_image(self, workflow_path, original_path):
+        """Find the actual image file corresponding to the description path"""
         from pathlib import Path
         
-        # Extract just the filename from the original path
+        # The original_path comes from the descriptions file and could be:
+        # 1. "202509_a\IMG_3137.PNG" (from original images in temp structure)
+        # 2. "converted_images\AAZT1776.jpg" (from converted images in temp structure)
+        # 3. "extracted_frames\video_frame.jpg" (from video frames in temp structure)
+        
         original_filename = Path(original_path).name
         
-        # First, try to find an exact match by filename
-        for image_file in converted_images_dir.glob('*'):
-            if image_file.name.lower() == original_filename.lower():
-                return image_file
+        # Check multiple possible locations for the actual file
+        search_dirs = [
+            workflow_path / "converted_images",
+            workflow_path / "extracted_frames",
+            workflow_path / "temp_combined_images" / "202509_a",  # Original images from temp structure
+            workflow_path / "temp_combined_images" / "converted_images",  # Converted images from temp structure
+            workflow_path / "temp_combined_images" / "extracted_frames",  # Extracted frames from temp structure
+        ]
         
-        # If no exact match, return first available image (for testing)
-        # In production, might need more sophisticated matching
-        image_files = list(converted_images_dir.glob('*.jpg')) + list(converted_images_dir.glob('*.png'))
-        return image_files[0] if image_files else None
+        # Add dynamic search for any subdirectories in temp_combined_images
+        temp_combined_dir = workflow_path / "temp_combined_images"
+        if temp_combined_dir.exists():
+            for subdir in temp_combined_dir.iterdir():
+                if subdir.is_dir() and subdir not in search_dirs:
+                    search_dirs.append(subdir)
+        
+        # If the original path includes "converted_images", try exact filename match first
+        if "converted_images" in original_path:
+            converted_images_dir = workflow_path / "converted_images"
+            if converted_images_dir.exists():
+                exact_match = converted_images_dir / original_filename
+                if exact_match.exists():
+                    return exact_match
+        
+        # Handle temp directory paths like "202509_a\IMG_3137.PNG"
+        if "\\" in original_path or "/" in original_path:
+            # Try to reconstruct the full path within temp_combined_images
+            temp_path = workflow_path / "temp_combined_images" / original_path.replace("\\", "/")
+            if temp_path.exists():
+                return temp_path
+        
+        # For all search directories, try to find the image
+        for search_dir in search_dirs:
+            if not search_dir.exists():
+                continue
+                
+            # Try exact filename match
+            exact_match = search_dir / original_filename
+            if exact_match.exists():
+                return exact_match
+            
+            # Try case-insensitive match
+            for image_file in search_dir.iterdir():
+                if image_file.is_file() and image_file.name.lower() == original_filename.lower():
+                    return image_file
+            
+            # Try matching by stem (filename without extension) for converted files
+            original_stem = Path(original_filename).stem.lower()
+            for image_file in search_dir.iterdir():
+                if image_file.is_file() and image_file.stem.lower() == original_stem:
+                    return image_file
+        
+        # If still no match found, look for any images with similar names
+        for search_dir in search_dirs:
+            if not search_dir.exists():
+                continue
+                
+            # Look for partial matches in the filename
+            for image_file in search_dir.iterdir():
+                if image_file.is_file() and image_file.suffix.lower() in {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}:
+                    # Check if original filename (without path prefix) contains some common elements
+                    if len(original_filename) > 4:  # Avoid matching very short names
+                        # This is a fallback - try to match based on creation time or file size if needed
+                        # For now, we'll just log that we couldn't find a match
+                        pass
+        
+        # No match found
+        print(f"Warning: Could not find image file for description path: {original_path}")
+        return None
 
     def _import_single_workflow_item(self, image_file, description_info):
         """Import a single image and its description into the workspace"""
