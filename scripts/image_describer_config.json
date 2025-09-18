@@ -1,5 +1,5 @@
 {
-  "default_model": "gemma3:latest",
+  "default_model": "moondream",
   "model_settings": {
     "model": "moondream",
     "temperature": 0.1,
@@ -16,8 +16,7 @@
     "Narrative": "Provide a narrative description including objects, colors and detail. Avoid interpretation, just describe.",
     "artistic": "Analyze this image from an artistic perspective, describing:\n- Visual composition and framing\n- Color palette and lighting mood\n- Artistic style or technique\n- Emotional tone or atmosphere\n- Subject matter and symbolism",
     "technical": "Provide a technical analysis of this image:\n- Camera settings and photographic technique\n- Lighting conditions and quality\n- Composition and framing\n- Image quality and clarity\n- Technical strengths or weaknesses",
-    "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition.",
-    "Social": "Provide a short description of this picture. Now evaluate suitability for social miedia:\ntechnical quality, unique, interesting elements."
+    "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition."
   },
   "output_format": {
     "include_timestamp": false,
