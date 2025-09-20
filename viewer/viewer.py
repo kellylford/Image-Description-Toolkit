@@ -436,11 +436,17 @@ class RedescribeDialog(QDialog):
     def update_prompt_preview(self):
         """Update the prompt text preview when selection changes"""
         current_style = self.prompt_combo.currentText()
-        if current_style in self.prompt_variations:
-            prompt_text = self.prompt_variations[current_style]
-            self.prompt_edit.setPlainText(prompt_text)
-        elif current_style:
-            # Fallback for unknown prompt styles
+        
+        # Case-insensitive lookup in loaded prompt variations
+        if hasattr(self, 'prompt_variations') and self.prompt_variations:
+            lower_variations = {k.lower(): v for k, v in self.prompt_variations.items()}
+            if current_style.lower() in lower_variations:
+                prompt_text = lower_variations[current_style.lower()]
+                self.prompt_edit.setPlainText(prompt_text)
+                return
+        
+        if current_style:
+            # Fallback for unknown prompt styles with case-insensitive lookup
             fallback_prompts = {
                 "detailed": "Describe this image in detail, including main subjects, setting, colors, and activities.",
                 "concise": "Provide a brief description of this image.",
@@ -448,7 +454,9 @@ class RedescribeDialog(QDialog):
                 "artistic": "Analyze this image from an artistic perspective, describing composition, colors, and mood.",
                 "technical": "Provide a technical analysis of this image including photographic technique and quality."
             }
-            prompt_text = fallback_prompts.get(current_style, "Describe this image.")
+            # Case-insensitive fallback lookup
+            lower_fallbacks = {k.lower(): v for k, v in fallback_prompts.items()}
+            prompt_text = lower_fallbacks.get(current_style.lower(), "Describe this image.")
             self.prompt_edit.setPlainText(prompt_text)
     
     def get_selections(self):

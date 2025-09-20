@@ -197,15 +197,18 @@ class ImageDescriber:
     
     def get_prompt(self) -> str:
         """
-        Get the prompt based on the selected style
+        Get the prompt based on the selected style with case-insensitive lookup
         
         Returns:
             Prompt string
         """
         prompt_variations = self.config.get('prompt_variations', {})
         
-        if self.prompt_style in prompt_variations:
-            return prompt_variations[self.prompt_style]
+        # Case-insensitive lookup
+        lower_variations = {k.lower(): v for k, v in prompt_variations.items()}
+        
+        if self.prompt_style.lower() in lower_variations:
+            return lower_variations[self.prompt_style.lower()]
         else:
             # Fallback to default prompt_template
             return self.config.get('prompt_template', 
@@ -828,13 +831,22 @@ def get_default_prompt_style(config_file: str = "image_describer_config.json") -
                 config = json.load(f)
             
             default_style = config.get('default_prompt_style', 'detailed')
-            # Validate that the default style exists in prompt_variations
-            available_styles = list(config.get('prompt_variations', {}).keys())
-            if default_style in available_styles:
-                return default_style
+            # Validate that the default style exists in prompt_variations (case-insensitive)
+            prompt_variations = config.get('prompt_variations', {})
+            lower_variations = {k.lower(): k for k, v in prompt_variations.items()}
+            
+            if default_style.lower() in lower_variations:
+                return lower_variations[default_style.lower()]
             else:
                 logger.warning(f"Default prompt style '{default_style}' not found in prompt_variations. Using 'detailed'.")
-                return 'detailed' if 'detailed' in available_styles else available_styles[0] if available_styles else 'detailed'
+                # Try to find 'detailed' case-insensitively
+                if 'detailed' in lower_variations:
+                    return lower_variations['detailed']
+                # Return first available style if any exist
+                elif prompt_variations:
+                    return list(prompt_variations.keys())[0]
+                else:
+                    return 'detailed'
     except:
         pass
     
