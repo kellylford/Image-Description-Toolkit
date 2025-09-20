@@ -24,6 +24,7 @@ import os
 import argparse
 import subprocess
 import shutil
+import shlex
 
 # Set UTF-8 encoding for console output on Windows
 if sys.platform.startswith('win'):
@@ -92,18 +93,55 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
     return "unknown"
 
 
+def validate_prompt_style(style: str, config_file: str = "image_describer_config.json") -> str:
+    """Validate and normalize prompt style with case-insensitive lookup"""
+    if not style:
+        return "detailed"
+    
+    try:
+        import json
+        config_paths = [
+            config_file,
+            "image_describer_config.json",
+            "scripts/image_describer_config.json"
+        ]
+        
+        for config_path in config_paths:
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    prompt_variations = config.get('prompt_variations', {})
+                    
+                    # Create case-insensitive lookup
+                    lower_variations = {k.lower(): k for k in prompt_variations.keys()}
+                    
+                    # Check if style exists (case-insensitive)
+                    if style.lower() in lower_variations:
+                        return lower_variations[style.lower()]
+                    
+                    break  # Found config file, exit loop
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue
+                
+    except Exception:
+        pass
+        
+    # Fallback to detailed if style not found
+    return "detailed"
+
+
 def get_effective_prompt_style(args, config_file: str = "workflow_config.json") -> str:
     """Determine which prompt style will actually be used"""
     # Command line argument takes precedence
     if hasattr(args, 'prompt_style') and args.prompt_style:
-        return sanitize_name(args.prompt_style)
+        return validate_prompt_style(args.prompt_style)
     
     # Check workflow config file
     try:
         config = WorkflowConfig(config_file)
         workflow_prompt = config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("prompt_style")
         if workflow_prompt:
-            return sanitize_name(workflow_prompt)
+            return validate_prompt_style(workflow_prompt)
     except Exception:
         pass
     
@@ -118,7 +156,7 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
         for config_path in config_paths:
             try:
                 default_style = get_default_prompt_style(config_path)
-                return sanitize_name(default_style)
+                return validate_prompt_style(default_style)
             except (FileNotFoundError, ImportError):
                 continue
                 
@@ -478,13 +516,15 @@ class WorkflowOrchestrator:
             
             # Handle prompt style - use config file default if not explicitly set
             if "prompt_style" in step_config and step_config["prompt_style"]:
-                cmd.extend(["--prompt-style", step_config["prompt_style"]])
+                validated_style = validate_prompt_style(step_config["prompt_style"])
+                cmd.extend(["--prompt-style", validated_style])
             else:
                 # Get default prompt style from image describer config
                 config_file = step_config.get("config_file", "image_describer_config.json")
                 default_style = get_default_prompt_style(config_file)
-                if default_style != "detailed":  # Only add if different from hardcoded default
-                    cmd.extend(["--prompt-style", default_style])
+                validated_style = validate_prompt_style(default_style)
+                if validated_style != "detailed":  # Only add if different from hardcoded default
+                    cmd.extend(["--prompt-style", validated_style])
             
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
@@ -802,6 +842,153 @@ class WorkflowOrchestrator:
             self.logger.warning(f"Could not update frame extractor config: {e}")
 
 
+def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
+    """
+    Parse workflow logs to determine completion state and original parameters
+    
+    Args:
+        output_dir: Workflow output directory containing logs
+        
+    Returns:
+        Dictionary with workflow state information
+    """
+    state = {
+        "valid": False,
+        "input_dir": None,
+        "steps": [],
+        "completed_steps": [],
+        "failed_steps": [],
+        "partially_completed_steps": [],
+        "model": None,
+        "prompt_style": None,
+        "config": None,
+        "can_resume": False,
+        "resume_from_step": None,
+        "describe_progress": None
+    }
+    
+    # Find workflow log file
+    logs_dir = output_dir / "logs"
+    if not logs_dir.exists():
+        return state
+    
+    workflow_logs = list(logs_dir.glob("workflow_*.log"))
+    if not workflow_logs:
+        return state
+    
+    # Find the log file with actual workflow data (not dry-run logs)
+    workflow_log = None
+    for log_file in workflow_logs:
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+                # Look for actual workflow start, not dry-run
+                if "Starting workflow with steps:" in content and "Dry run mode" not in content:
+                    workflow_log = log_file
+                    break
+        except Exception:
+            continue
+    
+    # If no valid workflow log found, use most recent as fallback
+    if not workflow_log:
+        workflow_log = max(workflow_logs, key=lambda x: x.stat().st_mtime)
+    
+    try:
+        with open(workflow_log, 'r', encoding='utf-8', errors='replace') as f:
+            log_content = f.read()
+        
+        # Extract basic workflow info from log
+        lines = log_content.split('\n')
+        
+        for line in lines:
+            if "Starting workflow with steps:" in line:
+                # Extract steps: "Starting workflow with steps: video, convert, describe, html"
+                steps_part = line.split("Starting workflow with steps:")[1].strip()
+                state["steps"] = [s.strip() for s in steps_part.split(',')]
+            
+            elif "Input directory:" in line:
+                # Extract input directory
+                input_part = line.split("Input directory:")[1].strip()
+                state["input_dir"] = input_part
+            
+            elif "Step '" in line and "' completed successfully" in line:
+                # Extract completed steps
+                step_name = line.split("Step '")[1].split("'")[0]
+                if step_name not in state["completed_steps"]:
+                    state["completed_steps"].append(step_name)
+            
+            elif "Step '" in line and "' failed:" in line:
+                # Extract failed steps
+                step_name = line.split("Step '")[1].split("'")[0]
+                if step_name not in state["failed_steps"]:
+                    state["failed_steps"].append(step_name)
+        
+        # Check for partial completion of describe step
+        if "describe" in state["steps"] and "describe" not in state["completed_steps"] and "describe" not in state["failed_steps"]:
+            # Check if descriptions file exists and has content
+            desc_file = output_dir / "descriptions" / "image_descriptions.txt"
+            if desc_file.exists():
+                try:
+                    with open(desc_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Count actual image descriptions by counting "File:" entries
+                        existing_descriptions = content.count("File: ")
+                    if existing_descriptions > 0:
+                        state["partially_completed_steps"].append("describe")
+                        state["describe_progress"] = existing_descriptions
+                except Exception:
+                    pass
+        
+        # Parse command line from log to extract model and other parameters
+        for line in lines:
+            if "Original command:" in line:
+                # This is the logged original command
+                cmd_line = line.split("Original command:")[1].strip()
+                
+                # Parse command line arguments
+                import shlex
+                try:
+                    cmd_args = shlex.split(cmd_line)
+                    # Find workflow.py and parse arguments after it
+                    for i, arg in enumerate(cmd_args):
+                        if arg.endswith("workflow.py"):
+                            remaining_args = cmd_args[i+1:]
+                            # Parse the arguments
+                            for j, arg in enumerate(remaining_args):
+                                if arg == "--model" and j+1 < len(remaining_args):
+                                    state["model"] = remaining_args[j+1]
+                                elif arg == "--prompt-style" and j+1 < len(remaining_args):
+                                    state["prompt_style"] = remaining_args[j+1]
+                                elif arg == "--config" and j+1 < len(remaining_args):
+                                    state["config"] = remaining_args[j+1]
+                            break
+                except Exception:
+                    pass  # Ignore parsing errors
+        
+        # Determine if workflow can be resumed
+        if state["steps"] and state["input_dir"]:
+            state["valid"] = True
+            
+            # Check if workflow is incomplete
+            total_steps = len(state["steps"])
+            completed_steps = len(state["completed_steps"])
+            
+            if completed_steps < total_steps and not state["failed_steps"]:
+                state["can_resume"] = True
+                
+                # Find the next step to resume from
+                for step in state["steps"]:
+                    if step not in state["completed_steps"]:
+                        state["resume_from_step"] = step
+                        break
+    
+    except Exception as e:
+        # Log parsing failed
+        print(f"Warning: Could not parse workflow state: {e}")
+    
+    return state
+
+
 def main():
     """Main function for command-line usage"""
     parser = argparse.ArgumentParser(
@@ -820,12 +1007,28 @@ Examples:
   python workflow.py photos --steps describe,html
   python workflow.py videos --steps video,describe,html --model llava:7b
   python workflow.py mixed_media --output-dir analysis --config my_workflow.json
+  
+Resume Examples:
+  python workflow.py --resume workflow_output_20250919_153443
+  python workflow.py --resume /path/to/interrupted/workflow
         """
     )
     
     parser.add_argument(
         "input_dir",
+        nargs='?',  # Make input_dir optional when using --resume
         help="Input directory containing media files to process"
+    )
+    
+    parser.add_argument(
+        "--resume", "-r",
+        help="Resume an interrupted workflow from the specified output directory"
+    )
+    
+    parser.add_argument(
+        "--preserve-descriptions",
+        action="store_true",
+        help="When resuming, preserve existing descriptions and skip describe step if substantial progress exists"
     )
     
     parser.add_argument(
@@ -874,37 +1077,126 @@ Examples:
     
     args = parser.parse_args()
     
-    # Handle original working directory if called from wrapper
-    original_cwd = args.original_cwd if args.original_cwd else os.getcwd()
-    
-    # Validate input directory (resolve relative to original working directory)
-    input_dir = Path(args.input_dir)
-    if not input_dir.is_absolute():
-        input_dir = (Path(original_cwd) / input_dir).resolve()
-    
-    if not input_dir.exists():
-        # Can't use logger yet since orchestrator isn't created
-        print(f"Error: Input directory does not exist: {input_dir}")
-        sys.exit(1)
-    
-    # Set output directory (resolve relative to original working directory)
-    if args.output_dir:
-        output_dir = Path(args.output_dir)
-        if not output_dir.is_absolute():
-            output_dir = (Path(original_cwd) / output_dir).resolve()
+    # Handle resume mode
+    if args.resume:
+        # Resume mode - validate resume directory and extract workflow state
+        resume_dir = Path(args.resume)
+        
+        if not resume_dir.is_absolute():
+            # Use original working directory if provided, otherwise current directory
+            base_dir = Path(args.original_cwd) if args.original_cwd else Path(os.getcwd())
+            resume_dir = (base_dir / resume_dir).resolve()
+        
+        if not resume_dir.exists():
+            print(f"ERROR: Resume directory does not exist: {resume_dir}")
+            sys.exit(1)
+        
+        # Parse workflow state from logs
+        workflow_state = parse_workflow_state(resume_dir)
+        
+        if not workflow_state["valid"]:
+            print(f"ERROR: Cannot determine workflow state from: {resume_dir}")
+            print("This directory does not appear to contain a valid workflow.")
+            sys.exit(1)
+        
+        if not workflow_state["can_resume"]:
+            if workflow_state["failed_steps"]:
+                print(f"ERROR: Workflow has failed steps: {', '.join(workflow_state['failed_steps'])}")
+                print("Cannot resume a failed workflow.")
+            else:
+                print(f"INFO: Workflow appears to be already complete.")
+                print(f"Completed steps: {', '.join(workflow_state['completed_steps'])}")
+                print("Nothing to resume.")
+            sys.exit(0)
+        
+        # Set up resume parameters
+        input_dir = Path(workflow_state["input_dir"])
+        output_dir = resume_dir
+        steps = workflow_state["steps"]
+        
+        # Override with state from logs
+        if workflow_state["model"]:
+            args.model = workflow_state["model"]
+        if workflow_state["prompt_style"]:
+            args.prompt_style = workflow_state["prompt_style"]
+        if workflow_state["config"]:
+            args.config = workflow_state["config"]
+        
+        # Filter steps to only include those not yet completed
+        remaining_steps = []
+        for step in steps:
+            if step not in workflow_state["completed_steps"]:
+                # Special handling for partially completed describe step
+                if step == "describe" and step in workflow_state.get("partially_completed_steps", []):
+                    desc_count = workflow_state.get('describe_progress', 0)
+                    if desc_count > 0:
+                        print(f"WARNING: Describe step was partially completed ({desc_count} descriptions exist)")
+                        
+                        # If substantial progress exists and preserve flag is set, skip describe
+                        if desc_count > 50 and args.preserve_descriptions:
+                            print(f"Skipping describe step to preserve {desc_count} existing descriptions")
+                            continue  # Skip this step
+                        elif desc_count > 50:
+                            # Ask user what to do with substantial progress
+                            print(f"Substantial progress detected ({desc_count} descriptions).")
+                            response = input("Preserve existing descriptions? (y/n): ").strip().lower()
+                            if response in ['y', 'yes']:
+                                print("Skipping describe step to preserve existing descriptions")
+                                continue
+                            else:
+                                print("Will restart describe step (existing descriptions will be overwritten)")
+                
+                remaining_steps.append(step)
+        
+        steps = remaining_steps
+        
+        if not steps:
+            print("All workflow steps are already completed. Nothing to resume.")
+            sys.exit(0)
+        
+        print(f"Resuming workflow from: {resume_dir}")
+        print(f"Original input: {input_dir}")
+        print(f"Completed steps: {', '.join(workflow_state['completed_steps'])}")
+        print(f"Remaining steps: {', '.join(steps)}")
+        
     else:
-        # Create timestamped workflow output directory with model and prompt info
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Normal mode - validate input directory is provided
+        if not args.input_dir:
+            print("Error: input_dir is required when not using --resume")
+            parser.print_help()
+            sys.exit(1)
         
-        # Get model and prompt info for directory naming
-        model_name = get_effective_model(args, args.config)
-        prompt_style = get_effective_prompt_style(args, args.config)
+        # Handle original working directory if called from wrapper
+        original_cwd = args.original_cwd if args.original_cwd else os.getcwd()
         
-        # Create descriptive directory name
-        output_dir = (Path(original_cwd) / f"workflow_{model_name}_{prompt_style}_{timestamp}").resolve()
-    
-    # Parse workflow steps
-    steps = [step.strip() for step in args.steps.split(",")]
+        # Validate input directory (resolve relative to original working directory)
+        input_dir = Path(args.input_dir)
+        if not input_dir.is_absolute():
+            input_dir = (Path(original_cwd) / input_dir).resolve()
+        
+        if not input_dir.exists():
+            # Can't use logger yet since orchestrator isn't created
+            print(f"Error: Input directory does not exist: {input_dir}")
+            sys.exit(1)
+        
+        # Set output directory (resolve relative to original working directory)
+        if args.output_dir:
+            output_dir = Path(args.output_dir)
+            if not output_dir.is_absolute():
+                output_dir = (Path(original_cwd) / output_dir).resolve()
+        else:
+            # Create timestamped workflow output directory with model and prompt info
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Get model and prompt info for directory naming
+            model_name = get_effective_model(args, args.config)
+            prompt_style = get_effective_prompt_style(args, args.config)
+            
+            # Create descriptive directory name
+            output_dir = (Path(original_cwd) / f"workflow_{model_name}_{prompt_style}_{timestamp}").resolve()
+        
+        # Parse workflow steps
+        steps = [step.strip() for step in args.steps.split(",")]
     
     # Validate steps
     valid_steps = ["video", "convert", "describe", "html"]
@@ -946,6 +1238,28 @@ Examples:
         
         # Run workflow
         results = orchestrator.run_workflow(input_dir, output_dir, steps)
+        
+        # Log original command for resume functionality
+        if not args.resume:  # Only log original command for new workflows
+            original_cmd = ["python", "workflow.py", str(input_dir)]
+            if args.output_dir:
+                original_cmd.extend(["--output-dir", args.output_dir])
+            if args.steps != "video,convert,describe,html":
+                original_cmd.extend(["--steps", args.steps])
+            if args.model:
+                original_cmd.extend(["--model", args.model])
+            if args.prompt_style:
+                original_cmd.extend(["--prompt-style", args.prompt_style])
+            if args.config != "workflow_config.json":
+                original_cmd.extend(["--config", args.config])
+            if args.verbose:
+                original_cmd.append("--verbose")
+            
+            orchestrator.logger.info(f"Original command: {' '.join(original_cmd)}")
+        else:
+            orchestrator.logger.info(f"Resuming workflow from: {resume_dir}")
+            orchestrator.logger.info(f"Original input directory: {input_dir}")
+            orchestrator.logger.info(f"Completed steps before resume: {', '.join(workflow_state['completed_steps'])}")
         
         # Log and print summary
         orchestrator.logger.info("\n" + "="*60)

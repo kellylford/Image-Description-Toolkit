@@ -436,10 +436,14 @@ class PromptEditorMainWindow(QMainWindow):
         prompt_variations = self.config_data.get('prompt_variations', {})
         self.default_prompt_combo.addItems(sorted(prompt_variations.keys()))
         
-        # Set current default
+        # Set current default with case-insensitive matching
         default_style = self.config_data.get('default_prompt_style', '')
-        if default_style in prompt_variations:
-            self.default_prompt_combo.setCurrentText(default_style)
+        if default_style:
+            # Create case-insensitive lookup
+            lower_variations = {k.lower(): k for k in prompt_variations.keys()}
+            if default_style.lower() in lower_variations:
+                actual_key = lower_variations[default_style.lower()]
+                self.default_prompt_combo.setCurrentText(actual_key)
     
     def populate_model_combo(self):
         """Populate the default model combo box with installed Ollama models"""
@@ -503,10 +507,13 @@ class PromptEditorMainWindow(QMainWindow):
             self.duplicate_prompt_btn.setEnabled(False)
     
     def load_prompt(self, prompt_name):
-        """Load a prompt into the editor"""
+        """Load a prompt into the editor with case-insensitive lookup"""
         self.current_prompt_name = prompt_name
         prompt_variations = self.config_data.get('prompt_variations', {})
-        prompt_text = prompt_variations.get(prompt_name, '')
+        
+        # Case-insensitive lookup
+        lower_variations = {k.lower(): v for k, v in prompt_variations.items()}
+        prompt_text = lower_variations.get(prompt_name.lower(), '')
         
         # Temporarily disconnect signals to avoid triggering changes
         self.prompt_name_edit.blockSignals(True)
