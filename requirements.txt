@@ -19,6 +19,12 @@ pillow-heif>=0.13.0
 opencv-python>=4.8.0
 numpy>=1.24.0
 
+# Enhanced metadata extraction dependencies
+pyexiv2>=2.15.0
+ExifRead>=3.0.0
+requests>=2.25.0
+geopy>=2.4.0
+
 # Hugging Face dependencies for local AI models (optional)
 transformers>=4.30.0
 torch>=2.0.0
