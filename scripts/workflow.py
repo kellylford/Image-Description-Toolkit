@@ -169,7 +169,7 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
 class WorkflowOrchestrator:
     """Main workflow orchestrator class"""
     
-    def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None):
+    def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, model: Optional[str] = None, prompt_style: Optional[str] = None):
         """
         Initialize the workflow orchestrator
         
@@ -182,6 +182,10 @@ class WorkflowOrchestrator:
             self.config.set_base_output_dir(base_output_dir)
         self.logger = WorkflowLogger("workflow_orchestrator", base_output_dir=self.config.base_output_dir)
         self.discovery = FileDiscovery(self.config)
+        
+        # Store override settings for resume functionality
+        self.override_model = model
+        self.override_prompt_style = prompt_style
         
         # Available workflow steps
         self.available_steps = {
@@ -511,11 +515,19 @@ class WorkflowOrchestrator:
             if "config_file" in step_config:
                 cmd.extend(["--config", step_config["config_file"]])
             
-            if "model" in step_config and step_config["model"]:
+            # Use override model if provided (for resume), otherwise use config
+            if self.override_model:
+                cmd.extend(["--model", self.override_model])
+                self.logger.info(f"Using override model for resume: {self.override_model}")
+            elif "model" in step_config and step_config["model"]:
                 cmd.extend(["--model", step_config["model"]])
             
-            # Handle prompt style - use config file default if not explicitly set
-            if "prompt_style" in step_config and step_config["prompt_style"]:
+            # Handle prompt style - use override if provided (for resume), otherwise use config
+            if self.override_prompt_style:
+                validated_style = validate_prompt_style(self.override_prompt_style)
+                cmd.extend(["--prompt-style", validated_style])
+                self.logger.info(f"Using override prompt style for resume: {self.override_prompt_style}")
+            elif "prompt_style" in step_config and step_config["prompt_style"]:
                 validated_style = validate_prompt_style(step_config["prompt_style"])
                 cmd.extend(["--prompt-style", validated_style])
             else:
@@ -965,6 +977,29 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
                 except Exception:
                     pass  # Ignore parsing errors
         
+
+        # Also try to extract model and prompt from subprocess commands (for older logs)
+        if not state["model"] or not state["prompt_style"]:
+            for line in lines:
+                if "image_describer.py" in line and "--model" in line:
+                    # Extract from subprocess command lines like:
+                    # python.exe image_describer.py ... --model gemma3 --prompt-style artistic
+                    import shlex
+                    try:
+                        # Find the part after image_describer.py
+                        parts = line.split('image_describer.py', 1)
+                        if len(parts) > 1:
+                            args_part = parts[1].strip()
+                            # Use shlex to properly parse the arguments
+                            tokens = shlex.split(args_part)
+                            for i, token in enumerate(tokens):
+                                if token == "--model" and i+1 < len(tokens) and not state["model"]:
+                                    state["model"] = tokens[i+1]
+                                elif token == "--prompt-style" and i+1 < len(tokens) and not state["prompt_style"]:
+                                    state["prompt_style"] = tokens[i+1]
+                    except Exception:
+                        pass  # Ignore parsing errors
+
         # Determine if workflow can be resumed
         if state["steps"] and state["input_dir"]:
             state["valid"] = True
@@ -1209,7 +1244,7 @@ Resume Examples:
     
     # Create orchestrator first to get access to logging
     try:
-        orchestrator = WorkflowOrchestrator(args.config, base_output_dir=output_dir)
+        orchestrator = WorkflowOrchestrator(args.config, base_output_dir=output_dir, model=args.model, prompt_style=args.prompt_style)
         
         if args.dry_run:
             orchestrator.logger.info("Dry run mode - showing what would be executed:")
