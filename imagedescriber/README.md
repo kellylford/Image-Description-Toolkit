@@ -296,6 +296,33 @@ ollama pull bakllava
 ollama pull llava-phi3
 ```
 
+### Ollama Cloud Models ⭐ NEW!
+ImageDescriber now supports Ollama's cloud models for access to massive models without local hardware requirements:
+
+```bash
+# Sign in to Ollama Cloud
+ollama signin
+
+# Pull cloud models (massive parameter counts!)
+ollama pull deepseek-v3.1:671b-cloud    # 671 billion parameters
+ollama pull qwen3-coder:480b-cloud      # 480 billion parameters  
+ollama pull gpt-oss:120b-cloud          # 120 billion parameters
+ollama pull gpt-oss:20b-cloud           # 20 billion parameters
+```
+
+**Features:**
+- **Separate Provider**: Appears as "Ollama Cloud" in provider dropdown
+- **Automatic Detection**: Only available when cloud models are pulled and user is signed in
+- **Massive Models**: 200B-671B parameter models for superior description quality
+- **Same Interface**: Uses familiar ImageDescriber interface, no learning curve
+- **Datacenter Performance**: Fast inference without local GPU requirements
+
+**Benefits over Local Models:**
+- **Exceptional Quality**: 671B parameter models produce dramatically better descriptions
+- **No Hardware Limits**: Works on any computer with internet
+- **Faster Processing**: Datacenter-grade hardware accelerates generation
+- **Easy Setup**: Just `ollama signin` and `ollama pull` - no complex configuration
+
 ## Workspace File Format
 
 Workspace files (`.idw`) are JSON documents containing:
