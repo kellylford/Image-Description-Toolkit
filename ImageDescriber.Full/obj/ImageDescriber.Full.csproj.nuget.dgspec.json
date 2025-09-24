@@ -1,0 +1,95 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/runner/work/Image-Description-Toolkit/Image-Description-Toolkit/ImageDescriber.Full/ImageDescriber.Full.csproj": {}
+  },
+  "projects": {
+    "/home/runner/work/Image-Description-Toolkit/Image-Description-Toolkit/ImageDescriber.Full/ImageDescriber.Full.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/runner/work/Image-Description-Toolkit/Image-Description-Toolkit/ImageDescriber.Full/ImageDescriber.Full.csproj",
+        "projectName": "ImageDescriber.Full",
+        "projectPath": "/home/runner/work/Image-Description-Toolkit/Image-Description-Toolkit/ImageDescriber.Full/ImageDescriber.Full.csproj",
+        "packagesPath": "/home/runner/.nuget/packages/",
+        "outputPath": "/home/runner/work/Image-Description-Toolkit/Image-Description-Toolkit/ImageDescriber.Full/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/runner/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "CommunityToolkit.Mvvm": {
+              "target": "Package",
+              "version": "[8.2.2, )"
+            },
+            "Microsoft.Extensions.Configuration": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Extensions.Configuration.Json": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Extensions.DependencyInjection": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Extensions.Hosting": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Extensions.Logging": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )"
+            },
+            "System.Net.Http": {
+              "target": "Package",
+              "version": "[4.3.4, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.119/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,245 @@
+<Window x:Class="ImageDescriber.Full.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ImageDescriber.Full"
+        xmlns:converters="clr-namespace:ImageDescriber.Full.Converters"
+        mc:Ignorable="d"
+        Title="Image Describer - Professional Edition" Height="800" Width="1200"
+        MinHeight="600" MinWidth="800">
+
+    <Window.Resources>
+        <!-- Converters -->
+        <converters:FilePathToImageSourceConverter x:Key="FilePathToImageSourceConverter"/>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        
+        <!-- TreeView Item Template for Hierarchical Display -->
+        <DataTemplate x:Key="WorkspaceItemTemplate">
+            <StackPanel Orientation="Horizontal">
+                <CheckBox IsChecked="{Binding BatchMarked}" Margin="0,0,5,0"/>
+                <TextBlock Text="{Binding StatusPrefix}" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="{Binding FileName}" />
+                <TextBlock Text="{Binding DescriptionCount, StringFormat=' ({0} descriptions)'}" 
+                           Foreground="Gray" Margin="5,0,0,0"
+                           Visibility="{Binding HasDescriptions, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Menu Bar -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Menu -->
+        <Menu Grid.Row="0">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New Workspace" Command="{Binding NewWorkspaceCommand}"/>
+                <MenuItem Header="_Open Workspace..." Command="{Binding OpenWorkspaceCommand}"/>
+                <MenuItem Header="_Save Workspace" Command="{Binding SaveWorkspaceCommand}"/>
+                <MenuItem Header="Save Workspace _As..." Command="{Binding SaveWorkspaceAsCommand}"/>
+                <Separator/>
+                <MenuItem Header="Add _Directory..." Command="{Binding AddDirectoryCommand}"/>
+                <MenuItem Header="Add _Files..." Command="{Binding AddFilesCommand}"/>
+                <Separator/>
+                <MenuItem Header="E_xit" Command="{Binding ExitCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Edit Description" Command="{Binding EditDescriptionCommand}"/>
+                <MenuItem Header="_Delete Description" Command="{Binding DeleteDescriptionCommand}"/>
+                <MenuItem Header="_Copy Description" Command="{Binding CopyDescriptionCommand}"/>
+                <Separator/>
+                <MenuItem Header="Mark for _Batch" Command="{Binding ToggleBatchMarkCommand}"/>
+                <MenuItem Header="Mark _All for Batch" Command="{Binding MarkAllBatchCommand}"/>
+                <MenuItem Header="_Clear All Batch Marks" Command="{Binding ClearAllBatchMarksCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Process">
+                <MenuItem Header="Process _Selected Image" Command="{Binding ProcessSelectedCommand}"/>
+                <MenuItem Header="Process _Batch" Command="{Binding ProcessBatchCommand}"/>
+                <MenuItem Header="_Stop Processing" Command="{Binding StopProcessingCommand}"/>
+                <Separator/>
+                <MenuItem Header="_AI Settings..." Command="{Binding ShowAISettingsCommand}"/>
+                <MenuItem Header="_Refresh Models" Command="{Binding RefreshModelsCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Extract Video Frames..." Command="{Binding ExtractVideoFramesCommand}"/>
+                <MenuItem Header="_Convert HEIC to JPG..." Command="{Binding ConvertHeicCommand}"/>
+                <MenuItem Header="_Export Descriptions..." Command="{Binding ExportDescriptionsCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About" Command="{Binding AboutCommand}"/>
+                <MenuItem Header="User _Guide" Command="{Binding ShowUserGuideCommand}"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="400" MinWidth="300"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*" MinWidth="250"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Panel - Workspace Tree -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Workspace Header -->
+                <Border Grid.Row="0" Background="LightGray" Padding="5">
+                    <TextBlock Text="{Binding WorkspaceName, StringFormat='Workspace: {0}'}" 
+                               FontWeight="Bold"/>
+                </Border>
+                
+                <!-- Tree View -->
+                <ListBox Grid.Row="1" 
+                          ItemsSource="{Binding WorkspaceItems}"
+                          ItemTemplate="{StaticResource WorkspaceItemTemplate}"
+                          SelectedItem="{Binding SelectedImageItem}"
+                          x:Name="WorkspaceListBox">
+                </ListBox>
+                
+                <!-- Batch Actions -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="5">
+                    <Button Content="Mark All" Command="{Binding MarkAllBatchCommand}" Margin="0,0,5,0"/>
+                    <Button Content="Clear All" Command="{Binding ClearAllBatchMarksCommand}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Splitter 1 -->
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" 
+                         Background="LightGray" ResizeBehavior="PreviousAndNext"/>
+
+            <!-- Center Panel - Image Preview -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Image Header -->
+                <Border Grid.Row="0" Background="LightGray" Padding="5">
+                    <TextBlock Text="{Binding SelectedImageItem.FileName, StringFormat='Image: {0}'}" 
+                               FontWeight="Bold"/>
+                </Border>
+                
+                <!-- Image Display -->
+                <ScrollViewer Grid.Row="1" ZoomMode="Enabled" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <Image Source="{Binding SelectedImageItem.FilePath, Converter={StaticResource FilePathToImageSourceConverter}}"
+                           Stretch="Uniform" 
+                           MaxWidth="800" MaxHeight="600"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Splitter 2 -->
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" 
+                         Background="LightGray" ResizeBehavior="PreviousAndNext"/>
+
+            <!-- Right Panel - AI Settings and Descriptions -->
+            <Grid Grid.Column="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- AI Provider Settings -->
+                <GroupBox Grid.Row="0" Header="AI Provider Settings" Margin="5">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Label Grid.Row="0" Grid.Column="0" Content="Provider:"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1" 
+                                  ItemsSource="{Binding AvailableProviders}"
+                                  SelectedItem="{Binding SelectedProvider}"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectedValuePath="Value"/>
+
+                        <Label Grid.Row="1" Grid.Column="0" Content="Model:"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" 
+                                  ItemsSource="{Binding AvailableModels}"
+                                  SelectedItem="{Binding SelectedModel}"/>
+
+                        <Button Grid.Row="2" Grid.Column="1" Content="Refresh Models" 
+                               Command="{Binding RefreshModelsCommand}" Margin="0,5,0,0"/>
+                    </Grid>
+                </GroupBox>
+
+                <!-- Processing Controls -->
+                <GroupBox Grid.Row="1" Header="Processing" Margin="5">
+                    <StackPanel>
+                        <Button Content="Process Selected Image" Command="{Binding ProcessSelectedCommand}" 
+                               Margin="0,0,0,5"/>
+                        <Button Content="Process Batch" Command="{Binding ProcessBatchCommand}" 
+                               Margin="0,0,0,5"/>
+                        <Button Content="Stop Processing" Command="{Binding StopProcessingCommand}"/>
+                        
+                        <!-- Progress Display -->
+                        <ProgressBar Value="{Binding ProgressValue}" Maximum="100" Height="20" 
+                                    Margin="0,10,0,0"/>
+                        <TextBlock Text="{Binding ProgressText}" HorizontalAlignment="Center" 
+                                  Margin="0,5,0,0"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Descriptions List -->
+                <GroupBox Grid.Row="2" Header="Descriptions" Margin="5">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <ListBox Grid.Row="0" ItemsSource="{Binding SelectedImageItem.Descriptions}"
+                                SelectedItem="{Binding SelectedDescription}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Model}" FontWeight="Bold" FontSize="10"/>
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="200"/>
+                                        <TextBlock Text="{Binding Created}" FontSize="9" Foreground="Gray"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5,0,0">
+                            <Button Content="Edit" Command="{Binding EditDescriptionCommand}" Margin="0,0,5,0"/>
+                            <Button Content="Delete" Command="{Binding DeleteDescriptionCommand}" Margin="0,0,5,0"/>
+                            <Button Content="Copy" Command="{Binding CopyDescriptionCommand}"/>
+                        </StackPanel>
+                    </Grid>
+                </GroupBox>
+            </Grid>
+        </Grid>
+
+        <!-- Status Bar -->
+        <StatusBar Grid.Row="2">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}"/>
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{Binding WorkspaceItems.Count, StringFormat='Items: {0}'}"/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>

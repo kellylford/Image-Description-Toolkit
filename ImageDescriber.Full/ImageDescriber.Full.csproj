@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyTitle>Image Describer - Professional WPF Edition</AssemblyTitle>
+    <AssemblyDescription>AI-powered image description toolkit with professional WPF interface</AssemblyDescription>
+    <AssemblyCompany>Image Description Toolkit</AssemblyCompany>
+    <AssemblyProduct>ImageDescriber.Full</AssemblyProduct>
+    <AssemblyCopyright>Copyright © 2024</AssemblyCopyright>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
+  </ItemGroup>
+
+</Project>
