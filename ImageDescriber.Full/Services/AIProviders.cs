@@ -196,6 +196,26 @@ namespace ImageDescriber.Full.Services
                     var data = JsonConvert.DeserializeObject<JObject>(content);
                     var models = new List<string>();
 
+                    // Known vision-capable model names based on user's installed models
+                    var visionCapableModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        // LLaVA models
+                        "llava", "llava:latest", "llava:7b", "llava:13b", "llava:34b",
+                        "llava-llama3", "llava-llama3:latest", "llava-llama3:8b",
+                        
+                        // BakLLaVA models  
+                        "bakllava", "bakllava:latest", "bakllava:7b",
+                        
+                        // Moondream models
+                        "moondream", "moondream:latest", "moondream:1.8b",
+                        
+                        // Llama 3.2 Vision models
+                        "llama3.2-vision", "llama3.2-vision:latest", "llama3.2-vision:11b", "llama3.2-vision:90b",
+                        
+                        // Other known vision models
+                        "llama3.2-vision:latest"
+                    };
+
                     if (data?["models"] is JArray modelsArray)
                     {
                         foreach (var model in modelsArray)
@@ -206,24 +226,34 @@ namespace ImageDescriber.Full.Services
                                 // Filter out cloud models (ending with -cloud) for local provider
                                 if (!modelName.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    models.Add(modelName);
+                                    // Check if this is a vision-capable model
+                                    var isVisionCapable = visionCapableModels.Contains(modelName) ||
+                                                         modelName.Contains("llava", StringComparison.OrdinalIgnoreCase) ||
+                                                         modelName.Contains("bakllava", StringComparison.OrdinalIgnoreCase) ||
+                                                         modelName.Contains("moondream", StringComparison.OrdinalIgnoreCase) ||
+                                                         modelName.Contains("vision", StringComparison.OrdinalIgnoreCase);
+                                    
+                                    if (isVisionCapable)
+                                    {
+                                        models.Add(modelName);
+                                    }
                                 }
                             }
                         }
                     }
 
-                    return models.Count > 0 ? models : new List<string> { "llava:7b (No local models installed)" };
+                    return models.Count > 0 ? models : new List<string> { "No vision-capable models installed (install llava:latest, moondream:latest, etc.)" };
                 }
                 else
                 {
                     _logger.LogWarning("Ollama not available: {StatusCode}", response.StatusCode);
-                    return new List<string> { "llava:7b (Ollama not running)" };
+                    return new List<string> { "llava:latest (Ollama not running)" };
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error connecting to Ollama");
-                return new List<string> { "llava:7b (Connection Error)" };
+                return new List<string> { "llava:latest (Connection Error)" };
             }
         }
 
@@ -245,23 +275,48 @@ namespace ImageDescriber.Full.Services
                 var json = JsonConvert.SerializeObject(requestBody);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/generate", content);
+                // Set timeout for Ollama requests (5 minutes like Python version)
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/generate", content, cts.Token);
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var responseContent = await response.Content.ReadAsStringAsync(cts.Token);
                     var responseData = JsonConvert.DeserializeObject<JObject>(responseContent);
-                    return responseData?["response"]?.ToString() ?? "No description generated";
+                    
+                    var description = responseData?["response"]?.ToString();
+                    if (!string.IsNullOrEmpty(description))
+                    {
+                        return description;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Ollama returned empty response for model {Model}", model);
+                        return "No description generated - model returned empty response";
+                    }
                 }
                 else
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Ollama API error {StatusCode}: {Error}", response.StatusCode, errorContent);
+                    
+                    // Check for specific "model stopped" error
+                    if (errorContent.Contains("model stopped") || errorContent.Contains("model not found"))
+                    {
+                        return $"Model '{model}' error: {errorContent}. Ensure the model is installed and running with: ollama run {model}";
+                    }
+                    
                     throw new Exception($"Ollama API error: {response.StatusCode} - {errorContent}");
                 }
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogError("Ollama request timed out for model {Model}", model);
+                throw new Exception($"Request timed out after 5 minutes. Model '{model}' may be too large or not responding.");
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating description with Ollama");
+                _logger.LogError(ex, "Error generating description with Ollama model {Model}", model);
                 throw;
             }
         }
@@ -336,41 +391,14 @@ namespace ImageDescriber.Full.Services
 
         public async Task<string> GenerateDescriptionAsync(string imagePath, string model, string prompt)
         {
-            try
-            {
-                var imageBytes = await System.IO.File.ReadAllBytesAsync(imagePath);
-                var base64Image = Convert.ToBase64String(imageBytes);
-
-                var requestBody = new
-                {
-                    model = model,
-                    prompt = prompt,
-                    images = new[] { base64Image },
-                    stream = false
-                };
-
-                var json = JsonConvert.SerializeObject(requestBody);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/generate", content);
-                
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    var responseData = JsonConvert.DeserializeObject<JObject>(responseContent);
-                    return responseData?["response"]?.ToString() ?? "No description generated";
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    throw new Exception($"Ollama Cloud API error: {response.StatusCode} - {errorContent}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating description with Ollama Cloud");
-                throw;
-            }
+            // Cloud models don't support vision yet (as noted in Python implementation)
+            return $"⚠️ Ollama Cloud model '{model}' doesn't support vision capabilities yet.\n\n" +
+                   $"💡 Try these local vision models instead:\n" +
+                   $"• llava:latest (7B parameters)\n" +
+                   $"• llava-llama3:latest (8B parameters)\n" +
+                   $"• bakllava:latest (7B parameters)\n" +
+                   $"• moondream:latest (1.8B parameters)\n\n" +
+                   $"Cloud models are excellent for text-only tasks but vision support is coming soon!";
         }
     }
 
