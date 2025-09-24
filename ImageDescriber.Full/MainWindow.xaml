@@ -4,60 +4,22 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ImageDescriber.Full"
-        xmlns:converters="clr-namespace:ImageDescriber.Full.Converters"
         mc:Ignorable="d"
-        Title="ImageDescriber - Professional Edition" Height="700" Width="1000"
-        MinHeight="600" MinWidth="800">
+        Title="ImageDescriber" Height="700" Width="1000" MinHeight="600" MinWidth="800">
 
     <Window.Resources>
-        <!-- Converters -->
-        <converters:FilePathToImageSourceConverter x:Key="FilePathToImageSourceConverter"/>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        
-        <!-- Image List Item Template -->
-        <DataTemplate x:Key="ImageItemTemplate">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding FileName}" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" Text="{Binding DescriptionCount, StringFormat='({0})'}" 
-                           Foreground="Gray" Margin="5,0,0,0" VerticalAlignment="Center"/>
-            </Grid>
-        </DataTemplate>
-        
-        <!-- Description List Item Template -->
-        <DataTemplate x:Key="DescriptionItemTemplate">
-            <StackPanel Margin="2">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding Model}" FontWeight="Bold" FontSize="10"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Provider}" FontSize="9" Foreground="DarkBlue"/>
-                </Grid>
-                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding Created}" FontSize="9" Foreground="Gray"/>
-            </StackPanel>
-        </DataTemplate>
+        <!-- Converters for data binding -->
+        <local:FilePathToImageSourceConverter x:Key="FilePathToImageSourceConverter"/>
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </Window.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <!-- Menu Bar (IsTabStop="False" to fix accessibility issue) -->
-        <Menu Grid.Row="0" IsTabStop="False">
+    <DockPanel>
+        <!-- Menu Bar - NOT in tab order as requested -->
+        <MenuBar DockPanel.Dock="Top" IsTabStop="False">
             <MenuItem Header="_File">
-                <MenuItem Header="_New Workspace" Command="{Binding NewWorkspaceCommand}"/>
-                <MenuItem Header="_Open Workspace..." Command="{Binding OpenWorkspaceCommand}"/>
-                <MenuItem Header="_Save Workspace" Command="{Binding SaveWorkspaceCommand}"/>
+                <MenuItem Header="_New Workspace" Command="{Binding NewWorkspaceCommand}" InputGestureText="Ctrl+N"/>
+                <MenuItem Header="_Open Workspace..." Command="{Binding OpenWorkspaceCommand}" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="_Save Workspace" Command="{Binding SaveWorkspaceCommand}" InputGestureText="Ctrl+S"/>
                 <MenuItem Header="Save Workspace _As..." Command="{Binding SaveWorkspaceAsCommand}"/>
                 <Separator/>
                 <MenuItem Header="Add _Directory..." Command="{Binding AddDirectoryCommand}"/>
@@ -66,169 +28,125 @@
                 <MenuItem Header="E_xit" Command="{Binding ExitCommand}"/>
             </MenuItem>
             <MenuItem Header="_Edit">
-                <MenuItem Header="_Edit Description" Command="{Binding EditDescriptionCommand}"/>
-                <MenuItem Header="_Delete Description" Command="{Binding DeleteDescriptionCommand}"/>
-                <MenuItem Header="_Copy Description" Command="{Binding CopyDescriptionCommand}"/>
-                <Separator/>
-                <MenuItem Header="_Process Selected Image" Command="{Binding ProcessSelectedCommand}"/>
-                <MenuItem Header="_Process Batch" Command="{Binding ProcessBatchCommand}"/>
-                <MenuItem Header="_Stop Processing" Command="{Binding StopProcessingCommand}"/>
+                <MenuItem Header="_Copy Description" Command="{Binding CopyDescriptionCommand}" InputGestureText="Ctrl+C"/>
+                <MenuItem Header="_Edit Description..." Command="{Binding EditDescriptionCommand}"/>
+                <MenuItem Header="_Delete Description" Command="{Binding DeleteDescriptionCommand}" InputGestureText="Delete"/>
             </MenuItem>
-            <MenuItem Header="_Tools">
-                <MenuItem Header="_AI Settings..." Command="{Binding ShowAISettingsCommand}"/>
-                <MenuItem Header="_Refresh Models" Command="{Binding RefreshModelsCommand}"/>
-                <MenuItem Header="_Extract Video Frames..." Command="{Binding ExtractVideoFramesCommand}"/>
-                <MenuItem Header="_Convert HEIC..." Command="{Binding ConvertHeicCommand}"/>
-                <MenuItem Header="_Export Descriptions..." Command="{Binding ExportDescriptionsCommand}"/>
+            <MenuItem Header="_Process">
+                <MenuItem Header="Process _Selected Image" Command="{Binding ProcessSelectedCommand}" InputGestureText="P"/>
+                <MenuItem Header="Process _Batch" Command="{Binding ProcessBatchCommand}" InputGestureText="B"/>
+                <MenuItem Header="_Stop Processing" Command="{Binding StopProcessingCommand}" InputGestureText="Esc"/>
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Command="{Binding AboutCommand}"/>
-                <MenuItem Header="User _Guide" Command="{Binding ShowUserGuideCommand}"/>
             </MenuItem>
-        </Menu>
+        </MenuBar>
+        
+        <!-- Status Bar -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}" 
+                          AutomationProperties.Name="Status Message"
+                          AutomationProperties.HelpText="Current operation status"/>
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding ProgressText}" Margin="0,0,10,0"/>
+                    <ProgressBar Width="150" Height="16" Value="{Binding ProgressValue}" Maximum="100" 
+                               Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </StackPanel>
+            </StatusBarItem>
+        </StatusBar>
 
-        <!-- Main Content Area - Two Panel Layout like Python Qt6 app -->
-        <Grid Grid.Row="1">
+        <!-- Main Content - Exact Python Qt6 Layout: Two-Panel Horizontal Splitter -->
+        <Grid DockPanel.Dock="Top">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="400" MinWidth="250"/>
+                <ColumnDefinition Width="400" MinWidth="200"/>
                 <ColumnDefinition Width="5"/>
                 <ColumnDefinition Width="*" MinWidth="300"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left Panel - Image List -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                
+            <!-- LEFT PANEL - Images List (exactly like Python Qt6) -->
+            <DockPanel Grid.Column="0">
                 <!-- Images Header -->
-                <Border Grid.Row="0" Background="LightGray" Padding="5">
-                    <TextBlock Text="Images:" FontWeight="Bold"/>
-                </Border>
+                <TextBlock DockPanel.Dock="Top" Text="Images:" FontWeight="Bold" Margin="5" 
+                          Background="LightGray" Padding="5"/>
                 
-                <!-- Image List -->
-                <ListBox Grid.Row="1" 
-                         Name="ImageListBox"
-                         ItemsSource="{Binding WorkspaceItems}"
-                         SelectedItem="{Binding SelectedImageItem}"
-                         ItemTemplate="{StaticResource ImageItemTemplate}"
-                         AutomationProperties.Name="Image List"
-                         AutomationProperties.HelpText="List of images in the workspace. Use arrow keys to navigate, then Tab to move to descriptions."/>
+                <!-- Batch Info at Bottom -->
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding BatchInfo}" Margin="5" 
+                          AutomationProperties.Name="Batch Queue Status"/>
                 
-                <!-- Batch Info -->
-                <TextBlock Grid.Row="2" 
-                          Text="{Binding BatchInfo}" 
-                          Padding="5" 
-                          Background="LightBlue" 
-                          FontSize="10"/>
-            </Grid>
+                <!-- Images ListBox - Main Content -->
+                <ListBox ItemsSource="{Binding WorkspaceImages}"
+                        SelectedItem="{Binding SelectedImageItem}"
+                        AutomationProperties.Name="Image List"
+                        AutomationProperties.HelpText="List of images and video frames in the workspace. Use arrow keys to navigate, P to process selected image, B to mark for batch.">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="2">
+                                <!-- Status Prefix (✓ for batch marked) -->
+                                <TextBlock Text="{Binding StatusPrefix}" FontWeight="Bold" 
+                                          Foreground="Green" Width="15"/>
+                                <!-- File Name -->
+                                <TextBlock Text="{Binding FileName}"/>
+                                <!-- Description Count -->
+                                <TextBlock Text="{Binding DescriptionCount, StringFormat=' ({0})'}" 
+                                          Foreground="Gray" Margin="5,0,0,0"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
 
-            <!-- Splitter -->
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" 
-                         Background="LightGray" ResizeBehavior="PreviousAndNext"/>
+            <!-- Vertical Splitter -->
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
 
-            <!-- Right Panel - Descriptions -->
-            <Grid Grid.Column="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="200" MinHeight="150"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
+            <!-- RIGHT PANEL - Descriptions (exactly like Python Qt6) -->
+            <DockPanel Grid.Column="2">
                 <!-- Descriptions Header -->
-                <Border Grid.Row="0" Background="LightGray" Padding="5">
-                    <TextBlock Text="Descriptions:" FontWeight="Bold"/>
-                </Border>
+                <TextBlock DockPanel.Dock="Top" Text="Descriptions:" FontWeight="Bold" Margin="5" 
+                          Background="LightGray" Padding="5"/>
                 
-                <!-- Description List -->
-                <ListBox Grid.Row="1"
-                         Name="DescriptionListBox" 
-                         ItemsSource="{Binding SelectedImageItem.Descriptions}"
-                         SelectedItem="{Binding SelectedDescription}"
-                         ItemTemplate="{StaticResource DescriptionItemTemplate}"
-                         AutomationProperties.Name="Description List"
-                         AutomationProperties.HelpText="List of descriptions for the selected image. Use arrow keys to navigate and view different descriptions."/>
-
-                <!-- Description Text Header -->
-                <Border Grid.Row="2" Background="LightGray" Padding="5">
-                    <TextBlock Text="Description Text:" FontWeight="Bold"/>
-                </Border>
+                <!-- Description Text Area at Bottom -->
+                <DockPanel DockPanel.Dock="Bottom" Height="200" MinHeight="100">
+                    <TextBlock DockPanel.Dock="Top" Text="Description Text:" FontWeight="Bold" 
+                              Margin="5" Background="LightGray" Padding="5"/>
+                    <TextBox Text="{Binding SelectedDescription.Text, Mode=OneWay}" 
+                            IsReadOnly="True" 
+                            TextWrapping="Wrap" 
+                            VerticalScrollBarVisibility="Auto" 
+                            Margin="5"
+                            AutomationProperties.Name="Description Text"
+                            AutomationProperties.HelpText="Displays the full image description. Use arrow keys to navigate through the text."/>
+                </DockPanel>
                 
-                <!-- Description Text Display -->
-                <TextBox Grid.Row="3" 
-                         Text="{Binding SelectedDescription.Text, Mode=OneWay}"
-                         IsReadOnly="True" 
-                         TextWrapping="Wrap" 
-                         VerticalScrollBarVisibility="Auto"
-                         AutomationProperties.Name="Description Text"
-                         AutomationProperties.HelpText="Full text of the selected description. Use arrow keys to navigate through the text."
-                         Margin="2"/>
-            </Grid>
+                <!-- Descriptions ListBox - Main Content -->
+                <ListBox ItemsSource="{Binding SelectedImageDescriptions}"
+                        SelectedItem="{Binding SelectedDescription}"
+                        Margin="5"
+                        AutomationProperties.Name="Description List"
+                        AutomationProperties.HelpText="List of descriptions for the selected image. Use arrow keys to navigate and view different descriptions.">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="2">
+                                <!-- Model and Provider Info -->
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Model}" FontWeight="Bold" FontSize="12"/>
+                                    <TextBlock Text="{Binding Provider, StringFormat=' ({0})'}" 
+                                              FontSize="10" Foreground="Blue" Margin="5,0,0,0"/>
+                                </StackPanel>
+                                <!-- Truncated Description Text -->
+                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" 
+                                          MaxHeight="50" TextTrimming="CharacterEllipsis" 
+                                          FontSize="11" Margin="0,2,0,0"/>
+                                <!-- Created Date -->
+                                <TextBlock Text="{Binding Created}" FontSize="9" 
+                                          Foreground="Gray" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
         </Grid>
-
-        <!-- AI Provider Settings -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            
-            <Label Grid.Column="0" Content="Provider:" VerticalAlignment="Center" Margin="5,2"/>
-            <ComboBox Grid.Column="1" 
-                      ItemsSource="{Binding AvailableProviders}"
-                      SelectedItem="{Binding SelectedProvider}"
-                      DisplayMemberPath="DisplayName"
-                      Margin="2"
-                      AutomationProperties.Name="AI Provider"
-                      AutomationProperties.HelpText="Select AI provider for image processing"/>
-            
-            <Label Grid.Column="2" Content="Model:" VerticalAlignment="Center" Margin="5,2"/>
-            <ComboBox Grid.Column="3" 
-                      ItemsSource="{Binding AvailableModels}"
-                      SelectedItem="{Binding SelectedModel}"
-                      Margin="2"
-                      AutomationProperties.Name="AI Model"
-                      AutomationProperties.HelpText="Select AI model for image processing"/>
-            
-            <Button Grid.Column="4" 
-                    Content="Process" 
-                    Command="{Binding ProcessSelectedCommand}"
-                    Margin="5,2"
-                    AutomationProperties.Name="Process Image"
-                    AutomationProperties.HelpText="Process the selected image with AI"/>
-        </Grid>
-
-        <!-- Status Bar and Progress -->
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="200"/>
-            </Grid.ColumnDefinitions>
-            
-            <!-- Status Message -->
-            <TextBlock Grid.Column="0" 
-                       Text="{Binding StatusMessage}" 
-                       VerticalAlignment="Center" 
-                       Margin="5,2"
-                       AutomationProperties.Name="Status Message"/>
-            
-            <!-- Progress Bar -->
-            <StackPanel Grid.Column="1" Orientation="Vertical" Margin="2">
-                <TextBlock Text="{Binding ProgressText}" 
-                           HorizontalAlignment="Center" 
-                           FontSize="10"
-                           AutomationProperties.Name="Progress Text"/>
-                <ProgressBar Value="{Binding ProgressValue}" 
-                            Maximum="100" 
-                            Height="15"
-                            AutomationProperties.Name="Progress Bar"/>
-            </StackPanel>
-        </Grid>
-    </Grid>
+    </DockPanel>
 </Window>

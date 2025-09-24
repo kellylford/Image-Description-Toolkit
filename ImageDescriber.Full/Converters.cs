@@ -5,7 +5,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
 
-namespace ImageDescriber.Full.Converters
+namespace ImageDescriber.Full
 {
     public class FilePathToImageSourceConverter : IValueConverter
     {
@@ -28,7 +28,7 @@ namespace ImageDescriber.Full.Converters
                 }
                 catch (Exception)
                 {
-                    // Return placeholder or null for invalid images
+                    // Return null for invalid images
                 }
             }
             return null;
@@ -42,8 +42,6 @@ namespace ImageDescriber.Full.Converters
 
     public class BoolToVisibilityConverter : IValueConverter
     {
-        public static readonly BoolToVisibilityConverter Instance = new();
-
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value is bool boolValue)
@@ -60,29 +58,6 @@ namespace ImageDescriber.Full.Converters
                 return visibility == Visibility.Visible;
             }
             return false;
-        }
-    }
-
-    public class InverseBoolToVisibilityConverter : IValueConverter
-    {
-        public static readonly InverseBoolToVisibilityConverter Instance = new();
-
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is bool boolValue)
-            {
-                return boolValue ? Visibility.Collapsed : Visibility.Visible;
-            }
-            return Visibility.Visible;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is Visibility visibility)
-            {
-                return visibility != Visibility.Visible;
-            }
-            return true;
         }
     }
 }
