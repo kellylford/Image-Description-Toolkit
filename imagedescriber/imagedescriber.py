@@ -64,7 +64,7 @@ from PyQt6.QtGui import (
 # Import our refactored modules
 from ai_providers import (
     AIProvider, OllamaProvider, OpenAIProvider, HuggingFaceProvider,
-    get_available_providers, _ollama_provider, _openai_provider, _huggingface_provider
+    get_available_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 from worker_threads import (
@@ -76,430 +76,6 @@ from dialogs import DirectorySelectionDialog, ProcessingDialog, ChatWindow
 
 
 # ================================
-# ACCESSIBILITY IMPROVEMENTS
-
-class AIProvider:
-    """Base class for AI providers"""
-    
-    def __init__(self):
-        pass
-    
-    def is_available(self) -> bool:
-        """Check if this provider is available"""
-        raise NotImplementedError
-    
-    def get_models(self) -> List[str]:
-        """Get list of available models"""
-        raise NotImplementedError
-    
-    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
-        """Process image with AI model"""
-        raise NotImplementedError
-    
-    def get_provider_name(self) -> str:
-        """Get human-readable provider name"""
-        raise NotImplementedError
-
-
-class OllamaProvider(AIProvider):
-    """Ollama provider implementation"""
-    
-    def is_available(self) -> bool:
-        return ollama is not None
-    
-    def get_models(self) -> List[str]:
-        """Get list of available Ollama models"""
-        if not self.is_available():
-            return []
-        
-        try:
-            models_response = ollama.list()
-            available_models = []
-            
-            # Handle both old dict format and new object format
-            if hasattr(models_response, 'models'):
-                # New format: models_response.models is a list of model objects
-                for model in models_response.models:
-                    if hasattr(model, 'model'):
-                        model_name = model.model
-                    else:
-                        model_name = getattr(model, 'name', '')
-                    if model_name:
-                        available_models.append(model_name)
-            elif 'models' in models_response:
-                # Old dict format: models_response['models'] 
-                for model in models_response['models']:
-                    model_name = model.get('model', model.get('name', ''))
-                    if model_name:
-                        available_models.append(model_name)
-            
-            # If no models found, add some common vision models as fallback
-            if not available_models:
-                available_models = ['moondream', 'gemma3', 'llava']
-            
-            return available_models
-            
-        except Exception as e:
-            print(f"Error getting Ollama models: {e}")
-            return ['moondream', 'gemma3', 'llava']  # Fallback defaults
-    
-    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
-        """Process image using Ollama"""
-        if not self.is_available():
-            raise Exception("Ollama is not available")
-        
-        # Encode to base64
-        image_base64 = base64.b64encode(image_data).decode('utf-8')
-        
-        # Call Ollama
-        response = ollama.chat(
-            model=model,
-            messages=[{
-                'role': 'user',
-                'content': prompt,
-                'images': [image_base64]
-            }],
-            options={
-                'temperature': kwargs.get('temperature', 0.1),
-                'num_predict': kwargs.get('num_predict', 600)
-            }
-        )
-        
-        if 'message' in response and 'content' in response['message']:
-            content = response['message']['content']
-            if content and content.strip():
-                return content.strip()
-            else:
-                raise Exception("Empty response from Ollama model")
-        else:
-            raise Exception(f"Unexpected response format from Ollama: {response}")
-    
-    def get_provider_name(self) -> str:
-        return "Ollama"
-
-
-class OpenAIProvider(AIProvider):
-    """OpenAI provider implementation"""
-    
-    def __init__(self):
-        super().__init__()
-        self.client = None
-        self.api_key = self._load_api_key()
-        if self.api_key and openai:
-            try:
-                self.client = openai.OpenAI(api_key=self.api_key)
-            except Exception as e:
-                print(f"Error initializing OpenAI client: {e}")
-                self.client = None
-    
-    def _load_api_key(self) -> Optional[str]:
-        """Load OpenAI API key from openai.txt file"""
-        key_file = Path("openai.txt")
-        if key_file.exists():
-            try:
-                return key_file.read_text().strip()
-            except Exception as e:
-                print(f"Error reading OpenAI key file: {e}")
-                return None
-        return None
-    
-    def is_available(self) -> bool:
-        return openai is not None and self.client is not None
-    
-    def get_models(self) -> List[str]:
-        """Get list of available OpenAI vision models"""
-        if not self.is_available():
-            return []
-        
-        # OpenAI vision models (as of 2025)
-        return [
-            'gpt-4o',
-            'gpt-4o-mini'
-        ]
-    
-    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
-        """Process image using OpenAI"""
-        if not self.is_available():
-            raise Exception("OpenAI is not available or API key not found")
-        
-        # Encode to base64
-        image_base64 = base64.b64encode(image_data).decode('utf-8')
-        
-        try:
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=[{
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'text',
-                            'text': prompt
-                        },
-                        {
-                            'type': 'image_url',
-                            'image_url': {
-                                'url': f"data:image/jpeg;base64,{image_base64}"
-                            }
-                        }
-                    ]
-                }],
-                max_tokens=kwargs.get('num_predict', 600),
-                temperature=kwargs.get('temperature', 0.1)
-            )
-            
-            if response.choices and response.choices[0].message.content:
-                return response.choices[0].message.content.strip()
-            else:
-                raise Exception("Empty response from OpenAI model")
-                
-        except Exception as e:
-            raise Exception(f"OpenAI API error: {str(e)}")
-    
-    def get_provider_name(self) -> str:
-        return "OpenAI"
-
-
-class HuggingFaceProvider(AIProvider):
-    """Hugging Face Transformers provider for local vision models"""
-    
-    def __init__(self):
-        super().__init__()
-        self.current_model = None
-        self.processor = None
-        self.device = None
-        self.available_models = {
-            "Salesforce/blip2-opt-2.7b": "BLIP-2 OPT 2.7B (Fast, good quality)",
-            "Salesforce/blip2-flan-t5-xl": "BLIP-2 Flan-T5 XL (Better instruction following)",
-            "Salesforce/instructblip-vicuna-7b": "InstructBLIP Vicuna 7B (Instruction-tuned)",
-            "llava-hf/llava-1.5-7b-hf": "LLaVA 1.5 7B (Conversational)",
-            "microsoft/git-base-coco": "GIT Base COCO (Lightweight)",
-            "openbmb/MiniCPM-V-2": "MiniCPM-V 2 (Efficient)"
-        }
-        
-    def is_available(self) -> bool:
-        """Check if Hugging Face transformers is available"""
-        try:
-            import transformers
-            import torch
-            return True
-        except ImportError:
-            return False
-    
-    def get_models(self) -> List[str]:
-        """Get list of available Hugging Face vision models"""
-        if not self.is_available():
-            return []
-        return list(self.available_models.keys())
-    
-    def get_device(self):
-        """Get the best available device for inference"""
-        if self.device is not None:
-            return self.device
-            
-        try:
-            import torch
-            if torch.cuda.is_available():
-                self.device = "cuda"
-            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-                self.device = "mps"  # Apple Silicon
-            else:
-                self.device = "cpu"
-        except Exception:
-            self.device = "cpu"
-        
-        return self.device
-    
-    def load_model(self, model_name: str, progress_callback=None):
-        """Load a specific Hugging Face model with optional progress reporting"""
-        if self.current_model == model_name:
-            return  # Already loaded
-            
-        try:
-            import torch
-            from transformers import AutoProcessor, AutoModelForCausalLM, BlipProcessor, BlipForConditionalGeneration
-            
-            if progress_callback:
-                progress_callback(f"Downloading/Loading model: {model_name}...", "This may take several minutes for first-time downloads")
-            
-            device = self.get_device()
-            
-            # Common loading arguments
-            common_args = {
-                "torch_dtype": torch.float16 if device != "cpu" else torch.float32,
-                "device_map": "auto" if device != "cpu" else None,
-                "trust_remote_code": True  # Allow custom code execution for models that need it
-            }
-            
-            # Different model architectures need different loading approaches
-            if "blip2" in model_name.lower():
-                from transformers import Blip2Processor, Blip2ForConditionalGeneration
-                self.processor = Blip2Processor.from_pretrained(model_name, trust_remote_code=True)
-                model = Blip2ForConditionalGeneration.from_pretrained(model_name, **common_args)
-            elif "blip" in model_name.lower() and "instruct" in model_name.lower():
-                from transformers import InstructBlipProcessor, InstructBlipForConditionalGeneration
-                self.processor = InstructBlipProcessor.from_pretrained(model_name, trust_remote_code=True)
-                model = InstructBlipForConditionalGeneration.from_pretrained(model_name, **common_args)
-            elif "llava" in model_name.lower():
-                from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
-                self.processor = LlavaNextProcessor.from_pretrained(model_name, trust_remote_code=True)
-                model = LlavaNextForConditionalGeneration.from_pretrained(model_name, **common_args)
-            elif "minicpm" in model_name.lower() or "cpm" in model_name.lower():
-                # Special handling for MiniCPM models
-                self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-                model = AutoModelForCausalLM.from_pretrained(model_name, **common_args)
-            elif "git" in model_name.lower():
-                # Special handling for GIT models
-                from transformers import GitProcessor, GitForCausalLM
-                self.processor = GitProcessor.from_pretrained(model_name, trust_remote_code=True)
-                model = GitForCausalLM.from_pretrained(model_name, **common_args)
-            else:
-                # Generic approach for other models
-                self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-                model = AutoModelForCausalLM.from_pretrained(model_name, **common_args)
-            
-            if device == "cpu":
-                model = model.to(device)
-                
-            self.model = model
-            self.current_model = model_name
-            
-            if progress_callback:
-                progress_callback(f"Model {model_name} loaded successfully", "Ready for processing")
-            
-        except Exception as e:
-            raise Exception(f"Failed to load Hugging Face model {model_name}: {str(e)}")
-    
-    def process_image(self, image_data: bytes, prompt: str, model: str, **kwargs) -> str:
-        """Process image with Hugging Face model"""
-        if not self.is_available():
-            raise Exception("Hugging Face transformers is not available")
-        
-        try:
-            from PIL import Image
-            import torch
-            import io
-            
-            # Get progress callback if provided
-            progress_callback = kwargs.get('progress_callback')
-            
-            # Load the requested model if not already loaded
-            self.load_model(model, progress_callback)
-            
-            # Indicate we're now processing the image
-            if progress_callback:
-                progress_callback(f"Processing with {model}...", "Generating description")
-            
-            # Convert image data to PIL Image
-            image = Image.open(io.BytesIO(image_data)).convert('RGB')
-            
-            # Process with the loaded model
-            device = self.get_device()
-            
-            try:
-                if "blip2" in model.lower():
-                    # BLIP-2 models work better with Q&A format or caption mode
-                    if prompt and len(prompt.strip()) > 0:
-                        # Convert prompt to Q&A format for better results
-                        qa_prompt = f"Question: {prompt} Answer:"
-                        inputs = self.processor(images=image, text=qa_prompt, return_tensors="pt").to(device)
-                    else:
-                        # Caption mode - just the image
-                        inputs = self.processor(images=image, return_tensors="pt").to(device)
-                    
-                    with torch.no_grad():
-                        generated_ids = self.model.generate(**inputs, max_new_tokens=200)
-                    generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-                elif "instruct" in model.lower():
-                    inputs = self.processor(images=image, text=prompt, return_tensors="pt").to(device)
-                    with torch.no_grad():
-                        generated_ids = self.model.generate(**inputs, max_new_tokens=200)
-                    generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-                elif "minicpm" in model.lower() or "cpm" in model.lower():
-                    # MiniCPM models have their own chat interface
-                    msgs = [{'role': 'user', 'content': prompt}]
-                    generated_text = self.model.chat(
-                        image=image,
-                        msgs=msgs,
-                        tokenizer=self.processor.tokenizer,
-                        sampling=True,
-                        temperature=0.7
-                    )
-                elif "git" in model.lower():
-                    # GIT models work differently - they generate captions without prompts
-                    pixel_values = self.processor(images=image, return_tensors="pt").pixel_values.to(device)
-                    with torch.no_grad():
-                        generated_ids = self.model.generate(pixel_values=pixel_values, max_length=50)
-                    generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                else:
-                    # Generic processing
-                    inputs = self.processor(image, prompt, return_tensors="pt").to(device)
-                    with torch.no_grad():
-                        outputs = self.model.generate(**inputs, max_new_tokens=200)
-                    generated_text = self.processor.decode(outputs[0], skip_special_tokens=True)
-            except Exception as processing_error:
-                # Fallback to generic processing if specific method fails
-                try:
-                    inputs = self.processor(image, prompt, return_tensors="pt").to(device)
-                    with torch.no_grad():
-                        outputs = self.model.generate(**inputs, max_new_tokens=200)
-                    generated_text = self.processor.batch_decode(outputs, skip_special_tokens=True)[0].strip()
-                except Exception:
-                    raise processing_error  # Re-raise original error
-            
-            # Clean up the response
-            if prompt in generated_text:
-                generated_text = generated_text.replace(prompt, "").strip()
-            
-            # For BLIP-2, also clean up Q&A format
-            if "blip2" in model.lower() and "Answer:" in generated_text:
-                generated_text = generated_text.split("Answer:")[-1].strip()
-            
-            return generated_text or "No description generated"
-            
-        except Exception as e:
-            raise Exception(f"Hugging Face processing failed: {str(e)}")
-    
-    def get_provider_name(self) -> str:
-        return "Hugging Face"
-    
-    def unload_model(self):
-        """Unload current model to free memory"""
-        if self.model is not None:
-            del self.model
-            del self.processor
-            self.model = None
-            self.processor = None
-            self.current_model = None
-            
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            except Exception:
-                pass
-
-
-# Global provider instances
-_ollama_provider = OllamaProvider()
-_openai_provider = OpenAIProvider()
-_huggingface_provider = HuggingFaceProvider()
-
-def get_available_providers() -> Dict[str, AIProvider]:
-    """Get all available AI providers"""
-    providers = {}
-    
-    if _ollama_provider.is_available():
-        providers['ollama'] = _ollama_provider
-    
-    if _openai_provider.is_available():
-        providers['openai'] = _openai_provider
-        
-    if _huggingface_provider.is_available():
-        providers['huggingface'] = _huggingface_provider
-    
-    return providers
-
-
 # ================================
 # ACCESSIBILITY IMPROVEMENTS
 # ================================
@@ -1002,14 +578,7 @@ class ProcessingWorker(QThread):
             def progress_callback(message, details=""):
                 self.progress_updated.emit(self.file_path, f"{message}")
             
-            description = provider.process_image(
-                image_data=image_data,
-                prompt=prompt,
-                model=self.model,
-                temperature=0.1,
-                num_predict=600,
-                progress_callback=progress_callback
-            )
+            description = provider.describe_image(image_path, prompt, self.model)
             
             return description
                 
@@ -1426,6 +995,8 @@ class ChatProcessingWorker(QThread):
         
         if provider == "ollama":
             return self.process_with_ollama_chat(model, chat_session, conversation_context)
+        elif provider == "ollama_cloud":
+            return self.process_with_ollama_chat(model, chat_session, conversation_context)
         elif provider == "openai":
             return self.process_with_openai_chat(model, chat_session, conversation_context)
         elif provider == "huggingface":
@@ -1491,6 +1062,13 @@ class ChatProcessingWorker(QThread):
                 'max_messages': 20,
                 'max_chars': 8000,  # ~2000 tokens
                 'strategy': 'generous'
+            }
+        elif provider == "ollama_cloud":
+            # Cloud models - very generous with context (large parameter models)
+            return {
+                'max_messages': 25,
+                'max_chars': 12000,  # ~3000 tokens
+                'strategy': 'very_generous'
             }
         elif provider == "openai":
             # Paid API - more conservative
@@ -2037,16 +1615,21 @@ class ProcessingDialog(QDialog):
         """Populate available AI providers"""
         self.provider_combo.clear()
         
+        # Check if we're in development mode with hardcoded models
+        from ai_providers import DEV_MODE_HARDCODED_MODELS
+        
         # Always show all providers for consistency with ProcessingDialog
         all_providers = {
             'ollama': _ollama_provider,
+            'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'huggingface': _huggingface_provider
         }
         
         for provider_key, provider in all_providers.items():
             display_name = provider.get_provider_name()
-            if not provider.is_available():
+            # Skip availability check in dev mode for faster loading
+            if not DEV_MODE_HARDCODED_MODELS and not provider.is_available():
                 display_name += " (Not Available)"
             self.provider_combo.addItem(display_name, provider_key)
     
@@ -2064,6 +1647,7 @@ class ProcessingDialog(QDialog):
         # Update status information based on provider availability
         all_providers = {
             'ollama': _ollama_provider,
+            'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'huggingface': _huggingface_provider
         }
@@ -2075,6 +1659,11 @@ class ProcessingDialog(QDialog):
                     self.status_label.setText("Ollama: Local AI processing. Install models with 'ollama pull <model_name>'")
                 else:
                     self.status_label.setText("Ollama not available. Please install Ollama from https://ollama.ai")
+            elif current_data == "ollama_cloud":
+                if provider.is_available():
+                    self.status_label.setText("Ollama Cloud: Massive cloud models (200B-671B parameters). Sign in with 'ollama signin'")
+                else:
+                    self.status_label.setText("Ollama Cloud not available. Run: ollama signin, then ollama pull <model>:cloud")
             elif current_data == "openai":
                 if provider.is_available():
                     self.status_label.setText("OpenAI: Cloud AI processing. Requires API key in openai.txt file.")
@@ -2092,13 +1681,20 @@ class ProcessingDialog(QDialog):
         """Populate models for selected provider"""
         self.model_combo.clear()
         
-        providers = get_available_providers()
-        if provider_key not in providers:
+        # Use the global provider instances (with caching) directly instead of get_available_providers()
+        all_providers = {
+            'ollama': _ollama_provider,
+            'ollama_cloud': _ollama_cloud_provider,
+            'openai': _openai_provider,
+            'huggingface': _huggingface_provider
+        }
+        
+        if provider_key not in all_providers:
             self.model_combo.addItem("No models available")
             return
         
-        provider = providers[provider_key]
-        models = provider.get_models()
+        provider = all_providers[provider_key]
+        models = provider.get_available_models()
         
         if models:
             for model in models:
@@ -2108,6 +1704,8 @@ class ProcessingDialog(QDialog):
             self.model_combo.addItem("No models available")
             if provider_key == "ollama":
                 print("Warning: No Ollama models detected. Please install vision models with 'ollama pull <model_name>'")
+            elif provider_key == "ollama_cloud":
+                print("Warning: No Ollama Cloud models detected. Please sign in with 'ollama signin' and pull cloud models.")
             elif provider_key == "openai":
                 print("Warning: OpenAI models not available. Check API key in openai.txt")
             elif provider_key == "huggingface":
@@ -2262,17 +1860,22 @@ class ChatDialog(QDialog):
         """Populate provider combo box"""
         self.provider_combo.clear()
         
+        # Check if we're in development mode with hardcoded models
+        from ai_providers import DEV_MODE_HARDCODED_MODELS
+        
         # Always show all providers, regardless of availability
         # This allows users to see what's possible and get setup instructions
         all_providers = {
             'ollama': _ollama_provider,
+            'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'huggingface': _huggingface_provider
         }
         
         for provider_key, provider in all_providers.items():
             display_name = provider.get_provider_name()
-            if not provider.is_available():
+            # Skip availability check in dev mode for faster loading
+            if not DEV_MODE_HARDCODED_MODELS and not provider.is_available():
                 display_name += " (Not Available)"
             self.provider_combo.addItem(display_name, provider_key)
     
@@ -2286,54 +1889,25 @@ class ChatDialog(QDialog):
         """Populate model combo based on provider"""
         self.model_combo.clear()
         
-        if provider == "ollama":
-            try:
-                import ollama
-                models_response = ollama.list()
-                
-                models = []
-                if hasattr(models_response, 'models'):
-                    for model in models_response.models:
-                        if hasattr(model, 'model'):
-                            models.append(model.model)
-                        elif hasattr(model, 'name'):
-                            models.append(model.name)
-                elif 'models' in models_response:
-                    for model in models_response['models']:
-                        models.append(model.get('model', model.get('name', 'Unknown')))
-                
-                if models:
-                    for model in sorted(models):
-                        self.model_combo.addItem(model)
-                else:
-                    self.model_combo.addItem("No models found")
-                    
-            except Exception as e:
-                self.model_combo.addItem(f"Error loading models: {str(e)}")
-                
-        elif provider == "openai":
-            # Add common OpenAI models
-            openai_models = [
-                "gpt-4",
-                "gpt-4-turbo", 
-                "gpt-3.5-turbo",
-                "gpt-4o",
-                "gpt-4o-mini"
-            ]
-            for model in openai_models:
-                self.model_combo.addItem(model)
-                
-        elif provider == "huggingface":
-            # Add Hugging Face vision models
-            global _huggingface_provider
-            if _huggingface_provider.is_available():
-                models = _huggingface_provider.get_models()
+        # Use the global provider instances (with caching) directly
+        all_providers = {
+            'ollama': _ollama_provider,
+            'ollama_cloud': _ollama_cloud_provider,
+            'openai': _openai_provider,
+            'huggingface': _huggingface_provider
+        }
+        
+        if provider in all_providers:
+            provider_instance = all_providers[provider]
+            models = provider_instance.get_available_models()
+            
+            if models:
                 for model in models:
-                    # Show just the model name part for cleaner display
-                    display_name = model.split('/')[-1] if '/' in model else model
-                    self.model_combo.addItem(display_name, model)  # Store full name as data
+                    self.model_combo.addItem(model)
             else:
-                self.model_combo.addItem("Install: pip install transformers torch")
+                self.model_combo.addItem("No models available")
+        else:
+            self.model_combo.addItem("Unknown provider")
     
     def update_status_info(self, provider):
         """Update status information for the selected provider"""
@@ -2342,6 +1916,11 @@ class ChatDialog(QDialog):
                 self.status_label.setText("Using local Ollama models. Make sure Ollama is running.")
             else:
                 self.status_label.setText("Ollama not available. Please install Ollama from https://ollama.ai")
+        elif provider == "ollama_cloud":
+            if _ollama_cloud_provider.is_available():
+                self.status_label.setText("Using Ollama Cloud models. Massive models (200B-671B parameters) running on datacenter hardware.")
+            else:
+                self.status_label.setText("Ollama Cloud not available. Run: ollama signin, then ollama pull <model>:cloud")
         elif provider == "openai":
             if _openai_provider.is_available():
                 self.status_label.setText("Using OpenAI API. Requires API key configuration.")
@@ -3969,7 +3548,7 @@ class ImageDescriberGUI(QMainWindow):
         super().__init__()
         
         # Application state
-        self.workspace = ImageWorkspace()
+        self.workspace = ImageWorkspace(new_workspace=True)  # Start as saved to avoid false "unsaved changes"
         self.current_workspace_file = None
         self._skip_verification = True  # Skip verification by default
         
@@ -5065,6 +4644,9 @@ class ImageDescriberGUI(QMainWindow):
             # Create list item
             list_item = QListWidgetItem(display_name)
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
+            
+            # Set accessibility properties
+            self.set_item_accessibility(list_item, file_path, display_name)
             
             # Mark batch items with accessible colors
             if item.batch_marked:
@@ -6163,7 +5745,21 @@ class ImageDescriberGUI(QMainWindow):
         
         # Create chat session
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        session_name = config['session_name'] or f"{config['provider'].upper()} {config['model']} Chat"
+        
+        # Create descriptive session name with proper provider display
+        provider_display = config['provider']
+        if config['provider'] == 'ollama_cloud':
+            provider_display = f"Ollama Cloud ({config['model']})"
+        elif config['provider'] == 'ollama':
+            provider_display = f"Ollama ({config['model']})"
+        elif config['provider'] == 'openai':
+            provider_display = f"OpenAI ({config['model']})"
+        elif config['provider'] == 'huggingface':
+            provider_display = f"HuggingFace ({config['model']})"
+        else:
+            provider_display = f"{config['provider'].upper()} ({config['model']})"
+            
+        session_name = config['session_name'] or f"{provider_display} Chat"
         
         # Create a unique chat ID
         chat_id = f"chat_{int(datetime.now().timestamp())}"
@@ -6918,6 +6514,7 @@ Please answer the follow-up question about this image, taking into account the c
         # Populate provider combo
         all_providers = {
             'ollama': _ollama_provider,
+            'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'huggingface': _huggingface_provider
         }
@@ -6945,7 +6542,7 @@ Please answer the follow-up question about this image, taking into account the c
                 provider = all_providers[provider_key]
                 if provider.is_available():
                     try:
-                        models = provider.get_models()
+                        models = provider.get_available_models()
                         for model in models:
                             model_combo.addItem(model)
                     except Exception as e:
@@ -7631,7 +7228,7 @@ Please answer the follow-up question about this image, taking into account the c
             # Get detailed status if available
             if file_path in self.processing_status:
                 status_msg = self.processing_status[file_path]
-                # Truncate long status messages for display
+                # Truncate long status messages for visual display only
                 if len(status_msg) > 50:
                     status_msg = status_msg[:47] + "..."
                 prefix_parts.append(f"p [{status_msg}]")
@@ -7650,6 +7247,26 @@ Please answer the follow-up question about this image, taking into account the c
             
         return display_name
     
+    def set_item_accessibility(self, list_item, file_path: str, display_name: str):
+        """Set accessibility properties for a list item"""
+        # Set basic accessible name
+        list_item.setData(Qt.ItemDataRole.AccessibleTextRole, display_name)
+        
+        # If item is processing, provide full status message for screen readers
+        if file_path in self.processing_status:
+            full_status = self.processing_status[file_path]
+            # Create accessible description with full status
+            accessible_name = display_name
+            if "p [" in display_name and "..." in display_name:
+                # Replace truncated status with full status for accessibility
+                accessible_name = display_name.replace(
+                    f"p [{full_status[:47]}...]" if len(full_status) > 50 else f"p [{full_status}]",
+                    f"processing: {full_status}"
+                )
+            # Set tooltip and accessible description
+            list_item.setToolTip(f"Status: {full_status}")
+            list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessible_name)
+    
     def update_specific_item_display(self, file_path: str):
         """Update display text for a specific item without losing focus"""
         # Find the item in the current list
@@ -7661,6 +7278,8 @@ Please answer the follow-up question about this image, taking into account the c
                 if workspace_item:
                     display_name = self.get_display_name(workspace_item, file_path)
                     item.setText(display_name)
+                    # Set accessibility properties with full status
+                    self.set_item_accessibility(item, file_path, display_name)
                 break
     
     # Worker event handlers

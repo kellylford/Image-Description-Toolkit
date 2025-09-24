@@ -17,7 +17,7 @@ from typing import List, Dict, Optional
 from PyQt6.QtCore import QThread, pyqtSignal
 
 # Import our refactored modules
-from ai_providers import get_available_providers, _ollama_provider, _openai_provider, _huggingface_provider
+from ai_providers import get_available_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider
 
 # Optional imports for video processing
 try:
