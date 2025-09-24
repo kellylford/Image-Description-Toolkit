@@ -24,6 +24,7 @@ namespace ImageDescriber.Full
                     // Register AI Providers
                     services.AddSingleton<IAIProvider, OpenAIProvider>();
                     services.AddSingleton<IAIProvider, OllamaProvider>();
+                    services.AddSingleton<IAIProvider, OllamaCloudProvider>();
                     services.AddSingleton<IAIProvider, HuggingFaceProvider>();
 
                     // Register AI Provider Service

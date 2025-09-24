@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Net.Http;
 using Newtonsoft.Json;
@@ -202,12 +203,16 @@ namespace ImageDescriber.Full.Services
                             var modelName = model["name"]?.ToString();
                             if (!string.IsNullOrEmpty(modelName))
                             {
-                                models.Add(modelName);
+                                // Filter out cloud models (ending with -cloud) for local provider
+                                if (!modelName.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    models.Add(modelName);
+                                }
                             }
                         }
                     }
 
-                    return models.Count > 0 ? models : new List<string> { "llava:7b (Not installed)" };
+                    return models.Count > 0 ? models : new List<string> { "llava:7b (No local models installed)" };
                 }
                 else
                 {
@@ -257,6 +262,113 @@ namespace ImageDescriber.Full.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating description with Ollama");
+                throw;
+            }
+        }
+    }
+
+    public class OllamaCloudProvider : IAIProvider
+    {
+        private readonly HttpClient _httpClient;
+        private readonly ILogger<OllamaCloudProvider> _logger;
+        private string _baseUrl = "http://localhost:11434";
+        
+        // Known cloud models based on Python implementation
+        private readonly List<string> _cloudModels = new()
+        {
+            "qwen3-coder:480b-cloud",
+            "gpt-oss:120b-cloud", 
+            "gpt-oss:20b-cloud",
+            "deepseek-v3.1:671b-cloud"
+        };
+
+        public string Name => "ollama_cloud";
+        public string DisplayName => "Ollama Cloud";
+        public bool IsConfigured => true; // Cloud models don't require separate API key
+
+        public OllamaCloudProvider(HttpClient httpClient, ILogger<OllamaCloudProvider> logger)
+        {
+            _httpClient = httpClient;
+            _logger = logger;
+        }
+
+        public void Configure(Dictionary<string, string> settings)
+        {
+            if (settings.TryGetValue("base_url", out var baseUrl))
+            {
+                _baseUrl = baseUrl;
+            }
+        }
+
+        public async Task<List<string>> GetAvailableModelsAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_baseUrl}/api/tags");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var data = JsonConvert.DeserializeObject<JObject>(content);
+                    var availableCloudModels = new List<string>();
+
+                    if (data?["models"] is JArray modelsArray)
+                    {
+                        var allModels = modelsArray.Select(m => m["name"]?.ToString()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+                        
+                        // Filter to only cloud models (ending with -cloud)
+                        availableCloudModels = allModels.Where(m => m!.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase)).ToList()!;
+                    }
+
+                    return availableCloudModels.Count > 0 ? availableCloudModels : new List<string> { "Cloud models (Not signed in or unavailable)" };
+                }
+                else
+                {
+                    _logger.LogWarning("Ollama not available for cloud models: {StatusCode}", response.StatusCode);
+                    return new List<string> { "Cloud models (Ollama not running)" };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching Ollama cloud models");
+                return new List<string> { "Cloud models (Connection Error)" };
+            }
+        }
+
+        public async Task<string> GenerateDescriptionAsync(string imagePath, string model, string prompt)
+        {
+            try
+            {
+                var imageBytes = await System.IO.File.ReadAllBytesAsync(imagePath);
+                var base64Image = Convert.ToBase64String(imageBytes);
+
+                var requestBody = new
+                {
+                    model = model,
+                    prompt = prompt,
+                    images = new[] { base64Image },
+                    stream = false
+                };
+
+                var json = JsonConvert.SerializeObject(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/generate", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var responseData = JsonConvert.DeserializeObject<JObject>(responseContent);
+                    return responseData?["response"]?.ToString() ?? "No description generated";
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    throw new Exception($"Ollama Cloud API error: {response.StatusCode} - {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating description with Ollama Cloud");
                 throw;
             }
         }

@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:ImageDescriber.Full"
         xmlns:converters="clr-namespace:ImageDescriber.Full.Converters"
         mc:Ignorable="d"
-        Title="Image Describer - Professional Edition" Height="800" Width="1200"
+        Title="ImageDescriber - Professional Edition" Height="700" Width="1000"
         MinHeight="600" MinWidth="800">
 
     <Window.Resources>
@@ -14,29 +14,46 @@
         <converters:FilePathToImageSourceConverter x:Key="FilePathToImageSourceConverter"/>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         
-        <!-- TreeView Item Template for Hierarchical Display -->
-        <DataTemplate x:Key="WorkspaceItemTemplate">
-            <StackPanel Orientation="Horizontal">
-                <CheckBox IsChecked="{Binding BatchMarked}" Margin="0,0,5,0"/>
-                <TextBlock Text="{Binding StatusPrefix}" Foreground="Green" FontWeight="Bold"/>
-                <TextBlock Text="{Binding FileName}" />
-                <TextBlock Text="{Binding DescriptionCount, StringFormat=' ({0} descriptions)'}" 
-                           Foreground="Gray" Margin="5,0,0,0"
-                           Visibility="{Binding HasDescriptions, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        <!-- Image List Item Template -->
+        <DataTemplate x:Key="ImageItemTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding FileName}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding DescriptionCount, StringFormat='({0})'}" 
+                           Foreground="Gray" Margin="5,0,0,0" VerticalAlignment="Center"/>
+            </Grid>
+        </DataTemplate>
+        
+        <!-- Description List Item Template -->
+        <DataTemplate x:Key="DescriptionItemTemplate">
+            <StackPanel Margin="2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding Model}" FontWeight="Bold" FontSize="10"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Provider}" FontSize="9" Foreground="DarkBlue"/>
+                </Grid>
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding Created}" FontSize="9" Foreground="Gray"/>
             </StackPanel>
         </DataTemplate>
     </Window.Resources>
 
     <Grid>
-        <!-- Menu Bar -->
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Menu -->
-        <Menu Grid.Row="0">
+        <!-- Menu Bar (IsTabStop="False" to fix accessibility issue) -->
+        <Menu Grid.Row="0" IsTabStop="False">
             <MenuItem Header="_File">
                 <MenuItem Header="_New Workspace" Command="{Binding NewWorkspaceCommand}"/>
                 <MenuItem Header="_Open Workspace..." Command="{Binding OpenWorkspaceCommand}"/>
@@ -53,21 +70,15 @@
                 <MenuItem Header="_Delete Description" Command="{Binding DeleteDescriptionCommand}"/>
                 <MenuItem Header="_Copy Description" Command="{Binding CopyDescriptionCommand}"/>
                 <Separator/>
-                <MenuItem Header="Mark for _Batch" Command="{Binding ToggleBatchMarkCommand}"/>
-                <MenuItem Header="Mark _All for Batch" Command="{Binding MarkAllBatchCommand}"/>
-                <MenuItem Header="_Clear All Batch Marks" Command="{Binding ClearAllBatchMarksCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_Process">
-                <MenuItem Header="Process _Selected Image" Command="{Binding ProcessSelectedCommand}"/>
-                <MenuItem Header="Process _Batch" Command="{Binding ProcessBatchCommand}"/>
+                <MenuItem Header="_Process Selected Image" Command="{Binding ProcessSelectedCommand}"/>
+                <MenuItem Header="_Process Batch" Command="{Binding ProcessBatchCommand}"/>
                 <MenuItem Header="_Stop Processing" Command="{Binding StopProcessingCommand}"/>
-                <Separator/>
-                <MenuItem Header="_AI Settings..." Command="{Binding ShowAISettingsCommand}"/>
-                <MenuItem Header="_Refresh Models" Command="{Binding RefreshModelsCommand}"/>
             </MenuItem>
             <MenuItem Header="_Tools">
+                <MenuItem Header="_AI Settings..." Command="{Binding ShowAISettingsCommand}"/>
+                <MenuItem Header="_Refresh Models" Command="{Binding RefreshModelsCommand}"/>
                 <MenuItem Header="_Extract Video Frames..." Command="{Binding ExtractVideoFramesCommand}"/>
-                <MenuItem Header="_Convert HEIC to JPG..." Command="{Binding ConvertHeicCommand}"/>
+                <MenuItem Header="_Convert HEIC..." Command="{Binding ConvertHeicCommand}"/>
                 <MenuItem Header="_Export Descriptions..." Command="{Binding ExportDescriptionsCommand}"/>
             </MenuItem>
             <MenuItem Header="_Help">
@@ -76,17 +87,15 @@
             </MenuItem>
         </Menu>
 
-        <!-- Main Content Area -->
+        <!-- Main Content Area - Two Panel Layout like Python Qt6 app -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="200"/>
+                <ColumnDefinition Width="400" MinWidth="250"/>
                 <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="400" MinWidth="300"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="*" MinWidth="250"/>
+                <ColumnDefinition Width="*" MinWidth="300"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left Panel - Workspace Tree -->
+            <!-- Left Panel - Image List -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -94,152 +103,132 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 
-                <!-- Workspace Header -->
+                <!-- Images Header -->
                 <Border Grid.Row="0" Background="LightGray" Padding="5">
-                    <TextBlock Text="{Binding WorkspaceName, StringFormat='Workspace: {0}'}" 
-                               FontWeight="Bold"/>
+                    <TextBlock Text="Images:" FontWeight="Bold"/>
                 </Border>
                 
-                <!-- Tree View -->
+                <!-- Image List -->
                 <ListBox Grid.Row="1" 
-                          ItemsSource="{Binding WorkspaceItems}"
-                          ItemTemplate="{StaticResource WorkspaceItemTemplate}"
-                          SelectedItem="{Binding SelectedImageItem}"
-                          x:Name="WorkspaceListBox">
-                </ListBox>
+                         Name="ImageListBox"
+                         ItemsSource="{Binding WorkspaceItems}"
+                         SelectedItem="{Binding SelectedImageItem}"
+                         ItemTemplate="{StaticResource ImageItemTemplate}"
+                         AutomationProperties.Name="Image List"
+                         AutomationProperties.HelpText="List of images in the workspace. Use arrow keys to navigate, then Tab to move to descriptions."/>
                 
-                <!-- Batch Actions -->
-                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="5">
-                    <Button Content="Mark All" Command="{Binding MarkAllBatchCommand}" Margin="0,0,5,0"/>
-                    <Button Content="Clear All" Command="{Binding ClearAllBatchMarksCommand}"/>
-                </StackPanel>
+                <!-- Batch Info -->
+                <TextBlock Grid.Row="2" 
+                          Text="{Binding BatchInfo}" 
+                          Padding="5" 
+                          Background="LightBlue" 
+                          FontSize="10"/>
             </Grid>
 
-            <!-- Splitter 1 -->
+            <!-- Splitter -->
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" 
                          Background="LightGray" ResizeBehavior="PreviousAndNext"/>
 
-            <!-- Center Panel - Image Preview -->
+            <!-- Right Panel - Descriptions -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="200" MinHeight="150"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                
-                <!-- Image Header -->
+
+                <!-- Descriptions Header -->
                 <Border Grid.Row="0" Background="LightGray" Padding="5">
-                    <TextBlock Text="{Binding SelectedImageItem.FileName, StringFormat='Image: {0}'}" 
-                               FontWeight="Bold"/>
+                    <TextBlock Text="Descriptions:" FontWeight="Bold"/>
                 </Border>
                 
-                <!-- Image Display -->
-                <ScrollViewer Grid.Row="1" ZoomMode="Enabled" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                    <Image Source="{Binding SelectedImageItem.FilePath, Converter={StaticResource FilePathToImageSourceConverter}}"
-                           Stretch="Uniform" 
-                           MaxWidth="800" MaxHeight="600"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </ScrollViewer>
-            </Grid>
+                <!-- Description List -->
+                <ListBox Grid.Row="1"
+                         Name="DescriptionListBox" 
+                         ItemsSource="{Binding SelectedImageItem.Descriptions}"
+                         SelectedItem="{Binding SelectedDescription}"
+                         ItemTemplate="{StaticResource DescriptionItemTemplate}"
+                         AutomationProperties.Name="Description List"
+                         AutomationProperties.HelpText="List of descriptions for the selected image. Use arrow keys to navigate and view different descriptions."/>
 
-            <!-- Splitter 2 -->
-            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" 
-                         Background="LightGray" ResizeBehavior="PreviousAndNext"/>
-
-            <!-- Right Panel - AI Settings and Descriptions -->
-            <Grid Grid.Column="4">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- AI Provider Settings -->
-                <GroupBox Grid.Row="0" Header="AI Provider Settings" Margin="5">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Label Grid.Row="0" Grid.Column="0" Content="Provider:"/>
-                        <ComboBox Grid.Row="0" Grid.Column="1" 
-                                  ItemsSource="{Binding AvailableProviders}"
-                                  SelectedItem="{Binding SelectedProvider}"
-                                  DisplayMemberPath="DisplayName"
-                                  SelectedValuePath="Value"/>
-
-                        <Label Grid.Row="1" Grid.Column="0" Content="Model:"/>
-                        <ComboBox Grid.Row="1" Grid.Column="1" 
-                                  ItemsSource="{Binding AvailableModels}"
-                                  SelectedItem="{Binding SelectedModel}"/>
-
-                        <Button Grid.Row="2" Grid.Column="1" Content="Refresh Models" 
-                               Command="{Binding RefreshModelsCommand}" Margin="0,5,0,0"/>
-                    </Grid>
-                </GroupBox>
-
-                <!-- Processing Controls -->
-                <GroupBox Grid.Row="1" Header="Processing" Margin="5">
-                    <StackPanel>
-                        <Button Content="Process Selected Image" Command="{Binding ProcessSelectedCommand}" 
-                               Margin="0,0,0,5"/>
-                        <Button Content="Process Batch" Command="{Binding ProcessBatchCommand}" 
-                               Margin="0,0,0,5"/>
-                        <Button Content="Stop Processing" Command="{Binding StopProcessingCommand}"/>
-                        
-                        <!-- Progress Display -->
-                        <ProgressBar Value="{Binding ProgressValue}" Maximum="100" Height="20" 
-                                    Margin="0,10,0,0"/>
-                        <TextBlock Text="{Binding ProgressText}" HorizontalAlignment="Center" 
-                                  Margin="0,5,0,0"/>
-                    </StackPanel>
-                </GroupBox>
-
-                <!-- Descriptions List -->
-                <GroupBox Grid.Row="2" Header="Descriptions" Margin="5">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        
-                        <ListBox Grid.Row="0" ItemsSource="{Binding SelectedImageItem.Descriptions}"
-                                SelectedItem="{Binding SelectedDescription}">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Model}" FontWeight="Bold" FontSize="10"/>
-                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="200"/>
-                                        <TextBlock Text="{Binding Created}" FontSize="9" Foreground="Gray"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5,0,0">
-                            <Button Content="Edit" Command="{Binding EditDescriptionCommand}" Margin="0,0,5,0"/>
-                            <Button Content="Delete" Command="{Binding DeleteDescriptionCommand}" Margin="0,0,5,0"/>
-                            <Button Content="Copy" Command="{Binding CopyDescriptionCommand}"/>
-                        </StackPanel>
-                    </Grid>
-                </GroupBox>
+                <!-- Description Text Header -->
+                <Border Grid.Row="2" Background="LightGray" Padding="5">
+                    <TextBlock Text="Description Text:" FontWeight="Bold"/>
+                </Border>
+                
+                <!-- Description Text Display -->
+                <TextBox Grid.Row="3" 
+                         Text="{Binding SelectedDescription.Text, Mode=OneWay}"
+                         IsReadOnly="True" 
+                         TextWrapping="Wrap" 
+                         VerticalScrollBarVisibility="Auto"
+                         AutomationProperties.Name="Description Text"
+                         AutomationProperties.HelpText="Full text of the selected description. Use arrow keys to navigate through the text."
+                         Margin="2"/>
             </Grid>
         </Grid>
 
-        <!-- Status Bar -->
-        <StatusBar Grid.Row="2">
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}"/>
-            </StatusBarItem>
-            <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding WorkspaceItems.Count, StringFormat='Items: {0}'}"/>
-            </StatusBarItem>
-        </StatusBar>
+        <!-- AI Provider Settings -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <Label Grid.Column="0" Content="Provider:" VerticalAlignment="Center" Margin="5,2"/>
+            <ComboBox Grid.Column="1" 
+                      ItemsSource="{Binding AvailableProviders}"
+                      SelectedItem="{Binding SelectedProvider}"
+                      DisplayMemberPath="DisplayName"
+                      Margin="2"
+                      AutomationProperties.Name="AI Provider"
+                      AutomationProperties.HelpText="Select AI provider for image processing"/>
+            
+            <Label Grid.Column="2" Content="Model:" VerticalAlignment="Center" Margin="5,2"/>
+            <ComboBox Grid.Column="3" 
+                      ItemsSource="{Binding AvailableModels}"
+                      SelectedItem="{Binding SelectedModel}"
+                      Margin="2"
+                      AutomationProperties.Name="AI Model"
+                      AutomationProperties.HelpText="Select AI model for image processing"/>
+            
+            <Button Grid.Column="4" 
+                    Content="Process" 
+                    Command="{Binding ProcessSelectedCommand}"
+                    Margin="5,2"
+                    AutomationProperties.Name="Process Image"
+                    AutomationProperties.HelpText="Process the selected image with AI"/>
+        </Grid>
+
+        <!-- Status Bar and Progress -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="200"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Status Message -->
+            <TextBlock Grid.Column="0" 
+                       Text="{Binding StatusMessage}" 
+                       VerticalAlignment="Center" 
+                       Margin="5,2"
+                       AutomationProperties.Name="Status Message"/>
+            
+            <!-- Progress Bar -->
+            <StackPanel Grid.Column="1" Orientation="Vertical" Margin="2">
+                <TextBlock Text="{Binding ProgressText}" 
+                           HorizontalAlignment="Center" 
+                           FontSize="10"
+                           AutomationProperties.Name="Progress Text"/>
+                <ProgressBar Value="{Binding ProgressValue}" 
+                            Maximum="100" 
+                            Height="15"
+                            AutomationProperties.Name="Progress Bar"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

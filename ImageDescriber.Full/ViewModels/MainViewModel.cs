@@ -65,6 +65,16 @@ namespace ImageDescriber.Full.ViewModels
         // Fix for SelectedProviderName vs SelectedProvider issue
         public string? SelectedProviderName => SelectedProvider?.DisplayName;
 
+        // Batch info for status display
+        public string BatchInfo
+        {
+            get
+            {
+                var batchCount = CurrentWorkspace.Items.Values.Count(i => i.BatchMarked);
+                return $"Batch Queue: {batchCount} items";
+            }
+        }
+
         public MainViewModel(AIProviderService aiProviderService, IWorkspaceService workspaceService, ILogger<MainViewModel> logger)
         {
             _aiProviderService = aiProviderService;
@@ -315,22 +325,17 @@ namespace ImageDescriber.Full.ViewModels
         {
             try
             {
-                // Using folder browser dialog would require additional NuGet package
-                // For now, show a message - this addresses the directory loading issue
-                var dialog = new OpenFileDialog
+                // Use FolderBrowserDialog for proper directory selection
+                using var dialog = new System.Windows.Forms.FolderBrowserDialog
                 {
-                    Title = "Select any image in the directory you want to add",
-                    Filter = "Image Files|*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.tiff;*.webp;*.heic",
-                    CheckFileExists = true
+                    Description = "Select directory containing images",
+                    ShowNewFolderButton = false
                 };
 
-                if (dialog.ShowDialog() == true)
+                var result = dialog.ShowDialog();
+                if (result == System.Windows.Forms.DialogResult.OK && !string.IsNullOrEmpty(dialog.SelectedPath))
                 {
-                    var directoryPath = Path.GetDirectoryName(dialog.FileName);
-                    if (!string.IsNullOrEmpty(directoryPath))
-                    {
-                        await AddDirectoryToWorkspaceAsync(directoryPath);
-                    }
+                    await AddDirectoryToWorkspaceAsync(dialog.SelectedPath);
                 }
             }
             catch (Exception ex)
@@ -372,6 +377,7 @@ namespace ImageDescriber.Full.ViewModels
                 ProgressValue = 100;
                 ProgressText = "Complete";
                 OnPropertyChanged(nameof(WorkspaceItems));
+                OnPropertyChanged(nameof(BatchInfo));
                 
                 StatusMessage = $"Added {addedCount} images from directory ({imageItems.Count} total found)";
                 
@@ -639,6 +645,7 @@ namespace ImageDescriber.Full.ViewModels
                     markedCount++;
                 }
             }
+            OnPropertyChanged(nameof(BatchInfo));
             StatusMessage = $"Marked {markedCount} items for batch processing";
         }
 
@@ -654,6 +661,7 @@ namespace ImageDescriber.Full.ViewModels
                     unmarkedCount++;
                 }
             }
+            OnPropertyChanged(nameof(BatchInfo));
             StatusMessage = $"Cleared {unmarkedCount} batch marks";
         }
 
