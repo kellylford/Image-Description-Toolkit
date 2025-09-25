@@ -3,24 +3,12 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
-    <AssemblyTitle>ImageDescriber - Professional WPF Edition</AssemblyTitle>
-    <AssemblyDescription>AI-powered image description toolkit - WPF version matching Python Qt6 ImageDescriber exactly</AssemblyDescription>
-    <AssemblyCompany>Image Description Toolkit</AssemblyCompany>
-    <AssemblyProduct>ImageDescriber.Full</AssemblyProduct>
-    <AssemblyCopyright>Copyright © 2024</AssemblyCopyright>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="System.Windows.Forms" Version="5.0.0" />
   </ItemGroup>
 
 </Project>
