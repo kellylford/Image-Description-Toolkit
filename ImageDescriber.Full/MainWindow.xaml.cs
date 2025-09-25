@@ -1,6 +1,6 @@
 using System;
 using System.Windows;
-using ImageDescriber.Full.ViewModels;
+using ImageDescriber.Full;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

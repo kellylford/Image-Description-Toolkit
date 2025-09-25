@@ -7,13 +7,12 @@ using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ImageDescriber.Full.Models;
+using ImageDescriber.Full;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using Newtonsoft.Json;
-using System.Windows.Forms;
 
-namespace ImageDescriber.Full.ViewModels
+namespace ImageDescriber.Full
 {
     public partial class MainViewModel : ObservableObject
     {
@@ -328,14 +327,14 @@ namespace ImageDescriber.Full.ViewModels
             try
             {
                 // Use proper FolderBrowserDialog as requested
-                using var dialog = new FolderBrowserDialog
+                using var dialog = new System.Windows.Forms.FolderBrowserDialog
                 {
                     Description = "Select directory containing images",
                     ShowNewFolderButton = false
                 };
 
                 var result = dialog.ShowDialog();
-                if (result == DialogResult.OK && !string.IsNullOrEmpty(dialog.SelectedPath))
+                if (result == System.Windows.Forms.DialogResult.OK && !string.IsNullOrEmpty(dialog.SelectedPath))
                 {
                     await AddDirectoryToWorkspaceAsync(dialog.SelectedPath);
                 }

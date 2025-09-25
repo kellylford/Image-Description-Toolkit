@@ -15,7 +15,7 @@
 
     <DockPanel>
         <!-- Menu Bar - NOT in tab order as requested -->
-        <MenuBar DockPanel.Dock="Top" IsTabStop="False">
+        <Menu DockPanel.Dock="Top" IsTabStop="False">
             <MenuItem Header="_File">
                 <MenuItem Header="_New Workspace" Command="{Binding NewWorkspaceCommand}" InputGestureText="Ctrl+N"/>
                 <MenuItem Header="_Open Workspace..." Command="{Binding OpenWorkspaceCommand}" InputGestureText="Ctrl+O"/>
@@ -40,7 +40,7 @@
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Command="{Binding AboutCommand}"/>
             </MenuItem>
-        </MenuBar>
+        </Menu>
         
         <!-- Status Bar -->
         <StatusBar DockPanel.Dock="Bottom">

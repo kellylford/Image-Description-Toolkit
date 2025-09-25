@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using Newtonsoft.Json;
 
-namespace ImageDescriber.Full.Models
+namespace ImageDescriber.Full
 {
     // Matches Python ImageDescription class exactly
     public class ImageDescription : INotifyPropertyChanged
