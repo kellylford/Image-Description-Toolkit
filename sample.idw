@@ -1,0 +1,185 @@
+{
+  "version": "3.0",
+  "directory_path": "",
+  "directory_paths": [],
+  "items": {
+    "C:/Users/kelly/GitHub/testingimages/202509_a/BQKB7756.HEIC": {
+      "file_path": "C:/Users/kelly/GitHub/testingimages/202509_a/BQKB7756.HEIC",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1759158123708",
+          "text": "Here\u2019s a descriptive narrative of the image, incorporating the YOLO object detection information:\n\nThe image depicts a section of what appears to be an ancient Roman ruin under a bright, clear blue sky. A large, weathered stone pillar dominates the foreground; it is predominantly gray and ochre, with darker, shadowed areas suggesting age and erosion. The pillar sits on a broken, partially submerged stone base. Surrounding the pillar are remnants of a curved stone structure, also gray and weathered, with significant damage. \n\nA yellow and black striped safety barrier, constructed of galvanized metal, runs across the lower portion of the image, partially obscuring the base of the pillar. Scattered around the base are pieces of broken stone. A person is visible in the bottom right corner. \n\nIn the background, a grand, classical Roman temple structure can be seen, primarily white and tan, with numerous columns rising above. To the right of the temple, a large green construction crane is prominently featured, leaning against a green construction fence. The sky is a brilliant, cloudless blue. The overall impression is of a partially excavated or restored Roman ruin, with ongoing construction activity visible in the background.",
+          "model": "gemma3:latest (\ud83c\udfaf YOLO Enhanced)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:02:03.708592",
+          "custom_prompt": "",
+          "provider": "onnx"
+        },
+        {
+          "id": "1759158149396",
+          "text": "Here's a detailed narrative description of the image:\n\nThe scene is dominated by a large, ancient stone Roman column standing prominently in a partially excavated area. The column is a weathered grey-beige color, with significant erosion and damage evident across its surface, particularly at the top. It is a multi-tiered column with a broad base and smaller, successively diminishing rings as it ascends. The column sits on a raised, rubble-strewn platform. \n\nSurrounding the column are sections of a ruined building, consisting of grey stone and crumbling walls. There are remnants of what appear to be arches and doorways. A yellow-green construction fence runs along the edge of the excavation site. \n\nTo the left, there's a large, multi-story building in the background, appearing to be an ancient Roman structure with white stone and multiple levels. A statue is visible on top of it. \n\nA light-colored, green construction crane is visible in the far background. \n\nThe ground is covered in a mixture of rubble, loose stones, and dirt. A small Italian flag is displayed on a pole near the column. \n\nThe sky is a clear, bright blue. The overall lighting is bright and sunny.",
+          "model": "gemma3:latest",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:02:29.396555",
+          "custom_prompt": "",
+          "provider": "ollama"
+        },
+        {
+          "id": "1759160469131",
+          "text": "Here's a descriptive narrative of the image:\n\nThe image depicts a large, weathered stone pillar standing prominently on a stone platform. The pillar is a warm, ochre color with a rough, textured surface. It is segmented with horizontal bands and small, rectangular recesses running vertically along its shaft. At the base, the pillar rests on a tiered platform constructed of similarly colored stone.\n\nAround the pillar, there's a scaffolding structure made of silver-colored metal, supported by silver poles, and a red and white safety cone.  To the left of the pillar, a crumbled stone structure, fragmented and weathered, lies partially submerged in a ditch. \n\nIn the background, several classical buildings, primarily white and gray in color, are visible.  A statue stands atop one of the buildings. Further back, a crane is positioned, and a green construction fence runs along the edge of the scene.\n\nThe sky is a vibrant, cloudless blue. The lighting suggests a bright, sunny day.",
+          "model": "gemma3:latest (\u26a0\ufe0f No YOLO)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:41:09.131937",
+          "custom_prompt": "",
+          "provider": "onnx"
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "C:/Users/kelly/GitHub/testingimages/202509_a/ABBW4262.HEIC": {
+      "file_path": "C:/Users/kelly/GitHub/testingimages/202509_a/ABBW4262.HEIC",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1759158311679",
+          "text": "Okay, here's a rich, vivid description of the image, incorporating the YOLO object detection information and focusing on color, light, and atmosphere:\n\nThe scene unfolds like a tranquil, slightly aged secret. The image presents a sun-drenched staircase, a worn, stone ribbon climbing upwards into a canopy of lush green. The dominant color is undeniably **green**, a complex layering of shades \u2013 deep emeralds from the densely packed foliage above, lighter lime greens from the sprouts clinging to the stone steps, and a vibrant, almost luminous green where light catches the young growth.  It\u2019s a profoundly calming, almost meditative green.\n\nThe steps themselves are a muted **gray-beige**, the stone bleached by years of sunlight and weather.  The texture is incredibly detailed \u2013 a jigsaw puzzle of irregular stones, each bearing the marks of time and the elements.  Patches of moss, a subtle **olive-gray**, creep along the crevices, softening the hard edges. \n\nThe lighting is key to the scene\u2019s mood.  It\u2019s the kind of bright, diffused light associated with a late summer or early autumn day \u2013 not harsh, but rich and warm. This light sculpts the shadows, accentuating the texture of the stone and creating pockets of deep shade where a cool, almost cyan-tinged light reflects.\n\nAbove, the trees form a dense, cathedral-like ceiling. Their leaves are a deep, saturated green, creating a sense of depth and layering.  Scattered throughout the green, like ghostly sentinels, are white, rectangular shapes \u2013 these are the detected \u201cpeople\u201d \u2013 presumably figures standing along the steps, adding an element of human presence to the otherwise serene scene. Their stark white against the verdant backdrop creates a quiet tension, a subtle awareness of life.\n\nThe overall atmospheric effect is one of quiet contemplation and timeless beauty. There\u2019s a gentle warmth, a feeling of being slightly removed from the hustle and bustle of the outside world. The carefully constructed palette \u2013 the earth tones of the stone and the vibrancy of the greenery \u2013 coupled with the subtle awareness of the individuals present, generates a feeling of peaceful solitude.  It's a space that invites you to linger, to breathe, and to simply *be*. \n\n---\n\nWould you like me to focus on a particular aspect of the image or create a description for a different type of scene?",
+          "model": "gemma3:latest (\ud83c\udfaf YOLO Enhanced)",
+          "prompt_style": "colorful",
+          "created": "2025-09-29T17:05:11.679275",
+          "custom_prompt": "",
+          "provider": "onnx"
+        },
+        {
+          "id": "1759158333562",
+          "text": "Okay, here\u2019s a rich, vivid description of the image, focusing on the palette, lighting, and atmosphere, as you requested:\n\n**The image presents a scene of serene, slightly melancholic beauty \u2013 a tiered stairway ascending through a lush, green space.**\n\n**The Foundation \u2013 Stone and Shadow:** The lower section is dominated by a series of weathered, grey-beige stone steps. The stone possesses a distinctly tactile quality, each block bearing the marks of time and the elements \u2013 streaks of darker grey and patches of a pale ochre. The lighting here is softer, pooled in the shadow cast by the trees, creating a cool, muted palette. The dampness of the steps and surrounding earth adds to this coolness.\n\n**The Verdant Ascent \u2013 An Explosion of Green:**  As the eye travels upwards, the palette explodes with vibrant greens. A dense tapestry of foliage \u2013 perhaps overgrown vines or cultivated plants \u2013 blankets the sides of the stairs. The greens range from the deep, almost black-green of shaded leaves to the brighter, fresher chartreuse of newly emerging growth. The variations in shade and tone create a dynamic texture, a visual wave climbing upwards. The green is the dominant force, creating a sense of depth and an invitation to explore the space.\n\n**Light and Shadow \u2013 A Subtle Dance:** The lighting is dappled, typical of a shaded urban park. Sunlight filters through the dense canopy, creating a mosaic of bright, clean patches of light on the steps and the leaves.  These bright spots are sharply defined against the darker, shadowed areas. The effect isn't harsh; rather it's a gentle, diffused quality, suggesting a warm, late-afternoon light. The light creates pockets of brightness that draw attention to the verticality of the stairs and the foliage. \n\n**The Human Element - Pale Contrast:** A lone figure, clad in white, stands on one of the steps, providing a touch of pale contrast to the dominant greens and greys. The white acts as a subtle focal point, highlighting the scale of the steps and emphasizing the quietness of the scene. \n\n**Overall Atmosphere:** The overall atmosphere is one of tranquility, a subtle sense of being tucked away from the noise of the city. The color relationships\u2014the cool greys and greens combined with the warm, diffused light\u2014create a harmonious balance.  There's a feeling of timelessness and perhaps a hint of nostalgia, as if this space has witnessed countless quiet moments.\n\n---\n\nWould you like me to focus on a particular aspect of the image (e.g., the texture, the lighting, or a specific element) and expand on that description?",
+          "model": "gemma3:latest",
+          "prompt_style": "colorful",
+          "created": "2025-09-29T17:05:33.562513",
+          "custom_prompt": "",
+          "provider": "ollama"
+        },
+        {
+          "id": "1759158504994",
+          "text": "Okay, here's a technical analysis of the image, incorporating the YOLO object detection information:\n\n**Technical Analysis of the Image**\n\n**1. Camera Settings and Photographic Technique:**\n\n* **Likely Settings:** Given the soft, slightly blurred effect and the overall feel of the image, it\u2019s likely the image was captured with a moderately wide aperture (around f/4-f/5.6) to create some depth of field.  The ISO was probably kept relatively low (perhaps 100-400) to minimize noise, and shutter speed was adjusted based on the lighting.\n* **Technique:**  The image appears to be a naturally-captured shot rather than a heavily manipulated one. The slight softness suggests the photographer prioritized capturing the scene's atmosphere and the movement of the person. The overall composition suggests a deliberate effort to create a sense of scale and depth.\n\n**2. Lighting Conditions and Quality:**\n\n* **Lighting:** The image is bathed in bright, diffused daylight. It appears to be a partially cloudy day, as the sunlight isn't harsh.\n* **Quality:** The lighting is excellent for this type of scene \u2013 soft, even, and providing good contrast. The lack of strong shadows contributes to the image's pleasant feel. There\u2019s a clear indication of specular highlights on the cobblestones, which suggests a direction of light.\n\n**3. Composition and Framing:**\n\n* **Framing:** The image employs a classic pyramidal composition. The steep staircase dominates the foreground, drawing the eye upwards toward the figure at the top. The figure acts as the \u2018point of interest\u2019 within the scene.\n* **Perspective:** The perspective creates a strong sense of depth. The eye is naturally led from the foreground steps to the figure, enhancing the sense of space.\n* **Rule of Thirds:**  The staircase and the figure itself don't strictly adhere to the rule of thirds, but the visual weight is balanced by the negative space at the top of the frame.\n\n**4. Image Quality and Clarity:**\n\n* **Overall Quality:** The image has good overall quality with decent resolution.  There\u2019s minimal noise.\n* **Clarity:**  The clarity is good, though the focal plane is slightly shallow. The details in the steps are well-defined, and the colors are natural.\n\n**5. Technical Strengths or Weaknesses**\n\n* **Strengths:** \n    *  Excellent lighting and color balance\n    *  Strong compositional technique\n    *  Good overall sharpness and clarity. \n* **Weaknesses:**\n    * Shallow depth of field, leading to slight blurring of the background and some loss of detail in the higher sections of the steps. \n\n\n**Incorporating YOLO Object Detection:**\n\nThe YOLO object detection confirms the presence of a human figure (person) within the scene, occupying a significant portion of the image (67%). The second most frequent object detected is another person (42%).  This aligns perfectly with the visual content. The accuracy of YOLO's object detection for this scene is high; it correctly identifies the most prominent feature\u2014the person on the steps. The detection demonstrates effective object recognition within this particular environment. \n\n**In Conclusion:**\n\nThis is a well-composed and effectively lit image that creates a sense of scale and tranquility. The technical aspects are strong, and the YOLO data confirms the presence of the human figure in the scene, adding another layer to the analysis.",
+          "model": "gemma3:latest (\ud83c\udfaf YOLO Enhanced)",
+          "prompt_style": "technical",
+          "created": "2025-09-29T17:08:24.994604",
+          "custom_prompt": "",
+          "provider": "onnx"
+        },
+        {
+          "id": "1759158583696",
+          "text": "Okay, let\u2019s break down this image with a technical analysis.\n\n**1. Camera Settings and Photographic Technique**\n\n*   **Shooting Mode:** Based on the sharpness and tonal range, it\u2019s highly likely this was shot in **Aperture Priority (Av or A)** mode.  This allows the camera to automatically determine the shutter speed for a given aperture, while the photographer controls the depth of field.\n*   **Aperture:** Judging by the sharpness, the aperture probably hovered around **f/5.6 to f/8**. This creates a good level of detail in the foreground and reasonably sharp mid-ground.\n*   **Shutter Speed:** The shutter speed appears to be around **1/200s - 1/400s**. This is a standard speed for freezing motion, effectively capturing the movement of the person walking on the stairs.\n*   **ISO:** The ISO is most likely at **100 or 200**. This keeps noise levels very low, which is crucial for a sharp and detailed image, especially when shooting in bright light. \n*   **Focus:** Single point autofocus was likely used, probably centered on the subject's face.\n*   **Image Stabilization:** It\u2019s likely the camera had in-body image stabilization (IBIS) or a lens with stabilization, as the image is remarkably sharp.\n\n**2. Lighting Conditions and Quality**\n\n*   **Lighting Type:** This image has **diffused, natural light**. The sky is bright and blue, suggesting it's a partly cloudy day. \n*   **Quality:** The light quality is *good*, but not perfect. There is some subtle shading on the stairs and the person, which adds depth and dimension to the image. The bright sky creates a contrast with the shadowed areas.\n*   **Direction:** The light is coming from the left, illuminating the person and creating highlights on the stairs. \n\n**3. Composition and Framing**\n\n*   **Rule of Thirds:** The person is positioned roughly along one of the vertical thirds, which creates a balanced and visually pleasing composition. \n*   **Leading Lines:** The staircase acts as a prominent leading line, guiding the viewer\u2019s eye towards the person and the distant background.\n*   **Depth of Field:** The moderate depth of field focuses attention on the person and the closest part of the stairs while maintaining some sharpness in the background.\n*   **Framing:** The lush greenery on either side creates a natural frame around the main subject, drawing the viewer's eye to the center of the image.\n\n**4. Image Quality and Clarity**\n\n*   **Sharpness:** The image is exceptionally sharp, particularly in the foreground. This indicates a good sensor, a stable shooting technique, and potentially image stabilization.\n*   **Noise:** There's very little noise, as the ISO was likely kept low.\n*   **Dynamic Range:** The image exhibits a good dynamic range, successfully capturing both the bright sky and the shadows on the stairs.\n\n**5. Technical Strengths and Weaknesses**\n\n*   **Strengths:**\n    *   Excellent Sharpness \u2013 Likely due to a combination of good technique and camera hardware.\n    *   Clean Image \u2013 Very little noise and distortion.\n    *   Good Dynamic Range \u2013 Well-balanced exposure.\n    *   Strong Composition \u2013 Effectively utilizes leading lines and the rule of thirds.\n*   **Weaknesses:**\n    *   Slight Over-Saturation of Green \u2013 The green hues are perhaps a bit too vivid, potentially a slight over-processing effect.\n    *   The image is very \"clean\" which can sometimes feel a little sterile and lacking in a little warmth.\n\n**Overall:**  This is a well-executed photograph with excellent technical quality. It\u2019s a strong example of outdoor photography, showing how a deliberate composition and technical knowledge can lead to a visually compelling image. \n\nDo you want me to analyze any specific aspect of the image in more detail, such as the color palette or the impact of the staircase?",
+          "model": "gemma3:latest",
+          "prompt_style": "technical",
+          "created": "2025-09-29T17:09:43.696944",
+          "custom_prompt": "",
+          "provider": "ollama"
+        },
+        {
+          "id": "1759159902179",
+          "text": "Here's a detailed description of the image:\n\nThe image shows a stone staircase leading upwards into a lush green area. The stairs are constructed of rectangular grey stones, varying slightly in size and shape. Patches of green grass and small weeds grow between the stones and at the base of the steps. \n\nAt the top of the stairs, a small, green-painted metal fence is partially visible, separating the stairs from a garden area. Several white, cylindrical objects, possibly flagpoles, stand in the garden area, topped with white cloth or flags. \n\nThe staircase is flanked by mature green trees with dense, broad leaves. The foliage is a deep, vibrant green, with some leaves exhibiting lighter shades.  Above the trees, a bright blue sky is visible with scattered, fluffy white clouds. The pavement at the base of the stairs is made of irregular, grey stone slabs. \n\nThe overall impression is a calm, shaded outdoor space.",
+          "model": "gemma3:latest (\u26a0\ufe0f No YOLO)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:31:42.179688",
+          "custom_prompt": "",
+          "provider": "onnx"
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "C:/Users/kelly/GitHub/testingimages/202509_a/ABJB7347.HEIC": {
+      "file_path": "C:/Users/kelly/GitHub/testingimages/202509_a/ABJB7347.HEIC",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1759158656116",
+          "text": "In the image, there is a woman standing on a sidewalk next to a stone wall. She is wearing a purple dress and carrying a black bag over her shoulder. The stone wall is made of large blocks and has a plaque with a gold circle in the center. Next to the woman's feet, there is a white helmet with a black strap. The background consists of a blue sky and some trees.",
+          "model": "llava-llama3:latest (\ud83c\udfaf YOLO Enhanced)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:10:56.116520",
+          "custom_prompt": "",
+          "provider": "onnx"
+        },
+        {
+          "id": "1759158663403",
+          "text": "In the image, there is a person wearing a pink dress standing on a sidewalk next to a stone wall. The wall has a weathered appearance with moss growing on it. The sidewalk is made of concrete and features a metal grate embedded in it. A black backpack is placed on the ground near the person's feet. The person appears to be looking down at the backpack, perhaps checking its contents or preparing to pick it up. The overall scene suggests an urban setting, possibly during a casual day out for shopping or sightseeing.",
+          "model": "llava-llama3:latest",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:11:03.403851",
+          "custom_prompt": "",
+          "provider": "ollama"
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "C:/Users/kelly/OneDrive/personal/Pictures/Brewers2022PosedPhoto/img_0022.jpg": {
+      "file_path": "C:/Users/kelly/OneDrive/personal/Pictures/Brewers2022PosedPhoto/img_0022.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1759160616806",
+          "text": "Here's a detailed description of the image:\n\n**Overall Impression:**\n\nThe image shows a group of approximately 20 people gathered in what appears to be a brightly lit, slightly institutional interior space, possibly a restaurant or event room. The atmosphere seems casual and informal. \n\n**People:**\n\n*   There is a mix of men and women of various ages, primarily appearing to be middle-aged or older.\n*   Most are wearing casual attire, including shorts, t-shirts, and sandals.\n*   Several individuals are wearing baseball caps, a prominent color being blue.\n*   Some have white shirts or blouses.\n*   Several are wearing the Milwaukee Brewers baseball team logo. \n*   One person is wearing a t-shirt with the text \u201cSAVE FERRIS\u201d.\n*   There is a woman pushing a stroller.\n\n**Clothing & Accessories:**\n\n*   The colors of the clothing are primarily blue, white, gray, and khaki.\n*   Sandals are commonly worn.\n*   Some people are wearing sunglasses.\n*   A dark-colored tote bag sits on the floor near the group.\n\n**Objects & Background:**\n\n*   A small table with a few plates containing food items is visible in the foreground. The food appears to be some kind of sandwiches and salads.\n*   The background is dominated by large windows that show a cityscape view. The buildings are tall and modern, with a mix of glass and steel.\n*   The walls are a light gray color.\n*   There's a small black object (possibly a trash can) visible in the background. \n*   A small black trash can is to the left.\n\n**Lighting & Environment:**\n\n*   The room is brightly lit, likely from overhead fluorescent lights.\n*   The windows provide natural light, but the room appears to be predominantly artificial light. \n\nLet me know if you'd like me to focus on any particular aspect of the image.",
+          "model": "gemma3:latest (\u26a0\ufe0f No YOLO)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:43:36.806541",
+          "custom_prompt": "",
+          "provider": "onnx"
+        },
+        {
+          "id": "1759160689747",
+          "text": "Here\u2019s a detailed description of the image:\n\n**Overall Impression:**\n\nThe image is a group photograph taken indoors. The lighting appears to be fluorescent and somewhat cool in tone. The setting appears to be a casual gathering of people in what looks like a small, possibly dimly lit, room.\n\n**People:**\n\nThere are approximately 18 people in the photo, all adults. They are standing relatively closely together, in a somewhat informal pose. Most are facing the camera directly. There is a mix of men and women.\n\n*   **Clothing:** The clothing is casual, typical for a group gathering. There is a wide range of styles and colors. Many are wearing baseball caps. Several people are wearing blue baseball shirts with the \u201cBrewers\u201d logo. A few individuals are wearing white t-shirts and/or sandals. One person is wearing a white shirt with the word \"SAVE FERRIS\" printed on it.\n*   **Expressions:** The expressions range from neutral to slightly smiling.\n*   **Age:** The individuals appear to be between roughly 40 and 70 years old.\n\n**Objects and Setting:**\n\n*   **Background:** A large, unadorned window dominates the background, offering a view of a city skyline.\n*   **Table:** In the foreground, there is a small table holding several plates with what appear to be partially eaten sandwiches or appetizers.\n*   **Floor:** The floor is covered in a dark, patterned carpet.\n*   **Decor:** There is a framed print hanging on the wall in the background, its subject obscured by the window.\n*   **Accessories:** One woman is holding a black and pink patterned bag.\n\n**Colors:**\n\nThe dominant colors are:\n\n*   Blue (in the \u201cBrewers\u201d shirts)\n*   Gray (in the carpet and walls)\n*   White (in t-shirts and some clothing)\n*   Black (in the window frame and the print)\n*   Pink (in the patterned bag)\n\n\nLet me know if you would like me to focus on any particular aspect of the image!",
+          "model": "gemma3:latest",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:44:49.747458",
+          "custom_prompt": "",
+          "provider": "ollama"
+        },
+        {
+          "id": "1759161313410",
+          "text": "Here is a descriptive narrative based on the provided YOLOv8x object detection data:\n\nThe scene depicts a group of approximately fifteen individuals gathered in what appears to be an interior space.  Several people are positioned in the middle-right area of the frame (95%, 94%, 93%, 92%, 89%, 85%), clustered around the central area.  A number of individuals are present in the middle-left (93%, 92%, 89%, 85%, 84%) and middle-center (93%, 92%, 89%, 85%, 84%) areas. \n\nThe individuals vary in size, with several appearing small (89%, 85%, 84%, 83%, 82%) and a few appearing tiny (89%, 85%, 84%, 83%, 82%).  There is a person in the top-right (89%) and top-left (82%) corners of the image. \n\nThere are several small objects present. A collection of food items, possibly plates or bowls with food on them, are placed in the middle-center area. The food is a light color, likely white or beige. There is a chair in the middle-center area. \n\nThe overall composition suggests a casual gathering. The lighting appears to be artificial, with the dominant colors being muted and the scene predominantly comprised of people and small objects.",
+          "model": "gemma3:latest (\ud83c\udfaf YOLO Enhanced)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T17:55:13.410950",
+          "custom_prompt": "",
+          "provider": "onnx"
+        },
+        {
+          "id": "1759171627070",
+          "text": "Here\u2019s a detailed narrative description of the image:\n\n**Overall Scene:** \nThe image depicts a group of approximately 20 people gathered in what appears to be a casual setting, likely an indoor venue with windows providing natural light. The setting seems somewhat dimly lit.\n\n**People:** \nThe group consists of men and women of varying ages, appearing to be in their 50s, 60s, and 70s. Many are casually dressed.\n\n*   **Clothing:** The majority of the individuals are wearing casual clothing, including t-shirts, shorts, and sandals. Several are wearing Milwaukee Brewers baseball caps. A woman is wearing a shirt with the text \"SAVE FERRIS.\" \n*   **Appearance:** Many are wearing sunglasses. Several individuals are smiling or have neutral expressions. \n\n**Objects and Details:**\n\n*   **Background:** A large window is visible in the background, revealing a cityscape with tall buildings.\n*   **Table:** A small wooden table is positioned in the foreground, holding several plates with food and drinks.\n*   **Food:** The plates hold what appears to be small sandwiches or appetizers. There are glasses and bottles containing drinks. \n*   **Surface:** The floor is covered with a dark gray carpet.\n*   **Color Palette:** The dominant colors are shades of gray, blue (from the Brewers hats and shirts), and muted tones of the people\u2019s clothing. \n\nLet me know if you would like me to focus on any particular aspect of the image.",
+          "model": "gemma3:latest (\u26a0\ufe0f No YOLO)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T20:47:07.069979",
+          "custom_prompt": "",
+          "provider": "onnx"
+        },
+        {
+          "id": "1759172212592",
+          "text": "Here's a detailed description of the image:\n\n**Overall Impression:**\n\nThe image depicts a group of approximately 20 adults standing together indoors, likely in a reception area or similar setting. The lighting is somewhat dim and warm.\n\n**Setting & Background:**\n\n*   The background consists of a large window with a cityscape visible beyond, featuring tall buildings of varying gray and dark colors.\n*   A dark gray wall is partially visible on the left.\n*   A small, dark gray door is situated on the right.\n*   The floor is covered in a dark gray carpet.\n\n**People:**\n\n*   The group is composed of men and women, ranging in age from approximately 50 to 70.\n*   They are dressed in a casual manner, primarily wearing short-sleeved shirts, t-shirts, and shorts.\n*   Many are wearing baseball caps, most of which feature the Milwaukee Brewers logo.\n*   Several individuals are wearing sandals.\n*   A woman on the right is wearing a dark blue t-shirt with the words \"SAVE FERRIS\" printed in white.\n\n**Objects & Details:**\n\n*   A small, rectangular platter with several pieces of food is placed on a dark gray table in the foreground. The food appears to be sandwiches or other handheld items.\n*   A black and white patterned bag is sitting on the floor near the platter. \n*   A small, pink child\u2019s stroller is positioned to the left of the group.\n*   Some individuals are looking directly at the camera, while others are engaged in conversation.\n\n**Colors:**\n\n*   The dominant colors include gray (in the wall, carpet, and building), blue (in the Brewers caps), white (in the signage and \u201cSAVE FERRIS\u201d banner), and various skin tones.\n\nLet me know if you'd like me to focus on a specific detail or aspect of the image.",
+          "model": "gemma3:latest (No YOLO)",
+          "prompt_style": "narrative",
+          "created": "2025-09-29T20:56:52.592432",
+          "custom_prompt": "",
+          "provider": "onnx"
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    }
+  },
+  "chat_sessions": {},
+  "created": "2025-09-29T17:00:47.740668",
+  "modified": "2025-09-29T20:56:52.592493"
+}
