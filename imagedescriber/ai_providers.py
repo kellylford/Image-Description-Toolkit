@@ -645,7 +645,7 @@ class ONNXProvider(AIProvider):
             if self.yolo_available and self.yolo_model:
                 try:
                     print(f"Running YOLOv8x detection for enhanced {actual_model}...")
-                    results = self.yolo_model(image_path, verbose=False, conf=0.15)  # Lower threshold for max detection
+                    results = self.yolo_model(image_path, verbose=True, conf=0.10)  # Lower threshold for max detection
                     
                     # Get image dimensions for spatial calculations
                     from PIL import Image
@@ -657,7 +657,7 @@ class ONNXProvider(AIProvider):
                         if boxes is not None:
                             for box in boxes:
                                 conf = float(box.conf[0])
-                                if conf > 0.15:  # Lower threshold for comprehensive detection
+                                if conf > 0.05:  # Very low threshold for comprehensive detection
                                     cls_id = int(box.cls[0])
                                     name = self.yolo_model.names[cls_id]
                                     bbox = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
@@ -2530,6 +2530,381 @@ class CopilotProvider(AIProvider):
         return enhanced
 
 
+class ObjectDetectionProvider(AIProvider):
+    """Pure object detection provider using YOLO without additional AI processing"""
+    
+    def __init__(self):
+        self.yolo_model = None
+        self.yolo_available = False
+        self._initialize_yolo_detection()
+    
+    def _initialize_yolo_detection(self):
+        """Initialize YOLO for object detection"""
+        try:
+            from ultralytics import YOLO
+            # Try to load YOLOv8 extra-large model (most accurate), fallback to nano if needed
+            try:
+                print("ObjectDetection: Loading YOLOv8x (most accurate model)...")
+                self.yolo_model = YOLO('yolov8x.pt')
+                self.yolo_model.model_name = 'yolov8x.pt'  # Store model name for reference
+                print("ObjectDetection: YOLO v8x initialized for pure object detection")
+            except (Exception, KeyboardInterrupt) as e:
+                print(f"ObjectDetection: YOLOv8x download failed, falling back to YOLOv8n: {e}")
+                self.yolo_model = YOLO('yolov8n.pt')
+                self.yolo_model.model_name = 'yolov8n.pt'  # Store model name for reference
+                print("ObjectDetection: YOLO v8n initialized for fast object detection")
+            
+            self.yolo_available = True
+        except ImportError:
+            self.yolo_model = None
+            self.yolo_available = False
+            print("ObjectDetection: YOLO not available (pip install ultralytics)")
+        except Exception as e:
+            self.yolo_model = None
+            self.yolo_available = False
+            print(f"ObjectDetection: YOLO initialization failed: {e}")
+    
+    def _get_object_location(self, bbox, img_width, img_height):
+        """Determine spatial location of object in image"""
+        x1, y1, x2, y2 = bbox
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+        
+        # Determine horizontal position
+        if center_x < img_width * 0.33:
+            h_pos = "left"
+        elif center_x > img_width * 0.67:
+            h_pos = "right"
+        else:
+            h_pos = "center"
+        
+        # Determine vertical position
+        if center_y < img_height * 0.33:
+            v_pos = "top"
+        elif center_y > img_height * 0.67:
+            v_pos = "bottom"
+        else:
+            v_pos = "middle"
+        
+        return f"{v_pos}-{h_pos}"
+    
+    def _get_object_size(self, bbox, img_width, img_height):
+        """Determine relative size of object in image"""
+        x1, y1, x2, y2 = bbox
+        obj_width = x2 - x1
+        obj_height = y2 - y1
+        obj_area = obj_width * obj_height
+        img_area = img_width * img_height
+        area_ratio = obj_area / img_area
+        
+        if area_ratio > 0.3:
+            return "large"
+        elif area_ratio > 0.1:
+            return "medium"
+        elif area_ratio > 0.02:
+            return "small"
+        else:
+            return "tiny"
+    
+    def get_provider_name(self) -> str:
+        return "Object Detection"
+    
+    def is_available(self) -> bool:
+        """Check if YOLO is available for object detection"""
+        return self.yolo_available
+    
+    def get_available_models(self) -> List[str]:
+        """Get list of available detection modes"""
+        if not self.yolo_available:
+            return [
+                "⚠️ YOLO not available",
+                "",
+                "Install with: pip install ultralytics",
+                "This will download YOLOv8 models automatically"
+            ]
+        
+        return [
+            "Object Detection Only",
+            "Object + Spatial Detection", 
+            "Detailed Object Analysis",
+            "🔧 Debug Mode (All Detections)",
+            "",
+            "📊 Pure YOLO detection without AI description",
+            "⚡ Fast processing - no LLM overhead",
+            "📍 Spatial location data included",
+            "🎯 Confidence scores and bounding boxes",
+            "🔧 Debug mode shows ALL YOLO detections"
+        ]
+    
+    def describe_image(self, image_path: str, prompt: str, model: str, **kwargs) -> str:
+        """Generate object detection results with configurable settings"""
+        
+        # Extract YOLO settings from kwargs (passed from ProcessingDialog)
+        yolo_settings = kwargs.get('yolo_settings', {})
+        confidence_threshold = yolo_settings.get('confidence_threshold', 0.10)
+        max_objects = yolo_settings.get('max_objects', 20)
+        preferred_model = yolo_settings.get('yolo_model', 'yolov8x.pt')
+        
+        # Handle info/error messages
+        if model.startswith("⚠️") or model.startswith("📊") or model.startswith("⚡") or model.startswith("📍") or model.startswith("🎯") or model == "":
+            return "Please select an object detection mode above."
+        
+        if not self.yolo_available or not self.yolo_model:
+            return ("YOLO object detection not available.\n\n"
+                   "Install with: pip install ultralytics\n\n"
+                   "This will automatically download YOLOv8 models for object detection.")
+        
+        try:
+            print(f"Running YOLO object detection: {model}")
+            print(f"🔧 Settings: confidence={confidence_threshold:.2f}, max_objects={max_objects}, model={preferred_model}")
+            
+            # Switch YOLO model if user selected a different one
+            current_model_name = getattr(self.yolo_model, 'model_name', 'yolov8x.pt')
+            if preferred_model != current_model_name:
+                print(f"🔄 Switching from {current_model_name} to {preferred_model}...")
+                try:
+                    from ultralytics import YOLO
+                    self.yolo_model = YOLO(preferred_model)
+                    self.yolo_model.model_name = preferred_model  # Store for future reference
+                    print(f"✅ Successfully loaded {preferred_model}")
+                except Exception as e:
+                    print(f"⚠️ Failed to load {preferred_model}, using current model: {e}")
+            
+            # Run YOLO detection with user-configured settings
+            print("🔍 Running YOLO detection with user settings...")
+            results = self.yolo_model(image_path, verbose=True, conf=confidence_threshold)
+            
+            # Get image dimensions
+            from PIL import Image
+            with Image.open(image_path) as img:
+                img_width, img_height = img.size
+            
+            print(f"📐 Image dimensions: {img_width}×{img_height}px")
+            
+            # Collect detected objects with user-configurable filtering
+            detected_objects = []
+            total_detections = 0
+            min_filter_confidence = max(0.01, confidence_threshold * 0.5)  # Filter at half the detection threshold
+            
+            for result in results:
+                boxes = result.boxes
+                if boxes is not None:
+                    total_detections += len(boxes)
+                    print(f"📊 YOLO found {len(boxes)} raw detections")
+                    
+                    for i, box in enumerate(boxes):
+                        conf = float(box.conf[0])
+                        cls_id = int(box.cls[0])
+                        name = self.yolo_model.names[cls_id]
+                        bbox = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
+                        
+                        print(f"  Detection {i+1}: {name} ({conf:.3f} confidence)")
+                        
+                        # Use user-configured filtering threshold
+                        if conf > min_filter_confidence:
+                            # Calculate spatial information
+                            location = self._get_object_location(bbox, img_width, img_height)
+                            size = self._get_object_size(bbox, img_width, img_height)
+                            
+                            detected_objects.append({
+                                'name': name,
+                                'confidence': conf * 100,
+                                'bbox': bbox,
+                                'location': location,
+                                'size': size
+                            })
+                        else:
+                            print(f"    ↳ Filtered out (confidence {conf:.3f} < {min_filter_confidence:.3f})")
+                        
+                        # Stop if we've reached the max objects limit
+                        if len(detected_objects) >= max_objects:
+                            print(f"🛑 Reached maximum objects limit ({max_objects})")
+                            break
+                    
+                    # Break outer loop too if max reached
+                    if len(detected_objects) >= max_objects:
+                        break
+            
+            print(f"🎯 Total raw detections: {total_detections}")
+            print(f"✅ Objects after filtering: {len(detected_objects)}")
+            
+            # Sort by confidence
+            detected_objects = sorted(detected_objects, key=lambda x: x['confidence'], reverse=True)
+            
+            print(f"🔍 Final YOLO results: {len(detected_objects)} objects detected")
+            
+            # Format output based on selected model
+            if "Object Detection Only" in model:
+                return self._format_simple_detection(detected_objects)
+            elif "Object + Spatial Detection" in model:
+                return self._format_spatial_detection(detected_objects)
+            elif "Detailed Object Analysis" in model:
+                return self._format_detailed_analysis(detected_objects, img_width, img_height)
+            elif "Debug Mode" in model:
+                return self._format_debug_analysis(detected_objects, total_detections, img_width, img_height)
+            else:
+                return self._format_spatial_detection(detected_objects)  # Default
+                
+        except Exception as e:
+            return f"Object detection failed: {str(e)}\n\nMake sure ultralytics is installed: pip install ultralytics"
+    
+    def _format_simple_detection(self, objects):
+        """Format simple object list"""
+        if not objects:
+            return "No objects detected in this image."
+        
+        result = f"🎯 OBJECT DETECTION RESULTS\n"
+        result += f"Found {len(objects)} objects:\n\n"
+        
+        for i, obj in enumerate(objects[:20], 1):  # Top 20 objects
+            result += f"{i:2d}. {obj['name']} ({obj['confidence']:.1f}%)\n"
+        
+        return result
+    
+    def _format_spatial_detection(self, objects):
+        """Format objects with spatial information"""
+        if not objects:
+            return "No objects detected in this image."
+        
+        result = f"📍 OBJECT + SPATIAL DETECTION RESULTS\n"
+        result += f"Found {len(objects)} objects with locations:\n\n"
+        
+        for i, obj in enumerate(objects[:15], 1):  # Top 15 with spatial data
+            result += f"{i:2d}. {obj['name']} ({obj['confidence']:.1f}%) - {obj['size']}, {obj['location']}\n"
+        
+        if len(objects) > 15:
+            result += f"\n... and {len(objects) - 15} more objects detected"
+        
+        return result
+    
+    def _format_detailed_analysis(self, objects, img_width, img_height):
+        """Format detailed analysis with bounding boxes"""
+        if not objects:
+            return "No objects detected in this image."
+        
+        result = f"🔍 DETAILED OBJECT ANALYSIS\n"
+        result += f"Image dimensions: {img_width}×{img_height}px\n"
+        result += f"Found {len(objects)} objects:\n\n"
+        
+        for i, obj in enumerate(objects[:10], 1):  # Top 10 with full details
+            bbox = obj['bbox']
+            x1, y1, x2, y2 = bbox
+            width = x2 - x1
+            height = y2 - y1
+            
+            result += f"{i:2d}. {obj['name']}\n"
+            result += f"    Confidence: {obj['confidence']:.1f}%\n"
+            result += f"    Size: {obj['size']} ({width:.0f}×{height:.0f}px)\n"
+            result += f"    Location: {obj['location']}\n"
+            result += f"    Bounding box: ({x1:.0f}, {y1:.0f}) to ({x2:.0f}, {y2:.0f})\n\n"
+        
+        if len(objects) > 10:
+            result += f"... and {len(objects) - 10} more objects detected\n"
+        
+        # Add summary statistics
+        result += f"\n📊 DETECTION SUMMARY:\n"
+        result += f"Total objects: {len(objects)}\n"
+        result += f"High confidence (>80%): {len([o for o in objects if o['confidence'] > 80])}\n"
+        result += f"Medium confidence (50-80%): {len([o for o in objects if 50 <= o['confidence'] <= 80])}\n"
+        result += f"Low confidence (15-50%): {len([o for o in objects if 15 <= o['confidence'] < 50])}\n"
+        
+        # Most common objects
+        object_counts = {}
+        for obj in objects:
+            object_counts[obj['name']] = object_counts.get(obj['name'], 0) + 1
+        
+        most_common = sorted(object_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        if most_common:
+            result += f"\nMost common objects: {', '.join([f'{name} ({count})' for name, count in most_common])}"
+        
+        return result
+    
+    def _format_debug_analysis(self, objects, total_raw_detections, img_width, img_height):
+        """Format comprehensive debug analysis"""
+        result = f"🔧 DEBUG MODE - COMPREHENSIVE YOLO ANALYSIS\n"
+        result += f"Image dimensions: {img_width}×{img_height}px\n"
+        result += f"Raw YOLO detections: {total_raw_detections}\n"
+        result += f"Objects after filtering: {len(objects)}\n\n"
+        
+        if not objects:
+            result += "❌ NO OBJECTS DETECTED\n\n"
+            result += "Possible reasons:\n"
+            result += "• Image contains objects YOLO wasn't trained on\n"
+            result += "• Objects are too small, blurry, or occluded\n"
+            result += "• Lighting/contrast issues\n"
+            result += "• YOLO model may not recognize artistic objects (statues, etc.)\n"
+            result += "• Try different YOLO model (yolov8s, yolov8m) if available\n"
+            return result
+        
+        # Show ALL detected objects with full details
+        result += "🎯 ALL DETECTED OBJECTS (sorted by confidence):\n"
+        for i, obj in enumerate(objects, 1):
+            bbox = obj['bbox']
+            x1, y1, x2, y2 = bbox
+            width = x2 - x1
+            height = y2 - y1
+            area_pct = (width * height) / (img_width * img_height) * 100
+            
+            result += f"\n{i:2d}. {obj['name'].upper()}\n"
+            result += f"    📊 Confidence: {obj['confidence']:.2f}%\n"
+            result += f"    📐 Size: {obj['size']} ({width:.0f}×{height:.0f}px = {area_pct:.1f}% of image)\n"
+            result += f"    📍 Location: {obj['location']}\n"
+            result += f"    🎯 Bounding box: ({x1:.0f}, {y1:.0f}) → ({x2:.0f}, {y2:.0f})\n"
+            
+            # Add confidence assessment
+            if obj['confidence'] > 80:
+                result += f"    ✅ High confidence detection\n"
+            elif obj['confidence'] > 50:
+                result += f"    ⚠️  Medium confidence detection\n"
+            elif obj['confidence'] > 20:
+                result += f"    🔍 Low confidence detection\n"
+            else:
+                result += f"    ❓ Very low confidence detection\n"
+        
+        # Add comprehensive statistics
+        result += f"\n📈 DETECTION STATISTICS:\n"
+        result += f"Total objects: {len(objects)}\n"
+        result += f"Confidence distribution:\n"
+        result += f"  • >80%: {len([o for o in objects if o['confidence'] > 80])} objects\n"
+        result += f"  • 50-80%: {len([o for o in objects if 50 <= o['confidence'] <= 80])} objects\n"
+        result += f"  • 20-50%: {len([o for o in objects if 20 <= o['confidence'] < 50])} objects\n"
+        result += f"  • 5-20%: {len([o for o in objects if 5 <= o['confidence'] < 20])} objects\n"
+        
+        # Size distribution
+        result += f"Size distribution:\n"
+        result += f"  • Large: {len([o for o in objects if o['size'] == 'large'])} objects\n"
+        result += f"  • Medium: {len([o for o in objects if o['size'] == 'medium'])} objects\n"
+        result += f"  • Small: {len([o for o in objects if o['size'] == 'small'])} objects\n"
+        result += f"  • Tiny: {len([o for o in objects if o['size'] == 'tiny'])} objects\n"
+        
+        # Object types
+        object_counts = {}
+        for obj in objects:
+            object_counts[obj['name']] = object_counts.get(obj['name'], 0) + 1
+        
+        most_common = sorted(object_counts.items(), key=lambda x: x[1], reverse=True)
+        result += f"Object types: {', '.join([f'{name}({count})' for name, count in most_common])}\n"
+        
+        # Add YOLO model info
+        result += f"\n🤖 YOLO MODEL INFO:\n"
+        result += f"Model type: YOLOv8 (probably yolov8x.pt or yolov8n.pt)\n"
+        result += f"Detection threshold: 5% confidence minimum\n"
+        result += f"Trained classes: {len(self.yolo_model.names)} total COCO classes\n"
+        
+        # Add suggestions
+        result += f"\n💡 SUGGESTIONS:\n"
+        if len(objects) < 3:
+            result += f"• Try lowering confidence threshold further\n"
+            result += f"• Check if objects are in YOLO's training classes\n"
+            result += f"• Museum artifacts may not be well-represented in COCO dataset\n"
+        
+        if any(obj['confidence'] < 30 for obj in objects):
+            result += f"• Low confidence suggests challenging detection conditions\n"
+            result += f"• Consider better lighting or different angle\n"
+        
+        return result
+
+
 # Global provider instances
 _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
@@ -2537,6 +2912,7 @@ _openai_provider = OpenAIProvider()
 _huggingface_provider = HuggingFaceProvider()
 _onnx_provider = ONNXProvider()
 _copilot_provider = CopilotProvider()
+_object_detection_provider = ObjectDetectionProvider()
 
 
 def get_available_providers() -> Dict[str, AIProvider]:
@@ -2561,6 +2937,9 @@ def get_available_providers() -> Dict[str, AIProvider]:
     if _copilot_provider.is_available():
         providers['copilot'] = _copilot_provider
     
+    if _object_detection_provider.is_available():
+        providers['object_detection'] = _object_detection_provider
+    
     return providers
 
 
@@ -2572,5 +2951,6 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'openai': _openai_provider,
         'huggingface': _huggingface_provider,
         'onnx': _onnx_provider,
-        'copilot': _copilot_provider
+        'copilot': _copilot_provider,
+        'object_detection': _object_detection_provider
     }

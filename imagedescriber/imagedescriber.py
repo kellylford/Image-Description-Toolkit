@@ -63,8 +63,8 @@ from PyQt6.QtGui import (
 
 # Import our refactored modules
 from ai_providers import (
-    AIProvider, OllamaProvider, OpenAIProvider, HuggingFaceProvider, ONNXProvider, CopilotProvider,
-    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider, _onnx_provider, _copilot_provider
+    AIProvider, OllamaProvider, OpenAIProvider, HuggingFaceProvider, ONNXProvider, CopilotProvider, ObjectDetectionProvider,
+    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider, _onnx_provider, _copilot_provider, _object_detection_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 from worker_threads import (
@@ -467,13 +467,14 @@ class ProcessingWorker(QThread):
     processing_complete = pyqtSignal(str, str, str, str, str, str)  # file_path, description, provider, model, prompt_style, custom_prompt
     processing_failed = pyqtSignal(str, str)  # file_path, error
     
-    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = ""):
+    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = "", yolo_settings: dict = None):
         super().__init__()
         self.file_path = file_path
         self.provider = provider
         self.model = model
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
+        self.yolo_settings = yolo_settings or {}
         
     def run(self):
         try:
@@ -578,7 +579,11 @@ class ProcessingWorker(QThread):
             def progress_callback(message, details=""):
                 self.progress_updated.emit(self.file_path, f"{message}")
             
-            description = provider.describe_image(image_path, prompt, self.model)
+            # Pass YOLO settings if using object detection provider
+            if self.provider == "object_detection" and self.yolo_settings:
+                description = provider.describe_image(image_path, prompt, self.model, yolo_settings=self.yolo_settings)
+            else:
+                description = provider.describe_image(image_path, prompt, self.model)
             
             return description
                 
@@ -1575,13 +1580,14 @@ class ProcessingDialog(QDialog):
         # Connect provider change to update models
         self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
         
-        # Prompt style selection
-        layout.addWidget(QLabel("Prompt Style:"))
+        # Prompt style selection (hidden for object detection)
+        self.prompt_label = QLabel("Prompt Style:")
+        layout.addWidget(self.prompt_label)
         self.prompt_combo = QComboBox()
         self.populate_prompts()
         layout.addWidget(self.prompt_combo)
         
-        # Custom prompt option
+        # Custom prompt option (hidden for object detection)
         self.custom_checkbox = QCheckBox("Use custom prompt")
         layout.addWidget(self.custom_checkbox)
         
@@ -1593,6 +1599,64 @@ class ProcessingDialog(QDialog):
         layout.addWidget(self.custom_prompt)
         
         self.custom_checkbox.toggled.connect(self.custom_prompt.setEnabled)
+        
+        # YOLO Object Detection Settings (shown only for object detection provider)
+        self.yolo_settings_label = QLabel("🎯 Object Detection Settings:")
+        self.yolo_settings_label.setStyleSheet("font-weight: bold; color: #2b5aa0;")
+        layout.addWidget(self.yolo_settings_label)
+        
+        # Confidence threshold setting
+        confidence_layout = QHBoxLayout()
+        confidence_layout.addWidget(QLabel("Confidence Threshold:"))
+        self.confidence_spin = QSpinBox()
+        self.confidence_spin.setRange(1, 95)
+        self.confidence_spin.setValue(10)
+        self.confidence_spin.setSuffix("%")
+        self.confidence_spin.setToolTip("Minimum confidence level for object detection (1-95%)")
+        confidence_layout.addWidget(self.confidence_spin)
+        confidence_layout.addStretch()
+        confidence_widget = QWidget()
+        confidence_widget.setLayout(confidence_layout)
+        layout.addWidget(confidence_widget)
+        self.confidence_widget = confidence_widget
+        
+        # Max objects setting
+        max_objects_layout = QHBoxLayout()
+        max_objects_layout.addWidget(QLabel("Maximum Objects:"))
+        self.max_objects_spin = QSpinBox()
+        self.max_objects_spin.setRange(1, 100)
+        self.max_objects_spin.setValue(20)
+        self.max_objects_spin.setToolTip("Maximum number of objects to detect and report")
+        max_objects_layout.addWidget(self.max_objects_spin)
+        max_objects_layout.addStretch()
+        max_objects_widget = QWidget()
+        max_objects_widget.setLayout(max_objects_layout)
+        layout.addWidget(max_objects_widget)
+        self.max_objects_widget = max_objects_widget
+        
+        # YOLO model selection
+        yolo_model_layout = QHBoxLayout()
+        yolo_model_layout.addWidget(QLabel("YOLO Model:"))
+        self.yolo_model_combo = QComboBox()
+        self.yolo_model_combo.addItem("yolov8n.pt (Fast, smaller file)")
+        self.yolo_model_combo.addItem("yolov8s.pt (Balanced)")
+        self.yolo_model_combo.addItem("yolov8m.pt (More accurate)")
+        self.yolo_model_combo.addItem("yolov8l.pt (Large, slower)")
+        self.yolo_model_combo.addItem("yolov8x.pt (Best accuracy)")
+        self.yolo_model_combo.setCurrentIndex(4)  # Default to yolov8x
+        self.yolo_model_combo.setToolTip("YOLO model size vs accuracy tradeoff")
+        yolo_model_layout.addWidget(self.yolo_model_combo)
+        yolo_model_layout.addStretch()
+        yolo_model_widget = QWidget()
+        yolo_model_widget.setLayout(yolo_model_layout)
+        layout.addWidget(yolo_model_widget)
+        self.yolo_model_widget = yolo_model_widget
+        
+        # Initially hide YOLO settings
+        self.yolo_settings_label.hide()
+        self.confidence_widget.hide()
+        self.max_objects_widget.hide()
+        self.yolo_model_widget.hide()
         
         # Provider status info
         self.status_label = QLabel()
@@ -1641,6 +1705,21 @@ class ProcessingDialog(QDialog):
             self.model_combo.clear()
             self.status_label.setText("No provider selected.")
             return
+        
+        # Show/hide settings based on provider type
+        is_object_detection = current_data == "object_detection"
+        
+        # Hide/show prompt-related controls
+        self.prompt_label.setVisible(not is_object_detection)
+        self.prompt_combo.setVisible(not is_object_detection)
+        self.custom_checkbox.setVisible(not is_object_detection)
+        self.custom_prompt.setVisible(not is_object_detection)
+        
+        # Hide/show YOLO settings
+        self.yolo_settings_label.setVisible(is_object_detection)
+        self.confidence_widget.setVisible(is_object_detection)
+        self.max_objects_widget.setVisible(is_object_detection)
+        self.yolo_model_widget.setVisible(is_object_detection)
         
         # Update models for selected provider
         self.populate_models(current_data)
@@ -1696,7 +1775,8 @@ class ProcessingDialog(QDialog):
             'openai': _openai_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
-            'copilot': _copilot_provider
+            'copilot': _copilot_provider,
+            'object_detection': _object_detection_provider
         }
         
         if provider_key not in all_providers:
@@ -1724,6 +1804,8 @@ class ProcessingDialog(QDialog):
                 print("Warning: No ONNX models found. Run download_onnx_models.bat to download models.")
             elif provider_key == "copilot":
                 print("Warning: Copilot+ PC hardware not detected or Windows AI APIs not available.")
+            elif provider_key == "object_detection":
+                print("Warning: YOLO object detection not available. Install with: pip install ultralytics")
     
     def get_selected_provider(self) -> str:
         """Get the selected provider key"""
@@ -1742,6 +1824,14 @@ class ProcessingDialog(QDialog):
         if self.custom_checkbox.isChecked():
             return self.custom_prompt.toPlainText()
         return ""
+    
+    def get_yolo_settings(self) -> dict:
+        """Get YOLO object detection settings"""
+        return {
+            'confidence_threshold': self.confidence_spin.value() / 100.0,  # Convert to 0.0-1.0 range
+            'max_objects': self.max_objects_spin.value(),
+            'yolo_model': self.yolo_model_combo.currentText().split(' ')[0]  # Extract just the model name
+        }
     
     def populate_prompts(self):
         """Populate prompt styles from config"""
@@ -1795,12 +1885,13 @@ class ProcessingDialog(QDialog):
         return {}
     
     def get_selections(self):
-        """Get selected provider, model, prompt style, and custom prompt"""
+        """Get selected provider, model, prompt style, custom prompt, and YOLO settings"""
         provider = self.get_selected_provider()
         model = self.get_selected_model()
         prompt_style = self.get_selected_prompt_style()
         custom_prompt = self.get_custom_prompt()
-        return provider, model, prompt_style, custom_prompt
+        yolo_settings = self.get_yolo_settings() if provider == "object_detection" else {}
+        return provider, model, prompt_style, custom_prompt, yolo_settings
 
 
 class ChatDialog(QDialog):
@@ -1885,7 +1976,8 @@ class ChatDialog(QDialog):
             'openai': _openai_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
-            'copilot': _copilot_provider
+            'copilot': _copilot_provider,
+            'object_detection': _object_detection_provider
         }
         
         for provider_key, provider in all_providers.items():
@@ -1912,7 +2004,8 @@ class ChatDialog(QDialog):
             'openai': _openai_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
-            'copilot': _copilot_provider
+            'copilot': _copilot_provider,
+            'object_detection': _object_detection_provider
         }
         
         if provider in all_providers:
@@ -1959,6 +2052,11 @@ class ChatDialog(QDialog):
                 self.status_label.setText(f"Using Copilot+ PC hardware acceleration. Status: {_copilot_provider.npu_info}")
             else:
                 self.status_label.setText("Copilot+ PC not available. Requires Windows 11 and Copilot+ PC hardware (NPU with 40+ TOPS)")
+        elif provider == "object_detection":
+            if _object_detection_provider.is_available():
+                self.status_label.setText("Using YOLO object detection. Fast processing without LLM overhead. Choose detection mode from models.")
+            else:
+                self.status_label.setText("Object detection not available. Install with: pip install ultralytics")
         else:
             self.status_label.setText("")
     
@@ -5532,12 +5630,12 @@ class ImageDescriberGUI(QMainWindow):
         # Show processing dialog first
         dialog = ProcessingDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            provider, model, prompt_style, custom_prompt = dialog.get_selections()
+            provider, model, prompt_style, custom_prompt, yolo_settings = dialog.get_selections()
             
             # Start processing (skip old verification logic for now)
             self.processing_items.add(file_path)  # Mark as processing
             self.update_window_title()  # Update title to show processing status
-            worker = ProcessingWorker(file_path, provider, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(file_path, provider, model, prompt_style, custom_prompt, yolo_settings)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -5735,7 +5833,7 @@ class ImageDescriberGUI(QMainWindow):
         # Show processing dialog first
         dialog = ProcessingDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            provider, model, prompt_style, custom_prompt = dialog.get_selections()
+            provider, model, prompt_style, custom_prompt, yolo_settings = dialog.get_selections()
             
         # Process each batch item
         self.batch_total = len(batch_items)
@@ -5752,7 +5850,7 @@ class ImageDescriberGUI(QMainWindow):
             # Add to processing items to show "p" indicator
             self.processing_items.add(item.file_path)
                 
-            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt, yolo_settings)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_batch_item_complete)
             worker.processing_failed.connect(self.on_batch_item_failed)
@@ -6552,7 +6650,8 @@ Please answer the follow-up question about this image, taking into account the c
             'openai': _openai_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
-            'copilot': _copilot_provider
+            'copilot': _copilot_provider,
+            'object_detection': _object_detection_provider
         }
         
         for provider_key, provider in all_providers.items():
@@ -6876,7 +6975,7 @@ Please answer the follow-up question about this image, taking into account the c
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         
-        provider, model, prompt_style, custom_prompt = dialog.get_selections()
+        provider, model, prompt_style, custom_prompt, yolo_settings = dialog.get_selections()
         
         # Optional verification
         if not getattr(self, '_skip_verification', True):
