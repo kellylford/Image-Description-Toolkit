@@ -1,119 +1,52 @@
-# ==================================================
-# Image Description Toolkit - Git Ignore Rules
-# ==================================================
+# Model files (too large for git - users should download these)
+imagedescriber/onnx_models/
+*.pt
+yolov8*.pt
 
-# Workflow output directories and files (all patterns)
-# These are created when scripts run and contain processed images/descriptions
-workflow_*/
-workflow_output*/
-comprehensive_test*/
-*_workflow_*
-*_test_*
+# Temporary and development files
+ChatHistory.txt
+test_*.py
+*_test.py
 
-# IDW and output files
-*.idw
-*.bak
-workflow_results.*
-batch_*.html
-batch_*.idw
-batch_*.bak
-
-# Test directories and files
-workflow_test_*/
-test_integration*/
-temp_*/
-debug_*.py
-test_temp_*
-clipboard_test_*
-
-# Application specific output files
-image_descriptions.txt
-image_descriptions.html
-*.uuid
-
-# PyInstaller build artifacts
-# Generated when building standalone executables
-build/
-dist/
-*.spec
-
-# Python cache and temporary files
+# Python cache and compiled files
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
+*.py[cod]
+*$py.class
 *.so
-.coverage
-.pytest_cache/
-*.egg-info/
-.tox/
 
 # Virtual environments
-.venv/
 venv/
 env/
 ENV/
 
-# IDE and editor files
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.project
-.pydevproject
 
-# OS generated files
+# OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Log files and directories
+# Log files
 *.log
 logs/
-log/
 
 # Temporary files
 *.tmp
 *.temp
 *.bak
 *.backup
-*.orig
 
-# Configuration overrides (keep templates)
-*_local.json
-*_override.json
+# Build artifacts
+build/
+dist/
+*.egg-info/
 
-# API Keys and secrets (NEVER commit these)
-openai.txt
-openai_key.txt
-api_keys.txt
-*.key
-secrets.json
-
-# Test output and artifacts
-test_output/
-test_results/
-
-# Documentation build outputs
-docs/_build/
-docs/build/
-
-# Package manager artifacts
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Application specific temp files
-*.pid
-*.seed
-*.uuid
-
-# Windows build artifacts
-*.exe.config
-*.exe.manifest
+# Local configuration files that might contain secrets
+config.local.*
+.env
+.env.local

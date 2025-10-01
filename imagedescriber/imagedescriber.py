@@ -63,8 +63,8 @@ from PyQt6.QtGui import (
 
 # Import our refactored modules
 from ai_providers import (
-    AIProvider, OllamaProvider, OpenAIProvider, HuggingFaceProvider,
-    get_available_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider
+    AIProvider, OllamaProvider, OpenAIProvider, HuggingFaceProvider, ONNXProvider, CopilotProvider,
+    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider, _onnx_provider, _copilot_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 from worker_threads import (
@@ -1619,19 +1619,20 @@ class ProcessingDialog(QDialog):
         from ai_providers import DEV_MODE_HARDCODED_MODELS
         
         # Always show all providers for consistency with ProcessingDialog
-        all_providers = {
-            'ollama': _ollama_provider,
-            'ollama_cloud': _ollama_cloud_provider,
-            'openai': _openai_provider,
-            'huggingface': _huggingface_provider
-        }
+        all_providers = get_all_providers()
         
         for provider_key, provider in all_providers.items():
-            display_name = provider.get_provider_name()
-            # Skip availability check in dev mode for faster loading
-            if not DEV_MODE_HARDCODED_MODELS and not provider.is_available():
-                display_name += " (Not Available)"
-            self.provider_combo.addItem(display_name, provider_key)
+            if provider is None:
+                continue  # Skip None providers
+            try:
+                display_name = provider.get_provider_name()
+                # Skip availability check in dev mode for faster loading
+                if not DEV_MODE_HARDCODED_MODELS and not provider.is_available():
+                    display_name += " (Not Available)"
+                self.provider_combo.addItem(display_name, provider_key)
+            except Exception as e:
+                print(f"Warning: Failed to add provider {provider_key}: {e}")
+                continue
     
     def on_provider_changed(self):
         """Handle provider selection change"""
@@ -1645,15 +1646,12 @@ class ProcessingDialog(QDialog):
         self.populate_models(current_data)
         
         # Update status information based on provider availability
-        all_providers = {
-            'ollama': _ollama_provider,
-            'ollama_cloud': _ollama_cloud_provider,
-            'openai': _openai_provider,
-            'huggingface': _huggingface_provider
-        }
+        all_providers = get_all_providers()
         
         if current_data in all_providers:
             provider = all_providers[current_data]
+            if provider is None:
+                return  # Skip None providers
             if current_data == "ollama":
                 if provider.is_available():
                     self.status_label.setText("Ollama: Local AI processing. Install models with 'ollama pull <model_name>'")
@@ -1674,6 +1672,16 @@ class ProcessingDialog(QDialog):
                     self.status_label.setText("Hugging Face: Local AI models. Models download automatically on first use. Requires: pip install transformers torch")
                 else:
                     self.status_label.setText("Hugging Face not available. Install with: pip install transformers torch accelerate")
+            elif current_data == "onnx":
+                if provider.is_available():
+                    self.status_label.setText(f"ONNX Runtime: Hardware-accelerated AI models. Status: {provider.hardware_type}. Run download_onnx_models.bat to get models.")
+                else:
+                    self.status_label.setText("ONNX Runtime not available. Install with: pip install onnxruntime onnx huggingface-hub")
+            elif current_data == "copilot":
+                if provider.is_available():
+                    self.status_label.setText(f"Copilot+ PC: Native Windows AI acceleration. Status: {provider.npu_info}")
+                else:
+                    self.status_label.setText("Copilot+ PC not available. Requires Windows 11 and Copilot+ PC hardware (NPU with 40+ TOPS)")
             else:
                 self.status_label.setText(f"Using {provider.get_provider_name()} provider")
     
@@ -1686,7 +1694,9 @@ class ProcessingDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'huggingface': _huggingface_provider
+            'huggingface': _huggingface_provider,
+            'onnx': _onnx_provider,
+            'copilot': _copilot_provider
         }
         
         if provider_key not in all_providers:
@@ -1710,6 +1720,10 @@ class ProcessingDialog(QDialog):
                 print("Warning: OpenAI models not available. Check API key in openai.txt")
             elif provider_key == "huggingface":
                 print("Warning: Hugging Face models not available. Check that transformers and torch are installed.")
+            elif provider_key == "onnx":
+                print("Warning: No ONNX models found. Run download_onnx_models.bat to download models.")
+            elif provider_key == "copilot":
+                print("Warning: Copilot+ PC hardware not detected or Windows AI APIs not available.")
     
     def get_selected_provider(self) -> str:
         """Get the selected provider key"""
@@ -1869,7 +1883,9 @@ class ChatDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'huggingface': _huggingface_provider
+            'huggingface': _huggingface_provider,
+            'onnx': _onnx_provider,
+            'copilot': _copilot_provider
         }
         
         for provider_key, provider in all_providers.items():
@@ -1894,7 +1910,9 @@ class ChatDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'huggingface': _huggingface_provider
+            'huggingface': _huggingface_provider,
+            'onnx': _onnx_provider,
+            'copilot': _copilot_provider
         }
         
         if provider in all_providers:
@@ -1931,6 +1949,16 @@ class ChatDialog(QDialog):
                 self.status_label.setText("Using Hugging Face vision models. Models download automatically. GPU recommended.")
             else:
                 self.status_label.setText("Hugging Face not available. Install with: pip install transformers torch accelerate")
+        elif provider == "onnx":
+            if _onnx_provider.is_available():
+                self.status_label.setText(f"Using ONNX Runtime models. Hardware acceleration: {_onnx_provider.hardware_type}. Run download_onnx_models.bat to get models.")
+            else:
+                self.status_label.setText("ONNX Runtime not available. Install with: pip install onnxruntime onnx huggingface-hub")
+        elif provider == "copilot":
+            if _copilot_provider.is_available():
+                self.status_label.setText(f"Using Copilot+ PC hardware acceleration. Status: {_copilot_provider.npu_info}")
+            else:
+                self.status_label.setText("Copilot+ PC not available. Requires Windows 11 and Copilot+ PC hardware (NPU with 40+ TOPS)")
         else:
             self.status_label.setText("")
     
@@ -4015,6 +4043,12 @@ class ImageDescriberGUI(QMainWindow):
         properties_action = QAction("Properties", self)
         properties_action.triggered.connect(self.show_image_properties)
         view_menu.addAction(properties_action)
+        
+        # Description Properties - NEW DIAGNOSTIC FEATURE
+        desc_properties_action = QAction("Description Properties", self)
+        desc_properties_action.setShortcut("Ctrl+Shift+P")
+        desc_properties_action.triggered.connect(self.show_description_properties)
+        view_menu.addAction(desc_properties_action)
         
         # Help menu
         help_menu = menubar.addMenu("Help")
@@ -6516,7 +6550,9 @@ Please answer the follow-up question about this image, taking into account the c
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'huggingface': _huggingface_provider
+            'huggingface': _huggingface_provider,
+            'onnx': _onnx_provider,
+            'copilot': _copilot_provider
         }
         
         for provider_key, provider in all_providers.items():
@@ -7975,6 +8011,288 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
             lines.append("")
         
         return "\n".join(lines)
+
+    def show_description_properties(self):
+        """Show diagnostic properties for the currently selected description"""
+        try:
+            # Get currently selected description based on navigation mode
+            if self.navigation_mode == "tree":
+                descriptions_list = self.description_list
+            elif self.navigation_mode == "master_detail":
+                descriptions_list = self.description_list_md
+            else:
+                QMessageBox.information(
+                    self, "No Navigation Mode",
+                    "Unable to determine current navigation mode."
+                )
+                return
+            
+            if not descriptions_list or descriptions_list.currentRow() < 0:
+                QMessageBox.information(
+                    self, "No Description Selected",
+                    "Please select a description first to view its properties."
+                )
+                return
+            
+            current_item = descriptions_list.currentItem()
+            if not current_item:
+                return
+            
+            # Extract description data
+            description_data = current_item.data(Qt.ItemDataRole.UserRole)
+            if not description_data:
+                QMessageBox.information(
+                    self, "No Description Data",
+                    "The selected description has no associated data."
+                )
+                return
+            
+            # Get the selected image file path for additional context
+            try:
+                file_path = self.get_current_selected_file_path()
+            except Exception as e:
+                file_path = None
+                print(f"Warning: Could not get file path: {e}")
+            
+            # Extract diagnostic properties
+            properties = self.extract_description_properties(description_data, file_path)
+            
+            # Create properties dialog
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Description Properties (Diagnostic)")
+            dialog.setModal(True)
+            dialog.resize(700, 600)
+            
+            layout = QVBoxLayout(dialog)
+            
+            # Create scrollable text area for properties
+            properties_text = QTextEdit()
+            properties_text.setReadOnly(True)
+            properties_text.setAccessibleName("Description Properties")
+            properties_text.setAccessibleDescription("Diagnostic information about the selected description including YOLO detection data, model info, and processing details.")
+            properties_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+            properties_text.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            properties_text.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+            
+            # Format properties as text
+            properties_text.setPlainText(self.format_description_properties_text(properties))
+            
+            layout.addWidget(properties_text)
+            
+            # Close button
+            button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+            button_box.rejected.connect(dialog.close)
+            layout.addWidget(button_box)
+            
+            dialog.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Properties Error", 
+                f"Failed to display description properties:\n{str(e)}"
+            )
+
+    def extract_description_properties(self, description_data, file_path: str = None) -> dict:
+        """Extract comprehensive diagnostic properties from a description"""
+        import re
+        properties = {}
+        
+        try:
+            # Handle different data formats
+            if isinstance(description_data, str):
+                # If it's just a string, create a minimal dict structure
+                description_dict = {
+                    "text": description_data,
+                    "id": "Unknown",
+                    "created": "Unknown",
+                    "model": "Unknown",
+                    "provider": "Unknown",
+                    "prompt_style": "Unknown",
+                    "custom_prompt": ""
+                }
+            elif isinstance(description_data, dict):
+                description_dict = description_data
+            else:
+                # Try to convert to dict if it has a to_dict method
+                if hasattr(description_data, 'to_dict'):
+                    description_dict = description_data.to_dict()
+                else:
+                    raise ValueError(f"Unsupported description data type: {type(description_data)}")
+            
+            # Basic Description Info
+            basic_info = {
+                "Description ID": description_dict.get("id", "Unknown"),
+                "Created": description_dict.get("created", "Unknown"),
+                "Model": description_dict.get("model", "Unknown"),
+                "Provider": description_dict.get("provider", "Unknown"),
+                "Prompt Style": description_dict.get("prompt_style", "Unknown"),
+                "Custom Prompt": description_dict.get("custom_prompt", "") or "None",
+                "Text Length": len(description_dict.get("text", "")),
+                "Data Type": str(type(description_data)),
+            }
+            properties["Basic Information"] = basic_info
+            
+            # AI Provider Analysis
+            provider_info = {}
+            model_name = description_dict.get("model", "")
+            provider = description_dict.get("provider", "")
+            
+            provider_info["Provider Type"] = provider
+            provider_info["Model Name"] = model_name
+            
+            # Check for YOLO enhancement indicators (no emojis)
+            yolo_indicators = []
+            if "YOLO Enhanced" in model_name:
+                yolo_indicators.append("Model name contains YOLO Enhanced indicator")
+            if "ENHANCED OLLAMA" in model_name:
+                yolo_indicators.append("Enhanced Ollama header detected")
+            
+            # Check description text for YOLO data
+            description_text = description_dict.get("text", "")
+            if "YOLO" in description_text:
+                yolo_indicators.append("Description text contains YOLO references")
+            if "detected objects" in description_text.lower():
+                yolo_indicators.append("Description mentions detected objects")
+            if any(location in description_text for location in ["top-left", "top-center", "top-right", "middle-left", "middle-center", "middle-right", "bottom-left", "bottom-center", "bottom-right"]):
+                yolo_indicators.append("Description contains spatial location data")
+            if any(size in description_text for size in ["large", "medium", "small", "tiny"]):
+                yolo_indicators.append("Description contains object size data")
+            
+            provider_info["YOLO Enhancement Detected"] = "Yes" if yolo_indicators else "No"
+            if yolo_indicators:
+                provider_info["YOLO Indicators"] = "; ".join(yolo_indicators)
+            
+            properties["AI Provider Analysis"] = provider_info
+            
+            # Enhanced Processing Detection
+            if provider == "onnx":
+                enhanced_info = {}
+                
+                try:
+                    # Analyze for object detection patterns
+                    # Look for object detection patterns like "person (85%, large, middle-center)"
+                    object_pattern = r'(\w+)\s*\((\d+)%,\s*(\w+),\s*([\w-]+)\)'
+                    objects_found = re.findall(object_pattern, description_text)
+                    
+                    if objects_found:
+                        enhanced_info["Detected Objects Count"] = len(objects_found)
+                        enhanced_info["Objects with Spatial Data"] = True
+                        enhanced_info["Sample Objects"] = "; ".join([f"{obj[0]} ({obj[1]}%, {obj[2]}, {obj[3]})" for obj in objects_found[:5]])
+                    else:
+                        enhanced_info["Detected Objects Count"] = 0
+                        enhanced_info["Objects with Spatial Data"] = False
+                        
+                    # Look for YOLO model references
+                    if "YOLOv8x" in description_text:
+                        enhanced_info["YOLO Model"] = "YOLOv8x (Maximum Accuracy)"
+                    elif "YOLOv8" in description_text:
+                        enhanced_info["YOLO Model"] = "YOLOv8 (Detected)"
+                    elif "YOLO" in description_text:
+                        enhanced_info["YOLO Model"] = "YOLO (Generic Reference)"
+                    else:
+                        enhanced_info["YOLO Model"] = "Not Detected"
+                        
+                except Exception as e:
+                    enhanced_info["Analysis Error"] = f"Pattern matching failed: {str(e)}"
+                    
+                properties["Enhanced Processing"] = enhanced_info
+            
+            # Prompt Analysis
+            prompt_info = {}
+            prompt_style = description_dict.get("prompt_style", "")
+            custom_prompt = description_dict.get("custom_prompt", "")
+            
+            prompt_info["Style"] = prompt_style
+            prompt_info["Custom Prompt Used"] = "Yes" if custom_prompt else "No"
+            if custom_prompt:
+                prompt_info["Custom Prompt Length"] = len(custom_prompt)
+                prompt_info["Custom Prompt Preview"] = custom_prompt[:100] + "..." if len(custom_prompt) > 100 else custom_prompt
+                
+            properties["Prompt Information"] = prompt_info
+            
+            # Description Text Preview
+            text_info = {}
+            if description_text:
+                text_info["Text Preview"] = description_text[:200] + "..." if len(description_text) > 200 else description_text
+                text_info["Contains YOLO Keywords"] = "YOLOv8" in description_text or "detected objects" in description_text.lower()
+                
+                # Look for object detection patterns in text
+                detection_patterns = [
+                    r'\b\w+\s*\(\d+%',  # object (confidence%
+                    r'(top|middle|bottom)[-\s]?(left|center|right)',  # spatial positions
+                    r'(large|medium|small|tiny)\s*(object|item|\w+)'  # size descriptors
+                ]
+                
+                found_patterns = []
+                for pattern in detection_patterns:
+                    matches = re.findall(pattern, description_text, re.IGNORECASE)
+                    if matches:
+                        found_patterns.append(f"{len(matches)} matches for {pattern}")
+                
+                text_info["Detection Patterns Found"] = "; ".join(found_patterns) if found_patterns else "None"
+            
+            properties["Description Text Analysis"] = text_info
+            
+            # File Context (if available)
+            if file_path:
+                try:
+                    from pathlib import Path
+                    context_info = {
+                        "Source Image": Path(file_path).name if file_path else "Unknown",
+                        "Image Path": file_path if file_path else "Unknown",
+                        "Image Type": Path(file_path).suffix.upper().lstrip('.') if file_path else "Unknown"
+                    }
+                    properties["File Context"] = context_info
+                except Exception as e:
+                    properties["File Context"] = {"Error": f"Could not analyze file: {str(e)}"}
+            
+        except Exception as e:
+            properties["Error"] = {"Message": f"Property extraction failed: {str(e)}", "Data Type": str(type(description_data))}
+        
+        return properties
+
+    def format_description_properties_text(self, properties: dict) -> str:
+        """Format description properties dictionary as readable diagnostic text"""
+        try:
+            lines = []
+            lines.append("DESCRIPTION DIAGNOSTIC PROPERTIES")
+            lines.append("=" * 50)
+            lines.append("")
+            
+            for category, props in properties.items():
+                lines.append(f"{category}")
+                lines.append("-" * len(category))
+                
+                if isinstance(props, dict):
+                    for key, value in props.items():
+                        try:
+                            # Format boolean values with indicators
+                            if isinstance(value, bool):
+                                value = "Yes" if value else "No"
+                            elif key == "YOLO Enhancement Detected":
+                                value = value if value == "Yes" else value
+                            elif key == "YOLO Model" and "Not Detected" in str(value):
+                                value = str(value)
+                            elif key == "YOLO Model" and "v8x" in str(value):
+                                value = str(value)
+                            elif key == "Objects with Spatial Data" and value:
+                                value = "Yes"
+                                
+                            lines.append(f"  {key}: {value}")
+                        except Exception as e:
+                            lines.append(f"  {key}: [Error formatting: {str(e)}]")
+                else:
+                    lines.append(f"  {props}")
+                
+                lines.append("")
+            
+            lines.append("Use this information to diagnose if YOLO enhancement is working properly.")
+            lines.append("Look for YOLO indicators, spatial data, and object detection patterns.")
+            
+            return "\n".join(lines)
+            
+        except Exception as e:
+            return f"Error formatting properties: {str(e)}\n\nRaw data:\n{str(properties)}"
 
     def closeEvent(self, event):
         """Handle application close - check for unsaved changes"""
