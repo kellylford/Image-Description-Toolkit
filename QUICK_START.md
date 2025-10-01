@@ -10,7 +10,7 @@ setup.bat
 
 ### Manual Setup:
 ```bash
-# 1. Install Python dependencies
+# 1. Install Python dependencies (includes YOLO object detection)
 pip install -r requirements.txt
 
 # 2. Install and start Ollama
@@ -30,6 +30,19 @@ python workflow.py tests/test_files/
 ## 📋 What You Get
 
 After setup, you can use:
+
+### Enhanced ONNX Provider (NEW!)
+```bash
+# Use YOLOv8x object detection + Ollama for maximum accuracy
+# Available in ImageDescriber GUI - select "Enhanced ONNX" provider
+cd imagedescriber && python imagedescriber.py
+
+# Features:
+# - YOLOv8x object detection (130MB, maximum accuracy)
+# - Spatial analysis (object locations and sizes)
+# - Enhanced prompts with detected object data
+# - Hardware acceleration (GPU/NPU when available)
+```
 
 ### Main Workflow System
 ```bash
@@ -91,6 +104,7 @@ build_viewer.bat
 ## 📚 Documentation
 
 - **README.md** - Complete user guide
+- **docs/ENHANCED_ONNX_GUIDE.md** - YOLOv8x + Ollama integration guide
 - **docs/CONFIGURATION.md** - Configuration options
 - **docs/HUGGING_FACE_DOWNLOAD_GUIDE.md** - Pre-download AI models
 - **docs/TESTING_README.md** - Model testing guide
@@ -122,8 +136,24 @@ ollama pull llama3.2-vision:11b
 # Update pip first
 python -m pip install --upgrade pip
 
-# Install requirements
+# Install requirements (includes YOLO detection)
 pip install -r requirements.txt
+
+# Test YOLO installation
+python -c "from ultralytics import YOLO; print('YOLO available')"
+```
+
+### Enhanced ONNX Provider Issues
+```bash
+# Check YOLO installation
+pip install ultralytics>=8.0.0
+
+# Check ONNX Runtime
+pip install onnxruntime>=1.16.0
+
+# Test Enhanced ONNX provider
+cd imagedescriber && python imagedescriber.py
+# Select "Enhanced ONNX" provider in GUI
 ```
 
 ### Test Suite Failures
@@ -141,11 +171,17 @@ python test_image_describer.py
    python comprehensive_test.py sample_images/
    ```
 
-2. **For Copilot+ PCs** (NPU acceleration):
-   - See `docs/COPILOT_PC_SETUP_GUIDE.md`
-   - Use ONNX providers for hardware acceleration
+2. **Use Enhanced ONNX Provider** for maximum accuracy:
+   - Launch ImageDescriber GUI: `cd imagedescriber && python imagedescriber.py`
+   - Select "Enhanced ONNX" as AI provider
+   - Choose any Ollama model (will show "YOLO Enhanced" suffix)
+   - Gets YOLOv8x object detection + enhanced prompts automatically
 
-3. **For large collections**:
+3. **For Copilot+ PCs** (NPU acceleration):
+   - See `docs/COPILOT_PC_SETUP_GUIDE.md`
+   - Enhanced ONNX provider automatically uses NPU when available
+
+4. **For large collections**:
    - Start with small test batches
    - Use `--dry-run` to preview processing
    - Enable verbose logging with `--verbose`

@@ -39,6 +39,9 @@ onnxruntime>=1.16.0
 onnx>=1.15.0
 huggingface-hub>=0.17.0
 
+# YOLO object detection for Enhanced ONNX provider (optional)
+ultralytics>=8.0.0
+
 # Windows Runtime for Copilot+ PC support (Windows only, optional)
 winrt>=1.0.0; sys_platform == "win32"
 pywin32>=306; sys_platform == "win32"

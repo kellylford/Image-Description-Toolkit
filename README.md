@@ -4,7 +4,30 @@ An AI-powered toolkit for generating descriptive text from images using local la
 
 ## 🌟 Features
 
-## 📞 Support & Doc## 🚀 **Ready to Get Started?**
+- **🔄 Unified Workflow System**: Complete pipeline from video → frames → images → descriptions → HTML reports
+- **🤖 AI-Powered Descriptions**: Generate natural language descriptions using local Ollama models
+- **⚡ Enhanced ONNX Provider**: YOLOv8x object detection + Ollama hybrid workflow for maximum accuracy
+- **🎯 Spatial Object Detection**: Precise location analysis (top/middle/bottom + left/center/right) and size classification
+- **🧪 Comprehensive Model Testing**: Automatically test all available Ollama models with all prompt styles to find optimal combinations
+- **📊 Advanced Performance Analytics**: Detailed reporting with timing, success rates, and quality metrics across all model/prompt combinations
+- **🎥 Video Frame Extraction**: Extract frames from videos for analysis
+- **🖼️ Image Format Conversion**: Convert HEIC images to JPG automatically
+- **📄 HTML Report Generation**: Create beautiful web galleries with descriptions
+- **⚡ Batch Processing**: Handle multiple files and directories efficiently
+- **📱 Interactive Visual Reports**: Comprehensive HTML reports with side-by-side model comparisons
+- **📋 Professional Logging**: Complete logging with statistics and progress tracking
+- **🛠️ Individual Script Access**: Use components separately when needed
+
+## 📞 Support & Documentation
+
+- **⚡ Enhanced ONNX Guide**: See `docs/ENHANCED_ONNX_GUIDE.md` for YOLOv8x + Ollama integration details
+- **📋 Comprehensive Testing Guide**: See `TESTING_GUIDE.md` for complete model testing documentation
+- **📚 Documentation**: Detailed guides available in the `docs/` directory
+- **🐛 Issues**: Report bugs or request features via [GitHub Issues](https://github.com/kellylford/Image-Description-Toolkit/issues)
+- **💬 Discussions**: Join conversations in [GitHub Discussions](https://github.com/kellylford/Image-Description-Toolkit/discussions)
+- **🧪 Testing**: Run `cd tests && python run_tests.py` to verify your setup
+
+## 🚀 **Ready to Get Started?**
 
 ### Option 1: Automated Setup (Recommended)
 ```cmd
@@ -14,7 +37,7 @@ setup.bat
 
 ### Option 2: Manual Setup
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies (includes YOLO detection)
 pip install -r requirements.txt
 
 # 2. Install Ollama and pull a vision model  
@@ -39,21 +62,7 @@ python workflow.py --resume workflow_output_directory
 
 **📋 For detailed setup instructions, see [QUICK_START.md](QUICK_START.md)**
 
-**💡 Pro Tip**: Always run the comprehensive testing first to discover which models work best with your specific types of images. You might be surprised which models perform excellently! Comprehensive Testing Guide**: See `TESTING_GUIDE.md` for complete model testing documentation
-- **📚 Documentation**: Detailed guides available in the `docs/` directory
-- **🐛 Issues**: Report bugs or request features via [GitHub Issues](https://github.com/kellylford/Image-Description-Toolkit/issues)
-- **💬 Discussions**: Join conversations in [GitHub Discussions](https://github.com/kellylford/Image-Description-Toolkit/discussions)
-- **🧪 Testing**: Run `cd tests && python run_tests.py` to verify your setup Unified Workflow System**: Complete pipeline from video → frames → images → descriptions → HTML reports
-- **🤖 AI-Powered Descriptions**: Generate natural language descriptions using local Ollama models
-- **🧪 Comprehensive Model Testing**: Automatically test all available Ollama models with all prompt styles to find optimal combinations
-- **📊 Advanced Performance Analytics**: Detailed reporting with timing, success rates, and quality metrics across all model/prompt combinations
-- **🎥 Video Frame Extraction**: Extract frames from videos for analysis
-- **🖼️ Image Format Conversion**: Convert HEIC images to JPG automatically
-- **📄 HTML Report Generation**: Create beautiful web galleries with descriptions
-- **⚡ Batch Processing**: Handle multiple files and directories efficiently
-- **� Interactive Visual Reports**: Comprehensive HTML reports with side-by-side model comparisons
-- **📋 Professional Logging**: Complete logging with statistics and progress tracking
-- **🛠️ Individual Script Access**: Use components separately when needed
+**💡 Pro Tip**: Always run the comprehensive testing first to discover which models work best with your specific types of images. You might be surprised which models perform excellently!
 
 ## 🔧 System Requirements
 
@@ -329,6 +338,18 @@ Professional graphical interface for managing image description projects:
 - **🎥 Video Support**: Frame extraction and management integrated
 - **📊 Real-time Status**: Live processing indicators and description counts
 - **🌐 Dual AI Support**: Both Ollama local and OpenAI cloud providers
+- **⚡ Enhanced ONNX Provider**: YOLOv8x object detection + Ollama hybrid workflow
+
+### Enhanced ONNX Provider (`imagedescriber/ai_providers.py`) **NEW!**
+Advanced AI provider combining YOLO object detection with Ollama language models:
+- **🎯 YOLOv8x Integration**: Maximum accuracy object detection (130MB model)
+- **📍 Spatial Analysis**: Precise object location (top/middle/bottom + left/center/right)
+- **📏 Size Classification**: Object size analysis (large/medium/small/tiny)
+- **🔄 Hybrid Workflow**: YOLO detection → Enhanced prompts → Ollama descriptions
+- **🏷️ Model Labeling**: Shows "YOLO Enhanced" suffix on Ollama models
+- **🎛️ Hardware Acceleration**: Uses available hardware (GPU/NPU) when possible
+- **📊 Enhanced Prompts**: Includes detected object data for more accurate descriptions
+- **🔧 Diagnostic Tools**: Description Properties feature for troubleshooting
 
 ### HTML Report Generator (`scripts/descriptions_to_html.py`)
 Create beautiful web galleries from descriptions:

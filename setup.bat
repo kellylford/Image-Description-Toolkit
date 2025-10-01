@@ -26,6 +26,14 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+echo Installing Enhanced ONNX provider with YOLO detection...
+pip install ultralytics>=8.0.0
+if errorlevel 1 (
+    echo WARNING: YOLO detection install failed - Enhanced ONNX features may be limited
+    echo You can install manually later with: pip install ultralytics
+)
+
 echo Dependencies installed successfully!
 echo.
 
