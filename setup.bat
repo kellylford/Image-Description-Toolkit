@@ -20,9 +20,33 @@ echo Python version: %PYTHON_VERSION%
 echo.
 
 echo [2/5] Installing Python dependencies...
-pip install -r requirements.txt
+echo Checking Python version compatibility...
+python -c "import sys; print('Python ' + str(sys.version_info.major) + '.' + str(sys.version_info.minor) + '.' + str(sys.version_info.micro))"
+
+REM Check for Python 3.13+ and use appropriate requirements file
+python -c "import sys; exit(0 if sys.version_info >= (3, 13) else 1)" >nul 2>&1
+if errorlevel 1 (
+    echo Installing with full requirements.txt...
+    pip install -r requirements.txt
+) else (
+    echo Python 3.13+ detected - using compatible requirements...
+    pip install -r requirements-python313.txt
+    echo.
+    echo NOTE: Some advanced packages may not be available for Python 3.13 yet.
+    echo Core functionality ^(Ollama, PyQt6 viewer, basic AI^) works normally.
+    echo Missing features: Enhanced ONNX, YOLO detection, advanced metadata extraction
+    echo.
+)
+
 if errorlevel 1 (
     echo ERROR: Failed to install Python dependencies
+    echo.
+    echo Troubleshooting suggestions:
+    echo 1. For Python 3.13+: Try: pip install -r requirements-python313.txt
+    echo 2. For older Python: Try: pip install -r requirements.txt  
+    echo 3. Install minimal core: pip install ollama PyQt6 Pillow opencv-python
+    echo 4. Consider Python 3.11 or 3.12 for full feature compatibility
+    echo.
     pause
     exit /b 1
 )

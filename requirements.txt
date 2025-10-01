@@ -43,7 +43,8 @@ huggingface-hub>=0.17.0
 ultralytics>=8.0.0
 
 # Windows Runtime for Copilot+ PC support (Windows only, optional)
-winrt>=1.0.0; sys_platform == "win32"
+# Note: winrt may not be available for Python 3.13+ yet
+winrt>=1.0.0; sys_platform == "win32" and python_version<"3.13"
 pywin32>=306; sys_platform == "win32"
 
 # Configuration and utilities (compatibility for older Python versions)
