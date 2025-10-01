@@ -6,6 +6,13 @@ An AI-powered toolkit for generating descriptive text from images using local la
 
 ## 📞 Support & Doc## 🚀 **Ready to Get Started?**
 
+### Option 1: Automated Setup (Recommended)
+```cmd
+# Windows users - run the automated setup script
+setup.bat
+```
+
+### Option 2: Manual Setup
 ```bash
 # 1. Install dependencies
 pip install -r requirements.txt
@@ -29,6 +36,8 @@ python workflow.py --resume workflow_output_directory
 ```
 
 **🎉 That's it!** The workflow system will handle the rest automatically. 
+
+**📋 For detailed setup instructions, see [QUICK_START.md](QUICK_START.md)**
 
 **💡 Pro Tip**: Always run the comprehensive testing first to discover which models work best with your specific types of images. You might be surprised which models perform excellently! Comprehensive Testing Guide**: See `TESTING_GUIDE.md` for complete model testing documentation
 - **📚 Documentation**: Detailed guides available in the `docs/` directory
@@ -106,9 +115,11 @@ If Ollama is running properly, you should see a JSON response with version infor
 
 ```
 Image-Description-Toolkit/
-├── workflow.py                # 🎯 Main entry point - workflow wrapper
-├── comprehensive_test.py      # 🧪 Comprehensive model testing and comparison
-├── scripts/                   # 🔧 Core processing scripts
+├── setup.bat                 # 🔧 Automated setup script (Windows)
+├── QUICK_START.md            # 📋 Quick setup guide
+├── workflow.py               # 🎯 Main entry point - workflow wrapper
+├── comprehensive_test.py     # 🧪 Comprehensive model testing and comparison
+├── scripts/                  # 🔧 Core processing scripts
 │   ├── workflow.py           #    Workflow orchestrator (main engine)
 │   ├── video_frame_extractor.py #    Extract frames from videos
 │   ├── ConvertImage.py       #    Convert HEIC to JPG
