@@ -1,0 +1,246 @@
+================================================================================
+    ImageDescriber - What's Included
+================================================================================
+
+📦 WHAT'S IN THE EXE (ImageDescriber.exe or ImageDescriber_amd64.exe)
+================================================================================
+
+✓ CORE APPLICATION
+  - ImageDescriber GUI application
+  - Complete Python 3.13 runtime (no Python install needed!)
+  - All required Python libraries (PyQt6, Pillow, etc.)
+  - Workspace management system
+  - Image organization and display
+  - Manual description editing
+  - HTML report generation
+  - Chat session management
+  - Full keyboard navigation and accessibility
+
+✓ IMAGE SUPPORT
+  - HEIC format support (iPhone photos)
+  - JPG/JPEG support
+  - PNG support (including transparency)
+  - BMP support
+  - GIF support
+  - CMYK color space handling
+  - Large image handling (up to 4K+)
+
+✓ FEATURES THAT WORK OUT-OF-THE-BOX
+  - Create and manage workspaces (organize image projects)
+  - Load and preview images (including fullscreen view)
+  - Add custom display names to images
+  - Type manual descriptions for any image
+  - Edit and refine descriptions
+  - Create chat sessions (conversation-style organization)
+  - Rename items (images and chats)
+  - Delete items in bulk
+  - Copy/paste descriptions between images
+  - Generate HTML galleries with your descriptions
+  - Export reports with side-by-side comparisons
+  - Professional formatting and styling
+  - Responsive web design (works on all devices)
+
+✓ UI FEATURES
+  - Resizable panels (drag to adjust)
+  - Image preview with zoom
+  - Fullscreen mode (press Enter)
+  - Tab navigation (keyboard-friendly)
+  - Drag-and-drop file loading
+  - Right-click context menus
+  - Keyboard shortcuts
+  - Progress indicators
+  - Status messages
+
+
+❌ WHAT'S NOT INCLUDED (Optional Add-ons)
+================================================================================
+
+These features require separate installation but add AI-powered capabilities:
+
+⚠️ OLLAMA (Required for AI Descriptions)
+  What: Local AI models that generate image descriptions
+  Cost: FREE
+  Size: ~250MB installer + ~2-8GB per model
+  Setup: Download from ollama.ai/download
+  Why needed: Provides the actual AI that "looks" at images
+  Works offline: YES (completely local and private)
+  
+  Models to download after installing Ollama:
+    - llava:7b (Recommended, 4GB) - Good balance of speed and quality
+    - moondream (2GB) - Fastest, smaller model
+    - llava:13b (8GB) - Best quality, slower
+  
+  Setup command: ollama pull llava:7b
+
+⚠️ YOLO / ULTRALYTICS (Optional - Object Detection)
+  What: Computer vision for detecting and counting objects
+  Cost: FREE
+  Size: ~50MB
+  Setup: pip install ultralytics
+  Why needed: Enables "Object Detection" provider
+  Features: Counts people, cars, animals, furniture, etc. (80 object types)
+  Works with: Pure object detection OR Enhanced ONNX hybrid
+  
+  Note: YOLO recognizes everyday objects (COCO dataset). It won't detect
+        specialized items like sculptures, paintings, or artwork.
+
+⚠️ ONNX MODELS (Optional - Performance Enhancement)
+  What: Pre-optimized AI models for faster inference
+  Cost: FREE
+  Size: ~230MB
+  Setup: Run download_onnx_models.bat (included with ImageDescriber)
+  Why needed: Speeds up Enhanced ONNX provider significantly
+  Requires: Ollama + YOLO already installed
+  Works offline: YES (after download)
+
+⚠️ OPENAI API KEY (Optional - Cloud AI)
+  What: Access to GPT-4 Vision (like ChatGPT Plus)
+  Cost: PAID (~$0.01-0.03 per image, pay-as-you-go)
+  Size: N/A (cloud service)
+  Setup: Sign up at platform.openai.com, get API key
+  Why needed: Highest quality descriptions, but costs money
+  Works offline: NO (requires internet)
+
+⚠️ HUGGINGFACE TOKEN (Optional - Model Hub)
+  What: Access to thousands of AI models on HuggingFace
+  Cost: FREE (for most models)
+  Size: Varies by model (typically 100MB - 10GB)
+  Setup: Sign up at huggingface.co, get read token
+  Why needed: Experiment with different AI architectures
+  Works offline: Some models (after download)
+
+
+🎯 QUICK START GUIDE
+================================================================================
+
+LEVEL 1: Use ImageDescriber RIGHT NOW (0 minutes)
+  → Just run ImageDescriber.exe
+  → Load images, organize them, add manual descriptions
+  → Export to HTML
+  → No AI, but everything else works!
+
+LEVEL 2: Add AI Descriptions (10 minutes)
+  → Install Ollama from ollama.ai/download
+  → Run: ollama pull llava:7b
+  → Restart ImageDescriber
+  → Select "Ollama" provider
+  → AI descriptions now work!
+
+LEVEL 3: Add Object Detection (15 minutes)
+  → Install Python from python.org (if not installed)
+  → Run: pip install ultralytics
+  → Restart ImageDescriber
+  → "Object Detection" provider now appears
+  → Can count and identify objects in images!
+
+LEVEL 4: Maximum Performance (25 minutes)
+  → Complete Level 2 and 3 above
+  → Run: download_onnx_models.bat
+  → Wait 5-10 minutes for download
+  → Restart ImageDescriber
+  → "Enhanced ONNX" providers now available
+  → Best accuracy combining YOLO + Ollama!
+
+
+📁 FILES INCLUDED WITH IMAGEDESCRIBER
+================================================================================
+
+When you extracted/downloaded ImageDescriber, you should have:
+
+REQUIRED (Must have):
+  ✓ ImageDescriber.exe (or ImageDescriber_amd64.exe / ImageDescriber_arm64.exe)
+  ✓ This file: WHATS_INCLUDED.txt
+
+HELPFUL (Recommended to keep):
+  ✓ USER_SETUP_GUIDE.md - Detailed setup instructions
+  ✓ setup_imagedescriber.bat - Interactive setup assistant
+  ✓ download_onnx_models.bat - ONNX model downloader (optional)
+
+OPTIONAL (Can delete if not needed):
+  - Any .spec or build files (development artifacts)
+  - __pycache__ folders (Python cache, not needed for .exe)
+
+
+💾 DISK SPACE REQUIREMENTS
+================================================================================
+
+ImageDescriber.exe:          ~30-50 MB (the app itself)
+
+Optional add-ons:
+  Ollama installer:          ~250 MB
+  Ollama llava:7b model:     ~4 GB
+  Ollama moondream model:    ~2 GB  
+  Ollama llava:13b model:    ~8 GB
+  YOLO ultralytics:          ~50 MB
+  ONNX models:               ~230 MB
+
+Realistic setup:
+  Minimal (no AI):           50 MB (just ImageDescriber.exe)
+  Recommended:               ~4.5 GB (ImageDescriber + Ollama + llava:7b + YOLO)
+  Maximum:                   ~9 GB (everything including large models)
+
+
+🔧 TROUBLESHOOTING
+================================================================================
+
+Q: Why can't I see AI providers like "Ollama" or "Object Detection"?
+A: These require external software. See "WHAT'S NOT INCLUDED" above.
+   Run setup_imagedescriber.bat to install missing components.
+
+Q: The app says "Python not found" but I just want to use it!
+A: ImageDescriber.exe includes Python! This message appears only if you
+   try to use features requiring external Python packages (YOLO, ONNX).
+   For basic use (manual descriptions, HTML export), ignore this message.
+
+Q: Do I need to install Python separately?
+A: NO - for basic use, Python is included in ImageDescriber.exe.
+   YES - only if you want object detection (YOLO) or ONNX models.
+
+Q: Why does ImageDescriber.exe take a while to start the first time?
+A: PyInstaller extracts bundled files on first run. Subsequent starts
+   will be much faster. This is normal.
+
+Q: Can I use ImageDescriber without internet?
+A: YES - After initial setup:
+   - Core features work offline (always)
+   - Ollama works offline (local AI)
+   - YOLO works offline (local detection)
+   - ONNX works offline (local models)
+   - OpenAI does NOT work offline (cloud API)
+
+Q: Where are my workspaces saved?
+A: Workspaces are saved wherever you create them. Each workspace is a
+   JSON file containing your image paths, descriptions, and settings.
+   The .exe doesn't store anything - you control all files.
+
+Q: Can I move ImageDescriber.exe to another computer?
+A: YES - Copy the .exe anywhere. It's fully portable!
+   If you set up optional features (Ollama, YOLO), install them on the
+   new computer too. Run setup_imagedescriber.bat to check status.
+
+
+📞 GETTING HELP
+================================================================================
+
+📖 Documentation:
+   - USER_SETUP_GUIDE.md (detailed setup walkthrough)
+   - Run setup_imagedescriber.bat (interactive assistant)
+   - Help menu in ImageDescriber application
+
+🌐 Online:
+   - GitHub: github.com/kellylford/Image-Description-Toolkit
+   - Report bugs: GitHub Issues tab
+   - Ask questions: GitHub Discussions tab
+
+💡 Quick Tips:
+   - Start with no AI setup - explore the interface first
+   - Then add Ollama (10 minutes) for AI descriptions
+   - Then add YOLO (5 minutes) for object detection
+   - Don't install everything at once - add features as needed!
+
+
+================================================================================
+Version: October 2025
+App: ImageDescriber v2.0+
+Questions? See GitHub Issues or Discussions
+================================================================================

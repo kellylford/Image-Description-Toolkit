@@ -71,6 +71,30 @@ if %ERRORLEVEL% equ 0 (
     echo ✓ ARM64 build successful!
     echo Single executable created at: %OUTPUT_DIR%\ImageDescriber_arm64.exe
     echo.
+    echo Copying user documentation...
+    copy "%SCRIPT_DIR%\USER_SETUP_GUIDE.md" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\WHATS_INCLUDED.txt" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\DISTRIBUTION_README.txt" "%OUTPUT_DIR%\README.txt" >nul 2>&1
+    copy "%SCRIPT_DIR%\setup_imagedescriber.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\download_onnx_models.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    echo Documentation files copied to distribution folder.
+    echo.
+    echo ================================================================
+    echo Distribution Package Contents:
+    echo ================================================================
+    echo   ImageDescriber_arm64.exe       - Main application
+    echo   README.txt                     - START HERE (quick start guide)
+    echo   USER_SETUP_GUIDE.md            - Detailed setup instructions
+    echo   WHATS_INCLUDED.txt             - What's bundled vs optional
+    echo   setup_imagedescriber.bat       - Interactive setup assistant
+    echo   download_onnx_models.bat       - ONNX model downloader
+    echo ================================================================
+    echo.
+    echo To distribute to end users:
+    echo   1. Zip the entire folder: %OUTPUT_DIR%
+    echo   2. Users extract and run ImageDescriber_arm64.exe
+    echo   3. Users run setup_imagedescriber.bat for AI features
+    echo.
     echo To run the application:
     echo   "%OUTPUT_DIR%\ImageDescriber_arm64.exe"
     echo.

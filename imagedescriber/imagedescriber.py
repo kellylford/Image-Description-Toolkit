@@ -64,7 +64,7 @@ from PyQt6.QtGui import (
 # Import our refactored modules
 from ai_providers import (
     AIProvider, OllamaProvider, OpenAIProvider, HuggingFaceProvider, ONNXProvider, CopilotProvider, ObjectDetectionProvider,
-    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider, _onnx_provider, _copilot_provider, _object_detection_provider
+    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider, _onnx_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 from worker_threads import (
@@ -467,14 +467,15 @@ class ProcessingWorker(QThread):
     processing_complete = pyqtSignal(str, str, str, str, str, str)  # file_path, description, provider, model, prompt_style, custom_prompt
     processing_failed = pyqtSignal(str, str)  # file_path, error
     
-    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = "", yolo_settings: dict = None):
+    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = "", yolo_settings: dict = None, detection_settings: dict = None):
         super().__init__()
         self.file_path = file_path
         self.provider = provider
         self.model = model
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
-        self.yolo_settings = yolo_settings or {}
+        # Support both old yolo_settings and new detection_settings parameters for backward compatibility
+        self.detection_settings = detection_settings or yolo_settings or {}
         
     def run(self):
         try:
@@ -579,9 +580,12 @@ class ProcessingWorker(QThread):
             def progress_callback(message, details=""):
                 self.progress_updated.emit(self.file_path, f"{message}")
             
-            # Pass YOLO settings if using object detection provider
-            if self.provider == "object_detection" and self.yolo_settings:
-                description = provider.describe_image(image_path, prompt, self.model, yolo_settings=self.yolo_settings)
+            # Pass detection settings if using detection provider
+            if self.provider == "object_detection" and self.detection_settings:
+                description = provider.describe_image(image_path, prompt, self.model, yolo_settings=self.detection_settings)
+            elif self.provider in ["grounding_dino", "grounding_dino_hybrid"] and self.detection_settings:
+                # Pass GroundingDINO settings
+                description = provider.describe_image(image_path, prompt, self.model, **self.detection_settings)
             else:
                 description = provider.describe_image(image_path, prompt, self.model)
             
@@ -1658,6 +1662,96 @@ class ProcessingDialog(QDialog):
         self.max_objects_widget.hide()
         self.yolo_model_widget.hide()
         
+        # GroundingDINO Settings (shown only for grounding_dino providers)
+        self.grounding_dino_settings_label = QLabel("🎯 GroundingDINO Detection Settings:")
+        self.grounding_dino_settings_label.setStyleSheet("font-weight: bold; color: #2b5aa0;")
+        layout.addWidget(self.grounding_dino_settings_label)
+        
+        # Detection mode radio buttons
+        mode_group_box = QGroupBox("Detection Mode")
+        mode_layout = QVBoxLayout()
+        self.grounding_dino_auto_radio = QRadioButton("Automatic (Use Preset)")
+        self.grounding_dino_custom_radio = QRadioButton("Custom Query")
+        self.grounding_dino_auto_radio.setChecked(True)
+        mode_layout.addWidget(self.grounding_dino_auto_radio)
+        mode_layout.addWidget(self.grounding_dino_custom_radio)
+        mode_group_box.setLayout(mode_layout)
+        layout.addWidget(mode_group_box)
+        self.grounding_dino_mode_widget = mode_group_box
+        
+        # Preset dropdown (shown when Automatic mode selected)
+        preset_layout = QHBoxLayout()
+        preset_layout.addWidget(QLabel("Detection Preset:"))
+        self.grounding_dino_preset_combo = QComboBox()
+        self.grounding_dino_preset_combo.addItem("Comprehensive Scan", "comprehensive")
+        self.grounding_dino_preset_combo.addItem("Indoor Objects", "indoor")
+        self.grounding_dino_preset_combo.addItem("Outdoor Scene", "outdoor")
+        self.grounding_dino_preset_combo.addItem("Workplace/Office", "workplace")
+        self.grounding_dino_preset_combo.addItem("Safety & Hazards", "safety")
+        self.grounding_dino_preset_combo.addItem("Retail/Inventory", "retail")
+        self.grounding_dino_preset_combo.addItem("Document/Text Elements", "document")
+        self.grounding_dino_preset_combo.setToolTip("Select a predefined detection preset for common scenarios")
+        preset_layout.addWidget(self.grounding_dino_preset_combo)
+        preset_layout.addStretch()
+        preset_widget = QWidget()
+        preset_widget.setLayout(preset_layout)
+        layout.addWidget(preset_widget)
+        self.grounding_dino_preset_widget = preset_widget
+        
+        # Custom query input (shown when Custom mode selected)
+        custom_query_layout = QVBoxLayout()
+        custom_query_layout.addWidget(QLabel("Custom Detection Query:"))
+        self.grounding_dino_query_input = QLineEdit()
+        self.grounding_dino_query_input.setPlaceholderText("Enter objects to detect (e.g., 'red car . person wearing hat . bicycle')")
+        self.grounding_dino_query_input.setToolTip(
+            "Enter what you want to detect. Separate multiple items with ' . '\n"
+            "Examples:\n"
+            "  • red car . blue truck . motorcycle\n"
+            "  • person wearing glasses . person with backpack\n"
+            "  • dangerous equipment . safety signs . fire exits"
+        )
+        custom_query_layout.addWidget(self.grounding_dino_query_input)
+        help_label = QLabel(
+            "💡 <i>Tip: Be specific! Use colors, attributes, states. Separate items with ' . '</i>"
+        )
+        help_label.setWordWrap(True)
+        help_label.setStyleSheet("color: #666; font-size: 10px;")
+        custom_query_layout.addWidget(help_label)
+        custom_query_widget = QWidget()
+        custom_query_widget.setLayout(custom_query_layout)
+        layout.addWidget(custom_query_widget)
+        self.grounding_dino_query_widget = custom_query_widget
+        
+        # Confidence threshold for GroundingDINO
+        gd_confidence_layout = QHBoxLayout()
+        gd_confidence_layout.addWidget(QLabel("Detection Confidence:"))
+        self.grounding_dino_confidence_spin = QSpinBox()
+        self.grounding_dino_confidence_spin.setRange(1, 95)
+        self.grounding_dino_confidence_spin.setValue(25)
+        self.grounding_dino_confidence_spin.setSuffix("%")
+        self.grounding_dino_confidence_spin.setToolTip("Minimum confidence threshold for detections (1-95%)")
+        gd_confidence_layout.addWidget(self.grounding_dino_confidence_spin)
+        gd_confidence_layout.addStretch()
+        gd_confidence_widget = QWidget()
+        gd_confidence_widget.setLayout(gd_confidence_layout)
+        layout.addWidget(gd_confidence_widget)
+        self.grounding_dino_confidence_widget = gd_confidence_widget
+        
+        # Connect radio buttons to show/hide preset vs custom query
+        self.grounding_dino_auto_radio.toggled.connect(
+            lambda checked: self.grounding_dino_preset_widget.setVisible(checked)
+        )
+        self.grounding_dino_custom_radio.toggled.connect(
+            lambda checked: self.grounding_dino_query_widget.setVisible(checked)
+        )
+        
+        # Initially hide GroundingDINO settings
+        self.grounding_dino_settings_label.hide()
+        self.grounding_dino_mode_widget.hide()
+        self.grounding_dino_preset_widget.hide()
+        self.grounding_dino_query_widget.hide()
+        self.grounding_dino_confidence_widget.hide()
+        
         # Provider status info
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
@@ -1708,18 +1802,32 @@ class ProcessingDialog(QDialog):
         
         # Show/hide settings based on provider type
         is_object_detection = current_data == "object_detection"
+        is_grounding_dino = current_data in ["grounding_dino", "grounding_dino_hybrid"]
         
         # Hide/show prompt-related controls
-        self.prompt_label.setVisible(not is_object_detection)
-        self.prompt_combo.setVisible(not is_object_detection)
-        self.custom_checkbox.setVisible(not is_object_detection)
-        self.custom_prompt.setVisible(not is_object_detection)
+        self.prompt_label.setVisible(not is_object_detection and not is_grounding_dino)
+        self.prompt_combo.setVisible(not is_object_detection and not is_grounding_dino)
+        self.custom_checkbox.setVisible(not is_object_detection and not is_grounding_dino)
+        self.custom_prompt.setVisible(not is_object_detection and not is_grounding_dino)
         
         # Hide/show YOLO settings
         self.yolo_settings_label.setVisible(is_object_detection)
         self.confidence_widget.setVisible(is_object_detection)
         self.max_objects_widget.setVisible(is_object_detection)
         self.yolo_model_widget.setVisible(is_object_detection)
+        
+        # Hide/show GroundingDINO settings
+        self.grounding_dino_settings_label.setVisible(is_grounding_dino)
+        self.grounding_dino_mode_widget.setVisible(is_grounding_dino)
+        self.grounding_dino_confidence_widget.setVisible(is_grounding_dino)
+        
+        # Show preset or custom query based on radio button selection
+        if is_grounding_dino:
+            self.grounding_dino_preset_widget.setVisible(self.grounding_dino_auto_radio.isChecked())
+            self.grounding_dino_query_widget.setVisible(self.grounding_dino_custom_radio.isChecked())
+        else:
+            self.grounding_dino_preset_widget.hide()
+            self.grounding_dino_query_widget.hide()
         
         # Update models for selected provider
         self.populate_models(current_data)
@@ -1761,6 +1869,16 @@ class ProcessingDialog(QDialog):
                     self.status_label.setText(f"Copilot+ PC: Native Windows AI acceleration. Status: {provider.npu_info}")
                 else:
                     self.status_label.setText("Copilot+ PC not available. Requires Windows 11 and Copilot+ PC hardware (NPU with 40+ TOPS)")
+            elif current_data == "grounding_dino":
+                if provider.is_available():
+                    self.status_label.setText("GroundingDINO: Text-prompted object detection with unlimited classes. Model (~700MB) downloads on first use.")
+                else:
+                    self.status_label.setText("GroundingDINO not available. Install with: pip install groundingdino-py torch torchvision")
+            elif current_data == "grounding_dino_hybrid":
+                if provider.is_available():
+                    self.status_label.setText("GroundingDINO Hybrid: Combines object detection with Ollama descriptions. Requires both GroundingDINO and Ollama.")
+                else:
+                    self.status_label.setText("GroundingDINO Hybrid not available. Install: pip install groundingdino-py torch torchvision + Ollama")
             else:
                 self.status_label.setText(f"Using {provider.get_provider_name()} provider")
     
@@ -1776,7 +1894,9 @@ class ProcessingDialog(QDialog):
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
-            'object_detection': _object_detection_provider
+            'object_detection': _object_detection_provider,
+            'grounding_dino': _grounding_dino_provider,
+            'grounding_dino_hybrid': _grounding_dino_hybrid_provider
         }
         
         if provider_key not in all_providers:
@@ -1833,6 +1953,24 @@ class ProcessingDialog(QDialog):
             'yolo_model': self.yolo_model_combo.currentText().split(' ')[0]  # Extract just the model name
         }
     
+    def get_grounding_dino_settings(self) -> dict:
+        """Get GroundingDINO detection settings"""
+        settings = {
+            'confidence_threshold': self.grounding_dino_confidence_spin.value() / 100.0,  # Convert to 0.0-1.0 range
+        }
+        
+        # Add detection mode and query/preset
+        if self.grounding_dino_auto_radio.isChecked():
+            # Automatic mode with preset
+            settings['mode'] = 'automatic'
+            settings['preset'] = self.grounding_dino_preset_combo.currentData()
+        else:
+            # Custom query mode
+            settings['mode'] = 'custom'
+            settings['query'] = self.grounding_dino_query_input.text().strip()
+        
+        return settings
+    
     def populate_prompts(self):
         """Populate prompt styles from config"""
         self.prompt_combo.clear()
@@ -1885,13 +2023,20 @@ class ProcessingDialog(QDialog):
         return {}
     
     def get_selections(self):
-        """Get selected provider, model, prompt style, custom prompt, and YOLO settings"""
+        """Get selected provider, model, prompt style, custom prompt, and detection settings"""
         provider = self.get_selected_provider()
         model = self.get_selected_model()
         prompt_style = self.get_selected_prompt_style()
         custom_prompt = self.get_custom_prompt()
-        yolo_settings = self.get_yolo_settings() if provider == "object_detection" else {}
-        return provider, model, prompt_style, custom_prompt, yolo_settings
+        
+        # Get detection settings based on provider type
+        detection_settings = {}
+        if provider == "object_detection":
+            detection_settings = self.get_yolo_settings()
+        elif provider in ["grounding_dino", "grounding_dino_hybrid"]:
+            detection_settings = self.get_grounding_dino_settings()
+        
+        return provider, model, prompt_style, custom_prompt, detection_settings
 
 
 class ChatDialog(QDialog):
@@ -3711,6 +3856,7 @@ class ImageDescriberGUI(QMainWindow):
         self.setup_menus()
         self.setup_shortcuts()
         self.setup_clipboard_monitoring()
+        self.setup_tab_order()  # Set proper tab navigation order
         
         # Update window title
         self.update_window_title()
@@ -3793,9 +3939,16 @@ class ImageDescriberGUI(QMainWindow):
         right_layout.addWidget(self.description_text)
 
         self.tree_splitter.addWidget(right_panel)
+        
+        # Image preview panel (initially hidden) - add AFTER descriptions
+        self.image_preview_panel = self.create_image_preview_widget()
+        self.tree_splitter.addWidget(self.image_preview_panel)
+        self.image_preview_panel.hide()  # Start hidden
 
-        # Set splitter proportions
-        self.tree_splitter.setSizes([400, 600])
+        # Set splitter proportions (image list narrower, descriptions and preview get more space)
+        # When preview is hidden: [250, 750] gives 25% to images, 75% to descriptions
+        # When preview is shown: [250, 400, 350] gives reasonable distribution
+        self.tree_splitter.setSizes([250, 750, 0])  # 0 for hidden preview initially
 
     def setup_master_detail_ui(self, parent_layout):
         """Setup the master-detail view UI"""
@@ -3859,6 +4012,265 @@ class ImageDescriberGUI(QMainWindow):
         # Set splitter proportions (media list smaller, details larger)
         self.master_detail_splitter.setSizes([300, 700])
 
+    def setup_tab_order(self):
+        """Set up the tab order for keyboard navigation"""
+        # Tab order for tree view: image list → description list → description text → image preview
+        self.setTabOrder(self.image_list, self.description_list)
+        self.setTabOrder(self.description_list, self.description_text)
+        if hasattr(self, 'image_preview_label'):
+            self.setTabOrder(self.description_text, self.image_preview_label)
+        
+        # Tab order for master-detail view
+        self.setTabOrder(self.media_list, self.frames_list)
+        self.setTabOrder(self.frames_list, self.description_list_md)
+        self.setTabOrder(self.description_list_md, self.description_text_md)
+
+    def create_image_preview_widget(self):
+        """Create the image preview widget with fullscreen capability"""
+        from PyQt6.QtWidgets import QLabel
+        from PyQt6.QtGui import QPixmap
+        from PyQt6.QtCore import Qt, QEvent as QtEvent
+        
+        preview_widget = QWidget()
+        preview_layout = QVBoxLayout(preview_widget)
+        preview_layout.addWidget(QLabel("Image Preview:"))
+        
+        # Create image label with scaling
+        self.image_preview_label = QLabel()
+        self.image_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_preview_label.setScaledContents(False)
+        self.image_preview_label.setStyleSheet("QLabel { background-color: #2b2b2b; border: 1px solid #555; }")
+        self.image_preview_label.setMinimumSize(200, 200)
+        self.image_preview_label.setAccessibleName("Image Preview")
+        self.image_preview_label.setAccessibleDescription("Preview of the currently selected image. Press Enter for fullscreen, Escape to exit fullscreen.")
+        self.image_preview_label.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.image_preview_label.setTabletTracking(True)
+        
+        # Install event filter to handle Enter/Escape keys
+        self.image_preview_label.installEventFilter(self)
+        
+        # Store original pixmap for fullscreen display
+        self.current_preview_pixmap = None
+        self.is_fullscreen_preview = False
+        
+        preview_layout.addWidget(self.image_preview_label)
+        
+        return preview_widget
+    
+    def eventFilter(self, obj, event):
+        """Event filter to handle Enter/Escape on image preview"""
+        from PyQt6.QtCore import QEvent
+        if obj == self.image_preview_label and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+                self.show_fullscreen_preview()
+                return True
+            elif event.key() == Qt.Key.Key_Escape and self.is_fullscreen_preview:
+                self.hide_fullscreen_preview()
+                return True
+        return super().eventFilter(obj, event)
+    
+    def show_fullscreen_preview(self):
+        """Show the current image in fullscreen"""
+        if not self.current_preview_pixmap or self.current_preview_pixmap.isNull():
+            return
+        
+        # Create fullscreen dialog
+        self.fullscreen_dialog = QDialog(self)
+        self.fullscreen_dialog.setWindowTitle("Image Preview - Press Escape to Exit")
+        self.fullscreen_dialog.setWindowState(Qt.WindowState.WindowFullScreen)
+        self.fullscreen_dialog.setStyleSheet("background-color: black;")
+        
+        layout = QVBoxLayout(self.fullscreen_dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        fullscreen_label = QLabel()
+        fullscreen_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        fullscreen_label.setPixmap(self.current_preview_pixmap.scaled(
+            self.fullscreen_dialog.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        ))
+        fullscreen_label.setAccessibleName("Fullscreen Image Preview")
+        fullscreen_label.setAccessibleDescription("Fullscreen view of the image. Press Escape to exit.")
+        
+        layout.addWidget(fullscreen_label)
+        
+        # Handle Escape key
+        def keyPressEvent(event):
+            if event.key() == Qt.Key.Key_Escape:
+                self.hide_fullscreen_preview()
+        
+        self.fullscreen_dialog.keyPressEvent = keyPressEvent
+        self.is_fullscreen_preview = True
+        self.fullscreen_dialog.exec()
+    
+    def hide_fullscreen_preview(self):
+        """Hide the fullscreen preview and return to normal view"""
+        if hasattr(self, 'fullscreen_dialog'):
+            self.fullscreen_dialog.close()
+            self.is_fullscreen_preview = False
+    
+    def _update_preview_accessible_name(self, file_path: str):
+        """Update the preview's accessible name with the display name or filename"""
+        try:
+            # Try to get the custom display name from workspace
+            workspace_item = self.workspace.get_item(file_path)
+            if workspace_item and workspace_item.display_name:
+                display_name = workspace_item.display_name
+            else:
+                # Fall back to filename
+                display_name = Path(file_path).name
+            
+            # Set accessible name and description
+            self.image_preview_label.setAccessibleName(f"Image Preview: {display_name}")
+            self.image_preview_label.setAccessibleDescription(
+                f"Preview of {display_name}. Press Enter for fullscreen, Escape to exit fullscreen."
+            )
+        except Exception as e:
+            # Fallback to generic name if anything fails
+            print(f"Warning: Could not update preview accessible name: {e}")
+            self.image_preview_label.setAccessibleName("Image Preview")
+    
+    def update_image_preview(self):
+        """Update the image preview with the currently selected image"""
+        if not hasattr(self, 'image_preview_label') or not self.show_image_preview_action.isChecked():
+            return
+        
+        file_path = self.get_current_selected_file_path()
+        if not file_path or not Path(file_path).exists():
+            self.image_preview_label.setText("No image selected")
+            self.current_preview_pixmap = None
+            return
+        
+        try:
+            from PIL import Image
+            from PyQt6.QtGui import QImage
+            import io
+            
+            # Handle HEIC files
+            file_path_obj = Path(file_path)
+            if file_path_obj.suffix.lower() in ['.heic', '.heif']:
+                try:
+                    import pillow_heif
+                    pillow_heif.register_heif_opener()
+                except ImportError:
+                    self.image_preview_label.setText("HEIC support not available\nInstall pillow-heif")
+                    self.current_preview_pixmap = None
+                    return
+            
+            # Load image with PIL (supports more formats including HEIC)
+            try:
+                pil_image = Image.open(file_path)
+                
+                # Convert to RGB if necessary (for transparency, CMYK, etc.)
+                if pil_image.mode not in ('RGB', 'RGBA', 'L'):
+                    pil_image = pil_image.convert('RGB')
+                
+                # Convert PIL Image to QPixmap via QImage
+                # First convert to bytes
+                image_data = io.BytesIO()
+                
+                # Save as PNG to preserve quality
+                if pil_image.mode == 'RGBA':
+                    pil_image.save(image_data, format='PNG')
+                    qimage = QImage()
+                    qimage.loadFromData(image_data.getvalue())
+                else:
+                    # For RGB and grayscale, convert to bytes
+                    if pil_image.mode == 'L':
+                        pil_image = pil_image.convert('RGB')
+                    
+                    # Convert to RGB bytes
+                    img_bytes = pil_image.tobytes('raw', 'RGB')
+                    qimage = QImage(img_bytes, pil_image.width, pil_image.height, 
+                                   pil_image.width * 3, QImage.Format.Format_RGB888)
+                
+                if qimage.isNull():
+                    self.image_preview_label.setText("Unable to convert image format")
+                    self.current_preview_pixmap = None
+                    return
+                
+                # Convert QImage to QPixmap
+                from PyQt6.QtGui import QPixmap
+                pixmap = QPixmap.fromImage(qimage)
+                
+                if pixmap.isNull():
+                    self.image_preview_label.setText("Unable to create pixmap")
+                    self.current_preview_pixmap = None
+                    return
+                
+                # Store original for fullscreen
+                self.current_preview_pixmap = pixmap
+                
+                # Scale to fit preview area
+                scaled_pixmap = pixmap.scaled(
+                    self.image_preview_label.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                
+                self.image_preview_label.setPixmap(scaled_pixmap)
+                
+                # Update accessible name to use the display name or filename
+                self._update_preview_accessible_name(file_path)
+                
+            except Exception as img_error:
+                # If PIL fails, try direct QPixmap load as fallback
+                print(f"PIL loading failed: {img_error}, trying QPixmap directly")
+                from PyQt6.QtGui import QPixmap
+                pixmap = QPixmap(file_path)
+                if pixmap.isNull():
+                    self.image_preview_label.setText(f"Unable to load image:\n{file_path_obj.name}")
+                    self.current_preview_pixmap = None
+                    return
+                
+                self.current_preview_pixmap = pixmap
+                scaled_pixmap = pixmap.scaled(
+                    self.image_preview_label.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self.image_preview_label.setPixmap(scaled_pixmap)
+                
+                # Update accessible name to use the display name or filename
+                self._update_preview_accessible_name(file_path)
+            
+        except Exception as e:
+            self.image_preview_label.setText(f"Error loading image:\n{str(e)}")
+            self.current_preview_pixmap = None
+            print(f"Image preview error for {file_path}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def toggle_image_preview(self):
+        """Toggle the visibility of the image preview panel"""
+        if self.show_image_preview_action.isChecked():
+            self.image_preview_panel.show()
+            # Adjust splitter sizes to give preview meaningful space
+            # Distribution: 25% images, 40% descriptions, 35% preview
+            total_width = self.tree_splitter.width()
+            self.tree_splitter.setSizes([
+                int(total_width * 0.25),  # Image list (narrower)
+                int(total_width * 0.40),  # Descriptions
+                int(total_width * 0.35)   # Preview (meaningful size)
+            ])
+            # Update tab order to include preview
+            if hasattr(self, 'image_preview_label'):
+                self.setTabOrder(self.description_text, self.image_preview_label)
+            self.update_image_preview()
+        else:
+            self.image_preview_panel.hide()
+            # Restore two-panel layout when preview is hidden
+            # Distribution: 25% images, 75% descriptions
+            total_width = self.tree_splitter.width()
+            self.tree_splitter.setSizes([
+                int(total_width * 0.25),  # Image list
+                int(total_width * 0.75),  # Descriptions
+                0                          # Preview hidden
+            ])
+            # Tab order stops at description_text when preview is hidden
+            # (preview is not in focus chain when hidden)
+    
     def switch_navigation_mode(self, mode):
         """Switch between tree view and master-detail view"""
         self.navigation_mode = mode
@@ -4127,6 +4539,15 @@ class ImageDescriberGUI(QMainWindow):
         # self.master_detail_action.setCheckable(True)
         # self.master_detail_action.triggered.connect(lambda: self.switch_navigation_mode("master_detail"))
         # navigation_menu.addAction(self.master_detail_action)
+        
+        view_menu.addSeparator()
+        
+        # Image Preview toggle
+        self.show_image_preview_action = QAction("Show Image Preview", self)
+        self.show_image_preview_action.setCheckable(True)
+        self.show_image_preview_action.setChecked(False)  # Default off
+        self.show_image_preview_action.triggered.connect(self.toggle_image_preview)
+        view_menu.addAction(self.show_image_preview_action)
         
         view_menu.addSeparator()
         
@@ -5196,6 +5617,42 @@ class ImageDescriberGUI(QMainWindow):
 
     def rename_item(self):
         """Rename the currently selected item"""
+        # Check if this is a chat session
+        current_item = self.image_list.currentItem() if self.navigation_mode == "tree" else None
+        if current_item:
+            item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
+            if item_type == "chat_session":
+                # Handle chat session rename
+                chat_id = current_item.data(Qt.ItemDataRole.UserRole)
+                if not hasattr(self.workspace, 'chat_sessions') or chat_id not in self.workspace.chat_sessions:
+                    QMessageBox.warning(self, "Rename", "Chat session not found.")
+                    return
+                
+                chat_session = self.workspace.chat_sessions[chat_id]
+                current_name = chat_session.get('name', 'Unnamed Chat')
+                
+                # Show rename dialog
+                new_name, ok = QInputDialog.getText(
+                    self, 
+                    "Rename Chat Session", 
+                    "Enter new chat name:",
+                    text=current_name
+                )
+                
+                if ok and new_name.strip():
+                    # Update the chat session name
+                    chat_session['name'] = new_name.strip()
+                    
+                    # Mark workspace as modified
+                    self.workspace.modified = True
+                    
+                    # Refresh the current view to show the new name
+                    self.refresh_current_view()
+                    
+                    self.statusBar().showMessage(f"Renamed chat to '{new_name.strip()}'", 3000)
+                return
+        
+        # Handle regular image/file rename
         file_path = self.get_current_selected_file_path()
         if not file_path:
             QMessageBox.information(self, "Rename", "Please select an item to rename.")
@@ -5416,6 +5873,9 @@ class ImageDescriberGUI(QMainWindow):
                 # Regular image file
                 file_path = current_item.data(Qt.ItemDataRole.UserRole)
                 self.load_descriptions_for_image(file_path)
+        
+        # Update image preview if enabled
+        self.update_image_preview()
     
     def display_chat_conversation(self, chat_id: str):
         """Display chat conversation in the description area"""

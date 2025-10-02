@@ -2905,6 +2905,425 @@ class ObjectDetectionProvider(AIProvider):
         return result
 
 
+class GroundingDINOProvider(AIProvider):
+    """
+    Text-prompted zero-shot object detection using GroundingDINO.
+    
+    Unlike YOLO (limited to 80 classes), GroundingDINO can detect ANY object
+    you describe in natural language:
+    - "red cars"
+    - "people wearing hats"
+    - "safety equipment"
+    - "damaged items"
+    - "text and signs"
+    
+    Supports both automatic comprehensive scanning and custom user queries.
+    """
+    
+    def __init__(self):
+        self.model = None
+        self.processor = None
+        self.device = None
+        self.grounding_dino_available = False
+        
+        # Default detection prompts for different scenarios
+        self.default_prompts = {
+            'comprehensive': "objects . people . animals . vehicles . furniture . electronics . plants . text . signs",
+            'indoor': "people . furniture . electronics . decorations . appliances . lighting . windows . doors . text",
+            'outdoor': "people . vehicles . buildings . trees . sky . roads . signs . animals . landscape . nature",
+            'workplace': "people . computers . desks . chairs . equipment . safety gear . tools . machinery . monitors",
+            'safety': "fire extinguisher . exit signs . safety equipment . hazards . emergency lights . first aid . warning signs",
+            'retail': "products . shelves . people . checkout . displays . signage . packaging . prices . carts",
+            'document': "text . logos . diagrams . tables . images . signatures . stamps . barcodes . headings"
+        }
+        
+        # Check availability
+        try:
+            import groundingdino
+            from groundingdino.util.inference import Model as GroundingDINOModel
+            self.grounding_dino_available = True
+        except ImportError:
+            self.grounding_dino_available = False
+    
+    def get_provider_name(self) -> str:
+        return "GroundingDINO"
+    
+    def is_available(self) -> bool:
+        return self.grounding_dino_available
+    
+    def get_available_models(self) -> List[str]:
+        """Return available detection modes"""
+        if not self.grounding_dino_available:
+            return []
+        
+        return [
+            "Comprehensive Detection (Auto)",
+            "Indoor Scene Detection",
+            "Outdoor Scene Detection",
+            "Workplace Safety Detection",
+            "Retail/Store Detection",
+            "Document/Text Detection",
+            "Custom Query (User-Defined)"
+        ]
+    
+    def _load_model(self):
+        """Load GroundingDINO model"""
+        if self.model is not None:
+            return self.model
+        
+        try:
+            from groundingdino.util.inference import Model as GroundingDINOModel
+            import torch
+            
+            # Determine device
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            
+            # Model paths (will auto-download if not present)
+            config_path = "GroundingDINO_SwinT_OGC.py"
+            checkpoint_path = "groundingdino_swint_ogc.pth"
+            
+            # Initialize model
+            self.model = GroundingDINOModel(
+                model_config_path=config_path,
+                model_checkpoint_path=checkpoint_path,
+                device=self.device
+            )
+            
+            return self.model
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to load GroundingDINO model: {str(e)}")
+    
+    def _get_detection_prompt(self, model: str, custom_query: str = None) -> str:
+        """Get the appropriate detection prompt based on model/mode"""
+        if custom_query:
+            return custom_query
+        
+        # Map model selection to prompt
+        model_lower = model.lower()
+        if "comprehensive" in model_lower or "auto" in model_lower:
+            return self.default_prompts['comprehensive']
+        elif "indoor" in model_lower:
+            return self.default_prompts['indoor']
+        elif "outdoor" in model_lower:
+            return self.default_prompts['outdoor']
+        elif "workplace" in model_lower or "safety" in model_lower:
+            return self.default_prompts['workplace']
+        elif "retail" in model_lower or "store" in model_lower:
+            return self.default_prompts['retail']
+        elif "document" in model_lower or "text" in model_lower:
+            return self.default_prompts['document']
+        else:
+            return self.default_prompts['comprehensive']
+    
+    def _describe_location(self, box, image_width, image_height) -> str:
+        """Describe where the object is located in the image"""
+        x_center = (box[0] + box[2]) / 2
+        y_center = (box[1] + box[3]) / 2
+        
+        # Normalize to 0-1
+        x_norm = x_center / image_width
+        y_norm = y_center / image_height
+        
+        # Vertical position
+        if y_norm < 0.33:
+            v_pos = "top"
+        elif y_norm < 0.67:
+            v_pos = "middle"
+        else:
+            v_pos = "bottom"
+        
+        # Horizontal position
+        if x_norm < 0.33:
+            h_pos = "left"
+        elif x_norm < 0.67:
+            h_pos = "center"
+        else:
+            h_pos = "right"
+        
+        return f"{v_pos}-{h_pos}"
+    
+    def _calculate_size(self, box, image_width, image_height) -> str:
+        """Determine relative size of detected object"""
+        width = box[2] - box[0]
+        height = box[3] - box[1]
+        area = (width * height) / (image_width * image_height)
+        
+        if area > 0.3:
+            return "large"
+        elif area > 0.1:
+            return "medium"
+        else:
+            return "small"
+    
+    def describe_image(self, image_path: str, prompt: str, model: str, **kwargs) -> str:
+        """
+        Detect objects in image using text prompts.
+        
+        Args:
+            image_path: Path to image file
+            prompt: User's description prompt (used for context in results)
+            model: Detection mode (Comprehensive, Indoor, Custom, etc.)
+            **kwargs: Additional parameters
+                - custom_query: Custom detection query string
+                - box_threshold: Confidence threshold (default 0.35)
+                - text_threshold: Text matching threshold (default 0.25)
+                - return_detections: Return raw detection data (default False)
+        """
+        try:
+            # Load model
+            if self.model is None:
+                self.model = self._load_model()
+            
+            # Get custom query from kwargs
+            custom_query = kwargs.get('custom_query', None)
+            box_threshold = kwargs.get('box_threshold', 0.35)
+            text_threshold = kwargs.get('text_threshold', 0.25)
+            return_detections = kwargs.get('return_detections', False)
+            
+            # Determine detection prompt
+            detection_prompt = self._get_detection_prompt(model, custom_query)
+            
+            # Load and prepare image
+            from PIL import Image
+            import numpy as np
+            
+            image = Image.open(image_path)
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            image_np = np.array(image)
+            image_width, image_height = image.size
+            
+            # Run detection
+            detections = self.model.predict_with_classes(
+                image=image_np,
+                classes=detection_prompt.split(' . '),
+                box_threshold=box_threshold,
+                text_threshold=text_threshold
+            )
+            
+            # Parse detections
+            results = []
+            if detections is not None:
+                boxes = detections.xyxy  # [x1, y1, x2, y2] format
+                confidences = detections.confidence
+                class_ids = detections.class_id
+                labels = [detection_prompt.split(' . ')[int(id)] for id in class_ids]
+                
+                for box, conf, label in zip(boxes, confidences, labels):
+                    location = self._describe_location(box, image_width, image_height)
+                    size = self._calculate_size(box, image_width, image_height)
+                    
+                    results.append({
+                        'label': label.strip(),
+                        'confidence': float(conf),
+                        'box': box.tolist(),
+                        'location': location,
+                        'size': size
+                    })
+            
+            # Return raw detections if requested (for hybrid providers)
+            if return_detections:
+                return results
+            
+            # Format results as human-readable description
+            return self._format_detection_results(results, detection_prompt, custom_query)
+            
+        except Exception as e:
+            return f"GroundingDINO detection failed: {str(e)}\n\nTroubleshooting:\n" \
+                   f"1. Install: pip install groundingdino-py\n" \
+                   f"2. Model will auto-download on first use (~700MB)\n" \
+                   f"3. GPU recommended but CPU works (slower)\n" \
+                   f"4. Check image is valid: {image_path}"
+    
+    def _format_detection_results(self, results: List[dict], prompt: str, custom_query: str = None) -> str:
+        """Format detection results as readable text"""
+        if not results:
+            query_text = custom_query if custom_query else prompt
+            return f"No objects detected matching query: '{query_text}'\n\n" \
+                   f"Try adjusting:\n" \
+                   f"• Query terms (be more general or specific)\n" \
+                   f"• Confidence threshold (lower to find more)\n" \
+                   f"• Image quality (better lighting, clearer view)"
+        
+        # Group by label
+        grouped = {}
+        for det in results:
+            label = det['label']
+            if label not in grouped:
+                grouped[label] = []
+            grouped[label].append(det)
+        
+        # Build output
+        output = "🎯 GroundingDINO Detection Results\n"
+        output += "=" * 60 + "\n\n"
+        
+        if custom_query:
+            output += f"Query: '{custom_query}'\n\n"
+        
+        output += f"📊 Summary: Found {len(results)} objects across {len(grouped)} categories\n\n"
+        
+        # List each category
+        for label, detections in sorted(grouped.items(), key=lambda x: -len(x[1])):
+            count = len(detections)
+            avg_conf = sum(d['confidence'] for d in detections) / count
+            
+            output += f"✓ {label.title()}: {count} instance(s) [avg confidence: {avg_conf:.1%}]\n"
+            
+            # Show details for each instance
+            for i, det in enumerate(detections, 1):
+                if count > 1:
+                    output += f"  #{i}: "
+                else:
+                    output += f"  "
+                output += f"Location: {det['location']}, "
+                output += f"Size: {det['size']}, "
+                output += f"Confidence: {det['confidence']:.1%}\n"
+            
+            output += "\n"
+        
+        # Add tips
+        output += "💡 Tips:\n"
+        output += "• Use chat to refine: 'find only red objects', 'show people with hats'\n"
+        output += "• Combine with Ollama for detailed descriptions\n"
+        output += "• Lower confidence to find more, raise to reduce false positives\n"
+        
+        return output
+
+
+class GroundingDINOHybridProvider(AIProvider):
+    """
+    Hybrid provider combining GroundingDINO detection with Ollama descriptions.
+    
+    Workflow:
+    1. GroundingDINO detects objects with text prompts
+    2. Detection results passed to Ollama as context
+    3. Ollama generates natural language description incorporating detections
+    
+    This combines precise object detection with natural language understanding.
+    """
+    
+    def __init__(self):
+        self.grounding_dino = GroundingDINOProvider()
+        self.ollama = OllamaProvider()
+    
+    def get_provider_name(self) -> str:
+        return "GroundingDINO + Ollama"
+    
+    def is_available(self) -> bool:
+        return self.grounding_dino.is_available() and self.ollama.is_available()
+    
+    def get_available_models(self) -> List[str]:
+        """Return Ollama models (detection mode is separate setting)"""
+        if not self.is_available():
+            return []
+        
+        return self.ollama.get_available_models()
+    
+    def describe_image(self, image_path: str, prompt: str, model: str, **kwargs) -> str:
+        """
+        Generate description using both GroundingDINO and Ollama.
+        
+        Args:
+            image_path: Path to image
+            prompt: User's description prompt
+            model: Ollama model to use
+            **kwargs: Additional parameters
+                - detection_mode: Which GroundingDINO mode (default: "Comprehensive Detection (Auto)")
+                - custom_query: Custom detection query
+                - box_threshold: Detection confidence threshold
+        """
+        try:
+            # Step 1: Run GroundingDINO detection
+            detection_mode = kwargs.get('detection_mode', "Comprehensive Detection (Auto)")
+            custom_query = kwargs.get('custom_query', None)
+            box_threshold = kwargs.get('box_threshold', 0.35)
+            
+            # Get raw detections
+            detections = self.grounding_dino.describe_image(
+                image_path=image_path,
+                prompt=prompt,
+                model=detection_mode,
+                custom_query=custom_query,
+                box_threshold=box_threshold,
+                return_detections=True  # Get structured data, not formatted text
+            )
+            
+            # Step 2: Format detection summary for Ollama
+            detection_summary = self._format_detections_for_ollama(detections, custom_query)
+            
+            # Step 3: Enhance prompt with detection context
+            enhanced_prompt = f"""{prompt}
+
+DETECTED OBJECTS:
+{detection_summary}
+
+Please provide a comprehensive description that incorporates these detected objects. Describe the scene naturally, mentioning where things are located and how they relate to each other."""
+            
+            # Step 4: Get description from Ollama
+            description = self.ollama.describe_image(
+                image_path=image_path,
+                prompt=enhanced_prompt,
+                model=model
+            )
+            
+            # Step 5: Combine results
+            result = "🔍 GroundingDINO + Ollama Analysis\n"
+            result += "=" * 60 + "\n\n"
+            result += f"📊 Detection Summary ({len(detections)} objects found):\n"
+            result += self._format_detection_list(detections)
+            result += "\n\n"
+            result += "📝 Detailed Description:\n"
+            result += description
+            
+            return result
+            
+        except Exception as e:
+            return f"Hybrid detection failed: {str(e)}\n\n" \
+                   f"Troubleshooting:\n" \
+                   f"• Ensure GroundingDINO is installed: pip install groundingdino-py\n" \
+                   f"• Ensure Ollama is running with a vision model\n" \
+                   f"• Check image path is valid"
+    
+    def _format_detections_for_ollama(self, detections: List[dict], custom_query: str = None) -> str:
+        """Format detections for Ollama context"""
+        if not detections:
+            return "No objects detected."
+        
+        # Group by label
+        grouped = {}
+        for det in detections:
+            label = det['label']
+            if label not in grouped:
+                grouped[label] = []
+            grouped[label].append(det)
+        
+        # Format concisely
+        lines = []
+        for label, dets in sorted(grouped.items(), key=lambda x: -len(x[1])):
+            count = len(dets)
+            locations = [d['location'] for d in dets]
+            lines.append(f"- {label}: {count}x (at {', '.join(set(locations))})")
+        
+        return '\n'.join(lines)
+    
+    def _format_detection_list(self, detections: List[dict]) -> str:
+        """Format detection list for display"""
+        if not detections:
+            return "None"
+        
+        # Group and count
+        grouped = {}
+        for det in detections:
+            label = det['label']
+            grouped[label] = grouped.get(label, 0) + 1
+        
+        # Format
+        items = [f"{label}: {count}" for label, count in sorted(grouped.items(), key=lambda x: -x[1])]
+        return ", ".join(items)
+
+
 # Global provider instances
 _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
@@ -2913,6 +3332,8 @@ _huggingface_provider = HuggingFaceProvider()
 _onnx_provider = ONNXProvider()
 _copilot_provider = CopilotProvider()
 _object_detection_provider = ObjectDetectionProvider()
+_grounding_dino_provider = GroundingDINOProvider()
+_grounding_dino_hybrid_provider = GroundingDINOHybridProvider()
 
 
 def get_available_providers() -> Dict[str, AIProvider]:
@@ -2940,6 +3361,12 @@ def get_available_providers() -> Dict[str, AIProvider]:
     if _object_detection_provider.is_available():
         providers['object_detection'] = _object_detection_provider
     
+    if _grounding_dino_provider.is_available():
+        providers['grounding_dino'] = _grounding_dino_provider
+    
+    if _grounding_dino_hybrid_provider.is_available():
+        providers['grounding_dino_hybrid'] = _grounding_dino_hybrid_provider
+    
     return providers
 
 
@@ -2952,5 +3379,7 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'huggingface': _huggingface_provider,
         'onnx': _onnx_provider,
         'copilot': _copilot_provider,
-        'object_detection': _object_detection_provider
+        'object_detection': _object_detection_provider,
+        'grounding_dino': _grounding_dino_provider,
+        'grounding_dino_hybrid': _grounding_dino_hybrid_provider
     }
