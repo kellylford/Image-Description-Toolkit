@@ -999,6 +999,11 @@ class ChatProcessingWorker(QThread):
         provider = chat_session['provider']
         model = chat_session['model']
         
+        # Check if this is a detection query for GroundingDINO
+        detection_query = self.parse_detection_query(message)
+        if detection_query:
+            return self.process_detection_query(chat_session, message, detection_query)
+        
         # Build conversation context from chat history
         conversation_context = self.build_conversation_context(chat_session, message)
         
@@ -1143,6 +1148,105 @@ class ChatProcessingWorker(QThread):
         messages.append({"role": "user", "content": current_message})
         
         return messages
+    
+    def parse_detection_query(self, message: str) -> str:
+        """
+        Parse message to detect if it's a GroundingDINO detection query.
+        Returns the detection query string if it's a detection request, None otherwise.
+        """
+        import re
+        
+        message_lower = message.lower()
+        
+        # Detection keywords that suggest the user wants object detection
+        detection_keywords = [
+            r'\bfind\b', r'\bdetect\b', r'\blocate\b', r'\bshow\b', 
+            r'\bidentify\b', r'\bsearch for\b', r'\blook for\b',
+            r'\bwhere is\b', r'\bwhere are\b', r'\bcount\b', r'\bhow many\b'
+        ]
+        
+        # Check if any detection keyword is present
+        has_detection_keyword = any(re.search(keyword, message_lower) for keyword in detection_keywords)
+        
+        if not has_detection_keyword:
+            return None
+        
+        # Extract what they want to detect
+        # Common patterns:
+        # "find red cars and blue trucks"
+        # "detect people wearing hats"
+        # "show me all the safety signs"
+        # "locate fire exits"
+        
+        # Remove the keyword and get the object/query part
+        for keyword_pattern in detection_keywords:
+            match = re.search(keyword_pattern, message_lower)
+            if match:
+                # Get everything after the keyword
+                query_part = message[match.end():].strip()
+                
+                # Clean up common words
+                query_part = re.sub(r'^(the|all|any|me)\b', '', query_part, flags=re.IGNORECASE).strip()
+                
+                if query_part:
+                    return query_part
+        
+        return None
+    
+    def process_detection_query(self, chat_session: dict, original_message: str, detection_query: str) -> str:
+        """
+        Process a detection query using GroundingDINO.
+        Returns formatted detection results as a chat response.
+        """
+        try:
+            # Check if GroundingDINO is available
+            providers = get_available_providers()
+            if 'grounding_dino' not in providers:
+                return ("I understand you want to detect objects, but GroundingDINO is not currently available. "
+                        "To use text-prompted object detection, please install: pip install groundingdino-py torch torchvision")
+            
+            # Get the context image path if provided in the message metadata
+            # Chat sessions can optionally have a 'context_image' field set by the main window
+            context_image = chat_session.get('context_image')
+            
+            if not context_image:
+                return (f"🎯 **Detection Request Recognized**\n\n"
+                        f"I understand you want to find: **{detection_query}**\n\n"
+                        f"However, I need an image context to perform detection. "
+                        f"Please select an image in the workspace first, then ask me to detect objects in it.\n\n"
+                        f"**Tip:** You can also use the 'Process Image' button with GroundingDINO provider for direct detection.")
+            
+            # Run GroundingDINO detection
+            provider = providers['grounding_dino']
+            
+            # Format the query for GroundingDINO (replace spaces with periods if needed)
+            formatted_query = detection_query.replace(" and ", " . ").replace(", ", " . ")
+            
+            # Run detection with custom query
+            detection_result = provider.describe_image(
+                image_path=context_image,
+                prompt="",  # Not used for GroundingDINO
+                model="",   # Not used for GroundingDINO
+                mode='custom',
+                query=formatted_query,
+                confidence_threshold=0.25
+            )
+            
+            # Format results for chat
+            response = f"🎯 **Detection Results for: {detection_query}**\n\n"
+            response += f"📷 Image: {Path(context_image).name}\n\n"
+            response += detection_result
+            
+            return response
+        
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            return (f"❌ **Error processing detection query**\n\n"
+                    f"Query: {detection_query}\n"
+                    f"Error: {str(e)}\n\n"
+                    f"Please ensure GroundingDINO is properly installed:\n"
+                    f"`pip install groundingdino-py torch torchvision`")
     
     def process_with_ollama_chat(self, model: str, chat_session: dict, context: str) -> str:
         """Process chat with Ollama using conversation context"""
@@ -1871,12 +1975,12 @@ class ProcessingDialog(QDialog):
                     self.status_label.setText("Copilot+ PC not available. Requires Windows 11 and Copilot+ PC hardware (NPU with 40+ TOPS)")
             elif current_data == "grounding_dino":
                 if provider.is_available():
-                    self.status_label.setText("GroundingDINO: Text-prompted object detection with unlimited classes. Model (~700MB) downloads on first use.")
+                    self.status_label.setText("GroundingDINO: Text-prompted detection with unlimited classes. Configure detection mode below. Model (~700MB) auto-downloads on first use - no manual download needed!")
                 else:
                     self.status_label.setText("GroundingDINO not available. Install with: pip install groundingdino-py torch torchvision")
             elif current_data == "grounding_dino_hybrid":
                 if provider.is_available():
-                    self.status_label.setText("GroundingDINO Hybrid: Combines object detection with Ollama descriptions. Requires both GroundingDINO and Ollama.")
+                    self.status_label.setText("GroundingDINO Hybrid: Detection + Ollama descriptions. Configure detection below. Model auto-downloads on first use.")
                 else:
                     self.status_label.setText("GroundingDINO Hybrid not available. Install: pip install groundingdino-py torch torchvision + Ollama")
             else:
@@ -1886,6 +1990,30 @@ class ProcessingDialog(QDialog):
         """Populate models for selected provider"""
         self.model_combo.clear()
         
+        # GroundingDINO standalone doesn't use traditional "models" - settings are in the detection controls
+        if provider_key == "grounding_dino":
+            self.model_combo.addItem("Detection configured below")
+            self.model_combo.setEnabled(False)
+            return
+        
+        # GroundingDINO Hybrid needs to show Ollama models for the description part
+        if provider_key == "grounding_dino_hybrid":
+            # Show Ollama models since hybrid mode uses Ollama for descriptions
+            provider = _ollama_provider
+            models = provider.get_available_models()
+            self.model_combo.setEnabled(True)
+            
+            if models:
+                for model in models:
+                    self.model_combo.addItem(model)
+                print(f"Hybrid mode: Found {len(models)} Ollama models for descriptions")
+            else:
+                self.model_combo.addItem("No Ollama models available")
+                print("Warning: Hybrid mode requires Ollama models. Install with: ollama pull llava")
+            return
+        
+        self.model_combo.setEnabled(True)
+        
         # Use the global provider instances (with caching) directly instead of get_available_providers()
         all_providers = {
             'ollama': _ollama_provider,
@@ -1894,9 +2022,7 @@ class ProcessingDialog(QDialog):
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
-            'object_detection': _object_detection_provider,
-            'grounding_dino': _grounding_dino_provider,
-            'grounding_dino_hybrid': _grounding_dino_hybrid_provider
+            'object_detection': _object_detection_provider
         }
         
         if provider_key not in all_providers:
@@ -2037,6 +2163,56 @@ class ProcessingDialog(QDialog):
             detection_settings = self.get_grounding_dino_settings()
         
         return provider, model, prompt_style, custom_prompt, detection_settings
+    
+    def accept(self):
+        """Validate selections before accepting dialog"""
+        provider = self.get_selected_provider()
+        model = self.get_selected_model()
+        
+        # Validation: Check for invalid model selections
+        invalid_models = ["No models available", "Detection configured below", ""]
+        
+        if model in invalid_models:
+            if provider == "grounding_dino_hybrid":
+                QMessageBox.warning(
+                    self,
+                    "Invalid Configuration",
+                    "GroundingDINO + Ollama requires an Ollama model for descriptions.\n\n"
+                    "Please:\n"
+                    "1. Ensure Ollama is running\n"
+                    "2. Install a vision model: ollama pull llava\n"
+                    "3. Select the model from the dropdown"
+                )
+                return
+            elif provider == "grounding_dino":
+                # Standalone GroundingDINO is OK with "Detection configured below"
+                if model == "Detection configured below":
+                    super().accept()
+                    return
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Invalid Configuration",
+                    f"No valid model selected for {provider}.\n\n"
+                    f"Please select a valid model from the dropdown."
+                )
+                return
+        
+        # Validation: Check if provider is available
+        all_providers = get_all_providers()
+        if provider in all_providers:
+            provider_obj = all_providers[provider]
+            if not provider_obj.is_available():
+                QMessageBox.warning(
+                    self,
+                    "Provider Not Available",
+                    f"{provider_obj.get_provider_name()} is not currently available.\n\n"
+                    f"Please check the setup requirements and try again."
+                )
+                return
+        
+        # All validations passed
+        super().accept()
 
 
 class ChatDialog(QDialog):
@@ -6090,12 +6266,12 @@ class ImageDescriberGUI(QMainWindow):
         # Show processing dialog first
         dialog = ProcessingDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            provider, model, prompt_style, custom_prompt, yolo_settings = dialog.get_selections()
+            provider, model, prompt_style, custom_prompt, detection_settings = dialog.get_selections()
             
             # Start processing (skip old verification logic for now)
             self.processing_items.add(file_path)  # Mark as processing
             self.update_window_title()  # Update title to show processing status
-            worker = ProcessingWorker(file_path, provider, model, prompt_style, custom_prompt, yolo_settings)
+            worker = ProcessingWorker(file_path, provider, model, prompt_style, custom_prompt, detection_settings=detection_settings)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -6293,7 +6469,7 @@ class ImageDescriberGUI(QMainWindow):
         # Show processing dialog first
         dialog = ProcessingDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            provider, model, prompt_style, custom_prompt, yolo_settings = dialog.get_selections()
+            provider, model, prompt_style, custom_prompt, detection_settings = dialog.get_selections()
             
         # Process each batch item
         self.batch_total = len(batch_items)
@@ -6310,7 +6486,7 @@ class ImageDescriberGUI(QMainWindow):
             # Add to processing items to show "p" indicator
             self.processing_items.add(item.file_path)
                 
-            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt, yolo_settings)
+            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt, detection_settings=detection_settings)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_batch_item_complete)
             worker.processing_failed.connect(self.on_batch_item_failed)
@@ -6607,6 +6783,19 @@ class ImageDescriberGUI(QMainWindow):
                 return
             
             chat_session = self.workspace.chat_sessions[chat_id]
+            
+            # Set context image if an image is currently selected in the workspace
+            # This allows detection queries to reference the selected image
+            current_item = self.image_list.currentItem()
+            if current_item:
+                file_path = current_item.data(Qt.ItemDataRole.UserRole)
+                workspace_item = self.workspace.get_item(file_path)
+                # Only set context if it's an actual image (not a chat or video)
+                if workspace_item and workspace_item.item_type == "image":
+                    chat_session['context_image'] = file_path
+                elif 'context_image' in chat_session:
+                    # Clear stale context if no image is selected
+                    del chat_session['context_image']
             
             # Initialize chat workers list if not exists
             if not hasattr(self, 'chat_workers'):

@@ -77,17 +77,25 @@ if %ERRORLEVEL% equ 0 (
     copy "%SCRIPT_DIR%\DISTRIBUTION_README.txt" "%OUTPUT_DIR%\README.txt" >nul 2>&1
     copy "%SCRIPT_DIR%\setup_imagedescriber.bat" "%OUTPUT_DIR%\" >nul 2>&1
     copy "%SCRIPT_DIR%\download_onnx_models.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\install_groundingdino.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\test_groundingdino.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\GROUNDINGDINO_QUICK_REFERENCE.md" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\HYBRID_MODE_GUIDE.md" "%OUTPUT_DIR%\" >nul 2>&1
     echo Documentation files copied to distribution folder.
     echo.
     echo ================================================================
     echo Distribution Package Contents:
     echo ================================================================
-    echo   ImageDescriber_arm64.exe       - Main application
-    echo   README.txt                     - START HERE (quick start guide)
-    echo   USER_SETUP_GUIDE.md            - Detailed setup instructions
-    echo   WHATS_INCLUDED.txt             - What's bundled vs optional
-    echo   setup_imagedescriber.bat       - Interactive setup assistant
-    echo   download_onnx_models.bat       - ONNX model downloader
+    echo   ImageDescriber_arm64.exe              - Main application
+    echo   README.txt                            - START HERE (quick start guide)
+    echo   USER_SETUP_GUIDE.md                   - Detailed setup instructions
+    echo   WHATS_INCLUDED.txt                    - What's bundled vs optional
+    echo   setup_imagedescriber.bat              - Interactive setup assistant
+    echo   download_onnx_models.bat              - ONNX model downloader
+    echo   install_groundingdino.bat             - GroundingDINO installer
+    echo   test_groundingdino.bat                - Test GroundingDINO install
+    echo   GROUNDINGDINO_QUICK_REFERENCE.md      - GroundingDINO usage guide
+    echo   HYBRID_MODE_GUIDE.md                  - Hybrid mode complete guide
     echo ================================================================
     echo.
     echo To distribute to end users:

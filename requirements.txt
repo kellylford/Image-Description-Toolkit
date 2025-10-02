@@ -42,6 +42,10 @@ huggingface-hub>=0.17.0
 # YOLO object detection for Enhanced ONNX provider (optional)
 ultralytics>=8.0.0
 
+# GroundingDINO for text-prompted object detection (optional)
+# Note: Downloads ~700MB model on first use
+groundingdino-py>=0.1.0
+
 # Windows Runtime for Copilot+ PC support (Windows only, optional)
 # Note: winrt may not be available for Python 3.13+ yet
 winrt>=1.0.0; sys_platform == "win32" and python_version<"3.13"

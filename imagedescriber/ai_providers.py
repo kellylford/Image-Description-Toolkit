@@ -2972,15 +2972,30 @@ class GroundingDINOProvider(AIProvider):
             return self.model
         
         try:
+            import groundingdino
             from groundingdino.util.inference import Model as GroundingDINOModel
             import torch
+            import urllib.request
             
             # Determine device
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             
-            # Model paths (will auto-download if not present)
-            config_path = "GroundingDINO_SwinT_OGC.py"
-            checkpoint_path = "groundingdino_swint_ogc.pth"
+            # Get absolute path to config file in the installed package
+            package_path = os.path.dirname(groundingdino.__file__)
+            config_path = os.path.join(package_path, "config", "GroundingDINO_SwinT_OGC.py")
+            
+            # Set up checkpoint path in torch hub cache
+            cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "torch", "hub", "checkpoints")
+            os.makedirs(cache_dir, exist_ok=True)
+            checkpoint_path = os.path.join(cache_dir, "groundingdino_swint_ogc.pth")
+            
+            # Download checkpoint from GitHub if not already cached (~700MB on first use)
+            if not os.path.exists(checkpoint_path):
+                checkpoint_url = "https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth"
+                print(f"Downloading GroundingDINO model (~700MB)...")
+                print(f"This is a one-time download, will be cached at: {checkpoint_path}")
+                urllib.request.urlretrieve(checkpoint_url, checkpoint_path)
+                print("Download complete!")
             
             # Initialize model
             self.model = GroundingDINOModel(
@@ -3262,11 +3277,25 @@ DETECTED OBJECTS:
 Please provide a comprehensive description that incorporates these detected objects. Describe the scene naturally, mentioning where things are located and how they relate to each other."""
             
             # Step 4: Get description from Ollama
-            description = self.ollama.describe_image(
-                image_path=image_path,
-                prompt=enhanced_prompt,
-                model=model
-            )
+            try:
+                description = self.ollama.describe_image(
+                    image_path=image_path,
+                    prompt=enhanced_prompt,
+                    model=model
+                )
+                
+                # Check if Ollama returned an error
+                if description.startswith("Error:"):
+                    description += f"\n\nDebug info:\n" \
+                                 f"- Model requested: {model}\n" \
+                                 f"- Ollama URL: {self.ollama.base_url}\n" \
+                                 f"- Try: Verify Ollama is running and model '{model}' is installed\n" \
+                                 f"- Available models: {', '.join(self.ollama.get_available_models()[:5])}"
+            except Exception as ollama_error:
+                description = f"Error: {str(ollama_error)}\n\n" \
+                            f"Debug info:\n" \
+                            f"- Model requested: {model}\n" \
+                            f"- Ollama URL: {self.ollama.base_url}"
             
             # Step 5: Combine results
             result = "🔍 GroundingDINO + Ollama Analysis\n"

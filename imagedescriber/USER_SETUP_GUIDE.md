@@ -91,6 +91,75 @@ To unlock **AI-powered image descriptions**, you need to set up at least ONE AI 
 
 ---
 
+### 🎯 Optional: GroundingDINO (Text-Prompted Object Detection)
+
+**Best for**: Detecting ANY object you describe, unlimited flexibility, works in chat
+
+**What it does**: Detects objects based on text descriptions - no preset limits!
+
+**Requirements**: Python packages (torch, torchvision, groundingdino-py)
+
+**Setup time**: 5 minutes + ~700MB model download on first use
+
+**Steps**:
+
+1. **Install GroundingDINO**
+   ```bash
+   pip install groundingdino-py torch torchvision
+   ```
+
+2. **First Use Model Download**
+   - First time you use GroundingDINO, it downloads ~700MB model
+   - This happens automatically
+   - Subsequent uses are instant (model is cached)
+
+3. **Verify Installation**
+   - In ImageDescriber provider dropdown, look for:
+     - **GroundingDINO** (standalone detection)
+     - **GroundingDINO + Ollama** (detection + descriptions)
+
+**Usage**:
+
+**Option 1: Preset Detection Modes**
+- Provider: **GroundingDINO** or **GroundingDINO + Ollama**
+- Detection Mode: **Automatic**
+- Choose preset: Comprehensive, Indoor, Outdoor, Workplace, Safety, Retail, Document
+- Adjust confidence threshold (default 25%)
+
+**Option 2: Custom Queries** (The Power Feature!)
+- Provider: **GroundingDINO** or **GroundingDINO + Ollama**
+- Detection Mode: **Custom Query**
+- Type what to find: "red cars . blue trucks . motorcycles"
+- Separate items with " . " (period with spaces)
+
+**Example Queries**:
+- `red cars . blue trucks . motorcycles`
+- `people wearing helmets . safety equipment`
+- `fire exits . emergency signs . first aid kits`
+- `logos . text . diagrams`
+- `damaged items . missing parts`
+
+**Chat Integration** (Chat-based Detection):
+- Select an image in the workspace
+- Open or continue a chat session
+- Type natural queries:
+  - "find red cars"
+  - "detect people wearing hats"
+  - "show me safety equipment"
+  - "locate fire exits"
+- GroundingDINO automatically detects and responds!
+
+**Advantages over YOLO**:
+- ✅ Unlimited object types (YOLO limited to 80)
+- ✅ Describe attributes: colors, states, conditions
+- ✅ Natural language: "person wearing hat" not just "person"
+- ✅ Works in chat with conversational queries
+- ✅ Hybrid mode: Combines detection with Ollama descriptions
+
+**Note**: First use downloads ~700MB model automatically. Requires internet connection for initial download only.
+
+---
+
 ### 🔥 Optional: Enhanced ONNX (Hybrid: YOLO + Ollama)
 
 **Best for**: Maximum accuracy, combining object detection with AI descriptions

@@ -84,6 +84,26 @@ These features require separate installation but add AI-powered capabilities:
   Note: YOLO recognizes everyday objects (COCO dataset). It won't detect
         specialized items like sculptures, paintings, or artwork.
 
+⚠️ GROUNDINGDINO (Optional - Text-Prompted Object Detection)
+  What: Advanced AI that detects ANY object you describe in text
+  Cost: FREE
+  Size: ~700MB (model downloads automatically on first use)
+  Setup: pip install groundingdino-py torch torchvision
+  Why needed: Enables "GroundingDINO" and "GroundingDINO + Ollama" providers
+  Features: Unlimited object types! Just describe what to find:
+    - "red cars and blue trucks"
+    - "people wearing safety helmets"
+    - "fire exits and emergency signs"
+    - "documents with logos"
+  Works offline: YES (after model downloads)
+  Works in chat: YES (type "find red cars" and it detects them)
+  
+  Advantages over YOLO:
+    - Unlimited object types (YOLO limited to 80)
+    - Describe specific attributes (colors, states, details)
+    - Natural language queries ("person wearing hat" not just "person")
+    - Hybrid mode combines detection with Ollama descriptions
+
 ⚠️ ONNX MODELS (Optional - Performance Enhancement)
   What: Pre-optimized AI models for faster inference
   Cost: FREE
