@@ -1,6 +1,6 @@
 # Image Description Prompt Editor
 
-A user-friendly Qt6 application for editing image description prompts and configuration settings without needing to manually edit JSON files.
+A user-friendly Qt6 application for editing image description prompts and configuration settings without needing to manually edit JSON files. **Now with multi-provider AI support!**
 
 ## Features
 
@@ -11,11 +11,18 @@ A user-friendly Qt6 application for editing image description prompts and config
 - **Delete prompts** - Remove unwanted prompt styles
 - **Duplicate prompts** - Copy existing prompts as templates for new ones
 
+### AI Provider Support (NEW!)
+- **Multi-provider selection** - Choose from Ollama, OpenAI, ONNX, Copilot, or HuggingFace
+- **API key management** - Secure storage for cloud provider credentials
+- **Provider-specific models** - Model list updates based on selected provider
+- **Live model discovery** - Automatically detects available models for each provider
+- **Command-line override** - Provider selection can be overridden via CLI flags
+
 ### Default Settings
 - **Default prompt style** - Set which prompt style to use by default
-- **Default AI model** - Choose which Ollama model to use for image descriptions
-- **Live model discovery** - Automatically detects installed Ollama models
-- **Model refresh** - Update model list when new models are installed
+- **Default AI provider** - Choose which AI provider to use (Ollama, OpenAI, etc.)
+- **Default AI model** - Select the specific model for the chosen provider
+- **Model refresh** - Update model list when new models are available
 - **Visual selection** - Dropdown menus show available options with descriptions
 
 ### File Operations
@@ -37,7 +44,12 @@ A user-friendly Qt6 application for editing image description prompts and config
 ### Prerequisites
 - Python 3.8 or higher
 - PyQt6 (automatically installed with requirements)
-- Ollama installed and running (for model selection)
+- At least one AI provider installed:
+  - **Ollama** - For local models (free)
+  - **OpenAI** - For cloud models (requires API key)
+  - **ONNX** - For local Florence-2 models (free)
+  - **HuggingFace** - For cloud models (requires token)
+  - **Copilot** - For GitHub Copilot models (requires access)
 
 ### Setup
 1. Ensure you're in the project root directory
@@ -45,7 +57,9 @@ A user-friendly Qt6 application for editing image description prompts and config
    ```bash
    pip install -r requirements.txt
    ```
-3. Ensure Ollama is installed and running:
+3. Set up your preferred AI provider:
+   
+   **For Ollama (local):**
    ```bash
    ollama --version
    ```
@@ -59,10 +73,68 @@ python prompt_editor/prompt_editor.py
 ```
 
 ### Basic Workflow
-1. **Edit prompts** - Select a prompt from the list and modify the text
-2. **Set defaults** - Choose default prompt style and AI model
-3. **Save changes** - Use Save (Ctrl+S) to save to current file
-4. **Create custom configs** - Use Save As (Ctrl+Shift+S) for new files
+1. **Select AI provider** - Choose Ollama, OpenAI, ONNX, Copilot, or HuggingFace
+2. **Configure API key** (if needed) - Enter key for OpenAI/HuggingFace or leave empty for env vars
+3. **Refresh models** - Click Refresh to load available models for selected provider
+4. **Edit prompts** - Select a prompt from the list and modify the text
+5. **Set defaults** - Choose default prompt style, provider, and AI model
+6. **Save changes** - Use Save (Ctrl+S) to save to current file
+7. **Create custom configs** - Use Save As (Ctrl+Shift+S) for new files
+
+### Provider-Specific Setup
+
+#### Using Ollama (Local, Free)
+1. Select **ollama** from AI Provider dropdown
+2. Click **Refresh** to load installed models
+3. Select your preferred model (e.g., moondream, llama3.2-vision)
+4. No API key needed
+5. Models run locally on your machine
+
+#### Using OpenAI (Cloud, Paid)
+1. Select **openai** from AI Provider dropdown
+2. API Key field appears automatically
+3. Enter your OpenAI API key OR leave empty to use `OPENAI_API_KEY` env var
+4. Model list shows: gpt-4o, gpt-4o-mini, gpt-4-turbo, etc.
+5. Select model (recommend gpt-4o-mini for cost-effectiveness)
+6. Save configuration
+
+#### Using ONNX (Local, Free)
+1. Select **onnx** from AI Provider dropdown
+2. Model list shows: florence-2-base, florence-2-large
+3. No API key needed
+4. Models run locally via ONNX runtime
+5. First use will download model (~700MB)
+
+#### Using HuggingFace (Cloud, Requires Token)
+1. Select **huggingface** from AI Provider dropdown
+2. API Key field appears (for HuggingFace token)
+3. Enter token OR leave empty to use `HUGGINGFACE_TOKEN` env var
+4. Select from available vision models
+5. Save configuration
+
+#### Using Copilot (GitHub Copilot Required)
+1. Select **copilot** from AI Provider dropdown
+2. Requires GitHub Copilot access
+3. Shows available Copilot models
+4. Authentication handled via GitHub CLI
+
+### Command-Line Override
+
+The provider and model set in the editor are **defaults** that can be overridden:
+
+```bash
+# Config says "ollama" but you want to use OpenAI for this run
+python scripts/image_describer.py /path/to/images \
+  --provider openai \
+  --model gpt-4o-mini \
+  --api-key-file openai_key.txt \
+  --prompt-style narrative
+```
+
+This flexibility allows you to:
+- Set safe defaults in config (e.g., free local Ollama)
+- Override for specific jobs (e.g., use OpenAI for important batches)
+- Test different providers without changing config
 
 ### Keyboard Shortcuts
 - **Ctrl+S** - Save changes

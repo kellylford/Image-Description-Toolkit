@@ -11,14 +11,16 @@ manually edit JSON. Features include:
 - Add new prompt styles
 - Delete existing prompts
 - Set default prompt style
-- Set default AI model from installed Ollama models
+- Multi-provider AI support (Ollama, OpenAI, ONNX, Copilot, HuggingFace)
+- Set default AI provider and model
+- API key configuration for cloud providers (OpenAI, HuggingFace)
+- Live model discovery from selected AI provider
 - Save and Save As functionality for creating custom configurations
 - Open different configuration files
 - Backup and restore functionality
 - Input validation and error handling
 - Accessible design with screen reader support
 - Real-time window title updates showing current file and modification status
-- Live model discovery from Ollama installation
 """
 
 import sys
@@ -37,11 +39,29 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QAction, QFont, QTextCharFormat, QTextCursor
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
-# Import ollama for model discovery
+# Import ollama for model discovery (backwards compatibility)
 try:
     import ollama
 except ImportError:
     ollama = None
+
+# Import AI providers for multi-provider support
+import sys
+from pathlib import Path
+# Add parent directory to path to import imagedescriber package
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from imagedescriber.ai_providers import (
+        OllamaProvider,
+        OpenAIProvider,
+        ONNXProvider,
+        CopilotProvider,
+        HuggingFaceProvider
+    )
+    AI_PROVIDERS_AVAILABLE = True
+except ImportError as e:
+    AI_PROVIDERS_AVAILABLE = False
+    print(f"Warning: AI providers not available: {e}")
 
 
 class PromptEditorMainWindow(QMainWindow):
@@ -132,7 +152,9 @@ class PromptEditorMainWindow(QMainWindow):
         self.setTabOrder(self.add_prompt_btn, self.delete_prompt_btn)
         self.setTabOrder(self.delete_prompt_btn, self.duplicate_prompt_btn)
         self.setTabOrder(self.duplicate_prompt_btn, self.default_prompt_combo)
-        self.setTabOrder(self.default_prompt_combo, self.default_model_combo)
+        self.setTabOrder(self.default_prompt_combo, self.provider_combo)
+        self.setTabOrder(self.provider_combo, self.api_key_edit)
+        self.setTabOrder(self.api_key_edit, self.default_model_combo)
         self.setTabOrder(self.default_model_combo, self.refresh_models_btn)
         self.setTabOrder(self.refresh_models_btn, self.save_btn)
         self.setTabOrder(self.save_btn, self.save_as_btn)
@@ -195,6 +217,40 @@ class PromptEditorMainWindow(QMainWindow):
         self.default_prompt_combo.currentTextChanged.connect(self.on_default_changed)
         default_form.addRow("Default Style:", self.default_prompt_combo)
         
+        # AI Provider selection
+        provider_layout = QVBoxLayout()
+        self.provider_combo = QComboBox()
+        self.provider_combo.setAccessibleDescription("Select which AI provider to use as default")
+        self.provider_combo.addItems(["ollama", "openai", "onnx", "copilot", "huggingface"])
+        self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
+        provider_layout.addWidget(self.provider_combo)
+        
+        # Add info label
+        provider_info = QLabel("(Can be overridden with --provider flag)")
+        provider_info.setStyleSheet("color: gray; font-size: 9pt;")
+        provider_layout.addWidget(provider_info)
+        
+        default_form.addRow("AI Provider:", provider_layout)
+        
+        # API Key field (for OpenAI and HuggingFace)
+        self.api_key_layout = QHBoxLayout()
+        self.api_key_edit = QLineEdit()
+        self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.api_key_edit.setPlaceholderText("Enter API key or leave empty to use environment variable")
+        self.api_key_edit.setAccessibleDescription("API key for cloud providers (OpenAI, HuggingFace)")
+        self.api_key_edit.textChanged.connect(self.on_default_changed)
+        self.api_key_layout.addWidget(self.api_key_edit)
+        
+        self.show_api_key_btn = QPushButton("Show")
+        self.show_api_key_btn.setMaximumWidth(60)
+        self.show_api_key_btn.setCheckable(True)
+        self.show_api_key_btn.clicked.connect(self.toggle_api_key_visibility)
+        self.api_key_layout.addWidget(self.show_api_key_btn)
+        
+        self.api_key_widget = QWidget()
+        self.api_key_widget.setLayout(self.api_key_layout)
+        default_form.addRow("API Key:", self.api_key_widget)
+        
         # Default model with refresh button
         model_layout = QHBoxLayout()
         self.default_model_combo = QComboBox()
@@ -204,7 +260,7 @@ class PromptEditorMainWindow(QMainWindow):
         
         self.refresh_models_btn = QPushButton("Refresh")
         self.refresh_models_btn.setMaximumWidth(60)
-        self.refresh_models_btn.setAccessibleDescription("Refresh available models from Ollama")
+        self.refresh_models_btn.setAccessibleDescription("Refresh available models from selected provider")
         self.refresh_models_btn.clicked.connect(self.populate_model_combo)
         model_layout.addWidget(self.refresh_models_btn)
         
@@ -396,6 +452,16 @@ class PromptEditorMainWindow(QMainWindow):
                 self.config_data = self.create_default_config()
                 self.save_config()
             
+            # Load provider and API key if present
+            provider = self.config_data.get('default_provider', 'ollama')
+            self.provider_combo.setCurrentText(provider)
+            
+            api_key = self.config_data.get('api_key', '')
+            self.api_key_edit.setText(api_key)
+            
+            # Update API key field visibility
+            self.on_provider_changed(provider)
+            
             self.populate_prompt_list()
             self.populate_default_combo()
             self.populate_model_combo()
@@ -411,12 +477,20 @@ class PromptEditorMainWindow(QMainWindow):
         """Create a default configuration with basic prompts"""
         return {
             "default_prompt_style": "detailed",
+            "default_provider": "ollama",  # Optional - scripts use --provider CLI argument by default
             "prompt_variations": {
                 "detailed": "Describe this image in detail, including:\n- Main subjects/objects\n- Setting/environment\n- Key colors and lighting\n- Notable activities or composition\nKeep it comprehensive and informative for metadata.",
                 "concise": "Describe this image concisely, including the main subjects, setting, and key visual elements.",
                 "narrative": "Provide a narrative description including objects, colors and detail. Avoid interpretation, just describe what you see.",
                 "artistic": "Analyze this image from an artistic perspective, describing composition, colors, mood, and visual technique.",
                 "technical": "Provide a technical analysis of this image including photographic technique, lighting, and image quality."
+            },
+            "model_settings": {
+                "model": "moondream",
+                "temperature": 0.1,
+                "num_predict": 600,
+                "top_k": 40,
+                "top_p": 0.9
             }
         }
     
@@ -446,26 +520,66 @@ class PromptEditorMainWindow(QMainWindow):
                 self.default_prompt_combo.setCurrentText(actual_key)
     
     def populate_model_combo(self):
-        """Populate the default model combo box with installed Ollama models"""
+        """Populate the default model combo box with models from the selected provider"""
         self.default_model_combo.clear()
         
+        provider = self.provider_combo.currentText()
+        
         try:
-            # Get models from Ollama
-            if ollama is None:
-                raise ImportError("Ollama module not available")
-            
-            models_response = ollama.list()
-            available_models = [model.model for model in models_response['models']]
+            # Get models based on selected provider
+            if provider == "ollama":
+                # Use legacy Ollama module if available
+                if ollama is None:
+                    raise ImportError("Ollama module not available")
+                models_response = ollama.list()
+                available_models = [model.model for model in models_response['models']]
+                
+            elif provider == "openai":
+                # OpenAI models - return predefined list since API doesn't have discovery
+                available_models = [
+                    "gpt-4o",
+                    "gpt-4o-mini",
+                    "gpt-4-turbo",
+                    "gpt-4-vision-preview",
+                    "gpt-4"
+                ]
+                
+            elif provider == "onnx":
+                # ONNX models - check for local models
+                if AI_PROVIDERS_AVAILABLE:
+                    try:
+                        onnx_provider = ONNXProvider()
+                        available_models = onnx_provider.get_available_models()
+                    except Exception as e:
+                        print(f"Error getting ONNX models: {e}")
+                        available_models = ["florence-2-base", "florence-2-large"]  # Default fallback
+                else:
+                    available_models = ["florence-2-base", "florence-2-large"]
+                    
+            elif provider == "copilot":
+                # Copilot - uses GitHub Copilot models
+                available_models = ["gpt-4o", "claude-3.5-sonnet", "o1-preview", "o1-mini"]
+                
+            elif provider == "huggingface":
+                # HuggingFace - return common vision models
+                available_models = [
+                    "microsoft/Florence-2-large",
+                    "microsoft/Florence-2-base",
+                    "Salesforce/blip-image-captioning-large",
+                    "Salesforce/blip2-opt-2.7b"
+                ]
+            else:
+                available_models = []
             
             if not available_models:
-                self.default_model_combo.addItem("No models installed", None)
+                self.default_model_combo.addItem("No models available", None)
                 self.default_model_combo.setEnabled(False)
                 return
             
             self.default_model_combo.setEnabled(True)
             
             # Add models to combo box
-            for model_name in sorted(available_models):
+            for model_name in available_models:
                 # Check if we have info about this model in config
                 model_info = self.config_data.get('available_models', {}).get(model_name, {})
                 description = model_info.get('description', '')
@@ -489,9 +603,10 @@ class PromptEditorMainWindow(QMainWindow):
                         break
                         
         except Exception as e:
-            # Fallback to config-based models if Ollama is not available
-            print(f"Warning: Could not load models from Ollama: {e}")
-            self.default_model_combo.addItem("Ollama not available - check installation", None)
+            # Fallback on error
+            error_msg = f"{provider.title()} not available: {e}"
+            print(f"Warning: {error_msg}")
+            self.default_model_combo.addItem(error_msg, None)
             self.default_model_combo.setEnabled(False)
     
     def on_prompt_selected(self, current, previous):
@@ -549,6 +664,27 @@ class PromptEditorMainWindow(QMainWindow):
     def on_default_changed(self):
         """Handle default prompt change"""
         self.mark_modified()
+    
+    def on_provider_changed(self, provider):
+        """Handle AI provider change"""
+        # Show/hide API key field based on provider
+        needs_api_key = provider in ["openai", "huggingface"]
+        self.api_key_widget.setVisible(needs_api_key)
+        
+        # Refresh the model list for the new provider
+        self.populate_model_combo()
+        
+        # Mark as modified
+        self.mark_modified()
+    
+    def toggle_api_key_visibility(self):
+        """Toggle API key visibility between password and plain text"""
+        if self.show_api_key_btn.isChecked():
+            self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.show_api_key_btn.setText("Hide")
+        else:
+            self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            self.show_api_key_btn.setText("Show")
     
     def update_char_count(self):
         """Update the character count label"""
@@ -689,6 +825,17 @@ class PromptEditorMainWindow(QMainWindow):
             
             # Update default prompt style
             self.config_data['default_prompt_style'] = self.default_prompt_combo.currentText()
+            
+            # Update default provider
+            self.config_data['default_provider'] = self.provider_combo.currentText()
+            
+            # Update API key (only if not empty)
+            api_key = self.api_key_edit.text().strip()
+            if api_key:
+                self.config_data['api_key'] = api_key
+            elif 'api_key' in self.config_data:
+                # Remove api_key if it's now empty
+                del self.config_data['api_key']
             
             # Update default model
             if self.default_model_combo.currentData():

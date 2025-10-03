@@ -169,7 +169,9 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
 class WorkflowOrchestrator:
     """Main workflow orchestrator class"""
     
-    def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", api_key_file: str = None):
+    def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, 
+                 model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", 
+                 api_key_file: str = None, detection_query: str = None, confidence: float = None):
         """
         Initialize the workflow orchestrator
         
@@ -178,8 +180,10 @@ class WorkflowOrchestrator:
             base_output_dir: Base output directory for the workflow
             model: Override model name
             prompt_style: Override prompt style
-            provider: AI provider to use (ollama, openai, onnx, copilot, huggingface)
+            provider: AI provider to use (ollama, openai, onnx, copilot, huggingface, groundingdino, groundingdino+ollama)
             api_key_file: Path to API key file for cloud providers
+            detection_query: Detection query for GroundingDINO (separate items with ' . ')
+            confidence: Confidence threshold for GroundingDINO (1-95)
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -192,6 +196,8 @@ class WorkflowOrchestrator:
         self.override_prompt_style = prompt_style
         self.provider = provider
         self.api_key_file = api_key_file
+        self.detection_query = detection_query
+        self.confidence = confidence
         
         # Available workflow steps
         self.available_steps = {
@@ -509,8 +515,12 @@ class WorkflowOrchestrator:
                 self.logger.info(f"Verification successful: All {len(combined_image_list)} copied files are discoverable by image_describer.py")
             
             # Build command for the combined directory - single call to image_describer.py
+            # Get the path to image_describer.py in the scripts directory
+            scripts_dir = Path(__file__).parent
+            image_describer_path = scripts_dir / "image_describer.py"
+            
             cmd = [
-                sys.executable, "image_describer.py",
+                sys.executable, str(image_describer_path),
                 str(temp_combined_dir),
                 "--recursive",
                 "--output-dir", str(output_dir),
@@ -553,6 +563,15 @@ class WorkflowOrchestrator:
                 validated_style = validate_prompt_style(default_style)
                 if validated_style != "detailed":  # Only add if different from hardcoded default
                     cmd.extend(["--prompt-style", validated_style])
+            
+            # Add GroundingDINO specific parameters if using groundingdino provider
+            if self.detection_query:
+                cmd.extend(["--detection-query", self.detection_query])
+                self.logger.info(f"Using detection query: {self.detection_query}")
+            
+            if self.confidence is not None:
+                cmd.extend(["--confidence", str(self.confidence)])
+                self.logger.info(f"Using confidence threshold: {self.confidence}")
             
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
@@ -1131,7 +1150,7 @@ Resume Examples:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "onnx", "copilot", "huggingface"],
+        choices=["ollama", "openai", "onnx", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
         default="ollama",
         help="AI provider to use for image description (default: ollama)"
     )
@@ -1144,6 +1163,18 @@ Resume Examples:
     parser.add_argument(
         "--prompt-style",
         help="Override prompt style for image description"
+    )
+    
+    parser.add_argument(
+        "--detection-query",
+        help="Detection query for GroundingDINO (separate items with ' . ')"
+    )
+    
+    parser.add_argument(
+        "--confidence",
+        type=float,
+        default=25.0,
+        help="Confidence threshold for GroundingDINO detection (1-95, default: 25)"
     )
     
     parser.add_argument(
@@ -1287,7 +1318,16 @@ Resume Examples:
     
     # Create orchestrator first to get access to logging
     try:
-        orchestrator = WorkflowOrchestrator(args.config, base_output_dir=output_dir, model=args.model, prompt_style=args.prompt_style, provider=args.provider, api_key_file=args.api_key_file)
+        orchestrator = WorkflowOrchestrator(
+            args.config, 
+            base_output_dir=output_dir, 
+            model=args.model, 
+            prompt_style=args.prompt_style, 
+            provider=args.provider, 
+            api_key_file=args.api_key_file,
+            detection_query=getattr(args, 'detection_query', None),
+            confidence=getattr(args, 'confidence', None)
+        )
         
         if args.dry_run:
             orchestrator.logger.info("Dry run mode - showing what would be executed:")
