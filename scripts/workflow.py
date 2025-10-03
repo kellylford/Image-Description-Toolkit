@@ -896,6 +896,7 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
         "partially_completed_steps": [],
         "model": None,
         "prompt_style": None,
+        "provider": None,
         "config": None,
         "can_resume": False,
         "resume_from_step": None,
@@ -946,9 +947,12 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
                 input_part = line.split("Input directory:")[1].strip()
                 state["input_dir"] = input_part
             
-            elif "Step '" in line and "' completed successfully" in line:
-                # Extract completed steps
-                step_name = line.split("Step '")[1].split("'")[0]
+            elif "Step '" in line and ("' completed successfully" in line or "' completed" in line):
+                # Extract completed steps - handle both old and new log formats
+                if "' completed successfully" in line:
+                    step_name = line.split("Step '")[1].split("' completed successfully")[0]
+                else:
+                    step_name = line.split("Step '")[1].split("' completed")[0]
                 if step_name not in state["completed_steps"]:
                     state["completed_steps"].append(step_name)
             
@@ -994,6 +998,8 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
                                     state["model"] = remaining_args[j+1]
                                 elif arg == "--prompt-style" and j+1 < len(remaining_args):
                                     state["prompt_style"] = remaining_args[j+1]
+                                elif arg == "--provider" and j+1 < len(remaining_args):
+                                    state["provider"] = remaining_args[j+1]
                                 elif arg == "--config" and j+1 < len(remaining_args):
                                     state["config"] = remaining_args[j+1]
                             break
@@ -1002,11 +1008,11 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
         
 
         # Also try to extract model and prompt from subprocess commands (for older logs)
-        if not state["model"] or not state["prompt_style"]:
+        if not state["model"] or not state["prompt_style"] or not state["provider"]:
             for line in lines:
-                if "image_describer.py" in line and "--model" in line:
+                if "image_describer.py" in line and ("--model" in line or "--provider" in line):
                     # Extract from subprocess command lines like:
-                    # python.exe image_describer.py ... --model gemma3 --prompt-style artistic
+                    # python.exe image_describer.py ... --model gemma3 --prompt-style artistic --provider onnx
                     import shlex
                     try:
                         # Find the part after image_describer.py
@@ -1020,6 +1026,8 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
                                     state["model"] = tokens[i+1]
                                 elif token == "--prompt-style" and i+1 < len(tokens) and not state["prompt_style"]:
                                     state["prompt_style"] = tokens[i+1]
+                                elif token == "--provider" and i+1 < len(tokens) and not state["provider"]:
+                                    state["provider"] = tokens[i+1]
                     except Exception:
                         pass  # Ignore parsing errors
 
@@ -1199,6 +1207,8 @@ Resume Examples:
             args.model = workflow_state["model"]
         if workflow_state["prompt_style"]:
             args.prompt_style = workflow_state["prompt_style"]
+        if workflow_state["provider"]:
+            args.provider = workflow_state["provider"]
         if workflow_state["config"]:
             args.config = workflow_state["config"]
         
@@ -1210,21 +1220,8 @@ Resume Examples:
                 if step == "describe" and step in workflow_state.get("partially_completed_steps", []):
                     desc_count = workflow_state.get('describe_progress', 0)
                     if desc_count > 0:
-                        print(f"WARNING: Describe step was partially completed ({desc_count} descriptions exist)")
-                        
-                        # If substantial progress exists and preserve flag is set, skip describe
-                        if desc_count > 50 and args.preserve_descriptions:
-                            print(f"Skipping describe step to preserve {desc_count} existing descriptions")
-                            continue  # Skip this step
-                        elif desc_count > 50:
-                            # Ask user what to do with substantial progress
-                            print(f"Substantial progress detected ({desc_count} descriptions).")
-                            response = input("Preserve existing descriptions? (y/n): ").strip().lower()
-                            if response in ['y', 'yes']:
-                                print("Skipping describe step to preserve existing descriptions")
-                                continue
-                            else:
-                                print("Will restart describe step (existing descriptions will be overwritten)")
+                        print(f"INFO: Describe step was partially completed ({desc_count} descriptions exist)")
+                        print(f"Will continue describing remaining images (existing descriptions will be preserved)")
                 
                 remaining_steps.append(step)
         
