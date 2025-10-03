@@ -169,13 +169,17 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
 class WorkflowOrchestrator:
     """Main workflow orchestrator class"""
     
-    def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, model: Optional[str] = None, prompt_style: Optional[str] = None):
+    def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", api_key_file: str = None):
         """
         Initialize the workflow orchestrator
         
         Args:
             config_file: Path to workflow configuration file
             base_output_dir: Base output directory for the workflow
+            model: Override model name
+            prompt_style: Override prompt style
+            provider: AI provider to use (ollama, openai, onnx, copilot, huggingface)
+            api_key_file: Path to API key file for cloud providers
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -186,6 +190,8 @@ class WorkflowOrchestrator:
         # Store override settings for resume functionality
         self.override_model = model
         self.override_prompt_style = prompt_style
+        self.provider = provider
+        self.api_key_file = api_key_file
         
         # Available workflow steps
         self.available_steps = {
@@ -511,6 +517,16 @@ class WorkflowOrchestrator:
                 "--log-dir", str(self.config.base_output_dir / "logs")
             ]
             
+            # Add provider parameter
+            if self.provider:
+                cmd.extend(["--provider", self.provider])
+                self.logger.info(f"Using AI provider: {self.provider}")
+            
+            # Add API key file if provided
+            if self.api_key_file:
+                cmd.extend(["--api-key-file", self.api_key_file])
+                self.logger.info(f"Using API key file: {self.api_key_file}")
+            
             # Add optional parameters
             if "config_file" in step_config:
                 cmd.extend(["--config", step_config["config_file"]])
@@ -797,6 +813,13 @@ class WorkflowOrchestrator:
         self.logger.info("FINAL WORKFLOW STATISTICS")
         self.logger.info("="*60)
         
+        # Configuration information
+        self.logger.info(f"AI Provider: {self.provider}")
+        if self.override_model:
+            self.logger.info(f"Model: {self.override_model}")
+        if self.override_prompt_style:
+            self.logger.info(f"Prompt Style: {self.override_prompt_style}")
+        
         # Time statistics
         self.logger.info(f"Start time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         self.logger.info(f"End time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -1037,10 +1060,20 @@ Workflow Steps:
   html    - Create HTML report from descriptions
 
 Examples:
+  # Ollama (default)
   python workflow.py media_folder
   python workflow.py media_folder --output-dir results
   python workflow.py photos --steps describe,html
   python workflow.py videos --steps video,describe,html --model llava:7b
+  
+  # OpenAI
+  python workflow.py photos --provider openai --model gpt-4o-mini --api-key-file ~/openai.txt
+  python workflow.py media --provider openai --model gpt-4o --steps describe,html
+  
+  # ONNX (Enhanced Ollama with YOLO)
+  python workflow.py images --provider onnx --model llava:latest
+  
+  # Configuration
   python workflow.py mixed_media --output-dir analysis --config my_workflow.json
   
 Resume Examples:
@@ -1086,6 +1119,18 @@ Resume Examples:
     parser.add_argument(
         "--model",
         help="Override AI model for image description"
+    )
+    
+    parser.add_argument(
+        "--provider",
+        choices=["ollama", "openai", "onnx", "copilot", "huggingface"],
+        default="ollama",
+        help="AI provider to use for image description (default: ollama)"
+    )
+    
+    parser.add_argument(
+        "--api-key-file",
+        help="Path to file containing API key for cloud providers (OpenAI, HuggingFace)"
     )
     
     parser.add_argument(
@@ -1220,15 +1265,16 @@ Resume Examples:
             if not output_dir.is_absolute():
                 output_dir = (Path(original_cwd) / output_dir).resolve()
         else:
-            # Create timestamped workflow output directory with model and prompt info
+            # Create timestamped workflow output directory with provider, model, and prompt info
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            # Get model and prompt info for directory naming
+            # Get provider, model and prompt info for directory naming
+            provider_name = args.provider if args.provider else "ollama"
             model_name = get_effective_model(args, args.config)
             prompt_style = get_effective_prompt_style(args, args.config)
             
-            # Create descriptive directory name
-            output_dir = (Path(original_cwd) / f"workflow_{model_name}_{prompt_style}_{timestamp}").resolve()
+            # Create descriptive directory name (wf = workflow)
+            output_dir = (Path(original_cwd) / f"wf_{provider_name}_{model_name}_{prompt_style}_{timestamp}").resolve()
         
         # Parse workflow steps
         steps = [step.strip() for step in args.steps.split(",")]
@@ -1244,7 +1290,7 @@ Resume Examples:
     
     # Create orchestrator first to get access to logging
     try:
-        orchestrator = WorkflowOrchestrator(args.config, base_output_dir=output_dir, model=args.model, prompt_style=args.prompt_style)
+        orchestrator = WorkflowOrchestrator(args.config, base_output_dir=output_dir, model=args.model, prompt_style=args.prompt_style, provider=args.provider, api_key_file=args.api_key_file)
         
         if args.dry_run:
             orchestrator.logger.info("Dry run mode - showing what would be executed:")

@@ -33,6 +33,17 @@ import ollama
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
+# Import AI providers from the main application
+# Add parent directory to path to import from imagedescriber module
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from imagedescriber.ai_providers import (
+    OllamaProvider,
+    OpenAIProvider,
+    ONNXProvider,
+    CopilotProvider,
+    HuggingFaceProvider
+)
+
 
 # Configure basic logging (will be enhanced in main() if log-dir is provided)
 logging.basicConfig(
@@ -85,17 +96,17 @@ def setup_logging(log_dir: Optional[str] = None, verbose: bool = False) -> None:
 
 
 class ImageDescriber:
-    """Class to handle image description using Ollama vision model"""
+    """Class to handle image description using various AI providers"""
     
     def __init__(self, model_name: str = None, max_image_size: int = 1024, 
                  enable_compression: bool = True, batch_delay: float = 2.0, 
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
-                 output_dir: str = None):
+                 output_dir: str = None, provider: str = "ollama", api_key: str = None):
         """
         Initialize the ImageDescriber
         
         Args:
-            model_name: Name of the Ollama vision model to use (overrides config if specified)
+            model_name: Name of the vision model to use (overrides config if specified)
             max_image_size: Maximum image dimension (width or height) in pixels
             enable_compression: Whether to compress images before processing
             batch_delay: Delay between processing images to prevent memory buildup
@@ -117,10 +128,68 @@ class ImageDescriber:
         self.batch_delay = batch_delay
         self.prompt_style = prompt_style
         self.output_dir = output_dir  # Custom output directory
+        self.provider_name = provider.lower()
+        self.api_key = api_key
         
         # Set supported formats from config
         self.supported_formats = set(self.config.get('processing_options', {}).get('supported_formats', 
                                                     ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']))
+        
+        # Initialize the AI provider
+        self.provider = self._initialize_provider()
+        
+        logger.info(f"Initialized ImageDescriber with provider: {self.provider_name}, model: {self.model_name}")
+    
+    def _initialize_provider(self):
+        """Initialize the AI provider based on configuration"""
+        try:
+            if self.provider_name == "ollama":
+                logger.info("Initializing Ollama provider...")
+                provider = OllamaProvider()
+                # Verify model is available
+                try:
+                    models = ollama.list()
+                    available_models = [model['name'] for model in models.get('models', [])]
+                    if self.model_name not in available_models:
+                        logger.warning(f"Model '{self.model_name}' not found in Ollama")
+                        logger.info(f"Available models: {', '.join(available_models)}")
+                        logger.info(f"Tip: Install with 'ollama pull {self.model_name}'")
+                except Exception as e:
+                    logger.warning(f"Could not verify Ollama models: {e}")
+                return provider
+                
+            elif self.provider_name == "openai":
+                logger.info("Initializing OpenAI provider...")
+                if not self.api_key:
+                    raise ValueError("OpenAI provider requires an API key. Use --api-key-file option.")
+                provider = OpenAIProvider()
+                provider.api_key = self.api_key
+                return provider
+                
+            elif self.provider_name == "onnx":
+                logger.info("Initializing ONNX provider...")
+                provider = ONNXProvider()
+                return provider
+                
+            elif self.provider_name == "copilot":
+                logger.info("Initializing Copilot+ PC provider...")
+                provider = CopilotProvider()
+                return provider
+                
+            elif self.provider_name == "huggingface":
+                logger.info("Initializing HuggingFace provider...")
+                if not self.api_key:
+                    raise ValueError("HuggingFace provider requires an API key. Use --api-key-file option.")
+                provider = HuggingFaceProvider()
+                provider.api_key = self.api_key
+                return provider
+                
+            else:
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, onnx, copilot, huggingface")
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
+            raise
     
     def load_config(self, config_file: str) -> dict:
         """
@@ -294,7 +363,7 @@ class ImageDescriber:
     
     def get_image_description(self, image_path: Path) -> Optional[str]:
         """
-        Get description of an image using Ollama vision model
+        Get description of an image using configured AI provider
         
         Args:
             image_path: Path to the image file
@@ -308,54 +377,77 @@ class ImageDescriber:
                 logger.warning(f"Unsupported image format: {image_path}")
                 return None
             
-            # Encode image to base64
-            image_base64 = self.encode_image_to_base64(image_path)
-            if not image_base64:
-                return None
-            
             # Get prompt from configuration
             prompt = self.get_prompt()
             logger.debug(f"Using prompt: {repr(prompt)}")
             
-            # Get model settings from configuration
-            model_settings = self.get_model_settings()
-            logger.debug(f"Using model settings: {model_settings}")
+            # For Ollama provider, use legacy direct API call for backward compatibility
+            if self.provider_name == "ollama":
+                # Encode image to base64
+                image_base64 = self.encode_image_to_base64(image_path)
+                if not image_base64:
+                    return None
+                
+                # Get model settings from configuration
+                model_settings = self.get_model_settings()
+                logger.debug(f"Using model settings: {model_settings}")
+                
+                # Call Ollama API with configured settings
+                response = ollama.chat(
+                    model=self.model_name,
+                    messages=[
+                        {
+                            'role': 'user',
+                            'content': prompt,
+                            'images': [image_base64]
+                        }
+                    ],
+                    options=model_settings
+                )
+                
+                logger.debug(f"Raw response: {response}")
+                logger.debug(f"Response type: {type(response)}")
+                logger.debug(f"Response keys: {response.keys() if hasattr(response, 'keys') else 'no keys'}")
+                if 'message' in response:
+                    logger.debug(f"Message: {response['message']}")
+                    logger.debug(f"Message type: {type(response['message'])}")
+                    if hasattr(response['message'], 'content'):
+                        logger.debug(f"Message content: {repr(response['message'].content)}")
+                    elif 'content' in response['message']:
+                        logger.debug(f"Message content dict: {repr(response['message']['content'])}")
+                
+                description = response['message']['content'].strip()
+                logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
+                logger.debug(f"Description content: {repr(description)}")
+                logger.debug(f"Description length: {len(description)}")
+                logger.debug(f"Description bool: {bool(description)}")
+                
+                # Clean up memory
+                del image_base64, response
+                gc.collect()
+                
+                return description
             
-            # Call Ollama API with configured settings
-            response = ollama.chat(
-                model=self.model_name,
-                messages=[
-                    {
-                        'role': 'user',
-                        'content': prompt,
-                        'images': [image_base64]
-                    }
-                ],
-                options=model_settings
-            )
-            
-            logger.debug(f"Raw response: {response}")
-            logger.debug(f"Response type: {type(response)}")
-            logger.debug(f"Response keys: {response.keys() if hasattr(response, 'keys') else 'no keys'}")
-            if 'message' in response:
-                logger.debug(f"Message: {response['message']}")
-                logger.debug(f"Message type: {type(response['message'])}")
-                if hasattr(response['message'], 'content'):
-                    logger.debug(f"Message content: {repr(response['message'].content)}")
-                elif 'content' in response['message']:
-                    logger.debug(f"Message content dict: {repr(response['message']['content'])}")
-            
-            description = response['message']['content'].strip()
-            logger.info(f"Generated description for {image_path.name}")
-            logger.debug(f"Description content: {repr(description)}")
-            logger.debug(f"Description length: {len(description)}")
-            logger.debug(f"Description bool: {bool(description)}")
-            
-            # Clean up memory
-            del image_base64, response
-            gc.collect()
-            
-            return description
+            else:
+                # Use provider's describe_image method for other providers
+                logger.debug(f"Using provider: {self.provider_name}")
+                
+                # Call provider's describe_image method with correct signature
+                # Providers expect: describe_image(image_path: str, prompt: str, model: str)
+                description = self.provider.describe_image(
+                    image_path=str(image_path),
+                    prompt=prompt,
+                    model=self.model_name
+                )
+                
+                if description:
+                    logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
+                    logger.debug(f"Description content: {repr(description)}")
+                    
+                # Clean up memory
+                gc.collect()
+                
+                return description
             
         except Exception as e:
             logger.error(f"Error generating description for {image_path}: {e}")
@@ -403,6 +495,7 @@ class ImageDescriber:
                     entry += f"{metadata_str}\n"
             
             if output_format.get('include_model_info', True):
+                entry += f"Provider: {self.provider_name}\n"
                 entry += f"Model: {self.model_name}\n"
                 entry += f"Prompt Style: {self.prompt_style}\n"
             
@@ -546,6 +639,7 @@ class ImageDescriber:
         overall_end_time = time.time()
         total_duration = overall_end_time - overall_start_time
         logger.info(f"Processing complete. Successfully processed {success_count}/{len(image_files)} images")
+        logger.info(f"Provider: {self.provider_name}, Model: {self.model_name}, Prompt Style: {self.prompt_style}")
         logger.info(f"Total processing time: {total_duration:.2f} seconds")
         logger.info(f"Average time per image: {total_duration/len(image_files):.2f} seconds")
         logger.info(f"Descriptions saved to: {output_file}")
@@ -883,23 +977,60 @@ def get_available_prompt_styles(config_file: str = "image_describer_config.json"
 def main():
     """Main function to run the image description script"""
     
+    # Quick check for --list-providers before full argument parsing
+    if '--list-providers' in sys.argv:
+        print("Available AI Providers:")
+        print("=" * 60)
+        print()
+        print("ollama       - Local Ollama models (default)")
+        print("             Models: llava, llava:7b, llava:13b, moondream, etc.")
+        print("             Requires: Ollama running locally")
+        print()
+        print("openai       - OpenAI cloud models")
+        print("             Models: gpt-4o, gpt-4o-mini, gpt-4-vision-preview")
+        print("             Requires: API key (--api-key-file or OPENAI_API_KEY)")
+        print()
+        print("onnx         - Enhanced Ollama with YOLO object detection")
+        print("             Models: Same as Ollama")
+        print("             Features: NPU acceleration, spatial awareness")
+        print()
+        print("copilot      - Copilot+ PC NPU acceleration")
+        print("             Models: florence-2")
+        print("             Requires: Copilot+ PC with NPU, DirectML")
+        print()
+        print("huggingface  - HuggingFace Inference API")
+        print("             Models: Various vision models on HF")
+        print("             Requires: API key (--api-key-file or HUGGINGFACE_API_KEY)")
+        print()
+        print("=" * 60)
+        sys.exit(0)
+    
     # Get available prompt styles and default from config
     available_styles = get_available_prompt_styles()
     default_style = get_default_prompt_style()
     
     parser = argparse.ArgumentParser(
-        description="Process images with Ollama vision model and save descriptions to a text file",
+        description="Process images with AI vision models and save descriptions to a text file",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Available prompt styles: {', '.join(available_styles)}
 Default prompt style: {default_style}
 
 Examples:
+  # Ollama (default provider)
   python {Path(__file__).name} exportedphotos
   python {Path(__file__).name} exportedphotos --prompt-style artistic --model llava:7b
-  python {Path(__file__).name} exportedphotos --max-size 512 --max-files 5 --verbose
   python {Path(__file__).name} exportedphotos --model llava:13b --prompt-style technical
-  python {Path(__file__).name} exportedphotos --no-metadata --model moondream
+  
+  # OpenAI
+  python {Path(__file__).name} exportedphotos --provider openai --model gpt-4o-mini --api-key-file ~/openai.txt
+  python {Path(__file__).name} exportedphotos --provider openai --model gpt-4-vision-preview
+  
+  # ONNX (Enhanced Ollama with YOLO detection)
+  python {Path(__file__).name} exportedphotos --provider onnx --model llava:latest
+  
+  # Copilot+ PC NPU
+  python {Path(__file__).name} exportedphotos --provider copilot --model florence-2
 
 Configuration:
   Use config_helper.py to manage settings:
@@ -914,10 +1045,22 @@ Configuration:
         help="Directory containing images to process"
     )
     parser.add_argument(
+        "--provider",
+        type=str,
+        default="ollama",
+        choices=["ollama", "openai", "onnx", "copilot", "huggingface"],
+        help="AI provider to use (default: ollama)"
+    )
+    parser.add_argument(
         "--model",
         type=str,
         default=None,
-        help="Ollama vision model to use (default: from image_describer_config.json)"
+        help="Model name to use (default: from image_describer_config.json or provider default)"
+    )
+    parser.add_argument(
+        "--api-key-file",
+        type=str,
+        help="Path to file containing API key for cloud providers (OpenAI, HuggingFace)"
     )
     parser.add_argument(
         "--recursive",
@@ -979,6 +1122,11 @@ Configuration:
         action="store_true",
         help="Disable metadata extraction from image files"
     )
+    parser.add_argument(
+        "--list-providers",
+        action="store_true",
+        help="List available AI providers and exit"
+    )
     
     args = parser.parse_args()
     
@@ -988,6 +1136,29 @@ Configuration:
     # Convert directory path to Path object
     directory_path = Path(args.directory)
     
+    # Load API key if provided
+    api_key = None
+    if args.api_key_file:
+        try:
+            api_key_path = Path(args.api_key_file).expanduser()
+            with open(api_key_path, 'r', encoding='utf-8') as f:
+                api_key = f.read().strip()
+            logger.info(f"Loaded API key from {api_key_path}")
+        except Exception as e:
+            logger.error(f"Failed to load API key from {args.api_key_file}: {e}")
+            sys.exit(1)
+    
+    # Check for API key in environment variables if not provided via file
+    if not api_key and args.provider in ["openai", "huggingface"]:
+        env_var = "OPENAI_API_KEY" if args.provider == "openai" else "HUGGINGFACE_API_KEY"
+        api_key = os.environ.get(env_var)
+        if api_key:
+            logger.info(f"Using API key from environment variable {env_var}")
+        else:
+            logger.error(f"Provider '{args.provider}' requires an API key.")
+            logger.error(f"Provide it via --api-key-file or set {env_var} environment variable")
+            sys.exit(1)
+    
     # Create ImageDescriber instance with memory optimization
     describer = ImageDescriber(
         model_name=args.model,
@@ -996,7 +1167,9 @@ Configuration:
         batch_delay=args.batch_delay,
         config_file=args.config,
         prompt_style=args.prompt_style,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        provider=args.provider,
+        api_key=api_key
     )
     
     # Override metadata extraction if disabled via command line
@@ -1004,28 +1177,29 @@ Configuration:
         describer.config['processing_options']['extract_metadata'] = False
         describer.config['output_format']['include_metadata'] = False
     
-    # Check if Ollama is available
-    try:
-        ollama.list()
-        logger.info("Ollama is available")
-    except Exception as e:
-        logger.error(f"Ollama is not available or not running: {e}")
-        logger.error("Please make sure Ollama is installed and running")
-        sys.exit(1)
-    
-    # Check if the specified model is available
-    try:
-        models = ollama.list()
-        available_models = [model['name'] for model in models.get('models', [])]
-        if describer.model_name not in available_models:
-            logger.error(f"Model '{describer.model_name}' is not available")
-            logger.error(f"Available models: {', '.join(available_models)}")
-            logger.info(f"You can install the model with: ollama pull {describer.model_name}")
+    # Check provider availability (only for Ollama to maintain backward compatibility)
+    if args.provider == "ollama":
+        try:
+            ollama.list()
+            logger.info("Ollama is available")
+        except Exception as e:
+            logger.error(f"Ollama is not available or not running: {e}")
+            logger.error("Please make sure Ollama is installed and running")
             sys.exit(1)
-        else:
-            logger.info(f"Using model: {describer.model_name}")
-    except Exception as e:
-        logger.warning(f"Could not check available models: {e}")
+        
+        # Check if the specified model is available
+        try:
+            models = ollama.list()
+            available_models = [model['name'] for model in models.get('models', [])]
+            if describer.model_name not in available_models:
+                logger.error(f"Model '{describer.model_name}' is not available")
+                logger.error(f"Available models: {', '.join(available_models)}")
+                logger.info(f"You can install the model with: ollama pull {describer.model_name}")
+                sys.exit(1)
+            else:
+                logger.info(f"Using provider: {describer.provider_name}, model: {describer.model_name}")
+        except Exception as e:
+            logger.warning(f"Could not check available models: {e}")
     
     # Process the directory
     try:

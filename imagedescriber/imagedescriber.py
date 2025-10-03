@@ -67,6 +67,29 @@ from ai_providers import (
     get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider, _onnx_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
+
+# Import provider capabilities for dynamic UI
+try:
+    import sys
+    from pathlib import Path
+    # Add models directory to path for provider_configs import
+    models_path = Path(__file__).parent.parent / 'models'
+    if str(models_path) not in sys.path:
+        sys.path.insert(0, str(models_path))
+    from provider_configs import supports_prompts, supports_custom_prompts, get_provider_capabilities
+    from model_options import get_all_options_for_provider, get_default_value
+except ImportError:
+    # Fallback if provider_configs not available
+    def supports_prompts(provider_name: str) -> bool:
+        return provider_name not in ["ONNX", "HuggingFace", "Object Detection", "Grounding DINO"]
+    def supports_custom_prompts(provider_name: str) -> bool:
+        return provider_name not in ["ONNX", "HuggingFace", "Object Detection", "Grounding DINO"]
+    def get_provider_capabilities(provider_name: str) -> dict:
+        return {}
+    def get_all_options_for_provider(provider_name: str) -> dict:
+        return {}
+    def get_default_value(option_config: dict) -> any:
+        return option_config.get("default")
 from worker_threads import (
     ProcessingWorker, WorkflowProcessWorker, ConversionWorker, 
     VideoProcessingWorker, ChatProcessingWorker
@@ -1904,15 +1927,34 @@ class ProcessingDialog(QDialog):
             self.status_label.setText("No provider selected.")
             return
         
-        # Show/hide settings based on provider type
+        # Map provider internal names to display names for capability lookup
+        provider_display_names = {
+            "ollama": "Ollama",
+            "ollama_cloud": "Ollama Cloud",
+            "openai": "OpenAI",
+            "onnx": "ONNX",
+            "huggingface": "HuggingFace",
+            "copilot": "Copilot+ PC",
+            "object_detection": "Object Detection",
+            "grounding_dino": "Grounding DINO",
+            "grounding_dino_hybrid": "Grounding DINO"
+        }
+        
+        provider_name = provider_display_names.get(current_data, current_data)
+        
+        # Show/hide settings based on provider type (keep legacy detection for UI-specific providers)
         is_object_detection = current_data == "object_detection"
         is_grounding_dino = current_data in ["grounding_dino", "grounding_dino_hybrid"]
         
-        # Hide/show prompt-related controls
-        self.prompt_label.setVisible(not is_object_detection and not is_grounding_dino)
-        self.prompt_combo.setVisible(not is_object_detection and not is_grounding_dino)
-        self.custom_checkbox.setVisible(not is_object_detection and not is_grounding_dino)
-        self.custom_prompt.setVisible(not is_object_detection and not is_grounding_dino)
+        # Use dynamic capability checking for prompt support
+        provider_supports_prompts = supports_prompts(provider_name)
+        provider_supports_custom = supports_custom_prompts(provider_name)
+        
+        # Hide/show prompt-related controls based on provider capabilities
+        self.prompt_label.setVisible(provider_supports_prompts)
+        self.prompt_combo.setVisible(provider_supports_prompts)
+        self.custom_checkbox.setVisible(provider_supports_custom)
+        self.custom_prompt.setVisible(provider_supports_custom)
         
         # Hide/show YOLO settings
         self.yolo_settings_label.setVisible(is_object_detection)
@@ -4748,7 +4790,8 @@ class ImageDescriberGUI(QMainWindow):
         # Help menu
         help_menu = menubar.addMenu("Help")
         
-        model_manager_action = QAction("Model Manager", self)
+        model_manager_action = QAction("Model Management Tools...", self)
+        model_manager_action.setStatusTip("Information about external model management tools (check_models.py, manage_models.py)")
         model_manager_action.triggered.connect(self.show_model_manager)
         help_menu.addAction(model_manager_action)
         
@@ -8459,16 +8502,39 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
         msg_box.exec()
 
     def show_model_manager(self):
-        """Show the Model Manager dialog"""
-        try:
-            dialog = ModelManagerDialog(self)
-            dialog.exec()
-        except Exception as e:
-            QMessageBox.critical(
-                self, "Model Manager Error",
-                f"Failed to open Model Manager:\n{str(e)}\n\n"
-                f"Please ensure Ollama is installed and accessible."
-            )
+        """Show information about external model management tools"""
+        message = (
+            "<h3>Model Management Tools</h3>"
+            "<p>Model management is now handled by external command-line tools that support all AI providers:</p>"
+            "<ul>"
+            "<li><b>check_models.py</b> - View installed and available models for any provider</li>"
+            "<li><b>manage_models.py</b> - Interactive model installation and management</li>"
+            "</ul>"
+            "<h4>Quick Examples:</h4>"
+            "<p><b>View Ollama models:</b><br>"
+            "<code>python check_models.py --provider ollama</code></p>"
+            "<p><b>Search for models:</b><br>"
+            "<code>python check_models.py --search vision</code></p>"
+            "<p><b>Interactive management:</b><br>"
+            "<code>python manage_models.py</code></p>"
+            "<p><b>List all providers:</b><br>"
+            "<code>python check_models.py --list-providers</code></p>"
+            "<h4>Benefits of External Tools:</h4>"
+            "<ul>"
+            "<li>Support all providers (Ollama, OpenAI, ONNX, Copilot+ PC, HuggingFace)</li>"
+            "<li>Can be used independently of GUI or in scripts</li>"
+            "<li>Better search and filtering capabilities</li>"
+            "<li>Recommended models clearly marked</li>"
+            "<li>View model installation status across all providers</li>"
+            "</ul>"
+            "<p><b>Documentation:</b> See docs/MODEL_SELECTION_GUIDE.md for complete details.</p>"
+        )
+        
+        QMessageBox.information(
+            self,
+            "Model Management Tools",
+            message
+        )
 
     def show_image_properties(self):
         """Show properties and metadata for the currently selected image"""
