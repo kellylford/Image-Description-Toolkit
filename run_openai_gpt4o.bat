@@ -16,8 +16,8 @@ REM ============================================================================
 setlocal
 
 REM Configuration - EDIT THESE VALUES
-set IMAGE_PATH=C:\Users\kelly\OneDrive\personal\Pictures\hawaii
-set API_KEY_FILE=c:\users\kelly\onedrive\openai.txt
+set IMAGE_PATH=<path to images>
+set API_KEY_FILE=<path to OpenAI key>
 
 REM Model Configuration
 set PROVIDER=openai
