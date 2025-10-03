@@ -1,0 +1,519 @@
+# Copilot+ PC NPU Hardware Setup Guide
+
+## Overview
+
+**Copilot+ PC** refers to Windows PCs with dedicated **NPU (Neural Processing Unit)** chips that provide hardware-accelerated AI processing. This guide shows you how to use the Copilot+ PC provider for local, hardware-accelerated image description.
+
+⚠️ **IMPORTANT:** This is about **Copilot+ PC NPU hardware**, NOT GitHub Copilot API service. 
+- **Copilot+ PC** = Special Windows PCs with NPU chips for local AI acceleration
+- **GitHub Copilot** = Cloud-based AI coding assistant (different product, not supported here)
+
+## Why Use Copilot+ PC NPU?
+
+✅ **Advantages:**
+- **Hardware acceleration** - Dedicated NPU chip for fast AI inference
+- **Local processing** - All data stays on your PC, complete privacy
+- **No API costs** - Free once you have the hardware
+- **Fast** - NPU-accelerated inference (though currently uses CPU fallback)
+- **Offline capable** - Works without internet connection
+- **Windows 11 optimized** - Native DirectML support
+
+❌ **Considerations:**
+- Requires specific Copilot+ PC hardware (~$999-2000)
+- Windows 11 only (version 22H2 or later)
+- Limited model selection (Florence-2 primarily)
+- Currently uses CPU fallback (full NPU support coming)
+- Not as powerful as high-end GPUs or cloud APIs
+
+## Requirements
+
+### Hardware Requirements
+
+**You MUST have a Copilot+ PC with one of these NPU chips:**
+
+**Qualcomm Snapdragon:**
+- Snapdragon X Elite
+- Snapdragon X Plus
+
+**Intel:**
+- Core Ultra (Series 2) processors with NPU
+- Lunar Lake generation
+
+**AMD:**
+- Ryzen AI processors with NPU
+- Strix Point generation
+
+**Common Copilot+ PC Devices:**
+- Microsoft Surface Laptop (7th Edition, Snapdragon)
+- Microsoft Surface Pro (11th Edition, Snapdragon)
+- Dell XPS 13 (9345, Snapdragon)
+- HP EliteBook Ultra G1q
+- Lenovo ThinkPad T14s Gen 6
+- Samsung Galaxy Book4 Edge
+- ASUS Vivobook S 15
+
+### Software Requirements
+
+1. **Windows 11** (version 22H2 or later, preferably 24H2)
+   - Earlier versions may not have NPU support
+   - Check your version: `winver`
+
+2. **Python 3.9+** with required packages
+
+3. **DirectML Runtime:**
+   ```bash
+   pip install onnxruntime-directml
+   ```
+
+4. **AI Model Dependencies:**
+   ```bash
+   pip install transformers torch einops timm pillow
+   ```
+
+## Installation
+
+### Step 1: Verify Copilot+ PC Hardware
+
+Check if you have a Copilot+ PC:
+
+**Option 1: Check Device Specifications**
+1. Open Settings → System → About
+2. Look for "Copilot+ PC" badge or NPU mention
+3. Check processor model (Snapdragon X, Core Ultra Series 2, or Ryzen AI)
+
+**Option 2: Check NPU in Task Manager**
+1. Open Task Manager (Ctrl+Shift+Esc)
+2. Go to Performance tab
+3. Look for "NPU" in the list (if you have one)
+
+**Option 3: Run Detection Script**
+```bash
+python -c "from models.copilot_npu import is_npu_available, get_npu_info; print(f'NPU: {get_npu_info()}')"
+```
+
+### Step 2: Install Dependencies
+
+```bash
+# Install DirectML support
+pip install onnxruntime-directml
+
+# Install AI model libraries
+pip install transformers torch einops timm pillow
+
+# Verify installation
+python -c "import onnxruntime; print('DirectML ready!')"
+```
+
+### Step 3: Download Florence-2 Model
+
+The Florence-2 model will download automatically on first use (~463MB), or you can pre-download:
+
+```bash
+python models/download_florence2.py
+```
+
+### Step 4: Test the Provider
+
+```bash
+# Test with a single image
+python scripts/workflow.py "test.jpg" --steps describe --provider copilot --model florence2-base
+```
+
+## Using the Batch File
+
+### Quick Start
+
+1. **Verify you have a Copilot+ PC**
+   - Check Settings → System → About for "Copilot+ PC" badge
+   - Or verify you have Snapdragon X / Core Ultra / Ryzen AI processor
+
+2. **Install dependencies**
+   ```bash
+   pip install onnxruntime-directml transformers torch
+   ```
+
+3. **Edit the batch file**
+   - Open `run_copilot.bat` in text editor
+   - Set `IMAGE_PATH` to your image or folder
+   - Example:
+     ```batch
+     set IMAGE_PATH=C:\Users\YourName\Pictures\photo.jpg
+     ```
+
+4. **Run the batch file**
+   - Double-click `run_copilot.bat`
+   - OR run from command prompt: `run_copilot.bat`
+
+5. **Find your results**
+   - Look for `wf_copilot_florence2-base_narrative_*` folder
+   - Open `descriptions/image_descriptions.txt` to see results
+
+### Configuration Options
+
+Edit these settings in the batch file:
+
+```batch
+REM Path to image or folder
+set IMAGE_PATH=C:\path\to\your\images
+
+REM Steps to run
+set STEPS=describe
+REM Or: set STEPS=describe,html
+
+REM Model to use (NPU-optimized models)
+set MODEL=florence2-base
+REM Options: florence2-base, florence2-large
+
+REM Prompt style
+set PROMPT_STYLE=narrative
+REM Options: narrative, detailed, concise, technical
+```
+
+## Command-Line Usage
+
+### Single Image
+
+```bash
+python scripts/workflow.py "C:\path\to\image.jpg" --provider copilot --model florence2-base --prompt-style narrative
+```
+
+### Folder of Images
+
+```bash
+python workflow.py "C:\path\to\images" --provider copilot --model gpt-4o --prompt-style narrative
+```
+
+### Full Workflow
+
+```bash
+python workflow.py "C:\path\to\images" --steps extract,describe,html,viewer --provider copilot --model gpt-4o --prompt-style narrative
+```
+
+## Available Models
+
+| Model | Provider | Quality | Speed | Best For |
+|-------|----------|---------|-------|----------|
+| **gpt-4o** | OpenAI | Excellent | Fast | General image description (recommended) |
+| **claude-3.5-sonnet** | Anthropic | Excellent | Fast | Detailed analysis, creative tasks |
+| **o1-preview** | OpenAI | Highest | Slower | Complex reasoning, detailed analysis |
+| **o1-mini** | OpenAI | Very Good | Medium | Balanced quality/speed |
+
+### Model Recommendations
+
+**For general use**: `gpt-4o`
+- Fast and accurate
+- Great for most image descriptions
+- Best balance of quality and speed
+
+**For detailed analysis**: `claude-3.5-sonnet`
+- Excellent at nuanced descriptions
+- Good for artistic/creative analysis
+- Very thorough
+
+**For complex scenes**: `o1-preview`
+- Best reasoning capabilities
+- Slowest but most thoughtful
+- Use for important/complex images
+
+**For speed**: `o1-mini`
+- Faster than o1-preview
+- Still very capable
+- Good for batches
+
+## Prompt Styles
+
+| Style | Best For | Description Length |
+|-------|----------|-------------------|
+| **narrative** | General use | Medium - balanced |
+| **detailed** | Maximum info | Long - comprehensive |
+| **concise** | Quick summaries | Short - essentials only |
+| **artistic** | Art analysis | Medium - composition focus |
+| **technical** | Photography | Medium - technical details |
+| **colorful** | Color analysis | Medium - palette focus |
+
+## Troubleshooting
+
+### "GitHub CLI not installed"
+
+**Cause**: GitHub CLI not installed or not in PATH
+
+**Solutions**:
+1. Install from https://cli.github.com
+2. After install, restart terminal/command prompt
+3. Verify: `gh --version`
+
+### "Not authenticated with GitHub CLI"
+
+**Cause**: Not logged in to GitHub
+
+**Solutions**:
+```bash
+# Login
+gh auth login
+
+# Follow prompts to authenticate
+
+# Verify
+gh auth status
+```
+
+### "No active GitHub Copilot subscription"
+
+**Cause**: Copilot subscription not active or expired
+
+**Solutions**:
+1. Check subscription at https://github.com/settings/copilot
+2. Subscribe or renew at https://github.com/features/copilot
+3. Wait a few minutes for activation
+4. Re-authenticate: `gh auth refresh`
+
+### "Rate limits exceeded"
+
+**Cause**: Too many requests in short time
+
+**Solutions**:
+1. Wait a few minutes before retrying
+2. Process images in smaller batches
+3. Contact GitHub support if limits seem wrong
+
+### "Network connectivity issues"
+
+**Cause**: Internet connection problems
+
+**Solutions**:
+1. Check internet connection
+2. Check firewall isn't blocking GitHub
+3. Try: `gh auth refresh`
+4. Use VPN if GitHub is blocked in your region
+
+### Authentication Expired
+
+**Cause**: GitHub CLI authentication token expired
+
+**Solutions**:
+```bash
+# Refresh authentication
+gh auth refresh
+
+# Or re-login
+gh auth logout
+gh auth login
+```
+
+## Cost & Pricing
+
+### GitHub Copilot Individual
+
+- **$10/month** or **$100/year**
+- Includes:
+  - Code completion in IDE
+  - Chat in IDE and GitHub
+  - CLI assistance
+  - **Access to image description via API**
+  - 30-day free trial
+
+### GitHub Copilot Business
+
+- **$19/user/month**
+- Everything in Individual plus:
+  - Organization management
+  - Policy controls
+  - Usage analytics
+
+### GitHub Copilot Enterprise
+
+- **$39/user/month**
+- Everything in Business plus:
+  - Chat in GitHub.com
+  - Custom models
+  - Fine-tuning
+  - Priority support
+
+### Cost Comparison
+
+| Provider | Cost per Month | Cost per 1,000 Images |
+|----------|----------------|----------------------|
+| **Copilot Individual** | **$10** | **$0** (included) |
+| **Copilot Business** | **$19/user** | **$0** (included) |
+| OpenAI gpt-4o (direct) | Pay-as-you-go | ~$10-20 |
+| OpenAI gpt-4o-mini | Pay-as-you-go | ~$1-2 |
+| HuggingFace Pro | $9 | $0 (unlimited) |
+| Ollama/ONNX | $0 | $0 (unlimited) |
+
+**Value Proposition**: If you already have Copilot for coding, image description is included at no extra cost!
+
+## Comparison with Other Providers
+
+### Copilot vs OpenAI Direct
+
+| Feature | Copilot | OpenAI Direct |
+|---------|---------|---------------|
+| **Pricing** | Flat $10-19/month | Pay per API call |
+| **Usage limits** | Generous (fair use) | Unlimited (pay-as-you-go) |
+| **Setup** | GitHub CLI auth | API key management |
+| **Models** | GPT-4o, Claude, o1 | GPT models only |
+| **Best for** | Developers with Copilot | High-volume production |
+
+### Copilot vs HuggingFace
+
+| Feature | Copilot | HuggingFace |
+|---------|---------|-------------|
+| **Free tier** | No (requires subscription) | Yes (~1K/month) |
+| **Quality** | Excellent (GPT-4o) | Very Good (Florence-2) |
+| **Speed** | Very Fast | Medium (cold starts) |
+| **Models** | Premium (GPT, Claude, o1) | Many open source |
+
+### Copilot vs Ollama/ONNX
+
+| Feature | Copilot | Ollama/ONNX |
+|---------|---------|-------------|
+| **Cost** | $10-19/month | Free |
+| **Privacy** | Cloud | Fully local |
+| **Quality** | Excellent | Good-Very Good |
+| **Resources** | None needed | Requires RAM/GPU |
+| **Setup** | GitHub CLI | Local installation |
+
+## Advanced Usage
+
+### Using Different Models
+
+Compare results from different models:
+
+```batch
+REM GPT-4o - Fast and accurate
+set MODEL=gpt-4o
+run_copilot.bat
+
+REM Claude - Detailed and creative
+set MODEL=claude-3.5-sonnet
+run_copilot.bat
+
+REM o1 - Complex reasoning
+set MODEL=o1-preview
+run_copilot.bat
+```
+
+### Batch Processing
+
+For large image collections:
+
+```batch
+REM Use fastest model for batches
+set MODEL=o1-mini
+set IMAGE_PATH=C:\Photos\LargeBatch
+set STEPS=describe
+```
+
+### High-Quality Analysis
+
+For important images:
+
+```batch
+REM Use best model and detailed prompt
+set MODEL=o1-preview
+set PROMPT_STYLE=detailed
+set IMAGE_PATH=C:\ImportantImage.jpg
+```
+
+### Integration with Development
+
+If you're using Copilot for coding, you can also:
+- Ask Copilot Chat to help write image processing scripts
+- Use Copilot to generate batch files
+- Get code suggestions for automation
+
+## Security & Privacy
+
+### What GitHub Sees
+
+When using Copilot for image description:
+- Images are sent to GitHub/OpenAI/Anthropic servers
+- Processed in the cloud (not stored permanently)
+- Subject to GitHub's privacy policy
+- Not used to train models (per Copilot terms)
+
+### Best Practices
+
+**DO:**
+- ✅ Review GitHub's privacy policy
+- ✅ Use for appropriate content only
+- ✅ Consider data sensitivity
+- ✅ Keep GitHub CLI authenticated securely
+
+**DON'T:**
+- ❌ Process sensitive/confidential images
+- ❌ Share authentication tokens
+- ❌ Process copyrighted images without rights
+- ❌ Violate GitHub's terms of service
+
+### For Sensitive Data
+
+If you need to process sensitive images:
+- Use local providers (Ollama/ONNX) instead
+- Or use OpenAI with data processing agreement
+- Or ensure compliance with your organization's policies
+
+## Example Workflows
+
+### Developer Using Copilot
+
+If you already have Copilot for coding:
+
+```batch
+REM Use included access for image description
+set MODEL=gpt-4o
+set IMAGE_PATH=C:\ProjectScreenshots
+set PROMPT_STYLE=technical
+```
+
+No extra cost - already included!
+
+### Professional Photography
+
+```batch
+REM High-quality analysis for client work
+set MODEL=claude-3.5-sonnet
+set IMAGE_PATH=C:\ClientPhotos\Photoshoot
+set STEPS=extract,describe,html,viewer
+set PROMPT_STYLE=detailed
+```
+
+### Quick Batch Processing
+
+```batch
+REM Fast processing of many images
+set MODEL=o1-mini
+set IMAGE_PATH=C:\Photos\EventPhotos
+set STEPS=describe
+set PROMPT_STYLE=concise
+```
+
+## Getting Help
+
+- **GitHub Copilot Docs**: https://docs.github.com/en/copilot
+- **GitHub CLI Docs**: https://cli.github.com/manual/
+- **Copilot Support**: https://support.github.com/
+- **IDT Documentation**: See `docs/` folder
+
+## Summary
+
+GitHub Copilot provides **premium AI models** for image description:
+
+1. ✅ Subscribe to GitHub Copilot ($10-19/month)
+   - 30-day free trial available
+2. ✅ Install GitHub CLI: https://cli.github.com
+3. ✅ Authenticate: `gh auth login`
+4. ✅ Edit `run_copilot.bat` with your image path
+5. ✅ Run batch file
+6. ✅ Find results in `wf_copilot_*` folder
+
+Perfect for users who:
+- 💼 Already have Copilot for development (no extra cost!)
+- 🎯 Want access to premium models (GPT-4o, Claude, o1)
+- ⚡ Need fast, reliable cloud processing
+- 🔄 Want to switch between multiple models
+- 📊 Process moderate volumes regularly
+
+If you're already paying for Copilot, this is effectively **free image description** included with your subscription!
+
+Happy describing! 🖼️

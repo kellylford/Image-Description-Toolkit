@@ -1,26 +1,31 @@
 @echo off
 REM ============================================================================
-REM Image Description Workflow - GitHub Copilot Provider
+REM Image Description Workflow - Copilot+ PC Provider
 REM ============================================================================
-REM This batch file runs the image description workflow using GitHub Copilot (cloud AI)
+REM This batch file runs the image description workflow using Copilot+ PC NPU hardware
 REM 
-REM Provider: Copilot (cloud, requires GitHub Copilot subscription)
-REM Model: gpt-4o (OpenAI's GPT-4 Omni via GitHub Copilot)
+REM Provider: Copilot+ PC (local NPU hardware acceleration)
+REM Model: florence2-base (Microsoft Florence-2 with DirectML)
 REM Prompt: narrative (balanced detail and readability)
 REM
 REM REQUIREMENTS:
-REM   - GitHub Copilot subscription (Individual, Business, or Enterprise)
-REM   - GitHub CLI (gh) installed and authenticated
+REM   - Copilot+ PC hardware with NPU chip:
+REM     * Qualcomm Snapdragon X Elite/Plus
+REM     * Intel Core Ultra (Series 2) with NPU
+REM     * AMD Ryzen AI with NPU
+REM   - Windows 11 (version 24H2 or later)
 REM   - Python 3.8+ with required packages
-REM   - Internet connection
+REM   - DirectML support (onnxruntime-directml)
 REM
 REM USAGE:
-REM   1. Install GitHub CLI: https://cli.github.com/
-REM   2. Authenticate: gh auth login
-REM   3. Ensure Copilot subscription is active
-REM   4. Edit IMAGE_PATH below
-REM   5. Run this batch file
-REM   6. Find results in wf_copilot_* directory
+REM   1. Ensure you have a Copilot+ PC with NPU hardware
+REM   2. Install requirements: pip install onnxruntime-directml transformers torch
+REM   3. Edit IMAGE_PATH below
+REM   4. Run this batch file
+REM   5. Find results in wf_copilot_* directory
+REM
+REM NOTE: This is for Copilot+ PC NPU hardware, NOT GitHub Copilot API
+REM       For cloud AI, use run_openai_gpt4o.bat or run_ollama.bat instead
 REM ============================================================================
 
 REM ============================================
@@ -34,11 +39,11 @@ set IMAGE_PATH=C:\path\to\your\image.jpg
 REM Steps to run (comma-separated: extract,describe,html,viewer or just describe)
 set STEPS=describe
 
-REM AI Provider (copilot for GitHub Copilot)
+REM AI Provider (copilot for Copilot+ PC NPU hardware)
 set PROVIDER=copilot
 
-REM Model to use (gpt-4o recommended, also: claude-3.5-sonnet, o1-preview, o1-mini)
-set MODEL=gpt-4o
+REM Model to use (florence2-base or florence2-large)
+set MODEL=florence2-base
 
 REM Prompt style (narrative, detailed, concise, artistic, technical, colorful)
 set PROMPT_STYLE=narrative
@@ -48,11 +53,11 @@ REM VALIDATION AND EXECUTION
 REM ============================================
 
 echo ============================================================================
-echo Image Description Workflow - GitHub Copilot Provider
+echo Image Description Workflow - Copilot+ PC NPU Provider
 echo ============================================================================
 echo.
 echo Configuration:
-echo   Provider: %PROVIDER%
+echo   Provider: %PROVIDER% (Copilot+ PC NPU Hardware)
 echo   Model: %MODEL%
 echo   Prompt Style: %PROMPT_STYLE%
 echo   Steps: %STEPS%
@@ -76,28 +81,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check if GitHub CLI is installed
-gh --version >nul 2>&1
+REM Check if running on Windows 11
+echo Checking Windows version...
+ver | findstr /i "10.0.22" >nul
 if errorlevel 1 (
-    echo ERROR: GitHub CLI (gh) is not installed
+    echo WARNING: Windows 11 (22H2 or later) recommended for NPU support
+    echo Your version may not support Copilot+ PC NPU hardware acceleration
     echo.
-    echo To install GitHub CLI:
-    echo   1. Visit https://cli.github.com/
-    echo   2. Download and install for your OS
-    echo   3. Run: gh auth login
-    echo   4. Ensure you have GitHub Copilot subscription
-    pause
-    exit /b 1
-)
-
-REM Check if authenticated
-echo Checking GitHub authentication...
-gh auth status >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Not authenticated with GitHub CLI
-    echo Please run: gh auth login
-    pause
-    exit /b 1
 )
 
 REM Navigate to project root
@@ -105,9 +95,9 @@ cd /d "%~dp0"
 echo Current directory: %CD%
 echo.
 
-REM Check if workflow.py exists
-if not exist "workflow.py" (
-    echo ERROR: workflow.py not found in current directory
+REM Check if scripts/workflow.py exists
+if not exist "scripts\workflow.py" (
+    echo ERROR: scripts\workflow.py not found
     echo Please run this batch file from the project root
     pause
     exit /b 1
@@ -115,23 +105,29 @@ if not exist "workflow.py" (
 
 REM Run the workflow
 echo Running workflow...
-echo Command: python workflow.py "%IMAGE_PATH%" --steps %STEPS% --provider %PROVIDER% --model %MODEL% --prompt-style %PROMPT_STYLE%
+echo Command: python scripts/workflow.py "%IMAGE_PATH%" --steps %STEPS% --provider %PROVIDER% --model %MODEL% --prompt-style %PROMPT_STYLE%
 echo.
-echo NOTE: Using GitHub Copilot (requires active subscription)
-echo       Images are processed via GitHub Copilot API
+echo NOTE: Using Copilot+ PC NPU hardware acceleration
+echo       This requires a Copilot+ PC with NPU chip (Snapdragon/Intel/AMD)
+echo       If NPU is not available, you'll get an error message
 echo.
 
-python workflow.py "%IMAGE_PATH%" --steps %STEPS% --provider %PROVIDER% --model %MODEL% --prompt-style %PROMPT_STYLE%
+python scripts/workflow.py "%IMAGE_PATH%" --steps %STEPS% --provider %PROVIDER% --model %MODEL% --prompt-style %PROMPT_STYLE%
 
 if errorlevel 1 (
     echo.
     echo ERROR: Workflow failed with error code %errorlevel%
     echo.
     echo Common issues:
-    echo   - No active GitHub Copilot subscription
-    echo   - GitHub CLI not authenticated (run: gh auth login)
-    echo   - Network connectivity issues
-    echo   - Rate limits exceeded
+    echo   - You don't have a Copilot+ PC with NPU hardware
+    echo   - DirectML is not installed (pip install onnxruntime-directml)
+    echo   - Missing dependencies (pip install transformers torch)
+    echo   - Florence-2 model not downloaded
+    echo.
+    echo If you don't have Copilot+ PC hardware, use these alternatives:
+    echo   - run_onnx.bat (local CPU/GPU inference)
+    echo   - run_ollama.bat (local Ollama models)
+    echo   - run_openai_gpt4o.bat (cloud API)
     pause
     exit /b %errorlevel%
 )
