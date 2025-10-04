@@ -23,7 +23,7 @@ echo [2/5] Testing GroundingDINO import...
 python -c "import groundingdino" >nul 2>&1
 if errorlevel 1 (
     echo ✗ FAIL: GroundingDINO not installed
-    echo   Solution: Run install_groundingdino.bat
+    echo   Solution: Run models/install_groundingdino.bat
     goto :test_failed
 ) else (
     echo ✓ PASS: GroundingDINO package found
@@ -106,7 +106,7 @@ echo ================================================================
 echo.
 echo Some components are not properly installed.
 echo Please review the errors above and:
-echo   1. Run install_groundingdino.bat to install/fix
+echo   1. Run models/install_groundingdino.bat to install/fix
 echo   2. Check for error messages during installation
 echo   3. See troubleshooting section below
 echo.
@@ -122,7 +122,7 @@ echo   - Run: python -m pip install --upgrade pip
 echo   - Try running Command Prompt as Administrator
 echo.
 echo • GroundingDINO not found:
-echo   - Run: install_groundingdino.bat
+echo   - Run: models/install_groundingdino.bat
 echo   - Or manually: pip install groundingdino-py torch torchvision
 echo.
 echo • Import errors:

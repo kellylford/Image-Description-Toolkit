@@ -147,7 +147,29 @@ def check_huggingface_status() -> Tuple[bool, List[str], str]:
         
         # Get available HF models
         models = provider.get_available_models()
-        return True, models, "OK"
+        
+        # Check which models are actually cached locally
+        try:
+            from pathlib import Path
+            cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+            cached_models = []
+            
+            if cache_dir.exists():
+                # Check for each model in cache
+                for model in models:
+                    # Convert model name to cache format (e.g., "Salesforce/blip-image-captioning-base" -> "models--Salesforce--blip-image-captioning-base")
+                    cache_name = "models--" + model.replace("/", "--")
+                    model_cache = cache_dir / cache_name
+                    if model_cache.exists():
+                        cached_models.append(f"{model} (cached)")
+                    else:
+                        cached_models.append(f"{model} (will download on first use)")
+                
+                return True, cached_models if cached_models else models, "OK"
+            else:
+                return True, models, "OK (models will download on first use)"
+        except:
+            return True, models, "OK"
     except Exception as e:
         return False, [], f"Error: {str(e)}"
 
@@ -204,6 +226,35 @@ def check_copilot_status() -> Tuple[bool, List[str], str]:
         return False, [], f"Error: {str(e)}"
 
 
+def check_groundingdino_status() -> Tuple[bool, List[str], str]:
+    """Check GroundingDINO provider status."""
+    try:
+        # Check if groundingdino package is available
+        try:
+            import groundingdino
+            from groundingdino.util.inference import Model as GroundingDINOModel
+            package_available = True
+        except ImportError:
+            return False, [], "groundingdino package not installed (run models/install_groundingdino.bat)"
+        
+        # Package is installed - check for cached models
+        from pathlib import Path
+        cache_dir = Path.home() / ".cache" / "groundingdino"
+        
+        models = ["GroundingDINO (Text-Prompted Detection)"]
+        
+        if cache_dir.exists() and any(cache_dir.iterdir()):
+            # Model has been downloaded
+            cache_size = sum(f.stat().st_size for f in cache_dir.rglob('*') if f.is_file()) / (1024 * 1024)
+            return True, models, f"Fully configured (model cached: {cache_size:.0f} MB)"
+        else:
+            # Package installed but model will download on first use
+            return True, models, "Package installed (model will download on first use, ~700MB)"
+            
+    except Exception as e:
+        return False, [], f"Error: {str(e)}"
+
+
 def get_model_metadata(model_name: str) -> Dict:
     """Get metadata about a specific model from config files."""
     # Check image_describer_config.json
@@ -256,7 +307,10 @@ def print_status_line(provider_name: str, available: bool, models: List[str], me
             print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install transformers torch")
         elif "onnx" in message.lower():
             print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install onnxruntime")
-            print(f"    Download models: python download_onnx_models.bat")
+            print(f"    Download models: run models/download_onnx_models.bat")
+        elif "groundingdino" in message.lower():
+            print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: run models/install_groundingdino.bat")
+            print(f"    This will install the package and download model files")
 
 
 def get_recommendations(all_status: Dict) -> List[str]:
@@ -285,6 +339,11 @@ def get_recommendations(all_status: Dict) -> List[str]:
         recommendations.append("Optional: Install YOLO for enhanced object detection")
         recommendations.append("  pip install ultralytics")
     
+    # Check if GroundingDINO is available
+    if 'groundingdino' in all_status and not all_status['groundingdino']['available']:
+        recommendations.append("Optional: Install GroundingDINO for advanced object detection")
+        recommendations.append("  Run: models/install_groundingdino.bat")
+    
     return recommendations
 
 
@@ -302,7 +361,7 @@ Examples:
     )
     parser.add_argument(
         '--provider',
-        choices=['ollama', 'ollama-cloud', 'openai', 'huggingface', 'onnx', 'copilot'],
+        choices=['ollama', 'ollama-cloud', 'openai', 'huggingface', 'onnx', 'copilot', 'groundingdino'],
         help='Check only a specific provider'
     )
     parser.add_argument(
@@ -326,6 +385,7 @@ Examples:
         'huggingface': ('HuggingFace', check_huggingface_status),
         'onnx': ('ONNX / Enhanced YOLO', check_onnx_status),
         'copilot': ('Copilot+ PC (NPU)', check_copilot_status),
+        'groundingdino': ('GroundingDINO (Object Detection)', check_groundingdino_status),
     }
     
     # Filter to specific provider if requested

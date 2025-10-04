@@ -92,7 +92,7 @@ python workflow.py <input_dir> \\
 - Users can manage models with provider-native tools:
   - Ollama: `ollama pull/list/rm`
   - OpenAI: Web dashboard
-  - ONNX: `download_onnx_models.bat`
+  - ONNX: `models/download_onnx_models.bat`
 
 **Implementation**:
 - Check Models: Launches `models/check_models.py` (shows available models across all providers)

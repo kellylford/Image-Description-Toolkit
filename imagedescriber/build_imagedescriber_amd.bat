@@ -72,15 +72,15 @@ if %ERRORLEVEL% equ 0 (
     echo Single executable created at: %OUTPUT_DIR%\ImageDescriber_amd64.exe
     echo.
     echo Copying user documentation...
-    copy "%SCRIPT_DIR%\USER_SETUP_GUIDE.md" "%OUTPUT_DIR%\" >nul 2>&1
-    copy "%SCRIPT_DIR%\WHATS_INCLUDED.txt" "%OUTPUT_DIR%\" >nul 2>&1
-    copy "%SCRIPT_DIR%\DISTRIBUTION_README.txt" "%OUTPUT_DIR%\README.txt" >nul 2>&1
+    copy "%SCRIPT_DIR%\dist_templates\USER_SETUP_GUIDE.md" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\dist_templates\WHATS_INCLUDED.txt" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\dist_templates\DISTRIBUTION_README.txt" "%OUTPUT_DIR%\README.txt" >nul 2>&1
     copy "%SCRIPT_DIR%\setup_imagedescriber.bat" "%OUTPUT_DIR%\" >nul 2>&1
-    copy "%SCRIPT_DIR%\download_onnx_models.bat" "%OUTPUT_DIR%\" >nul 2>&1
-    copy "%SCRIPT_DIR%\install_groundingdino.bat" "%OUTPUT_DIR%\" >nul 2>&1
-    copy "%SCRIPT_DIR%\test_groundingdino.bat" "%OUTPUT_DIR%\" >nul 2>&1
-    copy "%SCRIPT_DIR%\GROUNDINGDINO_QUICK_REFERENCE.md" "%OUTPUT_DIR%\" >nul 2>&1
-    copy "%SCRIPT_DIR%\HYBRID_MODE_GUIDE.md" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\..\models\download_onnx_models.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\..\models\install_groundingdino.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\..\tests\test_groundingdino.bat" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\..\docs\GROUNDINGDINO_QUICK_REFERENCE.md" "%OUTPUT_DIR%\" >nul 2>&1
+    copy "%SCRIPT_DIR%\..\docs\HYBRID_MODE_GUIDE.md" "%OUTPUT_DIR%\" >nul 2>&1
     echo Documentation files copied to distribution folder.
     echo.
     echo ================================================================

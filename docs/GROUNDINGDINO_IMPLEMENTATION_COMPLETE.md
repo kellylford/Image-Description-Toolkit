@@ -54,7 +54,7 @@ All core functionality implemented, tested, and documented. Ready for end-user d
   - Debug information for troubleshooting
 
 ### 4. Installation System ✅
-- **install_groundingdino.bat**
+- **models/install_groundingdino.bat**
   - Turn-key one-click installer
   - Checks Python availability
   - Detects existing installation
@@ -122,7 +122,7 @@ All core functionality implemented, tested, and documented. Ready for end-user d
 
 ### 7. Build System ✅
 - **Updated build_imagedescriber_amd.bat**
-  - Includes install_groundingdino.bat
+  - Includes models/install_groundingdino.bat
   - Includes test_groundingdino.bat
   - Includes GROUNDINGDINO_QUICK_REFERENCE.md
   - Includes HYBRID_MODE_GUIDE.md (NEW)
@@ -234,7 +234,7 @@ if not os.path.exists(checkpoint_path):
 ## User Instructions
 
 ### Quick Start
-1. Run `install_groundingdino.bat` (one-time setup)
+1. Run `models/install_groundingdino.bat` (one-time setup)
 2. Launch ImageDescriber
 3. Select Provider: "GroundingDINO" or "GroundingDINO + Ollama"
 4. Configure detection settings
@@ -287,7 +287,7 @@ See HYBRID_MODE_GUIDE.md for complete troubleshooting guide with:
 - [x] worker_threads.py (updated)
 - [x] data_models.py (updated)
 - [x] requirements.txt (updated)
-- [x] install_groundingdino.bat
+- [x] models/install_groundingdino.bat
 - [x] test_groundingdino.bat
 - [x] GROUNDINGDINO_QUICK_REFERENCE.md
 - [x] HYBRID_MODE_GUIDE.md

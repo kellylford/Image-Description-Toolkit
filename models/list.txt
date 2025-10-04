@@ -1,0 +1,61 @@
+=== Available Models ===
+
+OLLAMA
+  [INSTALLED] llava:7b [RECOMMENDED]
+    LLaVA 7B - Good balance of speed and quality
+    Size: 4.7GB | Min RAM: 8GB
+
+  [INSTALLED] llava:latest [RECOMMENDED]
+    LLaVA - Latest version
+    Size: ~4.7GB | Min RAM: 8GB
+
+  [INSTALLED] moondream:latest [RECOMMENDED]
+    Moondream - Fastest, smallest vision model
+    Size: 1.7GB | Min RAM: 4GB
+
+  [AVAILABLE] llama3.2-vision:11b [RECOMMENDED]
+    Llama 3.2 Vision 11B - Most accurate
+    Size: 7.5GB | Min RAM: 12GB
+    Install: ollama pull llama3.2-vision:11b
+
+  [INSTALLED] llama3.2-vision:latest [RECOMMENDED]
+    Llama 3.2 Vision - Latest version
+    Size: ~7.5GB | Min RAM: 12GB
+
+  [AVAILABLE] bakllava:latest
+    BakLLaVA - Vision model variant
+    Size: ~4.7GB | Min RAM: 8GB
+    Install: ollama pull bakllava
+
+  [AVAILABLE] llava-llama3:latest
+    LLaVA with Llama 3 base
+    Size: ~5.5GB | Min RAM: 8GB
+    Install: ollama pull llava-llama3
+
+  [INSTALLED] gemma3:latest
+    Gemma 3 - Google's vision model
+    Size: ~5GB | Min RAM: 8GB
+
+  [INSTALLED] mistral-small3.1:latest
+    Mistral Small 3.1
+    Size: ~4GB | Min RAM: 8GB
+
+
+OPENAI
+  [AVAILABLE] gpt-4o [RECOMMENDED]
+    GPT-4o - Latest multimodal model
+    Size: Cloud-based | Cost: $$$
+
+  [AVAILABLE] gpt-4o-mini [RECOMMENDED]
+    GPT-4o Mini - Faster, cheaper variant
+    Size: Cloud-based | Cost: $$
+
+  [AVAILABLE] gpt-4-turbo
+    GPT-4 Turbo with vision
+    Size: Cloud-based | Cost: $$$
+
+  [AVAILABLE] gpt-4-vision-preview
+    GPT-4 Vision (older)
+    Size: Cloud-based | Cost: $$$
+
+

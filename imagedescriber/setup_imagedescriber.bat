@@ -571,14 +571,17 @@ if errorlevel 1 (
 
 echo.
 echo Checking for download script...
-if exist "download_onnx_models.bat" (
+if exist "..\models\download_onnx_models.bat" (
     echo Found download_onnx_models.bat, running it...
+    call ..\models\download_onnx_models.bat
+) else if exist "download_onnx_models.bat" (
+    echo Found download_onnx_models.bat in current directory, running it...
     call download_onnx_models.bat
 ) else (
-    echo Download script not found in current directory.
+    echo Download script not found.
     echo.
     echo Manual steps:
-    echo   1. Locate download_onnx_models.bat (should be with ImageDescriber.exe)
+    echo   1. Locate models/download_onnx_models.bat
     echo   2. Run it to download ONNX models
     echo.
 )
@@ -606,8 +609,8 @@ cls
 echo Opening User Setup Guide...
 echo.
 
-if exist "USER_SETUP_GUIDE.md" (
-    start notepad USER_SETUP_GUIDE.md
+if exist "dist_templates\USER_SETUP_GUIDE.md" (
+    start notepad "dist_templates\USER_SETUP_GUIDE.md"
 ) else if exist "README.md" (
     start notepad README.md
 ) else (
@@ -713,7 +716,7 @@ echo   - YOLO: Great for counting/detecting specific objects
 echo   - Enhanced ONNX: Maximum accuracy (combines all features)
 echo   - Copilot+ PC: Fastest on compatible hardware
 echo.
-echo See USER_SETUP_GUIDE.md for detailed setup instructions.
+echo See dist_templates\USER_SETUP_GUIDE.md for detailed setup instructions.
 echo.
 pause
 goto main_menu
@@ -729,7 +732,7 @@ echo ================================================================
 echo.
 echo Quick Reference:
 echo   - Run this script anytime to check status or set up features
-echo   - See USER_SETUP_GUIDE.md for detailed instructions
+echo   - See dist_templates\USER_SETUP_GUIDE.md for detailed instructions
 echo   - GitHub: github.com/kellylford/Image-Description-Toolkit
 echo.
 echo Happy describing!

@@ -2,7 +2,7 @@
 
 ## 🚀 Installation (One-Time)
 
-**Run:** `install_groundingdino.bat`
+**Run:** `models/install_groundingdino.bat`
 
 **Or manually:**
 ```bash
@@ -207,4 +207,4 @@ Summary: 5 total detections across 2 object types
 
 ---
 
-**Quick Start:** Run `install_groundingdino.bat` → Wait for install → Restart ImageDescriber → Select GroundingDINO provider → Detect anything!
+**Quick Start:** Run `models/install_groundingdino.bat` → Wait for install → Restart ImageDescriber → Select GroundingDINO provider → Detect anything!

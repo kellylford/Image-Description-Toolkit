@@ -617,8 +617,9 @@ for detection in results['detections']:
 
 ### Documentation
 
-- **Quick Reference**: `imagedescriber/GROUNDINGDINO_QUICK_REFERENCE.md`
-- **Implementation Details**: `imagedescriber/GROUNDINGDINO_IMPLEMENTATION_COMPLETE.md`
+- **Quick Reference**: `docs/GROUNDINGDINO_QUICK_REFERENCE.md`
+- **Implementation Details**: `docs/GROUNDINGDINO_IMPLEMENTATION_COMPLETE.md`
+- **Hybrid Mode Guide**: `docs/HYBRID_MODE_GUIDE.md`
 - **Project Documentation**: Official GroundingDINO GitHub repository
 
 ### Support

@@ -177,7 +177,7 @@ To unlock **AI-powered image descriptions**, you need to set up at least ONE AI 
    - ✅ YOLO installed (see above)
 
 2. **Download ONNX Models** (optional, for faster inference)
-   - Double-click: **download_onnx_models.bat** (included with ImageDescriber)
+   - Double-click: **download_onnx_models.bat** (included with ImageDescriber, source: models/)
    - Wait 5-10 minutes (downloads ~230MB of optimized models)
    - These models are pre-optimized for faster CPU/GPU inference
 
