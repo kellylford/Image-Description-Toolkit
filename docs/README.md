@@ -67,6 +67,14 @@ This directory contains all documentation for the Image Description Toolkit.
 - [Phase 4 Complete](PHASE_4_COMPLETE.md) - Model manager updates  
 - [Phase 5 Complete](PHASE_5_COMPLETE.md) - Dynamic UI implementation
 
+#### Recent Enhancements
+- **[Chronological Ordering](CHRONOLOGICAL_IMPLEMENTATION_SUMMARY.md)** - Quick reference for Oct 4 implementation
+  - Video frames show source video name
+  - Descriptions appear in chronological order
+  - Frames inherit video timestamps
+- [Full Proposal](CHRONOLOGICAL_ORDERING_PROPOSAL.md) - Complete analysis and implementation details (40KB)
+- [Quick Reference](CHRONOLOGICAL_PHASE1_QUICKREF.md) - Copy-paste code snippets
+
 ---
 
 ### 🐛 Troubleshooting & Testing
