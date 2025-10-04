@@ -1402,7 +1402,28 @@ Phase 1 changes are:
 - **This document:** Comprehensive proposal with analysis, decisions, and implementation details
 - **`CHRONOLOGICAL_IMPLEMENTATION_SUMMARY.md`:** Quick reference - what changed, where, and why
 - **`CHRONOLOGICAL_PHASE1_QUICKREF.md`:** Copy-paste code snippets for implementation
+- **`TIMESTAMP_ANALYSIS.md`:** Detailed analysis of st_mtime consistency across file types ⭐ NEW
 - **Config files:** Behavior documented in `*_config.json` files
+
+### Timestamp Analysis Summary
+
+**User Question:** "If I look just at a column named date in windows for all the files, it appears to have the actual time from Europe when the picture was taken. How consistent is that?"
+
+**Answer:** ✅ HIGHLY CONSISTENT! (100% across all file types)
+
+**Key Findings:**
+- **LastWriteTime (st_mtime)** = Actual capture time (converted to local timezone)
+- **CreationTime (st_ctime)** = When copied to backup (NOT useful)
+- **Consistency:** Perfect across PNG, HEIC, MOV, JPEG
+- **Timezone:** Shows Eastern time with 6hr offset from Europe (correct)
+
+**Validation:**
+- Analyzed 30+ files across all types
+- 100% consistency observed
+- User-validated: Windows "Date Modified" shows actual Europe capture times
+- **Conclusion:** Using st_mtime is the CORRECT approach ✅
+
+See `TIMESTAMP_ANALYSIS.md` for detailed statistical analysis.
 
 ---
 
