@@ -466,12 +466,15 @@ class ONNXProvider(AIProvider):
         self.hardware_type = "Not Available"
         self.providers_list = []
         self.yolo_models = {}
+        self.yolo_model = None  # Will be initialized lazily on first use
+        self.yolo_available = False
+        self._yolo_initialized = False  # Track if we've attempted initialization
         
         if HAS_ONNX:
             self._detect_execution_providers()
         
-        # Initialize YOLO detection if available
-        self._initialize_yolo_detection()
+        # Don't initialize YOLO on import - do it lazily when needed
+        # self._initialize_yolo_detection()
     
     def _get_object_location(self, bbox, img_width, img_height):
         """Determine spatial location of object in image"""
@@ -514,6 +517,14 @@ class ONNXProvider(AIProvider):
             return "small"
         else:
             return "tiny"
+    
+    def _ensure_yolo_initialized(self):
+        """Lazy initialization of YOLO - only loads when actually needed"""
+        if self._yolo_initialized:
+            return  # Already attempted initialization
+        
+        self._yolo_initialized = True
+        self._initialize_yolo_detection()
     
     def _initialize_yolo_detection(self):
         """Initialize YOLO for enhanced object detection"""
@@ -642,6 +653,9 @@ class ONNXProvider(AIProvider):
         
         try:
             # Step 1: Run YOLO detection if available
+            # Lazy initialization: only load YOLO when actually needed
+            self._ensure_yolo_initialized()
+            
             yolo_objects = []
             if self.yolo_available and self.yolo_model:
                 try:
@@ -2671,6 +2685,16 @@ class ObjectDetectionProvider(AIProvider):
     def __init__(self):
         self.yolo_model = None
         self.yolo_available = False
+        self._yolo_initialized = False  # Track if we've attempted initialization
+        # Don't initialize YOLO on import - do it lazily when needed
+        # self._initialize_yolo_detection()
+    
+    def _ensure_yolo_initialized(self):
+        """Lazy initialization of YOLO - only loads when actually needed"""
+        if self._yolo_initialized:
+            return  # Already attempted initialization
+        
+        self._yolo_initialized = True
         self._initialize_yolo_detection()
     
     def _initialize_yolo_detection(self):
@@ -2776,6 +2800,9 @@ class ObjectDetectionProvider(AIProvider):
         # Handle info/error messages - check for model names without YOLOv8 prefix
         if "not available" in model or not model.startswith("YOLOv8"):
             return "Please select an object detection mode above."
+        
+        # Lazy initialization: only load YOLO when actually needed
+        self._ensure_yolo_initialized()
         
         if not self.yolo_available or not self.yolo_model:
             return ("YOLO object detection not available.\n\n"

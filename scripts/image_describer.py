@@ -630,24 +630,38 @@ class ImageDescriber:
             logger.error(f"Error creating output file: {e}")
             return
         
-        # Get all image files
+        # Get all image files with timestamps for chronological sorting
         pattern = "**/*" if recursive else "*"
-        image_files = []
+        image_files_with_time = []
         
         for file_path in directory_path.glob(pattern):
             if file_path.is_file() and self.is_supported_image(file_path):
-                image_files.append(file_path)
+                try:
+                    # Use file modification time for chronological sorting
+                    mtime = file_path.stat().st_mtime
+                    image_files_with_time.append((mtime, file_path))
+                except OSError as e:
+                    # If stat fails, use current time as fallback
+                    logger.debug(f"Could not get timestamp for {file_path}: {e}")
+                    image_files_with_time.append((time.time(), file_path))
         
-        if not image_files:
+        if not image_files_with_time:
             logger.info("No supported image files found in the directory")
             return
+        
+        # Sort chronologically (oldest first)
+        image_files_with_time.sort(key=lambda x: x[0])
+        image_files = [f[1] for f in image_files_with_time]
+        
+        logger.info(f"Found {len(image_files)} image files")
+        logger.info("Sorted files chronologically by modification time (oldest first)")
         
         # Limit files if specified
         if max_files and len(image_files) > max_files:
             image_files = image_files[:max_files]
             logger.info(f"Limited to first {max_files} files for processing")
         
-        logger.info(f"Found {len(image_files)} image files to process")
+        logger.info(f"Processing {len(image_files)} image files")
         
         # Process each image with memory management
         success_count = 0

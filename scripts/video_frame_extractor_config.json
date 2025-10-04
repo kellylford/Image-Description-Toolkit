@@ -3,7 +3,7 @@
     "time_interval_seconds": 5.0,
     "scene_change_threshold": 30.0,
     "min_scene_duration_seconds": 1.0,
-    "output_directory": "C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\workflow_moondream_narrative_20250926_154141\\extracted_frames",
+    "output_directory": "C:\\Users\\kelly\\GitHub\\idt\\wf_ollama_llava_narrative_20251004_150200\\extracted_frames",
     "preserve_directory_structure": false,
     "image_quality": 95,
     "resize_width": null,
@@ -13,5 +13,15 @@
     "end_time_seconds": null,
     "max_frames_per_video": null,
     "skip_existing": false,
-    "log_progress": true
+    "log_progress": true,
+    "frame_naming": {
+        "format": "{video_name}_{timestamp:.2f}s.jpg",
+        "description": "Frames are automatically named using the source video filename and timestamp (e.g., 'IMG_1235_12.45s.jpg'). This makes it easy to identify which video each frame came from and supports searching/filtering by video name.",
+        "note": "The 'frame_prefix' setting above is deprecated but kept for backward compatibility. New extractions use video name instead."
+    },
+    "timestamp_preservation": {
+        "enabled": true,
+        "description": "Extracted frames automatically inherit the modification time (st_mtime) from their source video file. This ensures frames sort chronologically with other photos taken at the same time.",
+        "rationale": "When video files have accurate modification times (e.g., from iPhone backups), preserving these times on frames ensures they appear in correct chronological order when processed alongside regular photos."
+    }
 }

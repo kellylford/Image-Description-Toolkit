@@ -194,6 +194,9 @@ class VideoFrameExtractor:
         """Extract frames at regular time intervals"""
         self.logger.info("Using time interval extraction mode")
         
+        # Extract video name for frame naming
+        video_name = Path(video_path).stem
+        
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             error_msg = f"Could not open video {video_path}"
@@ -237,15 +240,22 @@ class VideoFrameExtractor:
             if self.config["resize_width"] or self.config["resize_height"]:
                 frame = self.resize_frame(frame)
             
-            # Save frame
+            # Save frame with video name for clear source attribution
             timestamp = current_frame / fps
-            filename = f"{self.config['frame_prefix']}_{timestamp:.2f}s.jpg"
+            filename = f"{video_name}_{timestamp:.2f}s.jpg"
             output_path = os.path.join(output_dir, filename)
             
             success = cv2.imwrite(output_path, frame, [cv2.IMWRITE_JPEG_QUALITY, self.config["image_quality"]])
             if success:
                 extracted_files.append(output_path)
                 frame_count += 1
+                
+                # Preserve video timestamp on frame file for chronological sorting
+                try:
+                    video_stat = os.stat(video_path)
+                    os.utime(output_path, (video_stat.st_atime, video_stat.st_mtime))
+                except OSError as e:
+                    self.logger.debug(f"Could not preserve timestamp on {output_path}: {e}")
             else:
                 self.logger.error(f"Failed to save frame to {output_path}")
             
@@ -264,6 +274,9 @@ class VideoFrameExtractor:
         """Extract frames when scene changes are detected"""
         self.logger.info("Using scene change detection mode")
         start_time = time.time()
+        
+        # Extract video name for frame naming
+        video_name = Path(video_path).stem
         
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
@@ -318,8 +331,8 @@ class VideoFrameExtractor:
                     if self.config["resize_width"] or self.config["resize_height"]:
                         save_frame = self.resize_frame(frame)
                     
-                    # Save frame
-                    filename = f"{self.config['frame_prefix']}_scene_{scenes_detected:04d}_{timestamp:.2f}s.jpg"
+                    # Save frame with video name for clear source attribution
+                    filename = f"{video_name}_scene_{scenes_detected:04d}_{timestamp:.2f}s.jpg"
                     output_path = os.path.join(output_dir, filename)
                     
                     success = cv2.imwrite(output_path, save_frame, [cv2.IMWRITE_JPEG_QUALITY, self.config["image_quality"]])
@@ -329,6 +342,13 @@ class VideoFrameExtractor:
                         frame_count += 1
                         last_scene_frame = current_frame_num
                         self.logger.info(f"Saved frame: {os.path.abspath(output_path)}")
+                        
+                        # Preserve video timestamp on frame file for chronological sorting
+                        try:
+                            video_stat = os.stat(video_path)
+                            os.utime(output_path, (video_stat.st_atime, video_stat.st_mtime))
+                        except OSError as e:
+                            self.logger.debug(f"Could not preserve timestamp on {output_path}: {e}")
                     else:
                         self.logger.error(f"Failed to save frame to {output_path}")
             

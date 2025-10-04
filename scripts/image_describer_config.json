@@ -81,7 +81,12 @@
       ".bmp",
       ".tiff",
       ".webp"
-    ]
+    ],
+    "chronological_sorting": {
+      "enabled_by_default": true,
+      "description": "Images are automatically sorted by file modification time (oldest first) before processing. This ensures descriptions appear in chronological order, which is especially useful for photo collections and video frames.",
+      "rationale": "File modification times are preserved when copying photos from devices like iPhones, making them reliable for chronological ordering. Video frames inherit their source video's modification time."
+    }
   },
   "documentation": {
     "overview": "This configuration file controls all aspects of the image description process.",
