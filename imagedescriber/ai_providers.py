@@ -2361,16 +2361,21 @@ Your request indicates interest in comprehensive analysis - the image demonstrat
 
 
 class CopilotProvider(AIProvider):
-    """Copilot+ PC provider for NPU hardware acceleration using DirectML"""
+    """Copilot+ PC provider for NPU hardware acceleration using DirectML and BLIP-ONNX"""
     
     def __init__(self):
         self.npu_info = "Not Available"
         self.is_npu_available = False
         self.onnx_session = None
-        self.model_path = None
+        self.processor = None
+        self.tokenizer = None
         
         # Try to detect NPU hardware using new DirectML-based detection
         self._detect_npu_hardware()
+        
+        # Try to load BLIP ONNX model if NPU is available
+        if self.is_npu_available:
+            self._load_blip_onnx()
     
     def _detect_npu_hardware(self):
         """Detect NPU hardware on Copilot+ PC using DirectML"""
@@ -2391,6 +2396,56 @@ class CopilotProvider(AIProvider):
             self.npu_info = f"Detection failed: {str(e)}"
             self.is_npu_available = False
     
+    def _load_blip_onnx(self):
+        """Load BLIP ONNX model with DirectML for NPU acceleration"""
+        try:
+            import onnxruntime as ort
+            from pathlib import Path
+            
+            model_path = Path("models/onnx/blip/model.onnx")
+            
+            if not model_path.exists():
+                print("BLIP ONNX model not found. Run: python models/convert_blip_to_onnx.py")
+                self.onnx_session = None
+                return
+            
+            # Configure DirectML execution provider for NPU
+            providers = [
+                ('DmlExecutionProvider', {
+                    'device_id': 0,
+                    'enable_dynamic_graph_fusion': True
+                }),
+                'CPUExecutionProvider'  # Fallback
+            ]
+            
+            # Create ONNX Runtime session
+            self.onnx_session = ort.InferenceSession(
+                str(model_path),
+                providers=providers
+            )
+            
+            print(f"✅ BLIP ONNX loaded on NPU")
+            print(f"   Execution providers: {self.onnx_session.get_providers()}")
+            
+            # Load processor (for preprocessing)
+            try:
+                from transformers import BlipProcessor
+                self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+                print("✅ BLIP processor loaded")
+            except ImportError:
+                print("⚠️ transformers not available, will use basic preprocessing")
+                self.processor = None
+            
+        except ImportError as e:
+            if "onnxruntime" in str(e):
+                print("⚠️ ONNX Runtime not found. Install: pip install onnxruntime-directml")
+            else:
+                print(f"⚠️ Failed to load BLIP ONNX: {e}")
+            self.onnx_session = None
+        except Exception as e:
+            print(f"⚠️ Failed to load BLIP ONNX: {e}")
+            self.onnx_session = None
+    
     def get_provider_name(self) -> str:
         return f"Copilot+ PC ({self.npu_info})"
     
@@ -2399,159 +2454,92 @@ class CopilotProvider(AIProvider):
         return self.is_npu_available
     
     def get_available_models(self) -> List[str]:
-        """Get list of Copilot+ PC optimized models"""
-        if not self.is_available():
+            """Get list of Copilot+ PC optimized models"""
+            if not self.is_available():
+                return []
+            blip_path = Path("models/onnx/blip/model.onnx")
+            if blip_path.exists() and self.onnx_session is not None:
+                return [
+                    "BLIP-base NPU (Fast Captions)",
+                    "BLIP-base NPU (Detailed Mode)"
+                ]
             return []
-        
-        # Check which models are actually available
-        available = []
-        
-        # Check for Florence-2 ONNX model
-        florence2_path = Path("models/onnx/florence2/model.onnx")
-        if florence2_path.exists():
-            available.append("florence2-base")
-        
-        # Check for Phi-3 Vision
-        phi3_path = Path("models/onnx/phi3-vision/model.onnx")
-        if phi3_path.exists():
-            available.append("phi3-vision")
-        
-        # If no ONNX models, show placeholder models
-        if not available:
-            available = [
-                "florence2-base (not downloaded)",
-                "phi3-vision (not downloaded)"
-            ]
-        
-        return available
     
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
-        """Generate description using Copilot+ PC NPU"""
+        """Generate description using NPU-accelerated BLIP"""
         if not self.is_available():
             return "Error: Copilot+ PC NPU not available. DirectML support required."
         
+        if self.onnx_session is None:
+            return (
+                "Error: BLIP ONNX model not loaded.\n\n"
+                "Setup steps:\n"
+                "1. Run conversion: python models/convert_blip_to_onnx.py\n"
+                "2. Install ONNX Runtime: pip install onnxruntime-directml\n"
+                "3. Restart ImageDescriber\n\n"
+                "See docs/COPILOT_NPU_BLIP_SOLUTION.md for details."
+            )
+        
+        # Check for instruction text
+        if "Not Downloaded" in model or "To install" in model or model == "":
+            return "Please run: python models/convert_blip_to_onnx.py to download BLIP ONNX model."
+        
         try:
-            # Use PyTorch Florence-2 model with DirectML backend
-            # This is more compatible than pure ONNX for Florence-2
-            from transformers import AutoModelForCausalLM, AutoProcessor
-            import torch
             from PIL import Image
+            import numpy as np
             
-            # Determine model path
-            if "florence" in model.lower():
-                model_path = Path("models/onnx/florence2")
-                hf_model = "microsoft/Florence-2-base"
-            elif "large" in model.lower():
-                model_path = Path("models/onnx/florence2-large")
-                hf_model = "microsoft/Florence-2-large"
-            else:
-                return f"Error: Unknown model '{model}'. Available: florence2-base"
-            
-            # Check if model is downloaded locally
-            if not model_path.exists():
-                return (
-                    f"Error: Florence-2 model not found.\n\n"
-                    f"To download Florence-2:\n"
-                    f"  python models/download_florence2.py\n\n"
-                    f"Or it will download automatically on first use (463MB)..."
-                )
-            
-            # Load model with DirectML acceleration
-            print(f"Loading Florence-2 with DirectML NPU acceleration...")
-            
-            # Try to use cached model first
-            if hasattr(self, '_florence_model') and hasattr(self, '_florence_processor'):
-                model_obj = self._florence_model
-                processor = self._florence_processor
-            else:
-                # Load from local directory if available, else from HuggingFace
-                try:
-                    model_obj = AutoModelForCausalLM.from_pretrained(
-                        str(model_path),
-                        trust_remote_code=True,
-                        torch_dtype=torch.float16
-                    )
-                    processor = AutoProcessor.from_pretrained(
-                        str(model_path),
-                        trust_remote_code=True
-                    )
-                except:
-                    # Fallback to downloading from HuggingFace
-                    print(f"Downloading Florence-2 from HuggingFace (first time only)...")
-                    model_obj = AutoModelForCausalLM.from_pretrained(
-                        hf_model,
-                        trust_remote_code=True,
-                        torch_dtype=torch.float16
-                    )
-                    processor = AutoProcessor.from_pretrained(
-                        hf_model,
-                        trust_remote_code=True
-                    )
-                    
-                    # Save for future use
-                    model_path.mkdir(parents=True, exist_ok=True)
-                    model_obj.save_pretrained(str(model_path))
-                    processor.save_pretrained(str(model_path))
-                
-                # Move model to DirectML device
-                # Note: DirectML acceleration via onnxruntime-directml (not torch-directml)
-                # For now, CPU inference is fast enough (~2-3 sec per image)
-                # Full DirectML acceleration will be added in future update
-                model_obj = model_obj.to('cpu')
-                print("✓ Florence-2 loaded (CPU inference, fast enough for most use cases)")
-                print("  Future update will add full DirectML NPU acceleration")
-                
-                # Cache for reuse
-                self._florence_model = model_obj
-                self._florence_processor = processor
-            
-            # Process image
+            # Load and preprocess image
             image = Image.open(image_path).convert('RGB')
             
-            # Prepare task prompt for Florence-2
-            if "detail" in prompt.lower() or "comprehensive" in prompt.lower():
-                task = "<MORE_DETAILED_CAPTION>"
-            elif "caption" in prompt.lower() or "describe" in prompt.lower():
-                task = "<DETAILED_CAPTION>"
+            if self.processor is not None:
+                # Use BLIP processor
+                inputs = self.processor(images=image, return_tensors="np")
+                pixel_values = inputs['pixel_values']
             else:
-                task = "<CAPTION>"
+                # Basic preprocessing if transformer not available
+                # Resize to BLIP expected size (384x384)
+                image = image.resize((384, 384), Image.Resampling.BICUBIC)
+                
+                # Convert to numpy array and normalize
+                pixel_values = np.array(image).astype(np.float32) / 255.0
+                
+                # Normalize with ImageNet stats
+                mean = np.array([0.48145466, 0.4578275, 0.40821073])
+                std = np.array([0.26862954, 0.26130258, 0.27577711])
+                pixel_values = (pixel_values - mean) / std
+                
+                # Transpose to CHW format and add batch dimension
+                pixel_values = pixel_values.transpose(2, 0, 1)[np.newaxis, ...]
             
-            # Prepare inputs
-            inputs = processor(text=task, images=image, return_tensors="pt")
+            # Run ONNX inference on NPU
+            ort_inputs = {
+                self.onnx_session.get_inputs()[0].name: pixel_values
+            }
             
-            # Move inputs to same device as model
-            device = next(model_obj.parameters()).device
-            inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
-                     for k, v in inputs.items()}
-            
-            # Generate description
-            print("Generating description on NPU...")
-            with torch.no_grad():
-                generated_ids = model_obj.generate(
-                    **inputs,
-                    max_new_tokens=200,
-                    num_beams=3,
-                    do_sample=False
-                )
+            outputs = self.onnx_session.run(None, ort_inputs)
             
             # Decode output
-            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+            if self.processor is not None:
+                generated_ids = outputs[0]
+                caption = self.processor.decode(generated_ids[0], skip_special_tokens=True)
+            else:
+                # Basic decoding (simplified)
+                caption = "Image processed on NPU. Install transformers for full caption decoding: pip install transformers"
             
-            # Clean up the output
-            description = generated_text.replace(task, "").strip()
+            # Enhance based on mode
+            if "Detailed" in model:
+                return f"NPU-Accelerated Description:\n{caption}\n\nGenerated using Copilot+ PC NPU via DirectML"
+            else:
+                return caption
             
-            return description
-            
-        except ImportError as e:
-            if "torch_directml" in str(e):
-                return (
-                    f"Note: DirectML acceleration unavailable.\n"
-                    f"Install for NPU support: pip install torch-directml\n\n"
-                    f"Running on CPU as fallback..."
-                )
-            return f"Error: Missing dependencies.\n{str(e)}\n\nRun: pip install transformers torch einops timm"
         except Exception as e:
-            return f"Copilot+ PC Error: {str(e)}\n\nTry running: python models/download_florence2.py"
+            return (
+                f"Error during NPU inference: {str(e)}\n\n"
+                f"Troubleshooting:\n"
+                f"1. Ensure onnxruntime-directml is installed\n"
+                f"2. Check if BLIP ONNX model exists at models/onnx/blip/\n"
+                f"3. Try running: python models/convert_blip_to_onnx.py\n"
+            )
 
     def _preprocess_image_for_florence2(self, image_path: str):
         """Preprocess image for Florence-2 model"""
@@ -2764,23 +2752,16 @@ class ObjectDetectionProvider(AIProvider):
         """Get list of available detection modes"""
         if not self.yolo_available:
             return [
-                "⚠️ YOLO not available",
-                "",
-                "Install with: pip install ultralytics",
-                "This will download YOLOv8 models automatically"
+                "YOLO not available - Install with: pip install ultralytics"
             ]
         
+        # Return actual model names that can be selected
+        model_name = getattr(self.yolo_model, 'model_name', 'yolov8x.pt')
         return [
-            "Object Detection Only",
-            "Object + Spatial Detection", 
-            "Detailed Object Analysis",
-            "🔧 Debug Mode (All Detections)",
-            "",
-            "📊 Pure YOLO detection without AI description",
-            "⚡ Fast processing - no LLM overhead",
-            "📍 Spatial location data included",
-            "🎯 Confidence scores and bounding boxes",
-            "🔧 Debug mode shows ALL YOLO detections"
+            f"YOLOv8 Standard Detection ({model_name})",
+            f"YOLOv8 Spatial Analysis ({model_name})", 
+            f"YOLOv8 Detailed Analysis ({model_name})",
+            f"YOLOv8 Debug Mode ({model_name})"
         ]
     
     def describe_image(self, image_path: str, prompt: str, model: str, **kwargs) -> str:
@@ -2792,8 +2773,8 @@ class ObjectDetectionProvider(AIProvider):
         max_objects = yolo_settings.get('max_objects', 20)
         preferred_model = yolo_settings.get('yolo_model', 'yolov8x.pt')
         
-        # Handle info/error messages
-        if model.startswith("⚠️") or model.startswith("📊") or model.startswith("⚡") or model.startswith("📍") or model.startswith("🎯") or model == "":
+        # Handle info/error messages - check for model names without YOLOv8 prefix
+        if "not available" in model or not model.startswith("YOLOv8"):
             return "Please select an object detection mode above."
         
         if not self.yolo_available or not self.yolo_model:

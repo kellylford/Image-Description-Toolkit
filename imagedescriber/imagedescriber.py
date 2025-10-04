@@ -1928,11 +1928,12 @@ class ProcessingDialog(QDialog):
             return
         
         # Map provider internal names to display names for capability lookup
+        # ONNX provider shows as "Enhanced Ollama" so it should support prompts
         provider_display_names = {
             "ollama": "Ollama",
             "ollama_cloud": "Ollama Cloud",
             "openai": "OpenAI",
-            "onnx": "ONNX",
+            "onnx": "Enhanced Ollama (CPU + YOLO)",  # Use capability name for ONNX
             "huggingface": "HuggingFace",
             "copilot": "Copilot+ PC",
             "object_detection": "Object Detection",
@@ -8933,16 +8934,37 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
                 else:
                     raise ValueError(f"Unsupported description data type: {type(description_data)}")
             
+            # Get description text and handle emoji/large text issues
+            description_text = description_dict.get("text", "")
+            
+            # Remove emojis for display (they can cause rendering issues)
+            def remove_emojis(text):
+                # Keep emoji characters in the data but flag them
+                emoji_pattern = re.compile(
+                    "["
+                    u"\U0001F600-\U0001F64F"  # emoticons
+                    u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                    u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                    u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                    u"\U00002702-\U000027B0"
+                    u"\U000024C2-\U0001F251"
+                    "]+", flags=re.UNICODE)
+                return emoji_pattern.sub(r'', text)
+            
+            # Count emojis before removing
+            emoji_count = len(description_text) - len(remove_emojis(description_text))
+            
             # Basic Description Info
             basic_info = {
-                "Description ID": description_dict.get("id", "Unknown"),
-                "Created": description_dict.get("created", "Unknown"),
-                "Model": description_dict.get("model", "Unknown"),
-                "Provider": description_dict.get("provider", "Unknown"),
-                "Prompt Style": description_dict.get("prompt_style", "Unknown"),
-                "Custom Prompt": description_dict.get("custom_prompt", "") or "None",
-                "Text Length": len(description_dict.get("text", "")),
-                "Data Type": str(type(description_data)),
+                "Description ID": str(description_dict.get("id", "Unknown")),
+                "Created": str(description_dict.get("created", "Unknown")),
+                "Model": str(description_dict.get("model", "Unknown")),
+                "Provider": str(description_dict.get("provider", "Unknown")),
+                "Prompt Style": str(description_dict.get("prompt_style", "Unknown")),
+                "Custom Prompt": str(description_dict.get("custom_prompt", "") or "None"),
+                "Text Length": f"{len(description_text)} characters",
+                "Contains Emojis": f"Yes ({emoji_count} emoji characters)" if emoji_count > 0 else "No",
+                "Data Type": str(type(description_data).__name__),
             }
             properties["Basic Information"] = basic_info
             
@@ -8962,7 +8984,6 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
                 yolo_indicators.append("Enhanced Ollama header detected")
             
             # Check description text for YOLO data
-            description_text = description_dict.get("text", "")
             if "YOLO" in description_text:
                 yolo_indicators.append("Description text contains YOLO references")
             if "detected objects" in description_text.lower():
@@ -8978,24 +8999,25 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
             
             properties["AI Provider Analysis"] = provider_info
             
-            # Enhanced Processing Detection
-            if provider == "onnx":
+            # Enhanced Processing Detection (for ONNX/Object Detection providers)
+            if provider in ["onnx", "object_detection"]:
                 enhanced_info = {}
                 
                 try:
                     # Analyze for object detection patterns
-                    # Look for object detection patterns like "person (85%, large, middle-center)"
-                    object_pattern = r'(\w+)\s*\((\d+)%,\s*(\w+),\s*([\w-]+)\)'
-                    objects_found = re.findall(object_pattern, description_text)
+                    # Look for confidence percentages
+                    confidence_pattern = r'(\d+)%'
+                    confidences = re.findall(confidence_pattern, description_text)
                     
-                    if objects_found:
-                        enhanced_info["Detected Objects Count"] = len(objects_found)
-                        enhanced_info["Objects with Spatial Data"] = True
-                        enhanced_info["Sample Objects"] = "; ".join([f"{obj[0]} ({obj[1]}%, {obj[2]}, {obj[3]})" for obj in objects_found[:5]])
-                    else:
-                        enhanced_info["Detected Objects Count"] = 0
-                        enhanced_info["Objects with Spatial Data"] = False
-                        
+                    if confidences:
+                        enhanced_info["Objects with Confidence Scores"] = len(confidences)
+                        enhanced_info["Confidence Range"] = f"{min(map(int, confidences))}% - {max(map(int, confidences))}%"
+                    
+                    # Count spatial location references
+                    spatial_terms = ["top", "bottom", "middle", "left", "right", "center"]
+                    spatial_count = sum(description_text.lower().count(term) for term in spatial_terms)
+                    enhanced_info["Spatial References Count"] = spatial_count
+                    
                     # Look for YOLO model references
                     if "YOLOv8x" in description_text:
                         enhanced_info["YOLO Model"] = "YOLOv8x (Maximum Accuracy)"
@@ -9005,9 +9027,15 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
                         enhanced_info["YOLO Model"] = "YOLO (Generic Reference)"
                     else:
                         enhanced_info["YOLO Model"] = "Not Detected"
+                    
+                    # Check for dimension information
+                    dimension_pattern = r'(\d+)×(\d+)px'
+                    dimensions = re.findall(dimension_pattern, description_text)
+                    if dimensions:
+                        enhanced_info["Image Dimensions"] = f"{dimensions[0][0]}×{dimensions[0][1]}px"
                         
                 except Exception as e:
-                    enhanced_info["Analysis Error"] = f"Pattern matching failed: {str(e)}"
+                    enhanced_info["Analysis Error"] = f"Pattern matching failed: {str(e)[:100]}"
                     
                 properties["Enhanced Processing"] = enhanced_info
             
@@ -9016,34 +9044,40 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
             prompt_style = description_dict.get("prompt_style", "")
             custom_prompt = description_dict.get("custom_prompt", "")
             
-            prompt_info["Style"] = prompt_style
+            prompt_info["Style"] = prompt_style if prompt_style else "None"
             prompt_info["Custom Prompt Used"] = "Yes" if custom_prompt else "No"
             if custom_prompt:
-                prompt_info["Custom Prompt Length"] = len(custom_prompt)
-                prompt_info["Custom Prompt Preview"] = custom_prompt[:100] + "..." if len(custom_prompt) > 100 else custom_prompt
+                # Truncate long custom prompts
+                prompt_info["Custom Prompt Length"] = f"{len(custom_prompt)} characters"
+                if len(custom_prompt) > 100:
+                    prompt_info["Custom Prompt Preview"] = custom_prompt[:100] + "..."
+                else:
+                    prompt_info["Custom Prompt"] = custom_prompt
                 
             properties["Prompt Information"] = prompt_info
             
-            # Description Text Preview
+            # Description Text Preview (truncated for large texts, emoji-cleaned)
             text_info = {}
             if description_text:
-                text_info["Text Preview"] = description_text[:200] + "..." if len(description_text) > 200 else description_text
-                text_info["Contains YOLO Keywords"] = "YOLOv8" in description_text or "detected objects" in description_text.lower()
+                # Remove emojis for cleaner display
+                clean_text = remove_emojis(description_text)
+                
+                # Truncate to reasonable length
+                max_preview_length = 500
+                if len(clean_text) > max_preview_length:
+                    text_info["Text Preview"] = clean_text[:max_preview_length] + f"\n\n... (truncated, showing first {max_preview_length} of {len(clean_text)} characters)"
+                else:
+                    text_info["Text Preview"] = clean_text
+                
+                text_info["Full Text Length"] = f"{len(description_text)} characters"
+                text_info["Contains YOLO Keywords"] = "Yes" if ("YOLOv8" in description_text or "detected objects" in description_text.lower()) else "No"
                 
                 # Look for object detection patterns in text
-                detection_patterns = [
-                    r'\b\w+\s*\(\d+%',  # object (confidence%
-                    r'(top|middle|bottom)[-\s]?(left|center|right)',  # spatial positions
-                    r'(large|medium|small|tiny)\s*(object|item|\w+)'  # size descriptors
-                ]
+                detection_keywords = ["confidence", "location", "bounding box", "detected", "spatial"]
+                found_keywords = [kw for kw in detection_keywords if kw in description_text.lower()]
                 
-                found_patterns = []
-                for pattern in detection_patterns:
-                    matches = re.findall(pattern, description_text, re.IGNORECASE)
-                    if matches:
-                        found_patterns.append(f"{len(matches)} matches for {pattern}")
-                
-                text_info["Detection Patterns Found"] = "; ".join(found_patterns) if found_patterns else "None"
+                if found_keywords:
+                    text_info["Detection Keywords Found"] = ", ".join(found_keywords)
             
             properties["Description Text Analysis"] = text_info
             
