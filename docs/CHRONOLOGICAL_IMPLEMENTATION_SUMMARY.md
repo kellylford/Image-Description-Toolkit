@@ -1,17 +1,40 @@
 # Chronological Ordering - Implementation Summary
 
 **Date:** October 4, 2025  
-**Status:** ✅ Complete  
+**Status:** ✅ Complete + Critical Bug Fix  
 **Quick Reference:** What was changed and where
 
 ---
 
 ## Quick Facts
 
-- **Files Modified:** 4 files
-- **Lines Changed:** ~30 lines total
+- **Files Modified:** 5 files (4 initially + 1 bug fix)
+- **Lines Changed:** ~40 lines total
 - **Risk Level:** Low (backward compatible)
-- **Testing Status:** Ready for validation
+- **Testing Status:** Bug discovered during validation, fixed
+- **Critical Fix:** HEIC→JPG conversion now preserves timestamps
+
+---
+
+## ⚠️ Critical Bug Fix (Oct 4, 2025 - Post-Implementation)
+
+**Problem Discovered:** During testing, chronological sorting was broken for HEIC files!
+
+**Root Cause:** `ConvertImage.py` was creating new JPG files with **today's timestamp** instead of preserving the original HEIC file's modification time.
+
+**Impact:** 
+- All converted HEIC→JPG files got Oct 4 timestamps
+- Sorted to the END instead of their actual chronological position
+- Meta glasses photos (Sept 29) appeared AFTER files from today
+
+**Fix Applied:** Added timestamp preservation to `scripts/ConvertImage.py` (line ~115)
+```python
+# After image.save():
+source_stat = os.stat(input_path)
+os.utime(output_path, (source_stat.st_atime, source_stat.st_mtime))
+```
+
+**Result:** Converted JPG files now inherit HEIC source timestamps ✅
 
 ---
 
@@ -104,17 +127,24 @@ Processing Order:
 ### The Complete Flow
 
 ```
-📹 Source Video (IMG_1235.MOV, timestamp: Sep 15 14:30)
+� Source HEIC Photo (photo-20717.heic, timestamp: Sep 29 07:38)
+    ↓
+🔄 Convert to JPG
+    - Name: photo-20717.jpg
+    - Time: Sep 29 07:38 (copied from HEIC!) ✅ FIXED
+    ↓
+�📹 Source Video (IMG_1235.MOV, timestamp: Sep 15 14:30)
     ↓
 🎬 Extract Frames
     - Name: IMG_1235_12.45s.jpg (shows source!)
     - Time: Sep 15 14:30 (copied from video!)
     ↓
-📁 Mixed Directory
+📁 Mixed Directory (temp_combined_images)
     - IMG_1234.jpg (14:25)
     - IMG_1235.MOV (14:30)
     - IMG_1235_12.45s.jpg (14:30) ← Same time as video
     - IMG_1236.jpg (14:35)
+    - photo-20717.jpg (Sep 29 07:38) ← Preserves HEIC time!
     ↓
 🔍 Collect & Sort by st_mtime
     - Oldest → Newest
@@ -122,6 +152,7 @@ Processing Order:
 📝 Process in Order
     - Descriptions appear chronologically
     - Video frames appear at correct timeline position
+    - Converted photos appear at correct timeline position ✅
     ↓
 📖 Output: Coherent trip narrative! ✅
 ```
@@ -146,6 +177,20 @@ Processing Order:
 | Line(s) | Change | Purpose |
 |---------|--------|---------|
 | 633-655 | Replace file collection with timestamp-aware version | Chronological sorting |
+
+### `scripts/ConvertImage.py` (1 change) ⚠️ **CRITICAL BUG FIX**
+
+| Line(s) | Change | Purpose |
+|---------|--------|---------|
+| ~115-120 | Add `os.utime()` after `image.save()` | Preserve HEIC timestamp on converted JPG |
+
+**Details:** After `image.save(output_path, **save_kwargs)`, added:
+```python
+source_stat = os.stat(input_path)
+os.utime(output_path, (source_stat.st_atime, source_stat.st_mtime))
+```
+
+**Why Critical:** Without this, ALL converted images get today's timestamp, completely breaking chronological sorting for HEIC photos!
 
 ### Configuration Files (2 changes)
 

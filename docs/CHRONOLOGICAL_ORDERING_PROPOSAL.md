@@ -1,7 +1,7 @@
 # Chronological Ordering Proposal - Image Description Workflow
 
 **Date:** October 4, 2025  
-**Status:** ✅ Phase 1 Complete - Ready for Testing
+**Status:** ✅ Phase 1 Complete + Critical Bug Fix Applied  
 **Issue:** Image descriptions are not in chronological order; video frames don't reference source video
 
 ## Implementation Status
@@ -10,6 +10,13 @@
 - **Phase 1a:** Enhanced video frame naming (videoname_timestamp format) - COMPLETE
 - **Phase 1b:** File system timestamp sorting with video frame support - COMPLETE
 - **Phase 1c:** Configuration documentation updates - COMPLETE
+- **Phase 1d:** CRITICAL BUG FIX - HEIC→JPG timestamp preservation - COMPLETE
+
+### 🔍 Testing Discoveries
+- **Bug Found:** HEIC→JPG conversion was NOT preserving timestamps
+- **Impact:** All converted images sorted incorrectly (appeared at end with today's timestamp)
+- **Fix Applied:** Added timestamp preservation to `ConvertImage.py`
+- **Status:** Fixed and documented
 
 ### 📋 Planned
 - Phase 2: Enhanced output formatting (future)
@@ -455,6 +462,87 @@ Added chronological sorting section:
 
 ---
 
+### Critical Bug Discovery & Fix (October 4, 2025)
+
+#### The Problem
+
+During initial testing with user's Europe trip photos, discovered that chronological sorting was **broken for HEIC files**:
+
+**Observed Behavior:**
+- PNG screenshots (Sept 3) processed correctly in chronological order ✅
+- Video frames (Sept 1) appeared correctly at beginning ✅
+- **Meta glasses photos (Sept 29) appeared AFTER modern content** ❌
+
+**Investigation:**
+```bash
+# Original HEIC file:
+stat od_photo-20717_singular_display_fullPicture.heic
+> Modify: 2025-09-29 07:38:34
+
+# Converted JPG file:
+stat od_photo-20717_singular_display_fullPicture.jpg
+> Modify: 2025-10-04 15:12:00  ← TODAY!
+```
+
+**Root Cause:** 
+`ConvertImage.py` was creating new JPG files without preserving source timestamps. All converted files got "today's" modification time.
+
+**Impact:**
+- ALL HEIC→JPG converted files sorted to the END (most recent timestamp)
+- Completely broke chronological ordering for the primary photo type (Meta glasses use HEIC)
+- User's Sept 29 photos appeared after everything else
+
+#### The Fix
+
+**File:** `scripts/ConvertImage.py`  
+**Location:** After `image.save(output_path, **save_kwargs)` (line ~113)
+
+**Added:**
+```python
+# Preserve file modification time from source for chronological sorting
+try:
+    source_stat = os.stat(input_path)
+    os.utime(output_path, (source_stat.st_atime, source_stat.st_mtime))
+except OSError as e:
+    logger.debug(f"Could not preserve timestamp on {output_path}: {e}")
+```
+
+**Result:**
+- Converted JPG files now inherit HEIC source timestamps ✅
+- Sept 29 photos now appear in correct chronological position ✅
+- Same pattern as video frame timestamp preservation (consistent approach)
+
+#### Why This Was Missed Initially
+
+The Phase 1 implementation focused on:
+1. ✅ Video frame extraction (timestamp preservation added)
+2. ✅ Image description sorting (sorts by st_mtime)
+3. ❌ HEIC→JPG conversion (timestamp preservation FORGOTTEN)
+
+**Lesson:** Need to preserve timestamps at **ALL file creation points**, not just frame extraction.
+
+#### Verification
+
+**Before Fix:**
+```
+Processing Order (WRONG):
+1. Sept 1 - Video frames ✅
+2. Sept 3 - PNG screenshots ✅
+3. Sept 4 - Other videos ❌ (should be Sept 4)
+4. Oct 4 - Converted HEIC photos ❌ (should be Sept 29!)
+```
+
+**After Fix:**
+```
+Processing Order (CORRECT):
+1. Sept 1 - Video frames ✅
+2. Sept 3 - PNG screenshots ✅  
+3. Sept 4 - Videos ✅
+4. Sept 29 - Meta glasses photos ✅
+```
+
+---
+
 ### Key Design Decisions
 
 1. **Video name extraction:** `Path(video_path).stem`
@@ -470,6 +558,12 @@ Added chronological sorting section:
    - Prevents crashes from permission errors
    - Continues processing even if some operations fail
    - Debug logs for troubleshooting, not user errors
+
+4. **Timestamp preservation everywhere:** ⚠️ NEW
+   - Video frames: `os.utime()` after extraction
+   - Converted images: `os.utime()` after HEIC→JPG conversion
+   - Copied files: `shutil.copy2()` preserves automatically
+   - **Critical:** Must preserve at ALL file creation points!
 
 4. **Backward compatibility:** Keep `frame_prefix` config
    - Old configs still work

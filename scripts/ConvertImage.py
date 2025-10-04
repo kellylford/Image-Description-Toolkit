@@ -112,6 +112,13 @@ def convert_heic_to_jpg(input_path, output_path=None, quality=95, keep_metadata=
             
             image.save(output_path, **save_kwargs)
         
+        # Preserve file modification time from source for chronological sorting
+        try:
+            source_stat = os.stat(input_path)
+            os.utime(output_path, (source_stat.st_atime, source_stat.st_mtime))
+        except OSError as e:
+            logger.debug(f"Could not preserve timestamp on {output_path}: {e}")
+        
         logger.info(f"Successfully converted: {input_path.name} -> {output_path.name}")
         return True
         
