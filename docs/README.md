@@ -79,6 +79,7 @@ This directory contains all documentation for the Image Description Toolkit.
 
 ### 🐛 Troubleshooting & Testing
 - [Testing Guide](TESTING_README.md) - How to test components
+- [Workflow Resume API Key Requirement](WORKFLOW_RESUME_API_KEY.md) - **Important for cloud providers**
 - [Recent Fixes](FIXES_2025_10_02.md) - Bug fixes and improvements
 - [Enhancement Log](ENHANCEMENTS_2025_10_01.md) - Feature additions
 
