@@ -16,6 +16,8 @@ The Image Description Toolkit supports multiple AI providers with dozens of visi
 
 ### 🏆 **Highest Quality?**
 - **OpenAI**: `gpt-4o` (best overall, requires API key)
+- **Claude**: `claude-sonnet-4-5-20250929` (Claude 4.5 - exceptional for agents/coding)
+- **Claude**: `claude-opus-4-1-20250805` (Claude 4.1 - specialized complex tasks)
 - **Ollama**: `llama3.2-vision:latest` (excellent free option)
 
 ### ❌ **Models to Avoid**
@@ -28,6 +30,7 @@ The Image Description Toolkit supports multiple AI providers with dozens of visi
 | Provider | Models | Setup | Cost | Offline | Customization |
 |----------|--------|-------|------|---------|---------------|
 | **OpenAI** | 3 models | API key required | Pay per use | ❌ No | Limited |
+| **Claude** | 7 models | API key required | Pay per use | ❌ No | Limited |
 | **Ollama** | 6+ models | Local install | Free | ✅ Yes | High |
 | **Hugging Face** | 6 models | Auto-download | Free | ✅ Yes | High |
 
@@ -165,6 +168,64 @@ The Image Description Toolkit supports multiple AI providers with dozens of visi
 
 ---
 
+## Claude Models (Anthropic, Cloud, Paid)
+
+**All Claude 3.x and 4.x models support vision.** Claude 2.x models excluded (no vision support).
+
+### 🌟 **claude-sonnet-4-5-20250929** - *Claude 4.5 - Best Overall*
+- **Speed**: ⭐⭐⭐⭐ Fast (cloud)
+- **Quality**: ⭐⭐⭐⭐⭐ Outstanding
+- **Prompt Following**: ⭐⭐⭐⭐⭐ Outstanding
+- **Cost**: ~$0.003-0.015 per image
+- **Best for**: Agents, coding, highest intelligence across most tasks
+- **Strengths**: Top-tier reasoning, complex agents, multilingual, long-context
+- **Note**: **RECOMMENDED** - Latest and most capable Claude model
+
+### 🏆 **claude-opus-4-1-20250805** - *Claude 4.1 - Specialized Excellence*
+- **Speed**: ⭐⭐⭐ Moderate (cloud)
+- **Quality**: ⭐⭐⭐⭐⭐ Exceptional
+- **Prompt Following**: ⭐⭐⭐⭐⭐ Outstanding
+- **Cost**: ~$0.015-0.075 per image
+- **Best for**: Specialized complex tasks requiring superior reasoning
+- **Strengths**: Exceptional reasoning, advanced problem-solving
+- **Note**: Most powerful for specialized applications
+
+### � **claude-sonnet-4-20250514** - *Claude 4 - High Performance*
+- **Speed**: ⭐⭐⭐⭐ Fast (cloud)
+- **Quality**: ⭐⭐⭐⭐⭐ Excellent
+- **Prompt Following**: ⭐⭐⭐⭐⭐ Excellent
+- **Cost**: ~$0.003-0.015 per image
+- **Best for**: High-performance tasks, balanced quality/speed
+- **Strengths**: Excellent general purpose model
+
+### 💎 **claude-3-7-sonnet-20250219** - *Claude 3.7 - Extended Thinking*
+- **Speed**: ⭐⭐⭐⭐ Fast (cloud)
+- **Quality**: ⭐⭐⭐⭐⭐ Excellent
+- **Prompt Following**: ⭐⭐⭐⭐⭐ Excellent
+- **Cost**: ~$0.003-0.015 per image
+- **Best for**: Tasks requiring extended thinking capability
+- **Strengths**: Toggleable extended thinking, high intelligence
+
+### � **claude-3-5-haiku-20241022** - *Claude 3.5 Haiku - Fast & Affordable*
+- **Speed**: ⭐⭐⭐⭐⭐ Very Fast (cloud)
+- **Quality**: ⭐⭐⭐⭐ Good
+- **Prompt Following**: ⭐⭐⭐⭐ Good
+- **Cost**: ~$0.0008-0.004 per image
+- **Best for**: Batch processing, cost-conscious users, testing
+- **Strengths**: Fastest affordable option, excellent value
+
+### ⚡ **claude-3-haiku-20240307** - *Claude 3 Haiku - Ultra Fast*
+- **Speed**: ⭐⭐⭐⭐⭐ Very Fast (cloud)
+- **Quality**: ⭐⭐⭐ Basic
+- **Prompt Following**: ⭐⭐⭐⭐ Good
+- **Cost**: ~$0.00025-0.00125 per image
+- **Best for**: Very high volume, lowest cost
+- **Strengths**: Cheapest option, very fast
+
+**Deprecated Models:** Claude 3.5 Sonnet (Oct/Jun 2024), Claude 3 Opus/Sonnet (Feb 2024) - superseded by Claude 4 series.
+
+---
+
 ## Use Case Recommendations
 
 ### 📚 **Learning/Testing the App**
@@ -174,24 +235,30 @@ The Image Description Toolkit supports multiple AI providers with dozens of visi
 ### 🏠 **Personal Use (Photos, Art)**
 1. **Ollama**: `llava-llama3:latest` (excellent quality)
 2. **Ollama**: `llama3.2-vision:latest` (highest quality free option)
-3. **HF**: Wait for `instructblip` download (avoid blip2-opt)
-4. **OpenAI**: `gpt-4o-mini` (if you don't mind paying)
+3. **Claude**: `claude-3-5-haiku-20241022` (affordable cloud option)
+4. **HF**: Wait for `instructblip` download (avoid blip2-opt)
+5. **OpenAI**: `gpt-4o-mini` (if you don't mind paying)
 
 ### 💼 **Professional/Commercial Use**
-1. **OpenAI**: `gpt-4o` (highest quality)
-2. **Ollama**: `llama3.2-vision:latest` (best free option)
-3. **HF**: `Salesforce/instructblip-vicuna-7b` (instruction expert - downloading...)
-4. **HF**: `microsoft/git-base-coco` (basic but reliable backup)
+1. **Claude**: `claude-sonnet-4-5-20250929` (Claude 4.5 - best for agents/complex tasks)
+2. **OpenAI**: `gpt-4o` (highest quality, well-established)
+3. **Claude**: `claude-opus-4-1-20250805` (Claude 4.1 - specialized excellence)
+4. **Ollama**: `llama3.2-vision:latest` (best free option)
+5. **HF**: `Salesforce/instructblip-vicuna-7b` (instruction expert - downloading...)
 
 ### ⚡ **Batch Processing (Many Images)**
 1. **Ollama**: `moondream:latest` (fastest)
-2. **HF**: `microsoft/git-base-coco` (basic captions only)
-3. **Ollama**: `llava:latest` (fast + quality)
+2. **Claude**: `claude-3-5-haiku-20241022` (fast + quality, ~$0.80-4/1000 images)
+3. **Claude**: `claude-3-haiku-20240307` (ultra-cheap, ~$0.25-1.25/1000 images)
+4. **HF**: `microsoft/git-base-coco` (basic captions only)
+5. **Ollama**: `llava:latest` (fast + quality)
 
 ### 🎨 **Creative/Artistic Descriptions**
-1. **OpenAI**: `gpt-4o` (best creativity)
-2. **Ollama**: `llava-llama3:latest` (great free option)
-3. **HF**: `Salesforce/blip2-flan-t5-xl` (good instruction following)
+1. **Claude**: `claude-sonnet-4-5-20250929` (Claude 4.5 - highest intelligence)
+2. **OpenAI**: `gpt-4o` (excellent creativity)
+3. **Claude**: `claude-3-7-sonnet-20250219` (extended thinking for complex analysis)
+4. **Ollama**: `llava-llama3:latest` (great free option)
+5. **HF**: `Salesforce/blip2-flan-t5-xl` (good instruction following)
 
 ### 💾 **Limited Resources (RAM/Storage)**
 1. **Ollama**: `moondream:latest` (1.7GB)

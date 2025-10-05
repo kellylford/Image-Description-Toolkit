@@ -99,7 +99,7 @@ if errorlevel 1 (
 )
 
 REM Navigate
-cd /d "%~dp0.."
+cd /d "%~dp0..\.."
 if not exist "workflow.py" (
     echo ERROR: workflow.py not found
     pause
@@ -135,5 +135,116 @@ echo.
 echo To view results:
 echo   1. Open descriptions.html in your browser
 echo   2. Or run: python viewer/viewer.py [output_directory]
+echo.
+pause
+
+REM   1. Extract frames from videos
+REM   2. Convert HEIC images to JPG
+REM   3. Generate AI descriptions (using Ollama)
+REM   4. Create HTML gallery
+REM   5. Open viewer application
+REM
+REM USE CASE:
+REM   - You have a folder with videos AND images
+REM   - Want frame extraction + descriptions all in one go
+REM   - Want a browseable HTML gallery of results
+REM
+REM WHAT YOU NEED:
+REM   1. Ollama installed and running
+REM   2. Vision model: ollama pull llava
+REM   3. Python with all dependencies installed
+REM
+REM CUSTOMIZE BELOW: Set INPUT_DIR (can contain videos, images, or both)
+REM ============================================================================
+
+REM ======== EDIT THESE SETTINGS ========
+
+REM Where is your content? (folder with videos/images)
+set INPUT_DIR=C:\Users\kelly\Videos\VacationFootage
+
+REM Which Ollama model to use for descriptions?
+set MODEL=llava
+
+REM What style of descriptions?
+set PROMPT_STYLE=narrative
+
+REM ======================================
+
+echo.
+echo ========================================
+echo Complete Workflow: Video to Gallery
+echo ========================================
+echo Input: %INPUT_DIR%
+echo Model: %MODEL%
+echo Style: %PROMPT_STYLE%
+echo ========================================
+echo.
+echo This will:
+echo   1. Extract video frames
+echo   2. Convert HEIC images
+echo   3. Generate AI descriptions
+echo   4. Create HTML gallery
+echo   5. Open viewer
+echo.
+echo This may take a while for lots of videos!
+echo.
+pause
+
+REM Check if input exists
+if not exist "%INPUT_DIR%" (
+    echo ERROR: Input directory does not exist!
+    echo Please edit this .bat file and set INPUT_DIR
+    pause
+    exit /b 1
+)
+
+REM Check if Ollama is running
+echo Checking Ollama...
+ollama list >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Ollama is not running!
+    echo Please start Ollama or install from https://ollama.ai
+    pause
+    exit /b 1
+)
+
+REM Check if model exists
+ollama list | findstr /i "%MODEL%" >nul
+if errorlevel 1 (
+    echo Model '%MODEL%' not found. Downloading...
+    ollama pull %MODEL%
+)
+
+REM Navigate to scripts directory
+cd /d "%~dp0\..\..\scripts"
+
+REM Run COMPLETE workflow
+echo.
+echo Running complete workflow...
+echo.
+python workflow.py "%INPUT_DIR%" ^
+    --steps video,convert,describe,html,viewer ^
+    --provider ollama ^
+    --model %MODEL% ^
+    --prompt-style %PROMPT_STYLE%
+
+if errorlevel 1 (
+    echo.
+    echo ERROR: Workflow failed!
+    pause
+    exit /b 1
+)
+
+echo.
+echo ========================================
+echo SUCCESS! Complete workflow finished
+echo ========================================
+echo.
+echo Viewer should have opened automatically.
+echo Check the output folder for:
+echo   - Extracted frames
+echo   - Converted images
+echo   - Description files
+echo   - HTML gallery
 echo.
 pause

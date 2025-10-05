@@ -1097,6 +1097,10 @@ Examples:
   python workflow.py photos --provider openai --model gpt-4o-mini --api-key-file ~/openai.txt
   python workflow.py media --provider openai --model gpt-4o --steps describe,html
   
+  # Claude (Anthropic)
+  python workflow.py photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file ~/claude.txt
+  python workflow.py media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
+  
   # ONNX (Enhanced Ollama with YOLO)
   python workflow.py images --provider onnx --model llava:latest
   
@@ -1150,14 +1154,14 @@ Resume Examples:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "onnx", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
+        choices=["ollama", "openai", "claude", "onnx", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
         default="ollama",
         help="AI provider to use for image description (default: ollama)"
     )
     
     parser.add_argument(
         "--api-key-file",
-        help="Path to file containing API key for cloud providers (OpenAI, HuggingFace)"
+        help="Path to file containing API key for cloud providers (OpenAI, Claude, HuggingFace)"
     )
     
     parser.add_argument(

@@ -65,6 +65,21 @@ DEV_HUGGINGFACE_MODELS = [
     "facebook/blenderbot-400M-distill"
 ]
 
+DEV_CLAUDE_MODELS = [
+    # Claude 4 Series (Latest - 2025)
+    "claude-sonnet-4-5-20250929",   # Claude Sonnet 4.5 (best for agents/coding) - RECOMMENDED
+    "claude-opus-4-1-20250805",     # Claude Opus 4.1 (specialized complex tasks, superior reasoning)
+    "claude-sonnet-4-20250514",     # Claude Sonnet 4 (high performance)
+    "claude-opus-4-20250514",       # Claude Opus 4 (very high intelligence)
+    # Claude 3.7
+    "claude-3-7-sonnet-20250219",   # Claude Sonnet 3.7 (high performance with extended thinking)
+    # Claude 3.5
+    "claude-3-5-haiku-20241022",    # Claude Haiku 3.5 (fastest, most affordable)
+    # Claude 3
+    "claude-3-haiku-20240307",      # Claude Haiku 3 (fast and compact)
+    # Note: All Claude 3+ models support vision. Claude 2.x excluded (no vision support)
+]
+
 from abc import ABC, abstractmethod
 
 
@@ -283,6 +298,136 @@ class OpenAIProvider(AIProvider):
             if response.status_code == 200:
                 data = response.json()
                 return data['choices'][0]['message']['content']
+            else:
+                return f"Error: HTTP {response.status_code} - {response.text}"
+                
+        except Exception as e:
+            return f"Error generating description: {str(e)}"
+
+
+class ClaudeProvider(AIProvider):
+    """Anthropic Claude provider for Claude models"""
+    
+    def __init__(self, api_key: Optional[str] = None):
+        # Try multiple sources for API key in order of preference:
+        # 1. Explicitly passed key
+        # 2. Environment variable  
+        # 3. claude.txt file in current directory
+        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
+        self.base_url = "https://api.anthropic.com/v1"
+        self.timeout = 300
+        self.api_version = "2023-06-01"  # Anthropic API version
+    
+    def _load_api_key_from_file(self) -> Optional[str]:
+        """Load API key from claude.txt file - checks multiple locations"""
+        # Check multiple common locations
+        possible_paths = [
+            'claude.txt',  # Current directory
+            os.path.expanduser('~/claude.txt'),  # Home directory
+            os.path.expanduser('~/onedrive/claude.txt'),  # OneDrive
+            os.path.join(os.path.expanduser('~'), 'OneDrive', 'claude.txt'),  # OneDrive (capitalized)
+        ]
+        
+        for path in possible_paths:
+            try:
+                if os.path.exists(path):
+                    with open(path, 'r') as f:
+                        api_key = f.read().strip()
+                        if api_key:
+                            return api_key
+            except (FileNotFoundError, IOError):
+                continue
+        
+        return None
+    
+    def get_provider_name(self) -> str:
+        return "Claude"
+    
+    def is_available(self) -> bool:
+        """Check if Claude is available (has API key from env var or claude.txt file)"""
+        return bool(self.api_key)
+    
+    def get_available_models(self) -> List[str]:
+        """Get list of available Claude models"""
+        # DEVELOPMENT MODE: Return hardcoded models for faster testing
+        if DEV_MODE_HARDCODED_MODELS:
+            return DEV_CLAUDE_MODELS.copy() if self.is_available() else []
+        
+        # ORIGINAL DETECTION CODE (preserved for when dev mode is disabled)
+        if not self.is_available():
+            return []
+        
+        # Claude doesn't have a models endpoint, so we return the known models
+        # All Claude models support vision natively
+        return DEV_CLAUDE_MODELS.copy()
+    
+    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
+        """Generate description using Claude"""
+        if not self.is_available():
+            return "Error: Claude API key not configured"
+        
+        try:
+            # Read and encode image
+            with open(image_path, 'rb') as image_file:
+                image_data = base64.b64encode(image_file.read()).decode('utf-8')
+            
+            # Determine media type from file extension
+            ext = Path(image_path).suffix.lower()
+            media_type_map = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp'
+            }
+            media_type = media_type_map.get(ext, 'image/jpeg')
+            
+            # Prepare request (Anthropic Messages API format)
+            headers = {
+                "x-api-key": self.api_key,
+                "anthropic-version": self.api_version,
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": model,
+                "max_tokens": 1024,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": image_data
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+            }
+            
+            # Make request
+            response = requests.post(
+                f"{self.base_url}/messages",
+                headers=headers,
+                json=payload,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Extract text from content array
+                content = data.get('content', [])
+                if content and len(content) > 0:
+                    return content[0].get('text', '')
+                return "Error: No content in response"
             else:
                 return f"Error: HTTP {response.status_code} - {response.text}"
                 
@@ -3506,6 +3651,7 @@ Please provide a comprehensive description that incorporates these detected obje
 _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
+_claude_provider = ClaudeProvider()
 _huggingface_provider = HuggingFaceProvider()
 _onnx_provider = ONNXProvider()
 _copilot_provider = CopilotProvider()
@@ -3526,6 +3672,9 @@ def get_available_providers() -> Dict[str, AIProvider]:
     
     if _openai_provider.is_available():
         providers['openai'] = _openai_provider
+    
+    if _claude_provider.is_available():
+        providers['claude'] = _claude_provider
         
     if _huggingface_provider.is_available():
         providers['huggingface'] = _huggingface_provider
@@ -3554,6 +3703,7 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'ollama': _ollama_provider,
         'ollama_cloud': _ollama_cloud_provider,
         'openai': _openai_provider,
+        'claude': _claude_provider,
         'huggingface': _huggingface_provider,
         'onnx': _onnx_provider,
         'copilot': _copilot_provider,

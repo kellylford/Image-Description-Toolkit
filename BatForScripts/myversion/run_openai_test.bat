@@ -27,11 +27,11 @@ REM ============================================================================
 REM ======== EDIT THESE SETTINGS ========
 
 REM Path to your images
-set IMAGE_PATH=C:\path\to\your\images
+set IMAGE_PATH=\\ford\home\photos\MobileBackup\iPhone\2025\09
 
 REM Path to file containing your OpenAI API key
 REM File should contain only the key, one line
-set API_KEY_FILE=C:\path\to\openai_key.txt
+set API_KEY_FILE=C:\Users\kelly\openai.txt
 
 REM OpenAI model (gpt-4o-mini cheaper, gpt-4o better)
 set MODEL=gpt-4o-mini
@@ -94,7 +94,7 @@ if errorlevel 1 (
 )
 
 REM Navigate
-cd /d "%~dp0.."
+cd /d "%~dp0..\.."
 if not exist "workflow.py" (
     echo ERROR: workflow.py not found
     pause

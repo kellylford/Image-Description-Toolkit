@@ -39,6 +39,15 @@ PROVIDER_CAPABILITIES: Dict[str, Dict[str, Any]] = {
         "supports_options": True,
         "description": "GPT-4o and other OpenAI vision models"
     },
+    "Claude": {
+        "supports_prompts": True,
+        "supports_custom_prompts": True,
+        "prompt_styles": ["detailed", "technical", "creative", "accessibility"],
+        "requires_api_key": True,
+        "is_cloud": True,
+        "supports_options": True,
+        "description": "Claude 4.x series from Anthropic with advanced reasoning"
+    },
     "ONNX": {
         "supports_prompts": False,
         "supports_custom_prompts": False,

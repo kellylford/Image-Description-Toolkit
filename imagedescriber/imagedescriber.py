@@ -63,8 +63,8 @@ from PyQt6.QtGui import (
 
 # Import our refactored modules
 from ai_providers import (
-    AIProvider, OllamaProvider, OpenAIProvider, HuggingFaceProvider, ONNXProvider, CopilotProvider, ObjectDetectionProvider,
-    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider, _onnx_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
+    AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider, HuggingFaceProvider, ONNXProvider, CopilotProvider, ObjectDetectionProvider,
+    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider, _huggingface_provider, _onnx_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 
@@ -1036,6 +1036,8 @@ class ChatProcessingWorker(QThread):
             return self.process_with_ollama_chat(model, chat_session, conversation_context)
         elif provider == "openai":
             return self.process_with_openai_chat(model, chat_session, conversation_context)
+        elif provider == "claude":
+            return self.process_with_claude_chat(model, chat_session, conversation_context)
         elif provider == "huggingface":
             return self.process_with_huggingface_chat(model, chat_session, conversation_context)
         else:
@@ -1114,6 +1116,13 @@ class ChatProcessingWorker(QThread):
                 'max_chars': 4000,  # ~1000 tokens
                 'strategy': 'conservative'
             }
+        elif provider == "claude":
+            # Claude API - similar to OpenAI, paid API with good context handling
+            return {
+                'max_messages': 15,
+                'max_chars': 4000,  # ~1000 tokens
+                'strategy': 'conservative'
+            }
         elif provider == "huggingface":
             # Variable - moderate approach
             return {
@@ -1149,6 +1158,42 @@ class ChatProcessingWorker(QThread):
                 "role": "system",
                 "content": "You are a helpful AI assistant. Please provide clear, accurate, and helpful responses to the user's questions."
             })
+        
+        # Add conversation history with token awareness
+        total_estimated_tokens = 0
+        max_tokens = 3000  # Conservative limit for context
+        
+        for msg in recent_messages:
+            estimated_tokens = len(msg['content']) // 4  # Rough estimate: 4 chars per token
+            if total_estimated_tokens + estimated_tokens > max_tokens:
+                # Truncate older messages if needed
+                break
+                
+            if msg['type'] == 'user':
+                messages.append({"role": "user", "content": msg['content']})
+            else:
+                messages.append({"role": "assistant", "content": msg['content']})
+            
+            total_estimated_tokens += estimated_tokens
+        
+        # Add current message
+        messages.append({"role": "user", "content": current_message})
+        
+        return messages
+    
+    def build_claude_messages(self, chat_session: dict, current_message: str) -> list:
+        """Build Claude-format messages array with conversation history"""
+        conversation = chat_session.get('conversation', [])
+        
+        # Use context config for Claude (similar to OpenAI)
+        context_config = self.get_context_config('claude')
+        max_messages = context_config['max_messages']
+        
+        # Get recent conversation history
+        recent_messages = conversation[-max_messages:] if len(conversation) > max_messages else conversation
+        
+        # Build Claude messages format (Anthropic API uses similar structure to OpenAI)
+        messages = []
         
         # Add conversation history with token awareness
         total_estimated_tokens = 0
@@ -1330,6 +1375,63 @@ class ChatProcessingWorker(QThread):
                 raise Exception(f"OpenAI API key error: {str(e)}. Please check that openai.txt file exists and contains a valid API key.")
             else:
                 raise Exception(f"OpenAI processing failed: {str(e)}")
+    
+    def process_with_claude_chat(self, model: str, chat_session: dict, context: str) -> str:
+        """Process chat with Claude using conversation history"""
+        try:
+            # Use the global Claude provider that handles API key loading
+            global _claude_provider
+            
+            if not _claude_provider.is_available():
+                raise Exception("Claude is not available or API key not found. Please ensure claude.txt file contains your API key or ANTHROPIC_API_KEY is set.")
+            
+            if self._stop_requested:
+                return "Processing stopped"
+            
+            # Extract the current message from the context
+            # The context ends with "User: {message}\nAssistant:"
+            current_message = context.split("User: ")[-1].split("\nAssistant:")[0].strip()
+            
+            # Build Claude messages format
+            messages = self.build_claude_messages(chat_session, current_message)
+            
+            # Call Claude API using Anthropic Messages API format
+            import requests
+            
+            headers = {
+                "x-api-key": _claude_provider.api_key,
+                "anthropic-version": _claude_provider.api_version,
+                "content-type": "application/json"
+            }
+            
+            payload = {
+                "model": model,
+                "max_tokens": 1000,
+                "messages": messages
+            }
+            
+            response = requests.post(
+                f"{_claude_provider.base_url}/messages",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Claude API error: {response.status_code} - {response.text}")
+            
+            response_data = response.json()
+            
+            # Extract text from Claude's response format
+            if response_data.get('content') and len(response_data['content']) > 0:
+                return response_data['content'][0]['text']
+            else:
+                raise Exception("Empty response from Claude")
+            
+        except Exception as e:
+            if "API key" in str(e).lower() or "api key" in str(e).lower():
+                raise Exception(f"Claude API key error: {str(e)}. Please check that claude.txt file exists and contains a valid API key, or set ANTHROPIC_API_KEY environment variable.")
+            else:
+                raise Exception(f"Claude processing failed: {str(e)}")
     
     def process_with_huggingface_chat(self, model: str, chat_session: dict, context: str) -> str:
         """Process chat with Hugging Face using conversation context"""
@@ -1933,6 +2035,7 @@ class ProcessingDialog(QDialog):
             "ollama": "Ollama",
             "ollama_cloud": "Ollama Cloud",
             "openai": "OpenAI",
+            "claude": "Claude",
             "onnx": "Enhanced Ollama (CPU + YOLO)",  # Use capability name for ONNX
             "huggingface": "HuggingFace",
             "copilot": "Copilot+ PC",
@@ -2001,6 +2104,11 @@ class ProcessingDialog(QDialog):
                     self.status_label.setText("OpenAI: Cloud AI processing. Requires API key in openai.txt file.")
                 else:
                     self.status_label.setText("OpenAI not available. Install with: pip install openai. Requires API key in openai.txt file.")
+            elif current_data == "claude":
+                if provider.is_available():
+                    self.status_label.setText("Claude (Anthropic): Cloud AI processing with advanced reasoning. Requires API key in claude.txt file or ANTHROPIC_API_KEY env var.")
+                else:
+                    self.status_label.setText("Claude not available. Requires API key in claude.txt file (current directory, ~/, or ~/onedrive/), or set ANTHROPIC_API_KEY environment variable.")
             elif current_data == "huggingface":
                 if provider.is_available():
                     self.status_label.setText("Hugging Face: Local AI models. Models download automatically on first use. Requires: pip install transformers torch")
@@ -2062,6 +2170,7 @@ class ProcessingDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
+            'claude': _claude_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
@@ -2087,6 +2196,8 @@ class ProcessingDialog(QDialog):
                 print("Warning: No Ollama Cloud models detected. Please sign in with 'ollama signin' and pull cloud models.")
             elif provider_key == "openai":
                 print("Warning: OpenAI models not available. Check API key in openai.txt")
+            elif provider_key == "claude":
+                print("Warning: Claude models not available. Check API key in claude.txt file or ANTHROPIC_API_KEY environment variable")
             elif provider_key == "huggingface":
                 print("Warning: Hugging Face models not available. Check that transformers and torch are installed.")
             elif provider_key == "onnx":
@@ -2338,6 +2449,7 @@ class ChatDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
+            'claude': _claude_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
@@ -2366,6 +2478,7 @@ class ChatDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
+            'claude': _claude_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
@@ -2401,6 +2514,11 @@ class ChatDialog(QDialog):
                 self.status_label.setText("Using OpenAI API. Requires API key configuration.")
             else:
                 self.status_label.setText("OpenAI not available. Install with: pip install openai. Requires API key in openai.txt file.")
+        elif provider == "claude":
+            if _claude_provider.is_available():
+                self.status_label.setText("Using Claude (Anthropic) API. Advanced reasoning and vision capabilities. Requires API key.")
+            else:
+                self.status_label.setText("Claude not available. Requires API key in claude.txt file or ANTHROPIC_API_KEY environment variable.")
         elif provider == "huggingface":
             if _huggingface_provider.is_available():
                 self.status_label.setText("Using Hugging Face vision models. Models download automatically. GPU recommended.")
@@ -7341,6 +7459,7 @@ Please answer the follow-up question about this image, taking into account the c
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
+            'claude': _claude_provider,
             'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
