@@ -42,12 +42,6 @@ set PROMPT_STYLE=narrative
 REM Workflow steps (full workflow for set-and-forget processing)
 set STEPS=video,convert,describe,html
 
-REM Video frame extraction rate (frames per second)
-REM   0.5 = 1 frame every 2 seconds
-REM   1 = 1 frame per second  
-REM   2 = 2 frames per second
-set FPS=1
-
 REM ======================================
 
 echo ============================================================================
@@ -60,11 +54,10 @@ echo   Model: %MODEL%
 echo   Prompt Style: %PROMPT_STYLE%
 echo   Image/Folder: %IMAGE_PATH%
 echo   Steps: %STEPS%
-echo   Video FPS: %FPS%
 echo   API Key File: %API_KEY_FILE%
 echo.
 echo Complete Workflow:
-echo   1. Extract video frames (%FPS% FPS)
+echo   1. Extract video frames
 echo   2. Convert HEIC images to JPG
 echo   3. Generate AI descriptions (via OpenAI API)
 echo   4. Create HTML gallery
@@ -112,7 +105,7 @@ REM Run
 echo Running OpenAI workflow...
 echo NOTE: Images will be sent to OpenAI servers
 echo.
-python workflow.py "%IMAGE_PATH%" --provider openai --model %MODEL% --prompt-style %PROMPT_STYLE% --api-key-file "%API_KEY_FILE%" --steps %STEPS% --fps %FPS%
+python workflow.py "%IMAGE_PATH%" --provider openai --model %MODEL% --prompt-style %PROMPT_STYLE% --api-key-file "%API_KEY_FILE%" --steps %STEPS%
 
 if errorlevel 1 (
     echo.

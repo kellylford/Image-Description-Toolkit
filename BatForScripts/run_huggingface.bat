@@ -42,13 +42,6 @@ set PROMPT_STYLE=narrative
 REM Workflow steps (full workflow for set-and-forget processing)
 set STEPS=video,convert,describe,html
 
-REM Video frame extraction rate (frames per second)
-REM   0.5 = 1 frame every 2 seconds
-REM   1 = 1 frame per second  
-REM   2 = 2 frames per second
-set FPS=1
-set PROMPT_STYLE=narrative
-
 REM ======================================
 
 echo ============================================================================
@@ -61,10 +54,9 @@ echo   Model: %MODEL%
 echo   Prompt Style: %PROMPT_STYLE%
 echo   Image/Folder: %IMAGE_PATH%
 echo   Steps: %STEPS%
-echo   Video FPS: %FPS%
 echo.
 echo Complete Workflow:
-echo   1. Extract video frames (%FPS% FPS)
+echo   1. Extract video frames
 echo   2. Convert HEIC images to JPG
 echo   3. Generate AI descriptions (local transformers)
 echo   4. Create HTML gallery
@@ -118,7 +110,7 @@ REM Run workflow
 echo Running HuggingFace workflow...
 echo NOTE: First run will download model (~1GB)
 echo.
-python workflow.py "%IMAGE_PATH%" --provider huggingface --model %MODEL% --prompt-style %PROMPT_STYLE% --steps %STEPS% --fps %FPS%
+python workflow.py "%IMAGE_PATH%" --provider huggingface --model %MODEL% --prompt-style %PROMPT_STYLE% --steps %STEPS%
 
 if errorlevel 1 (
     echo.

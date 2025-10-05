@@ -38,12 +38,6 @@ set MODEL=llava
 REM Description style
 set PROMPT_STYLE=narrative
 
-REM Video frame extraction rate (frames per second)
-REM   0.5 = 1 frame every 2 seconds
-REM   1 = 1 frame per second  
-REM   2 = 2 frames per second
-set FPS=1
-
 REM ======================================
 
 echo ============================================================================
@@ -54,11 +48,10 @@ echo Configuration:
 echo   Provider: ollama
 echo   Model: %MODEL%
 echo   Prompt Style: %PROMPT_STYLE%
-echo   Frame Rate: %FPS% fps
 echo   Input Folder: %INPUT_PATH%
 echo.
 echo This will run ALL workflow steps:
-echo   1. Extract video frames (%FPS% fps)
+echo   1. Extract video frames
 echo   2. Convert HEIC images to JPG
 echo   3. Generate AI descriptions
 echo   4. Create HTML gallery
@@ -117,7 +110,7 @@ REM Run complete workflow with all steps
 echo.
 echo Running complete workflow...
 echo.
-python workflow.py "%INPUT_PATH%" --provider ollama --model %MODEL% --prompt-style %PROMPT_STYLE% --fps %FPS%
+python workflow.py "%INPUT_PATH%" --provider ollama --model %MODEL% --prompt-style %PROMPT_STYLE%
 
 if errorlevel 1 (
     echo.
@@ -175,12 +168,6 @@ set MODEL=llava
 REM What style of descriptions?
 set PROMPT_STYLE=narrative
 
-REM Video frame extraction settings (frames per second)
-REM   0.5 = 1 frame every 2 seconds
-REM   1 = 1 frame per second
-REM   2 = 2 frames per second
-set FPS=1
-
 REM ======================================
 
 echo.
@@ -190,11 +177,10 @@ echo ========================================
 echo Input: %INPUT_DIR%
 echo Model: %MODEL%
 echo Style: %PROMPT_STYLE%
-echo Frame Rate: %FPS% fps
 echo ========================================
 echo.
 echo This will:
-echo   1. Extract video frames (%FPS% fps)
+echo   1. Extract video frames
 echo   2. Convert HEIC images
 echo   3. Generate AI descriptions
 echo   4. Create HTML gallery
