@@ -134,6 +134,31 @@ def check_openai_status() -> Tuple[bool, List[str], str]:
         return False, [], f"Error: {str(e)}"
 
 
+def check_claude_status() -> Tuple[bool, List[str], str]:
+    """Check Claude (Anthropic) provider status."""
+    with SuppressOutput():
+        from imagedescriber.ai_providers import ClaudeProvider
+    
+    try:
+        provider = ClaudeProvider()
+        if not provider.is_available():
+            return False, [], "API key not configured (need claude.txt or ANTHROPIC_API_KEY)"
+        
+        # Known Claude vision models
+        models = [
+            "claude-sonnet-4-5-20250929",
+            "claude-opus-4-1-20250805",
+            "claude-sonnet-4-20250514",
+            "claude-opus-4-20250514",
+            "claude-3-7-sonnet-20250219",
+            "claude-3-5-haiku-20241022",
+            "claude-3-haiku-20240307"
+        ]
+        return True, models, "API key configured"
+    except Exception as e:
+        return False, [], f"Error: {str(e)}"
+
+
 def check_huggingface_status() -> Tuple[bool, List[str], str]:
     """Check HuggingFace provider status."""
     # Suppress YOLO loading messages that happen during ai_providers import
@@ -302,7 +327,10 @@ def print_status_line(provider_name: str, available: bool, models: List[str], me
             print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install Ollama: https://ollama.ai")
             print(f"    Then run: ollama serve")
         elif "api key" in message.lower():
-            print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add OpenAI API key to 'openai.txt' or OPENAI_API_KEY env var")
+            if "anthropic" in message.lower() or "claude" in provider_name.lower():
+                print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add Claude API key to 'claude.txt' or ANTHROPIC_API_KEY env var")
+            else:
+                print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add OpenAI API key to 'openai.txt' or OPENAI_API_KEY env var")
         elif "transformers" in message.lower():
             print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install transformers torch")
         elif "onnx" in message.lower():
@@ -334,6 +362,10 @@ def get_recommendations(all_status: Dict) -> List[str]:
     if 'openai' in all_status and not all_status['openai']['available']:
         recommendations.append("Optional: Configure OpenAI for cloud-based models")
     
+    # Check if Claude is available
+    if 'claude' in all_status and not all_status['claude']['available']:
+        recommendations.append("Optional: Configure Claude (Anthropic) for cloud-based models")
+    
     # Check if YOLO is available
     if 'onnx' in all_status and not all_status['onnx']['available']:
         recommendations.append("Optional: Install YOLO for enhanced object detection")
@@ -355,13 +387,14 @@ def main():
 Examples:
   python -m models.check_models                    # Check all providers
   python -m models.check_models --provider ollama  # Check only Ollama
+  python -m models.check_models --provider claude  # Check only Claude
   python -m models.check_models --verbose          # Show detailed model info
   python -m models.check_models --json             # Output as JSON
         """
     )
     parser.add_argument(
         '--provider',
-        choices=['ollama', 'ollama-cloud', 'openai', 'huggingface', 'onnx', 'copilot', 'groundingdino'],
+        choices=['ollama', 'ollama-cloud', 'openai', 'claude', 'huggingface', 'onnx', 'copilot', 'groundingdino'],
         help='Check only a specific provider'
     )
     parser.add_argument(
@@ -382,6 +415,7 @@ Examples:
         'ollama': ('Ollama (Local Models)', check_ollama_status),
         'ollama-cloud': ('Ollama Cloud', check_ollama_cloud_status),
         'openai': ('OpenAI', check_openai_status),
+        'claude': ('Claude (Anthropic)', check_claude_status),
         'huggingface': ('HuggingFace', check_huggingface_status),
         'onnx': ('ONNX / Enhanced YOLO', check_onnx_status),
         'copilot': ('Copilot+ PC (NPU)', check_copilot_status),
