@@ -3313,9 +3313,9 @@ class GroundingDINOProvider(AIProvider):
             query_text = custom_query if custom_query else prompt
             return f"No objects detected matching query: '{query_text}'\n\n" \
                    f"Try adjusting:\n" \
-                   f"• Query terms (be more general or specific)\n" \
-                   f"• Confidence threshold (lower to find more)\n" \
-                   f"• Image quality (better lighting, clearer view)"
+                   f"- Query terms (be more general or specific)\n" \
+                   f"- Confidence threshold (lower to find more)\n" \
+                   f"- Image quality (better lighting, clearer view)"
         
         # Group by label
         grouped = {}
@@ -3326,20 +3326,20 @@ class GroundingDINOProvider(AIProvider):
             grouped[label].append(det)
         
         # Build output
-        output = "🎯 GroundingDINO Detection Results\n"
+        output = "GroundingDINO Detection Results\n"
         output += "=" * 60 + "\n\n"
         
         if custom_query:
             output += f"Query: '{custom_query}'\n\n"
         
-        output += f"📊 Summary: Found {len(results)} objects across {len(grouped)} categories\n\n"
+        output += f"Summary: Found {len(results)} objects across {len(grouped)} categories\n\n"
         
         # List each category
         for label, detections in sorted(grouped.items(), key=lambda x: -len(x[1])):
             count = len(detections)
             avg_conf = sum(d['confidence'] for d in detections) / count
             
-            output += f"✓ {label.title()}: {count} instance(s) [avg confidence: {avg_conf:.1%}]\n"
+            output += f"{label.title()}: {count} instance(s) [avg confidence: {avg_conf:.1%}]\n"
             
             # Show details for each instance
             for i, det in enumerate(detections, 1):
@@ -3352,12 +3352,6 @@ class GroundingDINOProvider(AIProvider):
                 output += f"Confidence: {det['confidence']:.1%}\n"
             
             output += "\n"
-        
-        # Add tips
-        output += "💡 Tips:\n"
-        output += "• Use chat to refine: 'find only red objects', 'show people with hats'\n"
-        output += "• Combine with Ollama for detailed descriptions\n"
-        output += "• Lower confidence to find more, raise to reduce false positives\n"
         
         return output
 

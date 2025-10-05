@@ -35,8 +35,8 @@ bitsandbytes>=0.41.0
 openai>=1.0.0
 
 # ONNX Runtime for hardware-accelerated models (optional)
-onnxruntime>=1.16.0
-onnxruntime-directml>=1.16.0; sys_platform == "win32"  # DirectML NPU support for Windows
+# Note: Using onnxruntime-directml for NPU/DirectML support on Windows
+onnxruntime-directml>=1.16.0
 onnx>=1.15.0
 huggingface-hub>=0.17.0
 

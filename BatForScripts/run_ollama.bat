@@ -33,6 +33,15 @@ set MODEL=llava
 REM Description style (narrative, detailed, concise, technical, accessibility)
 set PROMPT_STYLE=narrative
 
+REM Workflow steps (full workflow for set-and-forget processing)
+set STEPS=video,convert,describe,html
+
+REM Video frame extraction rate (frames per second)
+REM   0.5 = 1 frame every 2 seconds
+REM   1 = 1 frame per second  
+REM   2 = 2 frames per second
+set FPS=1
+
 REM ======================================
 
 echo ============================================================================
@@ -40,13 +49,19 @@ echo Image Description Workflow - Ollama Provider
 echo ============================================================================
 echo.
 echo Configuration:
-echo   Provider: ollama
-echo   Model: %MODEL%
-echo   Prompt Style: %PROMPT_STYLE%
-echo   Image/Folder: %IMAGE_PATH%
+  echo   Provider: ollama
+  echo   Model: %MODEL%
+  echo   Prompt Style: %PROMPT_STYLE%
+  echo   Image/Folder: %IMAGE_PATH%
+  echo   Steps: %STEPS%
+  echo   Video FPS: %FPS%
 echo.
-
-REM Validate image path
+echo Complete Workflow:
+  echo   1. Extract video frames (%FPS% FPS)
+  echo   2. Convert HEIC images to JPG
+  echo   3. Generate AI descriptions
+  echo   4. Create HTML gallery
+echo.REM Validate image path
 if not exist "%IMAGE_PATH%" (
     echo ERROR: Image path does not exist: %IMAGE_PATH%
     echo Please edit this batch file and set IMAGE_PATH to a valid path
@@ -103,7 +118,7 @@ if not exist "workflow.py" (
 REM Run the workflow
 echo Running workflow...
 echo.
-python workflow.py "%IMAGE_PATH%" --provider ollama --model %MODEL% --prompt-style %PROMPT_STYLE%
+python workflow.py "%IMAGE_PATH%" --provider ollama --model %MODEL% --prompt-style %PROMPT_STYLE% --steps %STEPS% --fps %FPS%
 
 if errorlevel 1 (
     echo.
