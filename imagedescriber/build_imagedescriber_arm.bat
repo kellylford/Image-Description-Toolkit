@@ -62,6 +62,13 @@ REM Build the executable for ARM64
     --hidden-import "worker_threads" ^
     --hidden-import "ui_components" ^
     --hidden-import "dialogs" ^
+    --exclude-module "onnx.reference" ^
+    --exclude-module "onnx.reference.ops" ^
+    --exclude-module "torch.testing" ^
+    --exclude-module "pytest" ^
+    --exclude-module "polars" ^
+    --exclude-module "thop" ^
+    --exclude-module "scipy.signal" ^
     --target-architecture arm64 ^
     --clean ^
     "%SCRIPT_DIR%\imagedescriber.py"

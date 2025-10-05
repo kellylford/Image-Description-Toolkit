@@ -43,7 +43,7 @@ REM Default location: %USERPROFILE%\onedrive\claude.txt
 set API_KEY_FILE=c:\users\kelly\onedrive\claude.txt
 
 REM Claude model (3-5-sonnet-20241022 recommended for best quality)
-set MODEL=claude-3-5-sonnet-20241022
+set MODEL=claude-sonnet-4-5-20250929 
 
 REM Description style
 set PROMPT_STYLE=narrative
@@ -105,7 +105,7 @@ if errorlevel 1 (
 )
 
 REM Navigate
-cd /d "%~dp0.."
+cd /d "c:\users\kelly\github\it\"
 if not exist "workflow.py" (
     echo ERROR: workflow.py not found
     pause

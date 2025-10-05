@@ -44,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from imagedescriber.ai_providers import (
     OllamaProvider,
     OpenAIProvider,
+    ClaudeProvider,
     ONNXProvider,
     CopilotProvider,
     HuggingFaceProvider,
@@ -180,6 +181,14 @@ class ImageDescriber:
                 provider.api_key = self.api_key
                 return provider
                 
+            elif self.provider_name == "claude":
+                logger.info("Initializing Claude provider...")
+                if not self.api_key:
+                    raise ValueError("Claude provider requires an API key. Use --api-key-file option.")
+                provider = ClaudeProvider()
+                provider.api_key = self.api_key
+                return provider
+                
             elif self.provider_name == "onnx":
                 logger.info("Initializing ONNX provider...")
                 provider = ONNXProvider()
@@ -213,7 +222,7 @@ class ImageDescriber:
                 return provider
                 
             else:
-                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, onnx, copilot, huggingface, groundingdino, groundingdino+ollama")
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, onnx, copilot, huggingface, groundingdino, groundingdino+ollama")
                 
         except Exception as e:
             logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
@@ -1119,6 +1128,10 @@ Examples:
   python {Path(__file__).name} exportedphotos --provider openai --model gpt-4o-mini --api-key-file ~/openai.txt
   python {Path(__file__).name} exportedphotos --provider openai --model gpt-4-vision-preview
   
+  # Claude (Anthropic)
+  python {Path(__file__).name} exportedphotos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file ~/claude.txt
+  python {Path(__file__).name} exportedphotos --provider claude --model claude-3-5-haiku-20241022
+  
   # ONNX (Enhanced Ollama with YOLO detection)
   python {Path(__file__).name} exportedphotos --provider onnx --model llava:latest
   
@@ -1141,7 +1154,7 @@ Configuration:
         "--provider",
         type=str,
         default="ollama",
-        choices=["ollama", "openai", "onnx", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
+        choices=["ollama", "openai", "claude", "onnx", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
         help="AI provider to use (default: ollama)"
     )
     parser.add_argument(
@@ -1253,8 +1266,14 @@ Configuration:
             sys.exit(1)
     
     # Check for API key in environment variables if not provided via file
-    if not api_key and args.provider in ["openai", "huggingface"]:
-        env_var = "OPENAI_API_KEY" if args.provider == "openai" else "HUGGINGFACE_API_KEY"
+    if not api_key and args.provider in ["openai", "huggingface", "claude"]:
+        if args.provider == "openai":
+            env_var = "OPENAI_API_KEY"
+        elif args.provider == "claude":
+            env_var = "ANTHROPIC_API_KEY"
+        else:
+            env_var = "HUGGINGFACE_API_KEY"
+        
         api_key = os.environ.get(env_var)
         if api_key:
             logger.info(f"Using API key from environment variable {env_var}")
