@@ -1,0 +1,2 @@
+tests\test_files\images\blue_landscape.jpg
+tests\test_files\images\green_circle.png
