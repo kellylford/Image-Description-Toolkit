@@ -13,7 +13,7 @@ REM   - API key saved to a text file (one line, just the key)
 REM   - Internet connection
 REM   - Python 3.8+ with dependencies
 REM
-REM COST:
+REM Cost Estimate:
 REM   - gpt-4o-mini: ~$0.003 per image
 REM   - gpt-4o: ~$0.01 per image
 REM

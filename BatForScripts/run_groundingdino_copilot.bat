@@ -41,7 +41,7 @@ REM ======== EDIT THESE SETTINGS ========
 REM Path to your images (folder or single image file)
 REM Use absolute path without quotes
 REM Example: C:\MyPhotos  or  C:\MyPhotos\photo.jpg
-set IMAGE_PATH=\\ford\home\photos\MobileBackup\iPhone\2025\09
+set IMAGE_PATH=<path to images>
 
 REM Detection query - what objects to detect
 REM Separate items with ' . ' (space-dot-space)
