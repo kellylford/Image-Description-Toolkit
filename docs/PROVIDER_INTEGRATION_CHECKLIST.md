@@ -769,6 +769,263 @@ REM ... rest of template ...
 
 ---
 
+## Step 6.5: Update Model Management Scripts ⚠️ **IMPORTANT**
+
+**⚠️ NOTE:** These scripts were forgotten during Claude integration! Don't skip them.
+
+The toolkit includes two model management scripts in the `models/` directory that need to be updated:
+- `models/check_models.py` - Check provider status and list models
+- `models/manage_models.py` - Manage and install models
+
+### 6.5.1 Update check_models.py
+
+**File:** `models/check_models.py` (~465 lines)
+
+#### Add Status Check Function
+
+**Location:** After `check_openai_status()` function (around line 135)
+
+**Template:**
+
+```python
+def check_google_status() -> Tuple[bool, List[str], str]:
+    """Check Google AI provider status."""
+    with SuppressOutput():
+        from imagedescriber.ai_providers import GoogleProvider
+    
+    try:
+        provider = GoogleProvider()
+        if not provider.is_available():
+            return False, [], "API key not configured (need google.txt or GOOGLE_API_KEY)"
+        
+        # Known Google vision models
+        models = [
+            "gemini-2.0-flash",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash"
+        ]
+        return True, models, "API key configured"
+    except Exception as e:
+        return False, [], f"Error: {str(e)}"
+```
+
+- [ ] Status check function added
+- [ ] Model list matches provider's models
+- [ ] Environment variable name correct
+
+#### Add to Providers Dictionary
+
+**Location:** In `main()` function (around line 380)
+
+```python
+# Check all providers
+providers = {
+    'ollama': ('Ollama (Local Models)', check_ollama_status),
+    'ollama-cloud': ('Ollama Cloud', check_ollama_cloud_status),
+    'openai': ('OpenAI', check_openai_status),
+    'claude': ('Claude (Anthropic)', check_claude_status),
+    'google': ('Google AI (Gemini)', check_google_status),  # ADD THIS
+    'huggingface': ('HuggingFace', check_huggingface_status),
+    'onnx': ('ONNX / Enhanced YOLO', check_onnx_status),
+    'copilot': ('Copilot+ PC (NPU)', check_copilot_status),
+    'groundingdino': ('GroundingDINO (Object Detection)', check_groundingdino_status),
+}
+```
+
+- [ ] Provider added to dictionary with display name
+
+#### Add to Provider Choices
+
+**Location:** In argument parser (around line 360)
+
+```python
+parser.add_argument(
+    '--provider',
+    choices=['ollama', 'ollama-cloud', 'openai', 'claude', 'google', 'huggingface', 'onnx', 'copilot', 'groundingdino'],
+    help='Check only a specific provider'
+)
+```
+
+- [ ] Provider added to choices list
+
+#### Update Help Messages (Optional)
+
+**Location:** API key error messages (around line 305)
+
+```python
+elif "api key" in message.lower():
+    if "google" in message.lower() or "gemini" in provider_name.lower():
+        print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add Google API key to 'google.txt' or GOOGLE_API_KEY env var")
+    elif "anthropic" in message.lower() or "claude" in provider_name.lower():
+        print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add Claude API key to 'claude.txt' or ANTHROPIC_API_KEY env var")
+    else:
+        print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add OpenAI API key to 'openai.txt' or OPENAI_API_KEY env var")
+```
+
+- [ ] Help message updated for provider's API key
+
+**Testing check_models.py:**
+
+```bash
+# Test specific provider
+python -m models.check_models --provider google
+
+# Should show:
+# Google AI (Gemini)
+#   [OK] Status: API key configured
+#   Models: 3 available
+#     • gemini-2.0-flash
+#     • gemini-1.5-pro
+#     • gemini-1.5-flash
+```
+
+---
+
+### 6.5.2 Update manage_models.py
+
+**File:** `models/manage_models.py` (~860 lines)
+
+#### Add Models to MODEL_METADATA
+
+**Location:** After OpenAI models section (around line 165)
+
+**Template:**
+
+```python
+# Google AI (Gemini) Models
+"gemini-2.0-flash": {
+    "provider": "google",
+    "description": "Gemini 2.0 Flash - Latest, fastest",
+    "size": "Cloud-based",
+    "install_command": "Requires API key in google.txt or GOOGLE_API_KEY",
+    "recommended": True,
+    "cost": "$$",
+    "tags": ["vision", "cloud", "fast", "recommended"]
+},
+"gemini-1.5-pro": {
+    "provider": "google",
+    "description": "Gemini 1.5 Pro - Highest quality",
+    "size": "Cloud-based",
+    "install_command": "Requires API key in google.txt or GOOGLE_API_KEY",
+    "recommended": True,
+    "cost": "$$$",
+    "tags": ["vision", "cloud", "accurate", "recommended"]
+},
+"gemini-1.5-flash": {
+    "provider": "google",
+    "description": "Gemini 1.5 Flash - Good balance",
+    "size": "Cloud-based",
+    "install_command": "Requires API key in google.txt or GOOGLE_API_KEY",
+    "recommended": False,
+    "cost": "$$",
+    "tags": ["vision", "cloud"]
+},
+```
+
+**Fields to include:**
+- `provider`: Provider key (e.g., "google")
+- `description`: Clear model description
+- `size`: "Cloud-based" for API models
+- `install_command`: API key setup instructions
+- `recommended`: True for best models
+- `cost`: $ (cheap), $$ (moderate), $$$ (expensive)
+- `tags`: Categorization tags
+
+- [ ] All models added to MODEL_METADATA
+- [ ] Recommended flag set correctly
+- [ ] Cost indicators appropriate
+
+#### Update Supported Providers Documentation
+
+**Location:** Top of file docstring (around line 8)
+
+```python
+Supported Providers:
+    - Ollama (local vision models)
+    - OpenAI (cloud API models)
+    - Claude (Anthropic cloud API models)
+    - Google (Gemini cloud API models)  # ADD THIS
+    - HuggingFace (transformers-based models)
+    - YOLO (object detection)
+    - GroundingDINO (text-prompted detection)
+```
+
+- [ ] Provider added to documentation
+
+#### Add to Provider Choices
+
+**Location:** In argument parser (around line 783)
+
+```python
+list_parser.add_argument(
+    '--provider',
+    choices=['ollama', 'openai', 'claude', 'google', 'huggingface', 'yolo', 'groundingdino'],
+    help='Filter by provider'
+)
+```
+
+- [ ] Provider added to choices list
+
+#### Add Install Command Handling
+
+**Location:** In install command section (around line 832)
+
+```python
+elif provider == 'openai':
+    print(f"OpenAI models require an API key.")
+    print(f"Add your API key to 'openai.txt' or set OPENAI_API_KEY environment variable")
+elif provider == 'claude':
+    print(f"Claude models require an API key.")
+    print(f"Add your API key to 'claude.txt' or set ANTHROPIC_API_KEY environment variable")
+elif provider == 'google':  # ADD THIS
+    print(f"Google AI models require an API key.")
+    print(f"Add your API key to 'google.txt' or set GOOGLE_API_KEY environment variable")
+else:
+    print(f"Installation for {provider} not supported via this tool")
+```
+
+- [ ] Install command handling added
+
+**Testing manage_models.py:**
+
+```bash
+# List provider's models
+python -m models.manage_models list --provider google
+
+# Should show:
+# GOOGLE
+#   [AVAILABLE] gemini-2.0-flash [RECOMMENDED]
+#     Gemini 2.0 Flash - Latest, fastest
+#     Size: Cloud-based | Cost: $$
+#     Install: Requires API key in google.txt or GOOGLE_API_KEY
+```
+
+---
+
+### 6.5.3 Checklist Summary
+
+**check_models.py changes:**
+- [ ] Status check function created
+- [ ] Added to providers dictionary
+- [ ] Added to provider choices
+- [ ] Help messages updated
+- [ ] Tested with `--provider google`
+
+**manage_models.py changes:**
+- [ ] All models added to MODEL_METADATA
+- [ ] Supported providers list updated
+- [ ] Added to provider choices
+- [ ] Install command handling added
+- [ ] Tested with `list --provider google`
+
+**Why This Matters:**
+- Users can check if provider is configured: `checkmodels.bat google`
+- Users can list available models: `python -m models.manage_models list --provider google`
+- Provides installation instructions and model metadata
+- Integrates with existing model management workflow
+
+---
+
 ## Step 7: Testing ⚠️ **DO NOT SKIP**
 
 ### 7.1 GUI Testing
@@ -963,11 +1220,13 @@ grep -n "claude" imagedescriber/imagedescriber.py | wc -l
 grep -n "claude" models/provider_configs.py | wc -l
 grep -n "claude" scripts/workflow.py | wc -l
 grep -n "claude" scripts/image_describer.py | wc -l
+grep -n "claude" models/check_models.py | wc -l
+grep -n "claude" models/manage_models.py | wc -l
 ```
 
 Now search for your provider and ensure similar number of matches.
 
-- [ ] Provider name appears in all 5 core files
+- [ ] Provider name appears in all 7 core files
 - [ ] No "TODO" or "FIXME" comments left
 - [ ] No copy-paste errors (e.g., "Claude" in Google code)
 
@@ -984,6 +1243,8 @@ Based on Claude integration, you should have touched these locations:
 | `imagedescriber.py` | 6-10 locations | Import, display name, 4 dictionaries, chat (if needed) |
 | `workflow.py` | 2 locations | Choices, examples |
 | `image_describer.py` | 5 locations | Import, choices, examples, API key, initialization |
+| `models/check_models.py` | 4 locations | Status function, provider dict, choices, help |
+| `models/manage_models.py` | 4+ locations | Model metadata, docs, choices, install handling |
 
 - [ ] All expected changes made
 - [ ] No locations missed
@@ -1070,6 +1331,14 @@ Add note that Google was integrated following this checklist.
 **Cause:** API key not provided or not loaded correctly  
 **Fix:** Check `_load_api_key_from_file()` implementation, verify file paths
 
+### "invalid choice: 'google'" in check_models.py or manage_models.py
+**Cause:** Forgot to add provider to model management scripts  
+**Fix:** Add to provider choices in both `models/check_models.py` and `models/manage_models.py`
+
+### Provider doesn't show in checkmodels.bat output
+**Cause:** Forgot to add provider to `models/check_models.py`  
+**Fix:** Add status check function and provider dictionary entry
+
 ### ImportError or ModuleNotFoundError
 **Cause:** Provider SDK not installed  
 **Fix:** Install required package: `pip install google-generativeai` (or whatever)
@@ -1090,36 +1359,42 @@ Add note that Google was integrated following this checklist.
 | Workflow CLI (Step 4) | 5 min | Simple |
 | Batch CLI (Step 5) | 10 min | Often forgotten! |
 | Batch File (Step 6) | 5 min | Optional |
+| **Model Scripts (Step 6.5)** | 10-15 min | **Easy to forget!** |
 | **Testing (Step 7)** | 15-20 min | **Don't skip!** |
 | Documentation (Step 8) | 20-30 min | Important for users |
 | Verification (Step 9) | 10 min | Final checks |
 
-**Total:** ~90-120 minutes (with testing and documentation)  
-**Without documentation:** ~60 minutes  
-**Absolute minimum (no testing):** ~40 minutes (⚠️ not recommended)
+**Total:** ~105-135 minutes (with testing and documentation)  
+**Without documentation:** ~75 minutes  
+**Absolute minimum (no testing):** ~50 minutes (⚠️ not recommended)
 
 ---
 
 ## Summary
 
-Adding a provider touches **6 files** with **22+ integration points**:
+Adding a provider touches **8 files** with **28+ integration points**:
 
 1. ✅ **ai_providers.py** - Core implementation (4 points)
 2. ✅ **provider_configs.py** - Capabilities (1 point)
 3. ✅ **imagedescriber.py** - GUI integration (6-10 points) ⚠️ **Most error-prone**
 4. ✅ **workflow.py** - CLI workflow (2 points)
 5. ✅ **image_describer.py** - CLI batch (5 points) ⚠️ **Often forgotten**
-6. ✅ **Documentation** - Setup guides and examples (3+ files)
+6. ✅ **models/check_models.py** - Model status checking (4 points) ⚠️ **Often forgotten**
+7. ✅ **models/manage_models.py** - Model management (4+ points) ⚠️ **Often forgotten**
+8. ✅ **Documentation** - Setup guides and examples (3+ files)
 
 **Most Common Mistakes:**
 1. ❌ Forgetting one of the 4 provider dictionaries in imagedescriber.py
 2. ❌ Forgetting scripts/image_describer.py entirely
-3. ❌ Not testing thoroughly (especially GUI)
+3. ❌ Forgetting model management scripts (check_models.py, manage_models.py)
+4. ❌ Not testing thoroughly (especially GUI)
 
 **Success Criteria:**
 - ✅ Works in GUI (all 3 tabs)
 - ✅ Works in workflow.py
 - ✅ Works in image_describer.py
+- ✅ Shows in check_models.py output
+- ✅ Shows in manage_models.py list
 - ✅ API key loading works
 - ✅ All integration points updated
 
@@ -1127,7 +1402,7 @@ Adding a provider touches **6 files** with **22+ integration points**:
 
 ---
 
-**Version:** 1.0  
-**Last Updated:** October 5, 2025  
-**Based On:** Claude provider integration experience  
+**Version:** 1.1  
+**Last Updated:** October 5, 2025 (Updated to include model management scripts)  
+**Based On:** Claude provider integration experience (including lessons learned)  
 **Next Review:** After adding Google provider (to refine checklist)
