@@ -8,6 +8,7 @@ This is a standalone tool that works independently of the GUI and scripts.
 Supported Providers:
     - Ollama (local vision models)
     - OpenAI (cloud API models)
+    - Claude (Anthropic cloud API models)
     - HuggingFace (transformers-based models)
     - YOLO (object detection)
     - GroundingDINO (text-prompted detection)
@@ -168,6 +169,71 @@ MODEL_METADATA = {
         "recommended": False,
         "cost": "$$$",
         "tags": ["vision", "cloud"]
+    },
+    
+    # Claude (Anthropic) Models
+    "claude-sonnet-4-5-20250929": {
+        "provider": "claude",
+        "description": "Claude Sonnet 4.5 - Latest, most capable",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": True,
+        "cost": "$$",
+        "tags": ["vision", "cloud", "accurate", "recommended"]
+    },
+    "claude-opus-4-1-20250805": {
+        "provider": "claude",
+        "description": "Claude Opus 4.1 - Highest quality",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": True,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "accurate", "recommended"]
+    },
+    "claude-sonnet-4-20250514": {
+        "provider": "claude",
+        "description": "Claude Sonnet 4.0",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": False,
+        "cost": "$$",
+        "tags": ["vision", "cloud"]
+    },
+    "claude-opus-4-20250514": {
+        "provider": "claude",
+        "description": "Claude Opus 4.0",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "accurate"]
+    },
+    "claude-3-7-sonnet-20250219": {
+        "provider": "claude",
+        "description": "Claude 3.7 Sonnet",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": False,
+        "cost": "$$",
+        "tags": ["vision", "cloud"]
+    },
+    "claude-3-5-haiku-20241022": {
+        "provider": "claude",
+        "description": "Claude 3.5 Haiku - Fastest, cheapest",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": True,
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast", "recommended"]
+    },
+    "claude-3-haiku-20240307": {
+        "provider": "claude",
+        "description": "Claude 3.0 Haiku - Budget option",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": False,
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast"]
     },
     
     # HuggingFace Models
@@ -714,7 +780,7 @@ Examples:
     # List command
     list_parser = subparsers.add_parser('list', help='List available models')
     list_parser.add_argument('--installed', action='store_true', help='Show only installed models')
-    list_parser.add_argument('--provider', choices=['ollama', 'openai', 'huggingface', 'yolo', 'groundingdino'], help='Filter by provider')
+    list_parser.add_argument('--provider', choices=['ollama', 'openai', 'claude', 'huggingface', 'yolo', 'groundingdino'], help='Filter by provider')
     
     # Install command
     install_parser = subparsers.add_parser('install', help='Install a model')
@@ -766,6 +832,9 @@ Examples:
                 elif provider == 'openai':
                     print(f"OpenAI models require an API key.")
                     print(f"Add your API key to 'openai.txt' or set OPENAI_API_KEY environment variable")
+                elif provider == 'claude':
+                    print(f"Claude models require an API key.")
+                    print(f"Add your API key to 'claude.txt' or set ANTHROPIC_API_KEY environment variable")
                 else:
                     print(f"Installation for {provider} not supported via this tool")
             else:
