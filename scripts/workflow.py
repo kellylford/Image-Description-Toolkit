@@ -1110,6 +1110,11 @@ Examples:
 Resume Examples:
   python workflow.py --resume workflow_output_20250919_153443
   python workflow.py --resume /path/to/interrupted/workflow
+  
+  # ⚠️ Cloud providers require API key when resuming:
+  python workflow.py --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file ~/openai.txt
+  python workflow.py --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file ~/claude.txt
+  # See docs/WORKFLOW_RESUME_API_KEY.md for details
         """
     )
     

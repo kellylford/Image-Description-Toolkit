@@ -140,6 +140,19 @@ python workflow.py --resume workflow_gemma3_narrative_20250916_110009
 # If the workflow is already complete
 python workflow.py --resume complete_workflow
 # Output: ✅ Workflow appears to be complete - nothing to resume
+
+# ⚠️ IMPORTANT: Cloud Provider API Keys
+# When resuming workflows that use cloud providers (OpenAI, Claude, HuggingFace),
+# you MUST provide the API key file again:
+python workflow.py --resume wf_openai_gpt-4o-mini_narrative_20251005_122700 --api-key-file ~/openai.txt
+python workflow.py --resume wf_claude_claude-sonnet-4-5-20250929_narrative_20251005_150328 --api-key-file ~/claude.txt
+
+# Or set the environment variable before resuming:
+# Windows: set OPENAI_API_KEY=sk-your-key
+# Linux/Mac: export OPENAI_API_KEY=sk-your-key
+# Then: python workflow.py --resume <workflow_dir>
+
+# See docs/WORKFLOW_RESUME_API_KEY.md for detailed information
 ```
 
 ## 🔧 Backward Compatibility
