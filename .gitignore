@@ -12,6 +12,9 @@ test_*.py
 wf_*/
 wf_*
 
+# Local files (personal batch files, test outputs, etc.)
+localdonotsubmit/
+
 # Python cache and compiled files
 __pycache__/
 *.py[cod]
