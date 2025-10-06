@@ -5837,6 +5837,14 @@ class ImageDescriberGUI(QMainWindow):
     # UI update methods
     def refresh_view(self):
         """Refresh the image list view"""
+        # Check view mode and call appropriate refresh method
+        if self.view_mode == "flat":
+            self.refresh_flat_view()
+        else:
+            self.refresh_tree_view()
+    
+    def refresh_tree_view(self):
+        """Refresh the image list in tree view mode (original view)"""
         self.image_list.clear()
         
         # Collect items to display
@@ -6042,6 +6050,115 @@ class ImageDescriberGUI(QMainWindow):
             except Exception as e:
                 print(f"Warning: Could not restore chat selection: {e}")
                 # Fall back to regular refresh behavior
+    
+    def refresh_flat_view(self):
+        """Refresh the image list in flat view mode - shows all descriptions in a single list"""
+        self.image_list.clear()
+        
+        # Collect all items with their descriptions
+        all_descriptions = []
+        
+        for file_path, item in self.workspace.items.items():
+            # Skip extracted frames - they'll be shown with their descriptions
+            if item.item_type == "extracted_frame":
+                continue
+            
+            # Apply filter
+            if self.filter_mode == "described" and not item.descriptions:
+                continue
+            elif self.filter_mode == "undescribed" and item.descriptions:
+                continue
+            elif self.filter_mode == "batch" and not item.batch_marked:
+                continue
+            elif self.filter_mode == "videos" and item.item_type != "video":
+                continue
+            elif self.filter_mode == "images" and item.item_type == "video":
+                continue
+            elif self.filter_mode == "processing" and file_path not in self.processing_items:
+                continue
+            
+            # For items with descriptions, add each description
+            if item.descriptions:
+                for desc in item.descriptions:
+                    all_descriptions.append({
+                        'file_path': file_path,
+                        'item': item,
+                        'description': desc
+                    })
+            
+            # For videos, also include descriptions from extracted frames
+            if item.item_type == "video" and item.extracted_frames:
+                for frame_path in item.extracted_frames:
+                    frame_item = self.workspace.get_item(frame_path)
+                    if frame_item and frame_item.descriptions:
+                        for desc in frame_item.descriptions:
+                            all_descriptions.append({
+                                'file_path': frame_path,
+                                'item': frame_item,
+                                'description': desc
+                            })
+        
+        # Sort descriptions based on file date or filename
+        if self.sort_order == "filename":
+            all_descriptions.sort(key=lambda x: Path(x['file_path']).name.lower())
+        elif self.sort_order == "date_oldest":
+            def get_file_date(file_path):
+                try:
+                    return Path(file_path).stat().st_mtime
+                except:
+                    return 0
+            all_descriptions.sort(key=lambda x: get_file_date(x['file_path']), reverse=False)
+        elif self.sort_order == "date_newest":
+            def get_file_date(file_path):
+                try:
+                    return Path(file_path).stat().st_mtime
+                except:
+                    return 0
+            all_descriptions.sort(key=lambda x: get_file_date(x['file_path']), reverse=True)
+        
+        # Add descriptions to the list
+        for entry in all_descriptions:
+            file_path = entry['file_path']
+            item = entry['item']
+            desc = entry['description']
+            
+            file_name = Path(file_path).name
+            
+            # Format: "Description text - filename"
+            # Truncate very long descriptions for display
+            desc_text = desc.text
+            if len(desc_text) > 200:
+                desc_text = desc_text[:197] + "..."
+            
+            display_name = f"{desc_text} - {file_name}"
+            
+            # Create list item
+            list_item = QListWidgetItem(display_name)
+            # Store both file path and description ID for retrieval
+            list_item.setData(Qt.ItemDataRole.UserRole, file_path)
+            list_item.setData(Qt.ItemDataRole.UserRole + 1, desc.id)  # Description ID
+            
+            # Build accessibility description
+            accessibility_desc = f"Description: {desc_text}. Image: {file_name}"
+            
+            # Add model info if available
+            if desc.model:
+                accessibility_desc += f". Model: {desc.model}"
+            
+            list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
+            list_item.setToolTip(f"File: {file_name}\nDescription: {desc.text}\nModel: {desc.model or 'Unknown'}\nPrompt: {desc.prompt_style or 'Unknown'}")
+            
+            # Mark batch items with accessible colors
+            if item.batch_marked:
+                list_item.setBackground(QColor(227, 242, 253))  # Light blue
+            
+            self.image_list.addItem(list_item)
+        
+        self.update_batch_label()
+        
+        # Also refresh master-detail view if it's the current mode
+        if self.navigation_mode == "master_detail":
+            self.refresh_master_detail_view()
     
     def update_batch_label(self):
         """Update the batch queue label"""
@@ -6598,12 +6715,38 @@ class ImageDescriberGUI(QMainWindow):
         if current_item:
             # Check if this is a chat session
             item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
-            if item_type == "chat_session":
+            
+            # In flat view mode, the item contains both file_path and description_id
+            if self.view_mode == "flat" and item_type and item_type != "chat_session":
+                # This is a flat view item with a specific description
+                file_path = current_item.data(Qt.ItemDataRole.UserRole)
+                desc_id = item_type  # In flat view, UserRole+1 stores description ID
+                
+                # Clear description list and show just this description
+                self.description_list.clear()
+                
+                # Find and display the specific description
+                workspace_item = self.workspace.get_item(file_path)
+                if workspace_item:
+                    for desc in workspace_item.descriptions:
+                        if desc.id == desc_id:
+                            # Format text for better screen reader accessibility
+                            formatted_text = self.format_description_for_accessibility(desc.text)
+                            self.description_text.setPlainText(formatted_text)
+                            
+                            # Update accessibility description
+                            char_count = len(desc.text)
+                            preview = formatted_text[:200] + "..." if len(formatted_text) > 200 else formatted_text
+                            self.description_text.setAccessibleDescription(
+                                f"Image description with {char_count} characters from {desc.model}: {preview}"
+                            )
+                            break
+            elif item_type == "chat_session":
                 chat_id = current_item.data(Qt.ItemDataRole.UserRole)
                 # Display chat conversation in the description area
                 self.display_chat_conversation(chat_id)
             else:
-                # Regular image file
+                # Regular tree view - image file
                 file_path = current_item.data(Qt.ItemDataRole.UserRole)
                 self.load_descriptions_for_image(file_path)
         
@@ -8149,6 +8292,21 @@ Please answer the follow-up question about this image, taking into account the c
         # Show temporary status message
         order_display = order.replace("_", " ").title()
         self.status_bar.showMessage(f"Sorted by {order_display}", 2000)
+
+    def set_view_mode(self, mode: str):
+        """Set the view mode (tree or flat) and refresh view"""
+        self.view_mode = mode
+        
+        # Update checkable actions
+        self.view_mode_tree_action.setChecked(mode == "tree")
+        self.view_mode_flat_action.setChecked(mode == "flat")
+        
+        # Refresh the view with new mode applied
+        self.refresh_view()
+        
+        # Show temporary status message
+        mode_display = "Image Tree" if mode == "tree" else "Flat Image List"
+        self.status_bar.showMessage(f"View mode: {mode_display}", 2000)
 
     def process_all(self):
         """Process all images with automatic HEIC conversion and video frame extraction"""
