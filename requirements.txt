@@ -1,11 +1,12 @@
-# Image Description Toolkit - Complete Dependencies
+# Image Description Toolkit - Core Dependencies
 # 
 # This file contains all dependencies needed for the complete
-# Image Description Toolkit including workflow system and all individual scripts
+# Image Description Toolkit with Ollama, OpenAI, and Claude providers
 #
 # Install with: pip install -r requirements.txt
 
 # Core dependencies for image description functionality
+# Ollama provider (local AI)
 ollama>=0.3.0
 
 # GUI dependencies for viewer applications
@@ -25,40 +26,14 @@ ExifRead>=3.0.0
 requests>=2.25.0
 geopy>=2.4.0
 
-# Hugging Face dependencies for local AI models (optional)
-transformers>=4.30.0
-torch>=2.0.0
-accelerate>=0.20.0
-bitsandbytes>=0.41.0
-
-# OpenAI API support (optional)
+# OpenAI API support
 openai>=1.0.0
 
-# ONNX Runtime for hardware-accelerated models (optional)
-# Note: Using onnxruntime-directml for NPU/DirectML support on Windows
-onnxruntime-directml>=1.16.0
-onnx>=1.15.0
-huggingface-hub>=0.17.0
+# Claude (Anthropic) API support
+anthropic>=0.18.0
 
-# YOLO object detection for Enhanced ONNX provider (optional)
-ultralytics>=8.0.0
-
-# Florence-2 dependencies for Copilot+ PC (optional)
-einops>=0.8.0
-timm>=1.0.0
-
-# GroundingDINO for text-prompted object detection (optional)
-# Note: Downloads ~700MB model on first use
-groundingdino-py>=0.1.0
-
-# Windows Runtime for Copilot+ PC support (Windows only, optional)
-# Note: winrt may not be available for Python 3.13+ yet
-winrt>=1.0.0; sys_platform == "win32" and python_version<"3.13"
+# Windows support for PyQt6
 pywin32>=306; sys_platform == "win32"
-
-# Configuration and utilities (compatibility for older Python versions)
-typing-extensions>=4.0.0; python_version<"3.8"
-pathlib2>=2.3.5; python_version<"3.4"
 
 # Optional: Enhanced user experience
 tqdm>=4.60.0

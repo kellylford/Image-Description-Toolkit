@@ -1,9 +1,9 @@
-# Image Description Toolkit - Python 3.13+ Compatible Dependencies
+# Image Description Toolkit - Python 3.13+ Dependencies
 # 
-# Simplified requirements for Python 3.13+ where some packages may not be available yet
+# Dependencies for Python 3.13+ with Ollama, OpenAI, and Claude providers
 # Install with: pip install -r requirements-python313.txt
 
-# Core dependencies (should work with Python 3.13+)
+# Core dependencies
 ollama>=0.3.0
 PyQt6>=6.4.0
 Pillow>=10.0.0
@@ -11,20 +11,15 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 requests>=2.25.0
 
-# Basic AI functionality
+# AI provider APIs
 openai>=1.0.0
-transformers>=4.30.0
-torch>=2.0.0
+anthropic>=0.18.0
 
-# ONNX Runtime (if available for Python 3.13)
-onnxruntime>=1.16.0
-onnx>=1.15.0
-
-# HuggingFace hub
-huggingface-hub>=0.17.0
-
-# Windows support (core only)
+# Windows support
 pywin32>=306; sys_platform == "win32"
 
-# Note: Some advanced packages like winrt, pyexiv2, ultralytics may not be available
-# for Python 3.13+ yet. Core image description functionality will still work.
+# Optional: Enhanced user experience
+tqdm>=4.60.0
+
+# Note: pyexiv2 may not be available for Python 3.13+ yet
+# Core image description functionality will still work without it
