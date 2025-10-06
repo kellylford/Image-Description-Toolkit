@@ -63,8 +63,8 @@ from PyQt6.QtGui import (
 
 # Import our refactored modules
 from ai_providers import (
-    AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider, ObjectDetectionProvider,
-    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
+    AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider,
+    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 
@@ -2122,8 +2122,7 @@ class ProcessingDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'claude': _claude_provider,
-            'object_detection': _object_detection_provider
+            'claude': _claude_provider
         }
         
         if provider_key not in all_providers:
@@ -2396,8 +2395,7 @@ class ChatDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'claude': _claude_provider,
-            'object_detection': _object_detection_provider
+            'claude': _claude_provider
         }
         
         for provider_key, provider in all_providers.items():
@@ -2422,8 +2420,7 @@ class ChatDialog(QDialog):
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'claude': _claude_provider,
-            'object_detection': _object_detection_provider
+            'claude': _claude_provider
         }
         
         if provider in all_providers:
@@ -2460,11 +2457,6 @@ class ChatDialog(QDialog):
                 self.status_label.setText("Using Claude (Anthropic) API. Advanced reasoning and vision capabilities. Requires API key.")
             else:
                 self.status_label.setText("Claude not available. Requires API key in claude.txt file or ANTHROPIC_API_KEY environment variable.")
-        elif provider == "object_detection":
-            if _object_detection_provider.is_available():
-                self.status_label.setText("Using YOLO object detection. Fast processing without LLM overhead. Choose detection mode from models.")
-            else:
-                self.status_label.setText("Object detection not available. Install with: pip install ultralytics")
         else:
             self.status_label.setText("")
     
@@ -7923,8 +7915,7 @@ Please answer the follow-up question about this image, taking into account the c
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'claude': _claude_provider,
-            'object_detection': _object_detection_provider
+            'claude': _claude_provider
         }
         
         for provider_key, provider in all_providers.items():
