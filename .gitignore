@@ -8,6 +8,10 @@ ChatHistory.txt
 test_*.py
 *_test.py
 
+# Workflow output directories
+wf_*/
+wf_*
+
 # Python cache and compiled files
 __pycache__/
 *.py[cod]
