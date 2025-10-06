@@ -180,7 +180,7 @@ class WorkflowOrchestrator:
             base_output_dir: Base output directory for the workflow
             model: Override model name
             prompt_style: Override prompt style
-            provider: AI provider to use (ollama, openai, onnx, copilot, huggingface, groundingdino, groundingdino+ollama)
+            provider: AI provider to use (ollama, openai, copilot, huggingface, groundingdino, groundingdino+ollama)
             api_key_file: Path to API key file for cloud providers
             detection_query: Detection query for GroundingDINO (separate items with ' . ')
             confidence: Confidence threshold for GroundingDINO (1-95)
@@ -1052,7 +1052,7 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
             for line in lines:
                 if "image_describer.py" in line and ("--model" in line or "--provider" in line):
                     # Extract from subprocess command lines like:
-                    # python.exe image_describer.py ... --model gemma3 --prompt-style artistic --provider onnx
+                    # python.exe image_describer.py ... --model gemma3 --prompt-style artistic --provider ollama
                     import shlex
                     try:
                         # Find the part after image_describer.py
@@ -1122,9 +1122,6 @@ Examples:
   python workflow.py photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file ~/claude.txt
   python workflow.py media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
   
-  # ONNX (Enhanced Ollama with YOLO)
-  python workflow.py images --provider onnx --model llava:latest
-  
   # Configuration
   python workflow.py mixed_media --output-dir analysis --config my_workflow.json
   
@@ -1180,7 +1177,7 @@ Resume Examples:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "claude", "onnx", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
+        choices=["ollama", "openai", "claude", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
         default="ollama",
         help="AI provider to use for image description (default: ollama)"
     )

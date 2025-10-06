@@ -63,8 +63,8 @@ from PyQt6.QtGui import (
 
 # Import our refactored modules
 from ai_providers import (
-    AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider, ONNXProvider, CopilotProvider, ObjectDetectionProvider,
-    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider, _onnx_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
+    AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider, CopilotProvider, ObjectDetectionProvider,
+    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 
@@ -2123,7 +2123,6 @@ class ProcessingDialog(QDialog):
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider
         }
@@ -2399,7 +2398,6 @@ class ChatDialog(QDialog):
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider
         }
@@ -2427,7 +2425,6 @@ class ChatDialog(QDialog):
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider
         }
@@ -2466,11 +2463,6 @@ class ChatDialog(QDialog):
                 self.status_label.setText("Using Claude (Anthropic) API. Advanced reasoning and vision capabilities. Requires API key.")
             else:
                 self.status_label.setText("Claude not available. Requires API key in claude.txt file or ANTHROPIC_API_KEY environment variable.")
-        elif provider == "onnx":
-            if _onnx_provider.is_available():
-                self.status_label.setText(f"Using ONNX Runtime models. Hardware acceleration: {_onnx_provider.hardware_type}. Run download_onnx_models.bat to get models.")
-            else:
-                self.status_label.setText("ONNX Runtime not available. Install with: pip install onnxruntime onnx huggingface-hub")
         elif provider == "copilot":
             if _copilot_provider.is_available():
                 self.status_label.setText(f"Using Copilot+ PC hardware acceleration. Status: {_copilot_provider.npu_info}")
@@ -7940,7 +7932,6 @@ Please answer the follow-up question about this image, taking into account the c
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider
         }
