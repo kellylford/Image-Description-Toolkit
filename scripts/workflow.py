@@ -180,7 +180,7 @@ class WorkflowOrchestrator:
             base_output_dir: Base output directory for the workflow
             model: Override model name
             prompt_style: Override prompt style
-            provider: AI provider to use (ollama, openai, copilot, huggingface, groundingdino, groundingdino+ollama)
+            provider: AI provider to use (ollama, openai, huggingface, groundingdino, groundingdino+ollama)
             api_key_file: Path to API key file for cloud providers
             detection_query: Detection query for GroundingDINO (separate items with ' . ')
             confidence: Confidence threshold for GroundingDINO (1-95)
@@ -1177,7 +1177,7 @@ Resume Examples:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "claude", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
+        choices=["ollama", "openai", "claude", "huggingface", "groundingdino", "groundingdino+ollama"],
         default="ollama",
         help="AI provider to use for image description (default: ollama)"
     )
