@@ -4176,7 +4176,10 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_mode: str = "all"  # "all", "described", "undescribed", "batch", "videos", "images", or "processing"
         
         # Sorting settings
-        self.sort_order: str = "filename"  # "filename" or "date"
+        self.sort_order: str = "date_oldest"  # "filename", "date_oldest", or "date_newest"
+        
+        # View mode settings
+        self.view_mode: str = "tree"  # "tree" or "flat"
         
         # Navigation mode settings
         self.navigation_mode: str = "tree"  # "tree" or "master_detail"
@@ -4662,6 +4665,10 @@ class ImageDescriberGUI(QMainWindow):
         load_dir_action.triggered.connect(self.load_image_directory)
         file_menu.addAction(load_dir_action)
         
+        import_workflow_action = QAction("Import Workflow...", self)
+        import_workflow_action.triggered.connect(self.import_workflow)
+        file_menu.addAction(import_workflow_action)
+        
         file_menu.addSeparator()
         
         exit_action = QAction("Exit", self)
@@ -4846,19 +4853,40 @@ class ImageDescriberGUI(QMainWindow):
         
         view_menu.addSeparator()
         
+        # View Mode submenu
+        view_mode_menu = view_menu.addMenu("View Mode")
+        
+        self.view_mode_tree_action = QAction("Image Tree", self)
+        self.view_mode_tree_action.setCheckable(True)
+        self.view_mode_tree_action.setChecked(True)  # Default
+        self.view_mode_tree_action.triggered.connect(lambda: self.set_view_mode("tree"))
+        view_mode_menu.addAction(self.view_mode_tree_action)
+        
+        self.view_mode_flat_action = QAction("Flat Image List", self)
+        self.view_mode_flat_action.setCheckable(True)
+        self.view_mode_flat_action.triggered.connect(lambda: self.set_view_mode("flat"))
+        view_mode_menu.addAction(self.view_mode_flat_action)
+        
+        view_menu.addSeparator()
+        
         # Sort submenu
         sort_menu = view_menu.addMenu("Sort by")
         
         self.sort_filename_action = QAction("Filename", self)
         self.sort_filename_action.setCheckable(True)
-        self.sort_filename_action.setChecked(True)  # Default
         self.sort_filename_action.triggered.connect(lambda: self.set_sort_order("filename"))
         sort_menu.addAction(self.sort_filename_action)
         
-        self.sort_date_action = QAction("Date", self)
-        self.sort_date_action.setCheckable(True)
-        self.sort_date_action.triggered.connect(lambda: self.set_sort_order("date"))
-        sort_menu.addAction(self.sort_date_action)
+        self.sort_date_oldest_action = QAction("Date (Oldest First)", self)
+        self.sort_date_oldest_action.setCheckable(True)
+        self.sort_date_oldest_action.setChecked(True)  # Default
+        self.sort_date_oldest_action.triggered.connect(lambda: self.set_sort_order("date_oldest"))
+        sort_menu.addAction(self.sort_date_oldest_action)
+        
+        self.sort_date_newest_action = QAction("Date (Newest First)", self)
+        self.sort_date_newest_action.setCheckable(True)
+        self.sort_date_newest_action.triggered.connect(lambda: self.set_sort_order("date_newest"))
+        sort_menu.addAction(self.sort_date_newest_action)
         
         view_menu.addSeparator()
         
@@ -5414,14 +5442,371 @@ class ImageDescriberGUI(QMainWindow):
         
         if progress:
             progress.close()
+    
+    def import_workflow(self):
+        """Import descriptions from a workflow directory into the current workspace"""
+        from datetime import datetime
         
-        # Show summary
-        search_type = "recursively" if recursive else "in directory"
-        QMessageBox.information(self, "Directory Loaded", 
-                               f"Loaded {loaded_count} new files {search_type}\n"
-                               f"Total files in workspace: {len(self.workspace.items)}")
+        # Select workflow directory
+        workflow_dir = QFileDialog.getExistingDirectory(
+            self,
+            "Select Workflow Directory",
+            "",
+            QFileDialog.Option.ShowDirsOnly
+        )
         
-        self.workspace.mark_modified()
+        if not workflow_dir:
+            return
+        
+        workflow_path = Path(workflow_dir)
+        desc_file = workflow_path / "descriptions" / "image_descriptions.txt"
+        
+        if not desc_file.exists():
+            QMessageBox.warning(
+                self,
+                "Import Failed",
+                f"Could not find image_descriptions.txt in workflow directory.\n\n"
+                f"Expected: {desc_file}"
+            )
+            return
+        
+        try:
+            # Disable auto-refresh during import to prevent crashes
+            self.image_list.setUpdatesEnabled(False)
+            
+            # Load file path mapping if it exists
+            mapping_file = workflow_path / "descriptions" / "file_path_mapping.json"
+            file_path_mapping = {}
+            original_source_dir = None
+            video_to_frames = {}  # Map original video path -> list of extracted frame paths
+            
+            if mapping_file.exists():
+                try:
+                    import json
+                    with open(mapping_file, 'r', encoding='utf-8') as f:
+                        file_path_mapping = json.load(f)
+                    self.status_bar.showMessage(f"Loaded {len(file_path_mapping)} file path mappings", 2000)
+                except Exception as e:
+                    QMessageBox.warning(
+                        self,
+                        "Mapping File Warning",
+                        f"Could not load file_path_mapping.json.\n"
+                        f"Some files may not be found.\n\n"
+                        f"Error: {str(e)}"
+                    )
+            else:
+                # No mapping file - try to parse workflow log for original source directory
+                workflow_logs = list(workflow_path.glob("logs/workflow_*.log"))
+                if workflow_logs:
+                    try:
+                        with open(workflow_logs[0], 'r', encoding='utf-8') as f:
+                            for line in f:
+                                if "Input directory:" in line:
+                                    # Extract the directory path from log line
+                                    original_source_dir = line.split("Input directory:")[-1].strip()
+                                    self.status_bar.showMessage(f"Found original source: {original_source_dir}", 3000)
+                                    break
+                    except Exception as e:
+                        pass
+                
+                if not original_source_dir:
+                    self.status_bar.showMessage("No file mapping found - some files from original sources may be missing", 3000)
+            
+            # Parse frame extractor log to find original videos
+            # Strategy: Scan extracted_frames directory and reconstruct video paths
+            extracted_frames_dir = workflow_path / "extracted_frames"
+            if extracted_frames_dir.exists():
+                for video_dir in extracted_frames_dir.iterdir():
+                    if video_dir.is_dir():
+                        video_name = video_dir.name  # e.g., "IMG_3136" or "video-10898_singular_display"
+                        
+                        # Find frames in this directory
+                        frame_files = list(video_dir.glob("*.jpg")) + list(video_dir.glob("*.png"))
+                        if not frame_files:
+                            continue
+                        
+                        # Try to find the original video path
+                        video_path = None
+                        
+                        # 1. Check frame extractor log for explicit path
+                        frame_extractor_logs = list(workflow_path.glob("logs/frame_extractor_*.log"))
+                        if frame_extractor_logs:
+                            try:
+                                with open(frame_extractor_logs[0], 'r', encoding='utf-8') as f:
+                                    for line in f:
+                                        if "Found video file:" in line and video_name in line:
+                                            video_path = line.split("Found video file:")[-1].strip()
+                                            break
+                            except:
+                                pass
+                        
+                        # 2. If not in log, try to reconstruct from original source directory
+                        if not video_path and original_source_dir:
+                            # Try common video extensions
+                            for ext in ['.MOV', '.mov', '.mp4', '.MP4', '.avi', '.AVI', '.mkv', '.MKV']:
+                                candidate = Path(original_source_dir) / f"{video_name}{ext}"
+                                if candidate.exists():
+                                    video_path = str(candidate)
+                                    break
+                        
+                        # Store the mapping if we found the video
+                        if video_path:
+                            video_to_frames[video_path] = [str(f) for f in frame_files]
+            
+            # Read and parse the descriptions file
+            with open(desc_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Split by separator (80 dashes)
+            entries = content.split('-' * 80)
+            
+            imported_count = 0
+            duplicate_count = 0
+            missing_file_count = 0
+            error_count = 0
+            directories_to_add = set()  # Track unique directories
+            
+            # Show progress dialog
+            from PyQt6.QtWidgets import QProgressDialog
+            progress = QProgressDialog(
+                f"Importing descriptions from workflow...", 
+                "Cancel", 0, len(entries), self
+            )
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.show()
+            
+            for i, entry in enumerate(entries):
+                if progress.wasCanceled():
+                    break
+                
+                entry = entry.strip()
+                if not entry:
+                    continue
+                
+                try:
+                    # Parse entry fields
+                    lines = entry.split('\n')
+                    file_path = None
+                    provider = None
+                    model = None
+                    prompt_style = None
+                    description_lines = []
+                    
+                    reading_description = False
+                    for line in lines:
+                        if line.startswith('File: '):
+                            file_path = line[6:].strip()
+                        elif line.startswith('Provider: '):
+                            provider = line[10:].strip()
+                        elif line.startswith('Model: '):
+                            model = line[7:].strip()
+                        elif line.startswith('Prompt Style: '):
+                            prompt_style = line[14:].strip()
+                        elif line.startswith('Description: '):
+                            reading_description = True
+                            description_lines.append(line[13:].strip())
+                        elif reading_description and line.strip():
+                            description_lines.append(line.strip())
+                    
+                    if not all([file_path, provider, model, prompt_style, description_lines]):
+                        error_count += 1
+                        continue
+                    
+                    description = ' '.join(description_lines)
+                    
+                    # Map file path to actual location
+                    actual_path = None
+                    
+                    # Normalize the file path (handle backslashes on Windows)
+                    file_path_normalized = file_path.replace('\\', '/')
+                    
+                    # 1. Check file path mapping first (for files from temp_combined_images)
+                    if file_path in file_path_mapping:
+                        mapped_path = Path(file_path_mapping[file_path])
+                        if mapped_path.exists():
+                            actual_path = str(mapped_path.resolve())
+                    elif file_path_normalized in file_path_mapping:
+                        mapped_path = Path(file_path_mapping[file_path_normalized])
+                        if mapped_path.exists():
+                            actual_path = str(mapped_path.resolve())
+                    
+                    # 2. If not in mapping, check if it's a relative path within workflow
+                    if not actual_path:
+                        relative_path = Path(file_path_normalized)
+                        if len(relative_path.parts) > 0 and relative_path.parts[0] in ['converted_images', 'extracted_frames']:
+                            candidate = workflow_path / file_path_normalized
+                            if candidate.exists():
+                                actual_path = str(candidate.resolve())
+                    
+                    # 3. If we have original source directory, try to reconstruct path
+                    #    This handles files like "09\IMG_3137.PNG" from temp_combined_images
+                    if not actual_path and original_source_dir:
+                        try:
+                            # Extract just the filename from paths like "09\IMG_3137.PNG"
+                            file_parts = Path(file_path_normalized).parts
+                            if len(file_parts) >= 2:
+                                # Try: original_source_dir / filename
+                                candidate = Path(original_source_dir) / file_parts[-1]
+                                if candidate.exists():
+                                    actual_path = str(candidate.resolve())
+                        except:
+                            pass
+                    
+                    # 4. If still not found, try as absolute path
+                    if not actual_path:
+                        try:
+                            candidate_path = Path(file_path)
+                            if candidate_path.exists():
+                                actual_path = str(candidate_path.resolve())
+                        except:
+                            pass
+                    
+                    # If still not found, skip this entry
+                    if not actual_path:
+                        missing_file_count += 1
+                        continue
+                    
+                    # Get or create ImageItem
+                    if actual_path in self.workspace.items:
+                        item = self.workspace.items[actual_path]
+                    else:
+                        # Determine item type
+                        item_type = "image"
+                        if Path(actual_path).suffix.lower() in {'.mp4', '.mov', '.avi', '.mkv', '.wmv'}:
+                            item_type = "video"
+                        
+                        item = ImageItem(actual_path, item_type)
+                        self.workspace.add_item(item)
+                        
+                        # Track parent directory to add later
+                        parent_dir = str(Path(actual_path).parent)
+                        directories_to_add.add(parent_dir)
+                    
+                    # Create ImageDescription
+                    desc_obj = ImageDescription(
+                        text=description,
+                        model=model,
+                        prompt_style=prompt_style,
+                        provider=provider,
+                        created=datetime.now().isoformat()
+                    )
+                    
+                    # Ensure item.descriptions is a list
+                    if not hasattr(item, 'descriptions') or item.descriptions is None:
+                        item.descriptions = []
+                    
+                    # Add description if not duplicate
+                    is_duplicate = any(
+                        d.text == description and d.model == model and d.provider == provider
+                        for d in item.descriptions
+                    )
+                    
+                    if not is_duplicate:
+                        item.descriptions.append(desc_obj)
+                        imported_count += 1
+                    else:
+                        duplicate_count += 1
+                
+                except Exception as e:
+                    # Silently count errors during parsing
+                    error_count += 1
+                    continue
+                
+                # Update progress less frequently to avoid UI issues
+                if i % 10 == 0:
+                    progress.setValue(i + 1)
+                    QApplication.processEvents()
+            
+            # Final progress update
+            progress.setValue(len(entries))
+            progress.close()
+            
+            # Add original video items with their extracted frames
+            videos_added = 0
+            for video_path, frame_paths in video_to_frames.items():
+                try:
+                    if Path(video_path).exists():
+                        video_path_str = str(Path(video_path).resolve())
+                        
+                        # Create or get video item
+                        if video_path_str not in self.workspace.items:
+                            video_item = ImageItem(video_path_str, "video")
+                            self.workspace.add_item(video_item)
+                            
+                            # Add parent directory
+                            video_parent = str(Path(video_path_str).parent)
+                            directories_to_add.add(video_parent)
+                            
+                            videos_added += 1
+                        else:
+                            video_item = self.workspace.items[video_path_str]
+                        
+                        # Link extracted frames to video
+                        for frame_path in frame_paths:
+                            frame_path_resolved = str(Path(frame_path).resolve())
+                            if frame_path_resolved in self.workspace.items:
+                                # Mark frame as extracted from this video
+                                frame_item = self.workspace.items[frame_path_resolved]
+                                frame_item.parent_video = video_path_str
+                                frame_item.item_type = "extracted_frame"
+                                
+                                # Add frame to video's extracted_frames list
+                                if frame_path_resolved not in video_item.extracted_frames:
+                                    video_item.extracted_frames.append(frame_path_resolved)
+                except Exception as e:
+                    pass  # Skip videos that can't be found
+            
+            # Add all collected directories to workspace
+            for directory in directories_to_add:
+                if directory not in self.workspace.directory_paths:
+                    self.workspace.add_directory(directory)
+            
+            # Re-enable updates and refresh view
+            self.image_list.setUpdatesEnabled(True)
+            
+            try:
+                self.refresh_view()
+                self.update_window_title()
+            except Exception as e:
+                import traceback
+                error_details = traceback.format_exc()
+                # Try a simpler refresh
+                self.image_list.clear()
+                QMessageBox.warning(
+                    self,
+                    "Display Warning",
+                    f"Import completed but there was an error refreshing the display.\n"
+                    f"Try closing and reopening the workspace.\n\n"
+                    f"Error: {str(e)}\n\n"
+                    f"Imported {imported_count} descriptions successfully."
+                )
+            
+            # Show import summary
+            summary = f"Import Complete!\n\n"
+            summary += f"Imported: {imported_count} descriptions\n"
+            if videos_added > 0:
+                summary += f"Videos added: {videos_added}\n"
+            if duplicate_count > 0:
+                summary += f"Duplicates skipped: {duplicate_count}\n"
+            if missing_file_count > 0:
+                summary += f"Missing files: {missing_file_count}\n"
+            if error_count > 0:
+                summary += f"Parse errors: {error_count}\n"
+            
+            QMessageBox.information(self, "Workflow Import", summary)
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            self.image_list.setUpdatesEnabled(True)  # Re-enable updates on error
+            QMessageBox.critical(
+                self,
+                "Import Error",
+                f"Failed to import workflow:\n{str(e)}\n\nDetails:\n{error_details[:500]}"
+            )
+        finally:
+            # Ensure updates are always re-enabled
+            self.image_list.setUpdatesEnabled(True)
     
     def add_directory(self):
         """Add another directory to the current workspace"""
@@ -5481,8 +5866,16 @@ class ImageDescriberGUI(QMainWindow):
         # Sort items based on current sort order
         if self.sort_order == "filename":
             items_to_display.sort(key=lambda x: Path(x[0]).name.lower())
-        elif self.sort_order == "date":
-            # Sort by file modification time (most recent first)
+        elif self.sort_order == "date_oldest":
+            # Sort by file modification time (oldest first)
+            def get_file_date(file_path):
+                try:
+                    return Path(file_path).stat().st_mtime
+                except:
+                    return 0
+            items_to_display.sort(key=lambda x: get_file_date(x[0]), reverse=False)
+        elif self.sort_order == "date_newest":
+            # Sort by file modification time (newest first)
             def get_file_date(file_path):
                 try:
                     return Path(file_path).stat().st_mtime
@@ -5552,7 +5945,9 @@ class ImageDescriberGUI(QMainWindow):
                 
                 for frame_path in item.extracted_frames:
                     frame_workspace_item = self.workspace.get_item(frame_path)
-                    frame_items.append((frame_path, frame_workspace_item))
+                    # Only add frames that exist in workspace
+                    if frame_workspace_item:
+                        frame_items.append((frame_path, frame_workspace_item))
                 
                 # Sort frames based on current sort order  
                 if self.sort_order == "filename":
@@ -7745,13 +8140,15 @@ Please answer the follow-up question about this image, taking into account the c
         
         # Update checkable actions
         self.sort_filename_action.setChecked(order == "filename")
-        self.sort_date_action.setChecked(order == "date")
+        self.sort_date_oldest_action.setChecked(order == "date_oldest")
+        self.sort_date_newest_action.setChecked(order == "date_newest")
         
         # Refresh the view with new sort order applied
         self.refresh_view()
         
         # Show temporary status message
-        self.status_bar.showMessage(f"Sorted by {order}", 2000)
+        order_display = order.replace("_", " ").title()
+        self.status_bar.showMessage(f"Sorted by {order_display}", 2000)
 
     def process_all(self):
         """Process all images with automatic HEIC conversion and video frame extraction"""

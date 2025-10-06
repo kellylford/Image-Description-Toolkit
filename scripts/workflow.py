@@ -584,6 +584,27 @@ class WorkflowOrchestrator:
             if result.stderr.strip():
                 self.logger.warning(f"image_describer.py stderr:\n{result.stderr}")
             
+            # Save file path mapping before cleaning up temp directory
+            # This allows import tools to map temp paths back to originals
+            mapping_file = self.config.base_output_dir / "descriptions" / "file_path_mapping.json"
+            try:
+                import json
+                mapping = {}
+                for temp_path, original_path in combined_image_list:
+                    # Store relative temp path as key, absolute original path as value
+                    try:
+                        temp_relative = temp_path.relative_to(temp_combined_dir)
+                        mapping[str(temp_relative)] = str(original_path)
+                    except ValueError:
+                        # Fallback if relative path fails
+                        mapping[str(temp_path.name)] = str(original_path)
+                
+                with open(mapping_file, 'w', encoding='utf-8') as f:
+                    json.dump(mapping, f, indent=2)
+                self.logger.info(f"Saved file path mapping to {mapping_file}")
+            except Exception as e:
+                self.logger.warning(f"Failed to save file path mapping: {e}")
+            
             # Clean up temporary directory
             try:
                 shutil.rmtree(temp_combined_dir)
