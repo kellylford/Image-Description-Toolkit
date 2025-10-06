@@ -1290,21 +1290,26 @@ Resume Examples:
             sys.exit(1)
         
         # Set output directory (resolve relative to original working directory)
+        # Create timestamped workflow output directory with provider, model, and prompt info
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Get provider, model and prompt info for directory naming
+        provider_name = args.provider if args.provider else "ollama"
+        model_name = get_effective_model(args, args.config)
+        prompt_style = get_effective_prompt_style(args, args.config)
+        
+        # Create descriptive directory name (wf = workflow)
+        wf_dirname = f"wf_{provider_name}_{model_name}_{prompt_style}_{timestamp}"
+        
         if args.output_dir:
-            output_dir = Path(args.output_dir)
-            if not output_dir.is_absolute():
-                output_dir = (Path(original_cwd) / output_dir).resolve()
+            # User specified output directory - create wf_ directory inside it
+            base_dir = Path(args.output_dir)
+            if not base_dir.is_absolute():
+                base_dir = (Path(original_cwd) / base_dir).resolve()
+            output_dir = (base_dir / wf_dirname).resolve()
         else:
-            # Create timestamped workflow output directory with provider, model, and prompt info
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # Get provider, model and prompt info for directory naming
-            provider_name = args.provider if args.provider else "ollama"
-            model_name = get_effective_model(args, args.config)
-            prompt_style = get_effective_prompt_style(args, args.config)
-            
-            # Create descriptive directory name (wf = workflow)
-            output_dir = (Path(original_cwd) / f"wf_{provider_name}_{model_name}_{prompt_style}_{timestamp}").resolve()
+            # No output directory specified - create wf_ directory in current directory
+            output_dir = (Path(original_cwd) / wf_dirname).resolve()
         
         # Parse workflow steps
         steps = [step.strip() for step in args.steps.split(",")]
