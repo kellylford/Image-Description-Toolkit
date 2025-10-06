@@ -4516,7 +4516,7 @@ class ImageDescriberGUI(QMainWindow):
         menubar = self.menuBar()
         
         # File menu
-        file_menu = menubar.addMenu("File")
+        file_menu = menubar.addMenu("&File")
         
         new_action = QAction("New Workspace", self)
         new_action.setShortcut(QKeySequence.StandardKey.New)
@@ -4552,7 +4552,7 @@ class ImageDescriberGUI(QMainWindow):
         file_menu.addAction(exit_action)
         
         # Workspace menu
-        workspace_menu = menubar.addMenu("Workspace")
+        workspace_menu = menubar.addMenu("&Workspace")
         
         manage_dirs_action = QAction("Manage Directories...", self)
         manage_dirs_action.triggered.connect(self.manage_directories)
@@ -4567,14 +4567,14 @@ class ImageDescriberGUI(QMainWindow):
         workspace_menu.addAction(add_dir_action)
         
         # Processing menu
-        process_menu = menubar.addMenu("Processing")
+        process_menu = menubar.addMenu("&Processing")
         
-        process_sel_action = QAction("Process Selected (P)", self)
+        process_sel_action = QAction("Process Selected", self)
         process_sel_action.setShortcut(QKeySequence("P"))
         process_sel_action.triggered.connect(self.process_selected)
         process_menu.addAction(process_sel_action)
         
-        batch_mark_action = QAction("Mark for Batch (B)", self)
+        batch_mark_action = QAction("Mark for Batch", self)
         batch_mark_action.setShortcut(QKeySequence("B"))
         batch_mark_action.triggered.connect(self.toggle_batch_mark)
         process_menu.addAction(batch_mark_action)
@@ -4594,7 +4594,7 @@ class ImageDescriberGUI(QMainWindow):
         
         process_menu.addSeparator()
         
-        chat_action = QAction("Chat with Model (C)", self)
+        chat_action = QAction("Chat with Model", self)
         chat_action.setShortcut(QKeySequence("C"))
         chat_action.triggered.connect(self.start_chat_session)
         process_menu.addAction(chat_action)
@@ -4643,7 +4643,7 @@ class ImageDescriberGUI(QMainWindow):
         process_menu.addSeparator()
         
         # Descriptions menu
-        desc_menu = menubar.addMenu("Descriptions")
+        desc_menu = menubar.addMenu("&Descriptions")
         
         add_manual_desc_action = QAction("Add Manual Description", self)
         add_manual_desc_action.setShortcut(QKeySequence("M"))
@@ -4678,7 +4678,7 @@ class ImageDescriberGUI(QMainWindow):
         desc_menu.addAction(copy_path_action)
         
         # View menu
-        view_menu = menubar.addMenu("View")
+        view_menu = menubar.addMenu("&View")
         
         refresh_action = QAction("Refresh", self)
         refresh_action.setShortcut(QKeySequence.StandardKey.Refresh)
@@ -4789,7 +4789,7 @@ class ImageDescriberGUI(QMainWindow):
         view_menu.addAction(desc_properties_action)
         
         # Help menu
-        help_menu = menubar.addMenu("Help")
+        help_menu = menubar.addMenu("&Help")
         
         model_manager_action = QAction("Model Management Tools...", self)
         model_manager_action.setStatusTip("Information about external model management tools (check_models.py, manage_models.py)")
@@ -4878,9 +4878,9 @@ class ImageDescriberGUI(QMainWindow):
             self.handle_paste_from_clipboard()
         elif event.key() == Qt.Key.Key_F2:
             self.rename_item()
-        elif event.key() == Qt.Key.Key_F:
-            # Regular followup processing for images (chat sessions handle their own followup)
-            self.followup_processing()
+        elif event.key() == Qt.Key.Key_F and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            # F key for followup question
+            self.ask_followup_question()
         elif event.key() == Qt.Key.Key_Z and event.modifiers() == Qt.KeyboardModifier.NoModifier:
             # Auto-rename using AI-generated caption (hidden feature)
             print("DEBUG: Z key pressed in ImageDescriber, calling auto_rename_item")
