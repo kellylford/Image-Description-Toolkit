@@ -311,26 +311,13 @@ class ClaudeProvider(AIProvider):
         self.api_version = "2023-06-01"  # Anthropic API version
     
     def _load_api_key_from_file(self) -> Optional[str]:
-        """Load API key from claude.txt file - checks multiple locations"""
-        # Check multiple common locations
-        possible_paths = [
-            'claude.txt',  # Current directory
-            os.path.expanduser('~/claude.txt'),  # Home directory
-            os.path.expanduser('~/onedrive/claude.txt'),  # OneDrive
-            os.path.join(os.path.expanduser('~'), 'OneDrive', 'claude.txt'),  # OneDrive (capitalized)
-        ]
-        
-        for path in possible_paths:
-            try:
-                if os.path.exists(path):
-                    with open(path, 'r') as f:
-                        api_key = f.read().strip()
-                        if api_key:
-                            return api_key
-            except (FileNotFoundError, IOError):
-                continue
-        
-        return None
+        """Load API key from claude.txt file in current directory only"""
+        try:
+            with open('claude.txt', 'r') as f:
+                api_key = f.read().strip()
+                return api_key if api_key else None
+        except (FileNotFoundError, IOError):
+            return None
     
     def get_provider_name(self) -> str:
         return "Claude"

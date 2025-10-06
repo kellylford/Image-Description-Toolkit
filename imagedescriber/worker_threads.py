@@ -17,7 +17,7 @@ from typing import List, Dict, Optional
 from PyQt6.QtCore import QThread, pyqtSignal
 
 # Import our refactored modules
-from ai_providers import get_available_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _huggingface_provider
+from ai_providers import get_available_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider
 
 # Optional imports for video processing
 try:
@@ -504,10 +504,10 @@ class ChatProcessingWorker(QThread):
             return self.process_with_ollama_chat(model, conversation_context)
         elif provider == "openai":
             return self.process_with_openai_chat(model, chat_session, message)
-        elif provider == "huggingface":
-            return self.process_with_huggingface_chat(model, conversation_context)
+        elif provider == "claude":
+            return self.process_with_claude_chat(model, chat_session, message)
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            raise ValueError(f"Unsupported provider: {provider}. Supported: ollama, openai, claude")
     
     def build_conversation_context(self, chat_session: dict, current_message: str) -> str:
         """Build conversation context from chat history"""
@@ -615,18 +615,55 @@ class ChatProcessingWorker(QThread):
         
         return messages
     
-    def process_with_huggingface_chat(self, model: str, context: str) -> str:
-        """Process chat with HuggingFace"""
+    def process_with_claude_chat(self, model: str, chat_session: dict, current_message: str) -> str:
+        """Process chat with Claude"""
         try:
-            if not _huggingface_provider.is_available():
-                raise Exception("Hugging Face transformers is not available")
+            if not _claude_provider.is_available():
+                raise Exception("Claude is not available or API key not found")
             
             if self._stop_requested:
                 return "Processing stopped"
             
-            # For now, return an informational message
-            # In the future, this could be enhanced to use text generation models
-            return f"Hugging Face chat mode not fully implemented yet. The selected model '{model}' is primarily designed for image processing. For text chat, consider using Ollama or OpenAI providers."
+            # Build Claude messages format (similar to OpenAI)
+            messages = self.build_claude_messages(chat_session, current_message)
+            
+            # Use the provider's internal client
+            import anthropic
+            client = anthropic.Anthropic(api_key=_claude_provider.api_key)
+            
+            response = client.messages.create(
+                model=model,
+                max_tokens=1024,
+                messages=messages
+            )
+            
+            if response.content and len(response.content) > 0:
+                return response.content[0].text
+            else:
+                raise Exception("Empty response from Claude")
             
         except Exception as e:
-            raise Exception(f"Hugging Face processing failed: {str(e)}")
+            raise Exception(f"Claude processing failed: {str(e)}")
+    
+    def build_claude_messages(self, chat_session: dict, current_message: str) -> list:
+        """Build Claude-format messages array"""
+        conversation = chat_session.get('conversation', [])
+        
+        # Get recent conversation history (limit to last 15 messages)
+        recent_messages = conversation[-15:] if len(conversation) > 15 else conversation
+        
+        # Build Claude messages format
+        messages = []
+        
+        # Add conversation history
+        for msg in recent_messages:
+            if msg['type'] == 'user':
+                messages.append({"role": "user", "content": msg['content']})
+            else:
+                messages.append({"role": "assistant", "content": msg['content']})
+        
+        # Add current message
+        messages.append({"role": "user", "content": current_message})
+        
+        return messages
+    

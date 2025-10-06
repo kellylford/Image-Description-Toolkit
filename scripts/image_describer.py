@@ -44,12 +44,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from imagedescriber.ai_providers import (
     OllamaProvider,
     OpenAIProvider,
-    ClaudeProvider,
-    ONNXProvider,
-    CopilotProvider,
-    HuggingFaceProvider,
-    GroundingDINOProvider,
-    GroundingDINOHybridProvider
+    ClaudeProvider
 )
 
 
@@ -110,7 +105,7 @@ class ImageDescriber:
                  enable_compression: bool = True, batch_delay: float = 2.0, 
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
-                 log_dir: str = None, detection_query: str = None, confidence: float = 25.0):
+                 log_dir: str = None):
         """
         Initialize the ImageDescriber
         
@@ -143,8 +138,6 @@ class ImageDescriber:
         self.log_dir = log_dir  # Directory for logs and progress tracking
         self.provider_name = provider.lower()
         self.api_key = api_key
-        self.detection_query = detection_query  # For GroundingDINO providers
-        self.confidence = confidence  # For GroundingDINO providers
         
         # Set supported formats from config
         self.supported_formats = set(self.config.get('processing_options', {}).get('supported_formats', 
@@ -189,40 +182,8 @@ class ImageDescriber:
                 provider.api_key = self.api_key
                 return provider
                 
-            elif self.provider_name == "onnx":
-                logger.info("Initializing ONNX provider...")
-                provider = ONNXProvider()
-                return provider
-                
-            elif self.provider_name == "copilot":
-                logger.info("Initializing Copilot+ PC provider...")
-                provider = CopilotProvider()
-                return provider
-                
-            elif self.provider_name == "huggingface":
-                logger.info("Initializing HuggingFace provider...")
-                if not self.api_key:
-                    raise ValueError("HuggingFace provider requires an API key. Use --api-key-file option.")
-                provider = HuggingFaceProvider()
-                provider.api_key = self.api_key
-                return provider
-                
-            elif self.provider_name == "groundingdino":
-                logger.info("Initializing GroundingDINO provider...")
-                provider = GroundingDINOProvider()
-                if not provider.is_available():
-                    raise RuntimeError("GroundingDINO not available. Install with: pip install groundingdino-py torch torchvision")
-                return provider
-                
-            elif self.provider_name == "groundingdino+ollama" or self.provider_name == "groundingdino_ollama":
-                logger.info("Initializing GroundingDINO + Ollama hybrid provider...")
-                provider = GroundingDINOHybridProvider()
-                if not provider.is_available():
-                    raise RuntimeError("GroundingDINO hybrid not available. Ensure both GroundingDINO and Ollama are installed.")
-                return provider
-                
             else:
-                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, onnx, copilot, huggingface, groundingdino, groundingdino+ollama")
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude")
                 
         except Exception as e:
             logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
@@ -1154,7 +1115,7 @@ Configuration:
         "--provider",
         type=str,
         default="ollama",
-        choices=["ollama", "openai", "claude", "onnx", "copilot", "huggingface", "groundingdino", "groundingdino+ollama"],
+        choices=["ollama", "openai", "claude"],
         help="AI provider to use (default: ollama)"
     )
     parser.add_argument(
@@ -1166,7 +1127,7 @@ Configuration:
     parser.add_argument(
         "--api-key-file",
         type=str,
-        help="Path to file containing API key for cloud providers (OpenAI, HuggingFace)"
+        help="Path to file containing API key for cloud providers (OpenAI, Claude)"
     )
     parser.add_argument(
         "--recursive",
@@ -1222,17 +1183,6 @@ Configuration:
         default=default_style,
         choices=available_styles,
         help=f"Style of prompt to use. Available: {', '.join(available_styles)} (default: {default_style})"
-    )
-    parser.add_argument(
-        "--detection-query",
-        type=str,
-        help="Detection query for GroundingDINO (separate items with ' . ')"
-    )
-    parser.add_argument(
-        "--confidence",
-        type=float,
-        default=25.0,
-        help="Confidence threshold for GroundingDINO detection (1-95, default: 25)"
     )
     parser.add_argument(
         "--no-metadata",
@@ -1293,9 +1243,7 @@ Configuration:
         output_dir=args.output_dir,
         provider=args.provider,
         api_key=api_key,
-        log_dir=args.log_dir,
-        detection_query=args.detection_query,
-        confidence=args.confidence
+        log_dir=args.log_dir
     )
     
     # Override metadata extraction if disabled via command line

@@ -54,9 +54,7 @@ try:
     from imagedescriber.ai_providers import (
         OllamaProvider,
         OpenAIProvider,
-        ONNXProvider,
-        CopilotProvider,
-        HuggingFaceProvider
+        ClaudeProvider
     )
     AI_PROVIDERS_AVAILABLE = True
 except ImportError as e:
@@ -221,7 +219,7 @@ class PromptEditorMainWindow(QMainWindow):
         provider_layout = QVBoxLayout()
         self.provider_combo = QComboBox()
         self.provider_combo.setAccessibleDescription("Select which AI provider to use as default")
-        self.provider_combo.addItems(["ollama", "openai", "onnx", "copilot", "huggingface"])
+        self.provider_combo.addItems(["ollama", "openai", "claude"])
         self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
         provider_layout.addWidget(self.provider_combo)
         
@@ -544,31 +542,15 @@ class PromptEditorMainWindow(QMainWindow):
                     "gpt-4"
                 ]
                 
-            elif provider == "onnx":
-                # ONNX models - check for local models
-                if AI_PROVIDERS_AVAILABLE:
-                    try:
-                        onnx_provider = ONNXProvider()
-                        available_models = onnx_provider.get_available_models()
-                    except Exception as e:
-                        print(f"Error getting ONNX models: {e}")
-                        available_models = ["florence-2-base", "florence-2-large"]  # Default fallback
-                else:
-                    available_models = ["florence-2-base", "florence-2-large"]
-                    
-            elif provider == "copilot":
-                # Copilot - uses GitHub Copilot models
-                available_models = ["gpt-4o", "claude-3.5-sonnet", "o1-preview", "o1-mini"]
-                
-            elif provider == "huggingface":
-                # HuggingFace - return common vision models
+            elif provider == "claude":
+                # Claude models
                 available_models = [
-                    "microsoft/Florence-2-large",
-                    "microsoft/Florence-2-base",
-                    "Salesforce/blip-image-captioning-large",
-                    "Salesforce/blip2-opt-2.7b"
+                    "claude-sonnet-4-5-20250929",
+                    "claude-opus-4-1-20250805",
+                    "claude-3-5-haiku-20241022"
                 ]
             else:
+                # Default fallback
                 available_models = []
             
             if not available_models:

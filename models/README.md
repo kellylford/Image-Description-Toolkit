@@ -4,20 +4,13 @@
 
 ## Model Installation & Management Scripts
 
-### 🔧 Installation Scripts
-
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| `install_groundingdino.bat` | Install GroundingDINO for text-prompted object detection | `models\install_groundingdino.bat` |
-| `download_onnx_models.bat` | Download ONNX models for hardware acceleration | `models\download_onnx_models.bat` |
-| `download_florence2.py` | Download Florence-2 vision models | `python -m models.download_florence2` |
-
-### 📊 Status Checking
+###  Status Checking
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
 | `check_models.py` | Comprehensive model & provider status checker | `python -m models.check_models` |
 | `checkmodels.bat` | Convenient wrapper for check_models.py | `models\checkmodels.bat` |
+| `manage_models.py` | Model installation and management | `python -m models.manage_models` |
 
 ## Quick Commands
 
@@ -30,9 +23,10 @@ models\checkmodels.bat
 
 ### Check Specific Provider
 ```bash
-python -m models.check_models --provider groundingdino
 python -m models.check_models --provider ollama
-python -m models.check_models --provider onnx
+python -m models.check_models --provider ollama-cloud
+python -m models.check_models --provider openai
+python -m models.check_models --provider claude
 ```
 
 ### Detailed Information
@@ -51,63 +45,40 @@ The check_models.py script now checks:
 
 1. **Ollama** (Local Models) - Local AI models for image descriptions
 2. **Ollama Cloud** - Cloud-based Ollama models
-3. **OpenAI** - GPT-4 Vision and other OpenAI models
-4. **HuggingFace** - Transformers-based vision models (BLIP, ViT-GPT2, GIT)
-5. **ONNX / Enhanced YOLO** - Hardware-accelerated models
-6. **Copilot+ PC (NPU)** - NPU-accelerated models on Copilot+ PCs
-7. **GroundingDINO** ⭐ - Text-prompted object detection (NEW!)
+3. **OpenAI** - GPT-4o and other OpenAI models
+4. **Claude** - Anthropic Claude models (claude-3.5-sonnet, etc.)
 
 The manage_models.py script can install and manage:
 
 1. **Ollama** - Pull/remove local vision models
-2. **OpenAI** - Configure API keys
-3. **HuggingFace** ⭐ - Install transformers, manage model cache (NEW!)
-4. **YOLO** ⭐ - Install ultralytics package (NEW!)
-5. **GroundingDINO** ⭐ - Run installation script (NEW!)
+2. **OpenAI** - Configure API keys (openai.txt)
+3. **Claude** - Configure API keys (claude.txt)
 
-## Install Any Provider
+## Install Providers
 
-### Ollama
+### Ollama (Local Models)
 ```bash
-# Download from https://ollama.ai
+# Download Ollama from https://ollama.ai
+# Then pull models:
 ollama pull llava:7b
 # or use manage_models
 python -m models.manage_models install llava:7b
+python -m models.manage_models install moondream
+python -m models.manage_models install llama3.2-vision:11b
 ```
 
-### HuggingFace
+### OpenAI (Cloud)
 ```bash
-# Install transformers package (models download on first use)
-python -m models.manage_models install "Salesforce/blip-image-captioning-base"
-# or manually
-pip install transformers torch pillow
-```
-
-### GroundingDINO
-```bash
-# Using manage_models
-python -m models.manage_models install groundingdino
-# or directly
-models\install_groundingdino.bat
-```
-
-### YOLO
-```bash
-# Using manage_models
-python -m models.manage_models install yolo
-# or manually
-pip install ultralytics
-```
-
-### ONNX Models
-```bash
-models\download_onnx_models.bat
-```
-
-### OpenAI
-```bash
-# Create openai.txt with your API key
+# Create openai.txt in current directory with your API key
 # or set OPENAI_API_KEY environment variable
+# or pass --api-key-file <path> when running tools
+```
+
+### Claude (Cloud)
+```bash
+# Create claude.txt in current directory with your API key
+# or set ANTHROPIC_API_KEY environment variable
+# or pass --api-key-file <path> when running tools
 ```
 
 ## Python Module Structure
@@ -117,33 +88,26 @@ models/
 ├── __init__.py                  # Package initialization
 ├── check_models.py             # Status checker (all providers)
 ├── checkmodels.bat             # Wrapper script
-├── model_registry.py           # Model metadata registry
-├── provider_configs.py         # Provider capabilities
-├── copilot_npu.py             # Copilot+ PC NPU support
-├── download_florence2.py       # Florence-2 downloader
-├── download_onnx_models.bat    # ONNX models downloader
-├── install_groundingdino.bat   # GroundingDINO installer
-└── manage_models.py           # Model management utilities
+├── manage_models.py           # Model management utilities
+└── (legacy files removed)
 ```
 
 ## From Python Code
 
 ```python
 # Check model availability
-from models.model_registry import is_model_installed
-if is_model_installed("llava:7b"):
-    print("Model is ready!")
+from models.check_models import check_ollama_status
+status = check_ollama_status()
+if status['status'] == 'OK':
+    print(f"Ollama has {len(status['models'])} models installed")
 
-# Get provider capabilities
-from models.provider_configs import PROVIDER_CAPABILITIES
-capabilities = PROVIDER_CAPABILITIES.get("ollama")
-
-# Check GroundingDINO status programmatically
+# Run check_models programmatically
 import subprocess
 result = subprocess.run(
-    ["python", "-m", "models.check_models", "--provider", "groundingdino", "--json"],
+    ["python", "-m", "models.check_models", "--provider", "ollama", "--json"],
     capture_output=True, text=True
 )
+import json
 status = json.loads(result.stdout)
 ```
 
@@ -154,28 +118,34 @@ status = json.loads(result.stdout)
 
 Ollama (Local Models)
   [OK] Status: OK
-  Models: 3 available
+  Models: 8 available
     • llava:7b
     • moondream
-    • llama3.2-vision
+    • llama3.2-vision:11b
+    • llava:latest
+    • llama3.2-vision:latest
+    • llama3.1:latest
+    • mistral-small3.1:latest
+    • gemma3:latest
 
-GroundingDINO (Object Detection)
-  [OK] Status: Fully configured
-  Models: 1 available
-    • GroundingDINO (Object Detection)
+Ollama Cloud
+  [--] Not signed in
 
-ONNX / Enhanced YOLO
-  [OK] Status: OK
-  Models: 1 available
-    • Enhanced Ollama + YOLO (uses Ollama models)
+OpenAI
+  [--] API key not configured
+  Setup: Create openai.txt or set OPENAI_API_KEY
 
-=== Recommendations ===
-  • [OK] Ollama is ready with 3 models
+Claude (Anthropic)
+  [OK] API key configured
+  Models: 7 available
+    • claude-3.5-sonnet
+    • claude-3-opus
+    • claude-3-sonnet
+    • claude-3-haiku
 ```
 
 ## See Also
 
-- [MODEL_MANAGEMENT_REORGANIZATION.md](MODEL_MANAGEMENT_REORGANIZATION.md) - Details of the reorganization
-- [GROUNDINGDINO_GUIDE.md](../docs/GROUNDINGDINO_GUIDE.md) - GroundingDINO usage guide
-- [ONNX_GUIDE.md](../docs/ONNX_GUIDE.md) - ONNX provider guide
 - [MODEL_SELECTION_GUIDE.md](../docs/MODEL_SELECTION_GUIDE.md) - Choosing the right model
+- [OPENAI_SETUP_GUIDE.md](../docs/OPENAI_SETUP_GUIDE.md) - OpenAI configuration
+- [OLLAMA_GUIDE.md](../docs/OLLAMA_GUIDE.md) - Ollama usage guide
