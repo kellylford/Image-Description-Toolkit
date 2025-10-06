@@ -63,8 +63,8 @@ from PyQt6.QtGui import (
 
 # Import our refactored modules
 from ai_providers import (
-    AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider, HuggingFaceProvider, ONNXProvider, CopilotProvider, ObjectDetectionProvider,
-    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider, _huggingface_provider, _onnx_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
+    AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider, ONNXProvider, CopilotProvider, ObjectDetectionProvider,
+    get_available_providers, get_all_providers, _ollama_provider, _ollama_cloud_provider, _openai_provider, _claude_provider, _onnx_provider, _copilot_provider, _object_detection_provider, _grounding_dino_provider, _grounding_dino_hybrid_provider
 )
 from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
 
@@ -1038,8 +1038,6 @@ class ChatProcessingWorker(QThread):
             return self.process_with_openai_chat(model, chat_session, conversation_context)
         elif provider == "claude":
             return self.process_with_claude_chat(model, chat_session, conversation_context)
-        elif provider == "huggingface":
-            return self.process_with_huggingface_chat(model, chat_session, conversation_context)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     
@@ -1122,13 +1120,6 @@ class ChatProcessingWorker(QThread):
                 'max_messages': 15,
                 'max_chars': 4000,  # ~1000 tokens
                 'strategy': 'conservative'
-            }
-        elif provider == "huggingface":
-            # Variable - moderate approach
-            return {
-                'max_messages': 12,
-                'max_chars': 3000,  # ~750 tokens
-                'strategy': 'moderate'
             }
         else:
             # Default conservative approach
@@ -1433,24 +1424,6 @@ class ChatProcessingWorker(QThread):
             else:
                 raise Exception(f"Claude processing failed: {str(e)}")
     
-    def process_with_huggingface_chat(self, model: str, chat_session: dict, context: str) -> str:
-        """Process chat with Hugging Face using conversation context"""
-        try:
-            # Use the global HuggingFace provider, but for chat we need text generation
-            global _huggingface_provider
-            
-            if not _huggingface_provider.is_available():
-                raise Exception("Hugging Face transformers is not available. Please install: pip install transformers torch")
-            
-            if self._stop_requested:
-                return "Processing stopped"
-            
-            # For now, return an informational message about chat support
-            # In the future, this could be enhanced to use text generation models
-            return f"Hugging Face chat mode not fully implemented yet. The selected model '{model}' is primarily designed for image processing. For text chat, consider using Ollama or OpenAI providers, or we can add text-only Hugging Face models like FLAN-T5 or GPT-2."
-            
-        except Exception as e:
-            raise Exception(f"Hugging Face processing failed: {str(e)}")
     
     # Keep original methods for backward compatibility with image descriptions
     def process_with_ollama(self, model: str, prompt: str) -> str:
@@ -1507,24 +1480,8 @@ class ChatProcessingWorker(QThread):
                 raise Exception(f"OpenAI processing failed: {str(e)}")
     
     def process_with_huggingface(self, model: str, prompt: str) -> str:
-        """Process with Hugging Face (for image descriptions)"""
-        try:
-            # Use the global HuggingFace provider, but for chat we need text generation
-            # For now, return a message explaining this is primarily for image processing
-            global _huggingface_provider
-            
-            if not _huggingface_provider.is_available():
-                raise Exception("Hugging Face transformers is not available. Please install: pip install transformers torch")
-            
-            if self._stop_requested:
-                return "Processing stopped"
-            
-            # For chat-only mode, we'd need different models (like GPT-2, FLAN-T5, etc.)
-            # For now, return an informational message
-            return f"Hugging Face chat mode not fully implemented yet. The selected model '{model}' is primarily designed for image processing. For text chat, consider using Ollama or OpenAI providers, or we can add text-only Hugging Face models like FLAN-T5 or GPT-2."
-            
-        except Exception as e:
-            raise Exception(f"Hugging Face processing failed: {str(e)}")
+        """This provider has been removed. Use Ollama, OpenAI, or Claude instead."""
+        return "Error: HuggingFace provider has been removed from this version."
 
 
 class DirectorySelectionDialog(QDialog):
@@ -2109,11 +2066,6 @@ class ProcessingDialog(QDialog):
                     self.status_label.setText("Claude (Anthropic): Cloud AI processing with advanced reasoning. Requires API key in claude.txt file or ANTHROPIC_API_KEY env var.")
                 else:
                     self.status_label.setText("Claude not available. Requires API key in claude.txt file (current directory, ~/, or ~/onedrive/), or set ANTHROPIC_API_KEY environment variable.")
-            elif current_data == "huggingface":
-                if provider.is_available():
-                    self.status_label.setText("Hugging Face: Local AI models. Models download automatically on first use. Requires: pip install transformers torch")
-                else:
-                    self.status_label.setText("Hugging Face not available. Install with: pip install transformers torch accelerate")
             elif current_data == "onnx":
                 if provider.is_available():
                     self.status_label.setText(f"ONNX Runtime: Hardware-accelerated AI models. Status: {provider.hardware_type}. Run download_onnx_models.bat to get models.")
@@ -2171,7 +2123,6 @@ class ProcessingDialog(QDialog):
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider
@@ -2198,8 +2149,6 @@ class ProcessingDialog(QDialog):
                 print("Warning: OpenAI models not available. Check API key in openai.txt")
             elif provider_key == "claude":
                 print("Warning: Claude models not available. Check API key in claude.txt file or ANTHROPIC_API_KEY environment variable")
-            elif provider_key == "huggingface":
-                print("Warning: Hugging Face models not available. Check that transformers and torch are installed.")
             elif provider_key == "onnx":
                 print("Warning: No ONNX models found. Run download_onnx_models.bat to download models.")
             elif provider_key == "copilot":
@@ -2450,7 +2399,6 @@ class ChatDialog(QDialog):
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider
@@ -2479,7 +2427,6 @@ class ChatDialog(QDialog):
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider
@@ -2519,11 +2466,6 @@ class ChatDialog(QDialog):
                 self.status_label.setText("Using Claude (Anthropic) API. Advanced reasoning and vision capabilities. Requires API key.")
             else:
                 self.status_label.setText("Claude not available. Requires API key in claude.txt file or ANTHROPIC_API_KEY environment variable.")
-        elif provider == "huggingface":
-            if _huggingface_provider.is_available():
-                self.status_label.setText("Using Hugging Face vision models. Models download automatically. GPU recommended.")
-            else:
-                self.status_label.setText("Hugging Face not available. Install with: pip install transformers torch accelerate")
         elif provider == "onnx":
             if _onnx_provider.is_available():
                 self.status_label.setText(f"Using ONNX Runtime models. Hardware acceleration: {_onnx_provider.hardware_type}. Run download_onnx_models.bat to get models.")
@@ -5156,7 +5098,7 @@ class ImageDescriberGUI(QMainWindow):
             providers = {
                 "ollama": _ollama_provider,
                 "openai": _openai_provider,
-                "huggingface": _huggingface_provider
+                "claude": _claude_provider
             }
             
             provider_instance = None
@@ -7998,7 +7940,6 @@ Please answer the follow-up question about this image, taking into account the c
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
             'claude': _claude_provider,
-            'huggingface': _huggingface_provider,
             'onnx': _onnx_provider,
             'copilot': _copilot_provider,
             'object_detection': _object_detection_provider

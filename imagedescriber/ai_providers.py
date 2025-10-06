@@ -57,14 +57,6 @@ DEV_OPENAI_MODELS = [
     "gpt-4-vision-preview"
 ]
 
-DEV_HUGGINGFACE_MODELS = [
-    "Salesforce/blip-image-captioning-base",
-    "Salesforce/blip-image-captioning-large",
-    "microsoft/DialoGPT-medium",
-    "microsoft/DialoGPT-large",
-    "facebook/blenderbot-400M-distill"
-]
-
 DEV_CLAUDE_MODELS = [
     # Claude 4 Series (Latest - 2025)
     "claude-sonnet-4-5-20250929",   # Claude Sonnet 4.5 (best for agents/coding) - RECOMMENDED
@@ -516,71 +508,6 @@ class OllamaCloudProvider(AIProvider):
                f"• bakllava:latest (7B parameters)\n" \
                f"• moondream:latest (1.8B parameters)\n\n" \
                f"Cloud models are excellent for text-only tasks but vision support is coming soon!"
-
-
-class HuggingFaceProvider(AIProvider):
-    """HuggingFace provider for transformers models"""
-    
-    def __init__(self):
-        self.available_models = []
-        self._check_transformers()
-    
-    def _check_transformers(self):
-        """Check if transformers library is available and load models"""
-        try:
-            from transformers import pipeline, BlipProcessor, BlipForConditionalGeneration
-            self.has_transformers = True
-            # Common vision models
-            self.available_models = [
-                "Salesforce/blip-image-captioning-base",
-                "Salesforce/blip-image-captioning-large",
-                "microsoft/git-base-coco",
-                "nlpconnect/vit-gpt2-image-captioning"
-            ]
-        except ImportError:
-            self.has_transformers = False
-    
-    def get_provider_name(self) -> str:
-        return "HuggingFace"
-    
-    def is_available(self) -> bool:
-        """Check if HuggingFace transformers is available"""
-        return self.has_transformers
-    
-    def get_available_models(self) -> List[str]:
-        """Get list of available HuggingFace models"""
-        # DEVELOPMENT MODE: Return hardcoded models for faster testing
-        if DEV_MODE_HARDCODED_MODELS:
-            return DEV_HUGGINGFACE_MODELS.copy() if self.has_transformers else []
-        
-        # ORIGINAL DETECTION CODE (preserved for when dev mode is disabled)
-        return self.available_models if self.has_transformers else []
-    
-    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
-        """Generate description using HuggingFace"""
-        if not self.is_available():
-            return "Error: HuggingFace transformers not available"
-        
-        try:
-            from transformers import pipeline
-            from PIL import Image
-            
-            # Load the model
-            captioner = pipeline("image-to-text", model=model)
-            
-            # Open and process image
-            image = Image.open(image_path)
-            
-            # Generate caption
-            result = captioner(image)
-            
-            if result and len(result) > 0:
-                return result[0].get('generated_text', 'No description generated')
-            else:
-                return 'No description generated'
-                
-        except Exception as e:
-            return f"Error generating description: {str(e)}"
 
 
 # Try to import ONNX Runtime (optional dependency)
@@ -3652,7 +3579,6 @@ _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
-_huggingface_provider = HuggingFaceProvider()
 _onnx_provider = ONNXProvider()
 _copilot_provider = CopilotProvider()
 _object_detection_provider = ObjectDetectionProvider()
@@ -3675,9 +3601,6 @@ def get_available_providers() -> Dict[str, AIProvider]:
     
     if _claude_provider.is_available():
         providers['claude'] = _claude_provider
-        
-    if _huggingface_provider.is_available():
-        providers['huggingface'] = _huggingface_provider
     
     if _onnx_provider.is_available():
         providers['onnx'] = _onnx_provider
@@ -3704,7 +3627,6 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'ollama_cloud': _ollama_cloud_provider,
         'openai': _openai_provider,
         'claude': _claude_provider,
-        'huggingface': _huggingface_provider,
         'onnx': _onnx_provider,
         'copilot': _copilot_provider,
         'object_detection': _object_detection_provider,
