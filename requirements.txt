@@ -1,43 +1,90 @@
-# Image Description Toolkit - Core Dependencies
+# ============================================================================
+# Image Description Toolkit - Dependencies
+# ============================================================================
+# Installation options:
+#   Minimal (scripts only):     pip install Pillow requests ollama openai anthropic
+#   GUI applications:           pip install -r requirements.txt
+#   Full (all features):        pip install -r requirements.txt
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# CORE DEPENDENCIES (Required for all usage)
+# ----------------------------------------------------------------------------
+Pillow>=10.0.0          # Image processing (all components)
+requests>=2.25.0        # HTTP requests for AI providers
+ollama>=0.3.0           # Ollama Python client
+
+# Cloud AI Provider SDKs (used by both scripts and GUI)
+openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
+anthropic>=0.18.0       # Anthropic Claude official SDK (retry logic, token tracking, streaming)
+
+# ----------------------------------------------------------------------------
+# GUI APPLICATIONS (imagedescriber, viewer, prompt_editor)
+# ----------------------------------------------------------------------------
+PyQt6>=6.4.0                                # GUI framework
+pywin32>=306; sys_platform == "win32"       # Windows system integration
+
+# ----------------------------------------------------------------------------
+# VIDEO PROCESSING (scripts/video_frame_extractor.py only)
+# ----------------------------------------------------------------------------
+opencv-python>=4.8.0    # Video frame extraction
+numpy>=1.24.0           # Array operations (required by opencv-python)
+
+# ----------------------------------------------------------------------------
+# HEIC IMAGE SUPPORT (scripts/ConvertImage.py only)
+# ----------------------------------------------------------------------------
+pillow-heif>=0.13.0     # HEIC/HEIF image format conversion
+
+# ----------------------------------------------------------------------------
+# METADATA UTILITIES (MetaData/ directory - optional, not required for core workflow)
+# ----------------------------------------------------------------------------
+# Uncomment if you need advanced metadata extraction features:
+# pyexiv2>=2.15.0       # Advanced EXIF metadata extraction (may require C++ compilation)
+# ExifRead>=3.0.0       # Alternative EXIF reader
+# geopy>=2.4.0          # GPS coordinate reverse geocoding (Nominatim)
+
+# ----------------------------------------------------------------------------
+# DEVELOPMENT & TESTING
+# ----------------------------------------------------------------------------
+tqdm>=4.60.0            # Progress bars (optional, nice-to-have)
+pytest>=6.0.0           # Unit testing framework
+pytest-mock>=3.6.0      # Test mocking utilities
+
+# ============================================================================
+# INSTALLATION EXAMPLES
+# ============================================================================
 # 
-# This file contains all dependencies needed for the complete
-# Image Description Toolkit with Ollama, OpenAI, and Claude providers
+# Minimal installation (scripts only, no GUI, no video, no HEIC):
+#   pip install Pillow requests ollama openai anthropic
 #
-# Install with: pip install -r requirements.txt
-
-# Core dependencies for image description functionality
-# Ollama provider (local AI)
-ollama>=0.3.0
-
-# GUI dependencies for viewer applications
-PyQt6>=6.4.0
-
-# Image processing and format support
-Pillow>=10.0.0
-pillow-heif>=0.13.0
-
-# Video processing (for video_frame_extractor.py)
-opencv-python>=4.8.0
-numpy>=1.24.0
-
-# Enhanced metadata extraction dependencies
-pyexiv2>=2.15.0
-ExifRead>=3.0.0
-requests>=2.25.0
-geopy>=2.4.0
-
-# OpenAI API support
-openai>=1.0.0
-
-# Claude (Anthropic) API support
-anthropic>=0.18.0
-
-# Windows support for PyQt6
-pywin32>=306; sys_platform == "win32"
-
-# Optional: Enhanced user experience
-tqdm>=4.60.0
-
-# Development and testing (optional)
-pytest>=6.0.0
-pytest-mock>=3.6.0
+# Scripts with HEIC support:
+#   pip install Pillow requests ollama openai anthropic pillow-heif
+#
+# Scripts with video processing:
+#   pip install Pillow requests ollama openai anthropic opencv-python numpy
+#
+# GUI applications (full featured):
+#   pip install -r requirements.txt
+#
+# Development environment (includes testing):
+#   pip install -r requirements.txt
+#
+# Metadata utilities (optional advanced features):
+#   pip install pyexiv2 ExifRead geopy
+#
+# ============================================================================
+# NOTES
+# ============================================================================
+# 
+# Python 3.13 Compatibility:
+#   - All core dependencies work with Python 3.13+
+#   - pyexiv2 may require compilation on Python 3.13 (optional feature)
+#   - pillow-heif should work but check PyPI for latest wheels
+#
+# API Keys Required:
+#   - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
+#   - Claude: Set ANTHROPIC_API_KEY environment variable or create claude.txt
+#   - Ollama: Local installation, no API key needed
+#
+# See docs/OPENAI_SETUP_GUIDE.md for detailed configuration instructions
+# ============================================================================

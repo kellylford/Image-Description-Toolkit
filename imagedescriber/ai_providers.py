@@ -181,7 +181,7 @@ class OllamaProvider(AIProvider):
 
 
 class OpenAIProvider(AIProvider):
-    """OpenAI provider for GPT models"""
+    """OpenAI provider for GPT models using official SDK"""
     
     def __init__(self, api_key: Optional[str] = None):
         # Try multiple sources for API key in order of preference:
@@ -189,8 +189,24 @@ class OpenAIProvider(AIProvider):
         # 2. Environment variable  
         # 3. openai.txt file in current directory
         self.api_key = api_key or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
-        self.base_url = "https://api.openai.com/v1"
         self.timeout = 300
+        
+        # Initialize OpenAI client with SDK (lazy import to avoid dependency at module level)
+        self.client = None
+        if self.api_key:
+            try:
+                from openai import OpenAI
+                self.client = OpenAI(
+                    api_key=self.api_key,
+                    timeout=self.timeout,
+                    max_retries=3  # Automatic retry with exponential backoff
+                )
+            except ImportError:
+                # Fallback if SDK not installed
+                print("Warning: openai package not installed. Install with: pip install openai>=1.0.0")
+        
+        # Token usage tracking (for cost estimation and logging)
+        self.last_usage = None
     
     def _load_api_key_from_file(self) -> Optional[str]:
         """Load API key from openai.txt file"""
@@ -205,8 +221,8 @@ class OpenAIProvider(AIProvider):
         return "OpenAI"
     
     def is_available(self) -> bool:
-        """Check if OpenAI is available (has API key from env var or openai.txt file)"""
-        return bool(self.api_key)
+        """Check if OpenAI is available (has API key and SDK)"""
+        return bool(self.api_key and self.client)
     
     def get_available_models(self) -> List[str]:
         """Get list of available OpenAI models"""
@@ -219,25 +235,13 @@ class OpenAIProvider(AIProvider):
             return []
         
         try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            response = requests.get(
-                f"{self.base_url}/models",
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                # Filter for vision-capable models
-                vision_models = [
-                    model['id'] for model in data.get('data', [])
-                    if 'vision' in model['id'] or model['id'].startswith('gpt-4')
-                ]
-                return sorted(vision_models)
+            # Use SDK to list models
+            models_response = self.client.models.list()
+            vision_models = [
+                model.id for model in models_response.data
+                if 'vision' in model.id or model.id.startswith('gpt-4')
+            ]
+            return sorted(vision_models)
         except:
             pass
         
@@ -245,22 +249,18 @@ class OpenAIProvider(AIProvider):
         return ['gpt-4-vision-preview', 'gpt-4o', 'gpt-4o-mini']
     
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
-        """Generate description using OpenAI"""
+        """Generate description using OpenAI SDK with automatic retry and token tracking"""
         if not self.is_available():
-            return "Error: OpenAI API key not configured"
+            return "Error: OpenAI API key not configured or SDK not installed"
         
         try:
             # Read and encode image
             with open(image_path, 'rb') as image_file:
                 image_data = base64.b64encode(image_file.read()).decode('utf-8')
             
-            # Prepare request
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
+            # Use official SDK - handles retry logic, rate limits, and errors automatically
+            # Build request parameters
+            request_params = {
                 "model": model,
                 "messages": [
                     {
@@ -275,30 +275,49 @@ class OpenAIProvider(AIProvider):
                             }
                         ]
                     }
-                ],
-                "max_tokens": 1000
+                ]
             }
             
-            # Make request
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=self.timeout
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return data['choices'][0]['message']['content']
+            # GPT-5 and newer models (o1, o3, gpt-5) use max_completion_tokens instead of max_tokens
+            # Older models (GPT-4, GPT-3.5) use max_tokens
+            if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
+                request_params["max_completion_tokens"] = 1000
             else:
-                return f"Error: HTTP {response.status_code} - {response.text}"
+                request_params["max_tokens"] = 1000
+            
+            response = self.client.chat.completions.create(**request_params)
+            
+            # Store token usage for cost tracking and logging
+            self.last_usage = {
+                'prompt_tokens': response.usage.prompt_tokens,
+                'completion_tokens': response.usage.completion_tokens,
+                'total_tokens': response.usage.total_tokens,
+                'model': model
+            }
+            
+            return response.choices[0].message.content
                 
         except Exception as e:
-            return f"Error generating description: {str(e)}"
+            # SDK provides rich exception types for better error handling
+            error_msg = f"Error generating description: {str(e)}"
+            # Try to provide more specific error messages
+            error_type = type(e).__name__
+            if 'RateLimitError' in error_type:
+                error_msg = "Rate limit exceeded. Please wait a moment and try again."
+            elif 'AuthenticationError' in error_type:
+                error_msg = "Authentication failed. Please check your API key."
+            elif 'InvalidRequestError' in error_type:
+                error_msg = f"Invalid request: {str(e)}"
+            
+            return error_msg
+    
+    def get_last_token_usage(self) -> Optional[Dict]:
+        """Get token usage from last API call (for cost tracking and logging)"""
+        return self.last_usage
 
 
 class ClaudeProvider(AIProvider):
-    """Anthropic Claude provider for Claude models"""
+    """Anthropic Claude provider for Claude models using official SDK"""
     
     def __init__(self, api_key: Optional[str] = None):
         # Try multiple sources for API key in order of preference:
@@ -306,9 +325,24 @@ class ClaudeProvider(AIProvider):
         # 2. Environment variable  
         # 3. claude.txt file in current directory
         self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
-        self.base_url = "https://api.anthropic.com/v1"
         self.timeout = 300
-        self.api_version = "2023-06-01"  # Anthropic API version
+        
+        # Initialize Anthropic client with SDK (lazy import to avoid dependency at module level)
+        self.client = None
+        if self.api_key:
+            try:
+                import anthropic
+                self.client = anthropic.Anthropic(
+                    api_key=self.api_key,
+                    timeout=self.timeout,
+                    max_retries=3  # Automatic retry with exponential backoff
+                )
+            except ImportError:
+                # Fallback if SDK not installed
+                print("Warning: anthropic package not installed. Install with: pip install anthropic>=0.18.0")
+        
+        # Token usage tracking (for cost estimation and logging)
+        self.last_usage = None
     
     def _load_api_key_from_file(self) -> Optional[str]:
         """Load API key from claude.txt file in current directory only"""
@@ -323,8 +357,8 @@ class ClaudeProvider(AIProvider):
         return "Claude"
     
     def is_available(self) -> bool:
-        """Check if Claude is available (has API key from env var or claude.txt file)"""
-        return bool(self.api_key)
+        """Check if Claude is available (has API key and SDK)"""
+        return bool(self.api_key and self.client)
     
     def get_available_models(self) -> List[str]:
         """Get list of available Claude models"""
@@ -341,9 +375,9 @@ class ClaudeProvider(AIProvider):
         return DEV_CLAUDE_MODELS.copy()
     
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
-        """Generate description using Claude"""
+        """Generate description using Claude SDK with automatic retry and token tracking"""
         if not self.is_available():
-            return "Error: Claude API key not configured"
+            return "Error: Claude API key not configured or SDK not installed"
         
         try:
             # Read and encode image
@@ -361,17 +395,11 @@ class ClaudeProvider(AIProvider):
             }
             media_type = media_type_map.get(ext, 'image/jpeg')
             
-            # Prepare request (Anthropic Messages API format)
-            headers = {
-                "x-api-key": self.api_key,
-                "anthropic-version": self.api_version,
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": model,
-                "max_tokens": 1024,
-                "messages": [
+            # Use official SDK - handles retry logic, rate limits, and errors automatically
+            message = self.client.messages.create(
+                model=model,
+                max_tokens=1024,
+                messages=[
                     {
                         "role": "user",
                         "content": [
@@ -390,28 +418,38 @@ class ClaudeProvider(AIProvider):
                         ]
                     }
                 ]
-            }
-            
-            # Make request
-            response = requests.post(
-                f"{self.base_url}/messages",
-                headers=headers,
-                json=payload,
-                timeout=self.timeout
             )
             
-            if response.status_code == 200:
-                data = response.json()
-                # Extract text from content array
-                content = data.get('content', [])
-                if content and len(content) > 0:
-                    return content[0].get('text', '')
-                return "Error: No content in response"
-            else:
-                return f"Error: HTTP {response.status_code} - {response.text}"
+            # Store token usage for cost tracking and logging
+            self.last_usage = {
+                'prompt_tokens': message.usage.input_tokens,
+                'completion_tokens': message.usage.output_tokens,
+                'total_tokens': message.usage.input_tokens + message.usage.output_tokens,
+                'model': model
+            }
+            
+            # Extract text from content
+            if message.content and len(message.content) > 0:
+                return message.content[0].text
+            return "Error: No content in response"
                 
         except Exception as e:
-            return f"Error generating description: {str(e)}"
+            # SDK provides rich exception types for better error handling
+            error_msg = f"Error generating description: {str(e)}"
+            # Try to provide more specific error messages
+            error_type = type(e).__name__
+            if 'RateLimitError' in error_type:
+                error_msg = "Rate limit exceeded. Please wait a moment and try again."
+            elif 'AuthenticationError' in error_type:
+                error_msg = "Authentication failed. Please check your API key."
+            elif 'InvalidRequestError' in error_type:
+                error_msg = f"Invalid request: {str(e)}"
+            
+            return error_msg
+    
+    def get_last_token_usage(self) -> Optional[Dict]:
+        """Get token usage from last API call (for cost tracking and logging)"""
+        return self.last_usage
 
 
 class OllamaCloudProvider(AIProvider):

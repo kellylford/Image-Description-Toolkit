@@ -438,13 +438,17 @@ def get_short_model_name(model_name: str) -> str:
 class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
-                 created: str = "", custom_prompt: str = "", provider: str = ""):
+                 created: str = "", custom_prompt: str = "", provider: str = "",
+                 total_tokens: int = None, prompt_tokens: int = None, completion_tokens: int = None):
         self.text = text
         self.model = model
         self.prompt_style = prompt_style
         self.created = created or datetime.now().isoformat()
         self.custom_prompt = custom_prompt
         self.provider = provider
+        self.total_tokens = total_tokens
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
         self.id = f"{int(time.time() * 1000)}"  # Unique ID
     
     def to_dict(self) -> dict:
@@ -455,7 +459,10 @@ class ImageDescription:
             "prompt_style": self.prompt_style,
             "created": self.created,
             "custom_prompt": self.custom_prompt,
-            "provider": self.provider
+            "provider": self.provider,
+            "total_tokens": self.total_tokens,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens
         }
     
     @classmethod
@@ -466,7 +473,10 @@ class ImageDescription:
             prompt_style=data.get("prompt_style", ""),
             created=data.get("created", ""),
             custom_prompt=data.get("custom_prompt", ""),
-            provider=data.get("provider", "")
+            provider=data.get("provider", ""),
+            total_tokens=data.get("total_tokens"),
+            prompt_tokens=data.get("prompt_tokens"),
+            completion_tokens=data.get("completion_tokens")
         )
         desc.id = data.get("id", desc.id)
         return desc
@@ -1469,11 +1479,19 @@ class ChatProcessingWorker(QThread):
             # Build OpenAI messages format
             messages = self.build_openai_messages(chat_session, current_message)
             
-            response = _openai_provider.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=1000
-            )
+            # Build request parameters
+            request_params = {
+                "model": model,
+                "messages": messages
+            }
+            
+            # GPT-5 and newer models (o1, o3, gpt-5) use max_completion_tokens instead of max_tokens
+            if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
+                request_params["max_completion_tokens"] = 1000
+            else:
+                request_params["max_tokens"] = 1000
+            
+            response = _openai_provider.client.chat.completions.create(**request_params)
             
             if response.choices and response.choices[0].message:
                 return response.choices[0].message.content
@@ -1581,11 +1599,19 @@ class ChatProcessingWorker(QThread):
             if self._stop_requested:
                 return "Processing stopped"
             
-            response = _openai_provider.client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=1000
-            )
+            # Build request parameters
+            request_params = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            
+            # GPT-5 and newer models (o1, o3, gpt-5) use max_completion_tokens instead of max_tokens
+            if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
+                request_params["max_completion_tokens"] = 1000
+            else:
+                request_params["max_tokens"] = 1000
+            
+            response = _openai_provider.client.chat.completions.create(**request_params)
             
             if response.choices and response.choices[0].message:
                 return response.choices[0].message.content
@@ -8467,19 +8493,35 @@ Please answer the follow-up question about this image, taking into account the c
         )
         
         # Connect signals for live updates
-        worker.processing_complete.connect(lambda fp, desc, provider, model, prompt, custom: self._on_process_all_item_complete(fp, desc, provider, model, prompt, custom))
+        worker.processing_complete.connect(lambda fp, desc, provider, model, prompt, custom, tokens: self._on_process_all_item_complete(fp, desc, provider, model, prompt, custom, tokens))
         worker.processing_failed.connect(lambda fp, error: self._on_process_all_item_failed(fp, error))
         
         # Store reference and start
         self.workers.append(worker)
         worker.start()
     
-    def _on_process_all_item_complete(self, file_path, description, provider, model, prompt_style, custom_prompt):
+    def _on_process_all_item_complete(self, file_path, description, provider, model, prompt_style, custom_prompt, token_usage=None):
         """Handle completion of single item in Process All - with live updates"""
         # Add description to workspace
         workspace_item = self.workspace.get_item(file_path)
         if workspace_item:
-            desc = ImageDescription(description, model, prompt_style, custom_prompt=custom_prompt, provider=provider)
+            # Extract token data if available
+            total_tokens = None
+            prompt_tokens = None
+            completion_tokens = None
+            if token_usage:
+                total_tokens = token_usage.get('total_tokens')
+                prompt_tokens = token_usage.get('prompt_tokens')
+                completion_tokens = token_usage.get('completion_tokens')
+            
+            desc = ImageDescription(
+                description, model, prompt_style, 
+                custom_prompt=custom_prompt, 
+                provider=provider,
+                total_tokens=total_tokens,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens
+            )
             workspace_item.descriptions.append(desc)
             self.workspace.mark_modified()
         
@@ -8792,7 +8834,7 @@ Please answer the follow-up question about this image, taking into account the c
             message = args[0]
             self.status_bar.showMessage(message)
     
-    def on_processing_complete(self, file_path: str, description: str, provider: str, model: str, prompt_style: str, custom_prompt: str):
+    def on_processing_complete(self, file_path: str, description: str, provider: str, model: str, prompt_style: str, custom_prompt: str, token_usage=None):
         """Handle successful processing completion"""
         # Remove from processing set and status
         self.processing_items.discard(file_path)
@@ -8803,8 +8845,24 @@ Please answer the follow-up question about this image, taking into account the c
             workspace_item = ImageItem(file_path)
             self.workspace.add_item(workspace_item)
         
-        # Add the new description
-        desc = ImageDescription(description, model, prompt_style, custom_prompt=custom_prompt, provider=provider)
+        # Extract token data if available
+        total_tokens = None
+        prompt_tokens = None
+        completion_tokens = None
+        if token_usage:
+            total_tokens = token_usage.get('total_tokens')
+            prompt_tokens = token_usage.get('prompt_tokens')
+            completion_tokens = token_usage.get('completion_tokens')
+        
+        # Add the new description with token usage
+        desc = ImageDescription(
+            description, model, prompt_style, 
+            custom_prompt=custom_prompt, 
+            provider=provider,
+            total_tokens=total_tokens,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens
+        )
         workspace_item.add_description(desc)
         self.workspace.mark_modified()
         

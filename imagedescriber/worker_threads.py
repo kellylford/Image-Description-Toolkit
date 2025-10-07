@@ -29,7 +29,7 @@ except ImportError:
 class ProcessingWorker(QThread):
     """Worker thread for AI processing"""
     progress_updated = pyqtSignal(str, str)  # file_path, message
-    processing_complete = pyqtSignal(str, str, str, str, str, str)  # file_path, description, provider, model, prompt_style, custom_prompt
+    processing_complete = pyqtSignal(str, str, str, str, str, str, object)  # file_path, description, provider, model, prompt_style, custom_prompt, token_usage
     processing_failed = pyqtSignal(str, str)  # file_path, error
     
     def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = ""):
@@ -63,11 +63,11 @@ class ProcessingWorker(QThread):
             self.progress_updated.emit(self.file_path, f"Processing with {self.provider} {self.model}...")
             
             # Process the image with selected provider
-            description = self.process_with_ai(self.file_path, prompt_text)
+            description, token_usage = self.process_with_ai(self.file_path, prompt_text)
             
-            # Emit success
+            # Emit success with token usage
             self.processing_complete.emit(
-                self.file_path, description, self.provider, self.model, self.prompt_style, self.custom_prompt
+                self.file_path, description, self.provider, self.model, self.prompt_style, self.custom_prompt, token_usage
             )
             
         except Exception as e:
@@ -131,7 +131,12 @@ class ProcessingWorker(QThread):
             # Process with the selected provider
             description = provider.describe_image(image_path, prompt, self.model)
             
-            return description
+            # Get token usage if provider supports it (OpenAI, Claude SDKs)
+            token_usage = None
+            if hasattr(provider, 'get_last_token_usage'):
+                token_usage = provider.get_last_token_usage()
+            
+            return description, token_usage
                 
         except Exception as e:
             print(f"AI processing error: {str(e)}")
@@ -572,11 +577,19 @@ class ChatProcessingWorker(QThread):
             import openai
             client = openai.OpenAI(api_key=_openai_provider.api_key)
             
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=1000
-            )
+            # Build request parameters
+            request_params = {
+                "model": model,
+                "messages": messages
+            }
+            
+            # GPT-5 and newer models (o1, o3, gpt-5) use max_completion_tokens instead of max_tokens
+            if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
+                request_params["max_completion_tokens"] = 1000
+            else:
+                request_params["max_tokens"] = 1000
+            
+            response = client.chat.completions.create(**request_params)
             
             if response.choices and response.choices[0].message:
                 return response.choices[0].message.content

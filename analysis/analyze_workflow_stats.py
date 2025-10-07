@@ -55,6 +55,10 @@ def parse_workflow_log(log_path: Path) -> Dict:
         'errors': 0,
         'provider': None,
         'model': None,
+        'total_tokens': None,  # NEW: Total tokens from API
+        'prompt_tokens': None,  # NEW: Input/prompt tokens
+        'completion_tokens': None,  # NEW: Output/completion tokens
+        'estimated_cost': None,  # NEW: Cost in dollars
     }
     
     if not log_path.exists():
@@ -187,6 +191,27 @@ def parse_workflow_log(log_path: Path) -> Dict:
                 stats['heic_files_found'] = 0
                 stats['heic_files_converted'] = 0
             
+            # Token usage summary (from image_describer logs)
+            elif 'Total tokens:' in line:
+                match = re.search(r'Total tokens: ([\d,]+)', line)
+                if match:
+                    stats['total_tokens'] = int(match.group(1).replace(',', ''))
+            
+            elif 'Prompt tokens:' in line:
+                match = re.search(r'Prompt tokens: ([\d,]+)', line)
+                if match:
+                    stats['prompt_tokens'] = int(match.group(1).replace(',', ''))
+            
+            elif 'Completion tokens:' in line:
+                match = re.search(r'Completion tokens: ([\d,]+)', line)
+                if match:
+                    stats['completion_tokens'] = int(match.group(1).replace(',', ''))
+            
+            elif 'Estimated cost:' in line:
+                match = re.search(r'Estimated cost: \$([\d.]+)', line)
+                if match:
+                    stats['estimated_cost'] = float(match.group(1))
+            
             # Errors
             elif 'ERROR' in line:
                 stats['errors'] += 1
@@ -222,6 +247,33 @@ def parse_workflow_log(log_path: Path) -> Dict:
         # If average wasn't in log, calculate it
         if stats['average_time_per_image'] is None:
             stats['average_time_per_image'] = statistics.mean(times_only)
+    
+    # Also check image_describer log for token usage data
+    image_describer_logs = list(log_path.parent.glob("image_describer_*.log"))
+    if image_describer_logs:
+        describer_log = image_describer_logs[0]  # Use first one
+        try:
+            with open(describer_log, 'r', encoding='utf-8') as f:
+                for line in f:
+                    # Look for TOKEN USAGE SUMMARY section
+                    if 'Total tokens:' in line:
+                        match = re.search(r'Total tokens: ([\d,]+)', line)
+                        if match:
+                            stats['total_tokens'] = int(match.group(1).replace(',', ''))
+                    elif 'Prompt tokens:' in line:
+                        match = re.search(r'Prompt tokens: ([\d,]+)', line)
+                        if match:
+                            stats['prompt_tokens'] = int(match.group(1).replace(',', ''))
+                    elif 'Completion tokens:' in line:
+                        match = re.search(r'Completion tokens: ([\d,]+)', line)
+                        if match:
+                            stats['completion_tokens'] = int(match.group(1).replace(',', ''))
+                    elif 'Estimated cost:' in line:
+                        match = re.search(r'Estimated cost: \$([\d.]+)', line)
+                        if match:
+                            stats['estimated_cost'] = float(match.group(1))
+        except Exception as e:
+            print(f"Warning: Could not parse image_describer log: {e}")
     
     return stats
 
@@ -592,7 +644,11 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
             'Samples Count',
             'Videos Found',
             'Frames Extracted',
-            'Errors'
+            'Errors',
+            'Total Tokens',
+            'Prompt Tokens',
+            'Completion Tokens',
+            'Estimated Cost ($)'
         ])
         
         # Data rows
@@ -642,7 +698,11 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
                 len(stats['processing_times']),
                 stats['videos_found'] or 0,
                 stats['frames_extracted'] or 0,
-                stats['errors'] or 0
+                stats['errors'] or 0,
+                stats['total_tokens'] if stats['total_tokens'] is not None else '',
+                stats['prompt_tokens'] if stats['prompt_tokens'] is not None else '',
+                stats['completion_tokens'] if stats['completion_tokens'] is not None else '',
+                f"{stats['estimated_cost']:.4f}" if stats['estimated_cost'] is not None else ''
             ])
     
     print(f"CSV statistics saved to: {output_file}")

@@ -442,6 +442,24 @@ class ImageDescriber:
                     logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
                     logger.debug(f"Description content: {repr(description)}")
                     
+                    # Log token usage if provider supports it (OpenAI, Claude SDKs)
+                    if hasattr(self.provider, 'get_last_token_usage'):
+                        token_usage = self.provider.get_last_token_usage()
+                        if token_usage:
+                            logger.info(
+                                f"Token usage: {token_usage['total_tokens']} total "
+                                f"({token_usage['prompt_tokens']} prompt + "
+                                f"{token_usage['completion_tokens']} completion)"
+                            )
+                            # Store for workflow-level statistics
+                            if not hasattr(self, 'total_tokens'):
+                                self.total_tokens = 0
+                                self.total_prompt_tokens = 0
+                                self.total_completion_tokens = 0
+                            self.total_tokens += token_usage['total_tokens']
+                            self.total_prompt_tokens += token_usage['prompt_tokens']
+                            self.total_completion_tokens += token_usage['completion_tokens']
+                    
                 # Clean up memory
                 gc.collect()
                 
@@ -658,7 +676,7 @@ class ImageDescriber:
             else:
                 logger.debug(f"No metadata extracted for {image_path.name}")
             
-            # Get description from Ollama
+            # Get description from AI provider
             description = self.get_image_description(image_path)
             
             # Log end time for this image
@@ -705,6 +723,39 @@ class ImageDescriber:
         logger.info(f"Total processing time: {total_duration:.2f} seconds")
         if newly_processed > 0:
             logger.info(f"Average time per new image: {total_duration/newly_processed:.2f} seconds")
+        
+        # Log token usage summary if available (OpenAI, Claude with SDK)
+        if hasattr(self, 'total_tokens') and self.total_tokens > 0:
+            logger.info("=" * 60)
+            logger.info("TOKEN USAGE SUMMARY:")
+            logger.info(f"  Total tokens: {self.total_tokens:,}")
+            logger.info(f"  Prompt tokens: {self.total_prompt_tokens:,}")
+            logger.info(f"  Completion tokens: {self.total_completion_tokens:,}")
+            if newly_processed > 0:
+                logger.info(f"  Average tokens per image: {self.total_tokens/newly_processed:.0f}")
+            
+            # Estimate costs (approximate rates as of 2025)
+            cost_per_1k = {
+                'gpt-4o': {'input': 0.0025, 'output': 0.010},
+                'gpt-4o-mini': {'input': 0.00015, 'output': 0.0006},
+                'claude-sonnet-4': {'input': 0.003, 'output': 0.015},
+                'claude-opus-4': {'input': 0.015, 'output': 0.075},
+                'claude-3-5-haiku': {'input': 0.001, 'output': 0.005}
+            }
+            
+            # Try to estimate cost based on model name
+            estimated_cost = None
+            for model_key, rates in cost_per_1k.items():
+                if model_key in self.model_name.lower():
+                    input_cost = (self.total_prompt_tokens / 1000) * rates['input']
+                    output_cost = (self.total_completion_tokens / 1000) * rates['output']
+                    estimated_cost = input_cost + output_cost
+                    break
+            
+            if estimated_cost:
+                logger.info(f"  Estimated cost: ${estimated_cost:.4f}")
+            logger.info("=" * 60)
+        
         logger.info(f"Descriptions saved to: {output_file}")
     
     def extract_metadata(self, image_path: Path) -> Dict[str, Any]:
