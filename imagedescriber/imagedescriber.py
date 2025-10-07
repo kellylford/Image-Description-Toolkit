@@ -316,6 +316,125 @@ class AccessibleTextEdit(QPlainTextEdit):
 # ================================
 
 
+# ================================
+# UTILITY FUNCTIONS
+# ================================
+
+def get_short_model_name(model_name: str) -> str:
+    """
+    Extract short, readable model name from full model name.
+    Middle-ground format: Shows model variant but keeps it compact.
+    
+    Examples:
+        llava:7b -> LLaVA 7B
+        claude-3-5-haiku-20241022 -> Claude Haiku 3.5
+        gpt-4o-mini -> GPT-4o-mini
+        llama3.2-vision:11b -> Llama3.2-Vision 11B
+    
+    Used by both main GUI and chat dialog for consistent display.
+    """
+    if not model_name:
+        return "Unknown"
+    
+    model_lower = model_name.lower()
+    
+    # Claude models - extract family and version
+    if 'claude' in model_lower:
+        if 'haiku' in model_lower:
+            if '3-5' in model_lower:
+                return "Claude Haiku 3.5"
+            else:
+                return "Claude Haiku 3"
+        elif 'sonnet' in model_lower:
+            if '4-5' in model_lower:
+                return "Claude Sonnet 4.5"
+            elif '3-7' in model_lower:
+                return "Claude Sonnet 3.7"
+            elif 'sonnet-4' in model_lower:
+                return "Claude Sonnet 4"
+            else:
+                return "Claude Sonnet"
+        elif 'opus' in model_lower:
+            if '4-1' in model_lower:
+                return "Claude Opus 4.1"
+            elif 'opus-4' in model_lower:
+                return "Claude Opus 4"
+            else:
+                return "Claude Opus"
+        return "Claude"
+    
+    # OpenAI models
+    if 'gpt-4o-mini' in model_lower:
+        return "GPT-4o-mini"
+    elif 'gpt-4o' in model_lower:
+        return "GPT-4o"
+    elif 'gpt-5' in model_lower:
+        return "GPT-5"
+    elif 'gpt-4' in model_lower:
+        return "GPT-4"
+    elif 'gpt-3.5' in model_lower:
+        return "GPT-3.5"
+    
+    # LLaVA variants with size
+    if 'llava' in model_lower:
+        base = "LLaVA"
+        if 'phi3' in model_lower or 'phi-3' in model_lower:
+            base = "LLaVA-Phi3"
+        elif 'llama3' in model_lower:
+            base = "LLaVA-Llama3"
+        
+        # Extract size variant
+        if ':7b' in model_lower or '_7b' in model_lower:
+            return f"{base} 7B"
+        elif ':13b' in model_lower or '_13b' in model_lower:
+            return f"{base} 13B"
+        elif ':34b' in model_lower or '_34b' in model_lower:
+            return f"{base} 34B"
+        elif 'bakllava' in model_lower:
+            return "BakLLaVA"
+        
+        return base
+    
+    # Llama3.2-vision variants
+    if 'llama3.2-vision' in model_lower or 'llama3-2-vision' in model_lower:
+        if ':11b' in model_lower or '_11b' in model_lower:
+            return "Llama3.2-Vision 11B"
+        elif ':90b' in model_lower or '_90b' in model_lower:
+            return "Llama3.2-Vision 90B"
+        else:
+            return "Llama3.2-Vision"
+    
+    # Other Ollama models
+    if 'moondream' in model_lower:
+        return "Moondream"
+    if 'minicpm' in model_lower or 'mini-cpm' in model_lower:
+        if ':8b' in model_lower or '_8b' in model_lower:
+            return "MiniCPM-V 8B"
+        return "MiniCPM-V"
+    if 'cogvlm2' in model_lower or 'cogvlm-2' in model_lower:
+        return "CogVLM2"
+    if 'internvl' in model_lower:
+        return "InternVL"
+    if 'gemma3' in model_lower:
+        return "Gemma3"
+    if 'mistral' in model_lower and 'small' in model_lower:
+        return "Mistral-Small 3.1"
+    if 'mistral' in model_lower:
+        return "Mistral"
+    
+    # Generic fallback - try to extract readable name
+    short_name = model_name
+    if '/' in short_name:
+        short_name = short_name.split('/')[-1]
+    
+    # Remove common date suffixes but keep version numbers
+    import re
+    short_name = re.sub(r'-\d{8}$', '', short_name)  # Remove date like -20241022
+    
+    # Capitalize appropriately
+    return short_name.replace('_', ' ').replace('-', ' ').title()
+
+
 class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
@@ -2649,49 +2768,6 @@ class ChatWindow(QDialog):
         # Message detail is read-only and not part of main navigation
         self.message_detail.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     
-    def get_short_model_name(self, model_name):
-        """Extract short, readable model name from full model name"""
-        if not model_name:
-            return "Unknown"
-        
-        # Common model name mappings
-        model_mappings = {
-            'llama': 'Llama',
-            'moondream': 'Moondream', 
-            'mistral': 'Mistral',
-            'phi': 'Phi',
-            'gemma': 'Gemma',
-            'qwen': 'Qwen',
-            'gpt-4': 'GPT-4',
-            'gpt-3.5': 'GPT-3.5',
-            'gpt-4o': 'GPT-4o',
-            'claude': 'Claude',
-            'blip': 'BLIP',
-            'git-base': 'GIT',
-            'instructblip': 'InstructBLIP'
-        }
-        
-        model_lower = model_name.lower()
-        
-        # Check for exact matches first
-        for key, value in model_mappings.items():
-            if key in model_lower:
-                return value
-        
-        # If no mapping found, try to extract a reasonable short name
-        # Remove common prefixes and suffixes
-        short_name = model_name
-        if '/' in short_name:
-            short_name = short_name.split('/')[-1]  # Take last part after slash
-        
-        # Remove version numbers and common suffixes
-        for suffix in ['-chat', '-instruct', '-base', '-7b', '-13b', '-70b', '-2.7b', '-opt']:
-            if suffix in short_name.lower():
-                short_name = short_name.replace(suffix, '').replace(suffix.upper(), '')
-        
-        # Capitalize first letter
-        return short_name.capitalize()
-    
     def load_conversation(self):
         """Load the conversation history into the list"""
         self.history_list.clear()
@@ -2706,7 +2782,7 @@ class ChatWindow(QDialog):
             else:
                 provider = msg.get('provider', 'AI')
                 model = msg.get('model', 'Model')
-                short_model = self.get_short_model_name(model)
+                short_model = get_short_model_name(model)
                 
                 # For display: "ShortModel: message content (timestamp)"
                 display_text = f"{short_model}: {msg['content']} ({msg['timestamp']})"
@@ -2789,7 +2865,7 @@ class ChatWindow(QDialog):
             color = QColor(0, 120, 0)  # Green for user
             accessible_desc = "Your message"
         else:
-            short_model = self.get_short_model_name(model)
+            short_model = get_short_model_name(model)
             # Show "ShortModel: message content (timestamp)"
             display_text = f"{short_model}: {content} ({timestamp})"
             full_text = f"{short_model}: {content} ({timestamp})"
@@ -6693,7 +6769,7 @@ class ImageDescriberGUI(QMainWindow):
                 # Use short model name for better readability
                 provider = msg.get('provider', 'AI')
                 model = msg.get('model', 'Model')
-                short_model = self.get_short_model_name(f"{provider}_{model}")
+                short_model = get_short_model_name(f"{provider}_{model}")
                 
                 # Truncate long messages for the list view
                 preview = msg['content'][:100] + "..." if len(msg['content']) > 100 else msg['content']
@@ -6771,7 +6847,7 @@ class ImageDescriberGUI(QMainWindow):
             
             for i, desc in enumerate(sorted_descriptions):
                 # Show model and prompt type FIRST - simplified format
-                model_text = desc.model if desc.model else "Unknown Model"
+                model_text = get_short_model_name(desc.model) if desc.model else "Unknown Model"
                 
                 # Check prompt_style first to properly handle follow-ups
                 if desc.prompt_style == "follow-up":
@@ -7325,7 +7401,7 @@ class ImageDescriberGUI(QMainWindow):
         # Populate with chat sessions
         for chat_id, session in self.workspace.chat_sessions.items():
             display_text = f"{session['name']} ({session['timestamp']})"
-            short_model = self.get_short_model_name(session['model'])
+            short_model = get_short_model_name(session['model'])
             provider_info = f"{session['provider'].upper()} {short_model}"
             msg_count = len(session.get('conversation', []))
             tooltip = f"Session: {session['name']}\nProvider: {provider_info}\nMessages: {msg_count}\nCreated: {session['timestamp']}"
@@ -7897,7 +7973,7 @@ Please answer the follow-up question about this image, taking into account the c
         recent_descriptions = sorted(ai_descriptions, key=lambda d: d.created)[-3:]
         context_text = []
         for desc in recent_descriptions:
-            short_model = self.get_short_model_name(desc.model)
+            short_model = get_short_model_name(desc.model)
             context_text.append(f"• {short_model}: {desc.text[:200]}{'...' if len(desc.text) > 200 else ''}")
         
         context_display.setPlainText("\n\n".join(context_text))
