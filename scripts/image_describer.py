@@ -38,6 +38,15 @@ except ImportError:
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
+# Import ConvertImage utilities for image size optimization
+try:
+    from ConvertImage import optimize_image_size, TARGET_MAX_SIZE, CLAUDE_MAX_SIZE, OPENAI_MAX_SIZE
+except ImportError:
+    # If direct import fails, try from current directory
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from ConvertImage import optimize_image_size, TARGET_MAX_SIZE, CLAUDE_MAX_SIZE, OPENAI_MAX_SIZE
+
 # Import AI providers from the main application
 # Add parent directory to path to import from imagedescriber module
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -374,6 +383,21 @@ class ImageDescriber:
             if not self.is_supported_image(image_path):
                 logger.warning(f"Unsupported image format: {image_path}")
                 return None
+            
+            # Optimize image size for cloud providers (Claude 5MB limit, OpenAI 20MB)
+            if self.provider_name in ["claude", "openai"]:
+                # Determine appropriate size limit based on provider
+                max_size = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
+                # Use slightly smaller target to ensure we're under the limit
+                target_size = TARGET_MAX_SIZE  # 4.5MB safe margin
+                
+                success, original_size, final_size = optimize_image_size(image_path, max_file_size=target_size)
+                
+                if original_size > target_size:
+                    if success:
+                        logger.info(f"Optimized {image_path.name} for {self.provider_name}: {original_size/1024/1024:.2f}MB -> {final_size/1024/1024:.2f}MB")
+                    else:
+                        logger.warning(f"Could not optimize {image_path.name} below {target_size/1024/1024:.1f}MB limit. Proceeding with {final_size/1024/1024:.2f}MB (may fail)")
             
             # Get prompt from configuration
             prompt = self.get_prompt()

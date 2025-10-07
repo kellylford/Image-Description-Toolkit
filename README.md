@@ -5,23 +5,26 @@ An AI-powered toolkit for generating descriptive text from images using local la
 ## 🌟 Features
 
 - **🔄 Unified Workflow System**: Complete pipeline from video → frames → images → descriptions → HTML reports
-- **🤖 AI-Powered Descriptions**: Generate natural language descriptions using local Ollama models
+- **🤖 AI-Powered Descriptions**: Generate natural language descriptions using local Ollama models or cloud providers (OpenAI, Claude)
+- **💰 Token Usage Tracking**: Automatic cost tracking and estimation for cloud AI providers with detailed analytics
 - **⚡ Enhanced ONNX Provider**: YOLOv8x object detection + Ollama hybrid workflow for maximum accuracy
 - **🎯 Spatial Object Detection**: Precise location analysis (top/middle/bottom + left/center/right) and size classification
 - **🧪 Comprehensive Model Testing**: Automatically test all available Ollama models with all prompt styles to find optimal combinations
-- **📊 Advanced Performance Analytics**: Detailed reporting with timing, success rates, and quality metrics across all model/prompt combinations
+- **📊 Advanced Performance Analytics**: Detailed reporting with timing, success rates, quality metrics, and cost analysis
 - **🎥 Video Frame Extraction**: Extract frames from videos for analysis
 - **🖼️ Image Format Conversion**: Convert HEIC images to JPG automatically
 - **📄 HTML Report Generation**: Create beautiful web galleries with descriptions
 - **⚡ Batch Processing**: Handle multiple files and directories efficiently
 - **📱 Interactive Visual Reports**: Comprehensive HTML reports with side-by-side model comparisons
-- **📋 Professional Logging**: Complete logging with statistics and progress tracking
+- **📋 Professional Logging**: Complete logging with statistics, token usage, and cost tracking
 - **🛠️ Individual Script Access**: Use components separately when needed
 
 ## 📞 Support & Documentation
 
+- **💰 Token Tracking Guide**: See `docs/TOKEN_TRACKING_GUIDE.md` for cost optimization and analysis
 - **⚡ Enhanced ONNX Guide**: See `docs/ENHANCED_ONNX_GUIDE.md` for YOLOv8x + Ollama integration details
 - **📋 Comprehensive Testing Guide**: See `TESTING_GUIDE.md` for complete model testing documentation
+- **🔧 SDK Migration**: See `SDK_MIGRATION_COMPLETE.md` for OpenAI and Claude SDK integration details
 - **📚 Documentation**: Detailed guides available in the `docs/` directory
 - **🐛 Issues**: Report bugs or request features via [GitHub Issues](https://github.com/kellylford/Image-Description-Toolkit/issues)
 - **💬 Discussions**: Join conversations in [GitHub Discussions](https://github.com/kellylford/Image-Description-Toolkit/discussions)
