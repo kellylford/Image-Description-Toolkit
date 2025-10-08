@@ -224,6 +224,12 @@ class WorkflowOrchestrator:
         """Update the simple status.log file with current progress"""
         status_lines = []
         
+        # Safety check - ensure lists are not None
+        if self.statistics.get('steps_completed') is None:
+            self.statistics['steps_completed'] = []
+        if self.statistics.get('steps_failed') is None:
+            self.statistics['steps_failed'] = []
+        
         # Add overall progress
         total_steps = len(self.statistics['steps_completed']) + len(self.statistics['steps_failed'])
         if total_steps > 0:
@@ -242,7 +248,7 @@ class WorkflowOrchestrator:
             
         if 'describe' in self.statistics['steps_completed']:
             status_lines.append(f"✓ Image description complete ({self.statistics['total_descriptions']} descriptions)")
-        elif 'describe' in self.step_results.get('describe', {}).get('in_progress'):
+        elif self.step_results.get('describe', {}).get('in_progress', False):
             # Check if we have progress data
             desc_result = self.step_results.get('describe', {})
             if 'processed' in desc_result and 'total' in desc_result:

@@ -1,26 +1,19 @@
 @echo off
 REM Test all offline (Ollama) models on a specific directory
 REM Usage: allmodeltest.bat <image_directory>
-REM Requires: Ollama installed with vision models
 
-REM Check if directory argument is provided
-IF "%1"=="" (
-    echo.
-    echo ERROR: No directory specified!
-    echo.
+set IMAGE_DIR=%1
+if "%IMAGE_DIR%"=="" (
+    echo ERROR: No image directory specified!
     echo Usage: allmodeltest.bat ^<image_directory^>
-    echo.
-    echo Example: allmodeltest.bat "C:\Photos\Vacation2024"
-    echo.
+    echo Example: allmodeltest.bat C:\MyImages
     pause
     exit /b 1
 )
 
-SET IMAGE_DIR=%1
-
 echo.
 echo ========================================
-echo Testing 16 Ollama Vision Models (90B skipped)
+echo Testing ALL 17 Ollama Vision Models
 echo ========================================
 echo Target: %IMAGE_DIR%
 echo.
@@ -66,12 +59,12 @@ echo [10/17] Running Ollama Llama 3.2 Vision 11B...
 call run_ollama_llama32vision11b.bat "%IMAGE_DIR%"
 
 echo.
-echo [11/17] SKIPPED: Ollama Llama 3.2 Vision 90B (requires 64GB+ RAM, 15+ min per image)
-REM call run_ollama_llama32vision90b.bat "%IMAGE_DIR%"
+echo [11/17] Running Ollama Llama 3.2 Vision 90B...
+call run_ollama_llama32vision90b.bat "%IMAGE_DIR%"
 
 echo.
-echo [12/17] Running Ollama Pixtral 12B...
-call run_ollama_mistral32.bat "%IMAGE_DIR%"
+echo [12/17] Running Ollama Mistral 3.1...
+call run_ollama_mistral31.bat "%IMAGE_DIR%"
 
 echo.
 echo [13/17] Running Ollama Gemma...
@@ -95,7 +88,7 @@ call run_ollama_internvl.bat "%IMAGE_DIR%"
 
 echo.
 echo ========================================
-echo 16 model tests complete! (90B skipped)
+echo All 17 model tests complete!
 echo ========================================
 echo Results in: ..\Descriptions\wf_ollama_*
 echo.

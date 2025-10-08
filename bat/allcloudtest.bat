@@ -3,20 +3,14 @@ REM Test all cloud AI models (OpenAI and Claude) on a specific directory
 REM Usage: allcloudtest.bat <image_directory>
 REM Requires: API keys configured for OpenAI and Claude
 
-REM Check if directory argument is provided
-IF "%1"=="" (
-    echo.
-    echo ERROR: No directory specified!
-    echo.
+SET IMAGE_DIR=%1
+IF "%IMAGE_DIR%"=="" (
+    echo ERROR: No image directory specified!
     echo Usage: allcloudtest.bat ^<image_directory^>
-    echo.
-    echo Example: allcloudtest.bat "C:\Photos\Vacation2024"
-    echo.
+    echo Example: allcloudtest.bat C:\MyImages
     pause
     exit /b 1
 )
-
-SET IMAGE_DIR=%1
 
 echo.
 echo ========================================
