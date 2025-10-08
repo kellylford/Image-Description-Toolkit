@@ -1,0 +1,71 @@
+
+========================================================================
+Building Image Description Toolkit Executable
+========================================================================
+
+Using virtual environment Python: .venv
+
+[1/4] Cleaning previous builds...
+    Temporarily renaming workflow.py to avoid hook conflict...
+    Done.
+
+[2/4] Building executable with PyInstaller...
+    This may take 5-10 minutes...
+
+669 INFO: PyInstaller: 6.16.0, contrib hooks: 2025.9
+669 INFO: Python: 3.13.7
+702 INFO: Platform: Windows-11-10.0.26220-SP0
+702 INFO: Python environment: C:\Users\kelly\GitHub\idt\.venv
+706 INFO: Removing temporary files and cleaning cache in C:\Users\kelly\AppData\Local\pyinstaller
+745 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\kelly\\GitHub\\idt',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\\python313.zip',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\\DLLs',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\\Lib',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\win32',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\Pythonwin',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\setuptools\\_vendor',
+ 'C:\\Users\\kelly\\GitHub\\idt']
+2231 INFO: Appending 'datas' from .spec
+2234 INFO: checking Analysis
+2234 INFO: Building Analysis because Analysis-00.toc is non existent
+2234 INFO: Looking for Python shared library...
+2234 INFO: Using Python shared library: C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\python313.dll
+2234 INFO: Running Analysis Analysis-00.toc
+2234 INFO: Target bytecode optimization level: 0
+2234 INFO: Initializing module dependency graph...
+2236 INFO: Initializing module graph hook caches...
+2286 INFO: Analyzing modules for base_library.zip ...
+4621 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7018 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8246 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8842 INFO: Caching module dependency graph...
+8895 INFO: Analyzing C:\Users\kelly\GitHub\idt\idt_cli.py
+8901 INFO: Analyzing hidden import 'PIL'
+8903 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8905 INFO: Analyzing hidden import 'PIL._tkinter_finder'
+8906 INFO: Analyzing hidden import 'requests'
+8920 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+9187 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+9188 INFO: SetuptoolsInfo: initializing cached setuptools info...
+14296 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+14456 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+14809 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+16218 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+16484 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+16653 INFO: Analyzing hidden import 'ollama'
+16764 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+16818 INFO: Processing standard module hook 'hook-anyio.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+18186 INFO: Processing standard module hook 'hook-pydantic.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\pydantic\experimental\__init__.py:7: PydanticExperimentalWarning: This module is experimental, its contents are subject to change and deprecation.
+  warnings.warn(
+20284 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+20491 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'

@@ -1,0 +1,160 @@
+
+========================================================================
+Building Image Description Toolkit Executable
+========================================================================
+
+Using virtual environment Python: .venv
+
+[1/4] Cleaning previous builds...
+    Done.
+
+[2/4] Building executable with PyInstaller...
+    This may take 5-10 minutes...
+
+407 INFO: PyInstaller: 6.16.0, contrib hooks: 2025.9
+408 INFO: Python: 3.13.7
+446 INFO: Platform: Windows-11-10.0.26220-SP0
+446 INFO: Python environment: C:\Users\kelly\GitHub\idt\.venv
+449 INFO: Removing temporary files and cleaning cache in C:\Users\kelly\AppData\Local\pyinstaller
+467 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\kelly\\GitHub\\idt',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\\python313.zip',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\\DLLs',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\\Lib',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\win32',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\Pythonwin',
+ 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\setuptools\\_vendor',
+ 'C:\\Users\\kelly\\GitHub\\idt']
+1132 INFO: Appending 'datas' from .spec
+1134 INFO: checking Analysis
+1134 INFO: Building Analysis because Analysis-00.toc is non existent
+1134 INFO: Looking for Python shared library...
+1134 INFO: Using Python shared library: C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\python313.dll
+1134 INFO: Running Analysis Analysis-00.toc
+1134 INFO: Target bytecode optimization level: 0
+1134 INFO: Initializing module dependency graph...
+1138 INFO: Initializing module graph hook caches...
+1253 INFO: Analyzing modules for base_library.zip ...
+3179 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+3332 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+6053 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7803 INFO: Caching module dependency graph...
+7849 INFO: Analyzing C:\Users\kelly\GitHub\idt\idt_cli.py
+7857 INFO: Processing standard module hook 'hook-workflow.py' from 'C:\\Users\\kelly\\GitHub\\idt\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\Lib\importlib\metadata\__init__.py", line 407, in from_name
+    return next(iter(cls.discover(name=name)))
+StopIteration
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\imphook.py", line 422, in _load_hook_module
+    self._hook_module = importlib_load_source(self.hook_module_name, self.hook_filename)
+                        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\compat.py", line 559, in importlib_load_source
+    mod_loader.exec_module(mod)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\_pyinstaller_hooks_contrib\stdhooks\hook-workflow.py", line 15, in <module>
+    datas = copy_metadata('workflow')
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py", line 969, in copy_metadata
+    dist = importlib_metadata.distribution(package_name)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\Lib\importlib\metadata\__init__.py", line 960, in distribution
+    return Distribution.from_name(distribution_name)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\Lib\importlib\metadata\__init__.py", line 409, in from_name
+    raise PackageNotFoundError(name)
+importlib.metadata.PackageNotFoundError: No package metadata was found for workflow
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\__main__.py", line 321, in <module>
+    run()
+    ~~~^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\__main__.py", line 215, in run
+    run_build(pyi_config, spec_file, **vars(args))
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\__main__.py", line 70, in run_build
+    PyInstaller.building.build_main.main(pyi_config, spec_file, **kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\building\build_main.py", line 1272, in main
+    build(specfile, distpath, workpath, clean_build)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\building\build_main.py", line 1210, in build
+    exec(code, spec_namespace)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "ImageDescriptionToolkit.spec", line 16, in <module>
+    a = Analysis(
+        ['idt_cli.py'],                    # Entry point
+    ...<60 lines>...
+        noarchive=False,
+    )
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\building\build_main.py", line 584, in __init__
+    self.__postinit__()
+    ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\building\datastruct.py", line 184, in __postinit__
+    self.assemble()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\building\build_main.py", line 716, in assemble
+    program_scripts.append(self.graph.add_script(script))
+                           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 283, in add_script
+    self._top_script_node = super().add_script(pathname)
+                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1186, in add_script
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2646, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2095, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1258, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1437, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1818, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2646, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 385, in _safe_import_hook
+    excluded_imports = self._find_all_excluded_imports(source_module.identifier)
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 373, in _find_all_excluded_imports
+    excluded_imports.update(module_hook.excludedimports)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\imphook.py", line 343, in __getattr__
+    self._load_hook_module()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\PyInstaller\depend\imphook.py", line 425, in _load_hook_module
+    raise ImportErrorWhenRunningHook(self.hook_module_name, self.hook_filename)
+PyInstaller.exceptions.ImportErrorWhenRunningHook: ERROR: Failed to import module __PyInstaller_hooks_0_workflow required by hook for module C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\_pyinstaller_hooks_contrib\stdhooks\hook-workflow.py. Please check whether module __PyInstaller_hooks_0_workflow actually exists and whether the hook is compatible with your version of C:\Users\kelly\GitHub\idt\.venv\Lib\site-packages\_pyinstaller_hooks_contrib\stdhooks\hook-workflow.py: You might want to read more about hooks in the manual and provide a pull-request to improve PyInstaller.
+
+ERROR: Build failed!
+
+Press any key to continue . . . 
