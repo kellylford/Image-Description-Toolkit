@@ -38,11 +38,7 @@ def main():
     
     # Route to appropriate script
     if command == 'workflow':
-        # Import and run workflow
-        # The workflow.py wrapper already handles everything correctly
-        import workflow
-        # workflow.py runs as subprocess, so we just need to call it
-        # Actually, let's call the scripts/workflow.py directly
+        # Run workflow script directly (no import needed, we use subprocess)
         scripts_dir = base_dir / 'scripts'
         workflow_script = scripts_dir / 'workflow.py'
         

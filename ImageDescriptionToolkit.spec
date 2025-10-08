@@ -22,14 +22,23 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
+        # Include all Python scripts from scripts directory
+        ('scripts/*.py', 'scripts'),
+        
         # Include configuration files from scripts directory
         ('scripts/*.json', 'scripts'),
+        
+        # Include imagedescriber Python modules
+        ('imagedescriber/*.py', 'imagedescriber'),
         
         # Include VERSION file
         ('VERSION', '.'),
         
-        # Include model Python files (no JSON files in models/)
+        # Include model Python files
         ('models/*.py', 'models'),
+        
+        # Include analysis scripts
+        ('analysis/*.py', 'analysis'),
     ],
     hiddenimports=[
         # Core dependencies
