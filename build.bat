@@ -54,19 +54,6 @@ if not exist "ImageDescriptionToolkit.spec" (
 echo [1/4] Cleaning previous builds...
 if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
-
-REM Temporarily rename workflow.py to avoid PyInstaller hook conflict
-REM The idt_cli.py dispatcher doesn't import workflow.py directly
-if exist "workflow.py" (
-    echo     Temporarily renaming workflow.py to avoid hook conflict...
-    move "workflow.py" "workflow_temp.py" >nul
-    set WORKFLOW_RENAMED=1
-)
-if exist "scripts\workflow.py" (
-    move "scripts\workflow.py" "scripts\workflow_temp.py" >nul
-    set SCRIPTS_WORKFLOW_RENAMED=1
-)
-
 echo     Done.
 echo.
 
@@ -75,9 +62,6 @@ echo     This may take 5-10 minutes...
 echo.
 "%PYTHON_EXE%" -m PyInstaller --clean ImageDescriptionToolkit.spec
 if errorlevel 1 (
-    REM Restore workflow files on error
-    if defined WORKFLOW_RENAMED move "workflow_temp.py" "workflow.py" >nul
-    if defined SCRIPTS_WORKFLOW_RENAMED move "scripts\workflow_temp.py" "scripts\workflow.py" >nul
     echo.
     echo ERROR: Build failed!
     echo.
@@ -111,15 +95,6 @@ if errorlevel 1 (
     echo     Test successful!
 )
 echo.
-
-REM Restore renamed workflow files
-if defined WORKFLOW_RENAMED (
-    echo Restoring workflow.py...
-    move "workflow_temp.py" "workflow.py" >nul
-)
-if defined SCRIPTS_WORKFLOW_RENAMED (
-    move "scripts\workflow_temp.py" "scripts\workflow.py" >nul
-)
 
 echo ========================================================================
 echo Build Complete!
