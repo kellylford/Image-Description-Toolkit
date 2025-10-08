@@ -1,90 +1,80 @@
 @echo off
-REM Install ALL Ollama vision models
-REM This will download all vision-capable models for comprehensive testing
+setlocal EnableDelayedExpansion
 
+REM Install ALL Ollama vision models
 echo.
 echo ========================================
 echo Installing ALL Ollama Vision Models
 echo ========================================
 echo.
+
+REM Get current model status
+python models/check_models.py --provider ollama --json > current_models.json
+
+REM Define all available models and their sizes
+set "MODELS_LIST[0]=moondream:1.7"
+set "MODELS_LIST[1]=llava:latest:4.7"
+set "MODELS_LIST[2]=llava:7b:4.7"
+set "MODELS_LIST[3]=llava:13b:8.0"
+set "MODELS_LIST[4]=llava:34b:20.0"
+set "MODELS_LIST[5]=llava-phi3:2.9"
+set "MODELS_LIST[6]=llava-llama3:5.5"
+set "MODELS_LIST[7]=bakllava:4.7"
+set "MODELS_LIST[8]=llama3.2-vision:latest:7.8"
+set "MODELS_LIST[9]=llama3.2-vision:11b:7.8"
+set "MODELS_LIST[10]=llama3.2-vision:90b:55.0"
+set "MODELS_LIST[11]=minicpm-v:4.0"
+set "MODELS_LIST[12]=minicpm-v:8b:5.0"
+set "MODELS_LIST[13]=cogvlm2:8.0"
+set "MODELS_LIST[14]=internvl:4.0"
+set "MODELS_LIST[15]=gemma3:3.3"
+set "MODELS_LIST[16]=mistral-small3.1:15.0"
+
 echo This will install the following models:
 echo   Core Models:
-echo   - moondream (~1.7GB) - Already installed
-echo   - llava:latest (~4.7GB) - Already installed
-echo   - llava:7b (~4.7GB) - Already installed
-echo   - llava:13b (~8GB)
-echo   - llava:34b (~20GB)
-echo   - llava-phi3 (~2.9GB) - Already installed
-echo   - llava-llama3 (~5.5GB)
-echo   - bakllava (~4.7GB)
+
+set TOTAL_NEW=0
+
+for /L %%i in (0,1,16) do (
+    for /F "tokens=1,2 delims=:" %%a in ("!MODELS_LIST[%%i]!") do (
+        findstr /C:"%%a" current_models.json >nul
+        if !errorlevel! equ 0 (
+            echo   - %%a (%%b GB) - Already installed
+        ) else (
+            echo   - %%a (%%b GB)
+            set /a "TOTAL_NEW+=%%b"
+        )
+    )
+)
+
 echo.
-echo   Advanced Models:
-echo   - llama3.2-vision:latest (~7.8GB) - Already installed
-echo   - llama3.2-vision:11b (~7.8GB) - Already installed
-echo   - llama3.2-vision:90b (~55GB) - VERY LARGE
-echo.
-echo   Other Vision Models:
-echo   - minicpm-v (~4GB)
-echo   - minicpm-v:8b (~5GB)
-echo   - cogvlm2 (~8GB)
-echo   - internvl (~4GB)
-echo.
-echo   Large Language Models with Vision:
-echo   - gemma3 (~3.3GB) - Already installed
-echo   - mistral-small3.1 (~15GB) - Already installed
-echo.
-echo Total NEW downloads: ~130GB (excluding already installed)
+echo Total NEW downloads required: ~%TOTAL_NEW%GB
 echo.
 echo Press Ctrl+C to cancel, or
 pause
 
-echo.
-echo Installing missing models...
-echo.
+REM Clean up temporary file
+del current_models.json
 
-echo [1/9] Installing bakllava...
-ollama pull bakllava
-
-echo.
-echo [2/9] Installing llava-llama3...
-ollama pull llava-llama3
-
-echo.
-echo [3/9] Installing llava:13b...
-ollama pull llava:13b
-
-echo.
-echo [4/9] Installing llava:34b (LARGE - 20GB)...
-ollama pull llava:34b
-
-echo.
-echo [5/9] Installing llama3.2-vision:90b (VERY LARGE - 55GB)...
-ollama pull llama3.2-vision:90b
-
-echo.
-echo [6/9] Installing minicpm-v...
-ollama pull minicpm-v
-
-echo.
-echo [7/9] Installing minicpm-v:8b...
-ollama pull minicpm-v:8b
-
-echo.
-echo [8/9] Installing cogvlm2...
-ollama pull cogvlm2
-
-echo.
-echo [9/9] Installing internvl...
-ollama pull internvl
+REM Install missing models
+set /a count=1
+for /L %%i in (0,1,16) do (
+    for /F "tokens=1,2 delims=:" %%a in ("!MODELS_LIST[%%i]!") do (
+        findstr /C:"%%a" current_models.json >nul
+        if !errorlevel! neq 0 (
+            echo.
+            echo [!count!/17] Installing %%a...
+            ollama pull %%a
+            set /a count+=1
+        )
+    )
+)
 
 echo.
 echo ========================================
-echo All models installed successfully!
+echo Installation Complete!
 echo ========================================
 echo.
-echo Total vision models: 17
-echo.
-echo Run 'ollama list' to see all installed models
-echo Run batch files in the 'bat' folder to use them
+echo Run 'python models/check_models.py' to verify installation
 echo.
 pause
