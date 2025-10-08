@@ -1,6 +1,11 @@
 @echo off
-REM Run workflow with OpenAI GPT-4o-mini (fast & affordable cloud)
-REM Usage: run_openai_gpt4o_mini.bat <image_directory>
+SETLOCAL
+REM Run workflow with OpenAI GPT-4o Mini (fast & affordable)
+REM Usage: run_openai_gpt4o_mini.bat <image_directory> [prompt_style]
 REM Requires: openai.txt with API key in current directory OR OPENAI_API_KEY environment variable
 
-..\.venv\Scripts\python.exe ..\workflow.py --provider openai --model gpt-4o-mini --prompt-style narrative --output-dir ..\Descriptions %1
+SET PROMPT_STYLE=%2
+IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
+
+..\.venv\Scripts\python.exe ..\workflow.py --provider openai --model gpt-4o-mini --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+ENDLOCAL

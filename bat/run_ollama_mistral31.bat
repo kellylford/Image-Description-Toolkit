@@ -1,5 +1,10 @@
 @echo off
-REM Run workflow with Ollama Mistral Small 3.1
-REM Usage: run_ollama_mistral.bat <image_directory>
+SETLOCAL
+REM Run workflow with Ollama Mistral Nemo 3.1
+REM Usage: run_ollama_mistral31.bat <image_directory> [prompt_style]
 
-..\.venv\Scripts\python.exe ..\workflow.py --provider ollama --model mistral-small3.1:latest --prompt-style narrative --output-dir ..\Descriptions %1
+SET PROMPT_STYLE=%2
+IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
+
+..\.venv\Scripts\python.exe ..\workflow.py --provider ollama --model mistral-small3.1:latest --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+ENDLOCAL

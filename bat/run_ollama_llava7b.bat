@@ -1,9 +1,10 @@
 @echo off
-REM Run workflow with Ollama LLaVA 7B (balanced performance)
-REM Usage: run_ollama_llava7b.bat <image_directory>
-
-..\.venv\Scripts\python.exe ..\workflow.py --provider ollama --model llava:7b --prompt-style narrative --output-dir ..\Descriptions %1 off
+SETLOCAL
 REM Run workflow with Ollama LLaVA 7B (balanced quality & speed)
-REM Usage: run_ollama_llava7b.bat <image_directory>
+REM Usage: run_ollama_llava7b.bat <image_directory> [prompt_style]
 
-..\.venv\Scripts\python.exe ..\workflow.py --provider ollama --model llava:7b --prompt-style narrative --output-dir ..\Descriptions %1
+SET PROMPT_STYLE=%2
+IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
+
+..\.venv\Scripts\python.exe ..\workflow.py --provider ollama --model llava:7b --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+ENDLOCAL

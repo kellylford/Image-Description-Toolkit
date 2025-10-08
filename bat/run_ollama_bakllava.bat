@@ -1,5 +1,10 @@
 @echo off
-REM Run workflow with Ollama BakLLaVA (vision model variant)
-REM Usage: run_ollama_bakllava.bat <image_directory>
+SETLOCAL
+REM Run workflow with Ollama BakLLaVA (BakLLaVA variant)
+REM Usage: run_ollama_bakllava.bat <image_directory> [prompt_style]
 
-..\.venv\Scripts\python.exe ..\workflow.py --provider ollama --model bakllava:latest --prompt-style narrative --output-dir ..\Descriptions %1
+SET PROMPT_STYLE=%2
+IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
+
+..\.venv\Scripts\python.exe ..\workflow.py --provider ollama --model bakllava:latest --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+ENDLOCAL
