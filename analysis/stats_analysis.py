@@ -758,14 +758,14 @@ Examples:
         '--csv-output',
         type=str,
         default='workflow_timing_stats.csv',
-        help='CSV output filename (default: workflow_timing_stats.csv). Saved in analysis/ directory.'
+        help='CSV output filename (default: workflow_timing_stats.csv). Saved in analysis/results/ directory.'
     )
     
     parser.add_argument(
         '--json-output',
         type=str,
         default='workflow_statistics.json',
-        help='JSON output filename (default: workflow_statistics.json). Saved in analysis/ directory.'
+        help='JSON output filename (default: workflow_statistics.json). Saved in analysis/results/ directory.'
     )
     
     args = parser.parse_args()
@@ -821,8 +821,8 @@ Examples:
     # Print aggregate stats
     calculate_aggregate_stats(all_stats)
     
-    # Save to JSON and CSV in analysis directory with safe filenames
-    output_dir = Path(__file__).parent
+    # Save to JSON and CSV in analysis/results directory with safe filenames
+    output_dir = Path(__file__).parent / "results"
     ensure_directory(output_dir)
     
     json_output = output_dir / args.json_output

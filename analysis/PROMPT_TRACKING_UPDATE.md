@@ -1,7 +1,7 @@
-# Prompt Tracking Update for analyze_workflow_stats.py
+# Prompt Tracking Update for stats_analysis.py
 
 **Date:** 2025-01-XX  
-**Updated File:** `analyze_workflow_stats.py`  
+**Updated File:** `stats_analysis.py`  
 **Purpose:** Add prompt style tracking to timing and statistics analysis
 
 ## Summary
@@ -149,7 +149,7 @@ Ollama LLaVA 7B,ollama,llava,artistic,18.21
 
 1. **Run with multiple prompts:**
    ```bash
-   python analyze_workflow_stats.py
+   python stats_analysis.py
    ```
 
 2. **Check CSV output:**
@@ -167,12 +167,12 @@ Ollama LLaVA 7B,ollama,llava,artistic,18.21
 
 ## Files Modified
 
-- `analysis/analyze_workflow_stats.py` - Complete prompt tracking implementation
+- `analysis/stats_analysis.py` - Complete prompt tracking implementation
 
 ## Related Files
 
 - `analysis/combine_workflow_descriptions.py` - Already has prompt tracking (completed earlier)
-- `analysis/analyze_description_content.py` - Works with combined CSV (includes prompts)
+- `analysis/content_analysis.py` - Works with combined CSV (includes prompts)
 
 ## Next Steps (Optional Enhancements)
 
@@ -228,4 +228,4 @@ Ollama LLaVA 7B                colorful     42       13m 2s      18.62s       16
 
 ## Conclusion
 
-The analyze_workflow_stats.py script now provides complete prompt tracking across all output formats, enabling detailed comparison of model performance across different prompt styles. This complements the earlier update to combine_workflow_descriptions.py, providing comprehensive prompt tracking across the entire analysis toolkit.
+The stats_analysis.py script now provides complete prompt tracking across all output formats, enabling detailed comparison of model performance across different prompt styles. This complements the earlier update to combine_workflow_descriptions.py, providing comprehensive prompt tracking across the entire analysis toolkit.

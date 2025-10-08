@@ -81,7 +81,7 @@ If you have scripts that expect @-separated files:
 - Use `--format atsv` flag
 - Everything still works exactly as before
 
-### analyze_description_content.py
+### content_analysis.py
 - **Upgraded** to auto-detect delimiter (comma, tab, or @)
 - Works with all three formats automatically
 - No changes needed to your workflow!
@@ -92,7 +92,7 @@ If you have scripts that expect @-separated files:
 ```bash
 # Just use the defaults - you're all set!
 python combine_workflow_descriptions.py
-python analyze_description_content.py
+python content_analysis.py
 ```
 
 ### For Existing Workflows
@@ -161,7 +161,7 @@ IMG_001.jpg@The image shows a red car, parked near a building.@A red vehicle is 
 - **For existing workflows:** ATSV (legacy)
 
 ### Will my old files still work?
-Yes! The `analyze_description_content.py` tool auto-detects the delimiter, so your existing @-separated files will continue to work.
+Yes! The `content_analysis.py` tool auto-detects the delimiter, so your existing @-separated files will continue to work.
 
 ### Can I convert my old files to CSV?
 Yes, but you'd need to re-run `combine_workflow_descriptions.py` with the new format. The good news: your workflow description files haven't changed, so you can regenerate the combined file anytime.

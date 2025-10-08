@@ -358,20 +358,24 @@ Examples:
         '--input',
         type=str,
         default='combineddescriptions.csv',
-        help='Input file with combined descriptions (CSV/TSV/ATSV - auto-detected, default: combineddescriptions.csv)'
+        help='Input file with combined descriptions (CSV/TSV/ATSV - auto-detected, default: combineddescriptions.csv from results/ directory)'
     )
     
     parser.add_argument(
         '--output',
         type=str,
         default='description_content_analysis.csv',
-        help='Output CSV filename (default: description_content_analysis.csv). Saved in analysis/ directory.'
+        help='Output CSV filename (default: description_content_analysis.csv). Saved in analysis/results/ directory.'
     )
     
     args = parser.parse_args()
     
-    # Find the combined descriptions file
-    csv_path = Path(__file__).parent / args.input
+    # Find the combined descriptions file - check results/ directory first, then analysis/ directory
+    csv_path = Path(__file__).parent / "results" / args.input
+    
+    if not csv_path.exists():
+        # Fall back to analysis directory for backward compatibility
+        csv_path = Path(__file__).parent / args.input
     
     if not csv_path.exists():
         print(f"Error: Combined descriptions file not found at: {csv_path}")
@@ -408,8 +412,8 @@ Examples:
     if len(all_stats) > 1:
         print_comparison(all_stats)
     
-    # Save to CSV in analysis directory with safe filename
-    output_dir = Path(__file__).parent
+    # Save to CSV in analysis/results directory with safe filename
+    output_dir = Path(__file__).parent / "results"
     ensure_directory(output_dir)
     
     output_csv = output_dir / args.output

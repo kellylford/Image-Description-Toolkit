@@ -280,7 +280,7 @@ Examples:
         '--output',
         type=str,
         default='combineddescriptions.csv',
-        help='Output filename (default: combineddescriptions.csv). Saved in analysis/ directory.'
+        help='Output filename (default: combineddescriptions.csv). Saved in analysis/results/ directory.'
     )
     
     parser.add_argument(
@@ -364,8 +364,8 @@ Default: csv'''
     print(f"Total image+prompt combinations: {len(sorted_combinations)}")
     print(f"Total unique models: {len(unique_models)}")
     
-    # Create output file in analysis directory with safe filename
-    output_dir = Path(__file__).parent
+    # Create output file in analysis/results directory with safe filename
+    output_dir = Path(__file__).parent / "results"
     ensure_directory(output_dir)
     
     output_file = output_dir / args.output

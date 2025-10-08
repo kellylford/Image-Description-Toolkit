@@ -7,8 +7,8 @@ This directory contains three powerful analysis tools for evaluating and compari
 - [Overview](#overview)
 - [Tools](#tools)
   - [1. combine_workflow_descriptions.py](#1-combine_workflow_descriptionspy)
-  - [2. analyze_workflow_stats.py](#2-analyze_workflow_statspy)
-  - [3. analyze_description_content.py](#3-analyze_description_contentpy)
+  - [2. stats_analysis.py](#2-stats_analysispy)
+  - [3. content_analysis.py](#3-content_analysispy)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Common Use Cases](#common-use-cases)
@@ -74,7 +74,7 @@ python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--input-dir` | `../Descriptions` | Directory containing `wf_*` workflow folders |
-| `--output` | `combineddescriptions.csv` | Output filename (saved in analysis/ directory) |
+| `--output` | `combineddescriptions.csv` | Output filename (saved in analysis/results/ directory) |
 | `--format` | `csv` | Output format: `csv` (standard comma-delimited), `tsv` (tab-delimited), or `atsv` (@-separated legacy) |
 
 #### Output
@@ -113,7 +113,7 @@ IMG_1234.JPG	The image shows a red car...	A red vehicle is...	In this picture...
 
 ---
 
-### 2. analyze_workflow_stats.py
+### 2. stats_analysis.py
 
 **Purpose:** Analyzes performance metrics from workflow logs.
 
@@ -135,16 +135,16 @@ IMG_1234.JPG	The image shows a red car...	A red vehicle is...	In this picture...
 
 ```bash
 # Basic usage (analyzes all workflows in Descriptions directory)
-python analyze_workflow_stats.py
+python stats_analysis.py
 
 # Specify custom workflow directory
-python analyze_workflow_stats.py --input-dir /path/to/workflows
+python stats_analysis.py --input-dir /path/to/workflows
 
 # Custom output filenames
-python analyze_workflow_stats.py --csv-output timing_stats.csv --json-output stats.json
+python stats_analysis.py --csv-output timing_stats.csv --json-output stats.json
 
 # Full custom usage
-python analyze_workflow_stats.py --input-dir /data/workflows --csv-output my_stats.csv
+python stats_analysis.py --input-dir /data/workflows --csv-output my_stats.csv
 ```
 
 #### Arguments
@@ -152,8 +152,8 @@ python analyze_workflow_stats.py --input-dir /data/workflows --csv-output my_sta
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--input-dir` | `../Descriptions` | Directory containing `wf_*` workflow folders |
-| `--csv-output` | `workflow_timing_stats.csv` | CSV output filename |
-| `--json-output` | `workflow_statistics.json` | JSON output filename |
+| `--csv-output` | `workflow_timing_stats.csv` | CSV output filename (saved in analysis/results/ directory) |
+| `--json-output` | `workflow_statistics.json` | JSON output filename (saved in analysis/results/ directory) |
 
 #### Output
 
@@ -187,7 +187,7 @@ Claude Haiku 3
 
 ---
 
-### 3. analyze_description_content.py
+### 3. content_analysis.py
 
 **Purpose:** Analyzes word frequencies and vocabulary across AI model descriptions.
 
@@ -210,19 +210,19 @@ Claude Haiku 3
 
 ```bash
 # Basic usage (analyzes combineddescriptions.csv - auto-detects format)
-python analyze_description_content.py
+python content_analysis.py
 
 # Analyze specific combined descriptions file (works with CSV, TSV, or ATSV)
-python analyze_description_content.py --input my_descriptions.csv
+python content_analysis.py --input my_descriptions.csv
 
 # Analyze TSV file
-python analyze_description_content.py --input results.tsv
+python content_analysis.py --input results.tsv
 
 # Custom output filename
-python analyze_description_content.py --output word_analysis.csv
+python content_analysis.py --output word_analysis.csv
 
 # Full custom usage
-python analyze_description_content.py --input my_descriptions.csv --output my_analysis.csv
+python content_analysis.py --input my_descriptions.csv --output my_analysis.csv
 ```
 
 #### Arguments
@@ -230,9 +230,9 @@ python analyze_description_content.py --input my_descriptions.csv --output my_an
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--input` | `combineddescriptions.csv` | Input file with combined descriptions (CSV, TSV, or ATSV - auto-detected) |
-| `--output` | `description_content_analysis.csv` | Output CSV filename |
+| `--output` | `description_content_analysis.csv` | Output CSV filename (saved in analysis/results/ directory) |
 
-**Note:** Input file should be in the `analysis/` directory (typically created by `combine_workflow_descriptions.py`)
+**Note:** Input file is read from the `analysis/results/` directory by default (typically created by `combine_workflow_descriptions.py`). For backward compatibility, it will also check the `analysis/` directory if not found in `results/`.
 
 #### Output
 
@@ -304,10 +304,10 @@ cd analysis
 python combine_workflow_descriptions.py
 
 # 3. Analyze performance statistics
-python analyze_workflow_stats.py
+python stats_analysis.py
 
 # 4. Analyze word frequencies
-python analyze_description_content.py
+python content_analysis.py
 
 # Done! Check the output files in the analysis/ directory
 ```
@@ -321,8 +321,8 @@ cd analysis
 
 # Specify custom directory for all tools
 python combine_workflow_descriptions.py --input-dir /path/to/workflows
-python analyze_workflow_stats.py --input-dir /path/to/workflows
-python analyze_description_content.py  # Uses the combined file from step 1
+python stats_analysis.py --input-dir /path/to/workflows
+python content_analysis.py  # Uses the combined file from step 1
 ```
 
 ---
@@ -342,10 +342,10 @@ cd analysis
 python combine_workflow_descriptions.py --output model_comparison.csv
 
 # 2. Get performance metrics
-python analyze_workflow_stats.py --csv-output performance_comparison.csv
+python stats_analysis.py --csv-output performance_comparison.csv
 
 # 3. Analyze description quality
-python analyze_description_content.py --input model_comparison.csv --output quality_analysis.csv
+python content_analysis.py --input model_comparison.csv --output quality_analysis.csv
 ```
 
 **Results:**
@@ -362,13 +362,13 @@ cd analysis
 
 # Analyze "before" workflows
 python combine_workflow_descriptions.py --output before_descriptions.csv
-python analyze_workflow_stats.py --csv-output before_stats.csv
+python stats_analysis.py --csv-output before_stats.csv
 
 # Run new workflows with updated prompts...
 
 # Analyze "after" workflows
 python combine_workflow_descriptions.py --output after_descriptions.csv
-python analyze_workflow_stats.py --csv-output after_stats.csv
+python stats_analysis.py --csv-output after_stats.csv
 
 # Compare the CSV files to see improvements
 ```
@@ -381,9 +381,9 @@ python analyze_workflow_stats.py --csv-output after_stats.csv
 cd analysis
 
 # Monthly analysis with dated filenames
-python analyze_workflow_stats.py --csv-output stats_2025_01.csv
+python stats_analysis.py --csv-output stats_2025_01.csv
 # Next month...
-python analyze_workflow_stats.py --csv-output stats_2025_02.csv
+python stats_analysis.py --csv-output stats_2025_02.csv
 # Compare trends over time
 ```
 
@@ -402,13 +402,21 @@ This ensures you never accidentally overwrite previous analysis results.
 
 ### Default Output Locations
 
-All output files are saved in the `analysis/` directory:
+All output files are saved in the `analysis/results/` directory by default:
 
 | Tool | Default Output Files |
 |------|---------------------|
-| combine_workflow_descriptions.py | `combineddescriptions.csv` (or `.tsv`/`.txt` depending on format) |
-| analyze_workflow_stats.py | `workflow_timing_stats.csv`<br>`workflow_statistics.json` |
-| analyze_description_content.py | `description_content_analysis.csv` |
+| combine_workflow_descriptions.py | `results/combineddescriptions.csv` (or `.tsv`/`.txt` depending on format) |
+| stats_analysis.py | `results/workflow_timing_stats.csv`<br>`results/workflow_statistics.json` |
+| content_analysis.py | `results/description_content_analysis.csv` |
+
+**Why a separate results directory?**
+- ✅ Keeps the analysis directory clean and organized
+- ✅ Makes it easy to find all results in one place  
+- ✅ Prevents polluting the repository with output files
+- ✅ Results are automatically excluded from git (via `.gitignore`)
+
+**Note:** You can override the default location by specifying a full path with `--output`
 
 ### Understanding Output Files
 
@@ -446,8 +454,8 @@ All output files are saved in the `analysis/` directory:
 ### Performance Tips
 
 1. **Speed vs Quality Tradeoff**
-   - Use `analyze_workflow_stats.py` to find fastest models
-   - Use `analyze_description_content.py` to find most detailed models
+   - Use `stats_analysis.py` to find fastest models
+   - Use `content_analysis.py` to find most detailed models
    - Balance based on your needs
 
 2. **HEIC Conversion Impact**
@@ -487,7 +495,7 @@ All output files are saved in the `analysis/` directory:
 
 2. **Use Meaningful Output Names**
    ```bash
-   python analyze_workflow_stats.py --csv-output product_photos_jan2025.csv
+   python stats_analysis.py --csv-output product_photos_jan2025.csv
    # Not just "output.csv"
    ```
 
@@ -511,7 +519,7 @@ All output files are saved in the `analysis/` directory:
 ls ../Descriptions/
 
 # Or specify the correct path
-python analyze_workflow_stats.py --input-dir /actual/path/to/workflows
+python stats_analysis.py --input-dir /actual/path/to/workflows
 ```
 
 **"No descriptions found" error:**
@@ -547,7 +555,7 @@ for dir in /data/workflows/*; do
     if [ -d "$dir" ]; then
         name=$(basename "$dir")
         echo "Analyzing $name..."
-        python analyze_workflow_stats.py --input-dir "$dir" --csv-output "stats_${name}.csv"
+        python stats_analysis.py --input-dir "$dir" --csv-output "stats_${name}.csv"
     fi
 done
 ```
@@ -560,13 +568,13 @@ python combine_workflow_descriptions.py --input-dir ../Descriptions_Week1 --outp
 python combine_workflow_descriptions.py --input-dir ../Descriptions_Week2 --output week2.csv
 
 # Analyze each separately
-python analyze_description_content.py --input week1.csv --output analysis_week1.csv
-python analyze_description_content.py --input week2.csv --output analysis_week2.csv
+python content_analysis.py --input week1.csv --output analysis_week1.csv
+python content_analysis.py --input week2.csv --output analysis_week2.csv
 ```
 
 ### Custom Analysis Scripts
 
-The JSON output from `analyze_workflow_stats.py` can be imported into custom Python scripts:
+The JSON output from `stats_analysis.py` can be imported into custom Python scripts:
 
 ```python
 import json
