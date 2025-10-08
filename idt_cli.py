@@ -82,24 +82,39 @@ def main():
     
     # Route to appropriate script
     if command == 'workflow':
-        # For PyInstaller, we need to run the bundled script
+        # For PyInstaller, we need to import and run the module directly
         if getattr(sys, 'frozen', False):
-            # Running as executable - use bundled files
-            workflow_script = get_resource_path('scripts/workflow.py')
-            
-            if not workflow_script.exists():
-                print(f"Error: Workflow script not found at {workflow_script}")
-                print(f"Try running with --debug-paths to see available files")
+            # Running as executable - import the module directly
+            try:
+                # Add the scripts directory to Python path
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                
+                # Import workflow module
+                import workflow
+                
+                # Set up sys.argv for the workflow script
+                original_argv = sys.argv[:]
+                sys.argv = ['workflow.py'] + sys.argv[2:]  # Remove 'workflow' command, keep the rest
+                
+                try:
+                    # Run the workflow main function
+                    return workflow.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    # Restore original argv
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import workflow module: {e}")
                 return 1
-            
-            # Use the same Python executable (the bundle can run Python scripts)
-            import subprocess
-            args = sys.argv[2:]  # Pass all args after 'workflow'
-            cmd = [sys.executable, str(workflow_script)] + args
-            result = subprocess.run(cmd, cwd=str(workflow_script.parent))
-            return result.returncode
+            except Exception as e:
+                print(f"Error running workflow: {e}")
+                return 1
         else:
-            # Running as script - use relative paths
+            # Running as script - use subprocess (development mode)
             scripts_dir = base_dir / 'scripts'
             workflow_script = scripts_dir / 'workflow.py'
             
@@ -157,17 +172,44 @@ def main():
     
     elif command == 'check-models':
         # Check installed models
-        check_script = get_resource_path('models/check_models.py')
-        
-        if not check_script.exists():
-            print(f"Error: Check models script not found at {check_script}")
-            return 1
-        
-        import subprocess
-        args = sys.argv[2:]
-        cmd = [sys.executable, str(check_script)] + args
-        result = subprocess.run(cmd, cwd=str(check_script.parent))
-        return result.returncode
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                models_path = get_resource_path('models')
+                if str(models_path) not in sys.path:
+                    sys.path.insert(0, str(models_path))
+                
+                import check_models
+                
+                original_argv = sys.argv[:]
+                sys.argv = ['check_models.py'] + sys.argv[2:]
+                
+                try:
+                    return check_models.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import check_models module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running check_models: {e}")
+                return 1
+        else:
+            # Development mode - use subprocess
+            check_script = get_resource_path('models/check_models.py')
+            
+            if not check_script.exists():
+                print(f"Error: Check models script not found at {check_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(check_script)] + args
+            result = subprocess.run(cmd, cwd=str(check_script.parent))
+            return result.returncode
     
     elif command == 'extract-frames':
         # Extract video frames
