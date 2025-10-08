@@ -220,6 +220,56 @@ class WorkflowOrchestrator:
             'steps_failed': []
         }
         
+    def _update_status_log(self) -> None:
+        """Update the simple status.log file with current progress"""
+        status_lines = []
+        
+        # Add overall progress
+        total_steps = len(self.statistics['steps_completed']) + len(self.statistics['steps_failed'])
+        if total_steps > 0:
+            status_lines.append(f"Workflow Progress: {len(self.statistics['steps_completed'])}/{total_steps} steps completed")
+        
+        # Add step-specific status
+        if 'video' in self.statistics['steps_completed']:
+            status_lines.append(f"✓ Video extraction complete ({self.statistics['total_videos_processed']} videos)")
+        elif 'video' in self.statistics['steps_failed']:
+            status_lines.append(f"✗ Video extraction failed")
+            
+        if 'convert' in self.statistics['steps_completed']:
+            status_lines.append(f"✓ Image conversion complete ({self.statistics['total_conversions']} images)")
+        elif 'convert' in self.statistics['steps_failed']:
+            status_lines.append(f"✗ Image conversion failed")
+            
+        if 'describe' in self.statistics['steps_completed']:
+            status_lines.append(f"✓ Image description complete ({self.statistics['total_descriptions']} descriptions)")
+        elif 'describe' in self.step_results.get('describe', {}).get('in_progress'):
+            # Check if we have progress data
+            desc_result = self.step_results.get('describe', {})
+            if 'processed' in desc_result and 'total' in desc_result:
+                status_lines.append(f"⟳ Image description in progress: {desc_result['processed']}/{desc_result['total']} images described")
+            else:
+                status_lines.append(f"⟳ Image description in progress...")
+        elif 'describe' in self.statistics['steps_failed']:
+            status_lines.append(f"✗ Image description failed")
+            
+        if 'html' in self.statistics['steps_completed']:
+            status_lines.append(f"✓ HTML generation complete")
+        elif 'html' in self.statistics['steps_failed']:
+            status_lines.append(f"✗ HTML generation failed")
+        
+        # Add error count if any
+        if self.statistics['errors_encountered'] > 0:
+            status_lines.append(f"⚠ Errors encountered: {self.statistics['errors_encountered']}")
+        
+        # Add timing info if available
+        if self.statistics['start_time']:
+            start_time = datetime.fromisoformat(self.statistics['start_time'])
+            elapsed = (datetime.now() - start_time).total_seconds()
+            status_lines.append(f"\nElapsed time: {elapsed/60:.1f} minutes")
+        
+        # Update the status log
+        self.logger.update_status(status_lines)
+        
     def extract_video_frames(self, input_dir: Path, output_dir: Path) -> Dict[str, Any]:
         """
         Extract frames from videos using video_frame_extractor.py
@@ -563,6 +613,14 @@ class WorkflowOrchestrator:
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
             
+            # Store total images for status updates
+            self.step_results['describe'] = {
+                'in_progress': True,
+                'total': len(combined_image_list),
+                'processed': 0
+            }
+            self._update_status_log()
+            
             result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
             
             # Log the subprocess output for transparency
@@ -570,6 +628,10 @@ class WorkflowOrchestrator:
                 self.logger.info(f"image_describer.py output:\n{result.stdout}")
             if result.stderr.strip():
                 self.logger.warning(f"image_describer.py stderr:\n{result.stderr}")
+            
+            # Mark description as no longer in progress
+            if 'describe' in self.step_results:
+                self.step_results['describe']['in_progress'] = False
             
             # Save file path mapping before cleaning up temp directory
             # This allows import tools to map temp paths back to originals
@@ -730,6 +792,9 @@ class WorkflowOrchestrator:
         start_time = datetime.now()
         self.statistics['start_time'] = start_time.isoformat()
         
+        # Update initial status
+        self._update_status_log()
+        
         # Set base output directory in config
         self.config.set_base_output_dir(output_dir)
         
@@ -789,6 +854,9 @@ class WorkflowOrchestrator:
                     workflow_results["steps_completed"].append(step)
                     self.logger.info(f"Step '{step}' completed successfully")
                     
+                    # Update status log after successful step
+                    self._update_status_log()
+                    
                     # Update input directory for next step if this step produced outputs
                     if step in ["video", "convert"] and step_result.get("output_dir"):
                         current_input_dir = step_result["output_dir"]
@@ -798,6 +866,9 @@ class WorkflowOrchestrator:
                     workflow_results["success"] = False
                     self.logger.error(f"Step '{step}' failed: {step_result.get('error', 'Unknown error')}")
                     
+                    # Update status log after failed step
+                    self._update_status_log()
+                    
             except Exception as e:
                 self.statistics['errors_encountered'] += 1
                 self.statistics['steps_failed'].append(step)
@@ -805,6 +876,9 @@ class WorkflowOrchestrator:
                 workflow_results["steps_failed"].append(step)
                 workflow_results["success"] = False
                 self.step_results[step] = {"success": False, "error": str(e)}
+                
+                # Update status log after error
+                self._update_status_log()
         
         # Finalize statistics and logging
         end_time = datetime.now()
@@ -814,6 +888,9 @@ class WorkflowOrchestrator:
         
         # Log comprehensive final statistics
         self._log_final_statistics(start_time, end_time)
+        
+        # Final status update
+        self._update_status_log()
         
         return workflow_results
     

@@ -162,6 +162,13 @@ class WorkflowLogger:
             self.logger.addHandler(file_handler)
             
             self.logger.info(f"Workflow log file: {log_filename.absolute()}")
+            
+            # Set up status log file
+            self.status_log_path = logs_dir / "status.log"
+            self.logs_dir = logs_dir
+        else:
+            self.status_log_path = None
+            self.logs_dir = None
     
     def info(self, message: str) -> None:
         """Log info message"""
@@ -178,6 +185,24 @@ class WorkflowLogger:
     def debug(self, message: str) -> None:
         """Log debug message"""
         self.logger.debug(message)
+    
+    def update_status(self, status_lines: List[str]) -> None:
+        """
+        Update the simple status.log file with current workflow progress.
+        This creates an easy-to-read status file that shows the overall progress.
+        
+        Args:
+            status_lines: List of status messages to write (each will be on its own line)
+        """
+        if self.status_log_path:
+            try:
+                with open(self.status_log_path, 'w', encoding='utf-8') as f:
+                    f.write(f"Workflow Status - Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("=" * 70 + "\n\n")
+                    for line in status_lines:
+                        f.write(f"{line}\n")
+            except Exception as e:
+                self.logger.warning(f"Could not update status log: {e}")
 
 
 class FileDiscovery:
