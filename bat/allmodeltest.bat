@@ -20,7 +20,7 @@ SET IMAGE_DIR=%1
 
 echo.
 echo ========================================
-echo Testing ALL 17 Ollama Vision Models
+echo Testing 16 Ollama Vision Models (90B skipped)
 echo ========================================
 echo Target: %IMAGE_DIR%
 echo.
@@ -66,12 +66,12 @@ echo [10/17] Running Ollama Llama 3.2 Vision 11B...
 call run_ollama_llama32vision11b.bat "%IMAGE_DIR%"
 
 echo.
-echo [11/17] Running Ollama Llama 3.2 Vision 90B...
-call run_ollama_llama32vision90b.bat "%IMAGE_DIR%"
+echo [11/17] SKIPPED: Ollama Llama 3.2 Vision 90B (requires 64GB+ RAM, 15+ min per image)
+REM call run_ollama_llama32vision90b.bat "%IMAGE_DIR%"
 
 echo.
-echo [12/17] Running Ollama Mistral...
-call run_ollama_mistral.bat "%IMAGE_DIR%"
+echo [12/17] Running Ollama Pixtral 12B...
+call run_ollama_mistral32.bat "%IMAGE_DIR%"
 
 echo.
 echo [13/17] Running Ollama Gemma...
@@ -95,7 +95,7 @@ call run_ollama_internvl.bat "%IMAGE_DIR%"
 
 echo.
 echo ========================================
-echo All 17 model tests complete!
+echo 16 model tests complete! (90B skipped)
 echo ========================================
 echo Results in: ..\Descriptions\wf_ollama_*
 echo.
