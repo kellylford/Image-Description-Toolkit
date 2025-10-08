@@ -55,6 +55,7 @@ def parse_workflow_log(log_path: Path) -> Dict:
         'errors': 0,
         'provider': None,
         'model': None,
+        'prompt_style': None,  # NEW: Prompt style (narrative, detailed, concise, etc.)
         'total_tokens': None,  # NEW: Total tokens from API
         'prompt_tokens': None,  # NEW: Input/prompt tokens
         'completion_tokens': None,  # NEW: Output/completion tokens
@@ -65,12 +66,21 @@ def parse_workflow_log(log_path: Path) -> Dict:
         print(f"Warning: {log_path} not found")
         return stats
     
-    # Extract provider and model from directory name
+    # Extract provider, model, and prompt_style from directory name
+    # Format: wf_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
     dir_name = log_path.parent.parent.name
     parts = dir_name.split('_')
     if len(parts) >= 3:
         stats['provider'] = parts[1]
         stats['model'] = parts[2]
+        
+        # Prompt style is typically in parts[3] or parts[4] (if model has variant)
+        # Known prompt styles to look for
+        prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic']
+        for i in range(3, len(parts)):
+            if parts[i] in prompt_styles:
+                stats['prompt_style'] = parts[i]
+                break
     
     # Track conversion times and current filename
     conversion_start = None
@@ -430,6 +440,8 @@ def print_workflow_stats(stats: Dict):
     label = get_workflow_label(stats['workflow_dir'])
     
     print(f"\n{label}")
+    if stats['prompt_style']:
+        print(f"Prompt: {stats['prompt_style']}")
     print("-" * 80)
     
     if stats['start_time'] and stats['end_time']:
@@ -501,12 +513,13 @@ def print_comparison_table(all_stats: List[Dict]):
         return
     
     # Header
-    print(f"{'Workflow':<25} {'Files':<8} {'Duration':<12} {'Avg/Image':<12} {'Min':<8} {'Max':<8} {'Median':<8}")
-    print("-" * 100)
+    print(f"{'Workflow':<30} {'Prompt':<12} {'Files':<8} {'Duration':<12} {'Avg/Image':<12} {'Min':<8} {'Max':<8} {'Median':<8}")
+    print("-" * 115)
     
     # Rows
     for stats in valid_stats:
         label = get_workflow_label(stats['workflow_dir'])
+        prompt = stats['prompt_style'] if stats['prompt_style'] else "N/A"
         files = f"{stats['total_files_processed']:,}" if stats['total_files_processed'] else "N/A"
         duration = format_duration(stats['total_duration_seconds']) if stats['total_duration_seconds'] else "N/A"
         avg = f"{stats['average_time_per_image']:.2f}s" if stats['average_time_per_image'] else "N/A"
@@ -514,7 +527,7 @@ def print_comparison_table(all_stats: List[Dict]):
         max_t = f"{stats['max_time']:.2f}s" if stats['max_time'] is not None else "N/A"
         median = f"{stats['median_time']:.2f}s" if stats['median_time'] is not None else "N/A"
         
-        print(f"{label:<25} {files:<8} {duration:<12} {avg:<12} {min_t:<8} {max_t:<8} {median:<8}")
+        print(f"{label:<30} {prompt:<12} {files:<8} {duration:<12} {avg:<12} {min_t:<8} {max_t:<8} {median:<8}")
 
 
 def print_rankings(all_stats: List[Dict]):
@@ -533,7 +546,8 @@ def print_rankings(all_stats: List[Dict]):
     sorted_by_speed = sorted(valid_stats, key=lambda x: x['average_time_per_image'])
     for i, stats in enumerate(sorted_by_speed, 1):
         label = get_workflow_label(stats['workflow_dir'])
-        print(f"  {i}. {label:<30} {stats['average_time_per_image']:.2f}s/image")
+        prompt = f"({stats['prompt_style']})" if stats['prompt_style'] else ""
+        print(f"  {i}. {label:<30} {prompt:<12} {stats['average_time_per_image']:.2f}s/image")
     
     # Consistency ranking (smallest range between min and max)
     print("\n📊 Most Consistent Processing Time:")
@@ -541,7 +555,8 @@ def print_rankings(all_stats: List[Dict]):
     sorted_by_consistency = sorted(stats_with_range, key=lambda x: x[1])
     for i, (stats, range_val) in enumerate(sorted_by_consistency, 1):
         label = get_workflow_label(stats['workflow_dir'])
-        print(f"  {i}. {label:<30} Range: {range_val:.2f}s (min: {stats['min_time']:.2f}s, max: {stats['max_time']:.2f}s)")
+        prompt = f"({stats['prompt_style']})" if stats['prompt_style'] else ""
+        print(f"  {i}. {label:<30} {prompt:<12} Range: {range_val:.2f}s (min: {stats['min_time']:.2f}s, max: {stats['max_time']:.2f}s)")
     
     # Throughput ranking (images per minute)
     print("\n⚡ Highest Throughput (images/minute):")
@@ -554,7 +569,8 @@ def print_rankings(all_stats: List[Dict]):
     sorted_by_throughput = sorted(throughput_list, key=lambda x: x[1], reverse=True)
     for i, (stats, throughput) in enumerate(sorted_by_throughput, 1):
         label = get_workflow_label(stats['workflow_dir'])
-        print(f"  {i}. {label:<30} {throughput:.1f} images/minute")
+        prompt = f"({stats['prompt_style']})" if stats['prompt_style'] else ""
+        print(f"  {i}. {label:<30} {prompt:<12} {throughput:.1f} images/minute")
 
 
 def calculate_aggregate_stats(all_stats: List[Dict]):
@@ -625,6 +641,7 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
             'Workflow',
             'Provider',
             'Model',
+            'Prompt',
             'Total Files in Workflow',
             'Total Duration (seconds)',
             'Total Duration (minutes)',
@@ -679,6 +696,7 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
                 label,
                 stats['provider'] or '',
                 stats['model'] or '',
+                stats['prompt_style'] or '',
                 stats['total_files_processed'] or 0,
                 f"{stats['total_duration_seconds']:.2f}" if stats['total_duration_seconds'] else '',
                 f"{stats['total_duration_minutes']:.2f}" if stats['total_duration_minutes'] else '',

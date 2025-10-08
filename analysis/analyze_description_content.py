@@ -148,13 +148,41 @@ def analyze_model_descriptions(model_name: str, descriptions: List[str]) -> Dict
     }
 
 
+def detect_delimiter(csv_path: Path) -> str:
+    """
+    Detect the delimiter used in a CSV file by reading the first line.
+    
+    Returns:
+        The detected delimiter character (',', '\\t', or '@')
+    """
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        first_line = f.readline()
+        
+        # Count occurrences of each potential delimiter
+        comma_count = first_line.count(',')
+        tab_count = first_line.count('\t')
+        at_count = first_line.count('@')
+        
+        # Return the delimiter with the highest count
+        if tab_count > comma_count and tab_count > at_count:
+            return '\t'
+        elif comma_count > at_count:
+            return ','
+        else:
+            return '@'
+
+
 def read_combined_descriptions(csv_path: Path) -> Dict[str, List[str]]:
-    """Read the combined descriptions CSV file."""
+    """Read the combined descriptions CSV file with auto-detected delimiter."""
+    # Auto-detect the delimiter
+    delimiter = detect_delimiter(csv_path)
+    delimiter_name = 'comma' if delimiter == ',' else 'tab' if delimiter == '\t' else '@'
+    print(f"Detected delimiter: {delimiter_name}")
+    
     model_descriptions = defaultdict(list)
     
     with open(csv_path, 'r', encoding='utf-8') as f:
-        # Use @ as delimiter since that's what the file uses
-        reader = csv.DictReader(f, delimiter='@')
+        reader = csv.DictReader(f, delimiter=delimiter)
         
         for row in reader:
             # Skip the filename column
@@ -309,11 +337,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  # Analyze default combined descriptions file
+  # Analyze default combined descriptions file (auto-detects CSV/TSV/ATSV format)
   python analyze_description_content.py
   
   # Analyze specific combined descriptions file
-  python analyze_description_content.py --input combineddescriptions.txt
+  python analyze_description_content.py --input my_descriptions.csv
+  
+  # Analyze TSV file
+  python analyze_description_content.py --input results.tsv
   
   # Specify custom output filename
   python analyze_description_content.py --output word_analysis.csv
@@ -326,8 +357,8 @@ Examples:
     parser.add_argument(
         '--input',
         type=str,
-        default='combineddescriptions.txt',
-        help='Input CSV filename with combined descriptions (default: combineddescriptions.txt)'
+        default='combineddescriptions.csv',
+        help='Input file with combined descriptions (CSV/TSV/ATSV - auto-detected, default: combineddescriptions.csv)'
     )
     
     parser.add_argument(

@@ -4,6 +4,11 @@ Combine descriptions from multiple workflow directories into a single CSV file.
 
 This script reads the image_descriptions.txt files from all workflow directories
 and creates a CSV with columns: Image Name, Description1, Description2, etc.
+
+Formats:
+  - CSV (default): Standard comma-delimited with quoted fields - opens directly in Excel
+  - TSV: Tab-delimited - opens directly in Excel, good for long text fields
+  - ATSV: @-delimited (legacy) - requires Excel import wizard, but still supported
 """
 
 import argparse
@@ -89,32 +94,49 @@ def parse_description_file(file_path: Path) -> OrderedDict:
     return descriptions
 
 
-def get_workflow_label(workflow_dir: Path) -> str:
+def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
     """
-    Extract a readable label from the workflow directory name.
+    Extract a readable label and prompt style from the workflow directory name.
     Creates unique, distinguishable labels for all models.
     
+    Returns:
+        Tuple of (model_label, prompt_style)
+    
     Examples:
-        wf_claude_claude-3-haiku-20240307_narrative_... -> Claude Haiku 3
-        wf_claude_claude-3-5-haiku-20241022_narrative_... -> Claude Haiku 3.5
-        wf_ollama_llava_7b_narrative_... -> Ollama LLaVA 7B
-        wf_ollama_llava_13b_narrative_... -> Ollama LLaVA 13B
-        wf_openai_gpt-4o-mini_narrative_... -> OpenAI GPT-4o-mini
+        wf_claude_claude-3-haiku-20240307_narrative_... -> ("Claude Haiku 3", "narrative")
+        wf_claude_claude-3-5-haiku-20241022_colorful_... -> ("Claude Haiku 3.5", "colorful")
+        wf_ollama_llava_7b_artistic_... -> ("Ollama LLaVA 7B", "artistic")
+        wf_ollama_llava_13b_narrative_... -> ("Ollama LLaVA 13B", "narrative")
+        wf_openai_gpt-4o-mini_detailed_... -> ("OpenAI GPT-4o-mini", "detailed")
     """
     dir_name = workflow_dir.name
     
     # Extract provider and model from directory name
-    # Format: wf_PROVIDER_MODEL_VARIANT_PROMPTSTYLE_DATETIME
+    # Format: wf_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
     parts = dir_name.split('_')
+    
+    # Known prompt styles
+    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic']
+    
+    # Find the prompt style (it's the part before the datetime)
+    prompt_style = 'unknown'
+    for i, part in enumerate(parts):
+        if part.lower() in prompt_styles:
+            prompt_style = part
+            break
     
     if len(parts) >= 3:
         provider = parts[1].capitalize()
         model_part = parts[2]
         
-        # For models with size/variant in parts[3], include it
-        variant = parts[3] if len(parts) > 3 and parts[3] not in ['narrative', 'detailed', 'concise'] else None
+        # Determine if there's a variant (between model and prompt style)
+        # Check if parts[3] is NOT a prompt style and NOT a timestamp
+        variant = None
+        if len(parts) > 3 and parts[3].lower() not in prompt_styles and not parts[3].isdigit():
+            variant = parts[3]
         
         # Create readable labels for Claude models
+        model_label = None
         if provider.lower() == 'claude':
             # claude-3-haiku-20240307 -> Haiku 3
             # claude-3-5-haiku-20241022 -> Haiku 3.5
@@ -122,30 +144,30 @@ def get_workflow_label(workflow_dir: Path) -> str:
             # claude-sonnet-4-5-20250929 -> Sonnet 4.5
             if 'haiku' in model_part:
                 if '3-5' in model_part:
-                    return "Claude Haiku 3.5"
+                    model_label = "Claude Haiku 3.5"
                 else:
-                    return "Claude Haiku 3"
+                    model_label = "Claude Haiku 3"
             elif 'sonnet' in model_part:
                 if '4-5' in model_part:
-                    return "Claude Sonnet 4.5"
+                    model_label = "Claude Sonnet 4.5"
                 elif '3-7' in model_part:
-                    return "Claude Sonnet 3.7"
+                    model_label = "Claude Sonnet 3.7"
                 elif 'sonnet-4' in model_part:
-                    return "Claude Sonnet 4"
+                    model_label = "Claude Sonnet 4"
                 else:
-                    return "Claude Sonnet"
+                    model_label = "Claude Sonnet"
             elif 'opus' in model_part:
                 if '4-1' in model_part:
-                    return "Claude Opus 4.1"
+                    model_label = "Claude Opus 4.1"
                 elif 'opus-4-2' in model_part:
-                    return "Claude Opus 4"
+                    model_label = "Claude Opus 4"
                 else:
-                    return "Claude Opus"
+                    model_label = "Claude Opus"
         
         # Create readable labels for Ollama models
         elif provider.lower() == 'ollama':
             # llava with variant (7b, 13b, 34b, latest)
-            if 'llava' in model_part and variant:
+            if 'llava' in model_part:
                 base = "LLaVA"
                 if 'phi3' in model_part:
                     base = "LLaVA-Phi3"
@@ -153,63 +175,74 @@ def get_workflow_label(workflow_dir: Path) -> str:
                     base = "LLaVA-Llama3"
                 
                 # Format variant nicely
-                if variant == 'latest':
-                    return f"Ollama {base}"
-                elif variant.endswith('b'):  # 7b, 13b, 34b
-                    return f"Ollama {base} {variant.upper()}"
+                if variant and variant != 'latest':
+                    if variant.endswith('b'):  # 7b, 13b, 34b
+                        model_label = f"Ollama {base} {variant.upper()}"
+                    else:
+                        model_label = f"Ollama {base} {variant}"
                 else:
-                    return f"Ollama {base} {variant}"
+                    model_label = f"Ollama {base}"
             
             # llama3.2-vision with variant (11b, 90b, latest)
             elif 'llama3.2-vision' in model_part or 'llama3-2-vision' in model_part:
-                if variant == 'latest':
-                    return "Ollama Llama3.2-Vision"
-                elif variant.endswith('b'):
-                    return f"Ollama Llama3.2-Vision {variant.upper()}"
+                if variant and variant != 'latest' and variant.endswith('b'):
+                    model_label = f"Ollama Llama3.2-Vision {variant.upper()}"
                 else:
-                    return f"Ollama Llama3.2-Vision {variant}"
+                    model_label = "Ollama Llama3.2-Vision"
             
             # Other Ollama models (moondream, bakllava, etc.)
             elif model_part == 'moondream':
-                return "Ollama Moondream"
+                model_label = "Ollama Moondream"
             elif model_part == 'bakllava':
-                return "Ollama BakLLaVA"
+                model_label = "Ollama BakLLaVA"
             elif 'minicpm' in model_part:
                 if variant and variant.endswith('b'):
-                    return f"Ollama MiniCPM-V {variant.upper()}"
+                    model_label = f"Ollama MiniCPM-V {variant.upper()}"
                 else:
-                    return "Ollama MiniCPM-V"
+                    model_label = "Ollama MiniCPM-V"
             elif model_part == 'cogvlm2':
-                return "Ollama CogVLM2"
+                model_label = "Ollama CogVLM2"
             elif model_part == 'internvl':
-                return "Ollama InternVL"
+                model_label = "Ollama InternVL"
+            elif 'mistral' in model_part:
+                if 'small3.2' in model_part:
+                    model_label = "Ollama Mistral 3.2"
+                elif 'small3.1' in model_part:
+                    model_label = "Ollama Mistral 3.1"
+                else:
+                    model_label = f"Ollama {model_part.title()}"
+            elif 'qwen' in model_part:
+                model_label = "Ollama Qwen 2.5 VL"
             else:
                 # Generic fallback for Ollama
                 if variant and variant != 'latest':
-                    return f"Ollama {model_part.title()} {variant}"
+                    model_label = f"Ollama {model_part.title()} {variant}"
                 else:
-                    return f"Ollama {model_part.title()}"
+                    model_label = f"Ollama {model_part.title()}"
         
         # OpenAI models
         elif provider.lower() == 'openai':
             # gpt-4o, gpt-4o-mini, gpt-5
             if 'gpt-4o-mini' in model_part:
-                return "OpenAI GPT-4o-mini"
+                model_label = "OpenAI GPT-4o-mini"
             elif 'gpt-4o' in model_part:
-                return "OpenAI GPT-4o"
+                model_label = "OpenAI GPT-4o"
             elif 'gpt-5' in model_part:
-                return "OpenAI GPT-5"
+                model_label = "OpenAI GPT-5"
             else:
-                return f"OpenAI {model_part.upper()}"
+                model_label = f"OpenAI {model_part.upper()}"
         
         # Generic fallback for any other providers
         else:
             if variant and variant != 'latest':
-                return f"{provider} {model_part} {variant}"
+                model_label = f"{provider} {model_part} {variant}"
             else:
-                return f"{provider} {model_part}"
+                model_label = f"{provider} {model_part}"
+        
+        if model_label:
+            return (model_label, prompt_style)
     
-    return dir_name
+    return (dir_name, prompt_style)
 
 
 def main():
@@ -219,17 +252,20 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  # Use default Descriptions directory
+  # Create standard CSV (opens directly in Excel)
   python combine_workflow_descriptions.py
+  
+  # Create tab-separated file (also opens directly in Excel)
+  python combine_workflow_descriptions.py --format tsv --output results.tsv
+  
+  # Use legacy @-separated format (requires import wizard in Excel)
+  python combine_workflow_descriptions.py --format atsv --output results.txt
   
   # Specify custom workflow directory
   python combine_workflow_descriptions.py --input-dir /path/to/workflows
   
-  # Specify custom output filename
-  python combine_workflow_descriptions.py --output my_combined_descriptions.csv
-  
-  # Use both custom input and output
-  python combine_workflow_descriptions.py --input-dir /data/workflows --output results.csv
+  # Use both custom input and format
+  python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv
         '''
     )
     
@@ -243,8 +279,20 @@ Examples:
     parser.add_argument(
         '--output',
         type=str,
-        default='combineddescriptions.txt',
-        help='Output filename (default: combineddescriptions.txt). Saved in analysis/ directory.'
+        default='combineddescriptions.csv',
+        help='Output filename (default: combineddescriptions.csv). Saved in analysis/ directory.'
+    )
+    
+    parser.add_argument(
+        '--format',
+        type=str,
+        choices=['csv', 'tsv', 'atsv'],
+        default='csv',
+        help='''Output format:
+  csv  - Standard CSV with comma delimiter and quoted fields (recommended, opens directly in Excel)
+  tsv  - Tab-separated values (good Excel compatibility, no quotes needed)
+  atsv - @-separated values (legacy format, requires import wizard in Excel)
+Default: csv'''
     )
     
     args = parser.parse_args()
@@ -273,49 +321,48 @@ Examples:
     print()
     
     # Parse all description files
-    all_descriptions = []
-    workflow_labels = []
+    workflow_data = []  # List of (model_label, prompt_style, descriptions_dict)
     
     for workflow_dir in workflow_dirs:
         desc_file = workflow_dir / "descriptions" / "image_descriptions.txt"
-        label = get_workflow_label(workflow_dir)
-        workflow_labels.append(label)
+        model_label, prompt_style = get_workflow_label(workflow_dir)
         
         # Debug: Check if file exists
         if not desc_file.exists():
-            print(f"  ⚠️  WARNING: Description file not found for {label}")
+            print(f"  ⚠️  WARNING: Description file not found for {model_label} ({prompt_style})")
             print(f"      Expected: {desc_file}")
         
         descriptions = parse_description_file(desc_file)
         
         # Debug: Report parsing results
         if not descriptions:
-            print(f"  WARNING: No descriptions parsed from {label}")
+            print(f"  WARNING: No descriptions parsed from {model_label} ({prompt_style})")
             print(f"      File exists: {desc_file.exists()}")
             if desc_file.exists():
                 print(f"      File size: {desc_file.stat().st_size} bytes")
         
-        all_descriptions.append(descriptions)
+        workflow_data.append((model_label, prompt_style, descriptions))
     
-    # Use the first workflow's order as the primary ordering (preserves processing order)
-    # Then add any additional images from other workflows
-    if all_descriptions:
-        # Start with the first workflow's order (should be the most complete)
-        primary_order = list(all_descriptions[0].keys())
-        
-        # Add any images that appear in other workflows but not in the first
-        all_image_names = set()
-        for descriptions in all_descriptions:
-            all_image_names.update(descriptions.keys())
-        
-        # Add missing images in alphabetical order at the end
-        missing_images = sorted(all_image_names - set(primary_order))
-        image_order = primary_order + missing_images
-    else:
-        image_order = []
+    # Collect all unique (image_name, prompt_style) combinations
+    # This ensures we have a row for each image+prompt combination
+    image_prompt_combinations = set()
+    for model_label, prompt_style, descriptions in workflow_data:
+        for image_name in descriptions.keys():
+            image_prompt_combinations.add((image_name, prompt_style))
     
-    print(f"\nTotal unique images across all workflows: {len(image_order)}")
-    print(f"Sort order: Processing order from first workflow ({workflow_labels[0] if workflow_labels else 'N/A'})")
+    # Sort combinations: first by image name, then by prompt style
+    sorted_combinations = sorted(image_prompt_combinations, key=lambda x: (x[0], x[1]))
+    
+    # Get unique model labels for column headers (in order of appearance)
+    unique_models = []
+    for model_label, _, _ in workflow_data:
+        if model_label not in unique_models:
+            unique_models.append(model_label)
+    
+    print(f"\nTotal unique images across all workflows: {len(set(c[0] for c in sorted_combinations))}")
+    print(f"Total unique prompts: {len(set(c[1] for c in sorted_combinations))}")
+    print(f"Total image+prompt combinations: {len(sorted_combinations)}")
+    print(f"Total unique models: {len(unique_models)}")
     
     # Create output file in analysis directory with safe filename
     output_dir = Path(__file__).parent
@@ -324,32 +371,71 @@ Examples:
     output_file = output_dir / args.output
     output_file = get_safe_filename(output_file)
     
+    # Determine delimiter and quoting based on format
+    if args.format == 'csv':
+        delimiter = ','
+        quoting = csv.QUOTE_ALL  # Quote all fields for maximum Excel compatibility
+        quotechar = '"'
+    elif args.format == 'tsv':
+        delimiter = '\t'
+        quoting = csv.QUOTE_MINIMAL  # Tabs rarely need quoting
+        quotechar = '"'
+    else:  # atsv
+        delimiter = '@'
+        quoting = csv.QUOTE_MINIMAL
+        quotechar = '"'
+    
     with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
-        # Create header row
-        headers = ['Image Name'] + workflow_labels
-        writer = csv.writer(csvfile, delimiter='@')
+        # Create header row: Image Name, Prompt, Model1, Model2, Model3, ...
+        headers = ['Image Name', 'Prompt'] + unique_models
+        writer = csv.writer(csvfile, delimiter=delimiter, quoting=quoting, quotechar=quotechar)
         writer.writerow(headers)
         
-        # Write data rows in processing order
-        for image_name in image_order:
-            row = [image_name]
+        # Write data rows for each image+prompt combination
+        for image_name, prompt_style in sorted_combinations:
+            row = [image_name, prompt_style]
             
-            # Add description from each workflow (or empty string if not found)
-            for descriptions in all_descriptions:
-                description = descriptions.get(image_name, '')
+            # Add description from each model for this image+prompt combination
+            for model_label in unique_models:
+                # Find the description for this model+prompt+image combination
+                description = ''
+                for wf_model, wf_prompt, wf_descriptions in workflow_data:
+                    if wf_model == model_label and wf_prompt == prompt_style:
+                        description = wf_descriptions.get(image_name, '')
+                        break
                 row.append(description)
             
             writer.writerow(row)
     
     print(f"\nOutput file created: {output_file}")
-    print(f"Total rows: {len(image_order) + 1} (including header)")
+    print(f"Format: {args.format.upper()} ({'comma-delimited with quotes' if args.format == 'csv' else 'tab-delimited' if args.format == 'tsv' else '@-delimited'})")
+    print(f"Total rows: {len(sorted_combinations) + 1} (including header)")
+    
+    if args.format == 'csv':
+        print("\n[OK] This CSV file will open directly in Excel with proper column separation!")
+    elif args.format == 'tsv':
+        print("\n[OK] This TSV file will open directly in Excel with proper column separation!")
+    else:
+        print("\n[!] To open in Excel: Use Data > From Text/CSV and specify '@' as delimiter")
     
     # Print summary of coverage
-    print("\nCoverage summary:")
-    for i, label in enumerate(workflow_labels):
-        count = len(all_descriptions[i])
-        percentage = (count / len(image_order) * 100) if image_order else 0
-        print(f"  {label}: {count} images ({percentage:.1f}%)")
+    print("\nCoverage summary by model:")
+    for model_label in unique_models:
+        # Count how many image+prompt combinations have descriptions for this model
+        count = 0
+        for wf_model, wf_prompt, wf_descriptions in workflow_data:
+            if wf_model == model_label:
+                count += len(wf_descriptions)
+        print(f"  {model_label}: {count} descriptions")
+    
+    print("\nPrompts found:")
+    prompt_counts = {}
+    for _, prompt_style, descriptions in workflow_data:
+        if prompt_style not in prompt_counts:
+            prompt_counts[prompt_style] = 0
+        prompt_counts[prompt_style] += len(descriptions)
+    for prompt, count in sorted(prompt_counts.items()):
+        print(f"  {prompt}: {count} descriptions")
 
 
 if __name__ == "__main__":

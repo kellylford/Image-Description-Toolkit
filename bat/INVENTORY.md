@@ -1,10 +1,10 @@
 # Batch Files Inventory
 
-**Total: 37 batch files**
+**Total: 35 batch files**
 
-## Workflow Execution (28 files)
+## Workflow Execution (26 files)
 
-### Ollama Models - Local (18 files)
+### Ollama Models - Local (16 files)
 
 #### Small/Fast Models (3 files)
 1. `run_ollama_moondream.bat` - Moondream (fastest, 1.7GB)
@@ -25,15 +25,12 @@
 10. `run_ollama_llama32vision.bat` - Llama 3.2 Vision (7.8GB)
 11. `run_ollama_llama32vision11b.bat` - Llama 3.2 Vision 11B (most accurate, 7.8GB)
 
-#### Other Vision Models (8 files)
+#### Other Vision Models (6 files)
 12. `run_ollama_mistral31.bat` - Mistral Nemo 3.1 (12GB)
 13. `run_ollama_mistral32.bat` - Pixtral 12B (Mistral 3.2, 7.3GB)
 14. `run_ollama_minicpmv.bat` - MiniCPM-V (efficient Chinese model, 4GB)
 15. `run_ollama_minicpmv8b.bat` - MiniCPM-V 8B (larger Chinese model, 5GB)
-16. `run_ollama_cogvlm2.bat` - CogVLM2 (advanced Chinese model, 8GB)
-17. `run_ollama_internvl.bat` - InternVL (strong vision-language, 4GB)
-18. `run_ollama_qwen2.5vl.bat` - Qwen 2.5 VL (Alibaba's vision model, 5GB)
-19. `run_ollama_gemma.bat` - Gemma 3 (Google's model, 3.3GB)
+16. `run_ollama_qwen2.5vl.bat` - Qwen 2.5 VL (Alibaba's vision model, 5GB)
 
 ### OpenAI Models - Cloud (3 files)
 20. `run_openai_gpt4o_mini.bat` - GPT-4o mini (fast & affordable)
@@ -65,7 +62,7 @@
 
 ## Test & Utility Scripts (5 files)
 
-34. `allmodeltest.bat` - Run all 18 Ollama models sequentially on test images
+34. `allmodeltest.bat` - Run all 16 Ollama models sequentially on test images
 35. `allcloudtest.bat` - Run all 10 cloud models (OpenAI + Claude) sequentially
 36. `install_vision_models.bat` - Install all vision models (~130GB download)
 

@@ -53,17 +53,20 @@ All tools are designed to:
 #### Usage
 
 ```bash
-# Basic usage (uses default Descriptions directory)
+# Basic usage - creates standard CSV (opens directly in Excel!)
 python combine_workflow_descriptions.py
+
+# Create tab-separated file (also Excel-friendly)
+python combine_workflow_descriptions.py --format tsv --output results.tsv
+
+# Use legacy @-separated format (requires Excel import wizard)
+python combine_workflow_descriptions.py --format atsv --output results.txt
 
 # Specify custom workflow directory
 python combine_workflow_descriptions.py --input-dir /path/to/workflows
 
-# Custom output filename
-python combine_workflow_descriptions.py --output my_combined_descriptions.csv
-
-# Both custom input and output
-python combine_workflow_descriptions.py --input-dir /data/workflows --output results.csv
+# Combine custom format and directory
+python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv
 ```
 
 #### Arguments
@@ -71,18 +74,41 @@ python combine_workflow_descriptions.py --input-dir /data/workflows --output res
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--input-dir` | `../Descriptions` | Directory containing `wf_*` workflow folders |
-| `--output` | `combineddescriptions.txt` | Output filename (saved in analysis/ directory) |
+| `--output` | `combineddescriptions.csv` | Output filename (saved in analysis/ directory) |
+| `--format` | `csv` | Output format: `csv` (standard comma-delimited), `tsv` (tab-delimited), or `atsv` (@-separated legacy) |
 
 #### Output
 
-Creates a CSV file with:
+Creates a file with:
 - **Column 1:** Image Name (e.g., IMG_1234.JPG)
 - **Columns 2-N:** Description from each AI model
 
-**Example output:**
+**Format Options:**
+- **CSV (default):** Standard comma-delimited with quoted fields
+  - ✅ Opens directly in Excel with proper column separation
+  - ✅ Standard format recognized by all tools
+  - Best for: General use, sharing with others
+  
+- **TSV:** Tab-delimited values
+  - ✅ Opens directly in Excel with proper column separation
+  - ✅ No quoting needed, easier to read in text editors
+  - Best for: Long descriptions, manual text review
+  
+- **ATSV:** @-separated values (legacy)
+  - ⚠️ Requires Excel Data > From Text/CSV import wizard
+  - Still supported for backward compatibility
+  - Best for: Existing workflows that expect @ delimiter
+
+**Example CSV output:**
+```csv
+"Image Name","Claude Haiku 3","OpenAI GPT-4o","Ollama LLaVA"
+"IMG_1234.JPG","The image shows a red car...","A red vehicle is...","In this picture..."
 ```
-Image Name@Claude Haiku 3@OpenAI GPT-4o@Ollama LLaVA
-IMG_1234.JPG@"The image shows a red car..."@"A red vehicle is..."@"In this picture..."
+
+**Example TSV output:**
+```tsv
+Image Name	Claude Haiku 3	OpenAI GPT-4o	Ollama LLaVA
+IMG_1234.JPG	The image shows a red car...	A red vehicle is...	In this picture...
 ```
 
 ---
@@ -183,11 +209,14 @@ Claude Haiku 3
 #### Usage
 
 ```bash
-# Basic usage (analyzes combineddescriptions.txt)
+# Basic usage (analyzes combineddescriptions.csv - auto-detects format)
 python analyze_description_content.py
 
-# Analyze specific combined descriptions file
+# Analyze specific combined descriptions file (works with CSV, TSV, or ATSV)
 python analyze_description_content.py --input my_descriptions.csv
+
+# Analyze TSV file
+python analyze_description_content.py --input results.tsv
 
 # Custom output filename
 python analyze_description_content.py --output word_analysis.csv
@@ -200,7 +229,7 @@ python analyze_description_content.py --input my_descriptions.csv --output my_an
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--input` | `combineddescriptions.txt` | Input CSV with combined descriptions |
+| `--input` | `combineddescriptions.csv` | Input file with combined descriptions (CSV, TSV, or ATSV - auto-detected) |
 | `--output` | `description_content_analysis.csv` | Output CSV filename |
 
 **Note:** Input file should be in the `analysis/` directory (typically created by `combine_workflow_descriptions.py`)
@@ -377,17 +406,21 @@ All output files are saved in the `analysis/` directory:
 
 | Tool | Default Output Files |
 |------|---------------------|
-| combine_workflow_descriptions.py | `combineddescriptions.txt` |
+| combine_workflow_descriptions.py | `combineddescriptions.csv` (or `.tsv`/`.txt` depending on format) |
 | analyze_workflow_stats.py | `workflow_timing_stats.csv`<br>`workflow_statistics.json` |
 | analyze_description_content.py | `description_content_analysis.csv` |
 
 ### Understanding Output Files
 
-#### combineddescriptions.txt
-- **Format:** CSV with `@` delimiter
-- **Use:** Compare descriptions visually
-- **Open with:** Excel, LibreOffice, text editor
-- **Tip:** Search for specific images to see all model descriptions
+#### combineddescriptions.csv (or .tsv/.txt)
+- **Formats Available:**
+  - `.csv` - Standard CSV (comma-delimited, quoted fields) - **Recommended**
+  - `.tsv` - Tab-separated values - Good for Excel, easier to read in text editors
+  - `.txt` - @-separated (legacy format) - Requires Excel import wizard
+- **Use:** Compare descriptions visually side-by-side
+- **Open with:** Excel (double-click for CSV/TSV), LibreOffice, any text editor
+- **Excel Tip:** CSV and TSV formats open directly with proper columns - no import wizard needed!
+- **Search Tip:** Find specific images to see all model descriptions at once
 
 #### workflow_timing_stats.csv
 - **Format:** Standard CSV

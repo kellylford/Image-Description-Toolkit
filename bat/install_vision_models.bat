@@ -25,10 +25,10 @@ set "MODELS_LIST[9]=llama3.2-vision:11b:7.8"
 set "MODELS_LIST[10]=llama3.2-vision:90b:55.0"
 set "MODELS_LIST[11]=minicpm-v:4.0"
 set "MODELS_LIST[12]=minicpm-v:8b:5.0"
-set "MODELS_LIST[13]=cogvlm2:8.0"
-set "MODELS_LIST[14]=internvl:4.0"
-set "MODELS_LIST[15]=gemma3:3.3"
-set "MODELS_LIST[16]=mistral-small3.1:15.0"
+set "MODELS_LIST[13]=gemma3:3.3"
+set "MODELS_LIST[14]=mistral-small3.1:15.0"
+set "MODELS_LIST[15]=mistral-small3.2:15.0"
+set "MODELS_LIST[16]=qwen2.5vl:7.0"
 
 echo This will install the following models:
 echo   Core Models:
