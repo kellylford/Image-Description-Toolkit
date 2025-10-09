@@ -87,7 +87,8 @@ echo Image Description Toolkit v%VERSION% >> "%STAGE_DIR%\README.txt"
 echo Executable Distribution >> "%STAGE_DIR%\README.txt"
 echo. >> "%STAGE_DIR%\README.txt"
 echo QUICK START: >> "%STAGE_DIR%\README.txt"
-echo   1. Install Ollama from https://ollama.ai >> "%STAGE_DIR%\README.txt"
+echo   1. Run bat\install_ollama.bat to automatically install Ollama >> "%STAGE_DIR%\README.txt"
+echo      (Or manually install from https://ollama.ai) >> "%STAGE_DIR%\README.txt"
 echo   2. Download Ollama models (see bat\ folder for examples) >> "%STAGE_DIR%\README.txt"
 echo   3. Run batch files from bat\ folder >> "%STAGE_DIR%\README.txt"
 echo. >> "%STAGE_DIR%\README.txt"
@@ -134,13 +135,14 @@ echo.
 echo This package includes:
 echo   - idt.exe (single executable)
 echo   - All batch files (ready to use)
+echo   - install_ollama.bat (automatic Ollama installer)
 echo   - Directory structure (Descriptions, analysis, etc.)
 echo   - Documentation (README, QUICK_START, docs)
 echo   - Sample configurations
 echo.
 echo Users can:
 echo   1. Extract ZIP to any folder
-echo   2. Install Ollama
+echo   2. Run bat\install_ollama.bat (or install Ollama manually)
 echo   3. Run batch files immediately - no Python needed!
 echo.
 echo Ready for distribution!
