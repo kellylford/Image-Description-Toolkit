@@ -1043,46 +1043,52 @@ class ImageDescriber:
 
     # ...existing code...
 def get_default_prompt_style(config_file: str = "image_describer_config.json") -> str:
+    """Layered resolution default prompt style using config_loader.
+
+    Falls back to previous behavior if config_loader not available.
     """
-    Get the default prompt style from configuration file
-    
-    Args:
-        config_file: Path to configuration file
-        
-    Returns:
-        Default prompt style name
-    """
+    try:
+        from config_loader import load_json_config
+        cfg, path, source = load_json_config('image_describer_config.json', explicit=config_file if config_file != 'image_describer_config.json' else None, env_var_file='IDT_IMAGE_DESCRIBER_CONFIG')
+        if cfg:
+            default_style = cfg.get('default_prompt_style', 'detailed')
+            prompt_variations = cfg.get('prompt_variations', {})
+            lower_variations = {k.lower(): k for k in prompt_variations}
+            if default_style.lower() in lower_variations:
+                resolved = lower_variations[default_style.lower()]
+            elif 'detailed' in lower_variations:
+                resolved = lower_variations['detailed']
+            elif prompt_variations:
+                resolved = list(prompt_variations.keys())[0]
+            else:
+                resolved = 'detailed'
+            try:
+                logger.debug(f"Resolved default prompt style '{resolved}' from {path} (source={source})")
+            except Exception:
+                pass
+            return resolved
+    except Exception:
+        pass
+    # Fallback legacy path
     try:
         config_path = Path(config_file)
         if not config_path.is_absolute():
-            script_dir = Path(__file__).parent
-            config_path = script_dir / config_file
-        
+            config_path = Path(__file__).parent / config_file
         if config_path.exists():
             with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            default_style = config.get('default_prompt_style', 'detailed')
-            # Validate that the default style exists in prompt_variations (case-insensitive)
-            prompt_variations = config.get('prompt_variations', {})
-            lower_variations = {k.lower(): k for k, v in prompt_variations.items()}
-            
+                cfg = json.load(f)
+            default_style = cfg.get('default_prompt_style', 'detailed')
+            prompt_variations = cfg.get('prompt_variations', {})
+            lower_variations = {k.lower(): k for k in prompt_variations}
             if default_style.lower() in lower_variations:
                 return lower_variations[default_style.lower()]
-            else:
-                logger.warning(f"Default prompt style '{default_style}' not found in prompt_variations. Using 'detailed'.")
-                # Try to find 'detailed' case-insensitively
-                if 'detailed' in lower_variations:
-                    return lower_variations['detailed']
-                # Return first available style if any exist
-                elif prompt_variations:
-                    return list(prompt_variations.keys())[0]
-                else:
-                    return 'detailed'
-    except:
+            if 'detailed' in lower_variations:
+                return lower_variations['detailed']
+            if prompt_variations:
+                return list(prompt_variations.keys())[0]
+    except Exception:
         pass
-    
-    return "detailed"
+    return 'detailed'
 
 
 def get_available_prompt_styles(config_file: str = "image_describer_config.json") -> list:
@@ -1143,9 +1149,24 @@ def main():
         print("=" * 60)
         sys.exit(0)
     
-    # Get available prompt styles and default from config
-    available_styles = get_available_prompt_styles()
-    default_style = get_default_prompt_style()
+    # Get available prompt styles and default from config with override support
+    # Try layered config resolution (env var or external dir). Fallback silently to existing helpers on failure.
+    try:
+        from config_loader import load_json_config
+        cfg_dict, cfg_path, cfg_source = load_json_config('image_describer_config.json', explicit=None, env_var_file='IDT_IMAGE_DESCRIBER_CONFIG')
+        if cfg_dict:
+            variations = cfg_dict.get('prompt_variations', {})
+            available_styles = list(variations.keys()) or get_available_prompt_styles()
+            declared_default = cfg_dict.get('default_prompt_style') or get_default_prompt_style()
+            lower_map = {k.lower(): k for k in available_styles}
+            default_style = lower_map.get(declared_default.lower(), declared_default if declared_default in available_styles else get_default_prompt_style())
+            logger.info(f"Using image_describer_config from {cfg_path} (source={cfg_source}); default style '{default_style}'")
+        else:
+            available_styles = get_available_prompt_styles()
+            default_style = get_default_prompt_style()
+    except Exception:
+        available_styles = get_available_prompt_styles()
+        default_style = get_default_prompt_style()
     
     parser = argparse.ArgumentParser(
         description="Process images with AI vision models and save descriptions to a text file",

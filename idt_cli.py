@@ -284,6 +284,37 @@ def main():
         else:
             print("Image Description Toolkit (version unknown)")
         return 0
+
+    elif command == 'descriptions-to-html':
+        # Generate HTML from descriptions (descriptions_to_html.py)
+        if getattr(sys, 'frozen', False):
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                import descriptions_to_html as dth
+                # Rebuild argv: remove command token
+                original_argv = sys.argv[:]
+                sys.argv = ['descriptions_to_html.py'] + sys.argv[2:]
+                try:
+                    return dth.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+            except ImportError as e:
+                print(f"Error: Could not import descriptions_to_html module: {e}")
+                return 1
+        else:
+            script_path = get_resource_path('scripts/descriptions_to_html.py')
+            if not script_path.exists():
+                print(f"Error: descriptions_to_html.py not found at {script_path}")
+                return 1
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(script_path)] + args
+            result = subprocess.run(cmd, cwd=str(script_path.parent))
+            return result.returncode
     
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
@@ -298,11 +329,14 @@ def main():
 
 def print_usage():
     """Print usage information."""
-    print("""
+    exe_name = 'idt.exe' if getattr(sys, 'frozen', False) else (Path(sys.argv[0]).name or 'idt')
+    # Normalize if user renamed the file (strip extension for examples)
+    base_call = exe_name
+    print(f"""
 Image Description Toolkit - Unified CLI
 
 USAGE:
-    ImageDescriptionToolkit.exe <command> [options]
+    {base_call} <command> [options]
 
 COMMANDS:
     workflow              Run image description workflow
@@ -316,22 +350,22 @@ COMMANDS:
 
 EXAMPLES:
     # Run workflow with Ollama
-    ImageDescriptionToolkit.exe workflow --provider ollama --model llava
+    {base_call} workflow --provider ollama --model llava
 
     # Run workflow with Claude
-    ImageDescriptionToolkit.exe workflow --provider claude --model claude-opus-4
+    {base_call} workflow --provider claude --model claude-opus-4
 
     # Analyze statistics
-    ImageDescriptionToolkit.exe analyze-stats
+    {base_call} analyze-stats
 
     # Analyze content quality
-    ImageDescriptionToolkit.exe analyze-content
+    {base_call} analyze-content
 
     # Combine descriptions to CSV
-    ImageDescriptionToolkit.exe combine --output results.csv
+    {base_call} combine --output results.csv
 
     # Check available models
-    ImageDescriptionToolkit.exe check-models
+    {base_call} check-models
 
 NOTES:
     - Requires Ollama to be installed for Ollama models

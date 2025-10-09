@@ -43,6 +43,10 @@ from datetime import datetime
 # Import our workflow utilities
 from workflow_utils import WorkflowConfig, WorkflowLogger, FileDiscovery, create_workflow_paths
 from image_describer import get_default_prompt_style
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
 import re
 
 
@@ -569,28 +573,16 @@ class WorkflowOrchestrator:
             else:
                 self.logger.info(f"Verification successful: All {len(combined_image_list)} copied files are discoverable by image_describer.py")
             
-            # Build command for the combined directory - single call to image_describer.py
-            # Check if running in PyInstaller context and build command accordingly
+            # Build command for the combined directory - single call to image_describer
             if getattr(sys, 'frozen', False):
-                # Running as PyInstaller executable - use CLI routing
-                cmd = [
-                    sys.executable, "image_describer",
-                    str(temp_combined_dir),
-                    "--recursive",
-                    "--output-dir", str(output_dir),
-                    "--log-dir", str(self.config.base_output_dir / "logs")
-                ]
+                # In frozen mode rely on dispatcher supporting 'image_describer' alias
+                cmd = [sys.executable, 'image_describer', str(temp_combined_dir), '--recursive',
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
             else:
-                # Running as Python script - use direct script path
                 scripts_dir = Path(__file__).parent
-                image_describer_path = scripts_dir / "image_describer.py"
-                cmd = [
-                    sys.executable, str(image_describer_path),
-                    str(temp_combined_dir),
-                    "--recursive",
-                    "--output-dir", str(output_dir),
-                    "--log-dir", str(self.config.base_output_dir / "logs")
-                ]
+                image_describer_path = scripts_dir / 'image_describer.py'
+                cmd = [sys.executable, str(image_describer_path), str(temp_combined_dir), '--recursive',
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
             
             # Add provider parameter
             if self.provider:
@@ -628,6 +620,7 @@ class WorkflowOrchestrator:
                 validated_style = validate_prompt_style(default_style)
                 if validated_style != "detailed":  # Only add if different from hardcoded default
                     cmd.extend(["--prompt-style", validated_style])
+                self.logger.info(f"Resolved prompt style default '{validated_style}' using config '{config_file}'")
             
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
@@ -754,13 +747,23 @@ class WorkflowOrchestrator:
             html_file = output_dir / "image_descriptions.html"
             
             # Build command
-            cmd = [
-                sys.executable, "descriptions_to_html.py",
-                str(desc_file),
-                str(html_file),
-                "--title", step_config.get("title", "Image Analysis Report"),
-                "--log-dir", str(self.config.base_output_dir / "logs")
-            ]
+            if getattr(sys, 'frozen', False):
+                # Use dispatcher alias inside frozen exe
+                cmd = [
+                    sys.executable, "descriptions-to-html",
+                    str(desc_file),
+                    str(html_file),
+                    "--title", step_config.get("title", "Image Analysis Report"),
+                    "--log-dir", str(self.config.base_output_dir / "logs")
+                ]
+            else:
+                cmd = [
+                    sys.executable, "descriptions_to_html.py",
+                    str(desc_file),
+                    str(html_file),
+                    "--title", step_config.get("title", "Image Analysis Report"),
+                    "--log-dir", str(self.config.base_output_dir / "logs")
+                ]
             
             if step_config.get("include_details", False):
                 cmd.append("--full")

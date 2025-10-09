@@ -7,7 +7,7 @@ To build:
     pyinstaller ImageDescriptionToolkit.spec
 
 Output:
-    dist/ImageDescriptionToolkit.exe
+    dist/idt.exe
 """
 
 block_cipher = None
@@ -110,11 +110,12 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='ImageDescriptionToolkit',
+    # Executable base name (final file will be idt.exe on Windows)
+    name='idt',
     debug=False,                        # Set to True for debugging
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,                          # Compress with UPX (reduces size 30-50%)
+    upx=False,                         # Disable UPX (avoid PIL/Pillow extension decompression issues)
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,                      # Keep console window (CLI tool)

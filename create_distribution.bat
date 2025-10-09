@@ -24,7 +24,7 @@ echo ========================================================================
 echo.
 
 REM Check if executable exists
-if not exist "dist\ImageDescriptionToolkit.exe" (
+if not exist "dist\idt.exe" (
     echo ERROR: Executable not found!
     echo.
     echo Please run build.bat first to create the executable.
@@ -48,17 +48,13 @@ if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
 mkdir "%STAGE_DIR%"
 
 echo [1/5] Copying executable...
-copy "dist\ImageDescriptionToolkit.exe" "%STAGE_DIR%\" >nul
+copy "dist\idt.exe" "%STAGE_DIR%\" >nul
 echo     Done.
 echo.
 
-echo [2/5] Copying and updating batch files...
+echo [2/5] Copying batch files for executable use...
 mkdir "%STAGE_DIR%\bat"
-xcopy "bat\*.bat" "%STAGE_DIR%\bat\" /Y /Q >nul
-
-REM Update batch files to call exe instead of python (only in staging, not in repo)
-echo     Converting batch files to use executable...
-powershell -command "$files = Get-ChildItem '%STAGE_DIR%\bat\run_*.bat'; foreach($file in $files) { (Get-Content $file.FullName) -replace 'python workflow\.py', 'ImageDescriptionToolkit.exe workflow' | Set-Content $file.FullName }"
+xcopy "bat_exe\*.bat" "%STAGE_DIR%\bat\" /Y /Q >nul
 echo     Done.
 echo.
 
@@ -136,7 +132,7 @@ echo Package: releases\%ZIP_NAME%
 echo Size: %size_mb% MB (compressed)
 echo.
 echo This package includes:
-echo   - ImageDescriptionToolkit.exe (single executable)
+echo   - idt.exe (single executable)
 echo   - All batch files (ready to use)
 echo   - Directory structure (Descriptions, analysis, etc.)
 echo   - Documentation (README, QUICK_START, docs)

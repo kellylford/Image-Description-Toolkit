@@ -368,6 +368,31 @@ Configuration files are located in the `scripts/` directory:
 - **`scripts/image_describer_config.json`** - AI model selection, prompts, and processing parameters  
 - **`scripts/video_frame_extractor_config.json`** - Video processing settings and frame extraction options
 
+### Runtime Configuration Overrides (Executable Friendly)
+
+You can now override bundled configs (no rebuild) when using the packaged executable:
+
+1. Place a modified `image_describer_config.json` next to `ImageDescriptionToolkit.exe`, OR
+2. Set an environment variable to point at a custom file:
+
+```powershell
+set IDT_IMAGE_DESCRIBER_CONFIG=C:\deploy\custom_image_describer_config.json
+```
+
+3. Or define a directory containing the file:
+
+```powershell
+set IDT_CONFIG_DIR=C:\deploy\configs
+```
+
+4. Per-run override still wins:
+
+```powershell
+ImageDescriptionToolkit.exe workflow C:\media --prompt-style artistic
+```
+
+Resolution order and full details: see `docs/CONFIG_OVERRIDES.md` and distribution guidance in `docs/DISTRIBUTION.md`.
+
 ### Example Workflow Configuration
 
 ```json
