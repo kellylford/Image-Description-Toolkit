@@ -15,18 +15,24 @@ def convert_batch_files():
             content = f.read()
         
         # Replace Python workflow calls with idt.exe workflow
-        content = content.replace('..\\\\venv\\\\Scripts\\\\python.exe ..\\\\workflow.py', 'idt.exe workflow')
-        content = content.replace('..\\venv\\Scripts\\python.exe ..\\workflow.py', 'idt.exe workflow')
-        content = content.replace('python.exe ..\\workflow.py', 'idt.exe workflow')
-        content = content.replace('python ..\\workflow.py', 'idt.exe workflow')
-        content = content.replace('python workflow.py', 'idt.exe workflow')
+        # Note: Use ..\idt.exe because batch files will be in bat/ subdirectory
+        content = content.replace('..\\\\venv\\\\Scripts\\\\python.exe ..\\\\workflow.py', '..\\idt.exe workflow')
+        content = content.replace('..\\venv\\Scripts\\python.exe ..\\workflow.py', '..\\idt.exe workflow')
+        content = content.replace('python.exe ..\\workflow.py', '..\\idt.exe workflow')
+        content = content.replace('python ..\\workflow.py', '..\\idt.exe workflow')
+        content = content.replace('python workflow.py', '..\\idt.exe workflow')
         
-        # Fix output directory paths
-        content = content.replace('..\\Descriptions', 'Descriptions')
-        content = content.replace('..\\analysis', 'analysis')
+        # Also handle cases where it was already converted to idt.exe without path
+        content = content.replace('idt.exe workflow', '..\\idt.exe workflow')
+        
+        # Fix output directory paths (should be relative to bat/ subdirectory)
+        content = content.replace('..\\Descriptions', '..\\Descriptions')
+        content = content.replace('..\\analysis', '..\\analysis')
+        content = content.replace('Descriptions', '..\\Descriptions')
+        content = content.replace('analysis', '..\\analysis')
         
         # Fix model check calls (install_vision_models.bat)
-        content = content.replace('python models/check_models.py', 'idt.exe check-models')
+        content = content.replace('python models/check_models.py', '..\\idt.exe check-models')
         
         with open(bat_file, 'w') as f:
             f.write(content)

@@ -86,7 +86,7 @@ echo.
 echo ========================================
 echo All cloud model tests complete!
 echo ========================================
-echo Results in: Descriptions\wf_*
+echo Results in: ..\Descriptions\wf_*
 echo.
 echo COST WARNING: This run used API credits from both OpenAI and Claude
 echo.
