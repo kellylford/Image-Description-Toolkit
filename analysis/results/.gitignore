@@ -1,0 +1,5 @@
+# Ignore all files in this directory (analysis output files)
+*
+
+# But keep this .gitignore so the directory is tracked in git
+!.gitignore

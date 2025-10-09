@@ -64,27 +64,103 @@ if not errorlevel 1 (
     echo.
 )
 
-echo [1/4] Downloading Ollama for Windows...
+echo [1/4] Detecting system architecture and downloading Ollama...
+echo.
+
+REM Detect processor architecture using multiple methods
+echo Detecting processor architecture...
+echo Environment PROCESSOR_ARCHITECTURE: %PROCESSOR_ARCHITECTURE%
+echo Environment PROCESSOR_ARCHITEW6432: %PROCESSOR_ARCHITEW6432%
+
+REM Try to get architecture from wmic as well
+for /f "skip=1 delims=" %%a in ('wmic cpu get architecture /value 2^>nul ^| findstr "="') do set "%%a"
+
+REM Determine architecture (check multiple sources for reliability)
+set DETECTED_ARCH=UNKNOWN
+
+REM Check PROCESSOR_ARCHITEW6432 first (more reliable on 32-bit processes on 64-bit systems)
+if /i "%PROCESSOR_ARCHITEW6432%"=="ARM64" set DETECTED_ARCH=ARM64
+if /i "%PROCESSOR_ARCHITEW6432%"=="AMD64" set DETECTED_ARCH=AMD64
+
+REM If not set, check PROCESSOR_ARCHITECTURE
+if "%DETECTED_ARCH%"=="UNKNOWN" (
+    if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set DETECTED_ARCH=ARM64
+    if /i "%PROCESSOR_ARCHITECTURE%"=="AMD64" set DETECTED_ARCH=AMD64
+    if /i "%PROCESSOR_ARCHITECTURE%"=="x86" set DETECTED_ARCH=x86
+)
+
+REM Check wmic result if available
+if defined Architecture (
+    if "!Architecture!"=="9" set DETECTED_ARCH=AMD64
+    if "!Architecture!"=="12" set DETECTED_ARCH=ARM64
+    if "!Architecture!"=="0" set DETECTED_ARCH=x86
+)
+
+echo Detected architecture: %DETECTED_ARCH%
+echo.
+
+REM Determine the correct download URL based on detected architecture
+if /i "%DETECTED_ARCH%"=="ARM64" (
+    set OLLAMA_URL=https://ollama.ai/download/OllamaSetup-arm64.exe
+    set ARCH_NAME=ARM64
+    echo Windows ARM64 detected - downloading ARM64 version
+) else if /i "%DETECTED_ARCH%"=="AMD64" (
+    set OLLAMA_URL=https://ollama.ai/download/OllamaSetup.exe
+    set ARCH_NAME=x64
+    echo Windows x64 detected - downloading x64 version
+) else if /i "%DETECTED_ARCH%"=="x86" (
+    set OLLAMA_URL=https://ollama.ai/download/OllamaSetup.exe
+    set ARCH_NAME=x64 ^(32-bit compatibility^)
+    echo Windows x86 detected - downloading x64 version for compatibility
+) else (
+    echo WARNING: Could not reliably detect architecture (%DETECTED_ARCH%)
+    echo Available environment variables:
+    echo   PROCESSOR_ARCHITECTURE=%PROCESSOR_ARCHITECTURE%
+    echo   PROCESSOR_ARCHITEW6432=%PROCESSOR_ARCHITEW6432%
+    if defined Architecture echo   WMIC Architecture=!Architecture!
+    echo.
+    echo Please choose your architecture:
+    echo   1. ARM64 (for Windows on ARM devices like Surface Pro X, ARM-based PCs)
+    echo   2. x64 (for standard Intel/AMD 64-bit systems)
+    echo.
+    set /p arch_choice="Enter choice (1 or 2): "
+    
+    if "!arch_choice!"=="1" (
+        set OLLAMA_URL=https://ollama.ai/download/OllamaSetup-arm64.exe
+        set ARCH_NAME=ARM64 ^(manual selection^)
+        echo ARM64 selected manually
+    ) else if "!arch_choice!"=="2" (
+        set OLLAMA_URL=https://ollama.ai/download/OllamaSetup.exe
+        set ARCH_NAME=x64 ^(manual selection^)
+        echo x64 selected manually
+    ) else (
+        echo Invalid choice. Defaulting to x64 version.
+        set OLLAMA_URL=https://ollama.ai/download/OllamaSetup.exe
+        set ARCH_NAME=x64 ^(default fallback^)
+    )
+)
+
+echo Architecture detected: !ARCH_NAME!
 echo.
 
 REM Create temp directory
 set TEMP_DIR=%TEMP%\ollama_install_%RANDOM%
 mkdir "%TEMP_DIR%" 2>nul
 
-REM Download Ollama installer
-set OLLAMA_URL=https://ollama.ai/download/windows
+REM Set installer path
 set INSTALLER_PATH=%TEMP_DIR%\OllamaSetup.exe
 
-echo Downloading from: %OLLAMA_URL%
+echo Downloading Ollama for !ARCH_NAME!...
+echo URL: !OLLAMA_URL!
 echo Saving to: %INSTALLER_PATH%
 echo.
 
-curl -L -o "%INSTALLER_PATH%" "%OLLAMA_URL%"
+curl -L -o "%INSTALLER_PATH%" "!OLLAMA_URL!"
 if errorlevel 1 (
     echo ERROR: Failed to download Ollama installer.
     echo Please check your internet connection and try again.
     echo.
-    echo Manual download: %OLLAMA_URL%
+    echo Manual download for !ARCH_NAME!: !OLLAMA_URL!
     rmdir /s /q "%TEMP_DIR%" 2>nul
     pause
     exit /b 1
