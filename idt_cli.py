@@ -128,6 +128,57 @@ def main():
             result = subprocess.run(cmd, cwd=str(scripts_dir))
             return result.returncode
     
+    elif command == 'image_describer' or (len(sys.argv) > 1 and sys.argv[1].endswith('image_describer.py')):
+        # Handle image_describer command (called from workflow.py)
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                
+                import image_describer
+                
+                # Remove the script path from argv if it exists
+                original_argv = sys.argv[:]
+                if len(sys.argv) > 1 and sys.argv[1].endswith('image_describer.py'):
+                    # Called as: executable.exe /path/to/image_describer.py args...
+                    sys.argv = ['image_describer.py'] + sys.argv[2:]
+                else:
+                    # Called as: executable.exe image_describer args...
+                    sys.argv = ['image_describer.py'] + sys.argv[2:]
+                
+                try:
+                    return image_describer.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import image_describer module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running image_describer: {e}")
+                return 1
+        else:
+            # Running as script - use subprocess (development mode)
+            scripts_dir = base_dir / 'scripts'
+            image_describer_script = scripts_dir / 'image_describer.py'
+            
+            if not image_describer_script.exists():
+                print(f"Error: Image describer script not found at {image_describer_script}")
+                return 1
+            
+            import subprocess
+            # Remove the script path from args if it exists
+            args = sys.argv[2:]
+            if len(sys.argv) > 1 and sys.argv[1].endswith('image_describer.py'):
+                args = sys.argv[2:]
+            cmd = [sys.executable, str(image_describer_script)] + args
+            result = subprocess.run(cmd, cwd=str(scripts_dir))
+            return result.returncode
+    
     elif command == 'analyze-stats' or command == 'stats':
         # Run stats analysis
         stats_script = get_resource_path('analysis/stats_analysis.py')

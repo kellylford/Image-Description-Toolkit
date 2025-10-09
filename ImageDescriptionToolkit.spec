@@ -48,6 +48,7 @@ a = Analysis(
         'ollama',
         'openai',
         'anthropic',
+        'pillow_heif',
         
         # Standard library modules that might be missed
         'subprocess',

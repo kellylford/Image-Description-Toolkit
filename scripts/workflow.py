@@ -29,8 +29,11 @@ import shlex
 # Set UTF-8 encoding for console output on Windows
 if sys.platform.startswith('win'):
     import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+    # Fix for PyInstaller executable - only detach if method exists
+    if hasattr(sys.stdout, 'detach'):
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+    if hasattr(sys.stderr, 'detach'):
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
 import logging
 import json
 from pathlib import Path
@@ -567,17 +570,27 @@ class WorkflowOrchestrator:
                 self.logger.info(f"Verification successful: All {len(combined_image_list)} copied files are discoverable by image_describer.py")
             
             # Build command for the combined directory - single call to image_describer.py
-            # Get the path to image_describer.py in the scripts directory
-            scripts_dir = Path(__file__).parent
-            image_describer_path = scripts_dir / "image_describer.py"
-            
-            cmd = [
-                sys.executable, str(image_describer_path),
-                str(temp_combined_dir),
-                "--recursive",
-                "--output-dir", str(output_dir),
-                "--log-dir", str(self.config.base_output_dir / "logs")
-            ]
+            # Check if running in PyInstaller context and build command accordingly
+            if getattr(sys, 'frozen', False):
+                # Running as PyInstaller executable - use CLI routing
+                cmd = [
+                    sys.executable, "image_describer",
+                    str(temp_combined_dir),
+                    "--recursive",
+                    "--output-dir", str(output_dir),
+                    "--log-dir", str(self.config.base_output_dir / "logs")
+                ]
+            else:
+                # Running as Python script - use direct script path
+                scripts_dir = Path(__file__).parent
+                image_describer_path = scripts_dir / "image_describer.py"
+                cmd = [
+                    sys.executable, str(image_describer_path),
+                    str(temp_combined_dir),
+                    "--recursive",
+                    "--output-dir", str(output_dir),
+                    "--log-dir", str(self.config.base_output_dir / "logs")
+                ]
             
             # Add provider parameter
             if self.provider:

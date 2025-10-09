@@ -1,5 +1,5 @@
 {
-  "default_model": "moondream",
+  "default_model": "moondream:latest",
   "model_settings": {
     "model": "moondream",
     "temperature": 0.1,
@@ -16,7 +16,8 @@
     "narrative": "Provide a narrative description including objects, colors and detail. Avoid interpretation, just describe.",
     "artistic": "Analyze this image from an artistic perspective, describing:\n- Visual composition and framing\n- Color palette and lighting mood\n- Artistic style or technique\n- Emotional tone or atmosphere\n- Subject matter and symbolism",
     "technical": "Provide a technical analysis of this image:\n- Camera settings and photographic technique\n- Lighting conditions and quality\n- Composition and framing\n- Image quality and clarity\n- Technical strengths or weaknesses",
-    "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition."
+    "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition.",
+    "Simple": "Describe."
   },
   "output_format": {
     "include_timestamp": false,
@@ -124,5 +125,6 @@
       "include_metadata": "Whether to include extracted EXIF metadata in descriptions",
       "separator": "Character used to separate entries in the output file"
     }
-  }
+  },
+  "default_provider": "ollama"
 }

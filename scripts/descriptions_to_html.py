@@ -35,8 +35,11 @@ import time
 # Set UTF-8 encoding for console output on Windows
 if sys.platform.startswith('win'):
     import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+    # Fix for PyInstaller executable - only detach if method exists
+    if hasattr(sys.stdout, 'detach'):
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+    if hasattr(sys.stderr, 'detach'):
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
 
 # Setup logger
 logger = logging.getLogger('descriptions_to_html')
