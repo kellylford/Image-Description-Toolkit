@@ -70,8 +70,8 @@ def main():
         
         return 0
     
-    # Change to base directory so relative paths work
-    os.chdir(base_dir)
+    # Store original working directory for user paths
+    original_cwd = os.getcwd()
     
     # Parse command
     if len(sys.argv) < 2:
@@ -82,6 +82,15 @@ def main():
     
     # Route to appropriate script
     if command == 'workflow':
+        # Add default output directory if not specified
+        args = sys.argv[2:]
+        if '--output-dir' not in args and '-o' not in args and '--resume' not in args:
+            # Insert default output directory
+            args = ['--output-dir', 'Descriptions'] + args
+        
+        # Add original working directory for path resolution
+        args = ['--original-cwd', original_cwd] + args
+        
         # For PyInstaller, we need to import and run the module directly
         if getattr(sys, 'frozen', False):
             # Running as executable - import the module directly
@@ -96,7 +105,7 @@ def main():
                 
                 # Set up sys.argv for the workflow script
                 original_argv = sys.argv[:]
-                sys.argv = ['workflow.py'] + sys.argv[2:]  # Remove 'workflow' command, keep the rest
+                sys.argv = ['workflow.py'] + args  # Use modified args with default output dir
                 
                 try:
                     # Run the workflow main function
@@ -123,8 +132,7 @@ def main():
                 return 1
             
             import subprocess
-            args = sys.argv[2:]
-            cmd = [sys.executable, str(workflow_script)] + args
+            cmd = [sys.executable, str(workflow_script)] + args  # Use modified args
             result = subprocess.run(cmd, cwd=str(scripts_dir))
             return result.returncode
     
@@ -179,47 +187,131 @@ def main():
             result = subprocess.run(cmd, cwd=str(scripts_dir))
             return result.returncode
     
-    elif command == 'analyze-stats' or command == 'stats':
+    elif command == 'stats':
         # Run stats analysis
-        stats_script = get_resource_path('analysis/stats_analysis.py')
-        
-        if not stats_script.exists():
-            print(f"Error: Stats analysis script not found at {stats_script}")
-            return 1
-        
-        import subprocess
-        args = sys.argv[2:]
-        cmd = [sys.executable, str(stats_script)] + args
-        result = subprocess.run(cmd, cwd=str(stats_script.parent))
-        return result.returncode
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                analysis_path = get_resource_path('analysis')
+                if str(analysis_path) not in sys.path:
+                    sys.path.insert(0, str(analysis_path))
+                
+                import stats_analysis
+                
+                # Set up sys.argv for the stats script
+                original_argv = sys.argv[:]
+                sys.argv = ['stats_analysis.py'] + sys.argv[2:]
+                
+                try:
+                    return stats_analysis.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import stats_analysis module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running stats analysis: {e}")
+                return 1
+        else:
+            # Running as script - use subprocess
+            stats_script = get_resource_path('analysis/stats_analysis.py')
+            
+            if not stats_script.exists():
+                print(f"Error: Stats analysis script not found at {stats_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(stats_script)] + args
+            result = subprocess.run(cmd, cwd=str(stats_script.parent))
+            return result.returncode
     
-    elif command == 'analyze-content' or command == 'content':
+    elif command == 'contentreview':
         # Run content analysis
-        content_script = get_resource_path('analysis/content_analysis.py')
-        
-        if not content_script.exists():
-            print(f"Error: Content analysis script not found at {content_script}")
-            return 1
-        
-        import subprocess
-        args = sys.argv[2:]
-        cmd = [sys.executable, str(content_script)] + args
-        result = subprocess.run(cmd, cwd=str(content_script.parent))
-        return result.returncode
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                analysis_path = get_resource_path('analysis')
+                if str(analysis_path) not in sys.path:
+                    sys.path.insert(0, str(analysis_path))
+                
+                import content_analysis
+                
+                # Set up sys.argv for the content script
+                original_argv = sys.argv[:]
+                sys.argv = ['content_analysis.py'] + sys.argv[2:]
+                
+                try:
+                    return content_analysis.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import content_analysis module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running content analysis: {e}")
+                return 1
+        else:
+            # Running as script - use subprocess
+            content_script = get_resource_path('analysis/content_analysis.py')
+            
+            if not content_script.exists():
+                print(f"Error: Content analysis script not found at {content_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(content_script)] + args
+            result = subprocess.run(cmd, cwd=str(content_script.parent))
+            return result.returncode
     
-    elif command == 'combine':
+    elif command == 'combinedescriptions':
         # Combine workflow descriptions
-        combine_script = get_resource_path('analysis/combine_workflow_descriptions.py')
-        
-        if not combine_script.exists():
-            print(f"Error: Combine script not found at {combine_script}")
-            return 1
-        
-        import subprocess
-        args = sys.argv[2:]
-        cmd = [sys.executable, str(combine_script)] + args
-        result = subprocess.run(cmd, cwd=str(combine_script.parent))
-        return result.returncode
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                analysis_path = get_resource_path('analysis')
+                if str(analysis_path) not in sys.path:
+                    sys.path.insert(0, str(analysis_path))
+                
+                import combine_workflow_descriptions
+                
+                # Set up sys.argv for the combine script
+                original_argv = sys.argv[:]
+                sys.argv = ['combine_workflow_descriptions.py'] + sys.argv[2:]
+                
+                try:
+                    return combine_workflow_descriptions.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import combine_workflow_descriptions module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running combine descriptions: {e}")
+                return 1
+        else:
+            # Running as script - use subprocess
+            combine_script = get_resource_path('analysis/combine_workflow_descriptions.py')
+            
+            if not combine_script.exists():
+                print(f"Error: Combine script not found at {combine_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(combine_script)] + args
+            result = subprocess.run(cmd, cwd=str(combine_script.parent))
+            return result.returncode
     
     elif command == 'check-models':
         # Check installed models
@@ -340,9 +432,9 @@ USAGE:
 
 COMMANDS:
     workflow              Run image description workflow
-    analyze-stats         Analyze workflow performance statistics
-    analyze-content       Analyze description content and quality
-    combine               Combine descriptions from multiple workflows
+    stats                 Analyze workflow performance statistics
+    contentreview         Analyze description content and quality
+    combinedescriptions   Combine descriptions from multiple workflows
     check-models          Check installed Ollama models
     extract-frames        Extract frames from video files
     version               Show version information
@@ -356,13 +448,13 @@ EXAMPLES:
     {base_call} workflow --provider claude --model claude-opus-4
 
     # Analyze statistics
-    {base_call} analyze-stats
+    {base_call} stats
 
     # Analyze content quality
-    {base_call} analyze-content
+    {base_call} contentreview
 
     # Combine descriptions to CSV
-    {base_call} combine --output results.csv
+    {base_call} combinedescriptions --output results.csv
 
     # Check available models
     {base_call} check-models
