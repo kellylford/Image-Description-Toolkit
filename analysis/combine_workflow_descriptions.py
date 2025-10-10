@@ -301,8 +301,8 @@ Default: csv'''
     if args.input_dir:
         base_dir = args.input_dir
     else:
-        # Default to ../Descriptions relative to this script
-        base_dir = Path(__file__).parent.parent / "Descriptions"
+        # Default to Descriptions directory in current working directory
+        base_dir = Path.cwd() / "Descriptions"
     
     if not base_dir.exists():
         print(f"Error: Descriptions directory not found at: {base_dir}")

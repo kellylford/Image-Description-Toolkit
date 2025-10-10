@@ -371,7 +371,8 @@ Examples:
     args = parser.parse_args()
     
     # Find the combined descriptions file - check results/ directory first, then analysis/ directory
-    csv_path = Path(__file__).parent / "results" / args.input
+    # Default to results directory in current working directory
+    csv_path = Path.cwd() / "results" / args.input
     
     if not csv_path.exists():
         # Fall back to analysis directory for backward compatibility

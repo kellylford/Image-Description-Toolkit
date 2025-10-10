@@ -53,7 +53,23 @@ build/
 dist/
 *.egg-info/
 
+# Executable distribution
+releases/
+*.spec.bak
+
 # Local configuration files that might contain secrets
 config.local.*
 .env
 .env.local
+analysis/workflow_timing_stats.csv
+analysis/workflow_statistics.json
+analysis/combineddescriptions.txt
+analysis/description_content_analysis.csv
+/test_extract
+
+# Test and temporary files
+test_images/
+current_models.json
+debug_*.bat
+test_*.bat
+fix_*.sh

@@ -94,7 +94,7 @@ echo.
 echo ========================================
 echo All 18 model tests complete!
 echo ========================================
-echo Results in: ..\..\..\Descriptions\wf_ollama_*
+echo Results in: ..\Descriptions\wf_ollama_*
 echo.
 pause
 ENDLOCAL

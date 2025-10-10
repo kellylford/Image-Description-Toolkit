@@ -31,10 +31,11 @@ set "MODELS_LIST[15]=mistral-small3.2:15.0"
 set "MODELS_LIST[16]=qwen2.5vl:7.0"
 
 echo This will install the following models:
-echo   Core Models:
+echo Core Models:
 
 set TOTAL_NEW=0
 
+REM First pass: check what's already installed and calculate totals
 for /L %%i in (0,1,16) do (
     for /F "tokens=1,2 delims=:" %%a in ("!MODELS_LIST[%%i]!") do (
         findstr /C:"%%a" current_models.json >nul
@@ -53,10 +54,7 @@ echo.
 echo Press Ctrl+C to cancel, or
 pause
 
-REM Clean up temporary file
-del current_models.json
-
-REM Install missing models
+REM Install missing models (don't delete current_models.json yet)
 set /a count=1
 for /L %%i in (0,1,16) do (
     for /F "tokens=1,2 delims=:" %%a in ("!MODELS_LIST[%%i]!") do (
@@ -68,6 +66,10 @@ for /L %%i in (0,1,16) do (
             set /a count+=1
         )
     )
+)
+
+REM Clean up temporary file after installation
+del current_models.json
 )
 
 echo.

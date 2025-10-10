@@ -72,7 +72,7 @@ echo     Done.
 echo.
 
 echo [3/4] Verifying build...
-if not exist "dist\ImageDescriptionToolkit.exe" (
+if not exist "dist\idt.exe" (
     echo ERROR: Executable was not created!
     echo.
     pause
@@ -80,14 +80,14 @@ if not exist "dist\ImageDescriptionToolkit.exe" (
 )
 
 REM Get file size
-for %%A in ("dist\ImageDescriptionToolkit.exe") do set size=%%~zA
+for %%A in ("dist\idt.exe") do set size=%%~zA
 set /a size_mb=%size% / 1048576
-echo     Executable created: dist\ImageDescriptionToolkit.exe
+echo     Executable created: dist\idt.exe
 echo     Size: %size_mb% MB
 echo.
 
 echo [4/4] Testing executable...
-dist\ImageDescriptionToolkit.exe version
+dist\idt.exe version
 if errorlevel 1 (
     echo WARNING: Executable test failed
     echo.
@@ -100,10 +100,10 @@ echo ========================================================================
 echo Build Complete!
 echo ========================================================================
 echo.
-echo Executable location: dist\ImageDescriptionToolkit.exe
+echo Executable location: dist\idt.exe
 echo.
 echo Next steps:
-echo   1. Test the executable: dist\ImageDescriptionToolkit.exe help
+echo   1. Test the executable: dist\idt.exe help
 echo   2. Create distribution package with create_distribution.bat
 echo.
 pause
