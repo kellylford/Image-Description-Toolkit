@@ -7,5 +7,8 @@ REM   run_openai_gpt5.bat --prompt-style colorful test_images
 REM   run_openai_gpt5.bat test_images --dry-run
 REM Requires: openai.txt with API key in current directory OR OPENAI_API_KEY environment variable
 
-..\idt.exe workflow --provider openai --model gpt-5 --output-dir ..\Descriptions %*
+REM Change to project root directory to ensure config files are found
+cd /d "%~dp0\.."
+
+idt.exe workflow --provider openai --model gpt-5 --output-dir Descriptions %*
 ENDLOCAL

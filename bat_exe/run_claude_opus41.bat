@@ -7,5 +7,8 @@ REM   run_claude_opus41.bat --prompt-style colorful test_images
 REM   run_claude_opus41.bat test_images --dry-run
 REM Requires: claude.txt with API key in current directory OR ANTHROPIC_API_KEY environment variable
 
-..\idt.exe workflow --provider claude --model claude-opus-4-1-20250805 --output-dir ..\Descriptions %*
+REM Change to project root directory to ensure config files are found
+cd /d "%~dp0\.."
+
+idt.exe workflow --provider claude --model claude-opus-4-1-20250805 --output-dir Descriptions %*
 ENDLOCAL

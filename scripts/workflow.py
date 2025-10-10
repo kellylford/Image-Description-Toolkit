@@ -313,13 +313,23 @@ class WorkflowOrchestrator:
         self._update_frame_extractor_config(config_file, output_dir)
         
         try:
-            # Run video frame extractor
-            cmd = [
-                sys.executable, "video_frame_extractor.py",
-                str(input_dir),
-                "--config", config_file,
-                "--log-dir", str(self.config.base_output_dir)
-            ]
+            # Detect if running as PyInstaller executable
+            if getattr(sys, 'frozen', False):
+                # Running as executable - use unified CLI
+                cmd = [
+                    sys.executable, "extract-frames",
+                    str(input_dir),
+                    "--config", config_file,
+                    "--log-dir", str(self.config.base_output_dir)
+                ]
+            else:
+                # Running as Python script - use direct script call
+                cmd = [
+                    sys.executable, "video_frame_extractor.py",
+                    str(input_dir),
+                    "--config", config_file,
+                    "--log-dir", str(self.config.base_output_dir)
+                ]
             
             self.logger.info(f"Running: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
@@ -376,15 +386,27 @@ class WorkflowOrchestrator:
             # Get conversion settings
             step_config = self.config.get_step_config("image_conversion")
             
-            # Run image converter
-            cmd = [
-                sys.executable, "ConvertImage.py",
-                str(input_dir),
-                "--output", str(output_dir),
-                "--recursive",
-                "--quality", str(step_config.get("quality", 95)),
-                "--log-dir", str(self.config.base_output_dir / "logs")
-            ]
+            # Run image converter - handle both frozen and script modes
+            if getattr(sys, 'frozen', False):
+                # Running as executable - use unified CLI
+                cmd = [
+                    sys.executable, "convert-images",
+                    str(input_dir),
+                    "--output", str(output_dir),
+                    "--recursive",
+                    "--quality", str(step_config.get("quality", 95)),
+                    "--log-dir", str(self.config.base_output_dir / "logs")
+                ]
+            else:
+                # Running as Python script - use direct script call
+                cmd = [
+                    sys.executable, "ConvertImage.py",
+                    str(input_dir),
+                    "--output", str(output_dir),
+                    "--recursive",
+                    "--quality", str(step_config.get("quality", 95)),
+                    "--log-dir", str(self.config.base_output_dir / "logs")
+                ]
             
             if not step_config.get("keep_metadata", True):
                 cmd.append("--no-metadata")

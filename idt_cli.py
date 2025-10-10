@@ -408,6 +408,37 @@ def main():
             result = subprocess.run(cmd, cwd=str(script_path.parent))
             return result.returncode
     
+    elif command == 'convert-images':
+        # Convert HEIC images to JPG (ConvertImage.py)
+        if getattr(sys, 'frozen', False):
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                import ConvertImage as ci
+                # Rebuild argv: remove command token
+                original_argv = sys.argv[:]
+                sys.argv = ['ConvertImage.py'] + sys.argv[2:]
+                try:
+                    return ci.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+            except ImportError as e:
+                print(f"Error: Could not import ConvertImage module: {e}")
+                return 1
+        else:
+            script_path = get_resource_path('scripts/ConvertImage.py')
+            if not script_path.exists():
+                print(f"Error: ConvertImage.py not found at {script_path}")
+                return 1
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(script_path)] + args
+            result = subprocess.run(cmd, cwd=str(script_path.parent))
+            return result.returncode
+    
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
         return 0
@@ -437,6 +468,7 @@ COMMANDS:
     combinedescriptions   Combine descriptions from multiple workflows
     check-models          Check installed Ollama models
     extract-frames        Extract frames from video files
+    convert-images        Convert HEIC images to JPG
     version               Show version information
     help                  Show this help message
 
