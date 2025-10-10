@@ -98,7 +98,7 @@ for /l %%i in (1,1,%MODEL_COUNT%) do (
     echo -----------------------------------------------------------------------
     
     REM Run the workflow for this model
-    ..\dist\idt.exe workflow --provider ollama --model !MODEL_%%i! --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions "%IMAGE_DIR%"
+    ..\idt.exe workflow --provider ollama --model !MODEL_%%i! --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions "%IMAGE_DIR%"
     
     if !errorlevel! equ 0 (
         echo ✓ SUCCESS: !MODEL_%%i!

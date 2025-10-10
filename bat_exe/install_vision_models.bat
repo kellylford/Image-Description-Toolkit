@@ -9,7 +9,9 @@ echo ========================================
 echo.
 
 REM Get current model status
-..\dist\idt.exe check-models --provider ollama --json > current_models.json
+echo.
+echo Checking currently installed Ollama models...
+..\idt.exe check-models --provider ollama --json > current_models.json
 
 echo This will install the following models:
 echo Core Models:

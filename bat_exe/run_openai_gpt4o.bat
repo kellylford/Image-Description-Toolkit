@@ -7,5 +7,5 @@ REM Requires: openai.txt with API key in current directory OR OPENAI_API_KEY env
 SET PROMPT_STYLE=%2
 IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
 
-..\dist\idt.exe workflow --provider openai --model gpt-4o --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+..\idt.exe workflow --provider openai --model gpt-4o --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
 ENDLOCAL
