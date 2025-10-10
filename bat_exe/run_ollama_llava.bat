@@ -1,10 +1,10 @@
 @echo off
 SETLOCAL
 REM Run workflow with Ollama LLaVA (latest)
-REM Usage: run_ollama_llava.bat <image_directory> [prompt_style]
+REM Usage: run_ollama_llava.bat [options] <image_directory>
+REM Supports all workflow options in any order, e.g.:
+REM   run_ollama_llava.bat --prompt-style colorful test_images
+REM   run_ollama_llava.bat test_images --dry-run
 
-SET PROMPT_STYLE=%2
-IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
-
-..\idt.exe workflow --provider ollama --model llava:latest --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+..\idt.exe workflow --provider ollama --model llava:latest --output-dir ..\Descriptions %*
 ENDLOCAL
