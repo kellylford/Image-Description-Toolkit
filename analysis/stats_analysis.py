@@ -773,8 +773,8 @@ Examples:
     parser.add_argument(
         '--csv-output',
         type=str,
-        default='workflow_timing_stats.csv',
-        help='CSV output filename (default: workflow_timing_stats.csv). Saved in analysis/results/ directory.'
+        default='analysis/results/workflow_timing_stats.csv',
+        help='CSV output filename (default: analysis/results/workflow_timing_stats.csv)'
     )
     
     parser.add_argument(

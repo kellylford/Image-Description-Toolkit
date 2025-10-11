@@ -370,15 +370,15 @@ Examples:
     parser.add_argument(
         '--input',
         type=str,
-        default='combineddescriptions.csv',
-        help='Input file with combined descriptions (CSV/TSV/ATSV - auto-detected, default: combineddescriptions.csv from results/ directory)'
+        default='analysis/results/combineddescriptions.csv',
+        help='Input file with combined descriptions (default: analysis/results/combineddescriptions.csv, CSV/TSV/ATSV auto-detected)'
     )
     
     parser.add_argument(
         '--output',
         type=str,
-        default='description_content_analysis.csv',
-        help='Output CSV filename (default: description_content_analysis.csv). Saved in analysis/results/ directory.'
+        default='analysis/results/description_content_analysis.csv',
+        help='Output CSV filename (default: analysis/results/description_content_analysis.csv)'
     )
     
     args = parser.parse_args()

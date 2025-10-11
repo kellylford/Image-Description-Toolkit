@@ -322,8 +322,8 @@ Examples:
     parser.add_argument(
         '--output',
         type=str,
-        default='combineddescriptions.csv',
-        help='Output filename (default: combineddescriptions.csv). Saved in analysis/results/ directory.'
+        default='analysis/results/combineddescriptions.csv',
+        help='Output filename (default: analysis/results/combineddescriptions.csv)'
     )
     
     parser.add_argument(
