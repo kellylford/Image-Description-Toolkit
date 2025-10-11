@@ -490,6 +490,7 @@ class ImageDescriptionViewer(QWidget):
         self.setAccessibleName("Main Window")
         self.setAccessibleDescription("Main window for browsing image descriptions and images.")
         self.current_dir = None
+        self.workflow_name = None  # Store workflow name from metadata
         self.image_files = []
         self.descriptions = []
         self.descriptions_updated = []  # Track which descriptions have been updated
@@ -676,8 +677,12 @@ class ImageDescriptionViewer(QWidget):
         self.update_title()
     
     def update_title(self):
-        """Update window title with progress information for screen readers"""
+        """Update window title with progress information and workflow name for screen readers"""
         base_title = "Image Description Viewer"
+        
+        # Add workflow name if available
+        if self.workflow_name:
+            base_title = f"{base_title} - {self.workflow_name}"
         
         if self.live_mode and self.progress_info.get("total", 0) > 0:
             current = self.progress_info.get("current", 0)
@@ -693,6 +698,25 @@ class ImageDescriptionViewer(QWidget):
             self.setWindowTitle(title)
         else:
             self.setWindowTitle(base_title)
+    
+    def load_workflow_metadata(self, dir_path):
+        """Load workflow metadata and update workflow name"""
+        metadata_file = Path(dir_path) / "workflow_metadata.json"
+        
+        if metadata_file.exists():
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    self.workflow_name = metadata.get('workflow_name')
+                    if self.workflow_name:
+                        self.update_title()
+                        return True
+            except Exception as e:
+                print(f"Warning: Could not load workflow metadata: {e}")
+        
+        # No metadata found - clear workflow name
+        self.workflow_name = None
+        return False
     
     def on_file_changed(self, path):
         """Handle file system changes with focus preservation"""
@@ -822,6 +846,9 @@ class ImageDescriptionViewer(QWidget):
         """Load descriptions from either HTML or live file based on mode"""
         self.current_dir = dir_path
         self.dir_label.setText(f"Loaded: {dir_path}")
+        
+        # Load workflow metadata if available
+        self.load_workflow_metadata(dir_path)
         
         # Stop any existing monitoring
         self.stop_live_monitoring()

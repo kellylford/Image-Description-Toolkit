@@ -5480,6 +5480,21 @@ class ImageDescriberGUI(QMainWindow):
             return
         
         workflow_path = Path(workflow_dir)
+        
+        # Load workflow metadata if available
+        workflow_name = None
+        metadata_file = workflow_path / "workflow_metadata.json"
+        if metadata_file.exists():
+            try:
+                import json
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    workflow_name = metadata.get('workflow_name')
+                    if workflow_name:
+                        self.status_bar.showMessage(f"Importing workflow: {workflow_name}", 3000)
+            except Exception as e:
+                print(f"Warning: Could not load workflow metadata: {e}")
+        
         desc_file = workflow_path / "descriptions" / "image_descriptions.txt"
         
         if not desc_file.exists():
@@ -5804,6 +5819,8 @@ class ImageDescriberGUI(QMainWindow):
             
             # Show import summary
             summary = f"Import Complete!\n\n"
+            if workflow_name:
+                summary += f"Workflow: {workflow_name}\n\n"
             summary += f"Imported: {imported_count} descriptions\n"
             if videos_added > 0:
                 summary += f"Videos added: {videos_added}\n"

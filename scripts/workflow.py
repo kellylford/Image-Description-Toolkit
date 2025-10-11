@@ -41,7 +41,10 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Import our workflow utilities
-from workflow_utils import WorkflowConfig, WorkflowLogger, FileDiscovery, create_workflow_paths
+from workflow_utils import (
+    WorkflowConfig, WorkflowLogger, FileDiscovery, create_workflow_paths,
+    get_path_identifier_2_components, save_workflow_metadata, load_workflow_metadata
+)
 from image_describer import get_default_prompt_style
 try:
     from config_loader import load_json_config
@@ -818,7 +821,8 @@ class WorkflowOrchestrator:
             self.logger.error(f"Error during HTML generation: {e}")
             return {"success": False, "error": str(e)}
     
-    def run_workflow(self, input_dir: Path, output_dir: Path, steps: List[str]) -> Dict[str, Any]:
+    def run_workflow(self, input_dir: Path, output_dir: Path, steps: List[str], 
+                     workflow_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Run the complete workflow
         
@@ -826,6 +830,7 @@ class WorkflowOrchestrator:
             input_dir: Input directory containing media files
             output_dir: Base output directory
             steps: List of workflow steps to execute
+            workflow_metadata: Optional metadata to save about this workflow
             
         Returns:
             Dictionary with overall workflow results
@@ -846,6 +851,11 @@ class WorkflowOrchestrator:
         
         # Create workflow directory structure
         workflow_paths = create_workflow_paths(output_dir)
+        
+        # Save workflow metadata if provided
+        if workflow_metadata:
+            save_workflow_metadata(output_dir, workflow_metadata)
+            self.logger.info(f"Workflow name: {workflow_metadata.get('workflow_name', 'N/A')}")
         
         workflow_results = {
             "success": True,
@@ -1303,6 +1313,11 @@ Resume Examples:
     )
     
     parser.add_argument(
+        "--name",
+        help="Custom workflow name identifier (e.g., 'vacation_photos'). If not provided, auto-generates from input directory path."
+    )
+    
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable verbose logging"
@@ -1421,8 +1436,17 @@ Resume Examples:
         model_name = get_effective_model(args, args.config)
         prompt_style = get_effective_prompt_style(args, args.config)
         
+        # Determine workflow name identifier
+        if args.name:
+            # User provided a custom name
+            workflow_name = sanitize_name(args.name)
+        else:
+            # Auto-generate from input directory path (2 components)
+            workflow_name = get_path_identifier_2_components(str(input_dir))
+        
         # Create descriptive directory name (wf = workflow)
-        wf_dirname = f"wf_{provider_name}_{model_name}_{prompt_style}_{timestamp}"
+        # Format: wf_NAME_PROVIDER_MODEL_PROMPT_TIMESTAMP
+        wf_dirname = f"wf_{workflow_name}_{provider_name}_{model_name}_{prompt_style}_{timestamp}"
         
         if args.output_dir:
             # User specified output directory - create wf_ directory inside it
@@ -1482,8 +1506,20 @@ Resume Examples:
         if args.verbose:
             orchestrator.logger.logger.setLevel(logging.DEBUG)
         
+        # Prepare workflow metadata
+        metadata = {
+            "workflow_name": workflow_name,
+            "input_directory": str(input_dir),
+            "provider": provider_name,
+            "model": model_name,
+            "prompt_style": prompt_style,
+            "timestamp": timestamp,
+            "steps": steps,
+            "user_provided_name": bool(args.name)
+        }
+        
         # Run workflow
-        results = orchestrator.run_workflow(input_dir, output_dir, steps)
+        results = orchestrator.run_workflow(input_dir, output_dir, steps, workflow_metadata=metadata)
         
         # Log original command for resume functionality
         if not args.resume:  # Only log original command for new workflows

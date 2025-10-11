@@ -392,3 +392,96 @@ def get_workflow_output_dir(script_name: str, fallback_dir: Optional[Path] = Non
     return fallback_dir
 
 
+def get_path_identifier_2_components(full_path: str) -> str:
+    """
+    Extract 2-component path identifier from an input directory path.
+    
+    This creates a short, readable identifier from the rightmost 2 path components.
+    Examples:
+        C:\\Users\\kelly\\photos\\2025\\07 -> "2025_07"
+        \\\\server\\photos\\vacation\\beach -> "vacation_beach"
+        C:\\testimages -> "testimages"
+    
+    Args:
+        full_path: Full input directory path
+    
+    Returns:
+        String with 2 path components joined by underscores, suitable for directory names
+    """
+    import re
+    
+    # Normalize path separators
+    full_path = full_path.replace('\\', '/').strip('/')
+    
+    # Split into components
+    components = full_path.split('/')
+    
+    # Remove empty components
+    components = [c for c in components if c]
+    
+    # Take the last 2 components
+    suffix_components = components[-2:] if len(components) >= 2 else components
+    
+    # Join with underscores
+    suffix = '_'.join(suffix_components)
+    
+    # Clean up for use in directory name
+    # Remove special characters, keep alphanumeric and basic punctuation
+    suffix = re.sub(r'[^\w\-]', '_', suffix)
+    
+    # Remove multiple underscores
+    suffix = re.sub(r'_+', '_', suffix)
+    
+    # Limit length to avoid excessively long names
+    if len(suffix) > 50:
+        suffix = suffix[:50]
+    
+    return suffix.lower()
+
+
+def save_workflow_metadata(workflow_dir: Path, metadata: Dict[str, Any]) -> None:
+    """
+    Save workflow metadata to JSON file.
+    
+    Args:
+        workflow_dir: Path to workflow directory
+        metadata: Dictionary containing workflow metadata
+    """
+    import json
+    
+    metadata_file = workflow_dir / "workflow_metadata.json"
+    
+    try:
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not save workflow metadata: {e}")
+
+
+def load_workflow_metadata(workflow_dir: Path) -> Optional[Dict[str, Any]]:
+    """
+    Load workflow metadata from JSON file.
+    
+    Args:
+        workflow_dir: Path to workflow directory
+        
+    Returns:
+        Dictionary containing workflow metadata, or None if not found
+    """
+    import json
+    
+    metadata_file = workflow_dir / "workflow_metadata.json"
+    
+    if not metadata_file.exists():
+        return None
+    
+    try:
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not load workflow metadata: {e}")
+        return None
+
+
