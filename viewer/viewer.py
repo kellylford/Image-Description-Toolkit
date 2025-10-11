@@ -1183,9 +1183,80 @@ class ImageDescriptionViewer(QWidget):
 
 
 def main():
+    import argparse
+    
+    # Create parser for command-line arguments
+    parser = argparse.ArgumentParser(
+        description='Image Description Viewer - Browse workflow results and image descriptions',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Launch viewer with directory browser
+  viewer.exe
+  
+  # Open specific workflow output directory
+  viewer.exe C:\\path\\to\\workflow_output
+  
+  # Launch directly to directory selection dialog
+  viewer.exe --open
+  
+  # Show help
+  viewer.exe --help
+
+The viewer supports two modes:
+  - HTML Mode: View completed workflows with full HTML reports
+  - Live Mode: Monitor workflows in progress with real-time updates
+
+Keyboard shortcuts:
+  Up/Down Arrow: Navigate between images
+  Ctrl+C: Copy current description to clipboard
+  Ctrl+R: Redescribe current image (requires Ollama)
+"""
+    )
+    
+    parser.add_argument(
+        'directory',
+        nargs='?',
+        help='Workflow output directory to load on startup (optional)'
+    )
+    
+    parser.add_argument(
+        '--open',
+        action='store_true',
+        help='Launch directly to the directory selection dialog'
+    )
+    
+    # Filter out Qt arguments before parsing
+    # Qt can add its own args like -platform, etc.
+    import sys
+    filtered_args = [arg for arg in sys.argv if not arg.startswith('-platform')]
+    args = parser.parse_args(filtered_args[1:])  # Skip program name
+    
+    # Create Qt application
     app = QApplication(sys.argv)
     viewer = ImageDescriptionViewer()
-    viewer.show()
+    
+    # Handle command-line options
+    if args.open:
+        # Show the directory dialog immediately
+        viewer.show()
+        QTimer.singleShot(100, viewer.change_directory)
+    elif args.directory:
+        # Load the specified directory
+        dir_path = Path(args.directory).resolve()
+        if dir_path.exists() and dir_path.is_dir():
+            viewer.load_descriptions(str(dir_path))
+            viewer.show()
+        else:
+            print(f"Error: Directory not found: {args.directory}", file=sys.stderr)
+            QMessageBox.critical(None, "Directory Not Found", 
+                               f"The specified directory does not exist:\n{args.directory}\n\nPlease select a valid workflow output directory.")
+            viewer.show()
+            QTimer.singleShot(100, viewer.change_directory)
+    else:
+        # Normal startup - show empty viewer
+        viewer.show()
+    
     sys.exit(app.exec())
 
 if __name__ == "__main__":
