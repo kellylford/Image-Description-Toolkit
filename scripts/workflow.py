@@ -249,7 +249,7 @@ class WorkflowOrchestrator:
             status_lines.append(f"✗ Video extraction failed")
             
         if 'convert' in self.statistics['steps_completed']:
-            status_lines.append(f"✓ Image conversion complete ({self.statistics['total_conversions']} images)")
+            status_lines.append(f"✓ Image conversion complete ({self.statistics['total_conversions']} HEIC → JPG)")
         elif 'convert' in self.statistics['steps_failed']:
             status_lines.append(f"✗ Image conversion failed")
             
@@ -456,31 +456,56 @@ class WorkflowOrchestrator:
         self.logger.info("Starting image description...")
         
         # Build list of directories to search for images
-        search_dirs = [input_dir]
-        
-        # Add converted images directory if it exists and has content
+        # Track unique source images to avoid double-counting HEIC + converted JPG
         converted_dir = self.config.get_step_output_dir("image_conversion")
-        if converted_dir.exists() and any(converted_dir.iterdir()):
-            search_dirs.append(converted_dir)
-            self.logger.info(f"Including converted images from: {converted_dir}")
-        
-        # Add extracted frames directory if it exists and has content
         frames_dir = self.config.get_step_output_dir("video_extraction")
-        if frames_dir.exists() and any(frames_dir.iterdir()):
-            search_dirs.append(frames_dir)
-            self.logger.info(f"Including extracted frames from: {frames_dir}")
         
-        # Find image files in all search directories
+        # Find HEIC files in input directory that will/were converted
+        heic_files_in_input = self.discovery.find_files_by_type(input_dir, "heic")
+        has_conversions = converted_dir.exists() and any(converted_dir.iterdir())
+        
+        # Find regular (non-HEIC) images in input directory
+        all_input_images = self.discovery.find_files_by_type(input_dir, "images")
+        regular_input_images = [img for img in all_input_images if img not in heic_files_in_input]
+        
+        # Build the list of images to process
         all_image_files = []
-        for search_dir in search_dirs:
-            image_files = self.discovery.find_files_by_type(search_dir, "images")
-            all_image_files.extend(image_files)
+        unique_source_count = 0  # Track unique source images
+        conversion_count = 0  # Track format conversions
+        
+        # Add regular (non-HEIC) images from input directory
+        all_image_files.extend(regular_input_images)
+        unique_source_count += len(regular_input_images)
+        if regular_input_images:
+            self.logger.info(f"Found {len(regular_input_images)} regular image(s) in input directory")
+        
+        # Add converted images OR HEIC files (not both)
+        if has_conversions:
+            converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+            all_image_files.extend(converted_images)
+            unique_source_count += len(converted_images)
+            conversion_count = len(converted_images)
+            self.logger.info(f"Including {len(converted_images)} converted image(s) from: {converted_dir}")
+        elif heic_files_in_input:
+            # If conversion hasn't run yet, include HEIC files directly
+            all_image_files.extend(heic_files_in_input)
+            unique_source_count += len(heic_files_in_input)
+            self.logger.info(f"Found {len(heic_files_in_input)} HEIC image(s) in input directory (not yet converted)")
+        
+        # Add extracted frames from videos
+        if frames_dir.exists() and any(frames_dir.iterdir()):
+            frame_images = self.discovery.find_files_by_type(frames_dir, "images")
+            all_image_files.extend(frame_images)
+            unique_source_count += len(frame_images)
+            self.logger.info(f"Including {len(frame_images)} extracted frame(s) from: {frames_dir}")
         
         if not all_image_files:
             self.logger.info("No image files found to describe")
-            return {"success": True, "processed": 0, "output_dir": output_dir}
+            return {"success": True, "processed": 0, "unique_images": 0, "conversions": 0, "output_dir": output_dir}
         
-        self.logger.info(f"Found {len(all_image_files)} image files across {len(search_dirs)} directories")
+        self.logger.info(f"Total unique images to describe: {unique_source_count}")
+        if conversion_count > 0:
+            self.logger.info(f"Format conversions included: {conversion_count} (HEIC → JPG)")
         
         try:
             # Get description settings
@@ -493,74 +518,54 @@ class WorkflowOrchestrator:
             
             # Preserve full directory structure in temp dir to prevent collisions
             combined_image_list = []
-            total_files_found = 0
             total_copy_failures = 0
             
-            for search_dir in search_dirs:
-                dir_image_files = self.discovery.find_files_by_type(search_dir, "images")
-                if not dir_image_files:
-                    continue
+            # Copy all unique images to temporary directory
+            for image_file in all_image_files:
+                try:
+                    # Determine which source directory this file came from
+                    source_dir = None
+                    if image_file.is_relative_to(input_dir):
+                        source_dir = input_dir
+                    elif has_conversions and image_file.is_relative_to(converted_dir):
+                        source_dir = converted_dir
+                    elif frames_dir.exists() and image_file.is_relative_to(frames_dir):
+                        source_dir = frames_dir
+                    else:
+                        # Fallback to using parent directory
+                        source_dir = image_file.parent
                     
-                total_files_found += len(dir_image_files)
-                self.logger.info(f"Found {len(dir_image_files)} images from: {search_dir}")
-                
-                # Create a safe name for the source directory to use as root in temp structure
-                safe_source_name = search_dir.name.replace(" ", "_").replace(":", "")
-                
-                # Copy images while preserving their original directory structure
-                files_copied_from_dir = 0
-                files_failed_from_dir = 0
-                
-                for image_file in dir_image_files:
+                    # Calculate relative path from source_dir to image_file
                     try:
-                        # Calculate relative path from search_dir to image_file
-                        relative_path = image_file.relative_to(search_dir)
-                        
-                        # Create temp path preserving directory structure under source name
-                        temp_image_path = temp_combined_dir / safe_source_name / relative_path
-                        
-                        # Ensure parent directories exist
-                        temp_image_path.parent.mkdir(parents=True, exist_ok=True)
-                        
-                        # Copy file to temp location preserving structure
-                        shutil.copy2(image_file, temp_image_path)
-                        combined_image_list.append((temp_image_path, image_file))  # (temp_path, original_path)
-                        files_copied_from_dir += 1
-                        self.logger.debug(f"Copied {image_file} to {temp_image_path}")
-                        
-                    except ValueError as e:
-                        # Handle case where image_file is not relative to search_dir
-                        self.logger.warning(f"Could not determine relative path for {image_file}: {e}")
-                        # Fallback to original flattened approach for this file
-                        safe_filename = f"{safe_source_name}_{image_file.name}"
-                        temp_image_path = temp_combined_dir / safe_source_name / safe_filename
-                        temp_image_path.parent.mkdir(parents=True, exist_ok=True)
-                        try:
-                            shutil.copy2(image_file, temp_image_path)
-                            combined_image_list.append((temp_image_path, image_file))
-                            files_copied_from_dir += 1
-                            self.logger.debug(f"Copied {image_file} to {temp_image_path} (fallback)")
-                        except Exception as e2:
-                            self.logger.warning(f"Failed to copy {image_file} (fallback): {e2}")
-                            files_failed_from_dir += 1
-                            total_copy_failures += 1
-                            continue
-                    except Exception as e:
-                        self.logger.warning(f"Failed to copy {image_file}: {e}")
-                        files_failed_from_dir += 1
-                        total_copy_failures += 1
-                        continue
-                
-                self.logger.info(f"Successfully copied {files_copied_from_dir}/{len(dir_image_files)} images from {search_dir}")
-                if files_failed_from_dir > 0:
-                    self.logger.warning(f"Failed to copy {files_failed_from_dir} images from {search_dir}")
+                        relative_path = image_file.relative_to(source_dir)
+                    except ValueError:
+                        # If relative path fails, just use filename
+                        relative_path = Path(image_file.name)
+                    
+                    # Create a safe name for the source directory to use as root in temp structure
+                    safe_source_name = source_dir.name.replace(" ", "_").replace(":", "")
+                    
+                    # Create temp path preserving directory structure under source name
+                    temp_image_path = temp_combined_dir / safe_source_name / relative_path
+                    
+                    # Ensure parent directories exist
+                    temp_image_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Copy file to temp location preserving structure
+                    shutil.copy2(image_file, temp_image_path)
+                    combined_image_list.append((temp_image_path, image_file))  # (temp_path, original_path)
+                    self.logger.debug(f"Copied {image_file} to {temp_image_path}")
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to copy {image_file}: {e}")
+                    total_copy_failures += 1
+                    continue
             
             # Log comprehensive copy summary
-            self.logger.info(f"Copy Summary: Found {total_files_found} images total")
-            self.logger.info(f"Copy Summary: Successfully copied {len(combined_image_list)} images")
+            self.logger.info(f"Copy Summary: Successfully prepared {len(combined_image_list)}/{len(all_image_files)} images for processing")
             if total_copy_failures > 0:
                 self.logger.warning(f"Copy Summary: Failed to copy {total_copy_failures} images")
-                self.logger.warning(f"Copy Summary: Success rate: {(len(combined_image_list) / total_files_found * 100):.1f}%")
+                self.logger.warning(f"Copy Summary: Success rate: {(len(combined_image_list) / len(all_image_files) * 100):.1f}%")
             
             if not combined_image_list:
                 self.logger.info("No images were successfully prepared for processing")
@@ -700,9 +705,20 @@ class WorkflowOrchestrator:
             if result.returncode == 0:
                 self.logger.info("Image description completed successfully")
                 total_processed = len(combined_image_list)
+                
+                # Validate that we described the expected number of images
+                if total_processed != unique_source_count:
+                    self.logger.warning(f"Description count mismatch: processed {total_processed} but expected {unique_source_count} unique images")
+                else:
+                    self.logger.info(f"✓ Validation: All {unique_source_count} unique images were described")
             else:
                 self.logger.error(f"Image description failed: {result.stderr}")
-                return {"success": False, "error": f"Image description process failed: {result.stderr}"}
+                return {
+                    "success": False, 
+                    "error": f"Image description process failed: {result.stderr}",
+                    "unique_images": unique_source_count,
+                    "conversions": conversion_count
+                }
             
             # Check if description file was created
             target_desc_file = output_dir / "image_descriptions.txt"
@@ -713,16 +729,28 @@ class WorkflowOrchestrator:
                 return {
                     "success": True,
                     "processed": total_processed,
+                    "unique_images": unique_source_count,
+                    "conversions": conversion_count,
                     "output_dir": output_dir,
                     "description_file": target_desc_file
                 }
             else:
                 self.logger.warning("Description file was not created")
-                return {"success": False, "error": "Description file not created"}
+                return {
+                    "success": False, 
+                    "error": "Description file not created",
+                    "unique_images": unique_source_count,
+                    "conversions": conversion_count
+                }
                 
         except Exception as e:
             self.logger.error(f"Error during image description: {e}")
-            return {"success": False, "error": str(e)}
+            return {
+                "success": False, 
+                "error": str(e),
+                "unique_images": unique_source_count if 'unique_source_count' in locals() else 0,
+                "conversions": conversion_count if 'conversion_count' in locals() else 0
+            }
     
     def generate_html(self, input_dir: Path, output_dir: Path, description_file: Optional[Path] = None) -> Dict[str, Any]:
         """
@@ -948,12 +976,25 @@ class WorkflowOrchestrator:
                 self.statistics['total_videos_processed'] += processed
             elif step == "convert":
                 self.statistics['total_conversions'] += processed
-                self.statistics['total_images_processed'] += processed
+                # Don't count conversions as images processed - they're format conversions of existing images
             elif step == "describe":
+                # Use unique_images count if available, otherwise fall back to processed
+                unique_images = step_result.get("unique_images", processed)
+                conversions = step_result.get("conversions", 0)
+                
                 self.statistics['total_descriptions'] += processed
-                self.statistics['total_images_processed'] += processed
+                self.statistics['total_images_processed'] += unique_images
+                
+                # Track conversions if not already tracked in convert step
+                if conversions > 0 and self.statistics['total_conversions'] == 0:
+                    self.statistics['total_conversions'] = conversions
             
-            self.statistics['total_files_processed'] += processed
+            # For total files processed, count unique items not duplicates
+            if step == "video":
+                self.statistics['total_files_processed'] += processed
+            elif step == "describe":
+                unique_images = step_result.get("unique_images", processed)
+                self.statistics['total_files_processed'] += unique_images
     
     def _log_final_statistics(self, start_time: datetime, end_time: datetime) -> None:
         """Log comprehensive final workflow statistics"""
@@ -978,8 +1019,9 @@ class WorkflowOrchestrator:
         # File processing statistics
         self.logger.info(f"Total files processed: {self.statistics['total_files_processed']}")
         self.logger.info(f"Videos processed: {self.statistics['total_videos_processed']}")
-        self.logger.info(f"Images processed: {self.statistics['total_images_processed']}")
-        self.logger.info(f"HEIC conversions: {self.statistics['total_conversions']}")
+        self.logger.info(f"Unique images processed: {self.statistics['total_images_processed']}")
+        if self.statistics['total_conversions'] > 0:
+            self.logger.info(f"Format conversions (HEIC → JPG): {self.statistics['total_conversions']}")
         self.logger.info(f"Descriptions generated: {self.statistics['total_descriptions']}")
         
         # Step completion statistics
