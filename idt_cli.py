@@ -467,6 +467,60 @@ def main():
             result = subprocess.run(cmd, cwd=str(script_path.parent))
             return result.returncode
     
+    elif command == 'viewer':
+        # Launch the viewer executable
+        import subprocess
+        import platform
+        
+        # Detect architecture
+        machine = platform.machine().lower()
+        if machine in ('aarch64', 'arm64'):
+            arch = 'arm64'
+        else:
+            arch = 'amd64'
+        
+        # Try multiple possible viewer locations
+        viewer_names = [
+            f'viewer_{arch}.exe',
+            'viewer.exe',
+            f'viewer/viewer_{arch}.exe',
+            'viewer/viewer.exe',
+            f'../viewer/viewer_{arch}.exe',
+            '../viewer/viewer.exe',
+        ]
+        
+        viewer_exe = None
+        for name in viewer_names:
+            candidate = base_dir / name
+            if candidate.exists():
+                viewer_exe = candidate
+                break
+        
+        if not viewer_exe:
+            print("Error: Viewer executable not found.")
+            print(f"Looked in: {base_dir}")
+            print(f"Expected: viewer_{arch}.exe or viewer.exe")
+            print()
+            print("The viewer must be built separately using:")
+            print("  cd viewer")
+            print("  build_viewer.bat")
+            return 1
+        
+        # Launch viewer as separate process (detached)
+        try:
+            # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
+            if sys.platform == 'win32':
+                subprocess.Popen([str(viewer_exe)], 
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+            else:
+                subprocess.Popen([str(viewer_exe)])
+            
+            print(f"Launched viewer: {viewer_exe.name}")
+            return 0
+        except Exception as e:
+            print(f"Error launching viewer: {e}")
+            return 1
+    
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
         return 0
@@ -491,6 +545,7 @@ USAGE:
 
 COMMANDS:
     workflow              Run image description workflow
+    viewer                Launch the GUI viewer for browsing results
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
@@ -503,6 +558,9 @@ COMMANDS:
 EXAMPLES:
     # Run workflow with Ollama
     {base_call} workflow --provider ollama --model llava
+
+    # Launch viewer to browse results
+    {base_call} viewer
 
     # Run workflow with Claude
     {base_call} workflow --provider claude --model claude-opus-4
@@ -522,6 +580,7 @@ EXAMPLES:
 NOTES:
     - Requires Ollama to be installed for Ollama models
     - Requires API keys for OpenAI and Anthropic (set via environment variables)
+    - Viewer must be built separately (see viewer/build_viewer.bat)
     - All commands support --help for detailed options
 
 For detailed documentation, see the docs/ folder.

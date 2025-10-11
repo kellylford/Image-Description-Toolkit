@@ -7,7 +7,7 @@
 We tested **153 AI vision models** (71 cloud-based, 76 local) on a single test image to compare their performance across multiple dimensions: speed, cost, description quality, and detail level.
 
 **Key Findings:**
-- **Fastest Model**: Ollama Moondream (6.75s)
+- **Fastest Model**: OpenAI GPT-4o-mini (10.24s)
 - **Most Detailed**: Ollama Gemma3 (444 words)
 - **Most Cost-Effective**: Claude Haiku 3.5 ($0.000011/word)
 - **Cheapest Overall**: Claude Haiku 3.5 ($0.0020)
@@ -34,12 +34,12 @@ We tested **153 AI vision models** (71 cloud-based, 76 local) on a single test i
 ### Performance Comparison
 
 **Cloud Models (n=71):**
-- Average processing time: 15.90s
+- Average processing time: 34.72s
 - Average description length: 157.1 words
 - Average cost: $0.0290
 
 **Local Models (n=76):**
-- Average processing time: 65.39s
+- Average processing time: 66.98s
 - Average description length: 126.1 words
 - Cost: $0.00 (local processing)
 
@@ -49,16 +49,16 @@ We tested **153 AI vision models** (71 cloud-based, 76 local) on a single test i
 
 | Rank | Model | Provider | Time (s) | Throughput/min |
 |------|-------|----------|----------|----------------|
-| 1 | Ollama Moondream | ollama | 6.75 | 11.61 |
-| 2 | Ollama Moondream | ollama | 6.75 | 11.61 |
-| 3 | Claude Haiku 3 | claude | 7.65 | 16.85 |
-| 4 | Claude Haiku 3 | claude | 7.65 | 16.85 |
-| 5 | Claude Haiku 3 | claude | 7.65 | 16.85 |
-| 6 | Claude Haiku 3 | claude | 7.65 | 16.85 |
-| 7 | Claude Haiku 3 | claude | 7.65 | 16.85 |
-| 8 | Claude Haiku 3 | claude | 7.65 | 16.85 |
-| 9 | Claude Haiku 3 | claude | 7.65 | 16.85 |
-| 10 | Claude Haiku 3 | claude | 7.65 | 16.85 |
+| 1 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 2 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 3 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 4 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 5 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 6 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 7 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 8 | OpenAI GPT-4o-mini | openai | 10.24 | 10.27 |
+| 9 | Claude Haiku 3.5 | claude | 12.03 | 8.36 |
+| 10 | Claude Haiku 3.5 | claude | 12.03 | 8.36 |
 
 ### Detail Level Rankings (Most Detailed First)
 
@@ -99,7 +99,7 @@ Analyzing the relationship between processing time and description detail reveal
 **Fast & Detailed Winners:** Claude Haiku 3.5, Claude Haiku 3.5, Claude Haiku 3.5
 - These models provide detailed descriptions (100+ words) in under 20 seconds
 
-**Thorough but Slow:** Ollama Llama3.2-Vision 11B, Ollama Llama3.2-Vision, Ollama Llama3.2-Vision
+**Thorough but Slow:** Claude Haiku 3, Claude Haiku 3, Claude Haiku 3
 - Maximum detail but requires patience (100+ seconds)
 
 
@@ -107,10 +107,10 @@ Analyzing the relationship between processing time and description detail reveal
 
 #### Claude Models (Anthropic)
 - **Count**: 56 models tested
-- **Average Time**: 14.87s
+- **Average Time**: 38.74s
 - **Average Detail**: 152.5 words
 - **Average Cost**: $0.0172
-- **Fastest**: Claude Haiku 3
+- **Fastest**: Claude Haiku 3.5
 - **Most Detailed**: Claude Sonnet 4.5
 
 #### OpenAI Models
@@ -121,10 +121,10 @@ Analyzing the relationship between processing time and description detail reveal
 
 #### Ollama Local Models
 - **Count**: 76 models tested
-- **Average Time**: 65.39s
+- **Average Time**: 66.98s
 - **Average Detail**: 126.1 words
 - **Cost**: $0.00 (local processing, no API fees)
-- **Fastest Local**: Ollama Moondream
+- **Fastest Local**: Ollama Llama3.1
 - **Slowest Local**: Ollama LLaVA 34B
 
 
@@ -136,9 +136,9 @@ Analyzing the relationship between processing time and description detail reveal
 - **Zero cost option**: Any Ollama model (free local processing)
 
 ### For Speed-Critical Applications
-- **Absolute fastest**: Ollama Moondream (6.75s)
-- **Fastest cloud**: Claude Haiku 3 (7.65s)
-- **Fastest local**: Ollama Moondream (6.75s)
+- **Absolute fastest**: OpenAI GPT-4o-mini (10.24s)
+- **Fastest cloud**: OpenAI GPT-4o-mini (10.24s)
+- **Fastest local**: Ollama Llama3.1 (15.18s)
 
 ### For Maximum Detail
 - **Most comprehensive**: Ollama Gemma3 (444 words)

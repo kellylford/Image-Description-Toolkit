@@ -8,6 +8,9 @@ ChatHistory.txt
 test_*.py
 *_test.py
 
+# Personal/local batch files
+run_analysis_to_results.bat
+
 # Workflow output directories
 wf_*/
 wf_*
