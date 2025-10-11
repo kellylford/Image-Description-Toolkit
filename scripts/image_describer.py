@@ -388,8 +388,8 @@ class ImageDescriber:
             if self.provider_name in ["claude", "openai"]:
                 # Determine appropriate size limit based on provider
                 max_size = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
-                # Use slightly smaller target to ensure we're under the limit
-                target_size = TARGET_MAX_SIZE  # 4.5MB safe margin
+                # Use slightly smaller target to ensure we're under the limit (accounting for base64 encoding)
+                target_size = TARGET_MAX_SIZE  # 3.75MB safe margin (accounts for ~33% base64 overhead)
                 
                 success, original_size, final_size = optimize_image_size(image_path, max_file_size=target_size)
                 
@@ -453,6 +453,17 @@ class ImageDescriber:
             else:
                 # Use provider's describe_image method for other providers
                 logger.debug(f"Using provider: {self.provider_name}")
+                
+                # SAFETY CHECK: Ensure image size is under limit before sending to provider
+                # This is a fallback in case the earlier optimization didn't run
+                if self.provider_name in ["claude", "openai"]:
+                    current_size = image_path.stat().st_size
+                    max_allowed = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
+                    if current_size > TARGET_MAX_SIZE:
+                        logger.warning(f"Image {image_path.name} is {current_size/1024/1024:.2f}MB (over {TARGET_MAX_SIZE/1024/1024:.1f}MB limit). Attempting emergency optimization...")
+                        success, orig_size, final_size = optimize_image_size(image_path, max_file_size=TARGET_MAX_SIZE)
+                        if not success:
+                            logger.error(f"Emergency optimization failed! Image may be rejected by {self.provider_name} API")
                 
                 # Call provider's describe_image method with correct signature
                 # Providers expect: describe_image(image_path: str, prompt: str, model: str)

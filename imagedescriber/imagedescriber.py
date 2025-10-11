@@ -720,7 +720,8 @@ class ProcessingWorker(QThread):
                 image_data = f.read()
             
             # Check file size and resize if too large
-            max_size = 10 * 1024 * 1024  # 10MB limit
+            # Claude has 5MB limit, target 3.75MB to account for base64 encoding overhead (~33% increase)
+            max_size = 3.75 * 1024 * 1024  # 3.75MB (safe margin accounting for base64 encoding = ~5MB encoded)
             if len(image_data) > max_size:
                 image_data = self.resize_image_data(image_data, max_size)
             

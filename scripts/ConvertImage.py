@@ -45,7 +45,8 @@ logger = logging.getLogger(__name__)
 # File size limits for AI providers (in bytes)
 CLAUDE_MAX_SIZE = 5 * 1024 * 1024  # 5MB (Claude's limit)
 OPENAI_MAX_SIZE = 20 * 1024 * 1024  # 20MB (OpenAI's limit)
-TARGET_MAX_SIZE = 4.5 * 1024 * 1024  # 4.5MB (safe margin for Claude)
+# Target 3.75MB to account for base64 encoding overhead (~33% increase = 5MB base64)
+TARGET_MAX_SIZE = 3.75 * 1024 * 1024  # 3.75MB (safe margin accounting for base64 encoding)
 
 def setup_logging(log_dir=None, verbose=False):
     """Setup logging for the converter"""
