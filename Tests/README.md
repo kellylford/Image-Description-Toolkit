@@ -2,6 +2,12 @@
 
 This directory contains test files and debugging scripts used during development and troubleshooting.
 
+## Subdirectories
+
+### ModelPerformanceAnalyzer/
+
+Comprehensive analysis tool for comparing AI vision model performance. Combines workflow execution data with generated descriptions to provide insights on speed, cost, and quality trade-offs. See `ModelPerformanceAnalyzer/README.md` for details.
+
 ## Batch File Debugging Scripts
 
 These scripts were created to fix batch file issues during the external build testing phase:
