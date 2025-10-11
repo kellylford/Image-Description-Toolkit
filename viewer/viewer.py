@@ -663,6 +663,7 @@ class ImageDescriptionViewer(QWidget):
             self.workflow_monitor = None
         
         self.refresh_timer.stop()
+        self.image_preview_timer.stop()  # Stop any pending image preview
         self.file_watcher.removePaths(self.file_watcher.files())
         
         # Reset title to remove progress
