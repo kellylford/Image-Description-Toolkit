@@ -13,10 +13,16 @@ And produces:
 - Combined CSV with all metrics
 - Markdown blog post with analysis
 - Statistical insights and comparisons
+
+Usage:
+    python model_performance_analyzer.py
+    python model_performance_analyzer.py --input-dir /path/to/analysis/results
+    python model_performance_analyzer.py --input-dir /path/to/input --output-dir /path/to/output
 """
 
 import csv
 import sys
+import argparse
 from pathlib import Path
 from typing import Dict, List, Tuple
 import json
@@ -221,7 +227,7 @@ def generate_comprehensive_csv(combined_data: List[Dict], output_path: Path):
         writer.writeheader()
         writer.writerows(combined_data)
     
-    print(f"✓ Comprehensive CSV written to: {output_path}")
+    print(f"[OK] Comprehensive CSV written to: {output_path}")
 
 
 def generate_analysis_report(combined_data: List[Dict], output_path: Path):
@@ -457,21 +463,63 @@ The full dataset with all metrics is available in the accompanying CSV file for 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(content)
     
-    print(f"✓ Analysis report written to: {output_path}")
+    print(f"[OK] Analysis report written to: {output_path}")
 
 
 def main():
     """Main execution function."""
     
-    # Set up paths
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Analyze AI vision model performance by combining description quality with metrics",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Use default paths (idtexternal/idt/analysis/results)
+  python model_performance_analyzer.py
+  
+  # Specify custom input directory
+  python model_performance_analyzer.py --input-dir /path/to/results
+  
+  # Specify both input and output directories
+  python model_performance_analyzer.py --input-dir /path/to/input --output-dir /path/to/output
+        """
+    )
+    
+    # Set up default paths
     script_dir = Path(__file__).parent  # Tests/ModelPerformanceAnalyzer
     repo_root = script_dir.parent.parent  # Go up to repo root
-    analysis_dir = repo_root / "idtexternal" / "idt" / "analysis" / "results"
-    output_dir = script_dir  # Output to Tests/ModelPerformanceAnalyzer
+    default_input_dir = repo_root / "idtexternal" / "idt" / "analysis" / "results"
+    
+    parser.add_argument(
+        '--input-dir',
+        type=Path,
+        default=default_input_dir,
+        help=f'Directory containing combineddescriptions.csv and workflow_timing_stats.csv (default: {default_input_dir})'
+    )
+    
+    parser.add_argument(
+        '--output-dir',
+        type=Path,
+        default=script_dir,
+        help=f'Directory where output files will be saved (default: {script_dir})'
+    )
+    
+    args = parser.parse_args()
+    
+    # Use provided or default paths
+    analysis_dir = args.input_dir
+    output_dir = args.output_dir
+    
+    # Create output directory if it doesn't exist
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     print("=" * 70)
     print("AI Vision Model Performance Analysis Tool")
     print("=" * 70)
+    print()
+    print(f"Input directory:  {analysis_dir}")
+    print(f"Output directory: {output_dir}")
     print()
     
     # Load data
@@ -488,15 +536,15 @@ def main():
         return 1
     
     descriptions = load_descriptions(descriptions_file)
-    print(f"  ✓ Loaded descriptions for {len(descriptions)} models")
+    print(f"  [OK] Loaded descriptions for {len(descriptions)} models")
     
     metrics = load_performance_metrics(metrics_file)
-    print(f"  ✓ Loaded performance metrics for {len(metrics)} workflows")
+    print(f"  [OK] Loaded performance metrics for {len(metrics)} workflows")
     
     # Combine data
     print("\nCombining datasets...")
     combined_data = combine_data(descriptions, metrics)
-    print(f"  ✓ Combined {len(combined_data)} records")
+    print(f"  [OK] Combined {len(combined_data)} records")
     
     # Generate outputs
     print("\nGenerating outputs...")

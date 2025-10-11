@@ -837,14 +837,13 @@ Examples:
     # Print aggregate stats
     calculate_aggregate_stats(all_stats)
     
-    # Save to JSON and CSV in analysis/results directory with safe filenames
-    output_dir = get_resource_path("analysis/results")
-    ensure_directory(output_dir)
-    
-    json_output = output_dir / args.json_output
+    # Save to JSON and CSV - resolve to absolute paths
+    json_output = Path(args.json_output).resolve()
+    ensure_directory(json_output.parent)
     json_output = get_safe_filename(json_output)
     
-    csv_output = output_dir / args.csv_output
+    csv_output = Path(args.csv_output).resolve()
+    ensure_directory(csv_output.parent)
     csv_output = get_safe_filename(csv_output)
     
     save_stats_json(all_stats, json_output)

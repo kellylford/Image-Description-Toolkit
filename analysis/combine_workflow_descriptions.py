@@ -344,7 +344,7 @@ Default: csv'''
         
         # Debug: Check if file exists
         if not desc_file.exists():
-            print(f"  ⚠️  WARNING: Description file not found for {model_label} ({prompt_style})")
+            print(f"  WARNING: Description file not found for {model_label} ({prompt_style})")
             print(f"      Expected: {desc_file}")
         
         descriptions = parse_description_file(desc_file)
@@ -379,11 +379,9 @@ Default: csv'''
     print(f"Total image+prompt combinations: {len(sorted_combinations)}")
     print(f"Total unique models: {len(unique_models)}")
     
-    # Create output file in analysis/results directory with safe filename
-    output_dir = get_resource_path("analysis/results")
-    ensure_directory(output_dir)
-    
-    output_file = output_dir / args.output
+    # Create output file - resolve to absolute path
+    output_file = Path(args.output).resolve()
+    ensure_directory(output_file.parent)
     output_file = get_safe_filename(output_file)
     
     # Determine delimiter and quoting based on format
