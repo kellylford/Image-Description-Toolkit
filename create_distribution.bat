@@ -59,7 +59,7 @@ xcopy "bat_exe\*.bat" "%STAGE_DIR%\bat\" /Y /Q >nul
 REM Convert batch files from dist\idt.exe to idt.exe in staging
 echo     Converting batch files (dist\idt.exe → idt.exe)...
 for %%f in ("%STAGE_DIR%\bat\*.bat") do (
-    powershell -command "(Get-Content '%%f') -replace 'dist\\idt\.exe', 'idt.exe' | Set-Content '%%f'"
+    powershell -command "(Get-Content '%%f' -Raw) -replace 'dist\\idt\.exe', 'idt.exe' | Set-Content '%%f' -NoNewline -Encoding ASCII"
 )
 echo     Done.
 echo.

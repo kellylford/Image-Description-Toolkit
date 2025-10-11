@@ -21,12 +21,12 @@ set PROJECT_ROOT=%CD%
 REM Step 1: Build the executable
 echo [1/4] Building executable...
 echo.
-rem call build.bat
-rem if errorlevel 1 (
+call build.bat
+if errorlevel 1 (
     echo ERROR: Build failed!
-rem     pause
-rem     exit /b 1
-rem )
+    pause
+     exit /b 1
+ )
 
 echo.
 echo [Build completed successfully]
@@ -113,7 +113,7 @@ if not exist "%ZIP_FILE%" (
 
 REM Extract zip file to idtexternal\idt
 echo Extracting %ZIP_FILE% to idtexternal\idt...
-powershell -command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath 'idtexternal\idt' -Force"
+powershell -command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath 'idtexternal\idt'"
 if errorlevel 1 (
     echo ERROR: Failed to extract distribution package
     pause
@@ -121,6 +121,13 @@ if errorlevel 1 (
 )
 
 echo [Distribution unpacked successfully]
+
+REM Verify Descriptions directory was preserved
+if exist "idtexternal\idt\Descriptions" (
+    echo [Descriptions directory preserved successfully]
+) else (
+    echo WARNING: Descriptions directory was not preserved
+)
 echo.
 
 REM Final step: Copy to OneDrive (original functionality)

@@ -1,5 +1,9 @@
 @echo off
 SETLOCAL ENABLEDELAYEDEXPANSION
+
+REM Capture the original working directory before changing directories
+SET ORIGINAL_CWD=%CD%
+
 REM ===========================================================================
 REM Automated Ollama Model Tester (No Prompts)
 REM This script automatically detects and tests all available Ollama models
@@ -43,7 +47,7 @@ for /f "skip=1 tokens=1 delims= " %%a in ('ollama list') do (
     echo ----------------------------------------
     
 cd /d "%~dp0\.."
-    dist\idt.exe workflow --provider ollama --model %%a --prompt-style %PROMPT_STYLE% --output-dir ../Descriptions "%IMAGE_DIR%" --steps describe
+    idt.exe workflow --provider ollama --model %%a --prompt-style %PROMPT_STYLE% --output-dir ../Descriptions "%IMAGE_DIR%" --steps describe --original-cwd "%ORIGINAL_CWD%"
     if !errorlevel! equ 0 (
         echo ✓ SUCCESS: %%a
         set /a SUCCESS_COUNT+=1
