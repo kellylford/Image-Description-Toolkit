@@ -101,14 +101,20 @@ Creates a file with:
 
 **Example CSV output:**
 ```csv
-"Image Name","Claude Haiku 3","OpenAI GPT-4o","Ollama LLaVA"
-"IMG_1234.JPG","The image shows a red car...","A red vehicle is...","In this picture..."
+"Image Name","Prompt","Workflow","Claude Haiku 3","OpenAI GPT-4o","Ollama LLaVA"
+"IMG_1234.JPG","narrative","vacation_photos","The image shows a red car...","A red vehicle is...","In this picture..."
 ```
+
+**Note:** The "Workflow" column identifies which workflow processed the image. This is especially useful when:
+- Processing the same images multiple times with different settings
+- Comparing results from different workflow runs  
+- Tracking workflow versions and iterations
+- Workflows without metadata show "(legacy)" in the Workflow column
 
 **Example TSV output:**
 ```tsv
-Image Name	Claude Haiku 3	OpenAI GPT-4o	Ollama LLaVA
-IMG_1234.JPG	The image shows a red car...	A red vehicle is...	In this picture...
+Image Name	Prompt	Workflow	Claude Haiku 3	OpenAI GPT-4o	Ollama LLaVA
+IMG_1234.JPG	narrative	vacation_photos	The image shows a red car...	A red vehicle is...	In this picture...
 ```
 
 ---

@@ -109,6 +109,34 @@ def parse_description_file(file_path: Path) -> OrderedDict:
     return descriptions
 
 
+def get_workflow_name(workflow_dir: Path) -> str:
+    """
+    Get the workflow name from workflow_metadata.json if it exists.
+    Falls back to directory name parsing if no metadata file found.
+    
+    Args:
+        workflow_dir: Path to the workflow directory
+        
+    Returns:
+        Workflow name string (or None if not available)
+    """
+    import json
+    
+    metadata_file = workflow_dir / "workflow_metadata.json"
+    
+    if metadata_file.exists():
+        try:
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+                return metadata.get('workflow_name')
+        except Exception as e:
+            print(f"Warning: Could not read metadata from {metadata_file}: {e}")
+    
+    # No metadata file - workflows created before the naming feature
+    # Return None to indicate no workflow name available
+    return None
+
+
 def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
     """
     Extract a readable label and prompt style from the workflow directory name.
@@ -336,11 +364,12 @@ Default: csv'''
     print()
     
     # Parse all description files
-    workflow_data = []  # List of (model_label, prompt_style, descriptions_dict)
+    workflow_data = []  # List of (model_label, prompt_style, workflow_name, descriptions_dict)
     
     for workflow_dir in workflow_dirs:
         desc_file = workflow_dir / "descriptions" / "image_descriptions.txt"
         model_label, prompt_style = get_workflow_label(workflow_dir)
+        workflow_name = get_workflow_name(workflow_dir)
         
         # Debug: Check if file exists
         if not desc_file.exists():
@@ -356,27 +385,31 @@ Default: csv'''
             if desc_file.exists():
                 print(f"      File size: {desc_file.stat().st_size} bytes")
         
-        workflow_data.append((model_label, prompt_style, descriptions))
+        workflow_data.append((model_label, prompt_style, workflow_name, descriptions))
     
-    # Collect all unique (image_name, prompt_style) combinations
-    # This ensures we have a row for each image+prompt combination
-    image_prompt_combinations = set()
-    for model_label, prompt_style, descriptions in workflow_data:
+    # Collect all unique (image_name, prompt_style, workflow_name) combinations
+    # This ensures we have a row for each image+prompt+workflow combination
+    # This allows multiple workflows with the same image and prompt to be tracked separately
+    image_prompt_workflow_combinations = set()
+    for model_label, prompt_style, workflow_name, descriptions in workflow_data:
         for image_name in descriptions.keys():
-            image_prompt_combinations.add((image_name, prompt_style))
+            # Use workflow_name if available, otherwise use None
+            image_prompt_workflow_combinations.add((image_name, prompt_style, workflow_name))
     
-    # Sort combinations: first by image name, then by prompt style
-    sorted_combinations = sorted(image_prompt_combinations, key=lambda x: (x[0], x[1]))
+    # Sort combinations: first by image name, then by prompt style, then by workflow name
+    sorted_combinations = sorted(image_prompt_workflow_combinations, 
+                                key=lambda x: (x[0], x[1], x[2] if x[2] else ''))
     
     # Get unique model labels for column headers (in order of appearance)
     unique_models = []
-    for model_label, _, _ in workflow_data:
+    for model_label, _, _, _ in workflow_data:
         if model_label not in unique_models:
             unique_models.append(model_label)
     
     print(f"\nTotal unique images across all workflows: {len(set(c[0] for c in sorted_combinations))}")
     print(f"Total unique prompts: {len(set(c[1] for c in sorted_combinations))}")
-    print(f"Total image+prompt combinations: {len(sorted_combinations)}")
+    print(f"Total unique workflows: {len(set(c[2] for c in sorted_combinations if c[2]))}")
+    print(f"Total image+prompt+workflow combinations: {len(sorted_combinations)}")
     print(f"Total unique models: {len(unique_models)}")
     
     # Create output file - resolve to absolute path
@@ -399,21 +432,22 @@ Default: csv'''
         quotechar = '"'
     
     with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
-        # Create header row: Image Name, Prompt, Model1, Model2, Model3, ...
-        headers = ['Image Name', 'Prompt'] + unique_models
+        # Create header row: Image Name, Prompt, Workflow, Model1, Model2, Model3, ...
+        headers = ['Image Name', 'Prompt', 'Workflow'] + unique_models
         writer = csv.writer(csvfile, delimiter=delimiter, quoting=quoting, quotechar=quotechar)
         writer.writerow(headers)
         
-        # Write data rows for each image+prompt combination
-        for image_name, prompt_style in sorted_combinations:
-            row = [image_name, prompt_style]
+        # Write data rows for each image+prompt+workflow combination
+        for image_name, prompt_style, workflow_name in sorted_combinations:
+            row = [image_name, prompt_style, workflow_name if workflow_name else '(legacy)']
             
-            # Add description from each model for this image+prompt combination
+            # Add description from each model for this image+prompt+workflow combination
             for model_label in unique_models:
-                # Find the description for this model+prompt+image combination
+                # Find the description for this model+prompt+workflow+image combination
                 description = ''
-                for wf_model, wf_prompt, wf_descriptions in workflow_data:
-                    if wf_model == model_label and wf_prompt == prompt_style:
+                for wf_model, wf_prompt, wf_workflow_name, wf_descriptions in workflow_data:
+                    if (wf_model == model_label and wf_prompt == prompt_style and 
+                        wf_workflow_name == workflow_name):
                         description = wf_descriptions.get(image_name, '')
                         break
                 row.append(description)
@@ -434,21 +468,31 @@ Default: csv'''
     # Print summary of coverage
     print("\nCoverage summary by model:")
     for model_label in unique_models:
-        # Count how many image+prompt combinations have descriptions for this model
+        # Count how many image+prompt+workflow combinations have descriptions for this model
         count = 0
-        for wf_model, wf_prompt, wf_descriptions in workflow_data:
+        for wf_model, wf_prompt, wf_workflow_name, wf_descriptions in workflow_data:
             if wf_model == model_label:
                 count += len(wf_descriptions)
         print(f"  {model_label}: {count} descriptions")
     
     print("\nPrompts found:")
     prompt_counts = {}
-    for _, prompt_style, descriptions in workflow_data:
+    for _, prompt_style, _, descriptions in workflow_data:
         if prompt_style not in prompt_counts:
             prompt_counts[prompt_style] = 0
         prompt_counts[prompt_style] += len(descriptions)
     for prompt, count in sorted(prompt_counts.items()):
         print(f"  {prompt}: {count} descriptions")
+    
+    print("\nWorkflows found:")
+    workflow_counts = {}
+    for _, _, workflow_name, descriptions in workflow_data:
+        wf_label = workflow_name if workflow_name else '(legacy - no workflow name)'
+        if wf_label not in workflow_counts:
+            workflow_counts[wf_label] = 0
+        workflow_counts[wf_label] += len(descriptions)
+    for wf_name, count in sorted(workflow_counts.items()):
+        print(f"  {wf_name}: {count} descriptions")
 
 
 if __name__ == "__main__":
