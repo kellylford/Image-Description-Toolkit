@@ -1,0 +1,64 @@
+{
+    "test_config": {
+        "description": "Build test configuration for Image Description Toolkit",
+        "version": "1.0",
+        "timeout_seconds": 300,
+        "dry_run_mode": true
+    },
+    "test_scenarios": {
+        "basic_workflow": {
+            "enabled": true,
+            "steps": ["convert", "describe", "html"],
+            "expected_files": ["workflow.log"],
+            "timeout": 120
+        },
+        "model_prompt_test": {
+            "enabled": true,
+            "model": "llava:latest",
+            "prompt_style": "detailed",
+            "steps": ["describe"],
+            "timeout": 90
+        },
+        "directory_independence": {
+            "enabled": true,
+            "steps": ["convert"],
+            "timeout": 60
+        },
+        "batch_file_test": {
+            "enabled": true,
+            "prefer_bat_exe": true,
+            "steps": ["describe"],
+            "timeout": 90
+        },
+        "help_commands": {
+            "enabled": true,
+            "commands": [
+                "--help",
+                "workflow --help", 
+                "extract-frames --help",
+                "convert-images --help"
+            ],
+            "timeout": 30
+        }
+    },
+    "paths": {
+        "auto_detect_executable": true,
+        "executable_candidates": [
+            "dist/idt.exe",
+            "idtexternal/idt/idt.exe",
+            "idt.exe"
+        ],
+        "auto_detect_test_data": true,
+        "test_data_candidates": [
+            "idtexternal/testimages",
+            "testimages",
+            "test_data"
+        ]
+    },
+    "reporting": {
+        "save_detailed_results": true,
+        "save_command_output": true,
+        "max_error_length": 500,
+        "include_timestamps": true
+    }
+}

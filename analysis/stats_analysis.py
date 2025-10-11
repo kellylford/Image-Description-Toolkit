@@ -8,6 +8,22 @@ including timing data, throughput, and comparison across different AI providers.
 """
 
 import argparse
+import sys
+import os
+from pathlib import Path
+
+# Add parent directory to path for resource manager import
+current_dir = Path(__file__).parent
+parent_dir = current_dir.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+
+try:
+    from scripts.resource_manager import get_resource_path
+except ImportError:
+    # Fallback if resource manager not available
+    def get_resource_path(relative_path):
+        return Path(__file__).parent.parent / relative_path
 import re
 import statistics
 import sys
@@ -822,7 +838,7 @@ Examples:
     calculate_aggregate_stats(all_stats)
     
     # Save to JSON and CSV in analysis/results directory with safe filenames
-    output_dir = Path(__file__).parent / "results"
+    output_dir = get_resource_path("analysis/results")
     ensure_directory(output_dir)
     
     json_output = output_dir / args.json_output

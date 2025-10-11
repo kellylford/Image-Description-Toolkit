@@ -1,6 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 FINAL WORKING SPEC FILE - INCLUDES EVERYTHING EXPLICITLY
+
+MAINTENANCE NOTES:
+- This spec file is optimized for executable-first usage
+- When adding new modules, update hiddenimports list
+- Test with test_executable.py after building
+- Keep excludes list updated to avoid conflicts
+- Use build_executable.sh for automated builds
 """
 
 a = Analysis(

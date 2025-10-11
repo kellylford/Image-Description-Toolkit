@@ -320,6 +320,7 @@ class WorkflowOrchestrator:
                     sys.executable, "extract-frames",
                     str(input_dir),
                     "--config", config_file,
+                    "--output-dir", str(output_dir),
                     "--log-dir", str(self.config.base_output_dir)
                 ]
             else:
@@ -328,6 +329,7 @@ class WorkflowOrchestrator:
                     sys.executable, "video_frame_extractor.py",
                     str(input_dir),
                     "--config", config_file,
+                    "--output-dir", str(output_dir),
                     "--log-dir", str(self.config.base_output_dir)
                 ]
             

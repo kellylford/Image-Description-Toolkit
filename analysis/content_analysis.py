@@ -13,6 +13,19 @@ import csv
 import sys
 from pathlib import Path
 from collections import Counter, defaultdict
+
+# Add parent directory to path for resource manager import
+current_dir = Path(__file__).parent
+parent_dir = current_dir.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+
+try:
+    from scripts.resource_manager import get_resource_path
+except ImportError:
+    # Fallback if resource manager not available
+    def get_resource_path(relative_path):
+        return Path(__file__).parent.parent / relative_path
 from typing import Dict, List, Tuple
 import statistics
 from analysis_utils import get_safe_filename, ensure_directory
@@ -376,7 +389,7 @@ Examples:
     
     if not csv_path.exists():
         # Fall back to analysis directory for backward compatibility
-        csv_path = Path(__file__).parent / args.input
+        csv_path = get_resource_path(f"analysis/{args.input}")
     
     if not csv_path.exists():
         print(f"Error: Combined descriptions file not found at: {csv_path}")
@@ -414,7 +427,7 @@ Examples:
         print_comparison(all_stats)
     
     # Save to CSV in analysis/results directory with safe filename
-    output_dir = Path(__file__).parent / "results"
+    output_dir = get_resource_path("analysis/results")
     ensure_directory(output_dir)
     
     output_csv = output_dir / args.output

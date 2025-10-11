@@ -1,11 +1,10 @@
 @echo off
 SETLOCAL
-REM Run workflow with Claude Sonnet 4 (high performance)
-REM Usage: run_claude_sonnet4.bat <image_directory> [prompt_style]
-REM Requires: claude.txt with API key in current directory OR ANTHROPIC_API_KEY environment variable
+REM Run workflow with Ollama claude-sonnet-4-20250514
+REM Usage: run_claude_sonnet4.bat [options] <image_directory>
+REM Supports all workflow options in any order
 
-SET PROMPT_STYLE=%2
-IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
-
-..\.venv\Scripts\python.exe ..\workflow.py --provider claude --model claude-sonnet-4-20250514 --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+REM Change to project root directory to ensure config files are found
+cd /d "%~dp0\.."
+python workflow.py --provider ollama --model claude-sonnet-4-20250514 --output-dir Descriptions %*
 ENDLOCAL

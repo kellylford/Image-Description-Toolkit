@@ -5,5 +5,4 @@ REM
 REM This removes OPENAI_API_KEY from the current session only.
 
 set OPENAI_API_KEY=
-
 echo OPENAI_API_KEY environment variable has been removed from this session.

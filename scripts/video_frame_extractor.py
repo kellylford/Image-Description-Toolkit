@@ -628,6 +628,7 @@ def main():
     parser.add_argument("-c", "--config", default="video_frame_extractor_config.json",
                        help="Path to config file (default: video_frame_extractor_config.json)")
     parser.add_argument("--log-dir", help="Directory for log files (default: auto-detect workflow directory)")
+    parser.add_argument("--output-dir", help="Output directory for extracted frames (overrides config)")
     parser.add_argument("--create-config", action="store_true",
                        help="Create a default config file and exit")
     
@@ -652,6 +653,11 @@ def main():
         parser.error("Input file or directory is required unless using --create-config")
     
     extractor = VideoFrameExtractor(args.config, log_dir=args.log_dir)
+    
+    # Override output directory if specified
+    if args.output_dir:
+        extractor.config["output_directory"] = args.output_dir
+        extractor.logger.info(f"Command line override: Using output directory: {args.output_dir}")
     
     # Override extraction mode based on command line arguments
     if args.time is not None:

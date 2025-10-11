@@ -15,6 +15,9 @@ wf_*
 # Local files (personal batch files, test outputs, etc.)
 localdonotsubmit/
 
+# External installation directory (built version testing)
+idtexternal/
+
 # Python cache and compiled files
 __pycache__/
 *.py[cod]

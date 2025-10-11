@@ -10,13 +10,10 @@ if "%1"=="" (
     echo Example: setup_openai_key.bat C:\Keys\openai.txt
     exit /b 1
 )
-
 if not exist "%1" (
     echo Error: File "%1" not found
     exit /b 1
 )
-
 for /f "delims=" %%i in ('type "%1"') do set OPENAI_API_KEY=%%i
-
 echo OPENAI_API_KEY environment variable set for this session.
 echo To verify: echo %OPENAI_API_KEY%

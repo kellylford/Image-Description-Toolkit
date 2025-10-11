@@ -356,17 +356,45 @@ def main():
     
     elif command == 'extract-frames':
         # Extract video frames
-        extract_script = get_resource_path('scripts/video_frame_extractor.py')
-        
-        if not extract_script.exists():
-            print(f"Error: Video frame extractor script not found at {extract_script}")
-            return 1
-        
-        import subprocess
-        args = sys.argv[2:]
-        cmd = [sys.executable, str(extract_script)] + args
-        result = subprocess.run(cmd, cwd=str(extract_script.parent))
-        return result.returncode
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                
+                import video_frame_extractor
+                
+                # Set up sys.argv for the video frame extractor script
+                original_argv = sys.argv[:]
+                sys.argv = ['video_frame_extractor.py'] + sys.argv[2:]
+                
+                try:
+                    return video_frame_extractor.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import video_frame_extractor module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running video frame extractor: {e}")
+                return 1
+        else:
+            # Running as script - use subprocess
+            extract_script = get_resource_path('scripts/video_frame_extractor.py')
+            
+            if not extract_script.exists():
+                print(f"Error: Video frame extractor script not found at {extract_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(extract_script)] + args
+            result = subprocess.run(cmd, cwd=str(extract_script.parent))
+            return result.returncode
     
     elif command == 'version' or command == '--version' or command == '-v':
         # Show version

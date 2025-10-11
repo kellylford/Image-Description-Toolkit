@@ -17,6 +17,5 @@ if not exist "%1" (
 )
 
 for /f "delims=" %%i in ('type "%1"') do set ANTHROPIC_API_KEY=%%i
-
 echo ANTHROPIC_API_KEY environment variable set for this session.
 echo To verify: echo %ANTHROPIC_API_KEY%

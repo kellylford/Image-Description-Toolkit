@@ -1,11 +1,10 @@
 @echo off
 SETLOCAL
-REM Run workflow with OpenAI GPT-4o Mini (fast & affordable)
-REM Usage: run_openai_gpt4o_mini.bat <image_directory> [prompt_style]
-REM Requires: openai.txt with API key in current directory OR OPENAI_API_KEY environment variable
+REM Run workflow with Ollama gpt-4o-mini
+REM Usage: run_openai_gpt4o_mini.bat [options] <image_directory>
+REM Supports all workflow options in any order
 
-SET PROMPT_STYLE=%2
-IF "%PROMPT_STYLE%"=="" SET PROMPT_STYLE=narrative
-
-..\.venv\Scripts\python.exe ..\workflow.py --provider openai --model gpt-4o-mini --prompt-style %PROMPT_STYLE% --output-dir ..\Descriptions %1
+REM Change to project root directory to ensure config files are found
+cd /d "%~dp0\.."
+python workflow.py --provider ollama --model gpt-4o-mini --output-dir Descriptions %*
 ENDLOCAL

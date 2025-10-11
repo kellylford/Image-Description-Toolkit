@@ -52,9 +52,15 @@ copy "dist\idt.exe" "%STAGE_DIR%\" >nul
 echo     Done.
 echo.
 
-echo [2/5] Copying batch files for executable use...
+echo [2/5] Copying and converting batch files for executable use...
 mkdir "%STAGE_DIR%\bat"
 xcopy "bat_exe\*.bat" "%STAGE_DIR%\bat\" /Y /Q >nul
+
+REM Convert batch files from dist\idt.exe to idt.exe in staging
+echo     Converting batch files (dist\idt.exe → idt.exe)...
+for %%f in ("%STAGE_DIR%\bat\*.bat") do (
+    powershell -command "(Get-Content '%%f') -replace 'dist\\idt\.exe', 'idt.exe' | Set-Content '%%f'"
+)
 echo     Done.
 echo.
 

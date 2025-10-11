@@ -42,8 +42,8 @@ if errorlevel 1 (
 )
 
 REM Check if spec file exists
-if not exist "ImageDescriptionToolkit.spec" (
-    echo ERROR: ImageDescriptionToolkit.spec not found
+if not exist "final_working.spec" (
+    echo ERROR: final_working.spec not found
     echo.
     echo Please ensure you are running this script from the project root directory.
     echo.
@@ -60,7 +60,7 @@ echo.
 echo [2/4] Building executable with PyInstaller...
 echo     This may take 5-10 minutes...
 echo.
-"%PYTHON_EXE%" -m PyInstaller --clean ImageDescriptionToolkit.spec
+"%PYTHON_EXE%" -m PyInstaller --clean final_working.spec
 if errorlevel 1 (
     echo.
     echo ERROR: Build failed!
