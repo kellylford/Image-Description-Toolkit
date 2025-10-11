@@ -5,6 +5,24 @@ All notable changes to the Image Description Toolkit will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Performance Improvements
+
+**Viewer Application**
+- Optimized list navigation performance with deferred image preview loading
+- Text descriptions now update immediately (<5ms) while image previews load after 100ms delay
+- Arrow key navigation feels significantly more responsive, especially when navigating rapidly
+- Implemented debouncing effect - images only load when user pauses navigation
+- Added comprehensive performance optimization documentation in `docs/GUI_PERFORMANCE_OPTIMIZATION.md`
+- Added implementation notes in `docs/VIEWER_PERFORMANCE_OPTIMIZATION.md`
+
+### Technical Details
+- Added `image_preview_timer` QTimer for deferred image loading
+- Split `display_description()` into fast text update and deferred image loading phases
+- New `_load_deferred_image_preview()` method handles delayed image display
+- No API changes, fully backward compatible
+
 ## [1.0.0] - 2025-09-02
 
 ### Initial Release
