@@ -501,6 +501,12 @@ class ImageDescriptionViewer(QWidget):
         self.preserve_selection = True
         self.updating_content = False
         
+        # Performance optimization - deferred image loading
+        self.image_preview_timer = QTimer()
+        self.image_preview_timer.setSingleShot(True)
+        self.image_preview_timer.timeout.connect(self._load_deferred_image_preview)
+        self.pending_image_row = None
+        
         # Progress tracking
         self.progress_info = {"current": 0, "total": 0, "active": False}
         
@@ -916,7 +922,7 @@ class ImageDescriptionViewer(QWidget):
         if self.updating_content:
             return
             
-        # Show description
+        # Show description (FAST - update text immediately)
         if 0 <= row < len(self.descriptions):
             description = self.descriptions[row]
             
@@ -961,7 +967,18 @@ class ImageDescriptionViewer(QWidget):
             if self.description_text.toPlainText():  # Only clear if there's content
                 self.description_text.clear()
                 self.description_text.setAccessibleDescription("No description selected.")
-                
+        
+        # Defer image preview loading (SLOW - happens after short delay)
+        # This makes arrow key navigation feel more responsive
+        self.pending_image_row = row
+        self.image_preview_timer.start(100)  # 100ms delay
+    
+    def _load_deferred_image_preview(self):
+        """Load image preview after a short delay to improve navigation responsiveness"""
+        row = self.pending_image_row
+        if row is None:
+            return
+        
         # Show image preview
         if 0 <= row < len(self.image_files):
             img_path = self.image_files[row]
