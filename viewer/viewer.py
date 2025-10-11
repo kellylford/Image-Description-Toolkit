@@ -504,6 +504,12 @@ class ImageDescriptionViewer(QWidget):
         # Progress tracking
         self.progress_info = {"current": 0, "total": 0, "active": False}
         
+        # Performance optimization: Debounce image preview loading
+        self.image_preview_timer = QTimer()
+        self.image_preview_timer.setSingleShot(True)
+        self.image_preview_timer.timeout.connect(self._update_image_preview_delayed)
+        self.pending_preview_row = None
+        
         self.init_ui()
 
     def init_ui(self):
@@ -916,7 +922,7 @@ class ImageDescriptionViewer(QWidget):
         if self.updating_content:
             return
             
-        # Show description
+        # Show description text immediately (fast operation)
         if 0 <= row < len(self.descriptions):
             description = self.descriptions[row]
             
@@ -962,6 +968,19 @@ class ImageDescriptionViewer(QWidget):
                 self.description_text.clear()
                 self.description_text.setAccessibleDescription("No description selected.")
                 
+        # Delay image preview loading to avoid blocking UI during rapid navigation
+        # Cancel any pending preview
+        self.image_preview_timer.stop()
+        self.pending_preview_row = row
+        # Start timer with 150ms delay - balances responsiveness with performance
+        self.image_preview_timer.start(150)
+    
+    def _update_image_preview_delayed(self):
+        """Load and display image preview after debounce delay"""
+        row = self.pending_preview_row
+        if row is None:
+            return
+            
         # Show image preview
         if 0 <= row < len(self.image_files):
             img_path = self.image_files[row]
