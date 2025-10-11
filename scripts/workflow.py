@@ -645,8 +645,8 @@ class WorkflowOrchestrator:
                 config_file = step_config.get("config_file", "image_describer_config.json")
                 default_style = get_default_prompt_style(config_file)
                 validated_style = validate_prompt_style(default_style)
-                if validated_style != "detailed":  # Only add if different from hardcoded default
-                    cmd.extend(["--prompt-style", validated_style])
+                # Always explicitly pass the prompt style to avoid ambiguity
+                cmd.extend(["--prompt-style", validated_style])
                 self.logger.info(f"Resolved prompt style default '{validated_style}' using config '{config_file}'")
             
             # Single call to image_describer.py with all images
