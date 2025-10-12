@@ -29,7 +29,7 @@ def print_numbered_list(items, start=1):
     print()
 
 
-def get_choice(prompt, options, default=None):
+def get_choice(prompt, options, default=None, allow_back=False, allow_exit=True):
     """
     Get user choice from numbered list (accessible for screen readers)
     
@@ -37,20 +37,42 @@ def get_choice(prompt, options, default=None):
         prompt: Question to ask
         options: List of option strings
         default: Default option number (1-based) if user just presses Enter
+        allow_back: If True, allow 'b' to go back
+        allow_exit: If True, allow 'e' to exit
     
     Returns:
-        Selected option string
+        Selected option string, or 'BACK' if user pressed 'b', or 'EXIT' if user pressed 'e'
     """
     print(prompt)
     print_numbered_list(options)
     
+    # Build help text
+    help_parts = []
+    if allow_back:
+        help_parts.append("b=back")
+    if allow_exit:
+        help_parts.append("e=exit")
+    help_text = ", ".join(help_parts)
+    
     while True:
         if default:
-            user_input = input(f"Enter choice (1-{len(options)}, default={default}): ").strip()
+            if help_text:
+                user_input = input(f"Enter choice (1-{len(options)}, {help_text}, default={default}): ").strip().lower()
+            else:
+                user_input = input(f"Enter choice (1-{len(options)}, default={default}): ").strip().lower()
             if not user_input:
                 return options[default - 1]
         else:
-            user_input = input(f"Enter choice (1-{len(options)}): ").strip()
+            if help_text:
+                user_input = input(f"Enter choice (1-{len(options)}, {help_text}): ").strip().lower()
+            else:
+                user_input = input(f"Enter choice (1-{len(options)}): ").strip().lower()
+        
+        # Check for special commands
+        if user_input == 'b' and allow_back:
+            return 'BACK'
+        if user_input == 'e' and allow_exit:
+            return 'EXIT'
         
         try:
             choice = int(user_input)
@@ -59,7 +81,15 @@ def get_choice(prompt, options, default=None):
             else:
                 print(f"Please enter a number between 1 and {len(options)}")
         except ValueError:
-            print("Please enter a valid number")
+            valid_options = f"a number between 1 and {len(options)}"
+            if allow_back or allow_exit:
+                extras = []
+                if allow_back:
+                    extras.append("'b' for back")
+                if allow_exit:
+                    extras.append("'e' for exit")
+                valid_options += ", " + ", or ".join(extras)
+            print(f"Please enter {valid_options}")
 
 
 def get_input(prompt, default=None, allow_empty=False):
@@ -95,27 +125,41 @@ def setup_api_key(provider):
     existing_file = check_api_key_file(provider)
     if existing_file:
         print(f"Found existing API key file: {existing_file}")
-        use_existing = get_choice("Use this key file?", ["Yes", "No, specify a different file"])
+        use_existing = get_choice("Use this key file?", ["Yes", "No, specify a different file"], allow_back=True)
+        if use_existing == 'EXIT':
+            return None
+        if use_existing == 'BACK':
+            return 'BACK'
         if use_existing == "Yes":
-            return existing_file
+            # Convert to absolute path
+            return str(Path(existing_file).resolve())
     
     print(f"\nYou can either:")
     print("  1. Specify the path to a file containing your API key")
     print("  2. Enter the API key now (will be saved to a file)")
     
     choice = get_choice("How would you like to provide the API key?", 
-                       ["Path to existing key file", "Enter key now"])
+                       ["Path to existing key file", "Enter key now"], allow_back=True)
+    
+    if choice == 'EXIT':
+        return None
+    if choice == 'BACK':
+        return 'BACK'
     
     if choice == "Path to existing key file":
         while True:
             key_path = get_input("Enter path to API key file")
-            if Path(key_path).exists():
-                return key_path
+            key_path_obj = Path(key_path)
+            if key_path_obj.exists():
+                # Convert to absolute path to avoid working directory issues
+                return str(key_path_obj.resolve())
             else:
                 print(f"File not found: {key_path}")
-                retry = get_choice("Try again?", ["Yes", "No, skip API key setup"])
-                if retry == "No, skip API key setup":
+                retry = get_choice("Try again?", ["Yes", "No, skip API key setup"], allow_back=True)
+                if retry == 'EXIT' or retry == "No, skip API key setup":
                     return None
+                if retry == 'BACK':
+                    return 'BACK'
     else:
         # Enter key and save it
         api_key = get_input(f"Enter your {provider.upper()} API key")
@@ -127,7 +171,8 @@ def setup_api_key(provider):
             with open(filename, 'w') as f:
                 f.write(api_key.strip())
             print(f"API key saved to: {filename}")
-            return filename
+            # Return absolute path
+            return str(Path(filename).resolve())
         except Exception as e:
             print(f"Error saving API key: {e}")
             return None
@@ -207,17 +252,26 @@ def guided_workflow():
     providers = ["ollama", "openai", "claude"]
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
+    if provider == 'EXIT':
+        print("Exiting...")
+        return
+    
     # Step 2: API Key Setup (if needed)
     api_key_file = None
     if provider in ['openai', 'claude']:
         print_header(f"Step 2: {provider.upper()} API Key Setup")
         api_key_file = setup_api_key(provider)
+        if api_key_file == 'BACK':
+            # Go back to Step 1
+            return guided_workflow()
         if not api_key_file:
             print(f"\nWarning: No API key configured. The workflow may fail without a valid API key.")
-            cont = get_choice("Continue anyway?", ["Yes", "No, exit"])
-            if cont == "No, exit":
+            cont = get_choice("Continue anyway?", ["Yes", "No, go back to setup"], allow_back=True)
+            if cont == 'EXIT':
                 print("Exiting...")
                 return
+            if cont == 'BACK' or cont == "No, go back to setup":
+                return guided_workflow()
     
     # Step 3: Select Model
     print_header("Step 3: Select Model")
@@ -229,7 +283,13 @@ def guided_workflow():
         if installed_models:
             print(f"Found {len(installed_models)} installed model(s):")
             print_numbered_list(installed_models)
-            model = get_choice("Select a model", installed_models, default=1)
+            model = get_choice("Select a model", installed_models, default=1, allow_back=True)
+            if model == 'EXIT':
+                print("Exiting...")
+                return
+            if model == 'BACK':
+                # Go back to provider selection
+                return guided_workflow()
         else:
             print("No Ollama models found or Ollama is not running.")
             print("Common vision models: llava, llava:7b, llava:13b, moondream, bakllava")
@@ -239,23 +299,37 @@ def guided_workflow():
         openai_models = [
             "gpt-4o (best quality, higher cost)",
             "gpt-4o-mini (good quality, lower cost)",
-            "gpt-4-turbo (legacy, high quality)",
-            "gpt-4-vision-preview (legacy)"
+            "gpt-5 (experimental)"
         ]
         print("Available OpenAI models:")
-        model_choice = get_choice("Select a model", openai_models, default=2)
+        model_choice = get_choice("Select a model", openai_models, default=2, allow_back=True)
+        if model_choice == 'EXIT':
+            print("Exiting...")
+            return
+        if model_choice == 'BACK':
+            # Go back to provider selection - restart function
+            return guided_workflow()
         # Extract just the model name (before the space/parenthesis)
         model = model_choice.split()[0]
     
     elif provider == 'claude':
         claude_models = [
-            "claude-opus-4-20250514 (highest intelligence)",
-            "claude-sonnet-4-5-20250514 (best balance)", 
+            "claude-sonnet-4-5-20250929 (best balance, recommended)",
+            "claude-opus-4-1-20250805 (highest intelligence)",
+            "claude-opus-4-20250514 (high intelligence, legacy)",
             "claude-sonnet-4-20250514 (fast, capable)",
-            "claude-haiku-3-5-20250219 (fastest, economical)"
+            "claude-3-7-sonnet-20250219 (fast, capable, legacy)",
+            "claude-3-5-haiku-20241022 (fastest, economical)",
+            "claude-3-haiku-20240307 (economical, legacy)"
         ]
         print("Available Claude models:")
-        model_choice = get_choice("Select a model", claude_models, default=2)
+        model_choice = get_choice("Select a model", claude_models, default=1, allow_back=True)
+        if model_choice == 'EXIT':
+            print("Exiting...")
+            return
+        if model_choice == 'BACK':
+            # Go back to provider selection - restart function
+            return guided_workflow()
         # Extract just the model name (before the space/parenthesis)
         model = model_choice.split()[0]
     
@@ -270,10 +344,12 @@ def guided_workflow():
             break
         else:
             print(f"✗ {message}")
-            retry = get_choice("Try again?", ["Yes", "No, exit"])
-            if retry == "No, exit":
+            retry = get_choice("Try again?", ["Yes", "No, go back to model selection"], allow_back=True)
+            if retry == 'EXIT':
                 print("Exiting...")
                 return
+            if retry == 'BACK' or retry == "No, go back to model selection":
+                return guided_workflow()
     
     # Step 5: Workflow Name
     print_header("Step 5: Workflow Name (Optional)")
@@ -298,7 +374,13 @@ def guided_workflow():
             style_options.append(style)
     style_options.append("Skip (use default)")
     
-    style_choice = get_choice("Select prompt style", style_options)
+    style_choice = get_choice("Select prompt style", style_options, allow_back=True)
+    
+    if style_choice == 'EXIT':
+        print("Exiting...")
+        return
+    if style_choice == 'BACK':
+        return guided_workflow()
     
     # Extract just the style name
     if style_choice.startswith("Skip"):
@@ -331,7 +413,15 @@ def guided_workflow():
     
     # Ask to run or exit
     action = get_choice("What would you like to do?", 
-                       ["Run this command now", "Just show the command (don't run)", "Exit"])
+                       ["Run this command now", "Just show the command (don't run)", "Go back to modify settings"],
+                       allow_exit=True)
+    
+    if action == 'EXIT':
+        print("Exiting...")
+        return
+    
+    if action == "Go back to modify settings":
+        return guided_workflow()
     
     if action == "Run this command now":
         print_header("Running Workflow")
@@ -368,9 +458,13 @@ def guided_workflow():
     elif action == "Just show the command (don't run)":
         print("\nCopy and paste this command to run it:\n")
         print(f"  {command_str}\n")
-    
-    else:
+        
+        # Ask if they want to go back or exit
+        next_action = get_choice("What next?", ["Go back to modify settings", "Exit"], allow_exit=True)
+        if next_action == "Go back to modify settings":
+            return guided_workflow()
         print("Exiting...")
+        return
 
 
 def main():
