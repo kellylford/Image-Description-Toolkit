@@ -47,7 +47,7 @@ for /f "skip=1 tokens=1 delims= " %%a in ('ollama list') do (
     echo ----------------------------------------
     
 cd /d "%~dp0\.."
-    idt.exe workflow --provider ollama --model %%a --prompt-style %PROMPT_STYLE% --output-dir ../Descriptions "%IMAGE_DIR%" --steps describe --original-cwd "%ORIGINAL_CWD%"
+    idt.exe workflow --provider ollama --model %%a --prompt-style %PROMPT_STYLE% --output-dir ../Descriptions "%IMAGE_DIR%" --original-cwd "%ORIGINAL_CWD%"
     if !errorlevel! equ 0 (
         echo ✓ SUCCESS: %%a
         set /a SUCCESS_COUNT+=1

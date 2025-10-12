@@ -426,7 +426,50 @@ def guided_workflow():
     if action == "Go back to modify settings":
         return guided_workflow()
     
+    # If running now, ask about output directory
+    output_dir = "Descriptions"  # Default
     if action == "Run this command now":
+        print_header("Output Directory")
+        print("Where should the workflow results be saved?")
+        print(f"Default: {output_dir}")
+        print()
+        
+        custom_output = get_choice("Output directory:", 
+                                  [f"Use default ({output_dir})", "Specify custom directory"],
+                                  allow_exit=True, allow_back=True)
+        
+        if custom_output == 'EXIT':
+            print("Exiting...")
+            return
+        
+        if custom_output == 'BACK':
+            return guided_workflow()
+        
+        if custom_output == "Specify custom directory":
+            output_dir = input("\nEnter output directory path: ").strip()
+            if not output_dir:
+                print("No directory specified, using default: Descriptions")
+                output_dir = "Descriptions"
+            else:
+                print(f"Using output directory: {output_dir}")
+        
+        # Rebuild command with final output directory
+        cmd_parts = ["idt", "workflow", img_dir]
+        cmd_parts.extend(["--provider", provider])
+        cmd_parts.extend(["--model", model])
+        cmd_parts.extend(["--output-dir", output_dir])
+        
+        if api_key_file:
+            cmd_parts.extend(["--api-key-file", api_key_file])
+        
+        if workflow_name:
+            cmd_parts.extend(["--name", workflow_name])
+        
+        if prompt_style:
+            cmd_parts.extend(["--prompt-style", prompt_style])
+        
+        command_str = " ".join(f'"{part}"' if ' ' in part else part for part in cmd_parts)
+        
         print_header("Running Workflow")
         print(f"Executing: {command_str}\n")
         
@@ -437,7 +480,7 @@ def guided_workflow():
             import sys
             
             # Build arguments for workflow
-            workflow_args = [img_dir, "--provider", provider, "--model", model, "--output-dir", "Descriptions"]
+            workflow_args = [img_dir, "--provider", provider, "--model", model, "--output-dir", output_dir]
             if api_key_file:
                 workflow_args.extend(["--api-key-file", api_key_file])
             if workflow_name:
