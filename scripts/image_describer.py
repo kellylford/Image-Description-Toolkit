@@ -179,16 +179,18 @@ class ImageDescriber:
                 logger.info("Initializing OpenAI provider...")
                 if not self.api_key:
                     raise ValueError("OpenAI provider requires an API key. Use --api-key-file option.")
-                provider = OpenAIProvider()
-                provider.api_key = self.api_key
+                # Pass api_key to constructor so client initializes correctly
+                provider = OpenAIProvider(api_key=self.api_key)
                 return provider
                 
             elif self.provider_name == "claude":
                 logger.info("Initializing Claude provider...")
                 if not self.api_key:
                     raise ValueError("Claude provider requires an API key. Use --api-key-file option.")
-                provider = ClaudeProvider()
-                provider.api_key = self.api_key
+                # Pass api_key to constructor so client initializes correctly
+                provider = ClaudeProvider(api_key=self.api_key)
+                logger.info(f"Claude provider initialized. API key set: {bool(provider.api_key)}, Client available: {bool(provider.client)}, Is available: {provider.is_available()}")
+                print(f"INFO: Claude provider - API key set: {bool(provider.api_key)}, Client: {bool(provider.client)}, Available: {provider.is_available()}")
                 return provider
                 
             else:
@@ -1315,11 +1317,17 @@ Configuration:
     if args.api_key_file:
         try:
             api_key_path = Path(args.api_key_file).expanduser()
+            logger.info(f"Attempting to load API key from: {api_key_path}")
+            logger.info(f"File exists: {api_key_path.exists()}")
+            logger.info(f"Absolute path: {api_key_path.resolve()}")
             with open(api_key_path, 'r', encoding='utf-8') as f:
                 api_key = f.read().strip()
-            logger.info(f"Loaded API key from {api_key_path}")
+            logger.info(f"Successfully loaded API key from {api_key_path} (length: {len(api_key)})")
+            # Print to console for immediate feedback
+            print(f"INFO: Loaded API key from {api_key_path} (length: {len(api_key)})")
         except Exception as e:
             logger.error(f"Failed to load API key from {args.api_key_file}: {e}")
+            print(f"ERROR: Failed to load API key from {args.api_key_file}: {e}")
             sys.exit(1)
     
     # Check for API key in environment variables if not provided via file
