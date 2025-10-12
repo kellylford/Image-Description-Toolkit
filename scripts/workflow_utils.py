@@ -134,6 +134,9 @@ class WorkflowLogger:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(getattr(logging, log_level.upper()))
         
+        # Prevent propagation to parent loggers to avoid duplicate log entries
+        self.logger.propagate = False
+        
         # Clear existing handlers
         self.logger.handlers.clear()
         
