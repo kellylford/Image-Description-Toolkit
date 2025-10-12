@@ -256,7 +256,7 @@ def guided_workflow():
         print("Exiting...")
         return
     
-    # Step 2: API Key Setup (if needed)
+    # Step 2: API Key Setup (if needed for cloud providers)
     api_key_file = None
     if provider in ['openai', 'claude']:
         print_header(f"Step 2: {provider.upper()} API Key Setup")
@@ -273,16 +273,16 @@ def guided_workflow():
             if cont == 'BACK' or cont == "No, go back to setup":
                 return guided_workflow()
     
-    # Step 3: Select Model
-    print_header("Step 3: Select Model")
+    # Step 2/3: Select Model (step number depends on whether API key was needed)
+    model_step = "Step 2" if provider == 'ollama' else "Step 3"
+    print_header(f"{model_step}: Select Model")
     
     if provider == 'ollama':
         print("Checking for installed Ollama models...")
         installed_models = check_ollama_models()
         
         if installed_models:
-            print(f"Found {len(installed_models)} installed model(s):")
-            print_numbered_list(installed_models)
+            print(f"Found {len(installed_models)} installed model(s)\n")
             model = get_choice("Select a model", installed_models, default=1, allow_back=True)
             if model == 'EXIT':
                 print("Exiting...")
@@ -333,8 +333,9 @@ def guided_workflow():
         # Extract just the model name (before the space/parenthesis)
         model = model_choice.split()[0]
     
-    # Step 4: Image Directory
-    print_header("Step 4: Image Directory")
+    # Step 3/4: Image Directory (step number depends on whether API key was needed)
+    dir_step = "Step 3" if provider == 'ollama' else "Step 4"
+    print_header(f"{dir_step}: Image Directory")
     
     while True:
         img_dir = get_input("Enter path to directory containing images")
@@ -351,14 +352,16 @@ def guided_workflow():
             if retry == 'BACK' or retry == "No, go back to model selection":
                 return guided_workflow()
     
-    # Step 5: Workflow Name
-    print_header("Step 5: Workflow Name (Optional)")
+    # Step 4/5: Workflow Name (Optional)
+    name_step = "Step 4" if provider == 'ollama' else "Step 5"
+    print_header(f"{name_step}: Workflow Name (Optional)")
     print("You can provide a custom name for this workflow run.")
-    print("If you skip this, a timestamp-based name will be used.")
+    print("If you skip this, a name will be auto-generated from the input directory.")
     workflow_name = get_input("Enter workflow name", allow_empty=True)
     
-    # Step 6: Prompt Style (Optional)
-    print_header("Step 6: Prompt Style (Optional)")
+    # Step 5/6: Prompt Style (Optional)
+    style_step = "Step 5" if provider == 'ollama' else "Step 6"
+    print_header(f"{style_step}: Prompt Style (Optional)")
     
     # Get available prompt styles from config
     available_styles, default_style = get_available_prompt_styles()
