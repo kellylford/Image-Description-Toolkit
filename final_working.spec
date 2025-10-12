@@ -45,12 +45,35 @@ a = Analysis(
         'analysis.analyze_workflow_stats',
         'analysis.analyze_description_content',
         'analysis.combine_workflow_descriptions',
+        # imagedescriber package
+        'imagedescriber',
+        'imagedescriber.ai_providers',
         # Standard library imports
         'json', 'pathlib', 'subprocess', 'logging', 'datetime', 'argparse',
         # Image processing
         'PIL', 'PIL.Image', 'PIL.ImageOps', 'pillow_heif',
-        # AI providers  
+        # AI providers - CRITICAL for executable
         'requests', 'anthropic', 'openai',
+        # Anthropic dependencies
+        'anthropic._client',
+        'anthropic._base_client',
+        'anthropic._models',
+        'anthropic._types',
+        'anthropic._utils',
+        'anthropic._constants',
+        'anthropic._exceptions',
+        'anthropic.types',
+        'anthropic.resources',
+        # OpenAI dependencies
+        'openai._client',
+        'openai._base_client',
+        'openai._models',
+        'openai._types',
+        'openai._utils',
+        'openai._constants',
+        'openai._exceptions',
+        'openai.types',
+        'openai.resources',
     ],
     hookspath=[],
     hooksconfig={},

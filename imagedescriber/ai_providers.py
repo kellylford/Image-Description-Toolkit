@@ -25,6 +25,21 @@ except ImportError:
     LearningModelDeviceKind = None
     HAS_WINRT = False
 
+# Try to import AI provider SDKs at module level (required for PyInstaller)
+try:
+    import anthropic
+    HAS_ANTHROPIC = True
+except ImportError:
+    anthropic = None
+    HAS_ANTHROPIC = False
+
+try:
+    import openai
+    HAS_OPENAI = True
+except ImportError:
+    openai = None
+    HAS_OPENAI = False
+
 # DEVELOPMENT MODE: Disabled to show real installed models
 # Use check_models.py to see what's installed
 # Use manage_models.py to install/remove models
@@ -191,19 +206,19 @@ class OpenAIProvider(AIProvider):
         self.api_key = api_key or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
         self.timeout = 300
         
-        # Initialize OpenAI client with SDK (lazy import to avoid dependency at module level)
+        # Initialize OpenAI client with SDK
         self.client = None
-        if self.api_key:
+        if self.api_key and HAS_OPENAI:
             try:
-                from openai import OpenAI
-                self.client = OpenAI(
+                self.client = openai.OpenAI(
                     api_key=self.api_key,
                     timeout=self.timeout,
                     max_retries=3  # Automatic retry with exponential backoff
                 )
-            except ImportError:
-                # Fallback if SDK not installed
-                print("Warning: openai package not installed. Install with: pip install openai>=1.0.0")
+            except Exception as e:
+                print(f"Warning: Failed to initialize OpenAI client: {e}")
+        elif self.api_key and not HAS_OPENAI:
+            print("Warning: openai package not installed. Install with: pip install openai>=1.0.0")
         
         # Token usage tracking (for cost estimation and logging)
         self.last_usage = None
@@ -327,19 +342,19 @@ class ClaudeProvider(AIProvider):
         self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
         self.timeout = 300
         
-        # Initialize Anthropic client with SDK (lazy import to avoid dependency at module level)
+        # Initialize Anthropic client with SDK
         self.client = None
-        if self.api_key:
+        if self.api_key and HAS_ANTHROPIC:
             try:
-                import anthropic
                 self.client = anthropic.Anthropic(
                     api_key=self.api_key,
                     timeout=self.timeout,
                     max_retries=3  # Automatic retry with exponential backoff
                 )
-            except ImportError:
-                # Fallback if SDK not installed
-                print("Warning: anthropic package not installed. Install with: pip install anthropic>=0.18.0")
+            except Exception as e:
+                print(f"Warning: Failed to initialize Anthropic client: {e}")
+        elif self.api_key and not HAS_ANTHROPIC:
+            print("Warning: anthropic package not installed. Install with: pip install anthropic>=0.18.0")
         
         # Token usage tracking (for cost estimation and logging)
         self.last_usage = None
