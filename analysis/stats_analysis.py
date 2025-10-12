@@ -40,6 +40,29 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 
+def extract_timestamp_from_log_line(line: str) -> Optional[str]:
+    """
+    Extract timestamp from log line, supporting both old and new formats.
+    
+    New format (screen reader friendly): INFO - Message - (2025-10-12 14:30:00)
+    Old format: 2025-10-12 14:30:00 - module - INFO - Message
+    
+    Returns:
+        Timestamp string in format 'YYYY-MM-DD HH:MM:SS' or None if not found
+    """
+    # Try new format first (timestamp at end in parentheses)
+    new_format_match = re.search(r'\((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\)', line)
+    if new_format_match:
+        return new_format_match.group(1)
+    
+    # Fall back to old format (timestamp at start)
+    old_format_match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+    if old_format_match:
+        return old_format_match.group(1)
+    
+    return None
+
+
 def parse_workflow_log(log_path: Path) -> Dict:
     """
     Parse a workflow log file and extract statistics.
@@ -182,9 +205,9 @@ def parse_workflow_log(log_path: Path) -> Dict:
             
             # HEIC conversion - start time
             elif 'Starting image conversion' in line:
-                timestamp_match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
-                if timestamp_match:
-                    conversion_start = timestamp_match.group(1)
+                timestamp = extract_timestamp_from_log_line(line)
+                if timestamp:
+                    conversion_start = timestamp
             
             # HEIC conversion - successful conversions count
             elif 'Successful conversions:' in line:
@@ -200,17 +223,17 @@ def parse_workflow_log(log_path: Path) -> Dict:
                     if stats['heic_files_converted'] == 0:
                         stats['heic_files_converted'] = int(match.group(1))
                 # Capture end time
-                timestamp_match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
-                if timestamp_match:
-                    conversion_end = timestamp_match.group(1)
+                timestamp = extract_timestamp_from_log_line(line)
+                if timestamp:
+                    conversion_end = timestamp
             
             # HEIC conversion - image conversion completed
             elif 'Image conversion completed' in line:
                 # Capture end time if we haven't already
                 if not conversion_end:
-                    timestamp_match = re.search(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
-                    if timestamp_match:
-                        conversion_end = timestamp_match.group(1)
+                    timestamp = extract_timestamp_from_log_line(line)
+                    if timestamp:
+                        conversion_end = timestamp
             
             # HEIC conversion - no files found
             elif 'No HEIC files found' in line:

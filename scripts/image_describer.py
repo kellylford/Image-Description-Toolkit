@@ -83,7 +83,9 @@ def setup_logging(log_dir: Optional[str] = None, verbose: bool = False) -> None:
     logger.setLevel(level)
     
     # Create formatter
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Format: LEVEL - message - (timestamp)
+    # Screen reader friendly: reads important info first, timestamp last
+    formatter = logging.Formatter('%(levelname)s - %(message)s - (%(asctime)s)')
     
     # Console handler
     console_handler = logging.StreamHandler()

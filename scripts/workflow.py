@@ -181,7 +181,7 @@ class WorkflowOrchestrator:
     
     def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, 
                  model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", 
-                 api_key_file: str = None):
+                 api_key_file: str = None, preserve_descriptions: bool = False):
         """
         Initialize the workflow orchestrator
         
@@ -192,6 +192,7 @@ class WorkflowOrchestrator:
             prompt_style: Override prompt style
             provider: AI provider to use (ollama, openai, claude)
             api_key_file: Path to API key file for cloud providers
+            preserve_descriptions: If True, skip describe step if descriptions already exist
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -204,6 +205,7 @@ class WorkflowOrchestrator:
         self.override_prompt_style = prompt_style
         self.provider = provider
         self.api_key_file = api_key_file
+        self.preserve_descriptions = preserve_descriptions
         
         # Available workflow steps
         self.available_steps = {
@@ -457,6 +459,37 @@ class WorkflowOrchestrator:
             Dictionary with step results
         """
         self.logger.info("Starting image description...")
+        
+        # Check if preserve_descriptions flag is set and descriptions already exist
+        if self.preserve_descriptions:
+            # Look for existing descriptions file
+            desc_output_dir = self.config.get_step_output_dir("image_description")
+            existing_desc_file = desc_output_dir / "descriptions.csv"
+            
+            if existing_desc_file.exists():
+                # Count existing descriptions
+                try:
+                    import csv
+                    with open(existing_desc_file, 'r', encoding='utf-8') as f:
+                        reader = csv.reader(f)
+                        next(reader)  # Skip header
+                        desc_count = sum(1 for row in reader)
+                    
+                    self.logger.info(f"Preserve flag is set and {desc_count} descriptions already exist")
+                    print(f"INFO: Preserve flag is set - skipping describe step ({desc_count} existing descriptions)")
+                    
+                    # Return success result with existing file
+                    return {
+                        "success": True,
+                        "processed": desc_count,
+                        "output_dir": desc_output_dir,
+                        "description_file": str(existing_desc_file),
+                        "skipped": True,
+                        "reason": "preserve_descriptions flag enabled"
+                    }
+                except Exception as e:
+                    self.logger.warning(f"Could not read existing descriptions file: {e}")
+                    # Continue with normal processing if we can't read the file
         
         # Build list of directories to search for images
         search_dirs = [input_dir]
@@ -1423,6 +1456,12 @@ Resume Examples:
                     desc_count = workflow_state.get('describe_progress', 0)
                     if desc_count > 0:
                         print(f"INFO: Describe step was partially completed ({desc_count} descriptions exist)")
+                        
+                        # Auto-enable preserve-descriptions for partial resumes to prevent data loss
+                        if not args.preserve_descriptions:
+                            print(f"INFO: Auto-enabling --preserve-descriptions to protect existing work")
+                            args.preserve_descriptions = True
+                        
                         print(f"Will continue describing remaining images (existing descriptions will be preserved)")
                 
                 remaining_steps.append(step)
@@ -1509,7 +1548,8 @@ Resume Examples:
             model=args.model, 
             prompt_style=args.prompt_style, 
             provider=args.provider, 
-            api_key_file=args.api_key_file
+            api_key_file=args.api_key_file,
+            preserve_descriptions=args.preserve_descriptions
         )
         
         if args.dry_run:

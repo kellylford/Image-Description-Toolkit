@@ -68,7 +68,9 @@ class VideoFrameExtractor:
         self.logger.handlers.clear()
         
         # Create formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        # Format: LEVEL - message - (timestamp)
+        # Screen reader friendly: reads important info first, timestamp last
+        formatter = logging.Formatter('%(levelname)s - %(message)s - (%(asctime)s)')
         
         # Create file handler
         file_handler = logging.FileHandler(log_filename, encoding='utf-8')
