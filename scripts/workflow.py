@@ -1373,13 +1373,44 @@ Resume Examples:
         output_dir = resume_dir
         steps = workflow_state["steps"]
         
+        # Load existing workflow metadata if it exists
+        existing_metadata = load_workflow_metadata(resume_dir)
+        
+        if existing_metadata:
+            # Use existing metadata
+            workflow_name = existing_metadata.get("workflow_name", "resumed")
+            provider_name = existing_metadata.get("provider", "ollama")
+            model_name = existing_metadata.get("model", "unknown")
+            prompt_style = existing_metadata.get("prompt_style", "narrative")
+            timestamp = existing_metadata.get("timestamp", datetime.now().strftime("%Y%m%d_%H%M%S"))
+        else:
+            # Fallback: Extract from directory name or use defaults
+            # Directory format: wf_NAME_PROVIDER_MODEL_PROMPT_TIMESTAMP
+            dir_parts = resume_dir.name.split('_')
+            if len(dir_parts) >= 5 and dir_parts[0] == 'wf':
+                workflow_name = dir_parts[1]
+                provider_name = dir_parts[2]
+                model_name = dir_parts[3]
+                prompt_style = dir_parts[4]
+                timestamp = dir_parts[5] if len(dir_parts) > 5 else datetime.now().strftime("%Y%m%d_%H%M%S")
+            else:
+                # Ultimate fallback
+                workflow_name = "resumed"
+                provider_name = "ollama"
+                model_name = "unknown"
+                prompt_style = "narrative"
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
         # Override with state from logs
         if workflow_state["model"]:
             args.model = workflow_state["model"]
+            model_name = workflow_state["model"]
         if workflow_state["prompt_style"]:
             args.prompt_style = workflow_state["prompt_style"]
+            prompt_style = workflow_state["prompt_style"]
         if workflow_state["provider"]:
             args.provider = workflow_state["provider"]
+            provider_name = workflow_state["provider"]
         if workflow_state["config"]:
             args.config = workflow_state["config"]
         
