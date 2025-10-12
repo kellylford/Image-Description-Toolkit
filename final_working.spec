@@ -23,6 +23,7 @@ a = Analysis(
         ('scripts/descriptions_to_html.py', 'scripts'),
         ('scripts/video_frame_extractor.py', 'scripts'),
         ('scripts/config_loader.py', 'scripts'),
+        ('scripts/guided_workflow.py', 'scripts'),
         ('scripts/workflow_config.json', 'scripts'),
         ('scripts/image_describer_config.json', 'scripts'),
         # Include essential directories

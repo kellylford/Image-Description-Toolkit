@@ -467,6 +467,47 @@ def main():
             result = subprocess.run(cmd, cwd=str(script_path.parent))
             return result.returncode
     
+    elif command == 'guideme':
+        # Interactive guided workflow
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                
+                import guided_workflow
+                
+                original_argv = sys.argv[:]
+                sys.argv = ['guided_workflow.py'] + sys.argv[2:]
+                
+                try:
+                    return guided_workflow.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import guided_workflow module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running guided workflow: {e}")
+                return 1
+        else:
+            # Running as script - use subprocess
+            guided_script = get_resource_path('scripts/guided_workflow.py')
+            
+            if not guided_script.exists():
+                print(f"Error: Guided workflow script not found at {guided_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(guided_script)] + args
+            result = subprocess.run(cmd, cwd=str(guided_script.parent))
+            return result.returncode
+    
     elif command == 'viewer':
         # Launch the viewer executable
         import subprocess
@@ -544,6 +585,7 @@ USAGE:
     {base_call} <command> [options]
 
 COMMANDS:
+    guideme               Interactive wizard to build and run workflows
     workflow              Run image description workflow
     viewer                Launch the GUI viewer for browsing results
     stats                 Analyze workflow performance statistics
@@ -556,6 +598,9 @@ COMMANDS:
     help                  Show this help message
 
 EXAMPLES:
+    # Interactive guided workflow (recommended for beginners)
+    {base_call} guideme
+
     # Run workflow with Ollama
     {base_call} workflow --provider ollama --model llava
 
