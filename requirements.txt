@@ -16,7 +16,8 @@ ollama>=0.3.0           # Ollama Python client
 
 # Cloud AI Provider SDKs (used by both scripts and GUI)
 openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
-anthropic>=0.18.0       # Anthropic Claude official SDK (retry logic, token tracking, streaming)
+anthropic>=0.18.0,<0.26.0  # Anthropic Claude official SDK (pinned to avoid Rust/jiter dependency)
+httpx>=0.23.0,<0.27.0   # HTTP client (pinned for anthropic 0.25.9 compatibility)
 
 # ----------------------------------------------------------------------------
 # GUI APPLICATIONS (imagedescriber, viewer, prompt_editor)

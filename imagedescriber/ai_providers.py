@@ -29,16 +29,18 @@ except ImportError:
 try:
     import anthropic
     HAS_ANTHROPIC = True
-except ImportError:
+except ImportError as e:
     anthropic = None
     HAS_ANTHROPIC = False
+    print(f"DEBUG: Failed to import anthropic: {e}")
 
 try:
     import openai
     HAS_OPENAI = True
-except ImportError:
+except ImportError as e:
     openai = None
     HAS_OPENAI = False
+    print(f"DEBUG: Failed to import openai: {e}")
 
 # DEVELOPMENT MODE: Disabled to show real installed models
 # Use check_models.py to see what's installed
@@ -344,7 +346,10 @@ class ClaudeProvider(AIProvider):
         
         # Initialize Anthropic client with SDK
         self.client = None
-        if self.api_key and HAS_ANTHROPIC:
+        if not HAS_ANTHROPIC:
+            print("WARNING: anthropic package not available in this build")
+            print(f"DEBUG: HAS_ANTHROPIC={HAS_ANTHROPIC}, anthropic module={anthropic}")
+        elif self.api_key and HAS_ANTHROPIC:
             try:
                 self.client = anthropic.Anthropic(
                     api_key=self.api_key,
@@ -353,8 +358,9 @@ class ClaudeProvider(AIProvider):
                 )
             except Exception as e:
                 print(f"Warning: Failed to initialize Anthropic client: {e}")
-        elif self.api_key and not HAS_ANTHROPIC:
-            print("Warning: anthropic package not installed. Install with: pip install anthropic>=0.18.0")
+        elif not self.api_key:
+            # API key missing - this is expected, don't print warning
+            pass
         
         # Token usage tracking (for cost estimation and logging)
         self.last_usage = None

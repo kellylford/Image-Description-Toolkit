@@ -10,10 +10,16 @@ MAINTENANCE NOTES:
 - Use build_executable.sh for automated builds
 """
 
+from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+# Collect all anthropic and openai modules
+anthropic_datas, anthropic_binaries, anthropic_hiddenimports = collect_all('anthropic')
+openai_datas, openai_binaries, openai_hiddenimports = collect_all('openai')
+
 a = Analysis(
     ['idt_cli.py'],
     pathex=['.', 'scripts'],
-    binaries=[],
+    binaries=[] + anthropic_binaries + openai_binaries,
     datas=[
         # Include ALL scripts files individually
         ('scripts/workflow.py', 'scripts'),
@@ -30,7 +36,7 @@ a = Analysis(
         ('models', 'models'),
         ('analysis', 'analysis'),
         ('VERSION', '.'),
-    ],
+    ] + anthropic_datas + openai_datas,
     hiddenimports=[
         # EXPLICITLY include every module we need
         'scripts',
@@ -52,29 +58,9 @@ a = Analysis(
         'json', 'pathlib', 'subprocess', 'logging', 'datetime', 'argparse',
         # Image processing
         'PIL', 'PIL.Image', 'PIL.ImageOps', 'pillow_heif',
-        # AI providers - CRITICAL for executable
-        'requests', 'anthropic', 'openai',
-        # Anthropic dependencies
-        'anthropic._client',
-        'anthropic._base_client',
-        'anthropic._models',
-        'anthropic._types',
-        'anthropic._utils',
-        'anthropic._constants',
-        'anthropic._exceptions',
-        'anthropic.types',
-        'anthropic.resources',
-        # OpenAI dependencies
-        'openai._client',
-        'openai._base_client',
-        'openai._models',
-        'openai._types',
-        'openai._utils',
-        'openai._constants',
-        'openai._exceptions',
-        'openai.types',
-        'openai.resources',
-    ],
+        # AI providers - use collect_all results
+        'requests',
+    ] + anthropic_hiddenimports + openai_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
