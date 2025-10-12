@@ -313,6 +313,7 @@ def guided_workflow():
     cmd_parts = ["idt", "workflow", img_dir]
     cmd_parts.extend(["--provider", provider])
     cmd_parts.extend(["--model", model])
+    cmd_parts.extend(["--output-dir", "Descriptions"])  # Default output directory
     
     if api_key_file:
         cmd_parts.extend(["--api-key-file", api_key_file])
@@ -343,7 +344,7 @@ def guided_workflow():
             import sys
             
             # Build arguments for workflow
-            workflow_args = [img_dir, "--provider", provider, "--model", model]
+            workflow_args = [img_dir, "--provider", provider, "--model", model, "--output-dir", "Descriptions"]
             if api_key_file:
                 workflow_args.extend(["--api-key-file", api_key_file])
             if workflow_name:
