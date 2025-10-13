@@ -1359,7 +1359,11 @@ Resume Examples:
   # See docs/WORKFLOW_RESUME_API_KEY.md for details
   
 Viewing Results:
-  # After successful completion, you'll be prompted to launch the viewer
+  # Launch viewer automatically at workflow start (recommended for long batches):
+  idt workflow photos --view-results
+  idt workflow --resume wf_photos --view-results
+  
+  # Or you'll be prompted after successful completion
   # Or launch it manually anytime:
   idt viewer [workflow_directory]
         """
@@ -1436,6 +1440,12 @@ Viewing Results:
         "--dry-run",
         action="store_true",
         help="Show what would be done without executing"
+    )
+    
+    parser.add_argument(
+        "--view-results",
+        action="store_true",
+        help="Automatically launch viewer to monitor workflow progress in real-time"
     )
     
     parser.add_argument(
@@ -1665,6 +1675,11 @@ Viewing Results:
             "user_provided_name": bool(args.name)
         }
         
+        # Launch viewer if requested (before workflow starts for real-time monitoring)
+        if args.view_results:
+            orchestrator.logger.info(f"Launching viewer for real-time monitoring: {output_dir}")
+            launch_viewer(output_dir, orchestrator.logger)
+        
         # Run workflow
         results = orchestrator.run_workflow(input_dir, output_dir, steps, workflow_metadata=metadata)
         
@@ -1718,11 +1733,13 @@ Viewing Results:
         
         print(f"\nDetailed results saved in workflow log file.")
         
-        # Offer to view results if workflow was successful
-        if results['success'] and results['output_dir']:
+        # Offer to view results if workflow was successful and viewer wasn't already launched
+        if results['success'] and results['output_dir'] and not args.view_results:
             view_results = prompt_view_results()
             if view_results:
                 launch_viewer(results['output_dir'], orchestrator.logger)
+        elif args.view_results:
+            print(f"\nViewer is already running for this workflow.")
         
         # Exit with appropriate code
         sys.exit(0 if results['success'] else 1)
