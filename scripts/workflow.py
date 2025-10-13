@@ -1239,6 +1239,86 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
     return state
 
 
+def prompt_view_results() -> bool:
+    """
+    Prompt user if they want to view workflow results in the viewer.
+    Returns True if user wants to view results, False otherwise.
+    """
+    try:
+        response = input("\nWould you like to view the results in the viewer? (y/n): ").strip().lower()
+        return response in ('y', 'yes')
+    except (EOFError, KeyboardInterrupt):
+        return False
+
+
+def launch_viewer(output_dir: Path, logger: logging.Logger) -> None:
+    """
+    Launch the viewer application with the specified output directory.
+    Also creates a reusable .bat file for future viewing.
+    
+    Args:
+        output_dir: Path to the workflow output directory
+        logger: Logger instance for recording actions
+    """
+    try:
+        # Get the base path (for both dev and executable scenarios)
+        if getattr(sys, 'frozen', False):
+            # Running as executable
+            base_dir = Path(sys.executable).parent
+            viewer_exe = base_dir / "viewer.exe"
+        else:
+            # Running from source
+            base_dir = Path(__file__).parent.parent
+            viewer_exe = base_dir / "viewer" / "viewer.py"
+        
+        # Create a reusable .bat file in the output directory
+        bat_file = output_dir / "view_results.bat"
+        try:
+            with open(bat_file, 'w', encoding='utf-8') as f:
+                f.write("@echo off\n")
+                f.write("REM Auto-generated batch file to view workflow results\n")
+                f.write("REM Double-click this file to reopen the results in the viewer\n\n")
+                
+                if getattr(sys, 'frozen', False):
+                    # For executable deployment
+                    f.write(f'"{viewer_exe}" "{output_dir}"\n')
+                else:
+                    # For development (need Python)
+                    python_exe = sys.executable
+                    f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir}"\n')
+                
+                f.write("\nREM If viewer closes immediately, run this from a command prompt to see any errors\n")
+            
+            logger.info(f"Created reusable viewer launcher: {bat_file}")
+            print(f"INFO: Created reusable launcher: {bat_file}")
+            print("      Double-click this file anytime to view results again.")
+        except Exception as e:
+            logger.warning(f"Failed to create .bat file: {e}")
+        
+        # Launch the viewer
+        if viewer_exe.exists():
+            logger.info(f"Launching viewer with directory: {output_dir}")
+            print(f"\nINFO: Launching viewer...")
+            
+            if getattr(sys, 'frozen', False):
+                # Launch executable
+                subprocess.Popen([str(viewer_exe), str(output_dir)], 
+                               creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+            else:
+                # Launch Python script
+                subprocess.Popen([sys.executable, str(viewer_exe), str(output_dir)])
+            
+            logger.info("Viewer launched successfully")
+            print("INFO: Viewer launched successfully")
+        else:
+            logger.error(f"Viewer not found at: {viewer_exe}")
+            print(f"ERROR: Viewer not found at: {viewer_exe}")
+    
+    except Exception as e:
+        logger.error(f"Failed to launch viewer: {e}")
+        print(f"ERROR: Failed to launch viewer: {e}")
+
+
 def main():
     """Main function for command-line usage"""
     parser = argparse.ArgumentParser(
@@ -1632,6 +1712,12 @@ Resume Examples:
             print(f"Steps failed: {', '.join(results['steps_failed'])}")
         
         print(f"\nDetailed results saved in workflow log file.")
+        
+        # Offer to view results if workflow was successful
+        if results['success'] and results['output_dir']:
+            view_results = prompt_view_results()
+            if view_results:
+                launch_viewer(results['output_dir'], orchestrator.logger)
         
         # Exit with appropriate code
         sys.exit(0 if results['success'] else 1)
