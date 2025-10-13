@@ -105,6 +105,45 @@ def get_input(prompt, default=None, allow_empty=False):
             print("This field is required. Please enter a value.")
 
 
+def launch_viewer_for_workflow(output_dir: Path):
+    """
+    Launch the viewer application to monitor workflow progress in real-time.
+    
+    Args:
+        output_dir: Path to the workflow output directory
+    """
+    try:
+        # Get the base path (for both dev and executable scenarios)
+        if getattr(sys, 'frozen', False):
+            # Running as executable
+            base_dir = Path(sys.executable).parent
+            viewer_exe = base_dir / "viewer.exe"
+        else:
+            # Running from source
+            base_dir = Path(__file__).parent.parent
+            viewer_exe = base_dir / "viewer" / "viewer.py"
+        
+        # Launch the viewer
+        if viewer_exe.exists():
+            print(f"INFO: Launching viewer to monitor workflow progress...")
+            print(f"      The viewer will update in real-time as images are processed.\n")
+            
+            if getattr(sys, 'frozen', False):
+                # Launch executable
+                subprocess.Popen([str(viewer_exe), str(output_dir)], 
+                               creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+            else:
+                # Launch Python script
+                subprocess.Popen([sys.executable, str(viewer_exe), str(output_dir)])
+        else:
+            print(f"INFO: Viewer not found at: {viewer_exe}")
+            print(f"      You can manually launch it after workflow starts.\n")
+    
+    except Exception as e:
+        print(f"INFO: Could not launch viewer: {e}")
+        print(f"      You can manually launch it after workflow starts.\n")
+
+
 def check_api_key_file(provider):
     """Check if API key file exists"""
     key_files = {
@@ -472,6 +511,10 @@ def guided_workflow():
         
         print_header("Running Workflow")
         print(f"Executing: {command_str}\n")
+        
+        # Launch viewer immediately so user can watch progress in real-time
+        output_path = Path(output_dir)
+        launch_viewer_for_workflow(output_path)
         
         # Run the actual workflow
         try:
