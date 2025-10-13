@@ -12,9 +12,10 @@ The Image Description Toolkit (IDT) is a powerful, AI-driven tool for generating
 4. [Prompt Customization](#4-prompt-customization)
 5. [Advanced Usage & Commands](#5-advanced-usage--commands)
 6. [Analysis Tools](#6-analysis-tools)
-7. [Cloud Provider Setup](#7-cloud-provider-setup)
-8. [Batch Files Reference](#8-batch-files-reference)
-9. [Troubleshooting](#9-troubleshooting)
+7. [Results Viewer (Real-Time Monitoring)](#65-results-viewer-real-time-monitoring)
+8. [Cloud Provider Setup](#7-cloud-provider-setup)
+9. [Batch Files Reference](#8-batch-files-reference)
+10. [Troubleshooting](#9-troubleshooting)
 
 ---
 
@@ -72,12 +73,14 @@ This wizard will:
 5. ✅ Choose a prompt style
 6. ✅ Show you the command before running
 7. ✅ Run the workflow or save the command for later
+8. ✅ **Automatically launch the viewer to watch progress in real-time!**
 
 **Perfect for:**
 - First-time users
 - Testing different models
 - Learning the command options
 - Setting up cloud providers
+- Watching your workflow progress live as images are processed
 
 ### Option 2: Direct Command (Quick & Simple)
 
@@ -91,6 +94,12 @@ Once you're familiar with the tool:
    ```
 
 That's it! Results appear in `Descriptions/workflow_[timestamp]/`
+
+**After completion**, you'll be prompted:
+```
+Would you like to view the results in the viewer? (y/n):
+```
+Type `y` to automatically open the viewer and browse your results!
 
 ---
 
@@ -368,6 +377,97 @@ analysis/results/
 
 ---
 
+## 6.5. Results Viewer (Real-Time Monitoring)
+
+The **Results Viewer** is a GUI application that lets you browse, search, and monitor your workflow results in real-time.
+
+### Automatic Launch
+
+The viewer launches automatically in two scenarios:
+
+#### 1. Using `guideme` (Recommended)
+When you run a workflow through the interactive wizard:
+```bash
+idt guideme
+```
+The viewer **opens immediately** when the workflow starts, letting you watch progress in real-time as each image is processed!
+
+#### 2. After Direct Workflow Completion
+When you run `idt workflow` directly, you'll be prompted after successful completion:
+```
+Would you like to view the results in the viewer? (y/n): y
+```
+Type `y` and the viewer opens instantly.
+
+### Manual Launch
+
+You can also launch the viewer manually anytime:
+
+```bash
+# Open viewer with directory browser
+idt viewer
+
+# Open specific workflow output
+idt viewer C:\IDT\Descriptions\workflow_vacation_photos
+
+# Or double-click the auto-generated launcher
+# (found in each workflow directory)
+Descriptions\workflow_*/view_results.bat
+```
+
+### Viewer Features
+
+**Real-Time Monitoring:**
+- Live updates as images are processed
+- Progress tracking
+- Automatic refresh when new descriptions appear
+
+**Browse & Search:**
+- Navigate through all processed images
+- View descriptions alongside images
+- Copy descriptions to clipboard
+- Search and filter results
+
+**Workflow Information:**
+- View metadata (model used, prompt style, etc.)
+- See processing statistics
+- Check completion status
+
+### Reusable Launcher
+
+Every workflow automatically creates a `view_results.bat` file in its output directory:
+```
+Descriptions/
+└── workflow_vacation_photos/
+    ├── images/
+    ├── image_descriptions.txt
+    ├── index.html
+    ├── logs/
+    └── view_results.bat  ← Double-click to reopen results anytime!
+```
+
+**Benefits:**
+- ✅ Quick access to view past results
+- ✅ No need to remember viewer commands
+- ✅ Create shortcuts or pin to Start menu
+- ✅ Share with others to view your workflow outputs
+
+### Viewer Modes
+
+The viewer automatically detects two modes:
+
+**HTML Mode** (Completed workflows):
+- Full HTML report with thumbnails
+- Complete navigation
+- Static, finalized results
+
+**Live Mode** (In-progress workflows):
+- Real-time updates as descriptions are generated
+- Progress indicators
+- Auto-refresh on new content
+
+---
+
 ## 7. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
@@ -587,8 +687,11 @@ idt workflow C:\Photos --prompt-style artistic --name art_analysis
 # Export to CSV (after any run)
 idt combinedescriptions
 
-# View results in GUI
+# View results in GUI (or use auto-prompt after workflow!)
 idt viewer
+
+# Launch viewer for specific workflow
+idt viewer C:\IDT\Descriptions\workflow_photos
 
 # Check installed models
 idt check-models
