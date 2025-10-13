@@ -192,8 +192,8 @@ imagedescriber_v[VERSION]_arm64.zip
 
 ✅ **No changes to main requirements.txt** - PyQt6 still there for now  
 ✅ **No changes to scripts/** - All scripts untouched  
-✅ **No changes to main IDT build** - build.bat, final_working.spec unchanged  
-✅ **No changes to create_distribution.bat** - Main packaging untouched
+✅ **No changes to main IDT build** - build_idt.bat, final_working.spec unchanged  
+✅ **No changes to package_idt.bat** - Main packaging untouched
 
 **Rationale:**
 - You're close to release, testing with current build

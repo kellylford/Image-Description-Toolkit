@@ -27,7 +27,6 @@ if errorlevel 1 (
     pip install pyinstaller
     if errorlevel 1 (
         echo ERROR: Failed to install PyInstaller.
-        pause
         exit /b 1
     )
     echo.
@@ -41,7 +40,6 @@ if errorlevel 1 (
     pip install -r requirements.txt
     if errorlevel 1 (
         echo ERROR: Failed to install dependencies.
-        pause
         exit /b 1
     )
     echo.
@@ -58,7 +56,6 @@ REM Check if scripts directory exists
 if not exist "%SCRIPTS_DIR%" (
     echo ERROR: Scripts directory not found at: %SCRIPTS_DIR%
     echo ImageDescriber requires the scripts directory.
-    pause
     exit /b 1
 )
 
@@ -106,7 +103,6 @@ if errorlevel 1 (
     echo ========================================================================
     echo BUILD FAILED
     echo ========================================================================
-    pause
     exit /b 1
 )
 
@@ -119,4 +115,3 @@ echo Architecture: %ARCH%
 echo.
 echo To test: cd dist ^&^& ImageDescriber_%ARCH%.exe
 echo.
-pause

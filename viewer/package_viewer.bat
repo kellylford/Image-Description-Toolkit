@@ -33,7 +33,6 @@ if not exist "dist\viewer_%ARCH%.exe" (
     echo.
     echo Please run build_viewer.bat first to create the executable.
     echo.
-    pause
     exit /b 1
 )
 
@@ -55,7 +54,6 @@ echo [1/3] Copying executable...
 copy "dist\viewer_%ARCH%.exe" "%STAGE_DIR%\viewer.exe" >nul
 if errorlevel 1 (
     echo ERROR: Failed to copy executable
-    pause
     exit /b 1
 )
 
@@ -126,7 +124,6 @@ powershell -Command "Compress-Archive -Path '%STAGE_DIR%\*' -DestinationPath '%Z
 
 if errorlevel 1 (
     echo ERROR: Failed to create ZIP file
-    pause
     exit /b 1
 )
 
@@ -148,4 +145,3 @@ echo   - viewer.exe
 echo   - README.txt
 echo   - LICENSE.txt
 echo.
-pause

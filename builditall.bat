@@ -32,7 +32,6 @@ echo   4. ImageDescriber
 echo.
 echo Make sure all virtual environments are set up before continuing.
 echo.
-pause
 
 set BUILD_ERRORS=0
 
@@ -42,7 +41,7 @@ echo [1/4] Building IDT (main toolkit)...
 echo ========================================================================
 echo.
 
-call build.bat
+call build_idt.bat
 if errorlevel 1 (
     echo ERROR: IDT build failed!
     set /a BUILD_ERRORS+=1
@@ -145,4 +144,3 @@ if %BUILD_ERRORS%==0 (
 )
 
 echo.
-pause

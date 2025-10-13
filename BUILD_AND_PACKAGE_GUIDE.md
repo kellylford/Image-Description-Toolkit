@@ -7,6 +7,11 @@
 
 ## Quick Start
 
+### Complete Release (Build + Package):
+```bash
+releaseitall.bat
+```
+
 ### Build Everything:
 ```bash
 builditall.bat
@@ -17,10 +22,14 @@ builditall.bat
 packageitall.bat
 ```
 
-### Do Both:
+### Typical Workflow:
 ```bash
-builditall.bat
-packageitall.bat
+# One command does it all!
+releaseitall.bat
+
+# Or step by step:
+builditall.bat       # Build first
+packageitall.bat     # Package after
 ```
 
 ---
@@ -28,7 +37,7 @@ packageitall.bat
 ## What Gets Built
 
 ### 1. IDT (Main Toolkit)
-- **Build script:** `build.bat`
+- **Build script:** `build_idt.bat`
 - **Output:** `dist/idt.exe`
 - **Uses:** Root Python environment or `.venv`
 
@@ -52,7 +61,7 @@ packageitall.bat
 ## What Gets Packaged
 
 ### 1. IDT Distribution
-- **Package script:** `create_distribution.bat`
+- **Package script:** `package_idt.bat`
 - **Output:** `releases/ImageDescriptionToolkit_v[VERSION].zip`
 - **Contains:** idt.exe, bat files, docs, all distribution files
 
@@ -114,7 +123,7 @@ packageitall.bat
 
 ### builditall.bat does:
 
-1. ✅ Builds IDT using `build.bat`
+1. ✅ Builds IDT using `build_idt.bat`
 2. ✅ Activates `viewer/.venv` and builds viewer
 3. ✅ Activates `prompt_editor/.venv` and builds prompt editor
 4. ✅ Activates `imagedescriber/.venv` and builds imagedescriber
@@ -123,7 +132,7 @@ packageitall.bat
 
 ### packageitall.bat does:
 
-1. ✅ Packages IDT using `create_distribution.bat`
+1. ✅ Packages IDT using `package_idt.bat`
 2. ✅ Packages viewer and moves ZIP to `releases/`
 3. ✅ Packages prompt editor and moves ZIP to `releases/`
 4. ✅ Packages imagedescriber and moves ZIP to `releases/`
@@ -177,8 +186,8 @@ If you only want to build/package one app:
 
 ```bash
 # Just IDT
-build.bat
-create_distribution.bat
+build_idt.bat
+package_idt.bat
 
 # Just Viewer
 cd viewer
@@ -206,13 +215,29 @@ deactivate
 
 ## Typical Workflow
 
-### Full Release Process:
+### Full Release Process (RECOMMENDED):
 
 ```bash
 # 1. Update VERSION file
 echo 1.2.3 > VERSION
 
-# 2. Build everything
+# 2. Build and package everything in one command
+releaseitall.bat
+
+# 3. Verify packages in releases/ directory
+dir releases\*.zip
+
+# 4. Upload to GitHub
+# All ZIPs are ready in releases/ directory
+```
+
+### Step-by-Step Process:
+
+```bash
+# 1. Update VERSION file
+echo 1.2.3 > VERSION
+
+# 2. Build all applications
 builditall.bat
 
 # 3. Test executables
@@ -221,7 +246,7 @@ viewer\dist\viewer_arm64.exe
 prompt_editor\dist\prompt_editor_arm64.exe
 imagedescriber\dist\ImageDescriber_arm64.exe
 
-# 4. Package everything
+# 4. Package all applications
 packageitall.bat
 
 # 5. Upload releases
@@ -243,29 +268,37 @@ packageitall.bat
 
 ## Time Estimates
 
+**releaseitall.bat:** ~10-15 minutes (complete build + package)
+- Fully automated, no prompts
+- Runs builditall.bat + packageitall.bat
+
 **builditall.bat:** ~5-10 minutes (depending on system)
 - IDT: ~2-3 minutes
 - Viewer: ~1-2 minutes
 - Prompt Editor: ~1 minute
 - ImageDescriber: ~2-3 minutes
+- No user interaction required
 
 **packageitall.bat:** ~1-2 minutes
 - Mostly file copying and ZIP creation
 - Very fast
+- No prompts
 
-**Total release time:** ~10-15 minutes from start to finish ✅
+**Total release time:** ~10-15 minutes from start to finish ✅  
+**User interaction:** NONE - Completely automated ✅
 
 ---
 
 ## Benefits
 
-✅ **One command to build all**  
-✅ **One command to package all**  
-✅ **All releases in one directory**  
+✅ **One command for complete release** - `releaseitall.bat`  
+✅ **No user prompts** - Completely automated  
+✅ **All releases in one directory** - `releases/`  
 ✅ **Automatic venv activation/deactivation**  
 ✅ **Error tracking across all builds**  
-✅ **No need to chase files in different directories**  
-✅ **Perfect for release workflow**
+✅ **Continues on non-fatal errors**  
+✅ **Clear status messages**  
+✅ **Perfect for CI/CD workflows**
 
 ---
 

@@ -37,7 +37,6 @@ if errorlevel 1 (
     echo Or if using venv:
     echo     .venv\Scripts\pip.exe install pyinstaller
     echo.
-    pause
     exit /b 1
 )
 
@@ -47,7 +46,6 @@ if not exist "final_working.spec" (
     echo.
     echo Please ensure you are running this script from the project root directory.
     echo.
-    pause
     exit /b 1
 )
 
@@ -65,7 +63,6 @@ if errorlevel 1 (
     echo.
     echo ERROR: Build failed!
     echo.
-    pause
     exit /b 1
 )
 echo     Done.
@@ -75,7 +72,6 @@ echo [3/4] Verifying build...
 if not exist "dist\idt.exe" (
     echo ERROR: Executable was not created!
     echo.
-    pause
     exit /b 1
 )
 
@@ -104,6 +100,5 @@ echo Executable location: dist\idt.exe
 echo.
 echo Next steps:
 echo   1. Test the executable: dist\idt.exe help
-echo   2. Create distribution package with create_distribution.bat
+echo   2. Create distribution package with package_idt.bat
 echo.
-pause

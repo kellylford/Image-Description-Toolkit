@@ -33,7 +33,6 @@ if not exist "dist\ImageDescriber_%ARCH%.exe" (
     echo.
     echo Please run build_imagedescriber.bat first to create the executable.
     echo.
-    pause
     exit /b 1
 )
 
@@ -55,7 +54,6 @@ echo [1/4] Copying executable...
 copy "dist\ImageDescriber_%ARCH%.exe" "%STAGE_DIR%\ImageDescriber.exe" >nul
 if errorlevel 1 (
     echo ERROR: Failed to copy executable
-    pause
     exit /b 1
 )
 
@@ -145,7 +143,6 @@ powershell -Command "Compress-Archive -Path '%STAGE_DIR%\*' -DestinationPath '%Z
 
 if errorlevel 1 (
     echo ERROR: Failed to create ZIP file
-    pause
     exit /b 1
 )
 
@@ -168,4 +165,3 @@ echo   - README.txt
 echo   - LICENSE.txt
 echo   - Setup and documentation files ^(if available^)
 echo.
-pause

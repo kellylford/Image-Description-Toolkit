@@ -26,7 +26,6 @@ echo.
 echo This will create distribution packages for all four applications.
 echo All packages will be placed in the releases/ directory.
 echo.
-pause
 
 set PACKAGE_ERRORS=0
 
@@ -39,7 +38,7 @@ echo [1/4] Packaging IDT (main toolkit)...
 echo ========================================================================
 echo.
 
-call create_distribution.bat
+call package_idt.bat
 if errorlevel 1 (
     echo ERROR: IDT packaging failed!
     set /a PACKAGE_ERRORS+=1
@@ -156,4 +155,3 @@ if exist "releases" (
 )
 
 echo.
-pause

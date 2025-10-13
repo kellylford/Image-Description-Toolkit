@@ -27,7 +27,6 @@ if errorlevel 1 (
     pip install pyinstaller
     if errorlevel 1 (
         echo ERROR: Failed to install PyInstaller.
-        pause
         exit /b 1
     )
     echo.
@@ -40,7 +39,6 @@ if errorlevel 1 (
     pip install -r requirements.txt
     if errorlevel 1 (
         echo ERROR: Failed to install dependencies.
-        pause
         exit /b 1
     )
     echo.
@@ -59,7 +57,6 @@ if not exist "%SCRIPTS_DIR%" (
     echo The prompt editor needs scripts/image_describer_config.json to function.
     echo Build cannot continue without scripts directory.
     echo.
-    pause
     exit /b 1
 )
 
@@ -85,7 +82,6 @@ if errorlevel 1 (
     echo ========================================================================
     echo BUILD FAILED
     echo ========================================================================
-    pause
     exit /b 1
 )
 
@@ -98,4 +94,3 @@ echo Architecture: %ARCH%
 echo.
 echo To test: cd dist ^&^& prompt_editor_%ARCH%.exe
 echo.
-pause

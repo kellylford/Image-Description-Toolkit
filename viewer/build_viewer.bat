@@ -27,7 +27,6 @@ if errorlevel 1 (
     pip install pyinstaller
     if errorlevel 1 (
         echo ERROR: Failed to install PyInstaller.
-        pause
         exit /b 1
     )
     echo.
@@ -40,7 +39,6 @@ if errorlevel 1 (
     pip install -r requirements.txt
     if errorlevel 1 (
         echo ERROR: Failed to install dependencies.
-        pause
         exit /b 1
     )
     echo.
@@ -59,15 +57,7 @@ if not exist "%SCRIPTS_DIR%" (
     echo The redescribe feature will not work in the bundled executable.
     echo However, the viewer will still work for viewing HTML/Live modes.
     echo.
-    echo Do you want to continue building without scripts? ^(Y/N^)
-    choice /C YN /N
-    if errorlevel 2 (
-        echo Build cancelled.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo Building viewer WITHOUT scripts bundled...
+    echo Continuing to build viewer WITHOUT scripts bundled...
     echo.
     
     pyinstaller --onefile ^
@@ -103,7 +93,6 @@ if errorlevel 1 (
     echo ========================================================================
     echo BUILD FAILED
     echo ========================================================================
-    pause
     exit /b 1
 )
 
@@ -116,4 +105,3 @@ echo Architecture: %ARCH%
 echo.
 echo To test: cd dist ^&^& viewer_%ARCH%.exe
 echo.
-pause

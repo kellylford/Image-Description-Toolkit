@@ -6,7 +6,7 @@ REM This script creates a distributable ZIP file with the executable and
 REM all necessary files for end users.
 REM
 REM Prerequisites:
-REM   - Built executable in dist/ folder (run build.bat first)
+REM   - Built executable in dist/ folder (run build_idt.bat first)
 REM
 REM Output:
 REM   - releases/ImageDescriptionToolkit_v[VERSION].zip
@@ -27,9 +27,8 @@ REM Check if executable exists
 if not exist "dist\idt.exe" (
     echo ERROR: Executable not found!
     echo.
-    echo Please run build.bat first to create the executable.
+    echo Please run build_idt.bat first to create the executable.
     echo.
-    pause
     exit /b 1
 )
 
@@ -115,7 +114,6 @@ powershell -command "Compress-Archive -Path '%STAGE_DIR%\*' -DestinationPath 're
 if errorlevel 1 (
     echo ERROR: Failed to create ZIP file
     echo.
-    pause
     exit /b 1
 )
 
@@ -151,4 +149,3 @@ echo   3. Run batch files immediately - no Python needed!
 echo.
 echo Ready for distribution!
 echo.
-pause
