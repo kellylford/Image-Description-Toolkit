@@ -128,19 +128,13 @@ echo BUILD SUMMARY
 echo ========================================================================
 echo.
 
+echo BUILD COMPLETE
 if %BUILD_ERRORS%==0 (
-    echo SUCCESS: All applications built successfully!
-    echo.
-    echo Executables created:
-    echo   - dist\idt.exe
-    if exist "viewer\dist\viewer_*.exe" echo   - viewer\dist\viewer_*.exe
-    if exist "prompt_editor\dist\prompt_editor_*.exe" echo   - prompt_editor\dist\prompt_editor_*.exe
-    if exist "imagedescriber\dist\ImageDescriber_*.exe" echo   - imagedescriber\dist\ImageDescriber_*.exe
-    echo.
-    echo Next step: Run packageitall.bat to create distribution packages
+    echo SUCCESS: All applications built successfully
 ) else (
-    echo ERRORS ENCOUNTERED: %BUILD_ERRORS% build(s) failed
-    echo Please review the output above for error details.
+    echo ERRORS: %BUILD_ERRORS% build failures encountered
 )
 
 echo.
+
+exit /b 0
