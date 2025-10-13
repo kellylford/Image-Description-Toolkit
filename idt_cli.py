@@ -508,8 +508,8 @@ def main():
             result = subprocess.run(cmd, cwd=str(guided_script.parent))
             return result.returncode
     
-    elif command == 'viewer':
-        # Launch the viewer executable
+    elif command == 'viewer' or command == 'view':
+        # Launch the viewer executable with optional directory argument
         import subprocess
         import platform
         
@@ -547,16 +547,25 @@ def main():
             print("  build_viewer.bat")
             return 1
         
+        # Get any additional arguments to pass to viewer
+        viewer_args = sys.argv[2:]  # Everything after 'idt viewer'
+        
+        # Build command with arguments
+        cmd = [str(viewer_exe)] + viewer_args
+        
         # Launch viewer as separate process (detached)
         try:
             # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
             if sys.platform == 'win32':
-                subprocess.Popen([str(viewer_exe)], 
+                subprocess.Popen(cmd, 
                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
             else:
-                subprocess.Popen([str(viewer_exe)])
+                subprocess.Popen(cmd)
             
-            print(f"Launched viewer: {viewer_exe.name}")
+            if viewer_args:
+                print(f"Launched viewer: {viewer_exe.name} {' '.join(viewer_args)}")
+            else:
+                print(f"Launched viewer: {viewer_exe.name}")
             return 0
         except Exception as e:
             print(f"Error launching viewer: {e}")
@@ -587,7 +596,7 @@ USAGE:
 COMMANDS:
     guideme               Interactive wizard to build and run workflows
     workflow              Run image description workflow
-    viewer                Launch the GUI viewer for browsing results
+    viewer (or view)      Launch the GUI viewer for browsing results
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
@@ -604,8 +613,14 @@ EXAMPLES:
     # Run workflow with Ollama
     {base_call} workflow --provider ollama --model llava
 
-    # Launch viewer to browse results
+    # Launch viewer (empty)
     {base_call} viewer
+
+    # Launch viewer with specific directory
+    {base_call} viewer C:\\path\\to\\workflow_output
+
+    # Launch viewer with directory picker
+    {base_call} viewer --open
 
     # Run workflow with Claude
     {base_call} workflow --provider claude --model claude-opus-4
