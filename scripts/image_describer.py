@@ -697,18 +697,25 @@ class ImageDescriber:
         # Process each image with memory management
         success_count = 0
         skip_count = 0
+        newly_processed = 0  # Track images processed in this run (not skipped)
         overall_start_time = time.time()
+        
+        # Calculate how many images we expect to process (not skip)
+        already_done_count = len(already_described)
         
         for i, image_path in enumerate(image_files, 1):
             # Check if this image was already described (resume support)
             if str(image_path) in already_described:
                 skip_count += 1
-                logger.info(f"Skipping already-described image {i} of {len(image_files)}: {image_path.name}")
+                logger.info(f"Skipping already-described image {success_count + 1} of {len(image_files)}: {image_path.name}")
                 success_count += 1  # Count as success since it's already done
                 continue
             
             # Log progress and start time for this image
-            logger.info(f"Describing image {i} of {len(image_files)}: {image_path.name}")
+            newly_processed += 1
+            success_count += 1
+            # Show cumulative progress: where we are in total work
+            logger.info(f"Describing image {success_count} of {len(image_files)}: {image_path.name}")
             image_start_time = time.time()
             logger.info(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(image_start_time))}")
             
@@ -731,7 +738,6 @@ class ImageDescriber:
             if description:
                 # Write description to file with metadata and base directory for relative paths
                 if self.write_description_to_file(image_path, description, output_file, metadata, directory_path):
-                    success_count += 1
                     # Update progress file immediately after successful write
                     try:
                         with open(progress_file, 'a', encoding='utf-8') as pf:
@@ -758,7 +764,6 @@ class ImageDescriber:
         # Log overall completion summary
         overall_end_time = time.time()
         total_duration = overall_end_time - overall_start_time
-        newly_processed = success_count - skip_count
         logger.info(f"Processing complete. Successfully processed {success_count}/{len(image_files)} images")
         if skip_count > 0:
             logger.info(f"Skipped {skip_count} already-described images, processed {newly_processed} new images")
