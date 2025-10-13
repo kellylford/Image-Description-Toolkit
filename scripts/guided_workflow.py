@@ -117,7 +117,7 @@ def launch_viewer_for_workflow(output_dir: Path):
         if getattr(sys, 'frozen', False):
             # Running as executable
             base_dir = Path(sys.executable).parent
-            viewer_exe = base_dir / "viewer.exe"
+            viewer_exe = base_dir / "viewer" / "viewer.exe"
         else:
             # Running from source
             base_dir = Path(__file__).parent.parent

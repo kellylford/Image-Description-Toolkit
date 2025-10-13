@@ -1265,7 +1265,7 @@ def launch_viewer(output_dir: Path, logger: logging.Logger) -> None:
         if getattr(sys, 'frozen', False):
             # Running as executable
             base_dir = Path(sys.executable).parent
-            viewer_exe = base_dir / "viewer.exe"
+            viewer_exe = base_dir / "viewer" / "viewer.exe"
         else:
             # Running from source
             base_dir = Path(__file__).parent.parent
@@ -1333,30 +1333,35 @@ Workflow Steps:
 
 Examples:
   # Ollama (default)
-  python workflow.py media_folder
-  python workflow.py media_folder --output-dir results
-  python workflow.py photos --steps describe,html
-  python workflow.py videos --steps video,describe,html --model llava:7b
+  idt workflow media_folder
+  idt workflow media_folder --output-dir results
+  idt workflow photos --steps describe,html
+  idt workflow videos --steps video,describe,html --model llava:7b
   
   # OpenAI
-  python workflow.py photos --provider openai --model gpt-4o-mini --api-key-file ~/openai.txt
-  python workflow.py media --provider openai --model gpt-4o --steps describe,html
+  idt workflow photos --provider openai --model gpt-4o-mini --api-key-file openai.txt
+  idt workflow media --provider openai --model gpt-4o --steps describe,html
   
   # Claude (Anthropic)
-  python workflow.py photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file ~/claude.txt
-  python workflow.py media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
+  idt workflow photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file claude.txt
+  idt workflow media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
   
   # Configuration
-  python workflow.py mixed_media --output-dir analysis --config my_workflow.json
+  idt workflow mixed_media --output-dir analysis --config my_workflow.json
   
 Resume Examples:
-  python workflow.py --resume workflow_output_20250919_153443
-  python workflow.py --resume /path/to/interrupted/workflow
+  idt workflow --resume workflow_output_20250919_153443
+  idt workflow --resume /path/to/interrupted/workflow
   
   # ⚠️ Cloud providers require API key when resuming:
-  python workflow.py --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file ~/openai.txt
-  python workflow.py --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file ~/claude.txt
+  idt workflow --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file openai.txt
+  idt workflow --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file claude.txt
   # See docs/WORKFLOW_RESUME_API_KEY.md for details
+  
+Viewing Results:
+  # After successful completion, you'll be prompted to launch the viewer
+  # Or launch it manually anytime:
+  idt viewer [workflow_directory]
         """
     )
     
