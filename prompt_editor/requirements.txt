@@ -1,0 +1,30 @@
+# ============================================================================
+# Prompt Editor - Complete Dependencies
+# ============================================================================
+# Install in prompt_editor's virtual environment:
+#   cd prompt_editor
+#   python -m venv .venv
+#   .venv\Scripts\activate
+#   pip install -r requirements.txt
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# REQUIRED - GUI Framework
+# ----------------------------------------------------------------------------
+PyQt6>=6.4.0           # Qt6 GUI framework for the editor interface
+
+# ----------------------------------------------------------------------------
+# OPTIONAL - AI Provider Support (for model discovery)
+# ----------------------------------------------------------------------------
+ollama>=0.3.0          # Ollama Python client for model discovery
+openai>=1.0.0          # OpenAI API support
+anthropic>=0.18.0      # Anthropic Claude API support
+requests>=2.25.0       # HTTP requests
+
+# ----------------------------------------------------------------------------
+# REQUIRED - Build Tool
+# ----------------------------------------------------------------------------
+pyinstaller>=6.0.0     # For building the executable
+
+# Note: The prompt editor reads from scripts/image_describer_config.json
+# The scripts directory is bundled when building the executable.

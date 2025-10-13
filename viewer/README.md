@@ -47,10 +47,21 @@ viewer.exe --help
 ### Prerequisites
 
 - Python 3.10+
-- PyQt6
+- PyQt6 (install from `requirements.txt`)
 - PyInstaller
 
-### Build Command
+### Installation
+
+```bash
+cd viewer
+pip install -r requirements.txt
+pip install pyinstaller
+```
+
+### Build Process
+
+**Note:** PyInstaller builds for the architecture of the Python interpreter running the build.
+Cross-compilation is not supported on Windows.
 
 ```bash
 cd viewer
@@ -59,15 +70,39 @@ build_viewer.bat
 
 The build script will:
 1. Detect your system architecture (AMD64 or ARM64)
-2. Create a standalone executable in `dist/viewer/`
-3. Bundle all necessary dependencies
-4. Include the scripts directory for redescription functionality
+2. Install dependencies if needed (PyQt6, PyInstaller)
+3. Create a standalone executable in `dist/`
+4. Bundle the scripts directory for redescribe functionality
+5. Include all necessary PyQt6 components
 
-### Output
+### Build Output
 
-- **Executable**: `dist/viewer/viewer_<arch>.exe`
-  - Example: `viewer_amd64.exe` on 64-bit Windows
-- **Architecture-specific**: Automatically detects and builds for your system
+- **Executable**: `dist/viewer_<arch>.exe`
+  - ARM64 systems: `viewer_arm64.exe`
+  - AMD64 systems: `viewer_amd64.exe`
+- **Size**: Approximately 40-60MB (includes PyQt6)
+
+### Creating a Distribution Package
+
+After building, create a distributable ZIP:
+
+```bash
+cd viewer
+package_viewer.bat
+```
+
+This creates: `viewer_releases/viewer_v[VERSION]_[ARCH].zip` containing:
+- `viewer.exe` (renamed from `viewer_<arch>.exe`)
+- `README.txt` (usage instructions)
+- `LICENSE.txt` (license file)
+
+### Architecture Notes
+
+- **ARM64 Windows**: Builds ARM64 native executable (fast)
+- **AMD64 Windows**: Builds AMD64 executable (compatible with ARM64 via emulation)
+- Both architectures work, but native builds perform better
+- The viewer built on ARM64 only runs on ARM64 Windows
+- The viewer built on AMD64 runs on both AMD64 and ARM64 Windows
 
 ## Integration with IDT
 

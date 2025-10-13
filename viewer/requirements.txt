@@ -1,0 +1,30 @@
+# ============================================================================
+# Viewer Application - Complete Dependencies
+# ============================================================================
+# Install in viewer's virtual environment:
+#   cd viewer
+#   python -m venv .venv
+#   .venv\Scripts\activate
+#   pip install -r requirements.txt
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# REQUIRED - GUI Framework
+# ----------------------------------------------------------------------------
+PyQt6>=6.4.0           # Qt6 GUI framework for the viewer interface
+
+# ----------------------------------------------------------------------------
+# REQUIRED - For Redescribe Feature (uses scripts/image_describer.py)
+# ----------------------------------------------------------------------------
+Pillow>=10.0.0         # Image processing
+requests>=2.25.0       # HTTP requests
+ollama>=0.3.0          # Ollama Python client for redescribe feature
+
+# ----------------------------------------------------------------------------
+# REQUIRED - Build Tool
+# ----------------------------------------------------------------------------
+pyinstaller>=6.0.0     # For building the executable
+
+# Note: The viewer bundles the scripts directory which uses these dependencies
+# for the redescribe feature. Even if you don't plan to use redescribe,
+# these are needed for a successful build.

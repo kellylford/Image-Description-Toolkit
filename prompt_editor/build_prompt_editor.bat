@@ -1,69 +1,101 @@
 @echo off
-echo Building Image Description Prompt Editor...
+echo ========================================================================
+echo Building Image Description Prompt Editor
+echo ========================================================================
 echo.
 
-REM Get architecture using Python
-for /f "tokens=*" %%i in ('C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/python.exe -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
+REM Detect architecture using current Python
+echo Detecting system architecture...
+for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
 
-REM Map architecture names
+REM Map architecture names for output filename
 if "%ARCH%"=="aarch64" set ARCH=arm64
 if "%ARCH%"=="arm64" set ARCH=arm64
 if "%ARCH%"=="amd64" set ARCH=amd64
 if "%ARCH%"=="x86_64" set ARCH=amd64
 
-echo Detected architecture: %ARCH%
+echo Building for: %ARCH%
+echo.
+echo NOTE: PyInstaller builds for the current Python architecture.
+echo       Cross-compilation is not supported on Windows.
 echo.
 
 REM Check if PyInstaller is installed
-C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/python.exe -c "import PyInstaller" 2>nul
+python -c "import PyInstaller" 2>nul
 if errorlevel 1 (
     echo PyInstaller not found. Installing...
-    C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/pip.exe install pyinstaller
+    pip install pyinstaller
     if errorlevel 1 (
-        echo Failed to install PyInstaller. Exiting.
+        echo ERROR: Failed to install PyInstaller.
         pause
         exit /b 1
     )
+    echo.
+)
+
+REM Check if PyQt6 is installed
+python -c "import PyQt6" 2>nul
+if errorlevel 1 (
+    echo PyQt6 not found. Installing prompt editor dependencies...
+    pip install -r requirements.txt
+    if errorlevel 1 (
+        echo ERROR: Failed to install dependencies.
+        pause
+        exit /b 1
+    )
+    echo.
 )
 
 REM Create output directory
 if not exist "dist" mkdir dist
-if not exist "dist\prompt_editor" mkdir dist\prompt_editor
 
-REM Build the executable
-echo Building prompt editor executable...
+REM Get absolute path to scripts directory (one level up)
+set SCRIPTS_DIR=%cd%\..\scripts
+
+REM Check if scripts directory exists
+if not exist "%SCRIPTS_DIR%" (
+    echo WARNING: Scripts directory not found at: %SCRIPTS_DIR%
+    echo.
+    echo The prompt editor needs scripts/image_describer_config.json to function.
+    echo Build cannot continue without scripts directory.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo Scripts directory found: %SCRIPTS_DIR%
+echo Building prompt editor WITH scripts bundled...
 echo.
 
-C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/pyinstaller.exe --onefile ^
+REM Build the executable
+pyinstaller --onefile ^
     --windowed ^
     --name "prompt_editor_%ARCH%" ^
-    --distpath "dist\prompt_editor" ^
-    --workpath "build\prompt_editor_%ARCH%" ^
+    --distpath "dist" ^
+    --workpath "build" ^
     --specpath "build" ^
-    --add-data "C:\Users\kelly\GitHub\Image-Description-Toolkit\scripts;scripts" ^
+    --add-data "%SCRIPTS_DIR%;scripts" ^
     --hidden-import PyQt6.QtCore ^
     --hidden-import PyQt6.QtGui ^
     --hidden-import PyQt6.QtWidgets ^
-    prompt_editor\prompt_editor.py
+    prompt_editor.py
 
 if errorlevel 1 (
-    echo Build failed!
+    echo.
+    echo ========================================================================
+    echo BUILD FAILED
+    echo ========================================================================
     pause
     exit /b 1
 )
 
 echo.
-echo Build completed successfully!
-echo Executable created: dist\prompt_editor\prompt_editor_%ARCH%.exe
+echo ========================================================================
+echo BUILD SUCCESSFUL
+echo ========================================================================
+echo Executable created: dist\prompt_editor_%ARCH%.exe
+echo Architecture: %ARCH%
 echo.
-
-REM Test the executable
-echo Testing executable...
+echo To test: cd dist ^&^& prompt_editor_%ARCH%.exe
 echo.
-cd dist\prompt_editor
-start "" "prompt_editor_%ARCH%.exe"
-cd ..\..
-
-echo.
-echo Build and test completed!
 pause

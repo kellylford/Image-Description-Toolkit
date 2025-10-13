@@ -1,0 +1,51 @@
+# ============================================================================
+# ImageDescriber GUI - Complete Dependencies
+# ============================================================================
+# Install in imagedescriber's virtual environment:
+#   cd imagedescriber
+#   python -m venv .venv
+#   .venv\Scripts\activate
+#   pip install -r requirements.txt
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# REQUIRED - GUI Framework
+# ----------------------------------------------------------------------------
+PyQt6>=6.4.0           # Qt6 GUI framework
+
+# ----------------------------------------------------------------------------
+# REQUIRED - Image Processing
+# ----------------------------------------------------------------------------
+Pillow>=10.0.0         # Image processing
+pillow-heif>=0.13.0    # HEIC/HEIF image support
+opencv-python>=4.8.0   # Video frame extraction
+numpy>=1.24.0          # Array operations (required by opencv)
+
+# ----------------------------------------------------------------------------
+# REQUIRED - AI Providers
+# ----------------------------------------------------------------------------
+requests>=2.25.0       # HTTP requests
+ollama>=0.3.0          # Ollama Python client
+openai>=1.0.0          # OpenAI API
+anthropic>=0.18.0      # Anthropic Claude API
+
+# ----------------------------------------------------------------------------
+# REQUIRED - Utilities
+# ----------------------------------------------------------------------------
+tqdm>=4.60.0           # Progress bars
+
+# ----------------------------------------------------------------------------
+# REQUIRED - Build Tool
+# ----------------------------------------------------------------------------
+pyinstaller>=6.0.0     # For building the executable
+
+# ----------------------------------------------------------------------------
+# OPTIONAL - Advanced Features
+# ----------------------------------------------------------------------------
+# Uncomment if you need GroundingDINO object detection:
+# torch>=2.0.0         # PyTorch for GroundingDINO
+# transformers>=4.30.0 # HuggingFace transformers
+# groundingdino        # GroundingDINO package
+
+# Note: The imagedescriber bundles scripts directory for configurations
+# and includes all necessary AI provider dependencies.

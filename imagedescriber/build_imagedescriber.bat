@@ -1,97 +1,122 @@
 @echo off
-echo Building ImageDescriber GUI Application...
+echo ========================================================================
+echo Building ImageDescriber GUI Application
+echo ========================================================================
+echo.
 
-REM Get the directory where this script is located
-set "SCRIPT_DIR=%~dp0"
-set "ROOT_DIR=%SCRIPT_DIR%.."
+REM Detect architecture using current Python
+echo Detecting system architecture...
+for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
 
-REM Check if virtual environment exists
-if not exist "%ROOT_DIR%\.venv" (
-    echo Error: Virtual environment not found at %ROOT_DIR%\.venv
-    echo Please create and activate the virtual environment first.
+REM Map architecture names for output filename
+if "%ARCH%"=="aarch64" set ARCH=arm64
+if "%ARCH%"=="arm64" set ARCH=arm64
+if "%ARCH%"=="amd64" set ARCH=amd64
+if "%ARCH%"=="x86_64" set ARCH=amd64
+
+echo Building for: %ARCH%
+echo.
+echo NOTE: PyInstaller builds for the current Python architecture.
+echo       Cross-compilation is not supported on Windows.
+echo.
+
+REM Check if PyInstaller is installed
+python -c "import PyInstaller" 2>nul
+if errorlevel 1 (
+    echo PyInstaller not found. Installing...
+    pip install pyinstaller
+    if errorlevel 1 (
+        echo ERROR: Failed to install PyInstaller.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+REM Check if dependencies are installed
+echo Checking dependencies...
+python -c "import PyQt6" 2>nul
+if errorlevel 1 (
+    echo Installing ImageDescriber dependencies...
+    pip install -r requirements.txt
+    if errorlevel 1 (
+        echo ERROR: Failed to install dependencies.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+REM Create output directory
+if not exist "dist" mkdir dist
+
+REM Get absolute paths
+set SCRIPTS_DIR=%cd%\..\scripts
+set MODELS_DIR=%cd%\..\models
+
+REM Check if scripts directory exists
+if not exist "%SCRIPTS_DIR%" (
+    echo ERROR: Scripts directory not found at: %SCRIPTS_DIR%
+    echo ImageDescriber requires the scripts directory.
     pause
     exit /b 1
 )
 
-REM Get Python executable from virtual environment
-set "PYTHON_EXE=%ROOT_DIR%\.venv\Scripts\python.exe"
+echo Scripts directory found: %SCRIPTS_DIR%
+echo Models directory: %MODELS_DIR%
+echo.
+echo Building ImageDescriber with all dependencies...
+echo.
 
-REM Verify Python executable exists
-if not exist "%PYTHON_EXE%" (
-    echo Error: Python executable not found at %PYTHON_EXE%
+REM Build the executable
+pyinstaller --onefile ^
+    --windowed ^
+    --name "ImageDescriber_%ARCH%" ^
+    --distpath "dist" ^
+    --workpath "build" ^
+    --specpath "build" ^
+    --add-data "%SCRIPTS_DIR%;scripts" ^
+    --add-data "%cd%\ai_providers.py;." ^
+    --add-data "%cd%\data_models.py;." ^
+    --add-data "%cd%\worker_threads.py;." ^
+    --add-data "%cd%\ui_components.py;." ^
+    --add-data "%cd%\dialogs.py;." ^
+    --hidden-import "ollama" ^
+    --hidden-import "pillow_heif" ^
+    --hidden-import "cv2" ^
+    --hidden-import "ai_providers" ^
+    --hidden-import "data_models" ^
+    --hidden-import "worker_threads" ^
+    --hidden-import "ui_components" ^
+    --hidden-import "dialogs" ^
+    --hidden-import "PyQt6.QtCore" ^
+    --hidden-import "PyQt6.QtGui" ^
+    --hidden-import "PyQt6.QtWidgets" ^
+    --exclude-module "onnx.reference" ^
+    --exclude-module "onnx.reference.ops" ^
+    --exclude-module "torch.testing" ^
+    --exclude-module "pytest" ^
+    --exclude-module "polars" ^
+    --exclude-module "thop" ^
+    --exclude-module "scipy.signal" ^
+    imagedescriber.py
+
+if errorlevel 1 (
+    echo.
+    echo ========================================================================
+    echo BUILD FAILED
+    echo ========================================================================
     pause
     exit /b 1
 )
 
-REM Detect architecture
-for /f "tokens=*" %%i in ('%PYTHON_EXE% -c "import platform; print(platform.machine().lower())"') do set "ARCH=%%i"
-
-REM Fallback if architecture detection failed
-if "%ARCH%"=="" set "ARCH=amd64"
-
-if "%ARCH%"=="amd64" (
-    set "ARCH_NAME=AMD64"
-) else if "%ARCH%"=="arm64" (
-    set "ARCH_NAME=ARM64"
-) else (
-    set "ARCH_NAME=%ARCH%"
-)
-
-echo Detected architecture: %ARCH_NAME%
 echo.
-
-REM Ask user what to build
-echo What would you like to build?
-echo [1] Current architecture only (%ARCH_NAME%)
-echo [2] AMD64 only
-echo [3] ARM64 only  
-echo [4] Both AMD64 and ARM64
+echo ========================================================================
+echo BUILD SUCCESSFUL
+echo ========================================================================
+echo Executable created: dist\ImageDescriber_%ARCH%.exe
+echo Architecture: %ARCH%
 echo.
-set /p choice="Enter your choice (1-4): "
-
-if "%choice%"=="1" goto build_current
-if "%choice%"=="2" goto build_amd64
-if "%choice%"=="3" goto build_arm64
-if "%choice%"=="4" goto build_both
-goto build_current
-
-:build_current
-if "%ARCH%"=="amd64" (
-    call "%SCRIPT_DIR%build_imagedescriber_amd.bat"
-) else (
-    call "%SCRIPT_DIR%build_imagedescriber_arm.bat"
-)
-goto end
-
-:build_amd64
-call "%SCRIPT_DIR%build_imagedescriber_amd.bat"
-goto end
-
-:build_arm64
-call "%SCRIPT_DIR%build_imagedescriber_arm.bat"
-goto end
-
-:build_both
-echo.
-echo Building both architectures...
-echo.
-echo ========================================
-echo Building AMD64...
-echo ========================================
-call "%SCRIPT_DIR%build_imagedescriber_amd.bat"
-echo.
-echo ========================================
-echo Building ARM64...
-echo ========================================
-call "%SCRIPT_DIR%build_imagedescriber_arm.bat"
-echo.
-echo ========================================
-echo Build Summary
-echo ========================================
-echo Both builds completed.
-echo Check the output above for any errors.
+echo To test: cd dist ^&^& ImageDescriber_%ARCH%.exe
 echo.
 pause
-goto end
-
-:end
