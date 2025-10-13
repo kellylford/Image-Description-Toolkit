@@ -326,7 +326,8 @@ class WorkflowOrchestrator:
                     str(input_dir),
                     "--config", config_file,
                     "--output-dir", str(output_dir),
-                    "--log-dir", str(self.config.base_output_dir)
+                    "--log-dir", str(self.config.base_output_dir),
+                    "--quiet"  # Suppress subprocess console output to avoid duplicates
                 ]
             else:
                 # Running as Python script - use direct script call
@@ -335,17 +336,13 @@ class WorkflowOrchestrator:
                     str(input_dir),
                     "--config", config_file,
                     "--output-dir", str(output_dir),
-                    "--log-dir", str(self.config.base_output_dir)
+                    "--log-dir", str(self.config.base_output_dir),
+                    "--quiet"  # Suppress subprocess console output to avoid duplicates
                 ]
             
             self.logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
-            
-            # Log the subprocess output for transparency
-            if result.stdout.strip():
-                self.logger.info(f"video_frame_extractor.py output:\n{result.stdout}")
-            if result.stderr.strip():
-                self.logger.warning(f"video_frame_extractor.py stderr:\n{result.stderr}")
+            # Stream output directly to terminal for real-time progress feedback
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
             
             if result.returncode == 0:
                 self.logger.info("Video frame extraction completed successfully")
@@ -360,8 +357,8 @@ class WorkflowOrchestrator:
                     "extracted_frames": len(extracted_frames)
                 }
             else:
-                self.logger.error(f"Video frame extraction failed: {result.stderr}")
-                return {"success": False, "error": result.stderr}
+                self.logger.error(f"Video frame extraction failed with exit code {result.returncode}")
+                return {"success": False, "error": f"Process failed with exit code {result.returncode}. Check log file for details."}
                 
         except Exception as e:
             self.logger.error(f"Error during video frame extraction: {e}")
@@ -402,7 +399,8 @@ class WorkflowOrchestrator:
                     "--output", str(output_dir),
                     "--recursive",
                     "--quality", str(step_config.get("quality", 95)),
-                    "--log-dir", str(self.config.base_output_dir / "logs")
+                    "--log-dir", str(self.config.base_output_dir / "logs"),
+                    "--quiet"  # Suppress subprocess console output to avoid duplicates
                 ]
             else:
                 # Running as Python script - use direct script call
@@ -412,20 +410,16 @@ class WorkflowOrchestrator:
                     "--output", str(output_dir),
                     "--recursive",
                     "--quality", str(step_config.get("quality", 95)),
-                    "--log-dir", str(self.config.base_output_dir / "logs")
+                    "--log-dir", str(self.config.base_output_dir / "logs"),
+                    "--quiet"  # Suppress subprocess console output to avoid duplicates
                 ]
             
             if not step_config.get("keep_metadata", True):
                 cmd.append("--no-metadata")
             
             self.logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
-            
-            # Log the subprocess output for transparency
-            if result.stdout.strip():
-                self.logger.info(f"ConvertImage.py output:\n{result.stdout}")
-            if result.stderr.strip():
-                self.logger.warning(f"ConvertImage.py stderr:\n{result.stderr}")
+            # Stream output directly to terminal for real-time progress feedback
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
             
             if result.returncode == 0:
                 self.logger.info("Image conversion completed successfully")
@@ -440,8 +434,8 @@ class WorkflowOrchestrator:
                     "converted_images": len(converted_images)
                 }
             else:
-                self.logger.error(f"Image conversion failed: {result.stderr}")
-                return {"success": False, "error": result.stderr}
+                self.logger.error(f"Image conversion failed with exit code {result.returncode}")
+                return {"success": False, "error": f"Process failed with exit code {result.returncode}. Check log file for details."}
                 
         except Exception as e:
             self.logger.error(f"Error during image conversion: {e}")
@@ -637,12 +631,14 @@ class WorkflowOrchestrator:
             if getattr(sys, 'frozen', False):
                 # In frozen mode rely on dispatcher supporting 'image_describer' alias
                 cmd = [sys.executable, 'image_describer', str(temp_combined_dir), '--recursive',
-                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs'),
+                       '--quiet']  # Suppress subprocess console output to avoid duplicates
             else:
                 scripts_dir = Path(__file__).parent
                 image_describer_path = scripts_dir / 'image_describer.py'
                 cmd = [sys.executable, str(image_describer_path), str(temp_combined_dir), '--recursive',
-                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs'),
+                       '--quiet']  # Suppress subprocess console output to avoid duplicates
             
             # Add provider parameter
             if self.provider:
@@ -693,13 +689,8 @@ class WorkflowOrchestrator:
             }
             self._update_status_log()
             
-            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
-            
-            # Log the subprocess output for transparency
-            if result.stdout.strip():
-                self.logger.info(f"image_describer.py output:\n{result.stdout}")
-            if result.stderr.strip():
-                self.logger.warning(f"image_describer.py stderr:\n{result.stderr}")
+            # Stream output directly to terminal for real-time progress feedback
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
             
             # Mark description as no longer in progress
             if 'describe' in self.step_results:
@@ -737,8 +728,8 @@ class WorkflowOrchestrator:
                 self.logger.info("Image description completed successfully")
                 total_processed = len(combined_image_list)
             else:
-                self.logger.error(f"Image description failed: {result.stderr}")
-                return {"success": False, "error": f"Image description process failed: {result.stderr}"}
+                self.logger.error(f"Image description failed with exit code {result.returncode}")
+                return {"success": False, "error": f"Process failed with exit code {result.returncode}. Check log file for details."}
             
             # Check if description file was created
             target_desc_file = output_dir / "image_descriptions.txt"
@@ -829,13 +820,7 @@ class WorkflowOrchestrator:
                 cmd.append("--full")
             
             self.logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
-            
-            # Log the subprocess output for transparency
-            if result.stdout.strip():
-                self.logger.info(f"descriptions_to_html.py output:\n{result.stdout}")
-            if result.stderr.strip():
-                self.logger.warning(f"descriptions_to_html.py stderr:\n{result.stderr}")
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
             
             if result.returncode == 0:
                 self.logger.info("HTML generation completed successfully")
@@ -847,8 +832,8 @@ class WorkflowOrchestrator:
                     "html_file": html_file
                 }
             else:
-                self.logger.error(f"HTML generation failed: {result.stderr}")
-                return {"success": False, "error": result.stderr}
+                self.logger.error(f"HTML generation failed with exit code {result.returncode}")
+                return {"success": False, "error": f"Process failed with exit code {result.returncode}. Check log file for details."}
                 
         except Exception as e:
             self.logger.error(f"Error during HTML generation: {e}")
@@ -1133,11 +1118,17 @@ def parse_workflow_state(output_dir: Path) -> Dict[str, Any]:
             if "Starting workflow with steps:" in line:
                 # Extract steps: "Starting workflow with steps: video, convert, describe, html"
                 steps_part = line.split("Starting workflow with steps:")[1].strip()
+                # Remove timestamp if present (format: " - (2025-10-12 21:42:28,443)")
+                if " - (" in steps_part:
+                    steps_part = steps_part.split(" - (")[0].strip()
                 state["steps"] = [s.strip() for s in steps_part.split(',')]
             
             elif "Input directory:" in line:
                 # Extract input directory
                 input_part = line.split("Input directory:")[1].strip()
+                # Remove timestamp if present (format: " - (2025-10-12 21:42:28,443)")
+                if " - (" in input_part:
+                    input_part = input_part.split(" - (")[0].strip()
                 state["input_dir"] = input_part
             
             elif "Step '" in line and ("' completed successfully" in line or "' completed" in line):

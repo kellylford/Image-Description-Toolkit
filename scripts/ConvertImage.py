@@ -48,8 +48,8 @@ OPENAI_MAX_SIZE = 20 * 1024 * 1024  # 20MB (OpenAI's limit)
 # Target 3.75MB to account for base64 encoding overhead (~33% increase = 5MB base64)
 TARGET_MAX_SIZE = 3.75 * 1024 * 1024  # 3.75MB (safe margin accounting for base64 encoding)
 
-def setup_logging(log_dir=None, verbose=False):
-    """Setup logging for the converter"""
+def setup_logging(log_dir: str = None, verbose: bool = False, quiet: bool = False) -> None:
+    """Set up logging configuration."""
     global logger
     
     # Clear existing handlers
@@ -62,11 +62,12 @@ def setup_logging(log_dir=None, verbose=False):
     # Create formatter - screen reader friendly: level and message first, then timestamp
     formatter = logging.Formatter('%(levelname)s - %(message)s - (%(asctime)s)')
     
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Console handler (skip if quiet mode for subprocess calls)
+    if not quiet:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
     
     # File handler if log_dir is provided
     if log_dir:
@@ -424,10 +425,16 @@ Examples:
         help="Enable verbose logging"
     )
     
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress console output (log to file only)"
+    )
+    
     args = parser.parse_args()
     
     # Setup logging before any processing
-    setup_logging(args.log_dir, args.verbose)
+    setup_logging(args.log_dir, args.verbose, args.quiet)
     
     input_path = Path(args.input)
     

@@ -39,7 +39,7 @@ class VideoFrameExtractor:
             "errors": []
         }
         
-    def setup_logging(self):
+    def setup_logging(self, quiet: bool = False):
         """Set up logging to both console and file"""
         # Create log filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -77,14 +77,15 @@ class VideoFrameExtractor:
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
         
-        # Create console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
-        
         # Add handlers to logger
         self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
+        
+        # Console handler (skip if quiet mode for subprocess calls)
+        if not quiet:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
         
         self.logger.info(f"Video Frame Extractor started")
         self.logger.info(f"Log file: {log_filename.absolute()}")
@@ -633,6 +634,8 @@ def main():
     parser.add_argument("--output-dir", help="Output directory for extracted frames (overrides config)")
     parser.add_argument("--create-config", action="store_true",
                        help="Create a default config file and exit")
+    parser.add_argument("--quiet", action="store_true",
+                       help="Suppress console output (log to file only)")
     
     # Extraction mode options (mutually exclusive)
     mode_group = parser.add_mutually_exclusive_group()
@@ -655,6 +658,7 @@ def main():
         parser.error("Input file or directory is required unless using --create-config")
     
     extractor = VideoFrameExtractor(args.config, log_dir=args.log_dir)
+    extractor.setup_logging(quiet=args.quiet)
     
     # Override output directory if specified
     if args.output_dir:

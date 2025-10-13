@@ -57,21 +57,24 @@ from imagedescriber.ai_providers import (
 )
 
 
-# Configure basic logging (will be enhanced in main() if log-dir is provided)
+# Configure basic logging with screen reader friendly format
+# Format: LEVEL - message - (timestamp)
+# This provides a fallback before setup_logging() is called
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(levelname)s - %(message)s - (%(asctime)s)'
 )
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(log_dir: Optional[str] = None, verbose: bool = False) -> None:
+def setup_logging(log_dir: Optional[str] = None, verbose: bool = False, quiet: bool = False) -> None:
     """
     Set up logging configuration for the image describer
     
     Args:
         log_dir: Directory to write log files to
         verbose: Whether to enable debug logging
+        quiet: Whether to suppress console output (for subprocess calls)
     """
     global logger
     
@@ -87,11 +90,12 @@ def setup_logging(log_dir: Optional[str] = None, verbose: bool = False) -> None:
     # Screen reader friendly: reads important info first, timestamp last
     formatter = logging.Formatter('%(levelname)s - %(message)s - (%(asctime)s)')
     
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Console handler (skip if quiet mode for subprocess calls)
+    if not quiet:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
     
     # File handler if log_dir is provided
     if log_dir:
@@ -1305,11 +1309,16 @@ Configuration:
         action="store_true",
         help="List available AI providers and exit"
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress console output (log to file only)"
+    )
     
     args = parser.parse_args()
     
-    # Set up logging with log directory and verbosity
-    setup_logging(log_dir=args.log_dir, verbose=args.verbose)
+    # Set up logging with log directory, verbosity, and quiet mode
+    setup_logging(log_dir=args.log_dir, verbose=args.verbose, quiet=args.quiet)
     
     # Convert directory path to Path object
     directory_path = Path(args.directory)

@@ -803,8 +803,8 @@ Examples:
     parser.add_argument(
         '--json-output',
         type=str,
-        default='workflow_statistics.json',
-        help='JSON output filename (default: workflow_statistics.json). Saved in analysis/results/ directory.'
+        default='analysis/results/workflow_statistics.json',
+        help='JSON output filename (default: analysis/results/workflow_statistics.json)'
     )
     
     args = parser.parse_args()
