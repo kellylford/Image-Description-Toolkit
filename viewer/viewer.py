@@ -598,11 +598,12 @@ class ImageDescriptionViewer(QWidget):
         self.copy_img_btn.clicked.connect(self.copy_image_to_clipboard)
         btn_layout.addWidget(self.copy_img_btn)
 
-        self.redescribe_btn = QPushButton("Redescribe")
-        self.redescribe_btn.setAccessibleName("Redescribe Button")
-        self.redescribe_btn.setAccessibleDescription("Generate a new description for the selected image using a chosen model and prompt.")
-        self.redescribe_btn.clicked.connect(self.redescribe_image)
-        btn_layout.addWidget(self.redescribe_btn)
+        # Redescribe button removed - use 'idt' commands for re-processing
+        # self.redescribe_btn = QPushButton("Redescribe")
+        # self.redescribe_btn.setAccessibleName("Redescribe Button")
+        # self.redescribe_btn.setAccessibleDescription("Generate a new description for the selected image using a chosen model and prompt.")
+        # self.redescribe_btn.clicked.connect(self.redescribe_image)
+        # btn_layout.addWidget(self.redescribe_btn)
 
         layout.addLayout(btn_layout)
 
