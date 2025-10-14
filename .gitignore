@@ -10,6 +10,7 @@ test_*.py
 
 # Personal/local batch files
 run_analysis_to_results.bat
+tools/kelly_*.bat
 
 # Workflow output directories
 wf_*/
