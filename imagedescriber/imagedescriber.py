@@ -4,11 +4,11 @@ ImageDescriber - AI-Powered Image Description GUI
 
 A Qt6-based standalone application for processing images and generating AI descriptions.
 This app creates a document-based workspace where users can load directories of images,
-process them individually or in batches, and manage multiple descriptions per image.
+process them individually or process all images, and manage multiple descriptions per image.
 
 Features:
 - Document-based workspace (save/load projects)
-- Individual and batch image processing
+- Individual and multi-image processing
 - Multiple descriptions per image with editing/deletion
 - Video frame extraction with nested display
 - HEIC conversion support
@@ -4215,7 +4215,7 @@ class ImageDescriberGUI(QMainWindow):
         self.batch_processing: bool = False
         
         # Filter settings
-        self.filter_mode: str = "all"  # "all", "described", "undescribed", "batch", "videos", "images", or "processing"
+        self.filter_mode: str = "all"  # "all", "described", "undescribed", "videos", "images", or "processing"
         
         # Sorting settings
         self.sort_order: str = "date_oldest"  # "filename", "date_oldest", or "date_newest"
@@ -4281,15 +4281,11 @@ class ImageDescriberGUI(QMainWindow):
         left_layout.addWidget(QLabel("Images:"))
         self.image_list = QListWidget()
         self.image_list.setAccessibleName("Image List")
-        self.image_list.setAccessibleDescription("List of images and video frames in the workspace. Use arrow keys to navigate, P to process selected image, B to mark for batch.")
+        self.image_list.setAccessibleDescription("List of images and video frames in the workspace. Use arrow keys to navigate, P to process selected image.")
         self.image_list.itemSelectionChanged.connect(self.on_image_selection_changed)
         # Enable proper focus tracking
         self.image_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         left_layout.addWidget(self.image_list)
-
-        # Batch info
-        self.batch_label = QLabel("Batch Queue: 0 items")
-        left_layout.addWidget(self.batch_label)
 
         self.tree_splitter.addWidget(left_panel)
 
@@ -4349,10 +4345,6 @@ class ImageDescriberGUI(QMainWindow):
         self.media_list.itemSelectionChanged.connect(self.on_media_selection_changed)
         self.media_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         media_layout.addWidget(self.media_list)
-
-        # Batch info (shared with tree view)
-        self.batch_label_md = QLabel("Batch Queue: 0 items")
-        media_layout.addWidget(self.batch_label_md)
 
         self.master_detail_splitter.addWidget(media_panel)
 
@@ -4741,19 +4733,6 @@ class ImageDescriberGUI(QMainWindow):
         process_sel_action.triggered.connect(self.process_selected)
         process_menu.addAction(process_sel_action)
         
-        batch_mark_action = QAction("Mark for Batch", self)
-        batch_mark_action.setShortcut(QKeySequence("B"))
-        batch_mark_action.triggered.connect(self.toggle_batch_mark)
-        process_menu.addAction(batch_mark_action)
-        
-        batch_process_action = QAction("Process Batch", self)
-        batch_process_action.triggered.connect(self.process_batch)
-        process_menu.addAction(batch_process_action)
-        
-        clear_batch_action = QAction("Clear Batch Processing", self)
-        clear_batch_action.triggered.connect(self.clear_batch_selection)
-        process_menu.addAction(clear_batch_action)
-        
         self.stop_processing_action = QAction("Stop Processing", self)
         self.stop_processing_action.setEnabled(False)  # Disabled by default
         self.stop_processing_action.triggered.connect(self.stop_processing)
@@ -4872,11 +4851,6 @@ class ImageDescriberGUI(QMainWindow):
         self.filter_undescribed_action.setCheckable(True)
         self.filter_undescribed_action.triggered.connect(lambda: self.set_filter("undescribed"))
         filter_menu.addAction(self.filter_undescribed_action)
-        
-        self.filter_batch_action = QAction("Show Batch Items Only", self)
-        self.filter_batch_action.setCheckable(True)
-        self.filter_batch_action.triggered.connect(lambda: self.set_filter("batch"))
-        filter_menu.addAction(self.filter_batch_action)
         
         self.filter_videos_action = QAction("Show Videos Only", self)
         self.filter_videos_action.setCheckable(True)
@@ -5255,8 +5229,7 @@ class ImageDescriberGUI(QMainWindow):
         # Start with filter status
         filter_display = {
             "all": "All",
-            "described": "Described", 
-            "batch": "Batch",
+            "described": "Described",
             "videos": "Videos",
             "images": "Images",
             "processing": "Processing"
@@ -5281,8 +5254,6 @@ class ImageDescriberGUI(QMainWindow):
         # Add processing status - use custom status if provided
         if custom_status:
             title += f" - {custom_status}"
-        elif self.batch_processing:
-            title += f" - Batch Processing: {self.batch_completed} of {self.batch_total}"
         elif self.processing_items:
             # Show individual processing status
             num_processing = len(self.processing_items)
@@ -5312,7 +5283,6 @@ class ImageDescriberGUI(QMainWindow):
         self.description_list.clear()
         self.description_text.clear()
         self.update_window_title()
-        self.update_batch_label()
         
     def open_workspace(self):
         """Open an existing workspace"""
@@ -5905,8 +5875,6 @@ class ImageDescriberGUI(QMainWindow):
                 continue
             elif self.filter_mode == "undescribed" and item.descriptions:
                 continue
-            elif self.filter_mode == "batch" and not item.batch_marked:
-                continue
             elif self.filter_mode == "videos" and item.item_type != "video":
                 continue
             elif self.filter_mode == "images" and item.item_type == "video":
@@ -5947,16 +5915,12 @@ class ImageDescriberGUI(QMainWindow):
             # Build prefix indicators in order
             prefix_parts = []
             
-            # 1. Batch marker
-            if item.batch_marked:
-                prefix_parts.append("b")
-            
-            # 2. Description count (only if descriptions exist)
+            # 1. Description count (only if descriptions exist)
             if item.descriptions:
                 desc_count = len(item.descriptions)
                 prefix_parts.append(f"d{desc_count}")
                 
-            # 3. Processing indicator
+            # 2. Processing indicator
             if file_path in self.processing_items:
                 # Get detailed status if available
                 if file_path in self.processing_status:
@@ -5984,11 +5948,6 @@ class ImageDescriberGUI(QMainWindow):
             
             # Set accessibility properties
             self.set_item_accessibility(list_item, file_path, display_name)
-            
-            # Mark batch items with accessible colors
-            if item.batch_marked:
-                # Use light blue background (#E3F2FD) which provides good contrast with black text
-                list_item.setBackground(QColor(227, 242, 253))  # Light blue
             
             self.image_list.addItem(list_item)
             
@@ -6038,10 +5997,6 @@ class ImageDescriberGUI(QMainWindow):
                     frame_item = QListWidgetItem(frame_display)
                     frame_item.setData(Qt.ItemDataRole.UserRole, frame_path)
                     
-                    # Mark batch frames with same color as parent
-                    if frame_workspace_item and frame_workspace_item.batch_marked:
-                        frame_item.setBackground(QColor(227, 242, 253))  # Light blue
-                    
                     self.image_list.addItem(frame_item)
         
         # Add chat sessions to the list
@@ -6066,8 +6021,6 @@ class ImageDescriberGUI(QMainWindow):
                 chat_item.setForeground(QColor(0, 100, 200))  # Blue color for chats
                 
                 self.image_list.addItem(chat_item)
-        
-        self.update_batch_label()
         
         # Also refresh master-detail view if it's the current mode
         if self.navigation_mode == "master_detail":
@@ -6112,8 +6065,6 @@ class ImageDescriberGUI(QMainWindow):
             if self.filter_mode == "described" and not item.descriptions:
                 continue
             elif self.filter_mode == "undescribed" and item.descriptions:
-                continue
-            elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
             elif self.filter_mode == "videos" and item.item_type != "video":
                 continue
@@ -6195,13 +6146,7 @@ class ImageDescriberGUI(QMainWindow):
             # Tooltip shows same information in structured format
             list_item.setToolTip(f"Image: {file_name}\n{model_info}\n{prompt_info}\n\nDescription:\n{desc.text}")
             
-            # Mark batch items with accessible colors
-            if item.batch_marked:
-                list_item.setBackground(QColor(227, 242, 253))  # Light blue
-            
             self.image_list.addItem(list_item)
-        
-        self.update_batch_label()
         
         # Also refresh master-detail view if it's the current mode
         if self.navigation_mode == "master_detail":
@@ -6233,8 +6178,6 @@ class ImageDescriberGUI(QMainWindow):
             if self.filter_mode == "described" and not item.descriptions:
                 continue
             elif self.filter_mode == "undescribed" and item.descriptions:
-                continue
-            elif self.filter_mode == "batch" and not item.batch_marked:
                 continue
             elif self.filter_mode == "videos" and item.item_type != "video":
                 continue
@@ -6289,10 +6232,6 @@ class ImageDescriberGUI(QMainWindow):
             else:
                 accessibility_desc += " with no descriptions"
             
-            # Add batch indicator to accessibility description only
-            if item.batch_marked:
-                accessibility_desc = f"Batch marked: {accessibility_desc}"
-            
             list_item = QListWidgetItem(display_name)
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
             list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
@@ -6302,8 +6241,6 @@ class ImageDescriberGUI(QMainWindow):
         self.frames_list.clear()
         self.description_list_md.clear()
         self.description_text_md.clear()
-        
-        self.update_batch_label()
 
     def on_media_selection_changed(self):
         """Handle media selection change in master-detail view"""
@@ -8309,7 +8246,6 @@ Please answer the follow-up question about this image, taking into account the c
         self.filter_all_action.setChecked(mode == "all")
         self.filter_described_action.setChecked(mode == "described")
         self.filter_undescribed_action.setChecked(mode == "undescribed")
-        self.filter_batch_action.setChecked(mode == "batch")
         self.filter_videos_action.setChecked(mode == "videos")
         self.filter_images_action.setChecked(mode == "images")
         self.filter_processing_action.setChecked(mode == "processing")
@@ -9260,7 +9196,7 @@ You can check Ollama logs for more details."""
 <p>AI-powered image description application with support for:</p>
 <ul>
 <li>Multiple AI providers (Ollama, OpenAI)</li>
-<li>Batch processing</li>
+<li>Multiple image processing</li>
 <li>Video frame extraction</li>
 <li>Document-based workspaces</li>
 <li>Accessibility features</li>
