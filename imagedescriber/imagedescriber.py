@@ -4932,22 +4932,8 @@ class ImageDescriberGUI(QMainWindow):
         
         view_menu.addSeparator()
         
-        # Navigation mode submenu
-        navigation_menu = view_menu.addMenu("Navigation Mode")
-        
-        self.tree_view_action = QAction("Tree View", self)
-        self.tree_view_action.setCheckable(True)
-        self.tree_view_action.setChecked(True)  # Default mode
-        self.tree_view_action.triggered.connect(lambda: self.switch_navigation_mode("tree"))
-        navigation_menu.addAction(self.tree_view_action)
-        
-        # Master-Detail View temporarily hidden but code preserved for future use
-        # self.master_detail_action = QAction("Master-Detail View", self)
-        # self.master_detail_action.setCheckable(True)
-        # self.master_detail_action.triggered.connect(lambda: self.switch_navigation_mode("master_detail"))
-        # navigation_menu.addAction(self.master_detail_action)
-        
-        view_menu.addSeparator()
+        # Navigation mode menu removed - only tree view is used
+        # Code for navigation modes preserved in switch_navigation_mode() for future use
         
         # Image Preview toggle
         self.show_image_preview_action = QAction("Show Image Preview", self)
