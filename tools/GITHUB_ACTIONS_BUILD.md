@@ -31,16 +31,24 @@ Builds IDT for ARM64 Linux systems (Raspberry Pi, Apple Silicon via Rosetta, ARM
 
 ### Automatic Triggers
 The build automatically runs when you:
-- Push commits to the `ImageDescriber` branch
-- Push commits to the `main` branch
+- Push a version tag (e.g., `v2.0.0`, `v2.1.0`)
+- This prevents builds on every commit (saves time and resources)
 
-### Manual Trigger
-You can also trigger builds manually:
+### Manual Trigger (Primary Method)
+Trigger builds manually whenever you need them:
 1. Go to: https://github.com/kellylford/Image-Description-Toolkit/actions
-2. Click "Build Windows AMD64 Release" in the left sidebar
+2. Click "Build Windows AMD64 Release" or "Build Linux ARM64 Release" in the left sidebar
 3. Click the "Run workflow" button
 4. Select the branch you want to build
 5. Click "Run workflow"
+
+### Tag-Based Trigger (For Releases)
+Automatically build when creating a release:
+```bash
+git tag v2.0.0
+git push origin v2.0.0
+```
+This will trigger both Windows AMD64 and Linux ARM64 builds
 
 ### Build Process
 1. **Checkout code** - Gets the specified branch from GitHub

@@ -1,11 +1,10 @@
 name: Build Windows AMD64 Release
 
-# Trigger on push to ImageDescriber branch or manual dispatch
+# Trigger manually or on version tags
 on:
   push:
-    branches:
-      - ImageDescriber
-      - main
+    tags:
+      - 'v*'  # Only run on version tags like v2.0.0, v2.1.0, etc.
   workflow_dispatch:  # Allows manual trigger from GitHub UI
     inputs:
       branch:
