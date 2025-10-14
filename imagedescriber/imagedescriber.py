@@ -6183,13 +6183,16 @@ class ImageDescriberGUI(QMainWindow):
             
             file_name = Path(file_path).name
             
-            # Format: "Description text - filename"
-            # Truncate very long descriptions for display
+            # Format like viewer: Full description, then image name and model info
+            # NO truncation for screen reader accessibility
             desc_text = desc.text
-            if len(desc_text) > 200:
-                desc_text = desc_text[:197] + "..."
             
-            display_name = f"{desc_text} - {file_name}"
+            # Build display text: Description text, followed by metadata on new lines
+            model_info = f"Model: {desc.model}" if desc.model else "Model: Unknown"
+            prompt_info = f"Prompt: {desc.prompt_style}" if desc.prompt_style else "Prompt: Unknown"
+            
+            # For visual display: Full description + metadata
+            display_name = f"{desc_text}\n\nImage: {file_name}\n{model_info}\n{prompt_info}"
             
             # Create list item
             list_item = QListWidgetItem(display_name)
@@ -6197,15 +6200,12 @@ class ImageDescriberGUI(QMainWindow):
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
             list_item.setData(Qt.ItemDataRole.UserRole + 1, desc.id)  # Description ID
             
-            # Build accessibility description
-            accessibility_desc = f"Description: {desc_text}. Image: {file_name}"
-            
-            # Add model info if available
-            if desc.model:
-                accessibility_desc += f". Model: {desc.model}"
+            # Build accessibility description - same format, NO clipping
+            accessibility_desc = f"{desc_text}. Image: {file_name}. {model_info}. {prompt_info}"
             
             list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
-            list_item.setToolTip(f"File: {file_name}\nDescription: {desc.text}\nModel: {desc.model or 'Unknown'}\nPrompt: {desc.prompt_style or 'Unknown'}")
+            # Tooltip shows same information in structured format
+            list_item.setToolTip(f"Image: {file_name}\n{model_info}\n{prompt_info}\n\nDescription:\n{desc.text}")
             
             # Mark batch items with accessible colors
             if item.batch_marked:
