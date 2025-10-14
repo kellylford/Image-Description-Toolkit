@@ -6186,10 +6186,11 @@ class ImageDescriberGUI(QMainWindow):
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
             list_item.setData(Qt.ItemDataRole.UserRole + 1, desc.id)  # Description ID
             
-            # Build accessibility description - same format, NO clipping
-            accessibility_desc = f"{desc_text}. Image: {file_name}. {model_info}. {prompt_info}"
+            # Build accessibility text - this is what screen readers read
+            # Use AccessibleTextRole (not Description) to override the display text completely
+            accessibility_text = f"{desc_text}. Image: {file_name}. {model_info}. {prompt_info}"
             
-            list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessibility_desc)
+            list_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessibility_text)
             # Tooltip shows same information in structured format
             list_item.setToolTip(f"Image: {file_name}\n{model_info}\n{prompt_info}\n\nDescription:\n{desc.text}")
             

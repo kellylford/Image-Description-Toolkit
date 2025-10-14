@@ -37,6 +37,7 @@ Last commit: `8d8f16e` - "Add run_stats.bat to workflow helper files"
   - Accessible name changes dynamically based on mode
   - Hidden unused controls in Descriptions First mode
   - Updated tab order based on active mode
+  - Fixed screen reader "blank" issue by using AccessibleTextRole instead of AccessibleDescriptionRole
 - **Why:** Improve screen reader experience and keyboard navigation
 - **Test:**
   - [ ] Launch ImageDescriber
@@ -46,6 +47,8 @@ Last commit: `8d8f16e` - "Add run_stats.bat to workflow helper files"
   - [ ] With screen reader: Verify "Image List" is announced
   - [ ] Switch to View → View Mode → Descriptions First
   - [ ] With screen reader: Verify "Descriptions List" is announced
+  - [ ] With screen reader: Navigate list items - should NOT say "blank" before descriptions
+  - [ ] With screen reader: Verify full description is read without "blank" prefix
   - [ ] Tab through: Should skip description_list and description_text (hidden)
   - [ ] Switch back to AI Generation mode
   - [ ] Verify description_list and description_text reappear
