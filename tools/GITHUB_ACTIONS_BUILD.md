@@ -1,18 +1,31 @@
-# GitHub Actions - Automated Windows AMD64 Builds
+# GitHub Actions - Automated Multi-Platform Builds
 
 ## Overview
-This project uses GitHub Actions to automatically build Windows AMD64 executables for all four applications in the toolkit. Builds run on GitHub's cloud infrastructure at no cost (public repositories get unlimited free minutes).
+This project uses GitHub Actions to automatically build executables for multiple platforms. Builds run on GitHub's cloud infrastructure at no cost (public repositories get unlimited free minutes).
 
-## What Gets Built
+## Available Build Workflows
 
-The workflow builds and packages all four applications:
+### 1. Windows AMD64 Build
+**File:** `.github/workflows/build-windows-amd64.yml`
+
+Builds all four Windows applications:
 1. **IDT** (Main CLI toolkit) - `idt.exe`
 2. **Viewer** - `viewer.exe`
 3. **Prompt Editor** - `prompteditor.exe`
 4. **ImageDescriber** - `imagedescriber.exe`
 
-## Workflow File Location
-`.github/workflows/build-windows-amd64.yml`
+**Platform:** Windows Server 2022 (AMD64)  
+**Build Time:** 15-30 minutes
+
+### 2. Linux ARM64 Build
+**File:** `.github/workflows/build-linux-arm64.yml`
+
+Builds IDT for ARM64 Linux systems (Raspberry Pi, Apple Silicon via Rosetta, ARM servers):
+1. **IDT** (Main CLI toolkit) - `idt` (Linux binary)
+
+**Platform:** Linux ARM64 (via QEMU emulation)  
+**Build Time:** 20-40 minutes (emulation adds overhead)  
+**Note:** GUI apps not built for Linux (PyQt6 complexity)
 
 ## How It Works
 
@@ -50,10 +63,15 @@ After a build completes:
 2. **Click on a completed workflow run** (green checkmark)
 3. **Scroll to the "Artifacts" section** at the bottom
 4. **Download the ZIP files**:
-   - `idt-windows-amd64` - Main toolkit
+
+### Windows AMD64 Artifacts:
+   - `idt-windows-amd64` - Main toolkit (Windows .exe)
    - `viewer-windows-amd64` - Viewer application
    - `prompteditor-windows-amd64` - Prompt editor
    - `imagedescriber-windows-amd64` - ImageDescriber GUI
+
+### Linux ARM64 Artifacts:
+   - `idt-linux-arm64` - Main toolkit (Linux ARM64 binary)
 
 ### Artifact Retention
 - Artifacts are kept for **90 days** by default
