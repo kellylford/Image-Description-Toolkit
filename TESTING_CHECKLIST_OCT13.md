@@ -48,7 +48,29 @@ Last commit: `b4ae7c8` - "Remove Navigation Mode menu from imagedescriber View m
   - [ ] Run `view_results.bat` from root directory
   - [ ] Verify viewer launches with correct directory
 
-### 3. **Prompt Editor: Renamed Executable**
+### 3. **Workflow: Helper Batch Files Created Immediately**
+- **What Changed:** Creates three batch files in workflow directory as soon as workflow starts
+- **Files Created:**
+  - `view_results.bat` - Launch viewer to see results in real-time
+  - `resume_workflow.bat` - Resume interrupted workflow from last step
+  - `run_stats.bat` - Run stats analysis and save results to `stats/` subdirectory
+- **Why:** Provides easy access even if workflow is interrupted; stats only saved if user runs the bat file
+- **Test:**
+  - [ ] Run `idt workflow` or `idt guideme`
+  - [ ] Check workflow directory (e.g., `wf\wf_identifier_20250113_143022\`)
+  - [ ] Verify `view_results.bat` exists immediately
+  - [ ] Verify `resume_workflow.bat` exists immediately
+  - [ ] Verify `run_stats.bat` exists immediately
+  - [ ] Double-click `view_results.bat` - should launch viewer
+  - [ ] After workflow completes, double-click `run_stats.bat`
+  - [ ] Verify `stats\` subdirectory created in workflow directory
+  - [ ] Verify `stats\workflow_timing_stats.csv` exists
+  - [ ] Verify `stats\workflow_statistics.json` exists
+  - [ ] Verify stats files contain data about the workflow timing
+  - [ ] Interrupt a workflow (Ctrl+C), then double-click `resume_workflow.bat`
+  - [ ] Verify workflow resumes from last step
+
+### 4. **Prompt Editor: Renamed Executable**
 - **What Changed:** 
   - Old: `prompt_editor_amd64.exe`
   - New: `prompteditor_amd64.exe` (no underscore)
@@ -60,7 +82,7 @@ Last commit: `b4ae7c8` - "Remove Navigation Mode menu from imagedescriber View m
   - [ ] Package: `package_prompt_editor.bat`
   - [ ] Verify package contains: `prompteditor.exe`
 
-### 4. **Added CLI Commands for GUI Tools**
+### 5. **Added CLI Commands for GUI Tools**
 - **What Changed:** Added `idt prompteditor` and `idt imagedescriber` commands
 - **Why:** Unified access to all tools through idt.exe
 - **Test:**
@@ -69,7 +91,7 @@ Last commit: `b4ae7c8` - "Remove Navigation Mode menu from imagedescriber View m
   - [ ] `idt imagedescriber` launches image describer from `imagedescriber/` subdir
   - [ ] Commands work from IDT installation directory
 
-### 5. **ImageDescriber: External Config Support**
+### 6. **ImageDescriber: External Config Support**
 - **What Changed:** Checks for external config before bundled config
 - **Path Priority:**
   1. `c:\IDT\scripts\image_describer_config.json` (external, writable)
@@ -82,7 +104,7 @@ Last commit: `b4ae7c8` - "Remove Navigation Mode menu from imagedescriber View m
   - [ ] Verify new prompts appear in dropdown
   - [ ] Verify `idt workflow` also uses new prompts
 
-### 6. **ImageDescriber: Flat View Redesign**
+### 7. **ImageDescriber: Flat View Redesign**
 - **What Changed:** Flat image list now shows full descriptions (viewer-style)
 - **Format:**
   ```

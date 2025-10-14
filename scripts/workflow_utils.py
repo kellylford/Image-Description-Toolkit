@@ -371,6 +371,48 @@ def create_workflow_helper_files(output_dir: Path) -> None:
             f.write("\nREM This will continue from the last completed workflow step\n")
             f.write("pause\n")
         
+        # Create run_stats.bat
+        # This runs idt stats on just this workflow and copies results to stats/ subdirectory
+        stats_bat = output_dir / "run_stats.bat"
+        workflow_name = output_dir.name  # e.g., wf_identifier_20250113_143022
+        
+        with open(stats_bat, 'w', encoding='utf-8') as f:
+            f.write("@echo off\n")
+            f.write("REM Auto-generated: Run statistics analysis on this workflow\n")
+            f.write("REM Double-click this file to analyze timing and generate stats files\n")
+            f.write("REM Results will be saved in the 'stats' subdirectory\n\n")
+            
+            # Create stats subdirectory
+            f.write('echo Creating stats directory...\n')
+            f.write('if not exist "%~dp0stats" mkdir "%~dp0stats"\n\n')
+            
+            # Get parent directory (should be Descriptions/)
+            f.write('echo Running stats analysis...\n')
+            parent_dir = output_dir.parent.absolute()
+            
+            if getattr(sys, 'frozen', False) and idt_exe and idt_exe.exists():
+                # For executable deployment
+                f.write(f'"{idt_exe}" stats ')
+                f.write(f'--input-dir "{parent_dir}" ')
+                f.write(f'--csv-output "%~dp0stats\\workflow_timing_stats.csv" ')
+                f.write(f'--json-output "%~dp0stats\\workflow_statistics.json"\n\n')
+            else:
+                # For development
+                stats_script = base_dir / "analysis" / "stats_analysis.py"
+                python_exe = sys.executable
+                f.write(f'"{python_exe}" "{stats_script}" ')
+                f.write(f'--input-dir "{parent_dir}" ')
+                f.write(f'--csv-output "%~dp0stats\\workflow_timing_stats.csv" ')
+                f.write(f'--json-output "%~dp0stats\\workflow_statistics.json"\n\n')
+            
+            f.write('echo.\n')
+            f.write('echo Stats analysis complete!\n')
+            f.write('echo Results saved in stats\\ subdirectory:\n')
+            f.write('echo   - workflow_timing_stats.csv\n')
+            f.write('echo   - workflow_statistics.json\n')
+            f.write('echo.\n')
+            f.write('pause\n')
+        
     except Exception as e:
         # Silently fail - these are convenience files
         pass
