@@ -26,10 +26,10 @@ if "%ARCH%"=="amd64" set ARCH=amd64
 if "%ARCH%"=="x86_64" set ARCH=amd64
 
 REM Check if executable exists
-if not exist "dist\prompt_editor_%ARCH%.exe" (
+if not exist "dist\prompteditor_%ARCH%.exe" (
     echo ERROR: Executable not found!
     echo.
-    echo Expected: dist\prompt_editor_%ARCH%.exe
+    echo Expected: dist\prompteditor_%ARCH%.exe
     echo.
     echo Please run build_prompt_editor.bat first to create the executable.
     echo.
@@ -51,7 +51,7 @@ if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
 mkdir "%STAGE_DIR%"
 
 echo [1/3] Copying executable...
-copy "dist\prompt_editor_%ARCH%.exe" "%STAGE_DIR%\prompt_editor.exe" >nul
+copy "dist\prompteditor_%ARCH%.exe" "%STAGE_DIR%\prompteditor.exe" >nul
 if errorlevel 1 (
     echo ERROR: Failed to copy executable
     exit /b 1
@@ -70,7 +70,7 @@ echo used by the Image Description Toolkit ^(IDT^).
 echo.
 echo USAGE:
 echo.
-echo 1. Double-click prompt_editor.exe to launch
+echo 1. Double-click prompteditor.exe to launch
 echo.
 echo 2. The editor will load scripts/image_describer_config.json
 echo.
@@ -147,7 +147,7 @@ echo Architecture: %ARCH%
 echo Version: %VERSION%
 echo.
 echo Contents:
-echo   - prompt_editor.exe
+echo   - prompteditor.exe
 echo   - README.txt
 echo   - LICENSE.txt
 echo.

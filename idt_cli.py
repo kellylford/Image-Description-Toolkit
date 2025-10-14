@@ -571,6 +571,114 @@ def main():
             print(f"Error launching viewer: {e}")
             return 1
     
+    elif command == 'prompteditor':
+        # Launch the prompt editor executable
+        import subprocess
+        import platform
+        
+        # Detect architecture
+        machine = platform.machine().lower()
+        if machine in ('aarch64', 'arm64'):
+            arch = 'arm64'
+        else:
+            arch = 'amd64'
+        
+        # Try multiple possible prompt editor locations
+        editor_names = [
+            f'prompteditor_{arch}.exe',
+            'prompteditor.exe',
+            f'prompteditor/prompteditor_{arch}.exe',
+            'prompteditor/prompteditor.exe',
+            f'../prompteditor/prompteditor_{arch}.exe',
+            '../prompteditor/prompteditor.exe',
+        ]
+        
+        editor_exe = None
+        for name in editor_names:
+            candidate = base_dir / name
+            if candidate.exists():
+                editor_exe = candidate
+                break
+        
+        if not editor_exe:
+            print("Error: Prompt Editor executable not found.")
+            print(f"Looked in: {base_dir}")
+            print(f"Expected: prompteditor_{arch}.exe or prompteditor.exe")
+            print()
+            print("The prompt editor must be built separately using:")
+            print("  cd prompt_editor")
+            print("  build_prompt_editor.bat")
+            return 1
+        
+        # Launch prompt editor as separate process (detached)
+        try:
+            # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
+            if sys.platform == 'win32':
+                subprocess.Popen([str(editor_exe)], 
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+            else:
+                subprocess.Popen([str(editor_exe)])
+            
+            print(f"Launched prompt editor: {editor_exe.name}")
+            return 0
+        except Exception as e:
+            print(f"Error launching prompt editor: {e}")
+            return 1
+    
+    elif command == 'imagedescriber':
+        # Launch the image describer GUI executable
+        import subprocess
+        import platform
+        
+        # Detect architecture
+        machine = platform.machine().lower()
+        if machine in ('aarch64', 'arm64'):
+            arch = 'arm64'
+        else:
+            arch = 'amd64'
+        
+        # Try multiple possible image describer locations
+        describer_names = [
+            f'imagedescriber_{arch}.exe',
+            'imagedescriber.exe',
+            f'imagedescriber/imagedescriber_{arch}.exe',
+            'imagedescriber/imagedescriber.exe',
+            f'../imagedescriber/imagedescriber_{arch}.exe',
+            '../imagedescriber/imagedescriber.exe',
+        ]
+        
+        describer_exe = None
+        for name in describer_names:
+            candidate = base_dir / name
+            if candidate.exists():
+                describer_exe = candidate
+                break
+        
+        if not describer_exe:
+            print("Error: Image Describer executable not found.")
+            print(f"Looked in: {base_dir}")
+            print(f"Expected: imagedescriber_{arch}.exe or imagedescriber.exe")
+            print()
+            print("The image describer GUI must be built separately using:")
+            print("  cd imagedescriber")
+            print("  build_imagedescriber.bat")
+            return 1
+        
+        # Launch image describer as separate process (detached)
+        try:
+            # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
+            if sys.platform == 'win32':
+                subprocess.Popen([str(describer_exe)], 
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+            else:
+                subprocess.Popen([str(describer_exe)])
+            
+            print(f"Launched image describer: {describer_exe.name}")
+            return 0
+        except Exception as e:
+            print(f"Error launching image describer: {e}")
+            return 1
+    
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
         return 0
@@ -597,6 +705,8 @@ COMMANDS:
     guideme               Interactive wizard to build and run workflows
     workflow              Run image description workflow
     viewer (or view)      Launch the GUI viewer for browsing results
+    prompteditor          Launch the prompt editor to manage prompts
+    imagedescriber        Launch the image describer GUI
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
@@ -622,6 +732,12 @@ EXAMPLES:
     # Launch viewer with directory picker
     {base_call} viewer --open
 
+    # Launch prompt editor
+    {base_call} prompteditor
+
+    # Launch image describer GUI
+    {base_call} imagedescriber
+
     # Run workflow with Claude
     {base_call} workflow --provider claude --model claude-opus-4
 
@@ -640,7 +756,7 @@ EXAMPLES:
 NOTES:
     - Requires Ollama to be installed for Ollama models
     - Requires API keys for OpenAI and Anthropic (set via environment variables)
-    - Viewer must be built separately (see viewer/build_viewer.bat)
+    - GUI tools (viewer, prompteditor, imagedescriber) must be built separately
     - All commands support --help for detailed options
 
 For detailed documentation, see the docs/ folder.

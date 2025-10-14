@@ -67,7 +67,7 @@ echo.
 REM Build the executable
 pyinstaller --onefile ^
     --windowed ^
-    --name "prompt_editor_%ARCH%" ^
+    --name "prompteditor_%ARCH%" ^
     --distpath "dist" ^
     --workpath "build" ^
     --specpath "build" ^
@@ -89,8 +89,8 @@ echo.
 echo ========================================================================
 echo BUILD SUCCESSFUL
 echo ========================================================================
-echo Executable created: dist\prompt_editor_%ARCH%.exe
+echo Executable created: dist\prompteditor_%ARCH%.exe
 echo Architecture: %ARCH%
 echo.
-echo To test: cd dist ^&^& prompt_editor_%ARCH%.exe
+echo To test: cd dist ^&^& prompteditor_%ARCH%.exe
 echo.

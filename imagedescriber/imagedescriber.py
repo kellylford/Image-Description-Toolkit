@@ -665,13 +665,23 @@ class ProcessingWorker(QThread):
     def load_prompt_config(self) -> dict:
         """Load prompt configuration from the scripts directory"""
         try:
-            # Try to find the config file
+            # Try to find the config file - check external first, then bundled
+            config_path = None
+            
             if getattr(sys, 'frozen', False):
-                config_path = Path(sys._MEIPASS) / "scripts" / "image_describer_config.json"
+                # Running as executable - check external location first
+                exe_dir = Path(sys.executable).parent
+                external_path = exe_dir.parent / "scripts" / "image_describer_config.json"
+                if external_path.exists():
+                    config_path = external_path
+                else:
+                    # Fall back to bundled config
+                    config_path = Path(sys._MEIPASS) / "scripts" / "image_describer_config.json"
             else:
+                # Running from source
                 config_path = Path(__file__).parent.parent / "scripts" / "image_describer_config.json"
             
-            if config_path.exists():
+            if config_path and config_path.exists():
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                     # Convert the config format to what we expect
@@ -2381,12 +2391,23 @@ class ProcessingDialog(QDialog):
     def load_config(self):
         """Load configuration from scripts directory"""
         try:
+            # Try to find the config file - check external first, then bundled
+            config_path = None
+            
             if getattr(sys, 'frozen', False):
-                config_path = Path(sys._MEIPASS) / "scripts" / "image_describer_config.json"
+                # Running as executable - check external location first
+                exe_dir = Path(sys.executable).parent
+                external_path = exe_dir.parent / "scripts" / "image_describer_config.json"
+                if external_path.exists():
+                    config_path = external_path
+                else:
+                    # Fall back to bundled config
+                    config_path = Path(sys._MEIPASS) / "scripts" / "image_describer_config.json"
             else:
+                # Running from source
                 config_path = Path(__file__).parent.parent / "scripts" / "image_describer_config.json"
             
-            if config_path.exists():
+            if config_path and config_path.exists():
                 with open(config_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
         except Exception as e:
