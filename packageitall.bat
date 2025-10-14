@@ -13,9 +13,11 @@ REM   - All applications built (run builditall.bat first)
 REM
 REM Output (all in releases/ directory):
 REM   - releases/ImageDescriptionToolkit_v[VERSION].zip
-REM   - releases/viewer_v[VERSION]_[ARCH].zip
-REM   - releases/prompt_editor_v[VERSION]_[ARCH].zip
-REM   - releases/imagedescriber_v[VERSION]_[ARCH].zip
+REM   - releases/viewer_v[VERSION].zip
+REM   - releases/prompt_editor_v[VERSION].zip
+REM   - releases/imagedescriber_v[VERSION].zip
+REM   - releases/install_idt.bat (universal installer)
+REM   - releases/README.md (installation instructions)
 REM ============================================================================
 
 echo.
@@ -23,7 +25,8 @@ echo ========================================================================
 echo PACKAGE ALL APPLICATIONS
 echo ========================================================================
 echo.
-echo This will create distribution packages for all four applications.
+echo This will create distribution packages for all four applications
+echo and copy installer scripts to the releases directory.
 echo All packages will be placed in the releases/ directory.
 echo.
 
@@ -123,6 +126,28 @@ if errorlevel 1 (
     )
 )
 cd ..
+
+REM ============================================================================
+echo.
+echo [5/5] Copying installer script to releases...
+echo ========================================================================
+echo.
+
+copy "install_idt.bat" "releases\" >nul
+if errorlevel 1 (
+    echo WARNING: Failed to copy install_idt.bat
+) else (
+    echo Copied: install_idt.bat
+)
+
+copy "RELEASES_README.md" "releases\README.md" >nul
+if errorlevel 1 (
+    echo WARNING: Failed to copy RELEASES_README.md
+) else (
+    echo Copied: README.md
+)
+
+echo.
 
 REM ============================================================================
 echo.

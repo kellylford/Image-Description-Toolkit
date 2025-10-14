@@ -9,7 +9,7 @@ REM Prerequisites:
 REM   - Built executable in dist/ folder (run build_imagedescriber.bat first)
 REM
 REM Output:
-REM   - imagedescriber_releases/imagedescriber_v[VERSION]_[ARCH].zip
+REM   - imagedescriber_releases/imagedescriber_v[VERSION].zip
 REM ============================================================================
 
 echo.
@@ -18,18 +18,11 @@ echo Creating ImageDescriber Distribution Package
 echo ========================================================================
 echo.
 
-REM Detect architecture
-for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
-if "%ARCH%"=="aarch64" set ARCH=arm64
-if "%ARCH%"=="arm64" set ARCH=arm64
-if "%ARCH%"=="amd64" set ARCH=amd64
-if "%ARCH%"=="x86_64" set ARCH=amd64
-
 REM Check if executable exists
-if not exist "dist\ImageDescriber_%ARCH%.exe" (
+if not exist "dist\imagedescriber.exe" (
     echo ERROR: Executable not found!
     echo.
-    echo Expected: dist\ImageDescriber_%ARCH%.exe
+    echo Expected: dist\imagedescriber.exe
     echo.
     echo Please run build_imagedescriber.bat first to create the executable.
     echo.
@@ -51,7 +44,7 @@ if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
 mkdir "%STAGE_DIR%"
 
 echo [1/4] Copying executable...
-copy "dist\ImageDescriber_%ARCH%.exe" "%STAGE_DIR%\ImageDescriber.exe" >nul
+copy "dist\imagedescriber.exe" "%STAGE_DIR%\imagedescriber.exe" >nul
 if errorlevel 1 (
     echo ERROR: Failed to copy executable
     exit /b 1
@@ -71,16 +64,15 @@ echo [3/4] Creating main README...
 if not exist "%STAGE_DIR%\README.txt" (
     (
     echo ImageDescriber v%VERSION%
-    echo Architecture: %ARCH%
     echo.
     echo COMPREHENSIVE IMAGE DESCRIPTION GUI
     echo.
-    echo This is the standalone GUI application for batch processing images
+    echo This is the standalone GUI application for processing images
     echo with AI-powered descriptions using multiple providers.
     echo.
     echo QUICK START:
     echo.
-    echo 1. Double-click ImageDescriber.exe to launch
+    echo 1. Double-click imagedescriber.exe to launch
     echo.
     echo 2. Configure AI providers:
     echo    - Ollama: Local AI models ^(recommended^)
@@ -95,7 +87,7 @@ if not exist "%STAGE_DIR%\README.txt" (
     echo.
     echo FEATURES:
     echo - Multi-provider AI support ^(Ollama, OpenAI, Anthropic^)
-    echo - Batch image processing
+    echo - Multiple image processing
     echo - Workspace management
     echo - Progress tracking
     echo - Real-time preview
@@ -109,7 +101,7 @@ if not exist "%STAGE_DIR%\README.txt" (
     echo - HEIC/HEIF image support
     echo.
     echo REQUIREMENTS:
-    echo - Windows %ARCH%
+    echo - Windows 10 or later
     echo - AI provider ^(Ollama recommended, or OpenAI/Anthropic API keys^)
     echo.
     echo For the full Image Description Toolkit, visit:
@@ -127,7 +119,7 @@ if exist "..\LICENSE" (
 )
 
 REM Create the ZIP file
-set ZIP_NAME=imagedescriber_v%VERSION%_%ARCH%.zip
+set ZIP_NAME=imagedescriber_v%VERSION%.zip
 set ZIP_PATH=imagedescriber_releases\%ZIP_NAME%
 
 echo.
@@ -156,11 +148,10 @@ echo ========================================================================
 echo.
 echo Package: %ZIP_NAME%
 echo Location: imagedescriber_releases\
-echo Architecture: %ARCH%
 echo Version: %VERSION%
 echo.
 echo Contents:
-echo   - ImageDescriber.exe
+echo   - imagedescriber.exe
 echo   - README.txt
 echo   - LICENSE.txt
 echo   - Setup and documentation files ^(if available^)

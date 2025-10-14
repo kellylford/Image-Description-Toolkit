@@ -9,7 +9,7 @@ REM Prerequisites:
 REM   - Built executable in dist/ folder (run build_viewer.bat first)
 REM
 REM Output:
-REM   - viewer_releases/viewer_v[VERSION]_[ARCH].zip
+REM   - viewer_releases/viewer_v[VERSION].zip
 REM ============================================================================
 
 echo.
@@ -18,18 +18,11 @@ echo Creating Viewer Distribution Package
 echo ========================================================================
 echo.
 
-REM Detect architecture
-for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
-if "%ARCH%"=="aarch64" set ARCH=arm64
-if "%ARCH%"=="arm64" set ARCH=arm64
-if "%ARCH%"=="amd64" set ARCH=amd64
-if "%ARCH%"=="x86_64" set ARCH=amd64
-
 REM Check if executable exists
-if not exist "dist\viewer_%ARCH%.exe" (
+if not exist "dist\viewer.exe" (
     echo ERROR: Executable not found!
     echo.
-    echo Expected: dist\viewer_%ARCH%.exe
+    echo Expected: dist\viewer.exe
     echo.
     echo Please run build_viewer.bat first to create the executable.
     echo.
@@ -51,7 +44,7 @@ if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
 mkdir "%STAGE_DIR%"
 
 echo [1/3] Copying executable...
-copy "dist\viewer_%ARCH%.exe" "%STAGE_DIR%\viewer.exe" >nul
+copy "dist\viewer.exe" "%STAGE_DIR%\viewer.exe" >nul
 if errorlevel 1 (
     echo ERROR: Failed to copy executable
     exit /b 1
@@ -61,7 +54,6 @@ echo [2/3] Creating README...
 REM Create a distribution README
 (
 echo Image Description Viewer v%VERSION%
-echo Architecture: %ARCH%
 echo.
 echo STANDALONE VIEWER APPLICATION
 echo.
@@ -86,7 +78,7 @@ echo - Keyboard shortcuts for easy navigation
 echo - Screen reader accessible
 echo.
 echo REQUIREMENTS:
-echo - Windows %ARCH%
+echo - Windows 10 or later
 echo - Optional: Ollama ^(for redescribe feature^)
 echo.
 echo NOTES:
@@ -108,7 +100,7 @@ if exist "..\LICENSE" (
 )
 
 REM Create the ZIP file
-set ZIP_NAME=viewer_v%VERSION%_%ARCH%.zip
+set ZIP_NAME=viewer_v%VERSION%.zip
 set ZIP_PATH=viewer_releases\%ZIP_NAME%
 
 echo.
@@ -137,7 +129,6 @@ echo ========================================================================
 echo.
 echo Package: %ZIP_NAME%
 echo Location: viewer_releases\
-echo Architecture: %ARCH%
 echo Version: %VERSION%
 echo.
 echo Contents:

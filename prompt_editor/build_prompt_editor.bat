@@ -4,22 +4,6 @@ echo Building Image Description Prompt Editor
 echo ========================================================================
 echo.
 
-REM Detect architecture using current Python
-echo Detecting system architecture...
-for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
-
-REM Map architecture names for output filename
-if "%ARCH%"=="aarch64" set ARCH=arm64
-if "%ARCH%"=="arm64" set ARCH=arm64
-if "%ARCH%"=="amd64" set ARCH=amd64
-if "%ARCH%"=="x86_64" set ARCH=amd64
-
-echo Building for: %ARCH%
-echo.
-echo NOTE: PyInstaller builds for the current Python architecture.
-echo       Cross-compilation is not supported on Windows.
-echo.
-
 REM Check if PyInstaller is installed
 python -c "import PyInstaller" 2>nul
 if errorlevel 1 (
@@ -67,7 +51,7 @@ echo.
 REM Build the executable
 pyinstaller --onefile ^
     --windowed ^
-    --name "prompteditor_%ARCH%" ^
+    --name "prompteditor" ^
     --distpath "dist" ^
     --workpath "build" ^
     --specpath "build" ^
@@ -89,8 +73,7 @@ echo.
 echo ========================================================================
 echo BUILD SUCCESSFUL
 echo ========================================================================
-echo Executable created: dist\prompteditor_%ARCH%.exe
-echo Architecture: %ARCH%
+echo Executable created: dist\prompteditor.exe
 echo.
-echo To test: cd dist ^&^& prompteditor_%ARCH%.exe
+echo To test: cd dist ^&^& prompteditor.exe
 echo.

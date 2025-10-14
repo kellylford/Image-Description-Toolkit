@@ -9,7 +9,7 @@ REM Prerequisites:
 REM   - Built executable in dist/ folder (run build_prompt_editor.bat first)
 REM
 REM Output:
-REM   - prompt_editor_releases/prompt_editor_v[VERSION]_[ARCH].zip
+REM   - prompt_editor_releases/prompt_editor_v[VERSION].zip
 REM ============================================================================
 
 echo.
@@ -18,18 +18,11 @@ echo Creating Prompt Editor Distribution Package
 echo ========================================================================
 echo.
 
-REM Detect architecture
-for /f "tokens=*" %%i in ('python -c "import platform; print(platform.machine().lower())"') do set ARCH=%%i
-if "%ARCH%"=="aarch64" set ARCH=arm64
-if "%ARCH%"=="arm64" set ARCH=arm64
-if "%ARCH%"=="amd64" set ARCH=amd64
-if "%ARCH%"=="x86_64" set ARCH=amd64
-
 REM Check if executable exists
-if not exist "dist\prompteditor_%ARCH%.exe" (
+if not exist "dist\prompteditor.exe" (
     echo ERROR: Executable not found!
     echo.
-    echo Expected: dist\prompteditor_%ARCH%.exe
+    echo Expected: dist\prompteditor.exe
     echo.
     echo Please run build_prompt_editor.bat first to create the executable.
     echo.
@@ -51,7 +44,7 @@ if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
 mkdir "%STAGE_DIR%"
 
 echo [1/3] Copying executable...
-copy "dist\prompteditor_%ARCH%.exe" "%STAGE_DIR%\prompteditor.exe" >nul
+copy "dist\prompteditor.exe" "%STAGE_DIR%\prompteditor.exe" >nul
 if errorlevel 1 (
     echo ERROR: Failed to copy executable
     exit /b 1
@@ -61,7 +54,6 @@ echo [2/3] Creating README...
 REM Create a distribution README
 (
 echo Prompt Editor v%VERSION%
-echo Architecture: %ARCH%
 echo.
 echo STANDALONE PROMPT EDITOR APPLICATION
 echo.
@@ -92,7 +84,7 @@ echo - Backup and restore
 echo - Screen reader accessible
 echo.
 echo REQUIREMENTS:
-echo - Windows %ARCH%
+echo - Windows 10 or later
 echo - No additional dependencies required
 echo.
 echo NOTES:
@@ -114,7 +106,7 @@ if exist "..\LICENSE" (
 )
 
 REM Create the ZIP file
-set ZIP_NAME=prompt_editor_v%VERSION%_%ARCH%.zip
+set ZIP_NAME=prompt_editor_v%VERSION%.zip
 set ZIP_PATH=prompt_editor_releases\%ZIP_NAME%
 
 echo.
@@ -143,7 +135,6 @@ echo ========================================================================
 echo.
 echo Package: %ZIP_NAME%
 echo Location: prompt_editor_releases\
-echo Architecture: %ARCH%
 echo Version: %VERSION%
 echo.
 echo Contents:
