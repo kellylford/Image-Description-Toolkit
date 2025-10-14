@@ -1251,16 +1251,20 @@ def prompt_view_results() -> bool:
         return False
 
 
-def launch_viewer(output_dir: Path, logger: logging.Logger) -> None:
+def launch_viewer(output_dir, logger: logging.Logger) -> None:
     """
     Launch the viewer application with the specified output directory.
     Also creates a reusable .bat file for future viewing.
     
     Args:
-        output_dir: Path to the workflow output directory
+        output_dir: Path to the workflow output directory (Path object or string)
         logger: Logger instance for recording actions
     """
     try:
+        # Ensure output_dir is a Path object
+        if not isinstance(output_dir, Path):
+            output_dir = Path(output_dir)
+        
         # Get the base path (for both dev and executable scenarios)
         if getattr(sys, 'frozen', False):
             # Running as executable
