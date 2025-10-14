@@ -310,6 +310,72 @@ def create_workflow_paths(base_output_dir: Path, preserve_structure: bool = True
     return paths
 
 
+def create_workflow_helper_files(output_dir: Path) -> None:
+    """
+    Create helper batch files in the workflow directory for easy access.
+    Creates view_results.bat and resume_workflow.bat immediately so they're
+    available even if the workflow is interrupted.
+    
+    Args:
+        output_dir: Workflow output directory
+    """
+    import sys
+    from pathlib import Path
+    
+    try:
+        # Get the base path (for both dev and executable scenarios)
+        if getattr(sys, 'frozen', False):
+            # Running as executable
+            base_dir = Path(sys.executable).parent
+            idt_exe = base_dir / "idt.exe"
+            viewer_exe = base_dir / "viewer" / "viewer.exe"
+        else:
+            # Running from source
+            base_dir = Path(__file__).parent.parent
+            idt_exe = None  # Not available in dev mode
+            viewer_exe = base_dir / "viewer" / "viewer.py"
+        
+        # Create view_results.bat
+        view_bat = output_dir / "view_results.bat"
+        with open(view_bat, 'w', encoding='utf-8') as f:
+            f.write("@echo off\n")
+            f.write("REM Auto-generated: View workflow results in the viewer\n")
+            f.write("REM Double-click this file to view results anytime\n\n")
+            
+            if getattr(sys, 'frozen', False):
+                # For executable deployment
+                f.write(f'"{viewer_exe}" "{output_dir.absolute()}"\n')
+            else:
+                # For development (need Python)
+                python_exe = sys.executable
+                f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir.absolute()}"\n')
+            
+            f.write("\nREM If viewer closes immediately, run from command prompt to see errors\n")
+        
+        # Create resume_workflow.bat
+        resume_bat = output_dir / "resume_workflow.bat"
+        with open(resume_bat, 'w', encoding='utf-8') as f:
+            f.write("@echo off\n")
+            f.write("REM Auto-generated: Resume this workflow if interrupted\n")
+            f.write("REM Double-click this file to resume workflow from last completed step\n\n")
+            
+            if getattr(sys, 'frozen', False) and idt_exe and idt_exe.exists():
+                # For executable deployment
+                f.write(f'"{idt_exe}" workflow --resume "{output_dir.absolute()}"\n')
+            else:
+                # For development or if idt.exe not found
+                workflow_script = base_dir / "scripts" / "workflow.py"
+                python_exe = sys.executable
+                f.write(f'"{python_exe}" "{workflow_script}" --resume "{output_dir.absolute()}"\n')
+            
+            f.write("\nREM This will continue from the last completed workflow step\n")
+            f.write("pause\n")
+        
+    except Exception as e:
+        # Silently fail - these are convenience files
+        pass
+
+
 def get_script_compatibility_args(script_name: str, workflow_config: WorkflowConfig, 
                                 input_dir: Path, output_dir: Path) -> List[str]:
     """

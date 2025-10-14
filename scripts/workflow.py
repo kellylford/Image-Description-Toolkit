@@ -43,7 +43,8 @@ from datetime import datetime
 # Import our workflow utilities
 from workflow_utils import (
     WorkflowConfig, WorkflowLogger, FileDiscovery, create_workflow_paths,
-    get_path_identifier_2_components, save_workflow_metadata, load_workflow_metadata
+    get_path_identifier_2_components, save_workflow_metadata, load_workflow_metadata,
+    create_workflow_helper_files
 )
 from image_describer import get_default_prompt_style
 try:
@@ -869,6 +870,10 @@ class WorkflowOrchestrator:
         
         # Create workflow directory structure
         workflow_paths = create_workflow_paths(output_dir)
+        
+        # Create helper batch files immediately (view_results.bat and resume_workflow.bat)
+        create_workflow_helper_files(output_dir)
+        self.logger.info("Created workflow helper files: view_results.bat and resume_workflow.bat")
         
         # Save workflow metadata if provided
         if workflow_metadata:

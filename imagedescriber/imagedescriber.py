@@ -4898,13 +4898,13 @@ class ImageDescriberGUI(QMainWindow):
         # View Mode submenu
         view_mode_menu = view_menu.addMenu("View Mode")
         
-        self.view_mode_tree_action = QAction("Image Tree", self)
+        self.view_mode_tree_action = QAction("AI Generation", self)
         self.view_mode_tree_action.setCheckable(True)
         self.view_mode_tree_action.setChecked(True)  # Default
         self.view_mode_tree_action.triggered.connect(lambda: self.set_view_mode("tree"))
         view_mode_menu.addAction(self.view_mode_tree_action)
         
-        self.view_mode_flat_action = QAction("Flat Image List", self)
+        self.view_mode_flat_action = QAction("Descriptions First", self)
         self.view_mode_flat_action.setCheckable(True)
         self.view_mode_flat_action.triggered.connect(lambda: self.set_view_mode("flat"))
         view_mode_menu.addAction(self.view_mode_flat_action)
@@ -8342,11 +8342,39 @@ Please answer the follow-up question about this image, taking into account the c
         self.view_mode_tree_action.setChecked(mode == "tree")
         self.view_mode_flat_action.setChecked(mode == "flat")
         
+        # Update accessible name and UI visibility based on mode
+        if mode == "flat":
+            # In flat mode, image_list shows descriptions
+            self.image_list.setAccessibleName("Descriptions List")
+            self.image_list.setAccessibleDescription("List of all descriptions for images and video frames. Use arrow keys to navigate. Each entry shows the full description, image name, model, and prompt.")
+            
+            # Hide description list and text since they won't be used in flat mode
+            self.description_list.hide()
+            self.description_text.hide()
+            
+            # Update tab order: image_list → image_preview (if visible) or nothing
+            if hasattr(self, 'image_preview_label') and self.image_preview_panel.isVisible():
+                self.setTabOrder(self.image_list, self.image_preview_label)
+        else:
+            # In tree mode, image_list shows images
+            self.image_list.setAccessibleName("Image List")
+            self.image_list.setAccessibleDescription("List of images and video frames in the workspace. Use arrow keys to navigate, P to process selected image, B to mark for batch.")
+            
+            # Show description list and text for tree mode
+            self.description_list.show()
+            self.description_text.show()
+            
+            # Restore normal tab order: image_list → description_list → description_text → image_preview
+            self.setTabOrder(self.image_list, self.description_list)
+            self.setTabOrder(self.description_list, self.description_text)
+            if hasattr(self, 'image_preview_label'):
+                self.setTabOrder(self.description_text, self.image_preview_label)
+        
         # Refresh the view with new mode applied
         self.refresh_view()
         
         # Show temporary status message
-        mode_display = "Image Tree" if mode == "tree" else "Flat Image List"
+        mode_display = "AI Generation" if mode == "tree" else "Descriptions First"
         self.status_bar.showMessage(f"View mode: {mode_display}", 2000)
 
     def process_all(self):

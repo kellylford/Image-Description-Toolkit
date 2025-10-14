@@ -8,6 +8,26 @@ Last commit: `b4ae7c8` - "Remove Navigation Mode menu from imagedescriber View m
 
 ## 🔧 MAJOR CHANGES
 
+### 0. **ImageDescriber: Accessibility Fixes for View Modes**
+- **What Changed:** 
+  - Renamed "Image Tree" → "AI Generation" and "Flat Image List" → "Descriptions First"
+  - Accessible name changes dynamically based on mode
+  - Hidden unused controls in Descriptions First mode
+  - Updated tab order based on active mode
+- **Why:** Improve screen reader experience and keyboard navigation
+- **Test:**
+  - [ ] Launch ImageDescriber
+  - [ ] Load images with descriptions
+  - [ ] View → View Mode → Verify "AI Generation" is checked by default
+  - [ ] Tab through: image_list → description_list → description_text
+  - [ ] With screen reader: Verify "Image List" is announced
+  - [ ] Switch to View → View Mode → Descriptions First
+  - [ ] With screen reader: Verify "Descriptions List" is announced
+  - [ ] Tab through: Should skip description_list and description_text (hidden)
+  - [ ] Switch back to AI Generation mode
+  - [ ] Verify description_list and description_text reappear
+- **Documentation:** See `ACCESSIBILITY_FIXES_OCT13.md` for detailed info
+
 ### 1. **Viewer: Removed Redescribe Button**
 - **What Changed:** Commented out redescribe button in viewer GUI
 - **Why:** Redundant with CLI commands, simplifies interface
