@@ -4904,7 +4904,7 @@ class ImageDescriberGUI(QMainWindow):
         self.view_mode_tree_action.triggered.connect(lambda: self.set_view_mode("tree"))
         view_mode_menu.addAction(self.view_mode_tree_action)
         
-        self.view_mode_flat_action = QAction("Descriptions First", self)
+        self.view_mode_flat_action = QAction("Descriptions Only", self)
         self.view_mode_flat_action.setCheckable(True)
         self.view_mode_flat_action.triggered.connect(lambda: self.set_view_mode("flat"))
         view_mode_menu.addAction(self.view_mode_flat_action)
@@ -6171,7 +6171,7 @@ class ImageDescriberGUI(QMainWindow):
             
             # Format like viewer: Full description, then image name and model info
             # NO truncation for screen reader accessibility
-            desc_text = desc.text
+            desc_text = desc.text.strip()  # Remove leading/trailing whitespace
             
             # Build display text: Description text, followed by metadata on new lines
             model_info = f"Model: {desc.model}" if desc.model else "Model: Unknown"
@@ -6188,7 +6188,8 @@ class ImageDescriberGUI(QMainWindow):
             
             # Build accessibility text - this is what screen readers read
             # Use AccessibleTextRole (not Description) to override the display text completely
-            accessibility_text = f"{desc_text}. Image: {file_name}. {model_info}. {prompt_info}"
+            # Strip to remove any leading/trailing whitespace that causes "blank" announcements
+            accessibility_text = f"{desc_text}. Image: {file_name}. {model_info}. {prompt_info}".strip()
             
             list_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessibility_text)
             # Tooltip shows same information in structured format
@@ -8375,7 +8376,7 @@ Please answer the follow-up question about this image, taking into account the c
         self.refresh_view()
         
         # Show temporary status message
-        mode_display = "AI Generation" if mode == "tree" else "Descriptions First"
+        mode_display = "AI Generation" if mode == "tree" else "Descriptions Only"
         self.status_bar.showMessage(f"View mode: {mode_display}", 2000)
 
     def process_all(self):

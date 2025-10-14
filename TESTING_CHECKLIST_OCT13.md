@@ -33,11 +33,11 @@ Last commit: `8d8f16e` - "Add run_stats.bat to workflow helper files"
 
 ### 0. **ImageDescriber: Accessibility Fixes for View Modes**
 - **What Changed:** 
-  - Renamed "Image Tree" → "AI Generation" and "Flat Image List" → "Descriptions First"
+  - Renamed "Image Tree" → "AI Generation" and "Flat Image List" → "Descriptions Only"
   - Accessible name changes dynamically based on mode
-  - Hidden unused controls in Descriptions First mode
+  - Hidden unused controls in Descriptions Only mode
   - Updated tab order based on active mode
-  - Fixed screen reader "blank" issue by using AccessibleTextRole instead of AccessibleDescriptionRole
+  - Fixed screen reader "blank" issue by using AccessibleTextRole and .strip()
 - **Why:** Improve screen reader experience and keyboard navigation
 - **Test:**
   - [ ] Launch ImageDescriber
@@ -45,10 +45,10 @@ Last commit: `8d8f16e` - "Add run_stats.bat to workflow helper files"
   - [ ] View → View Mode → Verify "AI Generation" is checked by default
   - [ ] Tab through: image_list → description_list → description_text
   - [ ] With screen reader: Verify "Image List" is announced
-  - [ ] Switch to View → View Mode → Descriptions First
+  - [ ] Switch to View → View Mode → Descriptions Only
   - [ ] With screen reader: Verify "Descriptions List" is announced
   - [ ] With screen reader: Navigate list items - should NOT say "blank" before descriptions
-  - [ ] With screen reader: Verify full description is read without "blank" prefix
+  - [ ] With screen reader: Verify full description is read without "blank" prefix or leading spaces
   - [ ] Tab through: Should skip description_list and description_text (hidden)
   - [ ] Switch back to AI Generation mode
   - [ ] Verify description_list and description_text reappear
