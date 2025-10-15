@@ -158,8 +158,8 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
     # Format: wf_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
     parts = dir_name.split('_')
     
-    # Known prompt styles
-    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic']
+    # Known prompt styles (must match those in image_describer_config.json)
+    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic', 'simple']
     
     # Find the prompt style (it's the part before the datetime)
     prompt_style = 'unknown'
