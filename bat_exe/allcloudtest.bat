@@ -41,27 +41,27 @@ pause
 
 echo OPENAI MODELS (3)
 echo [1/10] Running gpt-4o...
-call run_openai_gpt4o.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_openai_gpt4o.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [2/10] Running gpt-4o-mini...
-call run_openai_gpt4o_mini.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_openai_gpt4o_mini.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [3/10] Running gpt-5...
-call run_openai_gpt5.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_openai_gpt5.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 
 echo CLAUDE MODELS (7)
 echo [4/10] Running claude-sonnet-4-5-20250929...
-call run_claude_sonnet45.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_claude_sonnet45.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [5/10] Running claude-opus-4-1-20250805...
-call run_claude_opus41.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_claude_opus41.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [6/10] Running claude-sonnet-4-20250514...
-call run_claude_sonnet4.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_claude_sonnet4.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [7/10] Running claude-opus-4-20250514...
-call run_claude_opus4.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_claude_opus4.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [8/10] Running claude-3-7-sonnet-20250219...
-call run_claude_sonnet37.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_claude_sonnet37.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [9/10] Running claude-3-5-haiku-20241022...
-call run_claude_haiku35.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_claude_haiku35.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo [10/10] Running claude-3-haiku-20240307...
-call run_claude_haiku3.bat --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
+call run_claude_haiku3.bat --batch --prompt-style %PROMPT_STYLE% "%IMAGE_DIR%"
 echo All cloud model tests complete!
 echo Results in: ..\Descriptions\wf_*
 echo COST WARNING: This run used API credits from both OpenAI and Claude

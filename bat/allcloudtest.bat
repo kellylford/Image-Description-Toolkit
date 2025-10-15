@@ -29,26 +29,26 @@ echo Press Ctrl+C to cancel, or
 pause
 echo OPENAI MODELS (3)
 echo [1/10] Running gpt-4o...
-call run_openai_gpt4o.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_openai_gpt4o.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [2/10] Running gpt-4o-mini...
-call run_openai_gpt4o_mini.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_openai_gpt4o_mini.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [3/10] Running gpt-5...
-call run_openai_gpt5.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_openai_gpt5.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo CLAUDE MODELS (7)
 echo [4/10] Running claude-sonnet-4-5-20250929...
-call run_claude_sonnet45.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_claude_sonnet45.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [5/10] Running claude-opus-4-1-20250805...
-call run_claude_opus41.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_claude_opus41.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [6/10] Running claude-sonnet-4-20250514...
-call run_claude_sonnet4.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_claude_sonnet4.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [7/10] Running claude-opus-4-20250514...
-call run_claude_opus4.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_claude_opus4.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [8/10] Running claude-3-7-sonnet-20250219...
-call run_claude_sonnet37.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_claude_sonnet37.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [9/10] Running claude-3-5-haiku-20241022...
-call run_claude_haiku35.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_claude_haiku35.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo [10/10] Running claude-3-haiku-20240307...
-call run_claude_haiku3.bat "%IMAGE_DIR%" "%PROMPT_STYLE%"
+call run_claude_haiku3.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
 echo All cloud model tests complete!
 echo Results in: ..\Descriptions\wf_*
 echo COST WARNING: This run used API credits from both OpenAI and Claude

@@ -1702,6 +1702,12 @@ Viewing Results:
     )
     
     parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="Non-interactive mode - skip prompts (useful for running multiple workflows sequentially)"
+    )
+    
+    parser.add_argument(
         "--original-cwd",
         help=argparse.SUPPRESS  # Hidden argument for wrapper communication
     )
@@ -1987,7 +1993,8 @@ Viewing Results:
         print(f"\nDetailed results saved in workflow log file.")
         
         # Offer to view results if workflow was successful and viewer wasn't already launched
-        if results['success'] and results['output_dir'] and not args.view_results:
+        # Skip prompt if --batch mode is enabled (for sequential workflow runs)
+        if results['success'] and results['output_dir'] and not args.view_results and not args.batch:
             view_results = prompt_view_results()
             if view_results:
                 launch_viewer(results['output_dir'], orchestrator.logger)
