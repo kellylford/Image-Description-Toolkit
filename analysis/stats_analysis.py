@@ -39,6 +39,69 @@ if sys.platform == 'win32':
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
+# API Pricing as of October 2025 (per million tokens)
+# Note: Prices may change - verify current pricing at provider websites
+API_PRICING = {
+    'claude': {
+        'claude-3-haiku-20240307': {'input': 0.25, 'output': 1.25, 'name': 'Claude 3 Haiku'},
+        'claude-3-5-haiku-20241022': {'input': 1.00, 'output': 5.00, 'name': 'Claude 3.5 Haiku'},
+        'claude-3-5-sonnet-20241022': {'input': 3.00, 'output': 15.00, 'name': 'Claude 3.5 Sonnet'},
+        'claude-3-5-sonnet-20240620': {'input': 3.00, 'output': 15.00, 'name': 'Claude 3.5 Sonnet'},
+        'claude-3-opus-20240229': {'input': 15.00, 'output': 75.00, 'name': 'Claude 3 Opus'},
+        'claude-opus-4-20250514': {'input': 15.00, 'output': 75.00, 'name': 'Claude Opus 4'},
+        'claude-opus-4-1-20250805': {'input': 15.00, 'output': 75.00, 'name': 'Claude Opus 4.1'},
+    },
+    'openai': {
+        'gpt-4o': {'input': 2.50, 'output': 10.00, 'name': 'GPT-4o'},
+        'gpt-4o-mini': {'input': 0.150, 'output': 0.600, 'name': 'GPT-4o mini'},
+        'gpt-4-turbo': {'input': 10.00, 'output': 30.00, 'name': 'GPT-4 Turbo'},
+    },
+    # Ollama models run locally - no API costs
+    'ollama': None
+}
+
+PRICING_DATE = "October 2025"
+
+
+def calculate_cost(provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> Optional[Dict]:
+    """
+    Calculate estimated API cost based on token usage.
+    
+    Returns:
+        Dictionary with cost breakdown or None if pricing not available
+    """
+    if provider not in API_PRICING or API_PRICING[provider] is None:
+        return None
+    
+    provider_pricing = API_PRICING[provider]
+    
+    # Try exact model match first
+    if model in provider_pricing:
+        pricing = provider_pricing[model]
+    else:
+        # Try to find a partial match
+        pricing = None
+        for model_key, model_pricing in provider_pricing.items():
+            if model_key in model or model in model_key:
+                pricing = model_pricing
+                break
+        
+        if pricing is None:
+            return None
+    
+    input_cost = (prompt_tokens / 1_000_000) * pricing['input']
+    output_cost = (completion_tokens / 1_000_000) * pricing['output']
+    total_cost = input_cost + output_cost
+    
+    return {
+        'model_name': pricing['name'],
+        'input_cost': input_cost,
+        'output_cost': output_cost,
+        'total_cost': total_cost,
+        'input_price_per_m': pricing['input'],
+        'output_price_per_m': pricing['output']
+    }
+
 
 def extract_timestamp_from_log_line(line: str) -> Optional[str]:
     """
@@ -106,12 +169,32 @@ def parse_workflow_log(log_path: Path) -> Dict:
         return stats
     
     # Extract provider, model, and prompt_style from directory name
-    # Format: wf_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
+    # Format examples:
+    #   wf_PROVIDER_MODEL_PROMPTSTYLE_DATETIME
+    #   wf_FOLDER_PROVIDER_MODEL_PROMPTSTYLE_DATETIME (when processing specific folders)
     dir_name = log_path.parent.parent.name
     parts = dir_name.split('_')
+    
+    # Known providers
+    known_providers = ['claude', 'openai', 'ollama']
+    
     if len(parts) >= 3:
-        stats['provider'] = parts[1]
-        stats['model'] = parts[2]
+        # Try to find the provider in the parts
+        provider_idx = None
+        for i, part in enumerate(parts[1:], 1):  # Skip 'wf'
+            if part in known_providers:
+                provider_idx = i
+                break
+        
+        if provider_idx:
+            stats['provider'] = parts[provider_idx]
+            # Model is the next part after provider
+            if provider_idx + 1 < len(parts):
+                stats['model'] = parts[provider_idx + 1]
+        else:
+            # Fallback to old logic if no known provider found
+            stats['provider'] = parts[1]
+            stats['model'] = parts[2]
         
         # Prompt style is typically in parts[3] or parts[4] (if model has variant)
         # Known prompt styles to look for
@@ -279,31 +362,54 @@ def parse_workflow_log(log_path: Path) -> Dict:
         except:
             pass
     
-    # Calculate min, max, median from individual processing times
-    if stats['processing_times']:
-        times_only = [item['time'] for item in stats['processing_times']]
-        stats['min_time'] = min(times_only)
-        stats['max_time'] = max(times_only)
-        stats['median_time'] = statistics.median(times_only)
-        
-        # Find files with min and max times
-        for item in stats['processing_times']:
-            if item['time'] == stats['min_time']:
-                stats['min_time_file'] = item['file']
-            if item['time'] == stats['max_time']:
-                stats['max_time_file'] = item['file']
-        
-        # If average wasn't in log, calculate it
-        if stats['average_time_per_image'] is None:
-            stats['average_time_per_image'] = statistics.mean(times_only)
-    
-    # Also check image_describer log for token usage data
+    # Also check image_describer log for token usage data AND average timing
     image_describer_logs = list(log_path.parent.glob("image_describer_*.log"))
     if image_describer_logs:
         describer_log = image_describer_logs[0]  # Use first one
         try:
+            recent_lines = []
+            individual_token_usage = []  # Track individual image token usage
             with open(describer_log, 'r', encoding='utf-8') as f:
                 for line in f:
+                    recent_lines.append(line)
+                    if len(recent_lines) > 10:
+                        recent_lines.pop(0)
+                    
+                    # Look for individual processing times (for min/max/median calculation)
+                    if 'Processing duration:' in line:
+                        match = re.search(r'Processing duration: ([\d.]+) seconds', line)
+                        if match:
+                            processing_time = float(match.group(1))
+                            # Look back for the filename
+                            filename = "Unknown"
+                            for recent_line in reversed(recent_lines[-10:]):
+                                filename_match = re.search(r'Generated description for (.+?)(?:\s+\(Provider:|\s*$)', recent_line)
+                                if filename_match:
+                                    filename = filename_match.group(1).strip()
+                                    break
+                            
+                            stats['processing_times'].append({
+                                'time': processing_time,
+                                'file': filename
+                            })
+                    
+                    # Look for individual token usage (for summing if no summary exists)
+                    if 'Token usage:' in line and 'total' in line and 'prompt' in line:
+                        match = re.search(r'Token usage: (\d+) total \((\d+) prompt \+ (\d+) completion\)', line)
+                        if match:
+                            individual_token_usage.append({
+                                'total': int(match.group(1)),
+                                'prompt': int(match.group(2)),
+                                'completion': int(match.group(3))
+                            })
+                    
+                    # Look for average time per image (if not already found in workflow log)
+                    if stats['average_time_per_image'] is None:
+                        if 'Average time per new image:' in line or 'Average time per image:' in line:
+                            match = re.search(r'Average time per (?:new )?image: ([\d.]+) seconds', line)
+                            if match:
+                                stats['average_time_per_image'] = float(match.group(1))
+                    
                     # Look for TOKEN USAGE SUMMARY section
                     if 'Total tokens:' in line:
                         match = re.search(r'Total tokens: ([\d,]+)', line)
@@ -321,8 +427,33 @@ def parse_workflow_log(log_path: Path) -> Dict:
                         match = re.search(r'Estimated cost: \$([\d.]+)', line)
                         if match:
                             stats['estimated_cost'] = float(match.group(1))
+            
+            # If no token summary was found, sum up the individual token usage
+            if stats['total_tokens'] is None and individual_token_usage:
+                stats['total_tokens'] = sum(t['total'] for t in individual_token_usage)
+                stats['prompt_tokens'] = sum(t['prompt'] for t in individual_token_usage)
+                stats['completion_tokens'] = sum(t['completion'] for t in individual_token_usage)
+                
         except Exception as e:
             print(f"Warning: Could not parse image_describer log: {e}")
+    
+    # Calculate min, max, median from individual processing times (after all log parsing)
+    if stats['processing_times']:
+        times_only = [item['time'] for item in stats['processing_times']]
+        stats['min_time'] = min(times_only)
+        stats['max_time'] = max(times_only)
+        stats['median_time'] = statistics.median(times_only)
+        
+        # Find files with min and max times
+        for item in stats['processing_times']:
+            if item['time'] == stats['min_time']:
+                stats['min_time_file'] = item['file']
+            if item['time'] == stats['max_time']:
+                stats['max_time_file'] = item['file']
+        
+        # If average wasn't in log, calculate it
+        if stats['average_time_per_image'] is None:
+            stats['average_time_per_image'] = statistics.mean(times_only)
     
     return stats
 
@@ -531,7 +662,51 @@ def print_workflow_stats(stats: Dict):
         print(f"    Median Time:           {stats['median_time']:.2f}s")
     
     if stats['processing_times']:
-        print(f"    Samples:               {len(stats['processing_times']):,} images (excludes extracted frames)")
+        sample_count = len(stats['processing_times'])
+        total_files = stats['total_files_processed']
+        
+        # Explain what the sample count represents
+        if sample_count == total_files:
+            print(f"    Timing Samples:        {sample_count:,} images (all files)")
+        elif sample_count < total_files:
+            print(f"    Timing Samples:        {sample_count:,} images")
+            print(f"                           (out of {total_files:,} total files processed)")
+            print(f"                           Note: Difference may include HEIC conversions,")
+            print(f"                           video frames, cached/skipped images, etc.")
+        else:
+            print(f"    Timing Samples:        {sample_count:,} images")
+    
+    # Token usage and cost information
+    if stats['total_tokens'] is not None:
+        print(f"\n  Token Usage:")
+        print(f"    Total Tokens:          {stats['total_tokens']:,}")
+        if stats['prompt_tokens'] is not None:
+            print(f"    Prompt Tokens:         {stats['prompt_tokens']:,}")
+        if stats['completion_tokens'] is not None:
+            print(f"    Completion Tokens:     {stats['completion_tokens']:,}")
+        
+        # Calculate and display cost if applicable
+        if stats['prompt_tokens'] and stats['completion_tokens'] and stats['provider'] and stats['model']:
+            cost_info = calculate_cost(
+                stats['provider'],
+                stats['model'],
+                stats['prompt_tokens'],
+                stats['completion_tokens']
+            )
+            
+            if cost_info:
+                print(f"\n  Estimated Cost (as of {PRICING_DATE}):")
+                print(f"    Model:                 {cost_info['model_name']}")
+                print(f"    Input Cost:            ${cost_info['input_cost']:.4f} ({stats['prompt_tokens']:,} × ${cost_info['input_price_per_m']:.2f}/M)")
+                print(f"    Output Cost:           ${cost_info['output_cost']:.4f} ({stats['completion_tokens']:,} × ${cost_info['output_price_per_m']:.2f}/M)")
+                print(f"    Total Cost:            ${cost_info['total_cost']:.2f}")
+                if stats['total_files_processed'] > 0:
+                    cost_per_image = cost_info['total_cost'] / stats['total_files_processed']
+                    print(f"    Cost per Image:        ${cost_per_image:.4f}")
+            elif stats['provider'] == 'ollama':
+                print(f"\n  Cost Information:")
+                print(f"    Provider:              Ollama (local)")
+                print(f"    API Cost:              $0.00 (runs locally)")
     
     if stats['errors']:
         print(f"  Errors Encountered:      {stats['errors']}")
@@ -653,6 +828,44 @@ def calculate_aggregate_stats(all_stats: List[Dict]):
         print(f"  Min:      {min(all_processing_times):.2f}s")
         print(f"  Max:      {max(all_processing_times):.2f}s")
         print(f"  Std Dev:  {statistics.stdev(all_processing_times):.2f}s")
+    
+    # Cost summary for paid API providers (check all_stats, not just valid_stats)
+    paid_workflows = [s for s in all_stats if s['total_tokens'] is not None and s['provider'] != 'ollama']
+    if paid_workflows:
+        print(f"\n" + "=" * 80)
+        print(f"API COST SUMMARY (as of {PRICING_DATE})")
+        print(f"Note: Prices subject to change - verify current pricing at provider websites")
+        print("=" * 80)
+        
+        total_api_cost = 0
+        for stats in paid_workflows:
+            if stats['prompt_tokens'] and stats['completion_tokens']:
+                cost_info = calculate_cost(
+                    stats['provider'],
+                    stats['model'],
+                    stats['prompt_tokens'],
+                    stats['completion_tokens']
+                )
+                
+                if cost_info:
+                    label = get_workflow_label(stats['workflow_dir'])
+                    # Use processing_times count if total_files_processed is 0 (incomplete runs)
+                    image_count = stats['total_files_processed'] if stats['total_files_processed'] > 0 else len(stats['processing_times'])
+                    
+                    print(f"\n{label}")
+                    print(f"  Model:        {cost_info['model_name']}")
+                    print(f"  Images:       {image_count:,}")
+                    if image_count == len(stats['processing_times']) and image_count < stats['total_files_processed']:
+                        print(f"  Status:       Incomplete (stopped early)")
+                    print(f"  Total Cost:   ${cost_info['total_cost']:.2f}")
+                    if image_count > 0:
+                        print(f"  Cost/Image:   ${cost_info['total_cost'] / image_count:.4f}")
+                    total_api_cost += cost_info['total_cost']
+        
+        if total_api_cost > 0:
+            print(f"\n{'=' * 80}")
+            print(f"Total API Costs Across All Paid Workflows: ${total_api_cost:.2f}")
+            print(f"{'=' * 80}")
 
 
 def save_stats_json(all_stats: List[Dict], output_file: Path):
@@ -765,6 +978,51 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
     print(f"CSV statistics saved to: {output_file}")
 
 
+def save_text_report(all_stats: list, output_file: Path, base_dir: Path):
+    """
+    Save a formatted text report of all statistics.
+    This captures the same output as the console display.
+    """
+    import sys
+    from io import StringIO
+    
+    # Capture console output
+    old_stdout = sys.stdout
+    sys.stdout = text_capture = StringIO()
+    
+    try:
+        # Print all the sections that appear in console
+        print_section_header("WORKFLOW STATISTICS ANALYZER")
+        print(f"Found {len(all_stats)} workflow directories\n")
+        
+        # Individual workflow stats
+        print_section_header("INDIVIDUAL WORKFLOW STATISTICS")
+        for stats in all_stats:
+            print_workflow_stats(stats)
+        
+        # Comparison table
+        print_comparison_table(all_stats)
+        
+        # Rankings
+        print_rankings(all_stats)
+        
+        # Aggregate stats
+        calculate_aggregate_stats(all_stats)
+        
+        # Get the captured output
+        report_content = text_capture.getvalue()
+        
+    finally:
+        # Restore stdout
+        sys.stdout = old_stdout
+    
+    # Write to file
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(report_content)
+    
+    print(f"Text report saved to: {output_file}")
+
+
 def main():
     """Main function to analyze workflow statistics."""
     parser = argparse.ArgumentParser(
@@ -807,6 +1065,13 @@ Examples:
         help='JSON output filename (default: analysis/results/workflow_statistics.json)'
     )
     
+    parser.add_argument(
+        '--text-output',
+        type=str,
+        default='analysis/results/workflow_report.txt',
+        help='Text report output filename (default: analysis/results/workflow_report.txt)'
+    )
+    
     args = parser.parse_args()
     
     # Determine input directory
@@ -844,7 +1109,17 @@ Examples:
             stats = parse_workflow_log(log_file)
             all_stats.append(stats)
         else:
-            print(f"Warning: No workflow log found in {workflow_dir.name}")
+            # No workflow log - try to parse from image_describer log directly
+            describer_logs = list((workflow_dir / "logs").glob("image_describer_*.log"))
+            if describer_logs:
+                print(f"Analyzing: {workflow_dir.name} (no workflow log, using image_describer log)")
+                # Create a fake workflow log path for parse_workflow_log to work with
+                fake_log_path = workflow_dir / "logs" / "workflow_missing.log"
+                stats = parse_workflow_log(fake_log_path)
+                # The function will parse image_describer logs even though workflow log doesn't exist
+                all_stats.append(stats)
+            else:
+                print(f"Warning: No workflow or image_describer log found in {workflow_dir.name}")
     
     # Print individual workflow stats
     print_section_header("INDIVIDUAL WORKFLOW STATISTICS")
@@ -869,11 +1144,17 @@ Examples:
     ensure_directory(csv_output.parent)
     csv_output = get_safe_filename(csv_output)
     
+    text_output = Path(args.text_output).resolve()
+    ensure_directory(text_output.parent)
+    text_output = get_safe_filename(text_output)
+    
     save_stats_json(all_stats, json_output)
     save_stats_csv(all_stats, csv_output)
+    save_text_report(all_stats, text_output, base_dir)
     
     print("\n" + "=" * 80)
     print("Analysis complete!")
+    print(f"Text report saved to: {text_output}")
     print(f"CSV data for quality analysis: {csv_output}")
     print(f"JSON data saved to: {json_output}")
     print("=" * 80 + "\n")
