@@ -75,6 +75,7 @@ def main():
 | `convert-images` | `scripts/ConvertImage.py` | HEIC → JPG conversion |
 | `extract-frames` | `scripts/video_frame_extractor.py` | Extract video frames |
 | `check-models` | `models/check_models.py` | Verify Ollama models |
+| `prompt-list` | `scripts/list_prompts.py` | List available prompt styles |
 | `stats` | `analysis/analyze_workflow_stats.py` | Performance analysis |
 | `contentreview` | `analysis/analyze_description_content.py` | Content quality |
 | `combinedescriptions` | `analysis/combine_workflow_descriptions.py` | Aggregate results |

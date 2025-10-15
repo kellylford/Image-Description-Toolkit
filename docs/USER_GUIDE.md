@@ -178,6 +178,16 @@ idt guideme  # (wizard will let you choose)
 
 ### Available Prompt Styles
 
+**Want to see all available prompts?** Use the `prompt-list` command:
+
+```bash
+# See prompt style names
+idt prompt-list
+
+# See names AND full prompt text
+idt prompt-list --verbose
+```
+
 | Style Name | Best For | Description |
 |------------|----------|-------------|
 | **narrative** | General use (default) | Detailed, objective descriptions without interpretation |
@@ -217,6 +227,9 @@ idt workflow <image_directory> [options]
 
 # Launch results viewer (GUI)
 idt viewer [directory]
+
+# List available prompt styles
+idt prompt-list [--verbose]
 
 # Analyze workflow statistics
 idt stats [workflow_directory]
@@ -259,6 +272,8 @@ Options:
   --recursive              Process subdirectories
   --max-files N            Limit number of files (for testing)
   --resume                 Resume interrupted workflow
+  --batch                  Non-interactive mode (skip prompts - for sequential runs)
+  --view-results           Auto-launch viewer to monitor progress
 ```
 
 **Examples:**
@@ -281,6 +296,13 @@ idt workflow C:\Photos --recursive --name all_photos
 
 # Resume an interrupted run
 idt workflow C:\Photos --resume
+
+# Non-interactive mode (for running multiple workflows sequentially)
+idt workflow C:\Photos --batch --name batch1
+idt workflow C:\More_Photos --batch --name batch2
+
+# Launch viewer automatically to watch progress
+idt workflow C:\Photos --view-results --name live_monitoring
 ```
 
 ---
