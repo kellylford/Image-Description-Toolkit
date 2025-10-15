@@ -298,9 +298,21 @@ def parse_workflow_log(log_path: Path) -> Dict:
                 if match:
                     stats['heic_files_converted'] = int(match.group(1))
             
-            # HEIC conversion - also check final summary
+            # HEIC conversion - also check final summary (old format)
             elif 'HEIC conversions:' in line:
                 match = re.search(r'HEIC conversions: (\d+)', line)
+                if match:
+                    # Update if we didn't catch it earlier
+                    if stats['heic_files_converted'] == 0:
+                        stats['heic_files_converted'] = int(match.group(1))
+                # Capture end time
+                timestamp = extract_timestamp_from_log_line(line)
+                if timestamp:
+                    conversion_end = timestamp
+            
+            # HEIC conversion - new format with smart counting
+            elif 'Format conversions (HEIC → JPG):' in line or 'Format conversions included:' in line:
+                match = re.search(r'(?:Format conversions.*?|included:)\s*(\d+)', line)
                 if match:
                     # Update if we didn't catch it earlier
                     if stats['heic_files_converted'] == 0:
