@@ -679,6 +679,60 @@ def main():
             print(f"Error launching image describer: {e}")
             return 1
     
+    elif command == 'configure' or command == 'config':
+        # Launch the IDT Configure executable
+        import subprocess
+        import platform
+        
+        # Detect architecture
+        machine = platform.machine().lower()
+        if machine in ('aarch64', 'arm64'):
+            arch = 'arm64'
+        else:
+            arch = 'amd64'
+        
+        # Try multiple possible IDT Configure locations
+        configure_names = [
+            f'idtconfigure_{arch}.exe',
+            'idtconfigure.exe',
+            f'idtconfigure/idtconfigure_{arch}.exe',
+            'idtconfigure/idtconfigure.exe',
+            f'../idtconfigure/idtconfigure_{arch}.exe',
+            '../idtconfigure/idtconfigure.exe',
+        ]
+        
+        configure_exe = None
+        for name in configure_names:
+            candidate = base_dir / name
+            if candidate.exists():
+                configure_exe = candidate
+                break
+        
+        if not configure_exe:
+            print("Error: IDT Configure executable not found.")
+            print(f"Looked in: {base_dir}")
+            print(f"Expected: idtconfigure_{arch}.exe or idtconfigure.exe")
+            print()
+            print("The IDT Configure tool must be built separately using:")
+            print("  cd idtconfigure")
+            print("  build_idtconfigure.bat")
+            return 1
+        
+        # Launch IDT Configure as separate process (detached)
+        try:
+            # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
+            if sys.platform == 'win32':
+                subprocess.Popen([str(configure_exe)], 
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+            else:
+                subprocess.Popen([str(configure_exe)])
+            
+            print(f"Launched IDT Configure: {configure_exe.name}")
+            return 0
+        except Exception as e:
+            print(f"Error launching IDT Configure: {e}")
+            return 1
+    
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
         return 0
@@ -707,6 +761,7 @@ COMMANDS:
     viewer (or view)      Launch the GUI viewer for browsing results
     prompteditor          Launch the prompt editor to manage prompts
     imagedescriber        Launch the image describer GUI
+    configure (or config) Launch the configuration manager
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
@@ -738,6 +793,9 @@ EXAMPLES:
     # Launch image describer GUI
     {base_call} imagedescriber
 
+    # Launch configuration manager
+    {base_call} configure
+
     # Run workflow with Claude
     {base_call} workflow --provider claude --model claude-opus-4
 
@@ -756,7 +814,7 @@ EXAMPLES:
 NOTES:
     - Requires Ollama to be installed for Ollama models
     - Requires API keys for OpenAI and Anthropic (set via environment variables)
-    - GUI tools (viewer, prompteditor, imagedescriber) must be built separately
+    - GUI tools (viewer, prompteditor, imagedescriber, configure) must be built separately
     - All commands support --help for detailed options
 
 For detailed documentation, see the docs/ folder.
