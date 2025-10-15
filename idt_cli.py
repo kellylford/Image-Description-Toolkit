@@ -354,6 +354,47 @@ def main():
             result = subprocess.run(cmd, cwd=str(check_script.parent))
             return result.returncode
     
+    elif command == 'prompt-list':
+        # List available prompt styles
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                
+                import list_prompts
+                
+                original_argv = sys.argv[:]
+                sys.argv = ['list_prompts.py'] + sys.argv[2:]
+                
+                try:
+                    return list_prompts.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import list_prompts module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running prompt-list: {e}")
+                return 1
+        else:
+            # Development mode - use subprocess
+            list_script = get_resource_path('scripts/list_prompts.py')
+            
+            if not list_script.exists():
+                print(f"Error: Prompt list script not found at {list_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(list_script)] + args
+            result = subprocess.run(cmd, cwd=str(list_script.parent))
+            return result.returncode
+    
     elif command == 'extract-frames':
         # Extract video frames
         if getattr(sys, 'frozen', False):
@@ -711,6 +752,7 @@ COMMANDS:
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
     check-models          Check installed Ollama models
+    prompt-list           List available prompt styles
     extract-frames        Extract frames from video files
     convert-images        Convert HEIC images to JPG
     version               Show version information
@@ -752,6 +794,10 @@ EXAMPLES:
 
     # Check available models
     {base_call} check-models
+
+    # List available prompt styles
+    {base_call} prompt-list
+    {base_call} prompt-list --verbose
 
 NOTES:
     - Requires Ollama to be installed for Ollama models
