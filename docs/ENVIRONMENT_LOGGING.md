@@ -25,16 +25,23 @@ Starting with the ImageDescriber branch updates (October 2025), IDT automaticall
 
 ### Hardware Information
 - CPU core count
-- Total and available RAM (if psutil installed)
+- Total RAM (detected via PowerShell on Windows even without psutil)
+- Available RAM and usage percentage (if psutil installed)
 - CPU frequency (if psutil installed)
-- Disk space (if psutil installed)
-- GPU information (Windows only, best effort)
+- CPU load at workflow start (if psutil installed)
+- Disk space and usage (if psutil installed)
+- GPU/Display adapter information (Windows, Linux, macOS)
+- **NPU Detection**: Automatically detects Copilot+ PC NPU indicators (Qualcomm, Snapdragon, Neural Processing)
+- **Copilot+ PC Identification**: Flags likely Copilot+ PCs based on NPU presence
 
 ### Environment
 - Username
 - Computer name
 - Home directory
 - Current working directory
+
+### Software
+- Ollama version (if installed)
 
 ## Log Location
 
@@ -90,8 +97,20 @@ PYTHON INFORMATION
 HARDWARE INFORMATION
 --------------------------------------------------------------------------------
   Cpu Count           : 12
-  Memory Total Gb     : 16.0
-  Memory Available Gb : 8.5
+  Memory Total Gb     : 32.0
+  Memory Available Gb : 24.5
+  Memory Percent Used : 23.4
+  Cpu Freq Current Mhz: 3000.0
+  Cpu Percent At Start: 15.2
+  GPU                 :
+    - Qualcomm(R) Adreno(TM) X1-85 GPU (Qualcomm(R) Adreno(TM) Graphics)
+  Npu Detected        : True
+  Copilot Plus Pc     : Likely (NPU indicators found in GPU info)
+
+--------------------------------------------------------------------------------
+SOFTWARE INFORMATION
+--------------------------------------------------------------------------------
+  Ollama Version      : ollama version is 0.12.5
 
 --------------------------------------------------------------------------------
 ENVIRONMENT
@@ -145,6 +164,47 @@ The `frozen` field shows whether the workflow was run as:
 - `false`: Python script (workflow.py)
 
 This helps troubleshoot differences between development and production environments.
+
+## Hardware Detection
+
+### GPU/NPU Detection
+
+IDT now uses modern PowerShell commands for GPU detection on Windows instead of the deprecated `wmic` tool. This provides:
+
+- **Better accuracy** on Windows 11 and modern systems
+- **NPU detection** for Copilot+ PCs (detects Qualcomm, Snapdragon, Neural Processing indicators)
+- **Cross-platform support** (Windows PowerShell, Linux lspci, macOS system_profiler)
+- **Detailed GPU info** including driver version and video processor
+
+### Memory Detection
+
+Even without psutil installed, IDT can detect total RAM on Windows using PowerShell:
+
+```powershell
+(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum / 1GB
+```
+
+For full memory details (available RAM, usage percentage), install psutil:
+
+```bash
+pip install psutil
+```
+
+### Copilot+ PC Detection
+
+The environment logger automatically identifies likely Copilot+ PCs by looking for NPU indicators in GPU information:
+
+- Qualcomm processor (ARM64)
+- Adreno GPU
+- Terms like "Snapdragon", "Neural", "NPU", "Hexagon"
+
+When detected, the log includes:
+```
+Npu Detected        : True
+Copilot Plus Pc     : Likely (NPU indicators found in GPU info)
+```
+
+This is valuable for comparing Ollama performance between NPU-accelerated and traditional hardware.
 
 ## Optional Enhancement: psutil
 
