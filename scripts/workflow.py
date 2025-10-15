@@ -36,6 +36,7 @@ if sys.platform.startswith('win'):
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
 import logging
 import json
+import platform
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -175,6 +176,154 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
         pass
         
     return "detailed"
+
+
+def log_environment_info(log_dir: Path, workflow_name: str = "workflow") -> Dict[str, Any]:
+    """
+    Capture and log comprehensive environment and machine information.
+    
+    Args:
+        log_dir: Directory where the environment log will be saved
+        workflow_name: Name of the workflow (used in filename)
+        
+    Returns:
+        Dictionary containing all environment information
+    """
+    import socket
+    
+    # Gather all environment information
+    env_info = {
+        "timestamp": datetime.now().isoformat(),
+        "workflow_name": workflow_name,
+        
+        # System Information
+        "system": {
+            "hostname": platform.node(),
+            "fqdn": socket.getfqdn(),
+            "os": platform.system(),
+            "os_release": platform.release(),
+            "os_version": platform.version(),
+            "architecture": platform.machine(),
+            "processor": platform.processor(),
+        },
+        
+        # Python Information
+        "python": {
+            "version": platform.python_version(),
+            "implementation": platform.python_implementation(),
+            "compiler": platform.python_compiler(),
+            "build": platform.python_build(),
+            "executable": sys.executable,
+            "frozen": getattr(sys, 'frozen', False),
+        },
+        
+        # Hardware Information
+        "hardware": {
+            "cpu_count": os.cpu_count(),
+        },
+        
+        # User/Environment
+        "environment": {
+            "username": os.environ.get('USERNAME') or os.environ.get('USER', 'unknown'),
+            "computername": os.environ.get('COMPUTERNAME') or platform.node(),
+            "home_dir": str(Path.home()),
+            "cwd": os.getcwd(),
+        },
+    }
+    
+    # Try to get additional info if psutil is available
+    try:
+        import psutil
+        env_info["hardware"]["memory_total_gb"] = round(psutil.virtual_memory().total / (1024**3), 2)
+        env_info["hardware"]["memory_available_gb"] = round(psutil.virtual_memory().available / (1024**3), 2)
+        
+        cpu_freq = psutil.cpu_freq()
+        if cpu_freq:
+            env_info["hardware"]["cpu_freq_current_mhz"] = cpu_freq.current
+            env_info["hardware"]["cpu_freq_max_mhz"] = cpu_freq.max
+            
+        disk = psutil.disk_usage('/')
+        env_info["hardware"]["disk_total_gb"] = round(disk.total / (1024**3), 2)
+        env_info["hardware"]["disk_free_gb"] = round(disk.free / (1024**3), 2)
+    except ImportError:
+        env_info["hardware"]["note"] = "Install psutil for extended hardware information"
+    except Exception as e:
+        env_info["hardware"]["psutil_error"] = str(e)
+    
+    # Check for GPU/NPU information (Windows specific for now)
+    try:
+        if platform.system() == "Windows":
+            # Try to detect Copilot+ PC NPU
+            result = subprocess.run(
+                ["wmic", "path", "win32_videocontroller", "get", "name"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                gpu_info = [line.strip() for line in result.stdout.split('\n') if line.strip() and line.strip() != 'Name']
+                env_info["hardware"]["gpu"] = gpu_info
+    except Exception as e:
+        env_info["hardware"]["gpu_detection_error"] = str(e)
+    
+    # Save to log file
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"environment_{workflow_name}_{timestamp}.log"
+    
+    try:
+        with open(log_file, 'w', encoding='utf-8') as f:
+            # Write header
+            f.write("=" * 80 + "\n")
+            f.write("IMAGE DESCRIPTION TOOLKIT - ENVIRONMENT LOG\n")
+            f.write("=" * 80 + "\n\n")
+            
+            # Write formatted information
+            f.write(f"Timestamp: {env_info['timestamp']}\n")
+            f.write(f"Workflow:  {env_info['workflow_name']}\n\n")
+            
+            f.write("-" * 80 + "\n")
+            f.write("SYSTEM INFORMATION\n")
+            f.write("-" * 80 + "\n")
+            for key, value in env_info["system"].items():
+                f.write(f"  {key.replace('_', ' ').title():<20}: {value}\n")
+            
+            f.write("\n" + "-" * 80 + "\n")
+            f.write("PYTHON INFORMATION\n")
+            f.write("-" * 80 + "\n")
+            for key, value in env_info["python"].items():
+                f.write(f"  {key.replace('_', ' ').title():<20}: {value}\n")
+            
+            f.write("\n" + "-" * 80 + "\n")
+            f.write("HARDWARE INFORMATION\n")
+            f.write("-" * 80 + "\n")
+            for key, value in env_info["hardware"].items():
+                if key == "gpu" and isinstance(value, list):
+                    f.write(f"  {key.upper():<20}:\n")
+                    for gpu in value:
+                        f.write(f"    - {gpu}\n")
+                else:
+                    f.write(f"  {key.replace('_', ' ').title():<20}: {value}\n")
+            
+            f.write("\n" + "-" * 80 + "\n")
+            f.write("ENVIRONMENT\n")
+            f.write("-" * 80 + "\n")
+            for key, value in env_info["environment"].items():
+                f.write(f"  {key.replace('_', ' ').title():<20}: {value}\n")
+            
+            # Write raw JSON at the end for machine parsing
+            f.write("\n" + "=" * 80 + "\n")
+            f.write("RAW JSON DATA (for machine parsing)\n")
+            f.write("=" * 80 + "\n")
+            json.dump(env_info, f, indent=2)
+            f.write("\n")
+        
+        print(f"Environment log saved: {log_file}")
+        
+    except Exception as e:
+        print(f"Warning: Could not save environment log: {e}")
+    
+    return env_info
 
 
 class WorkflowOrchestrator:
@@ -885,6 +1034,11 @@ class WorkflowOrchestrator:
         self.logger.info(f"Starting workflow with steps: {', '.join(steps)}")
         self.logger.info(f"Input directory: {input_dir}")
         self.logger.info(f"Output directory: {output_dir}")
+        
+        # Log environment information
+        workflow_name = workflow_metadata.get('workflow_name', 'workflow') if workflow_metadata else 'workflow'
+        log_dir = output_dir / "logs"
+        log_environment_info(log_dir, workflow_name)
         
         # Initialize workflow statistics
         start_time = datetime.now()
