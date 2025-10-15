@@ -231,135 +231,69 @@ def log_environment_info(log_dir: Path, workflow_name: str = "workflow") -> Dict
         },
     }
     
-    # Try to get memory info even without psutil (Windows)
-    if platform.system() == "Windows" and 'note' not in env_info["hardware"]:
-        try:
-            result = subprocess.run(
-                ["powershell", "-Command", 
-                 "(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum / 1GB"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                total_ram = float(result.stdout.strip())
-                env_info["hardware"]["memory_total_gb"] = round(total_ram, 2)
-        except Exception as e:
-            env_info["hardware"]["memory_detection_note"] = f"PowerShell memory detection failed: {str(e)}"
-    
-    # Try to get additional info if psutil is available
+    # Get hardware information using psutil
     try:
         import psutil
-        env_info["hardware"]["memory_total_gb"] = round(psutil.virtual_memory().total / (1024**3), 2)
-        env_info["hardware"]["memory_available_gb"] = round(psutil.virtual_memory().available / (1024**3), 2)
-        env_info["hardware"]["memory_percent_used"] = psutil.virtual_memory().percent
         
+        # Memory information
+        mem = psutil.virtual_memory()
+        env_info["hardware"]["memory_total_gb"] = round(mem.total / (1024**3), 2)
+        env_info["hardware"]["memory_available_gb"] = round(mem.available / (1024**3), 2)
+        env_info["hardware"]["memory_percent_used"] = mem.percent
+        
+        # CPU frequency
         cpu_freq = psutil.cpu_freq()
         if cpu_freq:
-            env_info["hardware"]["cpu_freq_current_mhz"] = cpu_freq.current
-            env_info["hardware"]["cpu_freq_max_mhz"] = cpu_freq.max
-            
+            env_info["hardware"]["cpu_freq_current_mhz"] = round(cpu_freq.current, 1)
+            env_info["hardware"]["cpu_freq_max_mhz"] = round(cpu_freq.max, 1)
+        
+        # Disk usage
         disk = psutil.disk_usage('/')
         env_info["hardware"]["disk_total_gb"] = round(disk.total / (1024**3), 2)
         env_info["hardware"]["disk_free_gb"] = round(disk.free / (1024**3), 2)
         env_info["hardware"]["disk_percent_used"] = disk.percent
         
-        # CPU times and load
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        env_info["hardware"]["cpu_percent_at_start"] = cpu_percent
+        # CPU load at workflow start
+        env_info["hardware"]["cpu_percent_at_start"] = psutil.cpu_percent(interval=0.1)
         
-    except ImportError:
-        env_info["hardware"]["note"] = "Install psutil for extended hardware information (pip install psutil)"
     except Exception as e:
         env_info["hardware"]["psutil_error"] = str(e)
     
-    # Check for GPU/NPU information
-    if platform.system() == "Windows":
-        # Try PowerShell (works on modern Windows)
-        try:
-            result = subprocess.run(
-                ["powershell", "-Command", 
-                 "Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor | ConvertTo-Json"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                import json
-                gpu_data = json.loads(result.stdout)
-                if not isinstance(gpu_data, list):
-                    gpu_data = [gpu_data]
+    # GPU/NPU detection (Windows PowerShell)
+    try:
+        result = subprocess.run(
+            ["powershell", "-Command", 
+             "Get-CimInstance Win32_VideoController | Select-Object Name, VideoProcessor | ConvertTo-Json"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            import json
+            gpu_data = json.loads(result.stdout)
+            if not isinstance(gpu_data, list):
+                gpu_data = [gpu_data]
+            
+            gpu_list = []
+            for gpu in gpu_data:
+                if gpu.get('Name'):
+                    gpu_info_str = gpu['Name']
+                    if gpu.get('VideoProcessor'):
+                        gpu_info_str += f" ({gpu['VideoProcessor']})"
+                    gpu_list.append(gpu_info_str)
+            
+            if gpu_list:
+                env_info["hardware"]["gpu"] = gpu_list
                 
-                gpu_list = []
-                for gpu in gpu_data:
-                    if gpu.get('Name'):
-                        gpu_info_str = gpu['Name']
-                        if gpu.get('VideoProcessor'):
-                            gpu_info_str += f" ({gpu['VideoProcessor']})"
-                        gpu_list.append(gpu_info_str)
-                
-                if gpu_list:
-                    env_info["hardware"]["gpu"] = gpu_list
-                    
-                    # Check for NPU indicators (Qualcomm, Snapdragon, Neural Processing)
-                    gpu_str = " ".join(gpu_list).lower()
-                    if any(term in gpu_str for term in ["qualcomm", "snapdragon", "neural", "npu", "hexagon"]):
-                        env_info["hardware"]["npu_detected"] = True
-                        env_info["hardware"]["copilot_plus_pc"] = "Likely (NPU indicators found in GPU info)"
-        except Exception as e:
-            env_info["hardware"]["gpu_detection_error"] = f"PowerShell GPU detection: {str(e)}"
-        
-        # Fallback to wmic if PowerShell failed
-        if "gpu" not in env_info["hardware"]:
-            try:
-                result = subprocess.run(
-                    ["wmic", "path", "win32_videocontroller", "get", "name"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                if result.returncode == 0:
-                    gpu_info = [line.strip() for line in result.stdout.split('\n') if line.strip() and line.strip() != 'Name']
-                    if gpu_info:
-                        env_info["hardware"]["gpu"] = gpu_info
-            except Exception as e:
-                if "gpu_detection_error" not in env_info["hardware"]:
-                    env_info["hardware"]["gpu_detection_error"] = f"WMIC fallback: {str(e)}"
+                # Check for NPU indicators (Qualcomm, Snapdragon)
+                gpu_str = " ".join(gpu_list).lower()
+                if any(term in gpu_str for term in ["qualcomm", "snapdragon", "adreno", "hexagon"]):
+                    env_info["hardware"]["npu_detected"] = True
+                    env_info["hardware"]["copilot_plus_pc"] = "Likely"
+    except Exception as e:
+        env_info["hardware"]["gpu_detection_error"] = str(e)
     
-    elif platform.system() == "Linux":
-        # Try lspci for Linux GPU detection
-        try:
-            result = subprocess.run(
-                ["lspci"], 
-                capture_output=True, 
-                text=True, 
-                timeout=5
-            )
-            if result.returncode == 0:
-                gpu_lines = [line for line in result.stdout.split('\n') if 'VGA' in line or 'Display' in line or '3D' in line]
-                if gpu_lines:
-                    env_info["hardware"]["gpu"] = gpu_lines
-        except Exception as e:
-            env_info["hardware"]["gpu_detection_error"] = f"Linux lspci: {str(e)}"
-    
-    elif platform.system() == "Darwin":
-        # Try system_profiler for macOS
-        try:
-            result = subprocess.run(
-                ["system_profiler", "SPDisplaysDataType"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                # Extract GPU names from output
-                gpu_lines = [line.strip() for line in result.stdout.split('\n') if 'Chipset Model:' in line]
-                if gpu_lines:
-                    env_info["hardware"]["gpu"] = [line.split(':', 1)[1].strip() for line in gpu_lines]
-        except Exception as e:
-            env_info["hardware"]["gpu_detection_error"] = f"macOS system_profiler: {str(e)}"
-    
-    # Check for Ollama if it's installed
+    # Ollama version detection
     try:
         result = subprocess.run(
             ["ollama", "--version"],

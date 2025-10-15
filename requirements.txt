@@ -13,6 +13,7 @@
 Pillow>=10.0.0          # Image processing (all components)
 requests>=2.25.0        # HTTP requests for AI providers
 ollama>=0.3.0           # Ollama Python client
+psutil>=5.9.0           # System/hardware information for environment logging
 
 # Cloud AI Provider SDKs (used by both scripts and GUI)
 openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
