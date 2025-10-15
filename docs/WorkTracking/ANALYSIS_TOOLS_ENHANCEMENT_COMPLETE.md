@@ -3,7 +3,7 @@
 ## ✅ All Requirements Implemented
 
 ### 1. Created Analysis Directory
-- **Location:** `c:\Users\kelly\GitHub\idt\analysis\`
+- **Location:** `analysis/` (in the toolkit root directory)
 - **Moved Scripts:**
   - `combine_workflow_descriptions.py`
   - `analyze_workflow_stats.py`

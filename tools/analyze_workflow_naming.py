@@ -254,10 +254,11 @@ def analyze_workflows(hold_dir, output_csv):
 
 if __name__ == "__main__":
     import sys
+    import os
     
-    # Default paths
-    default_hold_dir = r"C:\Users\kelly\GitHub\idt\idtexternal\idt\descriptions\hold"
-    default_output = r"C:\Users\kelly\GitHub\idt\workflow_naming_analysis.csv"
+    # Default paths (user-agnostic)
+    default_hold_dir = os.path.join(os.path.expanduser("~"), "idt", "descriptions", "hold")
+    default_output = "workflow_naming_analysis.csv"  # Current directory
     
     hold_dir = sys.argv[1] if len(sys.argv) > 1 else default_hold_dir
     output_csv = sys.argv[2] if len(sys.argv) > 2 else default_output

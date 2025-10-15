@@ -511,7 +511,7 @@ def get_path_identifier_2_components(full_path: str) -> str:
     
     This creates a short, readable identifier from the rightmost 2 path components.
     Examples:
-        C:\\Users\\kelly\\photos\\2025\\07 -> "2025_07"
+        C:\\Users\\username\\photos\\2025\\07 -> "2025_07"
         \\\\server\\photos\\vacation\\beach -> "vacation_beach"
         C:\\testimages -> "testimages"
     

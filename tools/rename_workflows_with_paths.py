@@ -293,11 +293,15 @@ WARNING: This modifies directory names. Make sure you have backups before runnin
 """
     )
     
+    # Get user-agnostic default path
+    import os
+    default_hold_dir = os.path.join(os.path.expanduser("~"), "idt", "descriptions", "hold")
+    
     parser.add_argument(
         'hold_dir',
         nargs='?',
-        default=r'C:\Users\kelly\GitHub\idt\idtexternal\idt\descriptions\hold',
-        help='Path to directory containing workflow directories (default: C:\\Users\\kelly\\GitHub\\idt\\idtexternal\\idt\\descriptions\\hold)'
+        default=default_hold_dir,
+        help=f'Path to directory containing workflow directories (default: ~/idt/descriptions/hold)'
     )
     
     parser.add_argument(

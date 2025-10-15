@@ -69,7 +69,7 @@ python tools/rename_workflows_with_paths.py C:\path\to\hold --dry-run
 3. Run without `--dry-run` to perform actual rename
 4. Review summary to confirm all renames succeeded
 
-**Default directory**: `C:\Users\kelly\GitHub\idt\idtexternal\idt\descriptions\hold`
+**Default directory**: `~/idt/descriptions/hold` (or `C:\Users\<USERNAME>\idt\descriptions\hold` on Windows)
 
 ---
 

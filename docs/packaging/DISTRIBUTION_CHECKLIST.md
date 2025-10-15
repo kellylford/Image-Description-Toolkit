@@ -24,7 +24,7 @@ Use this checklist when preparing a new release for end users.
 
 ### AMD64 Build
 ```batch
-cd c:\Users\kelly\GitHub\idt\imagedescriber
+cd <TOOLKIT_DIR>\imagedescriber
 build_imagedescriber_amd.bat
 ```
 
@@ -40,7 +40,7 @@ build_imagedescriber_amd.bat
 
 ### ARM64 Build (Optional)
 ```batch
-cd c:\Users\kelly\GitHub\idt\imagedescriber
+cd <TOOLKIT_DIR>\imagedescriber
 build_imagedescriber_arm.bat
 ```
 
@@ -82,7 +82,7 @@ build_imagedescriber_arm.bat
 
 **For AMD64:**
 ```batch
-cd c:\Users\kelly\GitHub\idt\dist
+cd <TOOLKIT_DIR>\dist
 # Zip the entire imagedescriber folder
 # Name it: ImageDescriber_v2.0_AMD64.zip
 ```

@@ -80,3 +80,4 @@ current_models.json
 debug_*.bat
 test_*.bat
 fix_*.sh
+.github/copilot-instructions.md

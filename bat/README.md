@@ -157,13 +157,13 @@ All batch files are configured to use the `--prompt-style narrative` setting for
 
 ### Local Processing (No API Key)
 ```
-cd C:\Users\Kelly\GitHub\idt\bat
+cd C:\idt\bat
 run_ollama_llava7b.bat C:\Photos\Vacation2024
 ```
 
 ### Cloud Processing with OpenAI
 ```
-cd C:\Users\Kelly\GitHub\idt\bat
+cd C:\idt\bat
 setup_openai_key.bat C:\Keys\openai.txt
 run_openai_gpt4o.bat C:\Photos\Vacation2024
 remove_openai_key.bat
@@ -171,7 +171,7 @@ remove_openai_key.bat
 
 ### Cloud Processing with Claude
 ```
-cd C:\Users\Kelly\GitHub\idt\bat
+cd C:\idt\bat
 setup_claude_key.bat C:\Keys\claude.txt
 run_claude_sonnet45.bat C:\Photos\Vacation2024
 remove_claude_key.bat
@@ -179,7 +179,7 @@ remove_claude_key.bat
 
 ### Compare Multiple Providers
 ```
-cd C:\Users\Kelly\GitHub\idt\bat
+cd C:\idt\bat
 run_ollama_llava7b.bat C:\Photos\Test
 run_openai_gpt4o.bat C:\Photos\Test
 run_claude_sonnet45.bat C:\Photos\Test
@@ -193,7 +193,7 @@ Each run creates a timestamped `wf_` subdirectory inside `Descriptions/` for org
 
 **Directory structure:**
 ```
-C:\Users\Kelly\GitHub\idt\
+C:\idt\
 ├── bat\                                           # Batch files
 ├── Descriptions\                                  # All workflow outputs go here
 │   ├── wf_ollama_llava-7b_narrative_20251006_143022\

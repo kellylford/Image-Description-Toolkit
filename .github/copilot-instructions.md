@@ -14,19 +14,18 @@ Follow these guidelines for all coding work on this project.
 
 5. **No Shortcuts:** Avoid the typical behavior of AI of taking shortcuts, not scanning files completely, and more. This has already resulted in duplicate code at times and extensive time debugging. The project has become too large for constant testing.
 
-6. **Chat Log:** Keep a running log of chat conversations in `c:\users\kelly\onedrive\VSCodeAIChat.md`. Be aware other machines may also edit the file.
+6. **Reposatory Hygiene:** Keep the repository clean and organized. Remove unused files, fix broken links, and ensure that documentation is up to date.
 
 ## Project-Specific Guidelines
 
 ### Testing Checklist
 - Maintain `TESTING_CHECKLIST_OCT13.md` (or current date) as a living document
 - Update it automatically whenever making commits, adding features, creating documentation, or fixing bugs
-- Ensure the checklist always reflects the current state of the session
+- Ensure the checklist always reflects the current state of the session Note: this file is in docs\archive.
 
 ### Documentation Structure
 - Main documentation: `docs/`
 - Work tracking: `docs/worktracking/`
-- Testing checklists: Root directory
 - Feature-specific docs: Appropriate subdirectories
 
 ### Architecture
