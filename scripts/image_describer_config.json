@@ -27,48 +27,10 @@
     "separator": "-"
   },
   "available_models": {
-    "moondream": {
-      "description": "Moondream vision model - compact and efficient for image analysis",
-      "size": "1.7B parameters",
-      "requirements": "ollama pull moondream",
-      "recommended": true
-    },
-    "llama3.2-vision": {
-      "description": "Latest Llama 3.2 Vision model - high quality but larger",
-      "size": "11B parameters",
-      "requirements": "ollama pull llama3.2-vision",
-      "recommended": false
-    },
-    "llava": {
-      "description": "LLaVA model - good balance of speed and quality",
-      "size": "7B parameters",
-      "requirements": "ollama pull llava",
-      "recommended": false
-    },
-    "llava:7b": {
-      "description": "LLaVA 7B model - faster processing, lower memory usage",
-      "size": "7B parameters",
-      "requirements": "ollama pull llava:7b",
-      "recommended": false
-    },
-    "llava:13b": {
-      "description": "LLaVA 13B model - higher quality, more memory usage",
-      "size": "13B parameters",
-      "requirements": "ollama pull llava:13b",
-      "recommended": false
-    },
-    "llava:34b": {
-      "description": "LLaVA 34B model - highest quality, requires significant memory",
-      "size": "34B parameters",
-      "requirements": "ollama pull llava:34b",
-      "recommended": false
-    },
-    "bakllava": {
-      "description": "BakLLaVA model - alternative vision model",
-      "size": "7B parameters",
-      "requirements": "ollama pull bakllava",
-      "recommended": false
-    }
+    "description": "Any Ollama vision model can be used. Install models with 'ollama pull MODEL_NAME'.",
+    "default": "moondream:latest",
+    "examples": ["moondream", "llama3.2-vision", "llava", "bakllava"],
+    "documentation": "See bat/ directory for ready-to-use model scripts, or visit https://ollama.com/library for full model list"
   },
   "processing_options": {
     "default_max_image_size": 1024,
