@@ -40,10 +40,40 @@ python viewer/viewer.py
 
 ### Loading a Workflow Output
 
+#### Method 1: Browse Results (Recommended)
+
+1. Click the **"Browse Results"** button
+2. The viewer will automatically detect workflow directories in common locations:
+   - `<installation_dir>/Descriptions/`
+   - `../Descriptions/` (one level up, then down)
+   - `C:/idt/Descriptions` (common Windows location)
+3. A dialog appears showing all available workflows in a table:
+   - **Name**: Workflow name
+   - **Provider**: AI provider (ollama, openai, claude)
+   - **Model**: Model name
+   - **Prompt**: Prompt style used
+   - **Descriptions**: Number of descriptions generated
+   - **Timestamp**: When workflow was run
+4. Navigate using:
+   - **Arrow Keys**: Move up/down through workflows
+   - **Enter**: Open selected workflow
+   - **Double-Click**: Open selected workflow
+   - **Browse Directory Button**: Manually select a different directory
+5. Click **"Open Workflow"** or press Enter to load
+
+**Benefits:**
+- See all workflows at a glance
+- Know how many descriptions before opening
+- See when each workflow was run
+- Keyboard-driven for efficiency
+- Automatically finds your workflow directories
+
+#### Method 2: Change Directory (Manual)
+
 1. Click the **"Change Directory"** button
 2. Navigate to and select a workflow output directory:
    - For completed workflows: Look for directories with `html_reports/` folder
-   - For active workflows: Look for directories with `descriptions/` folder
+   - For active workflows: Look for descriptions/` folder
 3. The viewer will automatically detect the appropriate mode:
    - **HTML Mode**: For completed workflows with final reports
    - **Live Mode**: For active workflows (auto-suggested if HTML not available)
@@ -99,9 +129,27 @@ python viewer/viewer.py
 
 | Control | Function |
 |---------|----------|
+| **Browse Results** | Open workflow browser to select from available workflows |
 | **Live Mode Checkbox** | Toggle between live monitoring and final HTML viewing |
 | **Refresh Button** | Manually update live content while preserving your position |
 | **Change Directory** | Load a different workflow output directory |
+
+### Workflow Browser
+
+The **Browse Results** dialog provides a convenient way to view and select from all available workflows:
+
+#### Features
+- **Auto-Detection**: Automatically finds workflow directories
+- **Sortable Columns**: Click column headers to sort
+- **Keyboard Navigation**: Use arrow keys to browse
+- **Quick Selection**: Double-click or press Enter to open
+- **Manual Override**: Browse button for custom locations
+
+#### Keyboard Shortcuts in Browser
+- **Arrow Keys**: Navigate up/down through workflows
+- **Enter**: Open selected workflow
+- **Escape**: Cancel and close dialog
+- **Tab**: Move between Browse button and OK/Cancel
 
 ### Standard Controls  
 
