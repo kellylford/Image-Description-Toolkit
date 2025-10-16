@@ -6,6 +6,7 @@ The `idt results-list` command scans your workflow results directory and creates
 
 ```bash
 # List all workflows in the default Descriptions directory
+# Creates workflow_results.csv (or auto-increments if exists)
 idt results-list
 
 # List workflows in a specific directory
@@ -20,6 +21,8 @@ idt results-list --sort-by name
 idt results-list --sort-by provider
 ```
 
+**Note:** If you don't specify `--output`, the command will automatically create `workflow_results.csv`, `workflow_results_1.csv`, `workflow_results_2.csv`, etc. to avoid overwriting existing files. If you do specify `--output`, it will respect your choice even if the file exists.
+
 ## CSV Output Format
 
 The generated CSV contains these columns:
@@ -30,17 +33,27 @@ The generated CSV contains these columns:
 | Provider | AI provider | `ollama`, `openai`, `claude` |
 | Model | Model name | `qwen3-vl:235b-cloud` |
 | Prompt | Prompt style used | `Simple`, `artistic`, `detailed` |
-| Descriptions | Number of descriptions | `1`, `150`, `729` |
+| Descriptions | Number of descriptions generated | `64`, `150`, `1077` |
 | Timestamp | When workflow ran | `2025-10-16 07:46:07` |
 | Viewer Command | Ready-to-use command | `idt viewer "Descriptions/wf_..."` |
+
+### How Description Counts Are Determined
+
+The command uses a three-method approach to accurately count descriptions:
+
+1. **Primary**: Parses `logs/status.log` for "Image description complete (X descriptions)"
+2. **Secondary**: Parses `logs/image_describer_progress.txt` for "Processed X of Y"
+3. **Fallback**: Counts "File:" markers in `descriptions/image_descriptions.txt`
+
+This ensures accurate counts even for workflows with thousands of images.
 
 ## Example Output
 
 ```csv
 Name,Provider,Model,Prompt,Descriptions,Timestamp,Viewer Command
-promptbaseline,ollama,qwen3-vl_235b-cloud,Simple,1,2025-10-16 07:46:07,"idt viewer ""Descriptions/wf_promptbaseline_ollama_qwen3-vl_235b-cloud_Simple_20251016_074607"""
-promptbaseline,ollama,qwen3-vl_235b-cloud,artistic,1,2025-10-16 07:55:43,"idt viewer ""Descriptions/wf_promptbaseline_ollama_qwen3-vl_235b-cloud_artistic_20251016_075543"""
-promptbaseline,ollama,qwen3-vl_235b-cloud,colorful,1,2025-10-16 08:09:39,"idt viewer ""Descriptions/wf_promptbaseline_ollama_qwen3-vl_235b-cloud_colorful_20251016_080939"""
+promptbaseline,ollama,qwen3-vl_235b-cloud,Simple,64,2025-10-16 07:46:07,"idt viewer ""Descriptions/wf_promptbaseline_ollama_qwen3-vl_235b-cloud_Simple_20251016_074607"""
+promptbaseline,ollama,qwen3-vl_235b-cloud,artistic,64,2025-10-16 07:55:43,"idt viewer ""Descriptions/wf_promptbaseline_ollama_qwen3-vl_235b-cloud_artistic_20251016_075543"""
+bigdaddyrun,ollama,qwen3-vl_235b-cloud,Simple,1077,2025-10-16 08:03:25,"idt viewer ""Descriptions/wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325"""
 ```
 
 ## Viewing Results
@@ -145,6 +158,28 @@ The command attempts to read workflow metadata from:
 
 If a workflow directory doesn't have metadata, it will appear with "unknown" values in the CSV.
 
+## File Management
+
+### Auto-Increment Protection
+
+When you run `idt results-list` without specifying `--output`, the command automatically prevents overwriting existing files:
+
+```bash
+# First run
+idt results-list
+# Creates: workflow_results.csv
+
+# Second run
+idt results-list
+# Creates: workflow_results_1.csv
+
+# Third run
+idt results-list
+# Creates: workflow_results_2.csv
+```
+
+This ensures you never accidentally lose previous catalogs. If you specify `--output`, the command respects your choice and may overwrite the file.
+
 ## Troubleshooting
 
 ### "No workflow results found"
@@ -162,3 +197,9 @@ If a workflow directory doesn't have metadata, it will appear with "unknown" val
 
 - Workflows without `workflow_metadata.json` will have parsed names
 - Consider re-running with current version to get full metadata
+
+### Description count shows as 0
+
+- Workflow may not have completed successfully
+- Check `logs/status.log` in the workflow directory for errors
+- Verify `descriptions/image_descriptions.txt` exists and has content
