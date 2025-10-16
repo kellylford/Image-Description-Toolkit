@@ -127,25 +127,65 @@ def parse_directory_name(dir_name: str) -> dict:
 
 
 def count_descriptions(workflow_dir: Path) -> int:
-    """Count the number of description files in the workflow.
+    """Count the number of descriptions in the workflow.
+    
+    Tries multiple methods to get accurate count:
+    1. Parse status.log for "Image description complete (X descriptions)"
+    2. Parse image_describer_progress.txt for completed count
+    3. Fallback: Count lines in image_descriptions.txt
     
     Args:
         workflow_dir: Path to workflow directory
         
     Returns:
-        Number of description files found
+        Number of descriptions found
     """
-    descriptions_dir = workflow_dir / 'descriptions'
-    if not descriptions_dir.exists():
-        return 0
+    # Method 1: Check status.log
+    status_file = workflow_dir / 'logs' / 'status.log'
+    if status_file.exists():
+        try:
+            with open(status_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Look for "Image description complete (64 descriptions)"
+                import re
+                match = re.search(r'Image description complete \((\d+) descriptions?\)', content)
+                if match:
+                    return int(match.group(1))
+        except Exception:
+            pass
     
-    # Count .txt files
-    count = 0
-    for item in descriptions_dir.glob('**/*.txt'):
-        if item.is_file():
-            count += 1
+    # Method 2: Check image_describer_progress.txt
+    progress_file = workflow_dir / 'logs' / 'image_describer_progress.txt'
+    if progress_file.exists():
+        try:
+            with open(progress_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                # Last line has format: "Processed X of Y images"
+                if lines:
+                    last_line = lines[-1].strip()
+                    import re
+                    match = re.search(r'Processed (\d+) of (\d+)', last_line)
+                    if match:
+                        return int(match.group(1))
+        except Exception:
+            pass
     
-    return count
+    # Method 3: Count entries in image_descriptions.txt
+    desc_file = workflow_dir / 'descriptions' / 'image_descriptions.txt'
+    if desc_file.exists():
+        try:
+            with open(desc_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Count "File:" markers (each image has one)
+                count = content.count('\nFile:')
+                # Add 1 if file starts with "File:" (no leading newline)
+                if content.startswith('File:'):
+                    count += 1
+                return count
+        except Exception:
+            pass
+    
+    return 0
 
 
 def format_timestamp(timestamp_str: str) -> str:
@@ -169,6 +209,35 @@ def format_timestamp(timestamp_str: str) -> str:
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return timestamp_str
+
+
+def get_next_available_filename(base_name: str, extension: str = '.csv') -> Path:
+    """Find the next available filename by incrementing a number.
+    
+    If base_name.csv exists, tries base_name_1.csv, base_name_2.csv, etc.
+    
+    Args:
+        base_name: Base filename without extension
+        extension: File extension (default: .csv)
+        
+    Returns:
+        Path to next available filename
+    """
+    # Try the base name first
+    filename = Path(f"{base_name}{extension}")
+    if not filename.exists():
+        return filename
+    
+    # Try numbered versions
+    counter = 1
+    while True:
+        filename = Path(f"{base_name}_{counter}{extension}")
+        if not filename.exists():
+            return filename
+        counter += 1
+        # Safety check to avoid infinite loop
+        if counter > 9999:
+            raise ValueError("Too many existing files with this base name")
 
 
 def generate_viewer_command(workflow_dir: Path, use_relative_path: bool = True) -> str:
@@ -224,8 +293,8 @@ Examples:
     
     parser.add_argument(
         '--output', '-o',
-        default='workflow_results.csv',
-        help='Output CSV file (default: workflow_results.csv)'
+        default=None,
+        help='Output CSV file (default: workflow_results.csv, auto-increments if exists)'
     )
     
     parser.add_argument(
@@ -290,8 +359,16 @@ Examples:
     sort_key = sort_key_map.get(args.sort_by, 'Timestamp')
     rows.sort(key=lambda x: x[sort_key])
     
+    # Determine output filename
+    if args.output:
+        output_file = Path(args.output)
+        # If user specified a file that exists, still respect their choice
+        # (they may want to overwrite)
+    else:
+        # Auto-increment to avoid overwriting
+        output_file = get_next_available_filename('workflow_results', '.csv')
+    
     # Write CSV
-    output_file = Path(args.output)
     with open(output_file, 'w', newline='', encoding='utf-8') as f:
         fieldnames = ['Name', 'Provider', 'Model', 'Prompt', 'Descriptions', 'Timestamp', 'Viewer Command']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
