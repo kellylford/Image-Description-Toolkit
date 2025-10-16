@@ -1,59 +1,171 @@
 @echo off
-SETLOCAecho.
-echo ========================================
-echo Testing ALL 16 Ollama Models
-echo ========================================EM Test all offline (Ollama) models on a specific directory
-REM Usage: allmodeltest.bat <image_directory> [prompt_style]
+SETLOCAL EnableDelayedExpansion
+REM Test all installed Ollama vision models on a directory
+REM Usage: allmodeltest.bat <image_directory> [options]
+REM
+REM Supports all standard workflow options:
+REM   --name <name>              Custom workflow name
+REM   --prompt-style <style>     Prompt style to use
+REM   --output-dir <dir>         Output directory
+REM   --steps <steps>            Workflow steps to run
+REM   --batch                    Non-interactive mode
+REM   --view-results             Auto-launch viewer
+REM
+REM Example: allmodeltest.bat C:\MyImages --prompt-style narrative --name "vacation"
+REM Example: allmodeltest.bat C:\MyImages --batch --view-results
 
 cd /d "%~dp0\.."
-REM Example: allmodeltest.bat C:\MyImages narrative
-set IMAGE_DIR=%1
-if "%IMAGE_DIR%"=="" (
+
+REM Check if first argument looks like an option
+set FIRST_ARG=%1
+if "%FIRST_ARG%"=="" (
     echo ERROR: No image directory specified!
-    echo Usage: allmodeltest.bat ^<image_directory^> [prompt_style]
-    echo Example: allmodeltest.bat C:\MyImages narrative
+    echo.
+    echo Usage: allmodeltest.bat ^<image_directory^> [options]
+    echo.
+    echo Examples:
+    echo   allmodeltest.bat C:\MyImages
+    echo   allmodeltest.bat C:\MyImages --prompt-style narrative
+    echo   allmodeltest.bat C:\MyImages --name vacation --batch
+    echo.
     pause
     exit /b 1
 )
-set PROMPT_STYLE=%2
-if "%PROMPT_STYLE%"=="" set PROMPT_STYLE=narrative
+
+if "%FIRST_ARG:~0,2%"=="--" (
+    echo ERROR: First argument must be the image directory!
+    echo Usage: allmodeltest.bat ^<image_directory^> [options]
+    pause
+    exit /b 1
+)
+
+REM First argument is the image directory
+set IMAGE_DIR=%~1
+
+REM Shift to get remaining arguments (all options)
+shift
+set OPTIONS=
+:parse_options
+if "%~1"=="" goto :done_parsing
+set OPTIONS=%OPTIONS% %1
+shift
+goto :parse_options
+:done_parsing
+
 echo.
-echo Testing ALL 16 Ollama Vision Models
-echo Target: %IMAGE_DIR%
-echo Prompt Style: %PROMPT_STYLE%
-echo [1/16] Running moondream:latest...
-call run_ollama_moondream.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [2/16] Running llava:7b...
-call run_ollama_llava7b.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [3/16] Running llava:latest...
-call run_ollama_llava.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [4/16] Running llava:13b...
-call run_ollama_llava13b.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [5/16] Running llava:34b...
-call run_ollama_llava34b.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [6/16] Running llava-phi3:latest...
-call run_ollama_llava_phi3.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [7/16] Running llava-llama3:latest...
-call run_ollama_llava_llama3.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [8/16] Running bakllava:latest...
-call run_ollama_bakllava.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [9/16] Running llama3.2-vision:latest...
-call run_ollama_llama32vision.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [10/16] Running llama3.2-vision:11b...
-call run_ollama_llama32vision11b.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [11/16] Running mistral-nemo:latest...
-call run_ollama_mistral31.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [12/16] Running pixtral:12b...
-call run_ollama_mistral32.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [13/16] Running gemma3:latest...
-call run_ollama_gemma.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [14/16] Running minicpm-v:latest...
-call run_ollama_minicpmv.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [15/16] Running minicpm-v:8b...
-call run_ollama_minicpmv8b.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo [16/16] Running qwen2.5-vl:latest...
-call run_ollama_qwen2.5vl.bat --batch "%IMAGE_DIR%" "%PROMPT_STYLE%"
-echo All 18 model tests complete!
-echo Results in: ..\Descriptions\wf_ollama_*
+echo ========================================
+echo Testing All Installed Ollama Vision Models
+echo ========================================
+echo Target Directory: %IMAGE_DIR%
+echo Additional Options: %OPTIONS%
+echo.
+
+REM Check if Ollama is installed and running
+where ollama >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Ollama is not installed or not in PATH!
+    echo Please install Ollama from https://ollama.ai/download
+    pause
+    exit /b 1
+)
+
+REM Query installed models and filter for vision models
+echo Detecting installed vision models...
+echo.
+
+REM Create temporary file for model list
+set TEMP_FILE=%TEMP%\ollama_models_%RANDOM%.txt
+ollama list | findstr /V "NAME" > "%TEMP_FILE%"
+
+REM Known vision model patterns (case-insensitive)
+REM These are models that support image inputs
+set VISION_PATTERNS=llava llama3.2-vision llama3.3-vision moondream bakllava minicpm pixtral mistral-nemo gemma qwen
+
+REM Count and display vision models
+set MODEL_COUNT=0
+set MODEL_LIST=
+
+for /f "tokens=1" %%M in (%TEMP_FILE%) do (
+    set MODEL_NAME=%%M
+    set IS_VISION=0
+    
+    REM Check if model name contains any vision pattern
+    for %%P in (%VISION_PATTERNS%) do (
+        echo !MODEL_NAME! | findstr /i "%%P" >nul
+        if !errorlevel! equ 0 set IS_VISION=1
+    )
+    
+    if !IS_VISION! equ 1 (
+        set /a MODEL_COUNT+=1
+        set MODEL_LIST=!MODEL_LIST! !MODEL_NAME!
+        echo [!MODEL_COUNT!] !MODEL_NAME!
+    )
+)
+
+REM Clean up temp file
+del "%TEMP_FILE%" >nul 2>&1
+
+if %MODEL_COUNT% equ 0 (
+    echo.
+    echo ERROR: No vision models found!
+    echo.
+    echo Please install at least one vision model, for example:
+    echo   ollama pull moondream
+    echo   ollama pull llava
+    echo   ollama pull llama3.2-vision
+    echo.
+    pause
+    exit /b 1
+)
+
+echo.
+echo Found %MODEL_COUNT% vision model(s)
+echo.
+
+REM Confirm before running
+set /p CONFIRM="Run workflow on all %MODEL_COUNT% models? (y/n): "
+if /i not "%CONFIRM%"=="y" (
+    echo Cancelled.
+    pause
+    exit /b 0
+)
+
+echo.
+echo ========================================
+echo Starting Multi-Model Test
+echo ========================================
+echo.
+
+REM Run workflow for each detected model
+set CURRENT=0
+for %%M in (%MODEL_LIST%) do (
+    set /a CURRENT+=1
+    echo.
+    echo ========================================
+    echo [!CURRENT!/%MODEL_COUNT%] Running: %%M
+    echo ========================================
+    echo.
+    
+    python workflow.py --provider ollama --model %%M --output-dir Descriptions --batch %OPTIONS% "%IMAGE_DIR%"
+    
+    if errorlevel 1 (
+        echo.
+        echo WARNING: Model %%M failed or was interrupted
+        echo.
+        set /p CONTINUE="Continue with remaining models? (y/n): "
+        if /i not "!CONTINUE!"=="y" (
+            echo Multi-model test cancelled.
+            pause
+            exit /b 1
+        )
+    )
+)
+
+echo.
+echo ========================================
+echo All %MODEL_COUNT% Model Tests Complete!
+echo ========================================
+echo Results in: Descriptions\wf_*
+echo.
 pause
 ENDLOCAL

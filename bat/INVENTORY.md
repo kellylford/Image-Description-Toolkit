@@ -62,7 +62,7 @@
 
 ## Test & Utility Scripts (5 files)
 
-34. `allmodeltest.bat` - Run all 16 Ollama models sequentially on test images
+34. `allmodeltest.bat` - **Dynamic Multi-Model Test** - Automatically detects and runs all installed Ollama vision models sequentially. Supports all standard workflow options (--name, --prompt-style, --batch, --view-results, etc.)
 35. `allcloudtest.bat` - Run all 10 cloud models (OpenAI + Claude) sequentially
 36. `install_vision_models.bat` - Install all vision models (~130GB download)
 
