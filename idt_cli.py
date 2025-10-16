@@ -33,8 +33,22 @@ def get_resource_path(relative_path):
     return base_path / relative_path
 
 
+def set_console_title(title):
+    """Set the Windows console title."""
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW(title)
+        except Exception:
+            # Silently fail if unable to set title
+            pass
+
+
 def main():
     """Main CLI dispatcher - routes commands to existing scripts."""
+    
+    # Set console title on Windows
+    set_console_title("IDT - Image Description Toolkit")
     
     # Get base directory
     base_dir = get_base_dir()
@@ -79,6 +93,28 @@ def main():
         return 1
     
     command = sys.argv[1]
+    
+    # Update console title based on command
+    title_map = {
+        'guideme': 'IDT - Guided Workflow',
+        'workflow': 'IDT - Describing Images',
+        'viewer': 'IDT - Viewer',
+        'view': 'IDT - Viewer',
+        'prompteditor': 'IDT - Prompt Editor',
+        'imagedescriber': 'IDT - Image Describer',
+        'stats': 'IDT - Analyzing Statistics',
+        'contentreview': 'IDT - Content Review',
+        'combinedescriptions': 'IDT - Combining Descriptions',
+        'check-models': 'IDT - Checking Models',
+        'prompt-list': 'IDT - Listing Prompts',
+        'extract-frames': 'IDT - Extracting Video Frames',
+        'convert-images': 'IDT - Converting Images',
+        'version': 'IDT - Version Info',
+        'help': 'IDT - Help'
+    }
+    
+    if command in title_map:
+        set_console_title(title_map[command])
     
     # Route to appropriate script
     if command == 'workflow':
