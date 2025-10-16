@@ -40,3 +40,35 @@ Follow these guidelines for all coding work on this project.
 - Create helper files (batch files on Windows) for user convenience
 - Opt-in approach for optional features (e.g., stats generation)
 - Keep directories clean - avoid automatic file creation unless essential
+
+## Viewer Development Patterns
+
+### Accessibility Requirements
+- **Single Tab Stops**: Use QListWidget instead of QTableWidget when possible to minimize tab stops
+- **Combined Text**: Concatenate data into single strings for list items rather than multiple columns
+- **Screen Reader Support**: Always set accessible names/descriptions on widgets
+- **Keyboard Navigation**: Ensure all functionality accessible via keyboard (arrows, Enter, tab)
+
+### Date/Time Formatting
+- **Standard Format**: `M/D/YYYY H:MMP` (no leading zeros, A/P suffix)
+  - Examples: `3/25/2025 7:35P`, `10/16/2025 8:03A`
+- **EXIF Extraction Priority**: DateTimeOriginal > DateTimeDigitized > DateTime > file mtime
+- **Consistent Across Features**: Use same format for workflow timestamps and image dates
+
+### Window Title Guidelines
+- **Always Show Stats**: Display percentage and count when content loaded, not just in live mode
+- **Format**: `"XX%, X of Y images described"` (integer percentage, no decimals)
+- **Live Mode Indicator**: Add `"(Live)"` suffix when actively monitoring
+- **Workflow Name**: Include in title for screen reader context
+
+### Code Reuse
+- **Import from scripts**: Reuse functions from `scripts/list_results.py` for workflow scanning
+- **Shared Functions**: `find_workflow_directories()`, `count_descriptions()`, `format_timestamp()`
+- **Avoid Duplication**: Check if functionality exists elsewhere before implementing
+
+### Error Handling
+- **Graceful Degradation**: Always provide fallbacks (e.g., file mtime if no EXIF)
+- **Try-Except for Optional**: Use try-except for optional imports and features
+- **Clear Messages**: Provide actionable error messages to users
+- **Silent Failures**: Don't crash on missing data, log and continue
+

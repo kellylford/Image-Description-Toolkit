@@ -429,6 +429,11 @@ You can also launch the viewer manually anytime:
 # Open viewer with directory browser
 idt viewer
 
+# Browse Results button shows all available workflows
+# - Lists all workflows with metadata
+# - Keyboard navigation (arrows, Enter)
+# - Single tab stop for accessibility
+
 # Open specific workflow output
 idt viewer C:\IDT\Descriptions\workflow_vacation_photos
 
@@ -441,19 +446,27 @@ Descriptions\workflow_*/view_results.bat
 
 **Real-Time Monitoring:**
 - Live updates as images are processed
-- Progress tracking
+- Progress tracking (shown in window title: "75%, 810 of 1077 images described (Live)")
 - Automatic refresh when new descriptions appear
 
 **Browse & Search:**
 - Navigate through all processed images
 - View descriptions alongside images
+- Image date displayed (when photo was taken)
 - Copy descriptions to clipboard
 - Search and filter results
 
+**Browse Results Dialog:**
+- Browse all available workflows with one click
+- See workflow metadata at a glance (Name, Prompt, Images, Model, Provider, Date)
+- Keyboard accessible with single tab stop
+- Auto-detects common workflow locations
+
 **Workflow Information:**
 - View metadata (model used, prompt style, etc.)
-- See processing statistics
-- Check completion status
+- See processing statistics in window title (always visible)
+- Check completion status (100%, 64 of 64 images described)
+- Human-friendly date/time formatting (3/25/2025 7:35P)
 
 ### Reusable Launcher
 

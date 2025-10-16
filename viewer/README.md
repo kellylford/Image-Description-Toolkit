@@ -11,12 +11,38 @@ A standalone GUI application for browsing and managing image descriptions genera
    - Navigate through image descriptions
    - Copy descriptions to clipboard
    - Redescribe images using Ollama (if available)
+   - See image dates (when photos were taken)
+   - Window title shows completion stats: "100%, 64 of 64 images described"
 
 2. **Live Mode** - Monitor workflows in progress with real-time updates
    - Watch descriptions appear as they're generated
    - Auto-refresh to show new content
-   - See progress indicators
+   - See progress indicators in window title: "75%, 810 of 1077 images described (Live)"
    - Seamlessly transition to HTML mode when workflow completes
+
+### Browse Results Dialog
+
+**One-click workflow browsing:**
+- Click "Browse Results" to see all available workflows
+- View workflow metadata: Name, Prompt, Images, Model, Provider, Date
+- Auto-detects common workflow locations (`Descriptions/`, `../Descriptions/`, `C:/idt/Descriptions`)
+- Keyboard accessible (single tab stop, arrow keys to navigate, Enter to select)
+- Shows workflows sorted by date (newest first)
+
+**Format**: `Name | Prompt | X images | Model | Provider | M/D/YYYY H:MMP`
+
+**Example**:
+```
+promptbaseline | Simple | 64 images | qwen3-vl_235b-cloud | ollama | 10/16/2025 7:46A
+bigdaddyrun | Descriptive | 1077 images | llava:13b | ollama | 3/25/2025 7:23P
+```
+
+### Date/Time Display
+
+- **Workflow Timestamps**: Formatted as `M/D/YYYY H:MMP` (e.g., `3/25/2025 7:35P`)
+- **Image Dates**: Extracted from EXIF data and displayed after descriptions
+- Priority: DateTimeOriginal > DateTimeDigitized > DateTime > file modified time
+- All dates use 12-hour format with A/P suffix (no leading zeros)
 
 ### Command-Line Interface
 
