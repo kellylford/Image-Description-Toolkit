@@ -423,32 +423,16 @@ class WorkflowBrowserDialog(QDialog):
         self.status_label.setAccessibleDescription("Shows the current directory and number of workflows found.")
         layout.addWidget(self.status_label)
         
-        # Table widget for displaying workflows
-        self.table = QTableWidget()
-        self.table.setAccessibleName("Workflows Table")
-        self.table.setAccessibleDescription("Table showing available workflows. Use arrow keys to navigate, Enter to select.")
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels([
-            "Name", "Provider", "Model", "Prompt", "Descriptions", "Timestamp"
-        ])
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSortingEnabled(True)
-        
-        # Make table columns resize appropriately
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Name
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Provider
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Model
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Prompt
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Descriptions
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Timestamp
+        # List widget for displaying workflows
+        self.list_widget = QListWidget()
+        self.list_widget.setAccessibleName("Workflows List")
+        self.list_widget.setAccessibleDescription("List of available workflows. Use arrow keys to navigate, Enter to select. Each entry contains workflow name, provider, model, prompt style, number of descriptions, and timestamp.")
+        self.list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         
         # Double-click to select
-        self.table.itemDoubleClicked.connect(self.on_double_click)
+        self.list_widget.itemDoubleClicked.connect(self.on_double_click)
         
-        layout.addWidget(self.table)
+        layout.addWidget(self.list_widget)
         
         # Browse directory button
         browse_layout = QHBoxLayout()
@@ -495,9 +479,8 @@ class WorkflowBrowserDialog(QDialog):
         
         self.current_dir = directory
         
-        # Clear existing rows
-        self.table.setRowCount(0)
-        self.table.setSortingEnabled(False)  # Disable while populating
+        # Clear existing items
+        self.list_widget.clear()
         
         # Find workflows using list_results logic
         try:
@@ -510,54 +493,51 @@ class WorkflowBrowserDialog(QDialog):
             self.status_label.setText(f"No workflows found in: {directory}")
             return
         
-        # Populate table
+        # Sort workflows by timestamp (newest first)
+        workflows.sort(key=lambda x: x[1].get('timestamp', ''), reverse=True)
+        
+        # Populate list
         self.workflows = []  # Store for selection
         for workflow_path, metadata in workflows:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            
             # Store workflow path
             self.workflows.append(workflow_path)
             
-            # Populate columns
-            name_item = QTableWidgetItem(metadata.get('workflow_name', 'unknown'))
-            name_item.setData(Qt.ItemDataRole.UserRole, str(workflow_path))  # Store full path
-            self.table.setItem(row, 0, name_item)
-            
-            self.table.setItem(row, 1, QTableWidgetItem(metadata.get('provider', 'unknown')))
-            self.table.setItem(row, 2, QTableWidgetItem(metadata.get('model', 'unknown')))
-            self.table.setItem(row, 3, QTableWidgetItem(metadata.get('prompt_style', 'unknown')))
+            # Get all the data
+            name = metadata.get('workflow_name', 'unknown')
+            provider = metadata.get('provider', 'unknown')
+            model = metadata.get('model', 'unknown')
+            prompt = metadata.get('prompt_style', 'unknown')
             
             # Count descriptions
             try:
                 desc_count = count_descriptions(workflow_path) if count_descriptions else 0
-                desc_item = QTableWidgetItem(str(desc_count))
-                desc_item.setData(Qt.ItemDataRole.DisplayRole, desc_count)  # For proper numeric sorting
-                self.table.setItem(row, 4, desc_item)
             except Exception as e:
                 print(f"Error counting descriptions for {workflow_path}: {e}")
-                self.table.setItem(row, 4, QTableWidgetItem("?"))
+                desc_count = 0
             
             # Format timestamp
             try:
                 timestamp = format_timestamp(metadata.get('timestamp', '')) if format_timestamp else metadata.get('timestamp', 'unknown')
-                self.table.setItem(row, 5, QTableWidgetItem(timestamp))
             except Exception:
-                self.table.setItem(row, 5, QTableWidgetItem(metadata.get('timestamp', 'unknown')))
-        
-        # Re-enable sorting
-        self.table.setSortingEnabled(True)
-        
-        # Sort by timestamp (column 5) descending by default (newest first)
-        self.table.sortItems(5, Qt.SortOrder.DescendingOrder)
+                timestamp = metadata.get('timestamp', 'unknown')
+            
+            # Combine all data into a single string for accessibility
+            display_text = f"{name} | {provider} | {model} | {prompt} | {desc_count} descriptions | {timestamp}"
+            
+            # Create list item with full text as accessible description
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, display_text)
+            item.setData(Qt.ItemDataRole.UserRole, str(workflow_path))  # Store full path
+            
+            self.list_widget.addItem(item)
         
         # Update status
         self.status_label.setText(f"Found {len(workflows)} workflow(s) in: {directory}")
         
-        # Select first row by default
-        if self.table.rowCount() > 0:
-            self.table.selectRow(0)
-            self.table.setFocus()
+        # Select first item by default
+        if self.list_widget.count() > 0:
+            self.list_widget.setCurrentRow(0)
+            self.list_widget.setFocus()
     
     def browse_directory(self):
         """Browse for a different directory."""
@@ -571,12 +551,12 @@ class WorkflowBrowserDialog(QDialog):
             self.load_workflows(Path(dir_path))
     
     def on_double_click(self, item):
-        """Handle double-click on table item."""
+        """Handle double-click on list item."""
         self.accept()
     
     def get_selected_workflow(self):
         """Get the selected workflow path."""
-        current_row = self.table.currentRow()
+        current_row = self.list_widget.currentRow()
         if current_row >= 0 and current_row < len(self.workflows):
             return self.workflows[current_row]
         return None
@@ -949,11 +929,16 @@ class ImageDescriptionViewer(QWidget):
             total = self.progress_info.get("total", 0)
             active = self.progress_info.get("active", False)
             
-            status = "Processing" if active else "Completed"
-            title = f"{base_title} - {status}: {current} of {total} images"
+            # Calculate percentage (no decimal points)
+            percentage = int((current / total * 100)) if total > 0 else 0
+            
+            # Format: "XX%, X of Y images described"
+            status_text = f"{percentage}%, {current} of {total} images described"
             
             if active:
-                title += " (Live)"
+                title = f"{base_title} - {status_text} (Live)"
+            else:
+                title = f"{base_title} - {status_text}"
             
             self.setWindowTitle(title)
         else:
