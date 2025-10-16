@@ -392,6 +392,71 @@ def find_descriptions_directory():
     return None
 
 
+def get_image_date(image_path: str) -> str:
+    """Extract the date/time the image was taken from EXIF data.
+    
+    Tries multiple EXIF fields in priority order:
+    1. DateTimeOriginal (when photo was taken)
+    2. DateTimeDigitized (when photo was digitized)
+    3. DateTime (file modification date in EXIF)
+    4. Falls back to file modification time
+    
+    Returns formatted date string like: 3/24/2025 7:35P
+    """
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS
+        from datetime import datetime
+        
+        # Try to open image and get EXIF data
+        with Image.open(image_path) as img:
+            exif_data = img.getexif()
+            
+            if exif_data:
+                # Convert to human-readable tags
+                exif_dict = {}
+                for tag_id, value in exif_data.items():
+                    tag = TAGS.get(tag_id, tag_id)
+                    exif_dict[tag] = value
+                
+                # Try different datetime fields in priority order
+                datetime_fields = ['DateTimeOriginal', 'DateTimeDigitized', 'DateTime']
+                
+                for field in datetime_fields:
+                    if field in exif_dict:
+                        dt_str = exif_dict[field]
+                        if dt_str:
+                            try:
+                                # Parse EXIF datetime format: YYYY:MM:DD HH:MM:SS
+                                dt = datetime.strptime(str(dt_str), '%Y:%m:%d %H:%M:%S')
+                                # Format as M/D/YYYY H:MMP
+                                hour = dt.hour
+                                am_pm = 'A' if hour < 12 else 'P'
+                                if hour == 0:
+                                    hour = 12
+                                elif hour > 12:
+                                    hour -= 12
+                                return f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{am_pm}"
+                            except (ValueError, TypeError):
+                                continue
+        
+        # Fallback to file modification time if no EXIF date found
+        file_mtime = os.path.getmtime(image_path)
+        dt = datetime.fromtimestamp(file_mtime)
+        hour = dt.hour
+        am_pm = 'A' if hour < 12 else 'P'
+        if hour == 0:
+            hour = 12
+        elif hour > 12:
+            hour -= 12
+        return f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{am_pm}"
+        
+    except Exception as e:
+        # If all else fails, return empty string
+        print(f"Error getting image date for {image_path}: {e}")
+        return ""
+
+
 class WorkflowBrowserDialog(QDialog):
     """Dialog for browsing and selecting workflow results."""
     
@@ -1246,6 +1311,14 @@ class ImageDescriptionViewer(QWidget):
         # Show description
         if 0 <= row < len(self.descriptions):
             description = self.descriptions[row]
+            
+            # Get image date and append to description
+            if 0 <= row < len(self.image_files):
+                img_path = self.image_files[row]
+                if os.path.isfile(img_path):
+                    image_date = get_image_date(img_path)
+                    if image_date:
+                        description = f"{description}\n\n{image_date}"
             
             # Process the text to ensure blank lines are properly handled for screen readers
             # Split into lines and process each blank line
