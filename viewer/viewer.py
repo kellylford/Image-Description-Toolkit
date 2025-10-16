@@ -47,9 +47,31 @@ try:
     import ollama
 except ImportError:
     ollama = None
+
+# Import workflow scanning functions from list_results
+scripts_dir = get_scripts_directory()
+if str(scripts_dir) not in sys.path:
+    sys.path.insert(0, str(scripts_dir))
+
+try:
+    from list_results import (
+        find_workflow_directories,
+        count_descriptions,
+        format_timestamp,
+        parse_directory_name
+    )
+except ImportError as e:
+    print(f"Warning: Could not import from list_results: {e}")
+    print("Browse Results feature may not work correctly")
+    find_workflow_directories = None
+    count_descriptions = None
+    format_timestamp = None
+    parse_directory_name = None
+
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, 
-    QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, QProgressBar, QStatusBar, QPlainTextEdit, QCheckBox
+    QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, 
+    QProgressBar, QStatusBar, QPlainTextEdit, QCheckBox, QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PyQt6.QtGui import QClipboard, QGuiApplication, QPixmap, QImage
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QFileSystemWatcher
@@ -329,6 +351,237 @@ class RedescribeWorker(QThread):
         except Exception as e:
             self.error.emit(f"Error: {str(e)}")
 
+
+def find_descriptions_directory():
+    """Auto-detect Descriptions directory.
+    
+    Checks common locations for workflow results:
+    1. <idt_root>/Descriptions/
+    2. ../Descriptions/ (one level up, then down)
+    3. C:/idt/Descriptions (common Windows installation)
+    
+    Returns:
+        Path object pointing to Descriptions directory, or None if not found
+    """
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller executable
+        root = Path(sys.executable).parent
+    else:
+        # Running in development mode
+        root = Path(__file__).parent.parent
+    
+    # Option 1: <root>/Descriptions
+    desc_dir = root / "Descriptions"
+    if desc_dir.exists() and desc_dir.is_dir():
+        # Check if it has any workflow directories
+        if any(item.name.startswith('wf_') for item in desc_dir.iterdir() if item.is_dir()):
+            return desc_dir
+    
+    # Option 2: ../Descriptions (one level up, then down)
+    desc_dir = root.parent / "Descriptions"
+    if desc_dir.exists() and desc_dir.is_dir():
+        if any(item.name.startswith('wf_') for item in desc_dir.iterdir() if item.is_dir()):
+            return desc_dir
+    
+    # Option 3: Check for common Windows installation path
+    desc_dir = Path("C:/idt/Descriptions")
+    if desc_dir.exists() and desc_dir.is_dir():
+        if any(item.name.startswith('wf_') for item in desc_dir.iterdir() if item.is_dir()):
+            return desc_dir
+    
+    return None
+
+
+class WorkflowBrowserDialog(QDialog):
+    """Dialog for browsing and selecting workflow results."""
+    
+    def __init__(self, parent=None, initial_dir=None):
+        super().__init__(parent)
+        self.setWindowTitle("Browse Workflow Results")
+        self.setMinimumSize(1000, 600)
+        self.setModal(True)
+        self.setAccessibleName("Browse Workflow Results Dialog")
+        self.setAccessibleDescription("Browse and select from available workflow result directories.")
+        
+        self.selected_workflow_path = None
+        self.current_dir = initial_dir
+        self.workflows = []  # Store workflow paths for selection
+        
+        self.init_ui()
+        
+        if initial_dir:
+            self.load_workflows(initial_dir)
+    
+    def init_ui(self):
+        """Initialize the dialog UI."""
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        # Status label showing directory and workflow count
+        self.status_label = QLabel("Loading workflows...")
+        self.status_label.setAccessibleName("Status Label")
+        self.status_label.setAccessibleDescription("Shows the current directory and number of workflows found.")
+        layout.addWidget(self.status_label)
+        
+        # Table widget for displaying workflows
+        self.table = QTableWidget()
+        self.table.setAccessibleName("Workflows Table")
+        self.table.setAccessibleDescription("Table showing available workflows. Use arrow keys to navigate, Enter to select.")
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels([
+            "Name", "Provider", "Model", "Prompt", "Descriptions", "Timestamp"
+        ])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSortingEnabled(True)
+        
+        # Make table columns resize appropriately
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Name
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Provider
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Model
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Prompt
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Descriptions
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Timestamp
+        
+        # Double-click to select
+        self.table.itemDoubleClicked.connect(self.on_double_click)
+        
+        layout.addWidget(self.table)
+        
+        # Browse directory button
+        browse_layout = QHBoxLayout()
+        self.browse_btn = QPushButton("Browse Different Directory...")
+        self.browse_btn.setAccessibleName("Browse Directory Button")
+        self.browse_btn.setAccessibleDescription("Select a different directory to browse for workflows.")
+        self.browse_btn.clicked.connect(self.browse_directory)
+        browse_layout.addWidget(self.browse_btn)
+        browse_layout.addStretch()
+        layout.addLayout(browse_layout)
+        
+        # Dialog buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.setAccessibleName("Dialog Buttons")
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Rename OK button to "Open Workflow"
+        ok_button = button_box.button(QDialogButtonBox.StandardButton.Ok)
+        ok_button.setText("Open Workflow")
+        ok_button.setAccessibleName("Open Workflow Button")
+        ok_button.setAccessibleDescription("Open the selected workflow in the viewer.")
+        
+        layout.addWidget(button_box)
+    
+    def load_workflows(self, directory):
+        """Load workflows from directory and populate table."""
+        if not directory or not Path(directory).exists():
+            self.status_label.setText("Directory not found")
+            return
+        
+        if find_workflow_directories is None:
+            self.status_label.setText("Error: list_results module not available")
+            QMessageBox.warning(
+                self,
+                "Feature Unavailable",
+                "The workflow browsing feature requires the list_results module,\n"
+                "which could not be loaded. Please ensure the application is\n"
+                "properly installed."
+            )
+            return
+        
+        self.current_dir = directory
+        
+        # Clear existing rows
+        self.table.setRowCount(0)
+        self.table.setSortingEnabled(False)  # Disable while populating
+        
+        # Find workflows using list_results logic
+        try:
+            workflows = find_workflow_directories(Path(directory))
+        except Exception as e:
+            self.status_label.setText(f"Error scanning directory: {e}")
+            return
+        
+        if not workflows:
+            self.status_label.setText(f"No workflows found in: {directory}")
+            return
+        
+        # Populate table
+        self.workflows = []  # Store for selection
+        for workflow_path, metadata in workflows:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            
+            # Store workflow path
+            self.workflows.append(workflow_path)
+            
+            # Populate columns
+            name_item = QTableWidgetItem(metadata.get('workflow_name', 'unknown'))
+            name_item.setData(Qt.ItemDataRole.UserRole, str(workflow_path))  # Store full path
+            self.table.setItem(row, 0, name_item)
+            
+            self.table.setItem(row, 1, QTableWidgetItem(metadata.get('provider', 'unknown')))
+            self.table.setItem(row, 2, QTableWidgetItem(metadata.get('model', 'unknown')))
+            self.table.setItem(row, 3, QTableWidgetItem(metadata.get('prompt_style', 'unknown')))
+            
+            # Count descriptions
+            try:
+                desc_count = count_descriptions(workflow_path) if count_descriptions else 0
+                desc_item = QTableWidgetItem(str(desc_count))
+                desc_item.setData(Qt.ItemDataRole.DisplayRole, desc_count)  # For proper numeric sorting
+                self.table.setItem(row, 4, desc_item)
+            except Exception as e:
+                print(f"Error counting descriptions for {workflow_path}: {e}")
+                self.table.setItem(row, 4, QTableWidgetItem("?"))
+            
+            # Format timestamp
+            try:
+                timestamp = format_timestamp(metadata.get('timestamp', '')) if format_timestamp else metadata.get('timestamp', 'unknown')
+                self.table.setItem(row, 5, QTableWidgetItem(timestamp))
+            except Exception:
+                self.table.setItem(row, 5, QTableWidgetItem(metadata.get('timestamp', 'unknown')))
+        
+        # Re-enable sorting
+        self.table.setSortingEnabled(True)
+        
+        # Sort by timestamp (column 5) descending by default (newest first)
+        self.table.sortItems(5, Qt.SortOrder.DescendingOrder)
+        
+        # Update status
+        self.status_label.setText(f"Found {len(workflows)} workflow(s) in: {directory}")
+        
+        # Select first row by default
+        if self.table.rowCount() > 0:
+            self.table.selectRow(0)
+            self.table.setFocus()
+    
+    def browse_directory(self):
+        """Browse for a different directory."""
+        dir_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Workflow Results Directory",
+            str(self.current_dir) if self.current_dir else ""
+        )
+        
+        if dir_path:
+            self.load_workflows(Path(dir_path))
+    
+    def on_double_click(self, item):
+        """Handle double-click on table item."""
+        self.accept()
+    
+    def get_selected_workflow(self):
+        """Get the selected workflow path."""
+        current_row = self.table.currentRow()
+        if current_row >= 0 and current_row < len(self.workflows):
+            return self.workflows[current_row]
+        return None
+
+
 class RedescribeDialog(QDialog):
     """Dialog for selecting model and prompt style for redescription"""
     
@@ -540,6 +793,12 @@ class ImageDescriptionViewer(QWidget):
         self.refresh_btn.clicked.connect(self.manual_refresh)
         self.refresh_btn.setVisible(False)
         dir_layout.addWidget(self.refresh_btn)
+        
+        self.browse_results_btn = QPushButton("Browse Results")
+        self.browse_results_btn.setAccessibleName("Browse Results Button")
+        self.browse_results_btn.setAccessibleDescription("Browse and select from available workflow result directories.")
+        self.browse_results_btn.clicked.connect(self.browse_workflow_results)
+        dir_layout.addWidget(self.browse_results_btn)
         
         self.change_dir_btn = QPushButton("Change Directory")
         self.change_dir_btn.setAccessibleName("Change Directory Button")
@@ -837,6 +1096,31 @@ class ImageDescriptionViewer(QWidget):
         finally:
             # Clear updating flag
             self.updating_content = False
+
+    def browse_workflow_results(self):
+        """Open workflow browser dialog."""
+        # Auto-detect descriptions directory
+        initial_dir = find_descriptions_directory()
+        
+        if not initial_dir:
+            # No auto-detection - let user browse
+            dir_path = QFileDialog.getExistingDirectory(
+                self,
+                "Select Workflow Results Directory"
+            )
+            if not dir_path:
+                return  # User cancelled
+            initial_dir = Path(dir_path)
+        
+        # Open dialog
+        dialog = WorkflowBrowserDialog(self, initial_dir)
+        result = dialog.exec()
+        
+        if result == QDialog.DialogCode.Accepted:
+            workflow_path = dialog.get_selected_workflow()
+            if workflow_path:
+                self.load_descriptions(str(workflow_path))
+                self.status_bar.showMessage(f"Loaded workflow: {workflow_path.name}")
 
     def change_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Workflow Output Directory")
