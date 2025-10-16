@@ -106,39 +106,49 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
 
 
 def validate_prompt_style(style: str, config_file: str = "image_describer_config.json") -> str:
-    """Validate and normalize prompt style with case-insensitive lookup"""
+    """Validate and normalize prompt style with case-insensitive lookup
+    
+    Uses config_loader for PyInstaller-compatible path resolution.
+    """
     if not style:
         return "detailed"
     
     try:
-        import json
-        config_paths = [
-            config_file,
-            "image_describer_config.json",
-            "scripts/image_describer_config.json"
-        ]
-        
-        for config_path in config_paths:
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    prompt_variations = config.get('prompt_variations', {})
-                    
-                    # Create case-insensitive lookup
-                    lower_variations = {k.lower(): k for k in prompt_variations.keys()}
-                    
-                    # Check if style exists (case-insensitive)
-                    if style.lower() in lower_variations:
-                        return lower_variations[style.lower()]
-                    
-                    break  # Found config file, exit loop
-            except (FileNotFoundError, json.JSONDecodeError):
-                continue
+        # Import at module level to avoid repeated imports
+        from scripts.config_loader import load_json_config
+    except ImportError:
+        try:
+            from config_loader import load_json_config
+        except ImportError:
+            # Fallback: config_loader not available, return style as-is if it looks valid
+            if style and len(style) > 0:
+                return style
+            return "detailed"
+    
+    try:
+        cfg, path, source = load_json_config('image_describer_config.json', 
+                                              explicit=config_file if config_file != 'image_describer_config.json' else None,
+                                              env_var_file='IDT_IMAGE_DESCRIBER_CONFIG')
+        if cfg:
+            prompt_variations = cfg.get('prompt_variations', {})
+            
+            # Create case-insensitive lookup
+            lower_variations = {k.lower(): k for k in prompt_variations.keys()}
+            
+            # Check if style exists (case-insensitive)
+            if style.lower() in lower_variations:
+                return lower_variations[style.lower()]
                 
-    except Exception:
+    except Exception as e:
+        # If config loading fails, return the style as-is (trust the caller)
         pass
         
-    # Fallback to detailed if style not found
+    # If style not found in config but was provided, return it anyway
+    # (allows custom/unknown styles to pass through)
+    if style:
+        return style
+        
+    # Final fallback
     return "detailed"
 
 
