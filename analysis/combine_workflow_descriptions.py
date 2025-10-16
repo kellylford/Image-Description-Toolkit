@@ -53,14 +53,17 @@ def parse_description_file(file_path: Path) -> OrderedDict:
     
     current_file = None
     current_description = []
+    in_description = False
     
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
-            # Check for file marker
+            # Check for file marker - this starts a new image block
             if line.startswith("File: "):
                 # Save previous description if exists
                 if current_file and current_description:
                     desc_text = ' '.join(current_description).strip()
+                    # Clean up multiple consecutive spaces
+                    desc_text = ' '.join(desc_text.split())
                     descriptions[current_file] = desc_text
                     current_description = []
                 
@@ -69,29 +72,31 @@ def parse_description_file(file_path: Path) -> OrderedDict:
                 # Extract just the filename from paths like "converted_images\IMG_3136.jpg"
                 # or "extracted_frames\IMG_3136\IMG_3136_0.00s.jpg" or "09\IMG_3137.PNG"
                 current_file = Path(file_path_str).name
+                in_description = False
                 
-            # Check for description marker
+            # Check for description marker - this starts the description content
             elif line.startswith("Description: "):
                 desc_text = line[13:].strip()  # Remove "Description: " prefix
-                current_description.append(desc_text)
+                if desc_text:  # Only add if not empty
+                    current_description.append(desc_text)
+                in_description = True
                 
-            # Check for separator (end of description block)
-            elif line.startswith("---"):
-                # Save the description we were building
-                if current_file and current_description:
-                    # Join and clean up extra spaces
-                    desc_text = ' '.join(current_description).strip()
-                    # Clean up multiple consecutive spaces
-                    desc_text = ' '.join(desc_text.split())
-                    descriptions[current_file] = desc_text
-                    current_description = []
-                    current_file = None
-                    
-            # Continue multi-line description (including empty lines between paragraphs)
-            elif current_file and current_description:
-                # This is a continuation of the description
+            # Skip metadata lines (Provider, Model, Prompt Style) if we haven't started description yet
+            elif not in_description and (line.startswith("Provider: ") or 
+                                        line.startswith("Model: ") or 
+                                        line.startswith("Prompt Style: ")):
+                # These are metadata lines, skip them
+                continue
+                
+            # Once we've started a description, capture everything until the next "File:" marker
+            # This includes lines that start with "---" (markdown separators within descriptions)
+            elif in_description and current_file:
+                # Skip "---" lines that are just markdown separators
+                if line.strip() == "---" or line.strip().startswith("---"):
+                    # Don't add markdown separators to the description
+                    continue
                 # Keep empty lines to preserve paragraph breaks
-                if line.strip():
+                elif line.strip():
                     current_description.append(line.strip())
                 else:
                     # Empty line - add a space to separate paragraphs
