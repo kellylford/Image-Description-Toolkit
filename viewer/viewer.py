@@ -69,7 +69,7 @@ except ImportError as e:
     parse_directory_name = None
 
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, 
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QLabel, QPushButton, 
     QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, 
     QProgressBar, QStatusBar, QPlainTextEdit, QCheckBox, QTableWidget, QTableWidgetItem, QHeaderView
 )
