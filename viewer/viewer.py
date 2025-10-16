@@ -1011,10 +1011,15 @@ class ImageDescriptionViewer(QWidget):
         if self.workflow_name:
             base_title = f"{base_title} - {self.workflow_name}"
         
-        if self.live_mode and self.progress_info.get("total", 0) > 0:
-            current = self.progress_info.get("current", 0)
-            total = self.progress_info.get("total", 0)
-            active = self.progress_info.get("active", False)
+        # Always show count if we have descriptions loaded
+        if len(self.descriptions) > 0:
+            total = len(self.descriptions)
+            current = total  # For non-live mode, all descriptions are loaded
+            
+            # In live mode, use the progress info if available
+            if self.live_mode and self.progress_info.get("total", 0) > 0:
+                current = self.progress_info.get("current", 0)
+                total = self.progress_info.get("total", 0)
             
             # Calculate percentage (no decimal points)
             percentage = int((current / total * 100)) if total > 0 else 0
@@ -1022,7 +1027,8 @@ class ImageDescriptionViewer(QWidget):
             # Format: "XX%, X of Y images described"
             status_text = f"{percentage}%, {current} of {total} images described"
             
-            if active:
+            # Add (Live) indicator if in active live mode
+            if self.live_mode and self.progress_info.get("active", False):
                 title = f"{base_title} - {status_text} (Live)"
             else:
                 title = f"{base_title} - {status_text}"
@@ -1261,6 +1267,8 @@ class ImageDescriptionViewer(QWidget):
                     # But only if no other widget currently has focus
                     if not QApplication.focusWidget():
                         self.list_widget.setFocus()
+                    # Update title with description count
+                    self.update_title()
                 else:
                     QMessageBox.information(self, "No Descriptions", "No image descriptions found in HTML report.")
             except Exception as e:
