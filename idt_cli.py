@@ -105,6 +105,7 @@ def main():
         'stats': 'IDT - Analyzing Statistics',
         'contentreview': 'IDT - Content Review',
         'combinedescriptions': 'IDT - Combining Descriptions',
+        'results-list': 'IDT - Listing Results',
         'check-models': 'IDT - Checking Models',
         'prompt-list': 'IDT - Listing Prompts',
         'extract-frames': 'IDT - Extracting Video Frames',
@@ -388,6 +389,47 @@ def main():
             args = sys.argv[2:]
             cmd = [sys.executable, str(check_script)] + args
             result = subprocess.run(cmd, cwd=str(check_script.parent))
+            return result.returncode
+    
+    elif command == 'results-list':
+        # List available workflow results
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                
+                import list_results
+                
+                original_argv = sys.argv[:]
+                sys.argv = ['list_results.py'] + sys.argv[2:]
+                
+                try:
+                    return list_results.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import list_results module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running results-list: {e}")
+                return 1
+        else:
+            # Development mode - use subprocess
+            list_script = get_resource_path('scripts/list_results.py')
+            
+            if not list_script.exists():
+                print(f"Error: Results list script not found at {list_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(list_script)] + args
+            result = subprocess.run(cmd, cwd=str(list_script.parent))
             return result.returncode
     
     elif command == 'prompt-list':
@@ -787,6 +829,7 @@ COMMANDS:
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
+    results-list          List available workflow results with viewer commands
     check-models          Check installed Ollama models
     prompt-list           List available prompt styles
     extract-frames        Extract frames from video files
@@ -827,6 +870,10 @@ EXAMPLES:
 
     # Combine descriptions to CSV
     {base_call} combinedescriptions --output results.csv
+
+    # List available workflow results
+    {base_call} results-list
+    {base_call} results-list --input-dir c:\\path\\to\\descriptions
 
     # Check available models
     {base_call} check-models

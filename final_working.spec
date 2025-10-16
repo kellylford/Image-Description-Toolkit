@@ -24,6 +24,8 @@ a = Analysis(
         ('scripts/video_frame_extractor.py', 'scripts'),
         ('scripts/config_loader.py', 'scripts'),
         ('scripts/guided_workflow.py', 'scripts'),
+        ('scripts/list_prompts.py', 'scripts'),
+        ('scripts/list_results.py', 'scripts'),
         ('scripts/workflow_config.json', 'scripts'),
         ('scripts/image_describer_config.json', 'scripts'),
         # Include essential directories
@@ -41,6 +43,8 @@ a = Analysis(
         'scripts.descriptions_to_html',
         'scripts.video_frame_extractor',
         'scripts.config_loader',
+        'scripts.list_prompts',
+        'scripts.list_results',
         'models.check_models',
         'analysis.analyze_workflow_stats',
         'analysis.analyze_description_content',
