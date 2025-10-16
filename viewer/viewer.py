@@ -515,14 +515,36 @@ class WorkflowBrowserDialog(QDialog):
                 print(f"Error counting descriptions for {workflow_path}: {e}")
                 desc_count = 0
             
-            # Format timestamp
+            # Format timestamp in short format: M/D/YYYY H:MMP
             try:
-                timestamp = format_timestamp(metadata.get('timestamp', '')) if format_timestamp else metadata.get('timestamp', 'unknown')
-            except Exception:
+                timestamp_str = metadata.get('timestamp', '')
+                if timestamp_str and timestamp_str != 'unknown':
+                    # Parse timestamp (format: YYYYMMDD_HHMMSS)
+                    if '_' in timestamp_str:
+                        date_part, time_part = timestamp_str.split('_')[:2]
+                    else:
+                        date_part = timestamp_str[:8]
+                        time_part = timestamp_str[8:14] if len(timestamp_str) >= 14 else '000000'
+                    
+                    from datetime import datetime
+                    dt = datetime.strptime(f"{date_part}{time_part}", "%Y%m%d%H%M%S")
+                    # Format as M/D/YYYY H:MMP (12-hour with P/A suffix, no leading zeros)
+                    hour = dt.hour
+                    am_pm = 'A' if hour < 12 else 'P'
+                    if hour == 0:
+                        hour = 12
+                    elif hour > 12:
+                        hour -= 12
+                    timestamp = f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{am_pm}"
+                else:
+                    timestamp = 'unknown'
+            except Exception as e:
+                print(f"Error formatting timestamp: {e}")
                 timestamp = metadata.get('timestamp', 'unknown')
             
-            # Combine all data into a single string for accessibility
-            display_text = f"{name} | {provider} | {model} | {prompt} | {desc_count} descriptions | {timestamp}"
+            # Reorder columns: Name, Prompt, Images, Model, Provider, Timestamp
+            # Changed order as requested
+            display_text = f"{name} | {prompt} | {desc_count} images | {model} | {provider} | {timestamp}"
             
             # Create list item with full text as accessible description
             item = QListWidgetItem(display_text)
