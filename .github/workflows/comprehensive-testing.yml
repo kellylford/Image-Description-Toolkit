@@ -1,15 +1,13 @@
 name: Comprehensive IDT Testing
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:  # Manual trigger only
     inputs:
       branch:
         description: 'Branch to test'
         required: false
         default: 'ImageDescriber'
         type: string
-  schedule:
-    - cron: '0 6 * * 1'  # Weekly on Monday at 6 AM UTC
 
 jobs:
   comprehensive-test:
