@@ -16,6 +16,7 @@ REM   - releases/ImageDescriptionToolkit_v[VERSION].zip
 REM   - releases/viewer_v[VERSION]_[ARCH].zip
 REM   - releases/prompt_editor_v[VERSION]_[ARCH].zip
 REM   - releases/imagedescriber_v[VERSION]_[ARCH].zip
+REM   - releases/idt2.zip (master package containing all individual packages)
 REM ============================================================================
 
 echo.
@@ -30,6 +31,7 @@ echo   3. Prompt Editor
 echo   4. ImageDescriber
 echo.
 echo All distribution packages will be created in releases/ directory.
+echo A master package (idt2.zip) will also be created containing all packages.
 echo.
 echo Starting release process...
 echo.
@@ -70,14 +72,55 @@ if errorlevel 1 (
 REM ============================================================================
 echo.
 echo ========================================================================
+echo PHASE 3: CREATE MASTER PACKAGE
+echo ========================================================================
+echo.
+
+REM Check if we have any packages to bundle
+if not exist releases\*.zip (
+    echo ERROR: No distribution packages found in releases\ directory!
+    echo Cannot create master package.
+    exit /b 1
+)
+
+echo Creating master package idt2.zip with all distribution packages...
+echo.
+
+REM Delete existing idt2.zip if it exists
+if exist releases\idt2.zip (
+    echo Removing existing idt2.zip...
+    del releases\idt2.zip
+)
+
+REM Create idt2.zip containing all individual distribution packages
+REM Use PowerShell for reliable ZIP creation on Windows
+powershell -NoProfile -Command "Compress-Archive -Path 'releases\*.zip' -DestinationPath 'releases\idt2.zip' -CompressionLevel Optimal -Force"
+
+if errorlevel 1 (
+    echo.
+    echo ERROR: Failed to create master package idt2.zip!
+    echo Individual packages are still available in releases\ directory.
+    exit /b 1
+)
+
+echo.
+echo Master package created successfully: releases\idt2.zip
+echo.
+
+REM ============================================================================
+echo.
+echo ========================================================================
 echo RELEASE COMPLETE!
 echo ========================================================================
 echo.
 echo All distribution packages have been created successfully.
 echo.
-echo Packages in releases\ directory:
+echo Individual packages in releases\ directory:
 echo.
-dir /b releases\*.zip 2>nul
+dir /b releases\*.zip 2>nul | findstr /V "idt2.zip"
+echo.
+echo Master package (contains all individual packages above):
+echo   idt2.zip
 echo.
 echo ========================================================================
 echo NEXT STEPS
@@ -89,7 +132,7 @@ echo    - Verify README files are correct
 echo.
 echo 2. Create GitHub Release:
 echo    - Tag version: v[VERSION]
-echo    - Upload all ZIP files from releases\
+echo    - Upload idt2.zip (master package) OR individual ZIPs from releases\
 echo    - Add release notes
 echo.
 echo 3. Update documentation:
