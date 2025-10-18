@@ -26,12 +26,15 @@ from analysis.analysis_utils import load_prompt_styles_from_config
 
 def create_test_workflow(base_dir: Path, prompt_style: str, workflow_num: int):
     """Create a test workflow directory with sample descriptions."""
-    workflow_name = f"wf_ollama_moondream_{prompt_style}_20241018_{workflow_num:04d}"
+    from datetime import datetime
+    date_str = datetime.now().strftime("%Y%m%d")
+    workflow_name = f"wf_ollama_moondream_{prompt_style.lower()}_{date_str}_{workflow_num:04d}"
     workflow_dir = base_dir / workflow_name
     desc_dir = workflow_dir / "descriptions"
     desc_dir.mkdir(parents=True, exist_ok=True)
     
     desc_file = desc_dir / "image_descriptions.txt"
+    # Use lowercase in workflow name but preserve case in description file
     content = f"""File: test_image_{workflow_num}.jpg
 Description: Test description for {prompt_style} prompt style.
 Provider: ollama
@@ -96,11 +99,14 @@ def main():
         
         print(f"Creating test workflows in: {test_dir}")
         
-        # Create test workflows for several prompts
+        # Create test workflows for all prompts, including edge cases
         test_prompts = []
-        for i, prompt in enumerate(prompt_styles[:5], 1):  # Test first 5 prompts
+        
+        # Include all prompts to ensure comprehensive testing
+        # This catches edge cases like "Simple" with capital S
+        for i, prompt in enumerate(prompt_styles, 1):
             create_test_workflow(test_dir, prompt, i)
-            test_prompts.append(prompt)
+            test_prompts.append(prompt.lower())  # Analysis uses lowercase
             print(f"  Created workflow with prompt: {prompt}")
         
         print(f"\nCreated {len(test_prompts)} test workflows\n")
