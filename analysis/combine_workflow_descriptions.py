@@ -32,7 +32,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 from collections import OrderedDict
-from analysis_utils import get_safe_filename, ensure_directory
+from analysis_utils import get_safe_filename, ensure_directory, load_prompt_styles_from_config
 
 
 def parse_description_file(file_path: Path) -> OrderedDict:
@@ -163,8 +163,8 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
     # Format: wf_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
     parts = dir_name.split('_')
     
-    # Known prompt styles (must match those in image_describer_config.json)
-    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic', 'simple']
+    # Load prompt styles dynamically from config
+    prompt_styles = load_prompt_styles_from_config()
     
     # Find the prompt style (it's the part before the datetime)
     prompt_style = 'unknown'
