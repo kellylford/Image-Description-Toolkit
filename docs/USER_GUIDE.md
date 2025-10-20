@@ -1,5 +1,7 @@
 # Image Description Toolkit (IDT) - User Guide
 
+> **📌 Note:** On October 20, 2025, the repository branches were reorganized. The `main` branch now contains the full v2.0 codebase (formerly the `ImageDescriber` branch). The original v1.0/v1.1 CLI-only releases are preserved in the `1.0release` branch. See [BRANCH_INFO.md](../BRANCH_INFO.md) for details.
+
 ## Overview
 The Image Description Toolkit (IDT) is a powerful, AI-driven tool for generating natural language descriptions from images and videos. It supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as a standalone Windows executable—**no Python installation required**.
 
