@@ -1,6 +1,6 @@
 # Image Description Toolkit (IDT) - User Guide
 
-> **📌 Note:** On October 20, 2025, the repository branches were reorganized. The `main` branch now contains the full v2.0 codebase (formerly the `ImageDescriber` branch). The original v1.0/v1.1 CLI-only releases are preserved in the `1.0release` branch. See [BRANCH_INFO.md](../BRANCH_INFO.md) for details.
+> **📌 Note:** On October 20, 2025, the repository branches were reorganized. The `main` branch now contains the full v3.0 codebase (formerly the `ImageDescriber` branch). The original v1.0/v1.1 CLI-only releases are preserved in the `1.0release` branch. See [BRANCH_INFO.md](../BRANCH_INFO.md) for details.
 
 ## Overview
 The Image Description Toolkit (IDT) is a powerful, AI-driven tool for generating natural language descriptions from images and videos. It supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as a standalone Windows executable—**no Python installation required**.
@@ -353,7 +353,7 @@ idt combinedescriptions --output C:\Exports\my_descriptions.csv --sort name
 idt combinedescriptions --input-dir Descriptions --sort date
 ```
 
-**💡 New in v2.0:** Images are now sorted by their **actual photo dates** (from EXIF data) instead of filename. This means your vacation photos appear in the order you took them, not alphabetically! Use `--sort name` for the old alphabetical behavior.
+**💡 New in v3.0:** Images are now sorted by their **actual photo dates** (from EXIF data) instead of filename. This means your vacation photos appear in the order you took them, not alphabetically! Use `--sort name` for the old alphabetical behavior.
 
 **💡 Pro Tip:** After ANY workflow run, immediately run `combinedescriptions` to get a nice Excel-ready file. Perfect for sharing or archiving!
 
@@ -764,11 +764,6 @@ idt help
 
 ## Further Resources
 
-- **Quick Start Guide:** `QUICK_START.md` (in root folder)
-- **Cloud Providers Guide:** `docs/CLOUD_PROVIDERS_GUIDE.md`
-- **Configuration Guide:** `docs/CONFIG_OVERRIDES.md`
-- **Token Tracking:** `docs/TOKEN_TRACKING_GUIDE.md`
-- **FAQ:** `docs/EXECUTABLE_FAQ.md`
 - **GitHub:** https://github.com/kellylford/Image-Description-Toolkit
 
 ---
