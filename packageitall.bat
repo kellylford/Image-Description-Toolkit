@@ -156,17 +156,23 @@ echo PACKAGING SUMMARY
 echo ========================================================================
 echo.
 
-if %PACKAGE_ERRORS%==0 (
-    echo SUCCESS: All applications packaged successfully!
-    echo.
-    echo Distribution packages in releases\ directory:
-    dir /b releases\*.zip 2>nul
-    echo.
-    echo All packages are ready for distribution!
-) else (
-    echo ERRORS ENCOUNTERED: %PACKAGE_ERRORS% packaging operation(s) failed
-    echo Please review the output above for error details.
-)
+if "%PACKAGE_ERRORS%"=="0" goto :success
+goto :errors
+
+:success
+echo SUCCESS: All applications packaged successfully!
+echo.
+echo Distribution packages in releases\ directory:
+dir /b releases\*.zip 2>nul
+echo.
+echo All packages are ready for distribution!
+goto :continue
+
+:errors
+echo ERRORS ENCOUNTERED: %PACKAGE_ERRORS% packaging operation(s) failed
+echo Please review the output above for error details.
+
+:continue
 
 echo.
 echo ========================================================================

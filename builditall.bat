@@ -129,7 +129,7 @@ echo ========================================================================
 echo.
 
 echo BUILD COMPLETE
-if %BUILD_ERRORS%==0 (
+if "%BUILD_ERRORS%"=="0" (
     echo SUCCESS: All applications built successfully
 ) else (
     echo ERRORS: %BUILD_ERRORS% build failures encountered
