@@ -5,6 +5,82 @@ All notable changes to the Image Description Toolkit will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2025-10-21
+
+### 🚀 Performance Improvements
+
+**Major Ollama Cloud Optimizations**
+- **75% faster retry recovery**: Reduced retry delays from [2s, 4s, 8s] to [0.5s, 1s, 2s]
+- **90-second request timeout**: Prevents 2+ minute hangs, fail fast and retry sooner
+- **Request throttling**: 3-second delays between Ollama requests to reduce server load
+- **Better error handling**: Enhanced timeout detection and retry logic
+- **Significant improvement**: 40-minute processing reduced to 15-20 minutes for large batches
+
+### 🔧 Fixes
+
+**Release Packaging**
+- Fixed idt2.zip regression - now includes all 4 applications correctly
+- Updated packaging scripts to include `imagedescriber_v3.0.1.zip`, `install_idt.bat`, and `README.md`
+- All distribution packages now complete and tested
+
+**Documentation**
+- Comprehensive User Guide updates featuring GUI applications prominently
+- Added dedicated sections for GUI ImageDescriber and Prompt Editor
+- Updated application overview and use case guidance
+- Enhanced troubleshooting for all four applications
+
+### 📚 Documentation
+
+**Enhanced User Guide**
+- Featured GUI ImageDescriber and Prompt Editor as top-level applications
+- Added comprehensive application comparison and use case guidance
+- Updated installation instructions for all four tools
+- Enhanced quick reference with application launchers
+
+**Technical Documentation**
+- Created detailed GitHub issue for Ollama performance analysis
+- Documented root cause analysis of server 500 errors
+- Added performance benchmarking data and optimization strategies
+
+## [3.0.0] - 2025-10-20
+
+### 🌟 Major Release - Complete Application Suite
+
+**Four Standalone Applications**
+- **CLI Toolkit (`idt.exe`)**: Advanced batch processing and automation
+- **GUI ImageDescriber (`imagedescriber.exe`)**: Visual interface for individual images
+- **Prompt Editor (`prompt_editor.exe`)**: Design and test custom prompts
+- **Results Viewer (`viewer.exe`)**: Browse results and real-time monitoring
+
+**Unified Distribution**
+- Single master package (`idt2.zip`) containing all applications
+- Automatic installer (`install_idt.bat`) for complete setup
+- Cross-architecture support (AMD64 and ARM64 Windows)
+- No Python installation required - all executables are standalone
+
+**Enhanced CLI Features**
+- Interactive wizard (`idt guideme`) for step-by-step setup
+- Workflow naming and organization improvements
+- Advanced analysis tools (`combinedescriptions`, `stats`, `contentreview`)
+- Real-time results viewing integration
+- Comprehensive batch file library for quick model testing
+
+**GUI Applications**
+- **ImageDescriber**: Drag-and-drop interface, real-time preview, visual provider setup
+- **Prompt Editor**: A/B testing, prompt library management, live preview
+- **Results Viewer**: Real-time monitoring, search/filter, accessibility optimized
+
+**Provider Support**
+- **Ollama**: Local models with automatic detection and installation helpers
+- **OpenAI**: GPT-4o, GPT-4o-mini with cost optimization
+- **Claude**: Full Anthropic model support with intelligent retry logic
+
+**Analysis & Export**
+- Chronological image sorting by EXIF date (not filename)
+- Enhanced CSV/TSV export with metadata preservation
+- Statistical analysis and performance benchmarking
+- Content quality analysis and readability metrics
+
 ## [1.0.0] - 2025-09-02
 
 ### Initial Release
