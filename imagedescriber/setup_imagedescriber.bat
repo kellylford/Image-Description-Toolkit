@@ -122,7 +122,7 @@ if errorlevel 1 (
 )
 echo.
 
-if %PYTHON_AVAILABLE%==1 (
+if "%PYTHON_AVAILABLE%"=="1" (
     echo Checking YOLO (for object detection)...
     python -c "from ultralytics import YOLO" >nul 2>&1
     if errorlevel 1 (
@@ -178,8 +178,8 @@ echo Summary
 echo ================================================================
 echo.
 
-if %OLLAMA_AVAILABLE%==1 (
-    if %OLLAMA_MODELS%==1 (
+if "%OLLAMA_AVAILABLE%"=="1" (
+    if "%OLLAMA_MODELS%"=="1" (
         echo Status: READY TO USE AI DESCRIPTIONS! ✓
         echo You can start using ImageDescriber with Ollama provider.
     ) else (
@@ -192,15 +192,15 @@ if %OLLAMA_AVAILABLE%==1 (
 )
 echo.
 
-if %PYTHON_AVAILABLE%==1 (
-    if %YOLO_AVAILABLE%==1 (
+if "%PYTHON_AVAILABLE%"=="1" (
+    if "%YOLO_AVAILABLE%"=="1" (
         echo Optional: Object Detection available ✓
     ) else (
         echo Optional: Install YOLO ^(option 3^) for object detection
     )
-    
-    if %ONNX_AVAILABLE%==1 (
-        if %ONNX_MODELS%==1 (
+
+    if "%ONNX_AVAILABLE%"=="1" (
+        if "%ONNX_MODELS%"=="1" (
             echo Optional: Enhanced ONNX available ✓
         ) else (
             echo Optional: Download ONNX models ^(option 4^) for performance boost
@@ -692,7 +692,7 @@ if errorlevel 1 set ENHANCED_READY=0
 curl -s http://localhost:11434/api/version >nul 2>&1
 if errorlevel 1 set ENHANCED_READY=0
 
-if %ENHANCED_READY%==1 (
+if "%ENHANCED_READY%"=="1" (
     echo [x] Enhanced ONNX: READY (all components available)
 ) else (
     echo [ ] Enhanced ONNX: NOT READY (requires YOLO + Ollama + ONNX)

@@ -195,7 +195,7 @@ echo SETUP SUMMARY
 echo ========================================================================
 echo.
 
-if %SETUP_ERRORS%==0 (
+if "%SETUP_ERRORS%"=="0" (
     echo SUCCESS: All environments set up successfully!
     echo.
     echo Virtual environments created:
