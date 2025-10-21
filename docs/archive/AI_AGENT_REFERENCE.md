@@ -78,7 +78,7 @@ def main():
 | `prompt-list` | `scripts/list_prompts.py` | List available prompt styles |
 | `stats` | `analysis/analyze_workflow_stats.py` | Performance analysis |
 | `contentreview` | `analysis/analyze_description_content.py` | Content quality |
-| `combinedescriptions` | `analysis/combine_workflow_descriptions.py` | Aggregate results |
+| `combinedescriptions` | `analysis/combine_workflow_descriptions.py` | Aggregate results (date-sorted by default) |
 | `viewer` | Launches `viewer.exe` | GUI workflow browser |
 | `version` | Built-in | Show version info |
 
