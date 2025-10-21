@@ -390,7 +390,7 @@ class WorkflowOrchestrator:
     
     def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, 
                  model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", 
-                 api_key_file: str = None, preserve_descriptions: bool = False):
+                 api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None):
         """
         Initialize the workflow orchestrator
         
@@ -402,6 +402,7 @@ class WorkflowOrchestrator:
             provider: AI provider to use (ollama, openai, claude)
             api_key_file: Path to API key file for cloud providers
             preserve_descriptions: If True, skip describe step if descriptions already exist
+            workflow_name: Name of the workflow (for display purposes)
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -415,6 +416,7 @@ class WorkflowOrchestrator:
         self.provider = provider
         self.api_key_file = api_key_file
         self.preserve_descriptions = preserve_descriptions
+        self.workflow_name = workflow_name
         
         # Available workflow steps
         self.available_steps = {
@@ -917,6 +919,10 @@ class WorkflowOrchestrator:
                 # Always explicitly pass the prompt style to avoid ambiguity
                 cmd.extend(["--prompt-style", validated_style])
                 self.logger.info(f"Resolved prompt style default '{validated_style}' using config '{config_file}'")
+            
+            # Add workflow name if available (for window title identification)
+            if self.workflow_name:
+                cmd.extend(["--workflow-name", self.workflow_name])
             
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
@@ -1990,7 +1996,8 @@ Viewing Results:
             prompt_style=args.prompt_style, 
             provider=args.provider, 
             api_key_file=args.api_key_file,
-            preserve_descriptions=args.preserve_descriptions
+            preserve_descriptions=args.preserve_descriptions,
+            workflow_name=workflow_name
         )
         
         if args.dry_run:
