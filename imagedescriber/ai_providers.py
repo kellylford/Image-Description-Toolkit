@@ -10,6 +10,8 @@ import requests
 import json
 import base64
 import time
+import random
+import functools
 from typing import List, Dict, Optional
 from pathlib import Path
 import platform
@@ -88,6 +90,85 @@ DEV_CLAUDE_MODELS = [
     # Note: All Claude 3+ models support vision. Claude 2.x excluded (no vision support)
 ]
 
+
+def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):
+    """
+    Retry decorator for API calls with exponential backoff.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay between retries in seconds
+        max_delay: Maximum delay between retries in seconds
+        backoff_multiplier: Multiplier for exponential backoff
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):  # +1 for initial attempt
+                try:
+                    result = func(*args, **kwargs)
+                    
+                    # Check if result indicates a retryable error
+                    if isinstance(result, str) and result.startswith("Error:"):
+                        # Extract status code if present
+                        if "status code: 5" in result or "status code: 429" in result or "timeout" in result.lower():
+                            if attempt < max_retries:
+                                delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
+                                # Add jitter to prevent thundering herd
+                                jitter = random.uniform(0.1, 0.5) * delay
+                                sleep_time = delay + jitter
+                                
+                                print(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed, retrying in {sleep_time:.1f}s...")
+                                time.sleep(sleep_time)
+                                continue
+                            else:
+                                print(f"  [RETRY] All {max_retries + 1} attempts failed")
+                                return result
+                    
+                    # Success or non-retryable error
+                    if attempt > 0:
+                        print(f"  [RETRY] Success on attempt {attempt + 1}")
+                    return result
+                    
+                except Exception as e:
+                    last_exception = e
+                    
+                    # Determine if error is retryable
+                    error_type = type(e).__name__
+                    error_msg = str(e).lower()
+                    is_retryable = (
+                        'timeout' in error_msg or
+                        'connectionerror' in error_type.lower() or
+                        'httperror' in error_type.lower() or
+                        'ratelimiterror' in error_type.lower() or
+                        hasattr(e, 'status_code') and (e.status_code >= 500 or e.status_code == 429)
+                    )
+                    
+                    if is_retryable and attempt < max_retries:
+                        delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
+                        jitter = random.uniform(0.1, 0.5) * delay
+                        sleep_time = delay + jitter
+                        
+                        print(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed ({error_type}), retrying in {sleep_time:.1f}s...")
+                        time.sleep(sleep_time)
+                        continue
+                    else:
+                        # Non-retryable error or max retries reached
+                        if attempt > 0:
+                            print(f"  [RETRY] All {max_retries + 1} attempts failed")
+                        raise e
+            
+            # This should not be reached, but just in case
+            if last_exception:
+                raise last_exception
+            return None
+            
+        return wrapper
+    return decorator
+
+
 from abc import ABC, abstractmethod
 
 
@@ -165,8 +246,9 @@ class OllamaProvider(AIProvider):
             pass
         return []
     
+    @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
-        """Generate description using Ollama"""
+        """Generate description using Ollama with automatic retry"""
         try:
             # Read and encode image
             with open(image_path, 'rb') as image_file:
@@ -190,10 +272,69 @@ class OllamaProvider(AIProvider):
             if response.status_code == 200:
                 return response.json().get('response', 'No description generated')
             else:
-                return f"Error: HTTP {response.status_code}"
+                # Enhanced error logging for Ollama HTTP errors
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+                
+                # Log detailed error information
+                print(f"[ERROR] Ollama API failure - {timestamp}")
+                print(f"  Image: {Path(image_path).name}")
+                print(f"  Model: {model}")
+                print(f"  Status Code: {response.status_code}")
+                print(f"  Response: {response.text[:500] if hasattr(response, 'text') else 'No response text'}")
+                
+                # Also log to file if possible
+                try:
+                    import json
+                    error_details = {
+                        'timestamp': timestamp,
+                        'provider': 'Ollama',
+                        'model': model,
+                        'image_path': image_path,
+                        'status_code': response.status_code,
+                        'response_text': response.text if hasattr(response, 'text') else None,
+                        'error_type': 'HTTP_ERROR'
+                    }
+                    log_file = Path('api_errors.log')
+                    with open(log_file, 'a', encoding='utf-8') as f:
+                        f.write(json.dumps(error_details) + '\n')
+                except Exception as log_error:
+                    print(f"  Warning: Could not write to error log: {log_error}")
+                
+                return f"Error: HTTP {response.status_code} - ({timestamp})"
                 
         except Exception as e:
-            return f"Error generating description: {str(e)}"
+            # Enhanced error logging for Ollama exceptions
+            from datetime import datetime
+            import traceback
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+            
+            # Log comprehensive error details
+            print(f"[ERROR] Ollama exception - {timestamp}")
+            print(f"  Image: {Path(image_path).name}")
+            print(f"  Model: {model}")
+            print(f"  Error Type: {type(e).__name__}")
+            print(f"  Error Message: {str(e)}")
+            
+            # Also log to file if possible
+            try:
+                import json
+                error_details = {
+                    'timestamp': timestamp,
+                    'provider': 'Ollama',
+                    'model': model,
+                    'image_path': image_path,
+                    'error_type': type(e).__name__,
+                    'error_message': str(e),
+                    'traceback': traceback.format_exc()
+                }
+                log_file = Path('api_errors.log')
+                with open(log_file, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(error_details) + '\n')
+            except Exception as log_error:
+                print(f"  Warning: Could not write to error log: {log_error}")
+            
+            return f"Error generating description: {str(e)} - ({timestamp})"
 
 
 class OpenAIProvider(AIProvider):
@@ -264,6 +405,7 @@ class OpenAIProvider(AIProvider):
         # Fallback to known vision models
         return ['gpt-4-vision-preview', 'gpt-4o', 'gpt-4o-mini']
     
+    @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         """Generate description using OpenAI SDK with automatic retry and token tracking"""
         if not self.is_available():
@@ -314,18 +456,74 @@ class OpenAIProvider(AIProvider):
             return response.choices[0].message.content
                 
         except Exception as e:
-            # SDK provides rich exception types for better error handling
-            error_msg = f"Error generating description: {str(e)}"
-            # Try to provide more specific error messages
-            error_type = type(e).__name__
-            if 'RateLimitError' in error_type:
-                error_msg = "Rate limit exceeded. Please wait a moment and try again."
-            elif 'AuthenticationError' in error_type:
-                error_msg = "Authentication failed. Please check your API key."
-            elif 'InvalidRequestError' in error_type:
-                error_msg = f"Invalid request: {str(e)}"
+            # Enhanced error logging with detailed diagnostics
+            from datetime import datetime
+            import traceback
             
-            return error_msg
+            # Get current timestamp for error logging
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+            
+            # Extract detailed error information
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            # Log comprehensive error details for debugging
+            error_details = {
+                'timestamp': timestamp,
+                'provider': 'OpenAI',
+                'model': model,
+                'image_path': image_path,
+                'error_type': error_type,
+                'error_message': error_msg,
+                'traceback': traceback.format_exc()
+            }
+            
+            # Try to extract HTTP status code and response details if available
+            status_code = None
+            response_text = None
+            if hasattr(e, 'status_code'):
+                status_code = e.status_code
+                error_details['status_code'] = status_code
+            if hasattr(e, 'response') and e.response:
+                try:
+                    response_text = e.response.text if hasattr(e.response, 'text') else str(e.response)
+                    error_details['response_text'] = response_text
+                except:
+                    pass
+            
+            # Log to console with structured format for easy parsing
+            print(f"[ERROR] OpenAI API failure - {timestamp}")
+            print(f"  Image: {Path(image_path).name}")
+            print(f"  Model: {model}")
+            print(f"  Error Type: {error_type}")
+            if status_code:
+                print(f"  Status Code: {status_code}")
+            print(f"  Error Message: {error_msg}")
+            if response_text and len(response_text) < 500:
+                print(f"  Response: {response_text}")
+            
+            # Also log to file if possible
+            try:
+                import json
+                log_file = Path('api_errors.log')
+                with open(log_file, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(error_details) + '\n')
+            except Exception as log_error:
+                print(f"  Warning: Could not write to error log: {log_error}")
+            
+            # Provide user-friendly error messages based on error type and status code
+            if 'RateLimitError' in error_type or (status_code and status_code == 429):
+                return f"Rate limit exceeded (status code: {status_code or 'unknown'}) - ({timestamp})"
+            elif 'AuthenticationError' in error_type or (status_code and status_code == 401):
+                return f"Authentication failed - check API key (status code: {status_code or 'unknown'}) - ({timestamp})"
+            elif 'InvalidRequestError' in error_type or (status_code and status_code == 400):
+                return f"Invalid request - {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
+            elif status_code and status_code >= 500:
+                return f"Server error from OpenAI API (status code: {status_code}) - ({timestamp})"
+            elif 'TimeoutError' in error_type or 'timeout' in error_msg.lower():
+                return f"Request timeout - try again later (status code: {status_code or 'timeout'}) - ({timestamp})"
+            else:
+                return f"Error generating description: {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
     
     def get_last_token_usage(self) -> Optional[Dict]:
         """Get token usage from last API call (for cost tracking and logging)"""
@@ -390,6 +588,7 @@ class ClaudeProvider(AIProvider):
         # All Claude models support vision natively
         return DEV_CLAUDE_MODELS.copy()
     
+    @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         """Generate description using Claude SDK with automatic retry and token tracking"""
         if not self.is_available():
@@ -450,18 +649,74 @@ class ClaudeProvider(AIProvider):
             return "Error: No content in response"
                 
         except Exception as e:
-            # SDK provides rich exception types for better error handling
-            error_msg = f"Error generating description: {str(e)}"
-            # Try to provide more specific error messages
-            error_type = type(e).__name__
-            if 'RateLimitError' in error_type:
-                error_msg = "Rate limit exceeded. Please wait a moment and try again."
-            elif 'AuthenticationError' in error_type:
-                error_msg = "Authentication failed. Please check your API key."
-            elif 'InvalidRequestError' in error_type:
-                error_msg = f"Invalid request: {str(e)}"
+            # Enhanced error logging with detailed diagnostics
+            from datetime import datetime
+            import traceback
             
-            return error_msg
+            # Get current timestamp for error logging
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+            
+            # Extract detailed error information
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            # Log comprehensive error details for debugging
+            error_details = {
+                'timestamp': timestamp,
+                'provider': 'Claude',
+                'model': model,
+                'image_path': image_path,
+                'error_type': error_type,
+                'error_message': error_msg,
+                'traceback': traceback.format_exc()
+            }
+            
+            # Try to extract HTTP status code and response details if available
+            status_code = None
+            response_text = None
+            if hasattr(e, 'status_code'):
+                status_code = e.status_code
+                error_details['status_code'] = status_code
+            if hasattr(e, 'response') and e.response:
+                try:
+                    response_text = e.response.text if hasattr(e.response, 'text') else str(e.response)
+                    error_details['response_text'] = response_text
+                except:
+                    pass
+            
+            # Log to console with structured format for easy parsing
+            print(f"[ERROR] Claude API failure - {timestamp}")
+            print(f"  Image: {Path(image_path).name}")
+            print(f"  Model: {model}")
+            print(f"  Error Type: {error_type}")
+            if status_code:
+                print(f"  Status Code: {status_code}")
+            print(f"  Error Message: {error_msg}")
+            if response_text and len(response_text) < 500:
+                print(f"  Response: {response_text}")
+            
+            # Also log to file if possible
+            try:
+                import json
+                log_file = Path('api_errors.log')
+                with open(log_file, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(error_details) + '\n')
+            except Exception as log_error:
+                print(f"  Warning: Could not write to error log: {log_error}")
+            
+            # Provide user-friendly error messages based on error type and status code
+            if 'RateLimitError' in error_type or (status_code and status_code == 429):
+                return f"Rate limit exceeded (status code: {status_code or 'unknown'}) - ({timestamp})"
+            elif 'AuthenticationError' in error_type or (status_code and status_code == 401):
+                return f"Authentication failed - check API key (status code: {status_code or 'unknown'}) - ({timestamp})"
+            elif 'InvalidRequestError' in error_type or (status_code and status_code == 400):
+                return f"Invalid request - {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
+            elif status_code and status_code >= 500:
+                return f"Server error from Claude API (status code: {status_code}) - ({timestamp})"
+            elif 'TimeoutError' in error_type or 'timeout' in error_msg.lower():
+                return f"Request timeout - try again later (status code: {status_code or 'timeout'}) - ({timestamp})"
+            else:
+                return f"Error generating description: {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
     
     def get_last_token_usage(self) -> Optional[Dict]:
         """Get token usage from last API call (for cost tracking and logging)"""

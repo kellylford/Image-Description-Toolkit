@@ -29,6 +29,17 @@ import gc
 import time
 from datetime import datetime
 
+
+def set_console_title(title):
+    """Set the Windows console title."""
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW(title)
+        except Exception:
+            # Silently fail if unable to set title
+            pass
+
 # Make ollama optional for backwards compatibility
 try:
     import ollama
@@ -376,9 +387,75 @@ class ImageDescriber:
             logger.error(f"Error encoding image {image_path}: {e}")
             return None
     
+    def validate_image_for_processing(self, image_path: Path) -> tuple[bool, str]:
+        """
+        Validate image before processing to catch issues early.
+        
+        Args:
+            image_path: Path to the image file
+            
+        Returns:
+            Tuple of (is_valid: bool, error_message: str)
+        """
+        try:
+            # Check if file exists and is readable
+            if not image_path.exists():
+                return False, "File does not exist"
+            
+            if not image_path.is_file():
+                return False, "Path is not a file"
+            
+            # Check file size
+            file_size = image_path.stat().st_size
+            if file_size == 0:
+                return False, "File is empty (0 bytes)"
+            
+            # Check if image format is supported
+            if not self.is_supported_image(image_path):
+                return False, f"Unsupported image format: {image_path.suffix}"
+            
+            # Check size limits for cloud providers
+            if self.provider_name in ["claude", "openai"]:
+                max_size = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
+                if file_size > max_size:
+                    return False, f"Image too large ({file_size/1024/1024:.1f}MB > {max_size/1024/1024:.1f}MB limit for {self.provider_name})"
+            
+            # Try to open and validate the image with PIL
+            try:
+                from PIL import Image
+                with Image.open(image_path) as img:
+                    # Verify image integrity
+                    img.verify()
+                    
+                # Re-open to get image info (verify() makes image unusable)
+                with Image.open(image_path) as img:
+                    width, height = img.size
+                    
+                    # Check if image dimensions are reasonable
+                    if width < 1 or height < 1:
+                        return False, f"Invalid image dimensions: {width}x{height}"
+                    
+                    # Check for extremely large dimensions that might cause memory issues
+                    if width > 10000 or height > 10000:
+                        return False, f"Image dimensions too large: {width}x{height} (may cause memory issues)"
+                    
+                    # Check total pixel count (memory usage estimation)
+                    total_pixels = width * height
+                    if total_pixels > 50_000_000:  # 50 megapixels
+                        return False, f"Image too large: {total_pixels/1_000_000:.1f} megapixels (max 50 MP recommended)"
+            
+            except Exception as pil_error:
+                return False, f"Invalid or corrupted image file: {str(pil_error)}"
+            
+            # All checks passed
+            return True, ""
+            
+        except Exception as e:
+            return False, f"Validation error: {str(e)}"
+    
     def get_image_description(self, image_path: Path) -> Optional[str]:
         """
-        Get description of an image using configured AI provider
+        Get description of an image using configured AI provider with retry logic
         
         Args:
             image_path: Path to the image file
@@ -422,18 +499,69 @@ class ImageDescriber:
                 model_settings = self.get_model_settings()
                 logger.debug(f"Using model settings: {model_settings}")
                 
-                # Call Ollama API with configured settings
-                response = ollama.chat(
-                    model=self.model_name,
-                    messages=[
-                        {
-                            'role': 'user',
-                            'content': prompt,
-                            'images': [image_base64]
-                        }
-                    ],
-                    options=model_settings
-                )
+                # Implement retry logic for Ollama API calls
+                max_retries = 3
+                base_delay = 2.0
+                max_delay = 30.0
+                backoff_multiplier = 2.0
+                
+                last_exception = None
+                for attempt in range(max_retries + 1):  # +1 for initial attempt
+                    try:
+                        # Call Ollama API with configured settings
+                        response = ollama.chat(
+                            model=self.model_name,
+                            messages=[
+                                {
+                                    'role': 'user',
+                                    'content': prompt,
+                                    'images': [image_base64]
+                                }
+                            ],
+                            options=model_settings
+                        )
+                        
+                        # If we get here, the call succeeded
+                        if attempt > 0:
+                            logger.info(f"  [RETRY] Success on attempt {attempt + 1} for {image_path.name}")
+                        break
+                        
+                    except Exception as e:
+                        last_exception = e
+                        error_msg = str(e).lower()
+                        error_type = type(e).__name__
+                        
+                        # Check if this is a retryable error
+                        is_retryable = (
+                            'server error' in error_msg or
+                            'status code: 5' in error_msg or
+                            '500' in error_msg or
+                            'unmarshal' in error_msg or
+                            'invalid character' in error_msg or
+                            'timeout' in error_msg or
+                            'connection' in error_msg.lower()
+                        )
+                        
+                        if is_retryable and attempt < max_retries:
+                            # Calculate delay with exponential backoff and jitter
+                            import random
+                            delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
+                            jitter = random.uniform(0.1, 0.5) * delay
+                            sleep_time = delay + jitter
+                            
+                            logger.warning(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed for {image_path.name} ({error_type}): {str(e)[:100]}...")
+                            logger.warning(f"  [RETRY] Retrying in {sleep_time:.1f}s...")
+                            time.sleep(sleep_time)
+                            continue
+                        else:
+                            # Non-retryable error or max retries reached
+                            if attempt > 0:
+                                logger.error(f"  [RETRY] All {max_retries + 1} attempts failed for {image_path.name}")
+                            raise e
+                else:
+                    # This should not be reached, but handle it just in case
+                    if last_exception:
+                        raise last_exception
                 
                 logger.debug(f"Raw response: {response}")
                 logger.debug(f"Response type: {type(response)}")
@@ -697,7 +825,9 @@ class ImageDescriber:
         # Process each image with memory management
         success_count = 0
         skip_count = 0
+        failed_count = 0  # Track failed image descriptions
         newly_processed = 0  # Track images processed in this run (not skipped)
+        failed_images = []  # Track details of failed images for summary
         overall_start_time = time.time()
         
         # Calculate how many images we expect to process (not skip)
@@ -707,8 +837,13 @@ class ImageDescriber:
             # Check if this image was already described (resume support)
             if str(image_path) in already_described:
                 skip_count += 1
-                logger.info(f"Skipping already-described image {success_count + 1} of {len(image_files)}: {image_path.name}")
                 success_count += 1  # Count as success since it's already done
+                logger.info(f"Skipping already-described image {success_count} of {len(image_files)}: {image_path.name}")
+                
+                # Update window title for skipped images too
+                current_processed = success_count + failed_count
+                progress_percent = int((current_processed / len(image_files)) * 100)
+                set_console_title(f"IDT - Describing Images ({progress_percent}%, {current_processed} of {len(image_files)}) - Skipped")
                 continue
             
             # Log progress and start time for this image
@@ -716,17 +851,46 @@ class ImageDescriber:
             success_count += 1
             # Show cumulative progress: where we are in total work
             logger.info(f"Describing image {success_count} of {len(image_files)}: {image_path.name}")
+            
+            # Update window title with progress
+            current_processed = success_count + failed_count
+            progress_percent = int((current_processed / len(image_files)) * 100)
+            set_console_title(f"IDT - Describing Images ({progress_percent}%, {current_processed} of {len(image_files)})")
+            
             image_start_time = time.time()
             logger.info(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(image_start_time))}")
             
+            # Validate image before processing
+            is_valid, validation_error = self.validate_image_for_processing(image_path)
+            if not is_valid:
+                failed_count += 1
+                success_count -= 1  # Adjust success count since we incremented it earlier
+                failed_images.append({
+                    'image': image_path.name,
+                    'reason': 'Validation Failed',
+                    'error_details': validation_error
+                })
+                logger.error(f"Validation failed for {image_path.name}: {validation_error}")
+                
+                # Update window title to reflect validation failure
+                current_processed = success_count + failed_count
+                progress_percent = int((current_processed / len(image_files)) * 100)
+                set_console_title(f"IDT - Describing Images ({progress_percent}%, {current_processed} of {len(image_files)}) - Validation Failed")
+                continue
+            
             # Extract metadata from image
             metadata = self.extract_metadata(image_path)
+            metadata_status = ""
             if metadata:
-                logger.debug(f"Extracted metadata for {image_path.name}: {metadata}")
+                sections = len(metadata)
+                metadata_status = f" ({sections} metadata section{'s' if sections != 1 else ''})"
+                logger.info(f"Extracted {sections} metadata section{'s' if sections != 1 else ''} for {image_path.name}")
             else:
+                metadata_status = " (no metadata)"
                 logger.debug(f"No metadata extracted for {image_path.name}")
             
             # Get description from AI provider
+            logger.info(f"Getting AI description for {image_path.name}{metadata_status}")
             description = self.get_image_description(image_path)
             
             # Log end time for this image
@@ -735,7 +899,7 @@ class ImageDescriber:
             logger.info(f"End time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(image_end_time))}")
             logger.info(f"Processing duration: {processing_duration:.2f} seconds")
             
-            if description:
+            if description and not description.startswith("Error:"):
                 # Write description to file with metadata and base directory for relative paths
                 if self.write_description_to_file(image_path, description, output_file, metadata, directory_path):
                     # Update progress file immediately after successful write
@@ -752,9 +916,45 @@ class ImageDescriber:
                     except ValueError:
                         logger.info(f"Successfully processed: {image_path.name}")
                 else:
+                    # File write failure
+                    failed_count += 1
+                    success_count -= 1  # Adjust success count since we incremented it earlier
+                    failed_images.append({
+                        'image': image_path.name,
+                        'reason': 'File write failed',
+                        'error_details': 'Could not write description to output file'
+                    })
                     logger.error(f"Failed to write description for: {image_path.name}")
             else:
-                logger.error(f"Failed to generate description for: {image_path.name}")
+                # Description generation failure
+                failed_count += 1
+                success_count -= 1  # Adjust success count since we incremented it earlier
+                error_reason = description if description else "No description generated"
+                
+                # Extract more specific error information
+                if description and description.startswith("Error:"):
+                    # Parse error message for better categorization
+                    if "status code: 5" in description:
+                        error_category = "Server Error"
+                    elif "status code: 429" in description:
+                        error_category = "Rate Limit"
+                    elif "status code: 401" in description:
+                        error_category = "Authentication"
+                    elif "timeout" in description.lower():
+                        error_category = "Timeout"
+                    elif "Invalid request" in description:
+                        error_category = "Invalid Request"
+                    else:
+                        error_category = "API Error"
+                else:
+                    error_category = "Unknown Error"
+                
+                failed_images.append({
+                    'image': image_path.name,
+                    'reason': error_category,
+                    'error_details': error_reason
+                })
+                logger.error(f"Failed to generate description for: {image_path.name} - {error_reason}")
             
             # Memory management: add delay and force garbage collection
             if self.batch_delay > 0:
@@ -764,13 +964,81 @@ class ImageDescriber:
         # Log overall completion summary
         overall_end_time = time.time()
         total_duration = overall_end_time - overall_start_time
+        
+        # Update window title to show completion
+        if failed_count > 0:
+            set_console_title(f"IDT - Image Description Complete ({success_count} success, {failed_count} failed)")
+        else:
+            set_console_title(f"IDT - Image Description Complete ({success_count}/{len(image_files)} images)")
+        
         logger.info(f"Processing complete. Successfully processed {success_count}/{len(image_files)} images")
         if skip_count > 0:
             logger.info(f"Skipped {skip_count} already-described images, processed {newly_processed} new images")
+        if failed_count > 0:
+            logger.info(f"Failed to process {failed_count} images")
         logger.info(f"Provider: {self.provider_name}, Model: {self.model_name}, Prompt Style: {self.prompt_style}")
         logger.info(f"Total processing time: {total_duration:.2f} seconds")
         if newly_processed > 0:
             logger.info(f"Average time per new image: {total_duration/newly_processed:.2f} seconds")
+        
+        # Generate comprehensive failure summary if there were failures
+        if failed_count > 0:
+            logger.info("=" * 80)
+            logger.info("FAILURE SUMMARY:")
+            logger.info(f"Total failed images: {failed_count}")
+            
+            # Group failures by reason for better analysis
+            failure_categories = {}
+            for failure in failed_images:
+                category = failure['reason']
+                if category not in failure_categories:
+                    failure_categories[category] = []
+                failure_categories[category].append(failure)
+            
+            # Report each category
+            for category, failures in failure_categories.items():
+                logger.info(f"\n{category} ({len(failures)} images):")
+                for failure in failures[:5]:  # Show first 5 of each category
+                    logger.info(f"  - {failure['image']}: {failure['error_details']}")
+                if len(failures) > 5:
+                    logger.info(f"  ... and {len(failures) - 5} more {category.lower()} failures")
+            
+            # Provide actionable recommendations
+            logger.info("\nRECOMMENDATIONS:")
+            for category, failures in failure_categories.items():
+                if category == "Server Error":
+                    logger.info(f"  - {category}: Cloud provider having issues. Try again later or switch providers.")
+                elif category == "Rate Limit":
+                    logger.info(f"  - {category}: Reduce processing speed or upgrade API plan.")
+                elif category == "Authentication":
+                    logger.info(f"  - {category}: Check your API key configuration.")
+                elif category == "Timeout":
+                    logger.info(f"  - {category}: Images may be too large. Try resizing or use different model.")
+                elif category == "Invalid Request":
+                    logger.info(f"  - {category}: Check image formats and sizes. May need conversion.")
+                else:
+                    logger.info(f"  - {category}: Check error details above and try reprocessing.")
+            
+            # Create failure report file
+            try:
+                failure_report_file = output_file.parent / f"failure_report_{time.strftime('%Y%m%d_%H%M%S')}.txt"
+                with open(failure_report_file, 'w', encoding='utf-8') as f:
+                    f.write(f"Image Processing Failure Report\n")
+                    f.write(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"Provider: {self.provider_name}, Model: {self.model_name}\n")
+                    f.write(f"Total failed: {failed_count}/{len(image_files)} images\n\n")
+                    
+                    for category, failures in failure_categories.items():
+                        f.write(f"{category} ({len(failures)} images):\n")
+                        for failure in failures:
+                            f.write(f"  {failure['image']}: {failure['error_details']}\n")
+                        f.write("\n")
+                
+                logger.info(f"\nDetailed failure report saved to: {failure_report_file}")
+            except Exception as e:
+                logger.warning(f"Could not create failure report file: {e}")
+            
+            logger.info("=" * 80)
         
         # Log token usage summary if available (OpenAI, Claude with SDK)
         if hasattr(self, 'total_tokens') and self.total_tokens > 0:
@@ -821,11 +1089,16 @@ class ImageDescriber:
         try:
             # Check if metadata extraction is enabled
             if not self.config.get('processing_options', {}).get('extract_metadata', False):
+                logger.debug(f"Metadata extraction disabled for {image_path.name}")
                 return metadata
             
             with Image.open(image_path) as img:
                 # Use getexif() instead of _getexif() (modern method)
                 exif_data = img.getexif()
+                
+                if not exif_data:
+                    logger.debug(f"No EXIF data found in {image_path.name} (this is normal for screenshots, web images, etc.)")
+                    return metadata
                 
                 if exif_data:
                     # Convert EXIF data to human-readable format
@@ -834,25 +1107,36 @@ class ImageDescriber:
                         tag = TAGS.get(tag_id, tag_id)
                         exif_dict[tag] = value
                     
+                    metadata_sections = 0
+                    
                     # Extract all available metadata
                     datetime_info = self._extract_datetime(exif_dict)
                     if datetime_info:
                         metadata['datetime'] = datetime_info
+                        metadata_sections += 1
                     
                     location_info = self._extract_location(exif_dict)
                     if location_info:
                         metadata['location'] = location_info
+                        metadata_sections += 1
                     
                     camera_info = self._extract_camera_info(exif_dict)
                     if camera_info:
                         metadata['camera'] = camera_info
+                        metadata_sections += 1
                     
                     technical_info = self._extract_technical_info(exif_dict)
                     if technical_info:
                         metadata['technical'] = technical_info
+                        metadata_sections += 1
+                    
+                    if metadata_sections > 0:
+                        logger.debug(f"Extracted {metadata_sections} metadata sections from {image_path.name}")
+                    else:
+                        logger.debug(f"EXIF data present but no usable metadata extracted from {image_path.name}")
                             
         except Exception as e:
-            logger.debug(f"Error extracting metadata from {image_path}: {e}")
+            logger.info(f"Could not extract metadata from {image_path.name}: {e} (image may not support EXIF)")
         
         return metadata
     

@@ -351,19 +351,19 @@ def main():
         epilog='''
 Examples:
   # Analyze default combined descriptions file (auto-detects CSV/TSV/ATSV format)
-  python analyze_description_content.py
+  idt contentreview
   
   # Analyze specific combined descriptions file
-  python analyze_description_content.py --input my_descriptions.csv
+  idt contentreview --input my_descriptions.csv
   
   # Analyze TSV file
-  python analyze_description_content.py --input results.tsv
+  idt contentreview --input results.tsv
   
   # Specify custom output filename
-  python analyze_description_content.py --output word_analysis.csv
+  idt contentreview --output word_analysis.csv
   
   # Full custom usage
-  python analyze_description_content.py --input my_descriptions.csv --output my_analysis.csv
+  idt contentreview --input my_descriptions.csv --output my_analysis.csv
         '''
     )
     

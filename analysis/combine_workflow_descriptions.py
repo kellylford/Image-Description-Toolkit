@@ -389,22 +389,22 @@ def main():
         epilog='''
 Examples:
   # Create standard CSV sorted by date (default, opens directly in Excel)
-  python combine_workflow_descriptions.py
+  idt combinedescriptions
   
   # Sort alphabetically by filename instead of by date
-  python combine_workflow_descriptions.py --sort name
+  idt combinedescriptions --sort name
   
   # Create tab-separated file sorted by date
-  python combine_workflow_descriptions.py --format tsv --output results.tsv
+  idt combinedescriptions --format tsv --output results.tsv
   
   # Use legacy @-separated format with alphabetical sorting
-  python combine_workflow_descriptions.py --format atsv --sort name --output results.txt
+  idt combinedescriptions --format atsv --sort name --output results.txt
   
   # Specify custom workflow directory with date sorting
-  python combine_workflow_descriptions.py --input-dir /path/to/workflows --sort date
+  idt combinedescriptions --input-dir /path/to/workflows --sort date
   
   # Use custom input, format, and sorting
-  python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv --sort name
+  idt combinedescriptions --input-dir /data/workflows --format tsv --sort name
         '''
     )
     

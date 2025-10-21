@@ -37,6 +37,7 @@ if sys.platform.startswith('win'):
 import logging
 import json
 import platform
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -472,7 +473,33 @@ class WorkflowOrchestrator:
             # Check if we have progress data
             desc_result = self.step_results.get('describe', {})
             if 'processed' in desc_result and 'total' in desc_result:
-                status_lines.append(f"⟳ Image description in progress: {desc_result['processed']}/{desc_result['total']} images described")
+                processed = desc_result['processed']
+                total = desc_result['total']
+                if total > 0:
+                    percentage = int((processed / total) * 100)
+                    status_lines.append(f"⟳ Image description in progress: {processed}/{total} images described ({percentage}%)")
+                    
+                    # Add estimated time remaining if we have enough data
+                    if processed > 0 and self.statistics.get('start_time'):
+                        try:
+                            start_time = datetime.fromisoformat(self.statistics['start_time'])
+                            elapsed_seconds = (datetime.now() - start_time).total_seconds()
+                            avg_time_per_image = elapsed_seconds / processed
+                            remaining_images = total - processed
+                            estimated_remaining_seconds = remaining_images * avg_time_per_image
+                            
+                            if estimated_remaining_seconds > 0:
+                                if estimated_remaining_seconds > 3600:  # > 1 hour
+                                    eta_str = f"{estimated_remaining_seconds/3600:.1f}h"
+                                elif estimated_remaining_seconds > 60:  # > 1 minute
+                                    eta_str = f"{estimated_remaining_seconds/60:.1f}m"
+                                else:
+                                    eta_str = f"{estimated_remaining_seconds:.0f}s"
+                                status_lines.append(f"   Estimated time remaining: {eta_str}")
+                        except Exception:
+                            pass  # Don't break status updates on ETA calculation errors
+                else:
+                    status_lines.append(f"⟳ Image description in progress: {processed}/{total} images described")
             else:
                 status_lines.append(f"⟳ Image description in progress...")
         elif 'describe' in self.statistics['steps_failed']:
@@ -902,8 +929,67 @@ class WorkflowOrchestrator:
             }
             self._update_status_log()
             
+            # Determine progress file location (same logic as image_describer.py)
+            progress_file = None
+            for arg_i, arg in enumerate(cmd):
+                if arg == "--log-dir" and arg_i + 1 < len(cmd):
+                    progress_file = Path(cmd[arg_i + 1]) / "image_describer_progress.txt"
+                    break
+                elif arg == "--output-dir" and arg_i + 1 < len(cmd):
+                    progress_file = Path(cmd[arg_i + 1]) / "image_describer_progress.txt"
+                    break
+            
+            if progress_file is None:
+                # Fallback to output directory
+                progress_file = self.config.base_output_dir / "descriptions" / "image_describer_progress.txt"
+            
+            # Start the subprocess with real-time progress monitoring
+            import threading
+            import time
+            
+            def monitor_progress():
+                """Monitor the progress file and update status in real-time"""
+                last_count = 0
+                while self.step_results.get('describe', {}).get('in_progress', False):
+                    try:
+                        if progress_file.exists():
+                            # Count lines in progress file (each line = one completed image)
+                            with open(progress_file, 'r', encoding='utf-8') as f:
+                                lines = f.readlines()
+                                current_count = len([line.strip() for line in lines if line.strip()])
+                            
+                            if current_count != last_count:
+                                # Update step results
+                                self.step_results['describe']['processed'] = current_count
+                                # Update status log
+                                self._update_status_log()
+                                last_count = current_count
+                        
+                        time.sleep(2)  # Check every 2 seconds
+                    except Exception as e:
+                        self.logger.debug(f"Progress monitoring error: {e}")
+                        time.sleep(5)  # Wait longer on error
+            
+            # Start progress monitoring in background thread
+            progress_thread = threading.Thread(target=monitor_progress, daemon=True)
+            progress_thread.start()
+            
             # Stream output directly to terminal for real-time progress feedback
             result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            
+            # Mark description as no longer in progress
+            if 'describe' in self.step_results:
+                self.step_results['describe']['in_progress'] = False
+                # Final update with actual completion count
+                if progress_file.exists():
+                    try:
+                        with open(progress_file, 'r', encoding='utf-8') as f:
+                            lines = f.readlines()
+                            final_count = len([line.strip() for line in lines if line.strip()])
+                        self.step_results['describe']['processed'] = final_count
+                    except Exception as e:
+                        self.logger.debug(f"Error reading final progress count: {e}")
+                self._update_status_log()
             
             # Mark description as no longer in progress
             if 'describe' in self.step_results:
