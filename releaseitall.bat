@@ -94,7 +94,7 @@ if exist releases\idt2.zip (
 
 REM Create idt2.zip containing all individual distribution packages
 REM Use PowerShell for reliable ZIP creation on Windows
-powershell -NoProfile -Command "Compress-Archive -Path 'releases\*.zip' -DestinationPath 'releases\idt2.zip' -CompressionLevel Optimal -Force"
+powershell -NoProfile -Command "Compress-Archive -Path 'releases\*.zip', 'releases\install_idt.bat', 'releases\README.md' -DestinationPath 'releases\idt2.zip' -CompressionLevel Optimal -Force"
 
 if errorlevel 1 (
     echo.
