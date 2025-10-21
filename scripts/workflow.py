@@ -17,6 +17,7 @@ Examples:
     python workflow.py media_folder
     python workflow.py media_folder --output-dir results --steps video,convert,describe,html
     python workflow.py photos --steps describe,html --model llava:7b
+    python workflow.py photos --timeout 120  # Increase timeout for slower hardware or large models
 """
 
 import sys
@@ -390,7 +391,8 @@ class WorkflowOrchestrator:
     
     def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, 
                  model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", 
-                 api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None):
+                 api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None,
+                 timeout: int = 90):
         """
         Initialize the workflow orchestrator
         
@@ -403,6 +405,7 @@ class WorkflowOrchestrator:
             api_key_file: Path to API key file for cloud providers
             preserve_descriptions: If True, skip describe step if descriptions already exist
             workflow_name: Name of the workflow (for display purposes)
+            timeout: Timeout in seconds for Ollama API requests (default: 90)
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -417,6 +420,7 @@ class WorkflowOrchestrator:
         self.api_key_file = api_key_file
         self.preserve_descriptions = preserve_descriptions
         self.workflow_name = workflow_name
+        self.timeout = timeout
         
         # Available workflow steps
         self.available_steps = {
@@ -915,6 +919,11 @@ class WorkflowOrchestrator:
                 # Get default prompt style from image describer config
                 config_file = step_config.get("config_file", "image_describer_config.json")
                 default_style = get_default_prompt_style(config_file)
+            
+            # Add timeout parameter for Ollama requests
+            if self.timeout != 90:  # Only add if non-default
+                cmd.extend(["--timeout", str(self.timeout)])
+                self.logger.info(f"Using custom timeout: {self.timeout} seconds")
                 validated_style = validate_prompt_style(default_style)
                 # Always explicitly pass the prompt style to avoid ambiguity
                 cmd.extend(["--prompt-style", validated_style])
@@ -1781,6 +1790,13 @@ Viewing Results:
     )
     
     parser.add_argument(
+        "--timeout",
+        type=int,
+        default=90,
+        help="Timeout in seconds for Ollama API requests (default: 90). Increase for slower hardware or large models."
+    )
+    
+    parser.add_argument(
         "--name",
         help="Custom workflow name identifier (e.g., 'vacation_photos'). If not provided, auto-generates from input directory path."
     )
@@ -1997,7 +2013,8 @@ Viewing Results:
             provider=args.provider, 
             api_key_file=args.api_key_file,
             preserve_descriptions=args.preserve_descriptions,
-            workflow_name=workflow_name
+            workflow_name=workflow_name,
+            timeout=args.timeout
         )
         
         if args.dry_run:
