@@ -20,10 +20,10 @@
     "Simple": "Describe."
   },
   "output_format": {
-    "include_timestamp": false,
+    "include_timestamp": true,
     "include_model_info": true,
-    "include_file_path": false,
-    "include_metadata": false,
+    "include_file_path": true,
+    "include_metadata": true,
     "separator": "-"
   },
   "available_models": {

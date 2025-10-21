@@ -1043,16 +1043,16 @@ def main():
         epilog='''
 Examples:
   # Analyze workflows in default Descriptions directory
-  python analyze_workflow_stats.py
+  idt stats
   
   # Analyze workflows in custom directory
-  python analyze_workflow_stats.py --input-dir /path/to/workflows
+  idt stats --input-dir /path/to/workflows
   
   # Specify custom output filenames
-  python analyze_workflow_stats.py --csv-output timing_stats.csv --json-output stats.json
+  idt stats --csv-output timing_stats.csv --json-output stats.json
   
   # Full custom usage
-  python analyze_workflow_stats.py --input-dir /data/workflows --csv-output my_stats.csv
+  idt stats --input-dir /data/workflows --csv-output my_stats.csv
         '''
     )
     
