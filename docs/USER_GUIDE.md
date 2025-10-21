@@ -92,8 +92,8 @@ IDT provides four main applications, each designed for different use cases:
 **Best for:** Individual images, quick testing, visual workflow, beginners
 
 **Key Features:**
-- Drag-and-drop image processing
-- Real-time preview of descriptions
+- Workspace-based project management
+- Paste images from clipboard (Ctrl+V)
 - Visual model and prompt selection
 - Interactive provider setup (Ollama/OpenAI/Claude)
 - Immediate feedback and results
@@ -102,16 +102,16 @@ IDT provides four main applications, each designed for different use cases:
 **When to use:** Single images, testing prompts/models, visual learners, quick tasks
 
 ### 📝 Prompt Editor - `prompt_editor.exe`
-**Best for:** Creating custom prompts, testing prompt variations, fine-tuning descriptions
+**Best for:** Managing prompts and configuration settings
 
 **Key Features:**
-- Visual prompt design interface
-- Live preview with test images
-- Compare different prompt styles side-by-side
-- Save and organize custom prompts
-- Export prompts for use in CLI or GUI applications
+- Edit and manage prompt styles in config file
+- Add, delete, and duplicate custom prompts
+- Configure default AI provider and model
+- Manage API keys for cloud services
+- Character count for prompt optimization
 
-**When to use:** Developing custom prompts, comparing description styles, optimization
+**When to use:** Setting up prompts, configuring providers, managing config files
 
 ### 📊 Results Viewer - `viewer.exe`
 **Best for:** Browsing results, real-time monitoring, sharing outputs
@@ -135,14 +135,14 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 
 1. **Launch:** Double-click `imagedescriber.exe` or run from command line
 2. **Setup Provider:** Choose Ollama (local) or cloud provider (OpenAI/Claude)
-3. **Load Image:** Drag and drop an image or use "Browse" button
+3. **Load Image:** Paste from clipboard (Ctrl+V) or use "Browse" button
 4. **Select Model & Prompt:** Choose from available options
 5. **Generate:** Click "Describe Image" and see results instantly!
 
 ### Main Interface
 
 **Image Panel:**
-- Drag-and-drop support for quick image loading
+- Paste images from clipboard (Ctrl+V)
 - Image preview with automatic scaling
 - Support for all major formats (JPG, PNG, HEIC, etc.)
 - File information display (size, dimensions, format)
@@ -160,7 +160,7 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 - Prompt preview and validation
 
 **Results Panel:**
-- Live description generation progress
+- Description generation progress tracking
 - Copy to clipboard functionality
 - Save descriptions to file
 - Processing time and model information
@@ -203,61 +203,59 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 
 ## 4. Prompt Editor Application
 
-The **Prompt Editor** (`prompt_editor.exe`) is a specialized tool for creating, testing, and refining custom prompts for image description.
+The **Prompt Editor** (`prompt_editor.exe`) is a configuration tool for managing prompt styles and AI provider settings in the `image_describer_config.json` file.
 
 ### Quick Start
 
 1. **Launch:** Double-click `prompt_editor.exe`
-2. **Load Test Image:** Choose a representative image for testing
-3. **Create/Edit Prompt:** Write your custom prompt text
-4. **Test & Preview:** Generate descriptions to see results
-5. **Save & Export:** Save prompts for use in other applications
+2. **Select Prompt:** Choose a prompt style from the list
+3. **Edit Prompt:** Modify the prompt text with character count display
+4. **Configure Provider:** Set default AI provider and model
+5. **Save:** Save changes to the configuration file
 
 ### Main Interface
 
-**Prompt Editing Panel:**
-- Rich text editor with syntax highlighting
-- Prompt templates and examples
-- Variable substitution support
-- Real-time character count and validation
+**Prompt List (Left Panel):**
+- View all available prompt styles
+- Select a prompt to edit
+- Add new prompt styles
+- Delete or duplicate existing prompts
+- Built-in prompts: narrative, detailed, concise, artistic, technical, colorful, simple
 
-**Test Image Panel:**
-- Quick image loading for prompt testing
-- Multiple test images support
-- Image metadata display for context-aware prompts
-- Thumbnail gallery for comparing results
+**Prompt Editor (Right Panel):**
+- Edit prompt name
+- Edit prompt text with real-time character count
+- See validation feedback
 
-**Preview & Results:**
-- Live description generation
-- Side-by-side comparison of different prompts
-- Processing time and token count tracking
-- Export results to various formats
+**Default Settings:**
+- Set default prompt style for CLI/GUI use
+- Choose default AI provider (Ollama, OpenAI, Claude)
+- Configure API keys for cloud providers
+- Set default model (auto-discovered from selected provider)
+- Refresh model list from provider
 
-**Prompt Library:**
-- Save and organize custom prompts
-- Built-in prompt templates (artistic, technical, narrative, etc.)
-- Import/export prompt collections
-- Version control for prompt iterations
+### Features
 
-### Advanced Features
+**Prompt Management:**
+- Add new custom prompt styles
+- Edit existing prompt text
+- Duplicate prompts as starting points
+- Delete unwanted prompts
+- Character count for prompt optimization
 
-**A/B Testing:**
-- Compare multiple prompt variations side-by-side
-- Statistical analysis of description quality
-- Batch testing across multiple images
-- Export comparison reports
+**Provider Configuration:**
+- Select default AI provider
+- Auto-discover available models from Ollama
+- Manual model entry for cloud providers
+- Secure API key storage (password-masked input)
+- Toggle API key visibility
 
-**Provider Integration:**
-- Test prompts with different AI providers
-- Model-specific prompt optimization
-- Cost estimation for cloud providers
-- Performance benchmarking
-
-**Export & Integration:**
-- Export prompts to CLI configuration files
-- Generate batch scripts with custom prompts
-- Integration with GUI ImageDescriber
-- Share prompt collections with team members
+**File Operations:**
+- Save changes to current config file
+- Save As to create new config files
+- Open different config files
+- Backup and restore functionality
+- Auto-detects config file location
 
 ### Prompt Design Best Practices
 
@@ -284,12 +282,14 @@ The **Prompt Editor** (`prompt_editor.exe`) is a specialized tool for creating, 
 ### Use Cases
 
 **Perfect for:**
-- ✅ Developing organization-specific description styles
-- ✅ Creating prompts for specialized image types (medical, technical, artistic)
-- ✅ A/B testing prompt effectiveness
-- ✅ Training teams on prompt engineering
-- ✅ Optimizing descriptions for specific audiences
-- ✅ Research and development of AI prompting techniques
+- ✅ Creating and managing custom prompt styles
+- ✅ Editing the default prompt for your workflow
+- ✅ Organizing multiple prompt variations for different image types
+- ✅ Configuring AI provider defaults (Ollama/OpenAI/Claude)
+- ✅ Managing API keys for cloud providers
+- ✅ Setting up the configuration before using CLI or GUI tools
+
+**Note:** The Prompt Editor does NOT test prompts or generate descriptions. Use the GUI ImageDescriber application to test how prompts work with actual images.
 
 ---
 
@@ -1080,10 +1080,11 @@ idt help
 - Testing settings before large CLI workflows
 
 **📝 Use Prompt Editor when:**
-- Creating custom prompts for specific needs
-- A/B testing different prompt styles
-- Need to compare prompt effectiveness
-- Developing organization-specific description formats
+- Editing or creating custom prompt styles
+- Managing prompt variations in config file
+- Configuring default AI provider and model
+- Setting up API keys for cloud providers
+- Preparing configuration before using CLI or GUI
 
 **📋 Use CLI (idt.exe) when:**
 - Processing hundreds or thousands of images
