@@ -8,16 +8,9 @@ This directory contains test files and debugging scripts used during development
 
 Comprehensive analysis tool for comparing AI vision model performance. Combines workflow execution data with generated descriptions to provide insights on speed, cost, and quality trade-offs. See `ModelPerformanceAnalyzer/README.md` for details.
 
-## Batch File Debugging Scripts
+### old_dev_scripts/
 
-These scripts were created to fix batch file issues during the external build testing phase:
-
-- `check_bat_syntax.py` - Comprehensive syntax checker for all batch files
-- `fix_all_bat_files.py` - Script to add --original-cwd support to workflow batch files
-- `fix_bat_files.py` - Earlier version of batch file fixer
-- `fix_bat_output_dirs.py` - Script to correct output directory paths
-- `fix_external_bat_cwd.py` - External build specific batch file fixes
-- `fix_external_bat_files.py` - Additional external build fixes
+Historical batch file debugging scripts from development phase. Archived for reference but no longer actively used.
 
 ## Test Scripts
 

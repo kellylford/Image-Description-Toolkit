@@ -501,25 +501,76 @@ class ImageDescriber:
                 
                 # Implement retry logic for Ollama API calls
                 max_retries = 3
-                base_delay = 2.0
-                max_delay = 30.0
-                backoff_multiplier = 2.0
+                # Optimized retry delays for server 500 errors - faster recovery
+                retry_delays = [0.5, 1.0, 2.0]  # Fixed delays instead of exponential backoff
                 
                 last_exception = None
                 for attempt in range(max_retries + 1):  # +1 for initial attempt
                     try:
-                        # Call Ollama API with configured settings
-                        response = ollama.chat(
-                            model=self.model_name,
-                            messages=[
-                                {
-                                    'role': 'user',
-                                    'content': prompt,
-                                    'images': [image_base64]
-                                }
-                            ],
-                            options=model_settings
-                        )
+                        # Call Ollama API with configured settings and timeout
+                        import signal
+                        
+                        def timeout_handler(signum, frame):
+                            raise TimeoutError("Ollama request timed out after 90 seconds")
+                        
+                        # Set up timeout for Windows/Unix compatibility
+                        try:
+                            # For Windows, we'll use a different approach since signal.alarm doesn't work
+                            import threading
+                            import time
+                            
+                            response = None
+                            exception_caught = None
+                            
+                            def make_request():
+                                nonlocal response, exception_caught
+                                try:
+                                    response = ollama.chat(
+                                        model=self.model_name,
+                                        messages=[
+                                            {
+                                                'role': 'user',
+                                                'content': prompt,
+                                                'images': [image_base64]
+                                            }
+                                        ],
+                                        options=model_settings
+                                    )
+                                except Exception as e:
+                                    exception_caught = e
+                            
+                            # Start request in background thread
+                            request_thread = threading.Thread(target=make_request)
+                            request_thread.daemon = True
+                            request_thread.start()
+                            
+                            # Wait for completion or timeout
+                            request_thread.join(timeout=90.0)
+                            
+                            if request_thread.is_alive():
+                                # Request is still running - timeout occurred
+                                logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after 90 seconds")
+                                raise TimeoutError("Ollama request timed out after 90 seconds")
+                            
+                            if exception_caught:
+                                raise exception_caught
+                                
+                            if response is None:
+                                raise RuntimeError("Request completed but no response received")
+                                
+                        except ImportError:
+                            # Fallback to direct call if threading unavailable
+                            response = ollama.chat(
+                                model=self.model_name,
+                                messages=[
+                                    {
+                                        'role': 'user',
+                                        'content': prompt,
+                                        'images': [image_base64]
+                                    }
+                                ],
+                                options=model_settings
+                            )
                         
                         # If we get here, the call succeeded
                         if attempt > 0:
@@ -539,15 +590,16 @@ class ImageDescriber:
                             'unmarshal' in error_msg or
                             'invalid character' in error_msg or
                             'timeout' in error_msg or
-                            'connection' in error_msg.lower()
+                            'connection' in error_msg.lower() or
+                            isinstance(e, TimeoutError)  # Handle our custom timeout
                         )
                         
                         if is_retryable and attempt < max_retries:
-                            # Calculate delay with exponential backoff and jitter
+                            # Use fixed retry delays optimized for server errors
                             import random
-                            delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
-                            jitter = random.uniform(0.1, 0.5) * delay
-                            sleep_time = delay + jitter
+                            base_delay = retry_delays[min(attempt, len(retry_delays) - 1)]
+                            jitter = random.uniform(0.1, 0.3) * base_delay  # Reduced jitter
+                            sleep_time = base_delay + jitter
                             
                             logger.warning(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed for {image_path.name} ({error_type}): {str(e)[:100]}...")
                             logger.warning(f"  [RETRY] Retrying in {sleep_time:.1f}s...")
@@ -1000,6 +1052,13 @@ class ImageDescriber:
             # Memory management: add delay and force garbage collection
             if self.batch_delay > 0:
                 time.sleep(self.batch_delay)
+            
+            # Additional throttling for Ollama to reduce server load
+            if self.provider_name == "ollama" and i < len(image_files):  # Don't delay after last image
+                ollama_throttle_delay = 3.0  # 3 seconds between Ollama requests
+                logger.debug(f"Ollama throttling: waiting {ollama_throttle_delay}s before next request")
+                time.sleep(ollama_throttle_delay)
+            
             gc.collect()
         
         # Log overall completion summary
