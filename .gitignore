@@ -5,8 +5,7 @@ yolov8*.pt
 
 # Temporary and development files
 ChatHistory.txt
-test_*.py
-*_test.py
+# Note: Test scripts are in tools/ directory, not root
 
 # Personal/local batch files
 run_analysis_to_results.bat
@@ -78,6 +77,5 @@ analysis/description_content_analysis.csv
 test_images/
 current_models.json
 debug_*.bat
-test_*.bat
+# Note: Test batch files moved to tools/ directory
 fix_*.sh
-.github/copilot-instructions.md
