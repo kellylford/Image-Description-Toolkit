@@ -43,7 +43,9 @@ All tools are designed to:
 - Reads `image_descriptions.txt` from all workflow directories
 - Creates a side-by-side CSV with one row per image
 - Each column represents a different AI model's description
-- Preserves processing order from the first workflow
+- **NEW in v2.0:** Sorts images chronologically by photo date (EXIF data) - oldest to newest
+- Uses intelligent EXIF extraction: DateTimeOriginal → DateTimeDigitized → DateTime → file mtime
+- Alternative alphabetical sorting available with `--sort name`
 
 **When to use:**
 - After running multiple workflows with different AI models
@@ -53,20 +55,23 @@ All tools are designed to:
 #### Usage
 
 ```bash
-# Basic usage - creates standard CSV (opens directly in Excel!)
+# Basic usage - creates CSV sorted by photo date (NEW DEFAULT!)
 python combine_workflow_descriptions.py
 
-# Create tab-separated file (also Excel-friendly)
-python combine_workflow_descriptions.py --format tsv --output results.tsv
+# Sort alphabetically by filename (legacy behavior)
+python combine_workflow_descriptions.py --sort name
 
-# Use legacy @-separated format (requires Excel import wizard)
-python combine_workflow_descriptions.py --format atsv --output results.txt
+# Create tab-separated file with date sorting
+python combine_workflow_descriptions.py --format tsv --sort date --output results.tsv
 
-# Specify custom workflow directory
-python combine_workflow_descriptions.py --input-dir /path/to/workflows
+# Use legacy @-separated format with alphabetical sorting
+python combine_workflow_descriptions.py --format atsv --sort name --output results.txt
 
-# Combine custom format and directory
-python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv
+# Specify custom workflow directory with date sorting
+python combine_workflow_descriptions.py --input-dir /path/to/workflows --sort date
+
+# Combine all options
+python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv --sort name
 ```
 
 #### Arguments
@@ -76,6 +81,7 @@ python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv
 | `--input-dir` | `../Descriptions` | Directory containing `wf_*` workflow folders |
 | `--output` | `combineddescriptions.csv` | Output filename (saved in analysis/results/ directory) |
 | `--format` | `csv` | Output format: `csv` (standard comma-delimited), `tsv` (tab-delimited), or `atsv` (@-separated legacy) |
+| `--sort` | `date` | **NEW!** Sort order: `date` (chronological by EXIF photo date) or `name` (alphabetical by filename) |
 
 #### Output
 
@@ -456,6 +462,23 @@ All output files are saved in the `analysis/results/` directory by default:
 ---
 
 ## Tips and Best Practices
+
+### Date Sorting Tips (NEW in v2.0)
+
+1. **Chronological Organization**
+   - **Default behavior:** Images sorted by actual photo date (EXIF data)
+   - Perfect for vacation photos, events, time-series analysis
+   - Shows images in the order you actually took them
+
+2. **When to Use Alphabetical Sorting**
+   - Add `--sort name` for filename-based sorting
+   - Useful when filenames have meaningful sequence (IMG_001, IMG_002...)
+   - Better for systematically named photos or screenshots
+
+3. **EXIF Date Extraction**
+   - Uses DateTimeOriginal (when photo was taken) when available
+   - Falls back to DateTimeDigitized → DateTime → file modification time
+   - Works across workflow subdirectories (converted_images, extracted_frames)
 
 ### Performance Tips
 

@@ -3,13 +3,7 @@
 > **📌 Note:** On October 20, 2025, the repository branches were reorganized. The `main` branch now contains the full v2.0 codebase (formerly the `ImageDescriber` branch). The original v1.0/v1.1 CLI-only releases are preserved in the `1.0release` branch. See [BRANCH_INFO.md](../BRANCH_INFO.md) for details.
 
 ## Overview
-The Image Description Toolkit (IDT) is a comprehensive suite of AI-driven tools for generating natural language descriptions from images and videos. It includes both command-line tools for batch processing and intuitive GUI applications for interactive use. IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as standalone Windows executables—**no Python installation required**.
-
-**The toolkit includes:**
-- **`idt.exe`** - Command-line interface for batch processing and automation
-- **`imagedescriber.exe`** - Interactive GUI for individual images and follow-up questions
-- **`viewer.exe`** - Real-time results viewer and workflow browser
-- **`prompt_editor.exe`** - Visual prompt creation and management tool
+The Image Description Toolkit (IDT) is a powerful, AI-driven tool for generating natural language descriptions from images and videos. It supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as a standalone Windows executable—**no Python installation required**.
 
 ---
 
@@ -20,26 +14,19 @@ The Image Description Toolkit (IDT) is a comprehensive suite of AI-driven tools 
 4. [Prompt Customization](#4-prompt-customization)
 5. [Advanced Usage & Commands](#5-advanced-usage--commands)
 6. [Analysis Tools](#6-analysis-tools)
-7. [GUI Applications](#7-gui-applications)
-   - [Results Viewer (Real-Time Monitoring)](#71-results-viewer-real-time-monitoring)
-   - [ImageDescriber (Interactive GUI)](#72-imagedescriber-interactive-gui)
-   - [Prompt Editor](#73-prompt-editor)
-8. [Cloud Provider Setup](#8-cloud-provider-setup)
-9. [Batch Files Reference](#9-batch-files-reference)
-10. [Troubleshooting](#10-troubleshooting)
+7. [Results Viewer (Real-Time Monitoring)](#65-results-viewer-real-time-monitoring)
+8. [Cloud Provider Setup](#7-cloud-provider-setup)
+9. [Batch Files Reference](#8-batch-files-reference)
+10. [Troubleshooting](#9-troubleshooting)
 
 ---
 
 ## 1. Installation & Setup
 
 ### Step 1: Download & Extract
-1. Download the latest `ImageDescriptionToolkit_v[VERSION].zip` from GitHub Releases or https://1drv.ms/f/c/a7b1bd807b044bbc/EpUH56shTt5Mo6kOv7mTbnUBuExso61DMl0aQM2nUPxWsQ?e=GLGNvT. Get the file idt2.zip.
+1. Download the latest `ImageDescriptionToolkit_v[VERSION].zip` from GitHub Releases
 2. Extract to a folder of your choice (e.g., `C:\IDT\`)
-3. **The toolkit includes four main executables:**
-   - `idt.exe` - Command-line interface (main tool)
-   - `imagedescriber.exe` - Interactive GUI for individual images
-   - `viewer.exe` - Results viewer and workflow browser
-   - `prompt_editor.exe` - Visual prompt creation and management
+3. The executable is `idt.exe`
 
 ### Step 2: Install Ollama (for local models)
 **Ollama is recommended for most users** - it's free, private, and runs locally.
@@ -60,7 +47,6 @@ ollama pull moondream
 ```bash
 ollama pull llava:7b        # Good balance of speed/quality
 ollama pull llava:13b       # Higher quality, slower
-ollama pull gemma3          # Good balance of speed and accuracy
 ollama pull llama3.2-vision # Latest Llama vision model (11GB)
 ```
 
@@ -72,8 +58,6 @@ ollama list
 ---
 
 ## 2. Getting Started: The Golden Path
-
-**💡 GUI Alternative:** If you prefer visual interfaces, you can also double-click `imagedescriber.exe` for individual image processing or `viewer.exe` to browse existing results. See [GUI Applications](#7-gui-applications) for details.
 
 ### Option 1: Interactive Guided Setup (Recommended for Beginners)
 
@@ -91,7 +75,7 @@ This wizard will:
 5. ✅ Choose a prompt style
 6. ✅ Show you the command before running
 7. ✅ Run the workflow or save the command for later
-8. ✅ **Automatically launch the viewer to monitor progress in real-time!**
+8. ✅ **Automatically launch the viewer to watch progress in real-time!**
 
 **Perfect for:**
 - First-time users
@@ -218,27 +202,21 @@ idt prompt-list --verbose
 
 ### Custom Prompt Styles
 
-**Use the Prompt Editor GUI to create and manage custom prompts!**
+You can add your own styles by editing `scripts/image_describer_config.json`:
 
-The easiest way to create custom prompt styles is through the **Prompt Editor** application:
-
-1. Launch the Prompt Editor: `prompt_editor.exe` (in the main IDT directory)
-2. Create, edit, and test your custom prompts with a visual interface
-3. Save your custom styles - they automatically become available to all IDT tools
-4. Preview how your prompts will look before using them
-
-**Benefits of using Prompt Editor:**
-- ✅ Visual interface - no JSON editing required
-- ✅ Built-in prompt testing and validation
-- ✅ Live preview of prompt styles
-- ✅ Easy management of multiple custom prompts
-- ✅ Automatic integration with IDT workflow commands
-
-**Alternative (Advanced Users):** You can also manually edit `scripts/image_describer_config.json` if preferred.
+```json
+{
+  "prompt_variations": {
+    "your_style_name": "Your custom prompt text here..."
+  }
+}
+```
 
 ---
 
 ## 5. Advanced Usage & Commands
+
+> **📖 Complete Reference:** For comprehensive documentation of all CLI commands with detailed options and examples, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
 
 ### IDT Command Reference
 
@@ -347,6 +325,7 @@ idt combinedescriptions
 
 By default, this:
 - ✅ Finds your most recent workflow run
+- ✅ **Sorts images chronologically (oldest to newest using EXIF dates)**
 - ✅ Exports to `analysis/results/combined_descriptions.csv`
 - ✅ Includes all descriptions with metadata
 - ✅ Opens beautifully in Excel
@@ -355,18 +334,26 @@ By default, this:
 **Options:**
 
 ```bash
-# Specify workflow directory
-idt combinedescriptions --workflow-dir Descriptions/workflow_summer_photos
+# Use default chronological sorting (by image date)
+idt combinedescriptions --sort date
 
-# Change output format
-idt combinedescriptions --output results.tsv --format tsv
+# Sort alphabetically by filename instead
+idt combinedescriptions --sort name
 
-# Include multiple workflow runs
-idt combinedescriptions --workflow-dir Descriptions/workflow_1 Descriptions/workflow_2
+# Specify workflow directory with date sorting
+idt combinedescriptions --input-dir Descriptions/workflow_summer_photos
 
-# Custom output location
-idt combinedescriptions --output C:\Exports\my_descriptions.csv
+# Change output format (CSV, TSV, or legacy @-separated)
+idt combinedescriptions --output results.tsv --format tsv --sort date
+
+# Custom output location with alphabetical sorting
+idt combinedescriptions --output C:\Exports\my_descriptions.csv --sort name
+
+# Combine multiple workflow runs (sorted by date)
+idt combinedescriptions --input-dir Descriptions --sort date
 ```
+
+**💡 New in v2.0:** Images are now sorted by their **actual photo dates** (from EXIF data) instead of filename. This means your vacation photos appear in the order you took them, not alphabetically! Use `--sort name` for the old alphabetical behavior.
 
 **💡 Pro Tip:** After ANY workflow run, immediately run `combinedescriptions` to get a nice Excel-ready file. Perfect for sharing or archiving!
 
@@ -418,42 +405,39 @@ Output saved to: `analysis/results/content_analysis_[timestamp].txt`
 All analysis results go to:
 ```
 analysis/results/
-├── combined_descriptions.csv
-├── workflow_stats_[timestamp].json
-└── content_analysis_[timestamp].txt
+├── combineddescriptions.csv          # Default combined export (date-sorted)
+├── combined_descriptions.csv         # Legacy filename (if specified)
+├── workflow_stats_[timestamp].json   # Performance statistics
+└── content_analysis_[timestamp].txt  # Content quality analysis
 ```
+
+**📁 File Organization:** The analysis tools create timestamped files to avoid overwriting previous analyses, except for `combineddescriptions.csv` which is the "current" export file.
 
 ---
 
-## 7. GUI Applications
-
-The Image Description Toolkit includes three powerful GUI applications that make working with image descriptions easier and more interactive. Each serves a specific purpose and can be used independently or together.
-
-### 7.1. Results Viewer (Real-Time Monitoring)
-
-**Launch:** `viewer.exe` or `idt viewer`
+## 6.5. Results Viewer (Real-Time Monitoring)
 
 The **Results Viewer** is a GUI application that lets you browse, search, and monitor your workflow results in real-time.
 
-#### Automatic Launch
+### Automatic Launch
 
 The viewer launches automatically in two scenarios:
 
-**1. Using `guideme` (Recommended)**
+#### 1. Using `guideme` (Recommended)
 When you run a workflow through the interactive wizard:
 ```bash
 idt guideme
 ```
 The viewer **opens immediately** when the workflow starts, letting you watch progress in real-time as each image is processed!
 
-**2. After Direct Workflow Completion**
+#### 2. After Direct Workflow Completion
 When you run `idt workflow` directly, you'll be prompted after successful completion:
 ```
 Would you like to view the results in the viewer? (y/n): y
 ```
 Type `y` and the viewer opens instantly.
 
-#### Manual Launch
+### Manual Launch
 
 You can also launch the viewer manually anytime:
 
@@ -472,12 +456,9 @@ idt viewer C:\IDT\Descriptions\workflow_vacation_photos
 # Or double-click the auto-generated launcher
 # (found in each workflow directory)
 Descriptions\workflow_*/view_results.bat
-
-# Or launch directly
-viewer.exe
 ```
 
-#### Viewer Features
+### Viewer Features
 
 **Real-Time Monitoring:**
 - Live updates as images are processed
@@ -503,7 +484,7 @@ viewer.exe
 - Check completion status (100%, 64 of 64 images described)
 - Human-friendly date/time formatting (3/25/2025 7:35P)
 
-#### Reusable Launcher
+### Reusable Launcher
 
 Every workflow automatically creates a `view_results.bat` file in its output directory:
 ```
@@ -522,7 +503,7 @@ Descriptions/
 - ✅ Create shortcuts or pin to Start menu
 - ✅ Share with others to view your workflow outputs
 
-#### Viewer Modes
+### Viewer Modes
 
 The viewer automatically detects two modes:
 
@@ -536,145 +517,9 @@ The viewer automatically detects two modes:
 - Progress indicators
 - Auto-refresh on new content
 
-### 7.2. ImageDescriber (Interactive GUI)
-
-**Launch:** `imagedescriber.exe`
-
-**ImageDescriber** is a powerful interactive GUI application perfect for getting descriptions of specific files, asking follow-up questions, and working with individual images or small sets of images.
-
-#### Key Features
-
-**Single Image Processing:**
-- Drag & drop any image file for instant description
-- Support for all major formats: JPG, PNG, HEIC, TIFF, WebP, BMP
-- Real-time processing with progress indicators
-- Multiple AI provider support (Ollama, OpenAI, Claude)
-
-**Interactive Follow-ups:**
-- Ask follow-up questions about the same image
-- Maintain conversation context across multiple queries
-- Perfect for detailed analysis or clarification
-- Chat-like interface for natural interaction
-
-**IDT Workflow Integration:**
-- Save results directly to IDT workflow format
-- Maintains compatibility with all IDT tools
-- Results can be viewed in Results Viewer
-- Export to standard IDT output formats
-
-**Directory Import:**
-- Import entire directories of images
-- Process multiple files in sequence
-- Batch processing with individual attention
-- Maintain organization and file structure
-
-**Workflow Results Import:**
-- Import existing IDT workflow results
-- Review and refine previous descriptions
-- Add follow-up questions to completed workflows
-- Extend batch processing results
-
-#### When to Use ImageDescriber
-
-**Perfect for:**
-- ✅ **Individual image analysis** - When you need detailed description of one specific image
-- ✅ **Interactive questioning** - When you want to ask follow-up questions about images
-- ✅ **Detailed exploration** - When you need to explore specific aspects of images
-- ✅ **Quality control** - When reviewing and refining batch processing results
-- ✅ **Specific file handling** - When working with particular files that need special attention
-- ✅ **Learning and experimentation** - When testing different prompts or models on specific images
-
-**Workflow:**
-1. Launch `imagedescriber.exe`
-2. Drag & drop an image or use File → Open
-3. Select your AI provider and model
-4. Choose or create a custom prompt
-5. Get the initial description
-6. Ask follow-up questions as needed
-7. Save to IDT workflow or export results
-
-#### ImageDescriber vs. CLI Workflow
-
-| Feature | ImageDescriber GUI | CLI Workflow (`idt workflow`) |
-|---------|-------------------|--------------------------------|
-| **Best for** | Individual images, follow-ups | Batch processing many images |
-| **Interaction** | Interactive, conversational | Automated, hands-off |
-| **Processing** | One-by-one with attention | Batch processing |
-| **Follow-ups** | Built-in follow-up questions | Single-pass descriptions |
-| **File handling** | Drag & drop, browse | Directory-based |
-| **Use case** | Analysis, exploration, QC | Production, automation |
-
-### 7.3. Prompt Editor
-
-**Launch:** `prompt_editor.exe`
-
-The **Prompt Editor** is a specialized GUI tool for creating, testing, and managing custom prompt styles for all IDT applications.
-
-#### Key Features
-
-**Visual Prompt Creation:**
-- User-friendly interface for writing prompts
-- No JSON editing required
-- Real-time preview of how prompts will appear
-- Syntax highlighting and validation
-
-**Prompt Testing:**
-- Test prompts on sample images before saving
-- Compare different prompt variations
-- See results immediately
-- Fine-tune prompts for optimal results
-
-**Prompt Management:**
-- Create, edit, and delete custom prompt styles
-- Organize prompts by category or purpose
-- Import/export prompt collections
-- Share prompts with other users
-
-**Integration with IDT:**
-- Custom prompts automatically available in all IDT tools
-- Works with CLI commands (`idt workflow --prompt-style your_custom_style`)
-- Available in ImageDescriber GUI
-- Seamless integration with existing workflows
-
-#### Workflow
-
-1. Launch `prompt_editor.exe`
-2. Create a new prompt or edit existing ones
-3. Write your custom prompt text
-4. Test the prompt on sample images
-5. Refine based on results
-6. Save the prompt style
-7. Use in any IDT application with `--prompt-style your_style_name`
-
-#### When to Use Prompt Editor
-
-**Perfect for:**
-- ✅ **Creating specialized prompts** - For specific use cases or industries
-- ✅ **Prompt experimentation** - Testing different approaches
-- ✅ **Team collaboration** - Sharing standardized prompts
-- ✅ **Quality optimization** - Fine-tuning prompts for better results
-- ✅ **Workflow customization** - Tailoring IDT to specific needs
-
-#### Example Custom Prompts
-
-**Real Estate:**
-```
-"Describe this property image focusing on architectural features, room layout, condition, and selling points. Include lighting quality and overall appeal."
-```
-
-**Medical/Scientific:**
-```
-"Provide a detailed technical description focusing on visible structures, conditions, measurements, and any notable features for documentation purposes."
-```
-
-**E-commerce:**
-```
-"Describe this product image for online catalog use, focusing on features, condition, colors, and details that would help customers make purchasing decisions."
-```
-
 ---
 
-## 8. Cloud Provider Setup
+## 7. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
 
@@ -726,7 +571,7 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 
 ---
 
-## 9. Batch Files Reference
+## 8. Batch Files Reference
 
 The `bat/` folder contains pre-configured batch files for quick model testing.
 
@@ -802,7 +647,7 @@ idt workflow C:\Photos --model llava:7b --name my_custom_name
 
 ---
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 
 ### Common Issues
 
@@ -872,20 +717,7 @@ ollama list            # Verify it's installed
 
 ## Quick Reference Card
 
-### GUI Applications (Double-click to launch)
-
-```bash
-# Interactive individual image processing
-imagedescriber.exe
-
-# Browse and monitor workflow results
-viewer.exe
-
-# Create and manage custom prompts
-prompt_editor.exe
-```
-
-### Most Common CLI Commands
+### Most Common Commands
 
 ```bash
 # Interactive wizard (start here!)
