@@ -637,7 +637,48 @@ class ImageDescriber:
                 return description
             
         except Exception as e:
-            logger.error(f"Error generating description for {image_path}: {e}")
+            # Enhanced error logging with detailed diagnostics
+            from datetime import datetime
+            import traceback
+            
+            # Get current timestamp for error logging
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+            
+            # Extract detailed error information
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            # Log comprehensive error details for debugging
+            logger.error(f"Error generating description for {image_path.name}: {error_type}: {error_msg}")
+            
+            # Check for specific Ollama issues
+            if 'unmarshal' in error_msg and 'invalid character' in error_msg:
+                logger.error(f"  This appears to be an Ollama server error returning HTML instead of JSON")
+                logger.error(f"  Try restarting Ollama: 'ollama serve' or check Ollama logs")
+            elif 'status code: 5' in error_msg:
+                logger.error(f"  This is a server error (5xx) - the issue is with Ollama server, not your images")
+            elif 'connection' in error_msg.lower():
+                logger.error(f"  Connection issue - check if Ollama is running: 'ollama list'")
+            
+            # Also log to file if possible for debugging
+            try:
+                import json
+                error_details = {
+                    'timestamp': timestamp,
+                    'provider': self.provider_name,
+                    'model': self.model_name,
+                    'image_path': str(image_path),
+                    'error_type': error_type,
+                    'error_message': error_msg,
+                    'traceback': traceback.format_exc()
+                }
+                log_file = Path('api_errors.log')
+                with open(log_file, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(error_details) + '\n')
+                logger.debug(f"  Detailed error logged to: {log_file}")
+            except Exception as log_error:
+                logger.debug(f"  Warning: Could not write to error log: {log_error}")
+            
             # Clean up memory on error
             gc.collect()
             return None
