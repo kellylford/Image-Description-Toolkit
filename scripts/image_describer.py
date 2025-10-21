@@ -131,7 +131,7 @@ class ImageDescriber:
                  enable_compression: bool = True, batch_delay: float = 2.0, 
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
-                 log_dir: str = None):
+                 log_dir: str = None, workflow_name: str = None):
         """
         Initialize the ImageDescriber
         
@@ -146,6 +146,7 @@ class ImageDescriber:
             provider: AI provider to use (ollama, onnx, openai, huggingface)
             api_key: API key for providers that require authentication
             log_dir: Directory where log files and progress tracking are stored
+            workflow_name: Name of the workflow (for window title display)
         """
         # Load configuration first
         self.config = self.load_config(config_file)
@@ -164,6 +165,7 @@ class ImageDescriber:
         self.log_dir = log_dir  # Directory for logs and progress tracking
         self.provider_name = provider.lower()
         self.api_key = api_key
+        self.workflow_name = workflow_name  # Workflow name for window title
         
         # Set supported formats from config
         self.supported_formats = set(self.config.get('processing_options', {}).get('supported_formats', 
@@ -173,6 +175,28 @@ class ImageDescriber:
         self.provider = self._initialize_provider()
         
         logger.info(f"Initialized ImageDescriber with provider: {self.provider_name}, model: {self.model_name}")
+    
+    def _build_window_title(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
+        """Build a descriptive window title with workflow context"""
+        base_title = f"IDT - Describing Images ({progress_percent}%, {current} of {total})"
+        
+        # Add suffix if provided (e.g., " - Skipped", " - Validation Failed")
+        if suffix:
+            base_title += suffix
+        
+        # Add workflow context: workflow name, prompt style, and model
+        context_parts = []
+        if self.workflow_name:
+            context_parts.append(self.workflow_name)
+        if self.prompt_style:
+            context_parts.append(self.prompt_style)
+        if self.model_name:
+            context_parts.append(self.model_name)
+        
+        if context_parts:
+            base_title += f" - {' - '.join(context_parts)}"
+        
+        return base_title
     
     def _initialize_provider(self):
         """Initialize the AI provider based on configuration"""
@@ -936,7 +960,7 @@ class ImageDescriber:
                 # Update window title for skipped images too
                 current_processed = success_count + failed_count
                 progress_percent = int((current_processed / len(image_files)) * 100)
-                set_console_title(f"IDT - Describing Images ({progress_percent}%, {current_processed} of {len(image_files)}) - Skipped")
+                set_console_title(self._build_window_title(progress_percent, current_processed, len(image_files), " - Skipped"))
                 continue
             
             # Log progress and start time for this image
@@ -948,7 +972,7 @@ class ImageDescriber:
             # Update window title with progress
             current_processed = success_count + failed_count
             progress_percent = int((current_processed / len(image_files)) * 100)
-            set_console_title(f"IDT - Describing Images ({progress_percent}%, {current_processed} of {len(image_files)})")
+            set_console_title(self._build_window_title(progress_percent, current_processed, len(image_files)))
             
             image_start_time = time.time()
             logger.info(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(image_start_time))}")
@@ -968,7 +992,7 @@ class ImageDescriber:
                 # Update window title to reflect validation failure
                 current_processed = success_count + failed_count
                 progress_percent = int((current_processed / len(image_files)) * 100)
-                set_console_title(f"IDT - Describing Images ({progress_percent}%, {current_processed} of {len(image_files)}) - Validation Failed")
+                set_console_title(self._build_window_title(progress_percent, current_processed, len(image_files), " - Validation Failed"))
                 continue
             
             # Extract metadata from image
@@ -1703,6 +1727,11 @@ Configuration:
         action="store_true",
         help="Suppress console output (log to file only)"
     )
+    parser.add_argument(
+        "--workflow-name",
+        type=str,
+        help="Workflow name (displayed in window title for identification)"
+    )
     
     args = parser.parse_args()
     
@@ -1758,7 +1787,8 @@ Configuration:
         output_dir=args.output_dir,
         provider=args.provider,
         api_key=api_key,
-        log_dir=args.log_dir
+        log_dir=args.log_dir,
+        workflow_name=args.workflow_name
     )
     
     # Override metadata extraction if disabled via command line
