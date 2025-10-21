@@ -26,8 +26,9 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
 9. [Analysis Tools](#9-analysis-tools)
 10. [Results Viewer (Real-Time Monitoring)](#10-results-viewer-real-time-monitoring)
 11. [Cloud Provider Setup](#11-cloud-provider-setup)
-12. [Batch Files Reference](#12-batch-files-reference)
-13. [Troubleshooting](#13-troubleshooting)
+12. [Performance Tips](#12-performance-tips)
+13. [Batch Files Reference](#13-batch-files-reference)
+14. [Troubleshooting](#14-troubleshooting)
 
 ---
 
@@ -508,6 +509,7 @@ Options:
   --api-key-file FILE      Path to API key file (for cloud providers)
   --output-dir DIR         Output directory (default: Descriptions)
   --steps STEPS            Comma-separated steps: video,convert,describe,html
+  --timeout SECONDS        Ollama request timeout in seconds (default: 90)
   --recursive              Process subdirectories
   --max-files N            Limit number of files (for testing)
   --resume                 Resume interrupted workflow
@@ -526,6 +528,9 @@ idt workflow C:\Photos --model llava:13b --prompt-style artistic
 
 # Cloud provider with custom name
 idt workflow C:\Photos --provider openai --model gpt-4o --name portfolio_review
+
+# Increase timeout for slower hardware or large models
+idt workflow C:\Photos --timeout 120
 
 # Only describe, skip HTML generation
 idt workflow C:\Photos --steps describe --name quick_test
@@ -806,7 +811,45 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 
 ---
 
-## 12. Batch Files Reference
+## 12. Performance Tips
+
+### Adjusting Timeout Settings
+
+The default timeout for Ollama requests is 90 seconds. You may need to adjust this based on your hardware and model size:
+
+```bash
+# Fast cloud Ollama (can decrease timeout)
+idt workflow C:\Photos --timeout 60
+
+# Standard local setup (default is fine)
+idt workflow C:\Photos
+
+# Slower hardware or large models (increase timeout)
+idt workflow C:\Photos --timeout 120
+
+# Very slow hardware or huge models (34B+)
+idt workflow C:\Photos --timeout 300
+```
+
+**When to adjust timeout:**
+- ⏱️ **Increase** if you see frequent timeout errors
+- ⚡ **Increase** when using large models (13B, 34B parameters)
+- 🐌 **Increase** on older hardware or CPU-only systems
+- ☁️ **Decrease** when using fast cloud Ollama instances
+- 🚀 **Keep default** for most local GPU setups with 7B models
+
+**Symptoms of timeout too low:**
+- Frequent "Request timed out after X seconds" errors
+- Works for some images but fails on complex ones
+- Model is processing but gets interrupted
+
+**Symptoms of timeout too high:**
+- Long waits when actual errors occur
+- Hangs on genuinely failed requests
+
+---
+
+## 13. Batch Files Reference
 
 The `bat/` folder contains pre-configured batch files for quick model testing.
 
@@ -882,7 +925,7 @@ idt workflow C:\Photos --model llava:7b --name my_custom_name
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 ### Common Issues
 

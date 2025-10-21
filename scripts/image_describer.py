@@ -131,7 +131,7 @@ class ImageDescriber:
                  enable_compression: bool = True, batch_delay: float = 2.0, 
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
-                 log_dir: str = None, workflow_name: str = None):
+                 log_dir: str = None, workflow_name: str = None, timeout: int = 90):
         """
         Initialize the ImageDescriber
         
@@ -147,6 +147,7 @@ class ImageDescriber:
             api_key: API key for providers that require authentication
             log_dir: Directory where log files and progress tracking are stored
             workflow_name: Name of the workflow (for window title display)
+            timeout: Timeout in seconds for Ollama API requests (default: 90)
         """
         # Load configuration first
         self.config = self.load_config(config_file)
@@ -166,6 +167,7 @@ class ImageDescriber:
         self.provider_name = provider.lower()
         self.api_key = api_key
         self.workflow_name = workflow_name  # Workflow name for window title
+        self.timeout = timeout  # Timeout for Ollama requests
         
         # Set supported formats from config
         self.supported_formats = set(self.config.get('processing_options', {}).get('supported_formats', 
@@ -535,7 +537,7 @@ class ImageDescriber:
                         import signal
                         
                         def timeout_handler(signum, frame):
-                            raise TimeoutError("Ollama request timed out after 90 seconds")
+                            raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
                         
                         # Set up timeout for Windows/Unix compatibility
                         try:
@@ -569,12 +571,12 @@ class ImageDescriber:
                             request_thread.start()
                             
                             # Wait for completion or timeout
-                            request_thread.join(timeout=90.0)
+                            request_thread.join(timeout=self.timeout)
                             
                             if request_thread.is_alive():
                                 # Request is still running - timeout occurred
-                                logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after 90 seconds")
-                                raise TimeoutError("Ollama request timed out after 90 seconds")
+                                logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after {self.timeout} seconds")
+                                raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
                             
                             if exception_caught:
                                 raise exception_caught
@@ -1713,6 +1715,12 @@ Configuration:
         help=f"Style of prompt to use. Available: {', '.join(available_styles)} (default: {default_style})"
     )
     parser.add_argument(
+        "--timeout",
+        type=int,
+        default=90,
+        help="Timeout in seconds for Ollama API requests (default: 90). Increase for slower hardware or large models."
+    )
+    parser.add_argument(
         "--no-metadata",
         action="store_true",
         help="Disable metadata extraction from image files"
@@ -1788,7 +1796,8 @@ Configuration:
         provider=args.provider,
         api_key=api_key,
         log_dir=args.log_dir,
-        workflow_name=args.workflow_name
+        workflow_name=args.workflow_name,
+        timeout=args.timeout
     )
     
     # Override metadata extraction if disabled via command line

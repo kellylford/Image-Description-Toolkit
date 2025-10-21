@@ -247,6 +247,7 @@ idt workflow <image_directory> [options]
 --dry-run                            # Show what would be processed without doing it
 --original-cwd PATH                   # Set working directory context
 --steps STEPS                         # Workflow steps: video,convert,describe,html
+--timeout SECONDS                     # Ollama request timeout (default: 90, increase for slow hardware)
 ```
 
 **Prompt Styles:**
@@ -269,6 +270,9 @@ idt workflow C:\Photos --provider openai --model gpt-4o --name "vacation_photos"
 
 # Claude with custom output directory
 idt workflow C:\Photos --provider claude --model claude-opus-4 --output-dir C:\Results
+
+# Increase timeout for slower hardware or large models
+idt workflow C:\Photos --timeout 120
 
 # Dry run to preview what will be processed
 idt workflow C:\Photos --dry-run
@@ -981,7 +985,18 @@ idt results-list --verbose
 idt stats [workflow_directory]
 ```
 
-#### 7. GUI applications not launching
+#### 7. Timeout errors with Ollama
+```bash
+# Increase timeout for slower hardware or large models
+idt workflow C:\Photos --timeout 120
+
+# Default is 90 seconds - adjust based on your hardware:
+# - Fast cloud Ollama: 60-90 seconds
+# - Local powerful GPU: 90-120 seconds  
+# - Slower hardware or large models (34B+): 180-300 seconds
+```
+
+#### 8. GUI applications not launching
 ```cmd
 REM Check if dependencies are installed
 REM Try running from command line to see error messages
