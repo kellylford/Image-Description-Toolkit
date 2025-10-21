@@ -29,10 +29,98 @@ except ImportError:
     def get_resource_path(relative_path):
         return Path(__file__).parent.parent / relative_path
 import re
+import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 from collections import OrderedDict
+from datetime import datetime
 from analysis_utils import get_safe_filename, ensure_directory
+
+
+def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
+    """
+    Extract the date/time the image was taken from EXIF data for sorting purposes.
+    
+    Searches for the image file in the workflow directories and tries multiple EXIF fields:
+    1. DateTimeOriginal (when photo was taken)
+    2. DateTimeDigitized (when photo was digitized) 
+    3. DateTime (file modification date in EXIF)
+    4. Falls back to file modification time
+    
+    Args:
+        image_name: The filename to search for
+        base_dir: Base directory containing workflow folders
+        
+    Returns:
+        datetime object for sorting (earliest possible date if file not found)
+    """
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS
+        
+        # Search for the image file in workflow directories
+        image_path = None
+        for workflow_dir in base_dir.glob("wf_*"):
+            # Check common subdirectories where images might be
+            for subdir in ['converted_images', 'extracted_frames', '']:
+                if subdir:
+                    search_dir = workflow_dir / subdir
+                else:
+                    search_dir = workflow_dir
+                    
+                if search_dir.exists():
+                    # Look for the exact filename
+                    potential_path = search_dir / image_name
+                    if potential_path.exists():
+                        image_path = potential_path
+                        break
+                    
+                    # Also check subdirectories (for video frames)
+                    for img_file in search_dir.rglob(image_name):
+                        if img_file.is_file():
+                            image_path = img_file
+                            break
+                            
+                if image_path:
+                    break
+            if image_path:
+                break
+        
+        if not image_path or not image_path.exists():
+            # Return epoch time if file not found (will sort to beginning)
+            return datetime.fromtimestamp(0)
+        
+        # Try to extract EXIF date
+        with Image.open(image_path) as img:
+            exif_data = img.getexif()
+            
+            if exif_data:
+                # Convert to human-readable tags
+                exif_dict = {}
+                for tag_id, value in exif_data.items():
+                    tag = TAGS.get(tag_id, tag_id)
+                    exif_dict[tag] = value
+                
+                # Try different datetime fields in priority order
+                datetime_fields = ['DateTimeOriginal', 'DateTimeDigitized', 'DateTime']
+                
+                for field in datetime_fields:
+                    if field in exif_dict:
+                        dt_str = exif_dict[field]
+                        if dt_str:
+                            try:
+                                # Parse EXIF datetime format: YYYY:MM:DD HH:MM:SS
+                                return datetime.strptime(str(dt_str), '%Y:%m:%d %H:%M:%S')
+                            except (ValueError, TypeError):
+                                continue
+        
+        # Fallback to file modification time if no EXIF date found
+        file_mtime = os.path.getmtime(image_path)
+        return datetime.fromtimestamp(file_mtime)
+        
+    except Exception as e:
+        # Return epoch time if any error occurs (will sort to beginning)
+        return datetime.fromtimestamp(0)
 
 
 def parse_description_file(file_path: Path) -> OrderedDict:
@@ -300,20 +388,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  # Create standard CSV (opens directly in Excel)
+  # Create standard CSV sorted by date (default, opens directly in Excel)
   python combine_workflow_descriptions.py
   
-  # Create tab-separated file (also opens directly in Excel)
+  # Sort alphabetically by filename instead of by date
+  python combine_workflow_descriptions.py --sort name
+  
+  # Create tab-separated file sorted by date
   python combine_workflow_descriptions.py --format tsv --output results.tsv
   
-  # Use legacy @-separated format (requires import wizard in Excel)
-  python combine_workflow_descriptions.py --format atsv --output results.txt
+  # Use legacy @-separated format with alphabetical sorting
+  python combine_workflow_descriptions.py --format atsv --sort name --output results.txt
   
-  # Specify custom workflow directory
-  python combine_workflow_descriptions.py --input-dir /path/to/workflows
+  # Specify custom workflow directory with date sorting
+  python combine_workflow_descriptions.py --input-dir /path/to/workflows --sort date
   
-  # Use both custom input and format
-  python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv
+  # Use custom input, format, and sorting
+  python combine_workflow_descriptions.py --input-dir /data/workflows --format tsv --sort name
         '''
     )
     
@@ -341,6 +432,17 @@ Examples:
   tsv  - Tab-separated values (good Excel compatibility, no quotes needed)
   atsv - @-separated values (legacy format, requires import wizard in Excel)
 Default: csv'''
+    )
+    
+    parser.add_argument(
+        '--sort',
+        type=str,
+        choices=['name', 'date'],
+        default='date',
+        help='''Sort order for images:
+  name - Sort alphabetically by filename (legacy behavior)
+  date - Sort chronologically by image date (oldest to newest, using EXIF data when available)
+Default: date'''
     )
     
     args = parser.parse_args()
@@ -401,9 +503,25 @@ Default: csv'''
             # Use workflow_name if available, otherwise use None
             image_prompt_workflow_combinations.add((image_name, prompt_style, workflow_name))
     
-    # Sort combinations: first by image name, then by prompt style, then by workflow name
-    sorted_combinations = sorted(image_prompt_workflow_combinations, 
-                                key=lambda x: (x[0], x[1], x[2] if x[2] else ''))
+    # Sort combinations based on user preference
+    if args.sort == 'date':
+        print("Sorting images by date (oldest to newest, extracting EXIF data)...")
+        # Create a cache for image dates to avoid repeated EXIF reads
+        date_cache = {}
+        def get_cached_date(image_name):
+            if image_name not in date_cache:
+                date_cache[image_name] = get_image_date_for_sorting(image_name, base_dir)
+            return date_cache[image_name]
+        
+        # Sort by: image date, then prompt style, then workflow name  
+        sorted_combinations = sorted(image_prompt_workflow_combinations, 
+                                    key=lambda x: (get_cached_date(x[0]), x[1], x[2] if x[2] else ''))
+        print(f"Sorted {len(set(c[0] for c in sorted_combinations))} unique images by date")
+    else:
+        # Sort by image name (alphabetically), then by prompt style, then by workflow name
+        sorted_combinations = sorted(image_prompt_workflow_combinations, 
+                                    key=lambda x: (x[0], x[1], x[2] if x[2] else ''))
+        print(f"Sorted {len(set(c[0] for c in sorted_combinations))} unique images alphabetically")
     
     # Get unique model labels for column headers (in order of appearance)
     unique_models = []
@@ -461,6 +579,7 @@ Default: csv'''
     
     print(f"\nOutput file created: {output_file}")
     print(f"Format: {args.format.upper()} ({'comma-delimited with quotes' if args.format == 'csv' else 'tab-delimited' if args.format == 'tsv' else '@-delimited'})")
+    print(f"Sort order: {'Date (oldest to newest)' if args.sort == 'date' else 'Alphabetical by filename'}")
     print(f"Total rows: {len(sorted_combinations) + 1} (including header)")
     
     if args.format == 'csv':
