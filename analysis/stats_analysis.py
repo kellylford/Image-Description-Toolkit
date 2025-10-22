@@ -475,21 +475,30 @@ def get_workflow_label(workflow_dir_name: str) -> str:
     Extract a readable label from the workflow directory name.
     Creates unique, distinguishable labels for all models.
     
+    Supports two naming formats:
+    1. wf_{provider}_{model}_{variant}_{prompt}_{date}_{time}
+    2. wf_{workflow_name}_{provider}_{model}_{variant}_{prompt}_{date}_{time}
+    
     Examples:
         wf_claude_claude-3-haiku-20240307_... -> Claude Haiku 3
-        wf_claude_claude-3-5-haiku-20241022_... -> Claude Haiku 3.5
-        wf_ollama_llava_7b_... -> Ollama LLaVA 7B
-        wf_ollama_llava_13b_... -> Ollama LLaVA 13B
-        wf_openai_gpt-4o-mini_... -> OpenAI GPT-4o-mini
+        wf_10multipletest_ollama_llava_13b_... -> Ollama LLaVA 13B
+        wf_testrun_ollama_minicpm-v_8b_... -> Ollama MiniCPM-V 8B
     """
     parts = workflow_dir_name.split('_')
     
     if len(parts) >= 3:
-        provider = parts[1].capitalize()
-        model_part = parts[2]
-        
-        # For models with size/variant in parts[3], include it
-        variant = parts[3] if len(parts) > 3 and parts[3] not in ['narrative', 'detailed', 'concise'] else None
+        # Detect if parts[1] is a provider or workflow name
+        # Providers are: ollama, claude, openai
+        if parts[1].lower() in ['ollama', 'claude', 'openai']:
+            # Format 1: wf_{provider}_{model}_{variant}_...
+            provider = parts[1].capitalize()
+            model_part = parts[2]
+            variant = parts[3] if len(parts) > 3 and parts[3] not in ['narrative', 'detailed', 'concise', 'colorful', 'artistic', 'technical', 'simple'] else None
+        else:
+            # Format 2: wf_{workflow_name}_{provider}_{model}_{variant}_...
+            provider = parts[2].capitalize() if len(parts) > 2 else parts[1].capitalize()
+            model_part = parts[3] if len(parts) > 3 else parts[2]
+            variant = parts[4] if len(parts) > 4 and parts[4] not in ['narrative', 'detailed', 'concise', 'colorful', 'artistic', 'technical', 'simple'] else None
         
         # Create readable labels for Claude models
         if provider.lower() == 'claude':
@@ -521,8 +530,12 @@ def get_workflow_label(workflow_dir_name: str) -> str:
         
         # Create readable labels for Ollama models
         elif provider.lower() == 'ollama':
+            # bakllava (must check before generic llava)
+            if model_part == 'bakllava':
+                return "Ollama BakLLaVA"
+            
             # llava with variant (7b, 13b, 34b, latest)
-            if 'llava' in model_part and variant:
+            elif 'llava' in model_part and variant:
                 base = "LLaVA"
                 if 'phi3' in model_part:
                     base = "LLaVA-Phi3"
@@ -537,22 +550,48 @@ def get_workflow_label(workflow_dir_name: str) -> str:
                 else:
                     return f"Ollama {base} {variant}"
             
+            # llava without explicit variant (standalone llava)
+            elif 'llava' in model_part:
+                base = "LLaVA"
+                if 'phi3' in model_part:
+                    return "Ollama LLaVA-Phi3"
+                elif 'llama3' in model_part:
+                    return "Ollama LLaVA-Llama3"
+                else:
+                    return "Ollama LLaVA"
+            
             # llama3.2-vision with variant (11b, 90b, latest)
             elif 'llama3.2-vision' in model_part or 'llama3-2-vision' in model_part:
                 if variant == 'latest':
                     return "Ollama Llama3.2-Vision"
-                elif variant.endswith('b'):
+                elif variant and variant.endswith('b'):
                     return f"Ollama Llama3.2-Vision {variant.upper()}"
                 else:
                     return f"Ollama Llama3.2-Vision {variant}"
             
-            # Other Ollama models (moondream, bakllava, etc.)
+            # qwen models (qwen2.5vl, qwen3-vl, qwen3-coder)
+            elif 'qwen' in model_part:
+                if 'qwen2.5vl' in model_part or 'qwen2-5vl' in model_part:
+                    base = "Qwen2.5-VL"
+                elif 'qwen3-vl' in model_part or 'qwen3vl' in model_part:
+                    base = "Qwen3-VL"
+                elif 'qwen3-coder' in model_part:
+                    base = "Qwen3-Coder"
+                else:
+                    base = "Qwen"
+                
+                if variant and variant != 'latest':
+                    # Handle variants like "235b-cloud", "480b-cloud"
+                    variant_display = variant.replace('-cloud', ' Cloud').upper()
+                    return f"Ollama {base} {variant_display}"
+                else:
+                    return f"Ollama {base}"
+            
+            # Other Ollama models
             elif model_part == 'moondream':
                 return "Ollama Moondream"
-            elif model_part == 'bakllava':
-                return "Ollama BakLLaVA"
             elif 'minicpm' in model_part:
-                if variant and variant.endswith('b'):
+                if variant and variant != 'latest' and variant.endswith('b'):
                     return f"Ollama MiniCPM-V {variant.upper()}"
                 else:
                     return "Ollama MiniCPM-V"
