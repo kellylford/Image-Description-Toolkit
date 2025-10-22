@@ -1,59 +1,77 @@
 @echo off
-REM Build script for IDT Configure
-REM Creates standalone executable using PyInstaller
-
-echo ========================================
+echo ========================================================================
 echo Building IDT Configure
-echo ========================================
+echo ========================================================================
 echo.
 
-REM Get version
-set /p VERSION=<..\VERSION
+REM Check if PyInstaller is installed
+python -c "import PyInstaller" 2>nul
+if errorlevel 1 (
+    echo PyInstaller not found. Installing...
+    pip install pyinstaller
+    if errorlevel 1 (
+        echo ERROR: Failed to install PyInstaller.
+        exit /b 1
+    )
+    echo.
+)
 
-REM Check for PyInstaller
-where pyinstaller >nul 2>nul
-if %errorlevel% neq 0 (
-    echo ERROR: PyInstaller not found
+REM Check if PyQt6 is installed
+python -c "import PyQt6" 2>nul
+if errorlevel 1 (
+    echo PyQt6 not found. Installing dependencies...
+    pip install -r requirements.txt
+    if errorlevel 1 (
+        echo ERROR: Failed to install dependencies.
+        exit /b 1
+    )
     echo.
-    echo Please install PyInstaller:
-    echo   pip install pyinstaller
+)
+
+REM Create output directory
+if not exist "dist" mkdir dist
+
+REM Get absolute path to scripts directory (one level up)
+set SCRIPTS_DIR=%cd%\..\scripts
+
+REM Check if scripts directory exists
+if not exist "%SCRIPTS_DIR%" (
+    echo ERROR: Scripts directory not found at: %SCRIPTS_DIR%
     echo.
-    pause
+    echo IDTConfigure requires access to configuration files in scripts/
+    echo.
     exit /b 1
 )
 
-echo Cleaning previous builds...
-if exist dist rmdir /s /q dist
-if exist build rmdir /s /q build
-
-echo.
-echo Building executable...
-echo Version: %VERSION%
+echo Scripts directory found: %SCRIPTS_DIR%
+echo Building IDTConfigure with configuration file access...
 echo.
 
-pyinstaller ^
-    --noconfirm ^
-    --onedir ^
+pyinstaller --onefile ^
     --windowed ^
     --name "idtconfigure" ^
-    --icon=NONE ^
-    --add-data "../VERSION;." ^
+    --distpath "dist" ^
+    --workpath "build" ^
+    --specpath "build" ^
+    --add-data "%SCRIPTS_DIR%;scripts" ^
+    --hidden-import PyQt6.QtCore ^
+    --hidden-import PyQt6.QtGui ^
+    --hidden-import PyQt6.QtWidgets ^
     idtconfigure.py
 
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo.
-    echo ERROR: Build failed!
-    pause
+    echo ========================================================================
+    echo BUILD FAILED
+    echo ========================================================================
     exit /b 1
 )
 
 echo.
-echo ========================================
-echo Build completed successfully!
-echo ========================================
+echo ========================================================================
+echo BUILD SUCCESSFUL
+echo ========================================================================
+echo Executable created: dist\idtconfigure.exe
 echo.
-echo Executable location: dist\idtconfigure\idtconfigure.exe
+echo To test: cd dist ^&^& idtconfigure.exe
 echo.
-echo You can now run: dist\idtconfigure\idtconfigure.exe
-echo.
-pause
