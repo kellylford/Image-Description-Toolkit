@@ -202,10 +202,13 @@ class WorkflowLogger:
         if self.status_log_path:
             try:
                 with open(self.status_log_path, 'w', encoding='utf-8') as f:
-                    f.write(f"Workflow Status - Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    now = datetime.now()
+                    f.write(f"Workflow Status - Last Updated: {now.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"Update Time: {now.strftime('%I:%M:%S %p')}\n")
                     f.write("=" * 70 + "\n\n")
                     for line in status_lines:
                         f.write(f"{line}\n")
+                self.logger.debug(f"Status log updated at {now.strftime('%H:%M:%S')}")
             except Exception as e:
                 self.logger.warning(f"Could not update status log: {e}")
 

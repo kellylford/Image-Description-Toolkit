@@ -945,18 +945,26 @@ class WorkflowOrchestrator:
             self._update_status_log()
             
             # Determine progress file location (same logic as image_describer.py)
+            # IMPORTANT: Check --log-dir FIRST because that's where image_describer.py writes it
             progress_file = None
             for arg_i, arg in enumerate(cmd):
                 if arg == "--log-dir" and arg_i + 1 < len(cmd):
                     progress_file = Path(cmd[arg_i + 1]) / "image_describer_progress.txt"
-                    break
-                elif arg == "--output-dir" and arg_i + 1 < len(cmd):
-                    progress_file = Path(cmd[arg_i + 1]) / "image_describer_progress.txt"
+                    self.logger.info(f"Progress file location from --log-dir: {progress_file}")
                     break
             
+            # Fallback to --output-dir if --log-dir not found
             if progress_file is None:
-                # Fallback to output directory
+                for arg_i, arg in enumerate(cmd):
+                    if arg == "--output-dir" and arg_i + 1 < len(cmd):
+                        progress_file = Path(cmd[arg_i + 1]) / "image_describer_progress.txt"
+                        self.logger.info(f"Progress file location from --output-dir: {progress_file}")
+                        break
+            
+            if progress_file is None:
+                # Final fallback to output directory
                 progress_file = self.config.base_output_dir / "descriptions" / "image_describer_progress.txt"
+                self.logger.info(f"Progress file location (fallback): {progress_file}")
             
             # Start the subprocess with real-time progress monitoring
             import threading
@@ -967,7 +975,10 @@ class WorkflowOrchestrator:
                 last_count = 0
                 last_status_update = 0
                 checks_without_file = 0
+                iteration = 0
+                self.logger.info("Progress monitoring thread started")
                 while self.step_results.get('describe', {}).get('in_progress', False):
+                    iteration += 1
                     try:
                         if progress_file.exists():
                             if checks_without_file > 0:
@@ -978,6 +989,10 @@ class WorkflowOrchestrator:
                                 lines = f.readlines()
                                 current_count = len([line.strip() for line in lines if line.strip()])
                             
+                            # Log every 5 checks to see if thread is running
+                            if iteration % 5 == 0:
+                                self.logger.debug(f"Monitoring check #{iteration}: {current_count}/{self.step_results['describe']['total']} images")
+                            
                             if current_count != last_count:
                                 # Update step results
                                 self.step_results['describe']['processed'] = current_count
@@ -987,6 +1002,8 @@ class WorkflowOrchestrator:
                                 if current_count - last_status_update >= 10 or (last_count == 0 and current_count > 0):
                                     self.logger.info(f"Progress update: {current_count}/{self.step_results['describe']['total']} images described, status.log updated")
                                     last_status_update = current_count
+                                elif current_count > 0:  # Log less frequently for intermediate updates
+                                    self.logger.debug(f"Progress: {current_count}/{self.step_results['describe']['total']} images")
                                 last_count = current_count
                         else:
                             checks_without_file += 1
@@ -998,10 +1015,15 @@ class WorkflowOrchestrator:
                         time.sleep(2)  # Check every 2 seconds
                     except Exception as e:
                         self.logger.warning(f"Progress monitoring error: {e}")
+                        import traceback
+                        self.logger.warning(f"Traceback: {traceback.format_exc()}")
                         time.sleep(5)  # Wait longer on error
+                
+                self.logger.info(f"Progress monitoring thread ending after {iteration} iterations")
             
             # Start progress monitoring in background thread
             self.logger.info(f"Starting progress monitoring thread (checking {progress_file} every 2 seconds)")
+            self.logger.info(f"Monitoring will track: {len(combined_image_list)} total images")
             progress_thread = threading.Thread(target=monitor_progress, daemon=True)
             progress_thread.start()
             
