@@ -9,6 +9,7 @@ The Image Description Toolkit (IDT) is a comprehensive, AI-driven suite for gene
 - **🖼️ GUI ImageDescriber** - Interactive, user-friendly desktop application
 - **📝 Prompt Editor** - Visual prompt design and testing tool
 - **📊 Results Viewer** - Real-time monitoring and results browsing
+- **⚙️ IDTConfigure** - Configuration management for all toolkit settings
 
 IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as standalone Windows executables—**no Python installation required**.
 
@@ -19,16 +20,17 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
 2. [IDT Applications Overview](#2-idt-applications-overview)
 3. [GUI ImageDescriber Application](#3-gui-imagedescriber-application)
 4. [Prompt Editor Application](#4-prompt-editor-application)
-5. [Getting Started: CLI Golden Path](#5-getting-started-cli-golden-path)
-6. [Understanding Workflow Runs & Naming](#6-understanding-workflow-runs--naming)
-7. [Prompt Customization](#7-prompt-customization)
-8. [Advanced CLI Usage & Commands](#8-advanced-cli-usage--commands)
-9. [Analysis Tools](#9-analysis-tools)
-10. [Results Viewer (Real-Time Monitoring)](#10-results-viewer-real-time-monitoring)
-11. [Cloud Provider Setup](#11-cloud-provider-setup)
-12. [Performance Tips](#12-performance-tips)
-13. [Batch Files Reference](#13-batch-files-reference)
-14. [Troubleshooting](#14-troubleshooting)
+5. [IDTConfigure - Configuration Management](#5-idtconfigure---configuration-management)
+6. [Getting Started: CLI Golden Path](#6-getting-started-cli-golden-path)
+7. [Understanding Workflow Runs & Naming](#7-understanding-workflow-runs--naming)
+8. [Prompt Customization](#8-prompt-customization)
+9. [Advanced CLI Usage & Commands](#9-advanced-cli-usage--commands)
+10. [Analysis Tools](#10-analysis-tools)
+11. [Results Viewer (Real-Time Monitoring)](#11-results-viewer-real-time-monitoring)
+12. [Cloud Provider Setup](#12-cloud-provider-setup)
+13. [Performance Tips](#13-performance-tips)
+14. [Batch Files Reference](#14-batch-files-reference)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -37,11 +39,12 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
 ### Step 1: Download & Extract
 1. Download the latest `ImageDescriptionToolkit_v[VERSION].zip` from GitHub Releases
 2. Extract to a folder of your choice (e.g., `C:\IDT\`)
-3. You'll find four main applications:
+3. You'll find five main applications:
    - `idt.exe` - Command line interface for batch processing
    - `imagedescriber.exe` - GUI application for individual images
    - `prompt_editor.exe` - Visual prompt design and testing tool
    - `viewer.exe` - Results browser and monitoring application
+   - `idtconfigure.exe` - Configuration management tool
 
 ### Step 2: Install Ollama (for local models)
 **Ollama is recommended for most users** - it's free, private, and runs locally.
@@ -124,6 +127,37 @@ IDT provides four main applications, each designed for different use cases:
 - View image metadata and processing details
 
 **When to use:** Reviewing results, monitoring progress, sharing with others
+
+### ⚙️ IDTConfigure - `idtconfigure.exe` or `idt configure`
+**Best for:** Managing all toolkit configuration files, adjusting processing settings
+
+**Key Features:**
+- Visual editor for all toolkit configuration files
+- Manage AI model settings (provider, model, API keys, timeout)
+- Edit prompt styles (narrative, detailed, concise, etc.)
+- Configure video frame extraction (interval, quality, limit)
+- Adjust processing options (batch size, resize, HEIC conversion)
+- Modify workflow settings (resume, retry, directory structure)
+- Set output formats (TSV, ATSV, CSV)
+- Menu-based navigation with 30+ configurable settings
+- Full keyboard accessibility and screen reader support
+
+**When to use:** 
+- Changing video extraction settings (e.g., every 30 seconds instead of 1 second)
+- Adjusting timeout values for slow models
+- Modifying retry logic for API requests
+- Configuring default providers and models
+- Setting up custom prompt styles
+- Any configuration change without editing JSON files manually
+
+**Launch IDTConfigure:**
+```bash
+# From command line
+idt configure
+
+# Or run directly
+idtconfigure.exe
+```
 
 ---
 
@@ -293,7 +327,187 @@ The **Prompt Editor** (`prompt_editor.exe`) is a configuration tool for managing
 
 ---
 
-## 5. Getting Started: CLI Golden Path
+## 5. IDTConfigure - Configuration Management
+
+The **IDTConfigure** application (`idtconfigure.exe`) is a comprehensive GUI tool for managing all toolkit configuration files without manually editing JSON. It provides a menu-driven interface to configure AI models, prompt styles, video extraction settings, processing options, workflows, and output formats.
+
+### Why Use IDTConfigure?
+
+**Before IDTConfigure:** You had to manually edit JSON files like `image_describer_config.json`, `video_frame_extractor_config.json`, and `workflow_config.json`. This was error-prone and required understanding JSON syntax.
+
+**With IDTConfigure:** Click through intuitive menus, change settings with spinboxes/checkboxes/dropdowns, and save—all configuration files are updated correctly.
+
+### Launching IDTConfigure
+
+```bash
+# Method 1: Via CLI command (recommended)
+idt configure
+
+# Method 2: Run executable directly
+idtconfigure.exe
+```
+
+### Configuration Categories
+
+IDTConfigure organizes settings into 6 main categories:
+
+#### 1. AI Model Settings
+Configure which AI models to use and how to connect to them:
+- **Provider**: Choose between Ollama (local), OpenAI (cloud), or Claude (cloud)
+- **Model Name**: Specify the exact model (e.g., `llava:7b`, `gpt-4o-mini`, `claude-3-haiku-20240307`)
+- **API Keys**: Set OpenAI and Claude API keys securely
+- **Timeout**: Request timeout in seconds (default: 240s, increase for slow models)
+- **Batch Size**: Number of images to process concurrently (default: 5)
+
+**Common Use Cases:**
+- Switch from GPT-4o to Claude Haiku for cost savings
+- Increase timeout from 240s to 360s for large models like LLaVA 34B
+- Set batch size to 1 for low-memory systems
+
+#### 2. Prompt Styles
+Manage the prompt templates used for image description:
+- **Add New Prompts**: Create custom prompt styles (narrative, technical, detailed, etc.)
+- **Edit Existing Prompts**: Modify prompt text and names
+- **Delete Prompts**: Remove unused prompt styles
+- **Set Default Prompt**: Choose which prompt style to use by default
+
+**Common Use Cases:**
+- Create a "medical" prompt for healthcare image descriptions
+- Edit the "narrative" prompt to add specific details you want captured
+- Remove unused prompts to simplify model selection
+
+#### 3. Video Frame Extraction
+Configure how video files are processed into frame images:
+- **Frame Interval**: Extract frames every N seconds (default: 1.0s)
+- **Quality**: JPEG quality 1-100 (default: 85)
+- **Frame Limit**: Maximum frames per video (default: 120, 0 = unlimited)
+- **Extraction Mode**: Options:
+  - `all` - Extract all frames at interval (default)
+  - `first` - Only extract the first frame
+  - `keyframes` - Only extract keyframes (scene changes)
+  - `smart` - Intelligent selection based on motion
+
+**Common Use Cases:**
+- Change interval from 1.0s to 30.0s for long videos (e.g., security footage)
+- Set mode to `first` for video thumbnails only
+- Increase frame limit to 300 for detailed video analysis
+- Set mode to `keyframes` to reduce redundant frames
+
+#### 4. Processing Options
+Control image processing behavior:
+- **Convert HEIC**: Auto-convert iPhone HEIC images to JPEG (default: true)
+- **Resize Images**: Resize images before processing (for models with size limits)
+- **Max Dimension**: Maximum width/height in pixels (default: 2048)
+- **Skip Existing**: Skip images that already have descriptions (default: true)
+- **Preserve Originals**: Keep original HEIC files after conversion (default: true)
+
+**Common Use Cases:**
+- Disable HEIC conversion if you've already converted files
+- Increase max dimension to 4096 for high-detail image analysis
+- Disable skip existing to regenerate all descriptions with a new model
+
+#### 5. Workflow Settings
+Configure workflow behavior and organization:
+- **Auto Resume**: Automatically resume interrupted workflows (default: true)
+- **Workflow Naming**: Enable/disable custom workflow names (default: true)
+- **Max Retries**: Number of retry attempts for failed requests (default: 4)
+- **Retry Delay**: Delay between retries in seconds (default: 0.6)
+- **Generate HTML**: Create HTML reports for workflows (default: true)
+- **Save Metadata**: Save workflow metadata JSON files (default: true)
+
+**Common Use Cases:**
+- Increase max retries to 6 for unreliable network conditions
+- Disable HTML generation for faster processing in production
+- Disable auto resume to force fresh runs
+
+#### 6. Output Format Settings
+Configure how results are exported and formatted:
+- **Default Format**: Choose CSV, TSV, or ATSV for combined descriptions
+- **Sort Order**: Sort images by name or date
+- **Include Metadata**: Add timestamp/model info to exports
+- **Export Encoding**: UTF-8 or system default
+
+**Common Use Cases:**
+- Switch to TSV format for Excel compatibility with long descriptions
+- Sort by date instead of filename for chronological results
+- Include metadata for audit trails
+
+### User Interface
+
+**Navigation:**
+- **Left Panel**: Menu with 6 categories
+- **Right Panel**: Settings list for selected category
+- **Bottom Buttons**:
+  - **Save** - Save changes to configuration files
+  - **Reload** - Discard changes and reload from files
+  - **Close** - Exit application
+
+**Keyboard Shortcuts:**
+- `↑/↓` - Navigate menu and settings
+- `Tab` - Switch between panels
+- `Enter` - Activate selected item
+- `Escape` - Cancel/Close
+- All controls are screen-reader accessible
+
+### Example: Changing Video Frame Extraction
+
+Let's say you're processing security camera footage and want to extract 1 frame every 30 seconds instead of every 1 second:
+
+1. **Launch IDTConfigure:**
+   ```bash
+   idt configure
+   ```
+
+2. **Navigate to Video Frame Extraction:**
+   - Click "Video Frame Extraction" in the left menu
+   - Or press `↓` arrow to navigate, then `Enter`
+
+3. **Change Frame Interval:**
+   - Select "Frame Interval (seconds)"
+   - Change from `1.0` to `30.0`
+
+4. **Save:**
+   - Click "Save" button
+   - Or press `Alt+S`
+
+5. **Close:**
+   - Click "Close"
+   - Configuration is now updated for all future workflows
+
+### Configuration Files Modified
+
+IDTConfigure manages these configuration files (located in `scripts/` directory):
+- **`image_describer_config.json`** - AI model settings, prompts, providers
+- **`video_frame_extractor_config.json`** - Video processing settings
+- **`workflow_config.json`** - Workflow behavior and organization
+
+**Note:** Changes take effect immediately for new workflows. Active workflows continue using the settings they started with.
+
+### When to Use IDTConfigure
+
+**Use IDTConfigure when you need to:**
+- ✅ Change video extraction settings (interval, mode, quality)
+- ✅ Adjust timeout values for slow models
+- ✅ Switch AI providers or models
+- ✅ Create or edit custom prompt styles
+- ✅ Configure retry logic and error handling
+- ✅ Set up API keys for cloud providers
+- ✅ Modify batch processing parameters
+- ✅ Any configuration change without editing JSON manually
+
+**Use Prompt Editor when you need to:**
+- ✅ Quick prompt text editing only
+- ✅ Simpler interface focused just on prompts
+- ✅ No need for advanced settings
+
+**IDTConfigure vs Prompt Editor:**
+- IDTConfigure manages **all** configuration files and settings
+- Prompt Editor focuses only on prompts and basic provider setup
+- Both tools are complementary—use whichever fits your needs
+
+---
+
+## 6. Getting Started: CLI Golden Path
 
 ### Option 1: Interactive Guided Setup (Recommended for Beginners)
 
@@ -341,7 +555,7 @@ Type `y` to automatically open the viewer and browse your results!
 
 ---
 
-## 6. Understanding Workflow Runs & Naming
+## 7. Understanding Workflow Runs & Naming
 
 ### What is a Workflow Run?
 
@@ -396,7 +610,7 @@ Each run is completely self-contained and independent.
 
 ---
 
-## 7. Prompt Customization
+## 8. Prompt Customization
 
 **Prompt styles control HOW your images are described** - often more important than model selection!
 
@@ -450,7 +664,7 @@ You can add your own styles by editing `scripts/image_describer_config.json`:
 
 ---
 
-## 8. Advanced CLI Usage & Commands
+## 9. Advanced CLI Usage & Commands
 
 > **📖 Complete Reference:** For comprehensive documentation of all CLI commands with detailed options and examples, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
 
@@ -551,7 +765,7 @@ idt workflow C:\Photos --view-results --name live_monitoring
 
 ---
 
-## 9. Analysis Tools
+## 10. Analysis Tools
 
 After running workflows, use these tools to analyze and export results:
 
@@ -655,7 +869,7 @@ analysis/results/
 
 ---
 
-## 10. Results Viewer (Real-Time Monitoring)
+## 11. Results Viewer (Real-Time Monitoring)
 
 The **Results Viewer** is a GUI application that lets you browse, search, and monitor your workflow results in real-time.
 
@@ -759,7 +973,7 @@ The viewer automatically detects two modes:
 
 ---
 
-## 11. Cloud Provider Setup
+## 12. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
 
@@ -811,7 +1025,7 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 
 ---
 
-## 12. Performance Tips
+## 13. Performance Tips
 
 ### Adjusting Timeout Settings
 
@@ -849,7 +1063,7 @@ idt workflow C:\Photos --timeout 300
 
 ---
 
-## 13. Batch Files Reference
+## 14. Batch Files Reference
 
 The `bat/` folder contains pre-configured batch files for quick model testing.
 
@@ -925,7 +1139,7 @@ idt workflow C:\Photos --model llava:7b --name my_custom_name
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 ### Common Issues
 

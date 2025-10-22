@@ -2,7 +2,7 @@
 REM ============================================================================
 REM Environment Setup - Create Virtual Environments for All Apps
 REM ============================================================================
-REM This script creates separate virtual environments for all four applications
+REM This script creates separate virtual environments for all five applications
 REM and installs their dependencies.
 REM
 REM What it does:
@@ -10,7 +10,8 @@ REM   1. Creates .venv for main IDT (root directory)
 REM   2. Creates .venv for viewer
 REM   3. Creates .venv for prompt_editor
 REM   4. Creates .venv for imagedescriber
-REM   5. Installs requirements.txt in each venv
+REM   5. Creates .venv for idtconfigure
+REM   6. Installs requirements.txt in each venv
 REM
 REM Prerequisites:
 REM   - Python 3.8+ installed and in PATH
@@ -28,6 +29,7 @@ echo   1. IDT (main toolkit)
 echo   2. Viewer
 echo   3. Prompt Editor
 echo   4. ImageDescriber
+echo   5. IDTConfigure
 echo.
 echo This is a ONE-TIME setup process.
 echo.
@@ -151,7 +153,7 @@ cd ..
 REM ============================================================================
 :imagedescriber_setup
 echo.
-echo [4/4] Setting up ImageDescriber...
+echo [4/5] Setting up ImageDescriber...
 echo ========================================================================
 echo.
 
@@ -167,7 +169,7 @@ if exist ".venv" (
         echo ERROR: Failed to create virtual environment for ImageDescriber
         set /a SETUP_ERRORS+=1
         cd ..
-        goto summary
+        goto idtconfigure_setup
     )
     echo Virtual environment created.
 )
@@ -182,6 +184,45 @@ if errorlevel 1 (
     set /a SETUP_ERRORS+=1
 ) else (
     echo SUCCESS: ImageDescriber environment ready
+)
+call deactivate
+
+cd ..
+
+REM ============================================================================
+:idtconfigure_setup
+echo.
+echo [5/5] Setting up IDTConfigure...
+echo ========================================================================
+echo.
+
+cd idtconfigure
+
+if exist ".venv" (
+    echo WARNING: .venv already exists in idtconfigure directory
+    echo Skipping creation, but will update requirements...
+) else (
+    echo Creating virtual environment...
+    python -m venv .venv
+    if errorlevel 1 (
+        echo ERROR: Failed to create virtual environment for IDTConfigure
+        set /a SETUP_ERRORS+=1
+        cd ..
+        goto summary
+    )
+    echo Virtual environment created.
+)
+
+echo.
+echo Installing dependencies...
+call .venv\Scripts\activate.bat
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERROR: Failed to install IDTConfigure dependencies
+    set /a SETUP_ERRORS+=1
+) else (
+    echo SUCCESS: IDTConfigure environment ready
 )
 call deactivate
 
@@ -203,6 +244,7 @@ if "%SETUP_ERRORS%"=="0" (
     if exist "viewer\.venv" echo   - Viewer:            viewer\.venv
     if exist "prompt_editor\.venv" echo   - Prompt Editor:    prompt_editor\.venv
     if exist "imagedescriber\.venv" echo   - ImageDescriber:   imagedescriber\.venv
+    if exist "idtconfigure\.venv" echo   - IDTConfigure:     idtconfigure\.venv
     echo.
     echo All dependencies installed.
     echo.
