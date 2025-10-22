@@ -133,8 +133,11 @@ def parse_workflow_log(log_path: Path) -> Dict:
     Returns:
         Dictionary containing workflow statistics
     """
+    workflow_dir_path = log_path.parent.parent
     stats = {
-        'workflow_dir': log_path.parent.parent.name,
+        'workflow_dir': workflow_dir_path,  # Store as Path object for metadata access
+        'workflow_dir_name': workflow_dir_path.name,  # Store name separately for compatibility
+        'workflow_name': None,  # Will be populated from metadata if available
         'log_file': log_path.name,
         'start_time': None,
         'end_time': None,
@@ -168,11 +171,17 @@ def parse_workflow_log(log_path: Path) -> Dict:
         print(f"Warning: {log_path} not found")
         return stats
     
+    # Get workflow name from metadata if available
+    stats['workflow_name'] = get_workflow_name(workflow_dir_path)
+    
+    # Get workflow name from metadata if available
+    stats['workflow_name'] = get_workflow_name(workflow_dir_path)
+    
     # Extract provider, model, and prompt_style from directory name
     # Format examples:
     #   wf_PROVIDER_MODEL_PROMPTSTYLE_DATETIME
     #   wf_FOLDER_PROVIDER_MODEL_PROMPTSTYLE_DATETIME (when processing specific folders)
-    dir_name = log_path.parent.parent.name
+    dir_name = workflow_dir_path.name
     parts = dir_name.split('_')
     
     # Known providers
@@ -470,6 +479,32 @@ def parse_workflow_log(log_path: Path) -> Dict:
     return stats
 
 
+def get_workflow_name(workflow_dir: Path) -> str:
+    """
+    Get the workflow name from workflow_metadata.json if it exists.
+    
+    Args:
+        workflow_dir: Path to the workflow directory
+        
+    Returns:
+        Workflow name string (or None if not available)
+    """
+    import json
+    
+    metadata_file = workflow_dir / "workflow_metadata.json"
+    
+    if metadata_file.exists():
+        try:
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+                return metadata.get('workflow_name')
+        except Exception as e:
+            print(f"Warning: Could not read metadata from {metadata_file}: {e}")
+    
+    # No metadata file - workflows created before the naming feature
+    return None
+
+
 def get_workflow_label(workflow_dir_name: str) -> str:
     """
     Extract a readable label from the workflow directory name.
@@ -486,19 +521,31 @@ def get_workflow_label(workflow_dir_name: str) -> str:
     """
     parts = workflow_dir_name.split('_')
     
-    if len(parts) >= 3:
+    # Known providers
+    known_providers = ['ollama', 'claude', 'openai']
+    
+    # Detect if parts[1] is a provider or a workflow name
+    # If parts[1] is a known provider, use format 1
+    # Otherwise, assume format 2 (workflow name prefix)
+    provider_idx = 1
+    if len(parts) > 2 and parts[1].lower() not in known_providers:
+        # Format 2: wf_WORKFLOWNAME_PROVIDER_...
+        provider_idx = 2
+    
+    if len(parts) >= provider_idx + 2:
         # Detect if parts[1] is a provider or workflow name
         # Providers are: ollama, claude, openai
-        if parts[1].lower() in ['ollama', 'claude', 'openai']:
-            # Format 1: wf_{provider}_{model}_{variant}_...
-            provider = parts[1].capitalize()
-            model_part = parts[2]
-            variant = parts[3] if len(parts) > 3 and parts[3] not in ['narrative', 'detailed', 'concise', 'colorful', 'artistic', 'technical', 'simple'] else None
-        else:
-            # Format 2: wf_{workflow_name}_{provider}_{model}_{variant}_...
-            provider = parts[2].capitalize() if len(parts) > 2 else parts[1].capitalize()
-            model_part = parts[3] if len(parts) > 3 else parts[2]
-            variant = parts[4] if len(parts) > 4 and parts[4] not in ['narrative', 'detailed', 'concise', 'colorful', 'artistic', 'technical', 'simple'] else None
+        provider = parts[provider_idx].capitalize()
+        model_part = parts[provider_idx + 1]
+        
+        # Known prompt styles
+        prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic', 'simple']
+        
+        # Determine if there's a variant (between model and prompt style)
+        variant = None
+        variant_idx = provider_idx + 2
+        if len(parts) > variant_idx and parts[variant_idx].lower() not in prompt_styles and not parts[variant_idx].isdigit():
+            variant = parts[variant_idx]
         
         # Create readable labels for Claude models
         if provider.lower() == 'claude':
@@ -658,9 +705,12 @@ def print_section_header(title: str):
 
 def print_workflow_stats(stats: Dict):
     """Print statistics for a single workflow."""
-    label = get_workflow_label(stats['workflow_dir'])
+    label = get_workflow_label(stats['workflow_dir_name'])
+    workflow_name = stats.get('workflow_name')
     
     print(f"\n{label}")
+    if workflow_name:
+        print(f"Workflow: {workflow_name}")
     if stats['prompt_style']:
         print(f"Prompt: {stats['prompt_style']}")
     print("-" * 80)
@@ -783,7 +833,7 @@ def print_comparison_table(all_stats: List[Dict]):
     
     # Rows
     for stats in valid_stats:
-        label = get_workflow_label(stats['workflow_dir'])
+        label = get_workflow_label(stats['workflow_dir_name'])
         prompt = stats['prompt_style'] if stats['prompt_style'] else "N/A"
         files = f"{stats['total_files_processed']:,}" if stats['total_files_processed'] else "N/A"
         duration = format_duration(stats['total_duration_seconds']) if stats['total_duration_seconds'] else "N/A"
@@ -810,7 +860,7 @@ def print_rankings(all_stats: List[Dict]):
     print("🏆 Fastest Average Processing Time:")
     sorted_by_speed = sorted(valid_stats, key=lambda x: x['average_time_per_image'])
     for i, stats in enumerate(sorted_by_speed, 1):
-        label = get_workflow_label(stats['workflow_dir'])
+        label = get_workflow_label(stats['workflow_dir_name'])
         prompt = f"({stats['prompt_style']})" if stats['prompt_style'] else ""
         print(f"  {i}. {label:<30} {prompt:<12} {stats['average_time_per_image']:.2f}s/image")
     
@@ -819,7 +869,7 @@ def print_rankings(all_stats: List[Dict]):
     stats_with_range = [(s, s['max_time'] - s['min_time']) for s in valid_stats if s['min_time'] is not None]
     sorted_by_consistency = sorted(stats_with_range, key=lambda x: x[1])
     for i, (stats, range_val) in enumerate(sorted_by_consistency, 1):
-        label = get_workflow_label(stats['workflow_dir'])
+        label = get_workflow_label(stats['workflow_dir_name'])
         prompt = f"({stats['prompt_style']})" if stats['prompt_style'] else ""
         print(f"  {i}. {label:<30} {prompt:<12} Range: {range_val:.2f}s (min: {stats['min_time']:.2f}s, max: {stats['max_time']:.2f}s)")
     
@@ -833,7 +883,7 @@ def print_rankings(all_stats: List[Dict]):
     
     sorted_by_throughput = sorted(throughput_list, key=lambda x: x[1], reverse=True)
     for i, (stats, throughput) in enumerate(sorted_by_throughput, 1):
-        label = get_workflow_label(stats['workflow_dir'])
+        label = get_workflow_label(stats['workflow_dir_name'])
         prompt = f"({stats['prompt_style']})" if stats['prompt_style'] else ""
         print(f"  {i}. {label:<30} {prompt:<12} {throughput:.1f} images/minute")
 
@@ -899,7 +949,7 @@ def calculate_aggregate_stats(all_stats: List[Dict]):
                 )
                 
                 if cost_info:
-                    label = get_workflow_label(stats['workflow_dir'])
+                    label = get_workflow_label(stats['workflow_dir_name'])
                     # Use processing_times count if total_files_processed is 0 (incomplete runs)
                     image_count = stats['total_files_processed'] if stats['total_files_processed'] > 0 else len(stats['processing_times'])
                     
@@ -921,10 +971,18 @@ def calculate_aggregate_stats(all_stats: List[Dict]):
 
 def save_stats_json(all_stats: List[Dict], output_file: Path):
     """Save statistics to JSON file for later analysis."""
-    # Convert stats to JSON-serializable format
+    # Convert stats to JSON-serializable format (Path objects to strings)
+    json_stats = []
+    for stats in all_stats:
+        json_stat = stats.copy()
+        # Convert Path objects to strings
+        if 'workflow_dir' in json_stat and isinstance(json_stat['workflow_dir'], Path):
+            json_stat['workflow_dir'] = str(json_stat['workflow_dir'])
+        json_stats.append(json_stat)
+    
     json_data = {
         'generated_at': datetime.now().isoformat(),
-        'workflows': all_stats
+        'workflows': json_stats
     }
     
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -941,9 +999,10 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
         
         # Header row
         writer.writerow([
-            'Workflow',
-            'Provider',
+            'Workflow Name',
             'Model',
+            'Provider',
+            'Model ID',
             'Prompt',
             'Total Files in Workflow',
             'Total Duration (seconds)',
@@ -973,7 +1032,8 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
         
         # Data rows
         for stats in all_stats:
-            label = get_workflow_label(stats['workflow_dir'])
+            model_label = get_workflow_label(stats['workflow_dir_name'])
+            workflow_name = stats.get('workflow_name', '') or '(legacy)'
             
             # Calculate standard deviation if we have processing times
             std_dev = None
@@ -996,7 +1056,8 @@ def save_stats_csv(all_stats: List[Dict], output_file: Path):
             non_heic = stats['total_files_processed'] - stats['heic_files_converted'] - stats['frames_extracted']
             
             writer.writerow([
-                label,
+                workflow_name,
+                model_label,
                 stats['provider'] or '',
                 stats['model'] or '',
                 stats['prompt_style'] or '',
