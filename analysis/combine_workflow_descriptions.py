@@ -244,15 +244,20 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
         wf_ollama_llava_7b_artistic_... -> ("Ollama LLaVA 7B", "artistic")
         wf_ollama_llava_13b_narrative_... -> ("Ollama LLaVA 13B", "narrative")
         wf_openai_gpt-4o-mini_detailed_... -> ("OpenAI GPT-4o-mini", "detailed")
+        wf_10multipletest_ollama_gemma3_narrative_... -> ("Ollama Gemma3", "narrative")
     """
     dir_name = workflow_dir.name
     
     # Extract provider and model from directory name
     # Format: wf_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
+    # OR: wf_WORKFLOWNAME_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
     parts = dir_name.split('_')
     
     # Known prompt styles (must match those in image_describer_config.json)
     prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic', 'simple']
+    
+    # Known providers
+    known_providers = ['ollama', 'claude', 'openai']
     
     # Find the prompt style (it's the part before the datetime)
     prompt_style = 'unknown'
@@ -261,15 +266,24 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
             prompt_style = part
             break
     
-    if len(parts) >= 3:
-        provider = parts[1].capitalize()
-        model_part = parts[2]
+    # Detect if parts[1] is a provider or a workflow name
+    # If parts[1] is a known provider, use format 1
+    # Otherwise, assume format 2 (workflow name prefix)
+    provider_idx = 1
+    if len(parts) > 2 and parts[1].lower() not in known_providers:
+        # Format 2: wf_WORKFLOWNAME_PROVIDER_...
+        provider_idx = 2
+    
+    if len(parts) >= provider_idx + 2:
+        provider = parts[provider_idx].capitalize()
+        model_part = parts[provider_idx + 1]
         
         # Determine if there's a variant (between model and prompt style)
-        # Check if parts[3] is NOT a prompt style and NOT a timestamp
+        # Check if parts[provider_idx + 2] is NOT a prompt style and NOT a timestamp
         variant = None
-        if len(parts) > 3 and parts[3].lower() not in prompt_styles and not parts[3].isdigit():
-            variant = parts[3]
+        variant_idx = provider_idx + 2
+        if len(parts) > variant_idx and parts[variant_idx].lower() not in prompt_styles and not parts[variant_idx].isdigit():
+            variant = parts[variant_idx]
         
         # Create readable labels for Claude models
         model_label = None
@@ -302,8 +316,12 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
         
         # Create readable labels for Ollama models
         elif provider.lower() == 'ollama':
+            # bakllava (must check BEFORE generic llava to avoid false match)
+            if model_part == 'bakllava':
+                model_label = "Ollama BakLLaVA"
+            
             # llava with variant (7b, 13b, 34b, latest)
-            if 'llava' in model_part:
+            elif 'llava' in model_part:
                 base = "LLaVA"
                 if 'phi3' in model_part:
                     base = "LLaVA-Phi3"
@@ -326,11 +344,9 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
                 else:
                     model_label = "Ollama Llama3.2-Vision"
             
-            # Other Ollama models (moondream, bakllava, etc.)
+            # Other Ollama models (moondream, minicpm, etc.)
             elif model_part == 'moondream':
                 model_label = "Ollama Moondream"
-            elif model_part == 'bakllava':
-                model_label = "Ollama BakLLaVA"
             elif 'minicpm' in model_part:
                 if variant and variant.endswith('b'):
                     model_label = f"Ollama MiniCPM-V {variant.upper()}"
@@ -348,7 +364,22 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
                 else:
                     model_label = f"Ollama {model_part.title()}"
             elif 'qwen' in model_part:
-                model_label = "Ollama Qwen 2.5 VL"
+                # Handle different Qwen models
+                if 'qwen2.5vl' in model_part or 'qwen2-5vl' in model_part:
+                    base = "Qwen2.5-VL"
+                elif 'qwen3-vl' in model_part or 'qwen3vl' in model_part:
+                    base = "Qwen3-VL"
+                elif 'qwen3-coder' in model_part:
+                    base = "Qwen3-Coder"
+                else:
+                    base = "Qwen"
+                
+                if variant and variant != 'latest':
+                    # Handle variants like "235b-cloud", "480b-cloud"
+                    variant_display = variant.replace('-cloud', ' Cloud').replace('b', 'B')
+                    model_label = f"Ollama {base} {variant_display}"
+                else:
+                    model_label = f"Ollama {base}"
             else:
                 # Generic fallback for Ollama
                 if variant and variant != 'latest':

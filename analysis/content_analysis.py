@@ -370,30 +370,46 @@ Examples:
     parser.add_argument(
         '--input',
         type=str,
-        default='analysis/results/combineddescriptions.csv',
-        help='Input file with combined descriptions (default: analysis/results/combineddescriptions.csv, CSV/TSV/ATSV auto-detected)'
+        default='combineddescriptions.csv',
+        help='Input file with combined descriptions (default: combineddescriptions.csv in analysis/results, CSV/TSV/ATSV auto-detected)'
     )
     
     parser.add_argument(
         '--output',
         type=str,
         default='analysis/results/description_content_analysis.csv',
-        help='Output CSV filename (default: analysis/results/description_content_analysis.csv)'
+        help='Output CSV filename (default: analysis/results/description_content_analysis.csv, relative to current directory)'
     )
     
     args = parser.parse_args()
     
-    # Find the combined descriptions file - check results/ directory first, then analysis/ directory
-    # Default to results directory in current working directory
-    csv_path = Path.cwd() / "results" / args.input
+    # Resolve input path - handle both absolute and relative paths
+    input_path = Path(args.input)
     
-    if not csv_path.exists():
-        # Fall back to analysis directory for backward compatibility
-        csv_path = get_resource_path(f"analysis/{args.input}")
+    if input_path.is_absolute():
+        # User provided an absolute path
+        csv_path = input_path
+    else:
+        # Relative path - try multiple locations
+        # 1. Try relative to current working directory
+        csv_path = Path.cwd() / args.input
+        
+        if not csv_path.exists():
+            # 2. Try just the filename in results/ (strip any path from default)
+            just_filename = Path(args.input).name
+            csv_path = Path.cwd() / "results" / just_filename
+        
+        if not csv_path.exists():
+            # 3. Try analysis/results/ from script directory
+            csv_path = get_resource_path("analysis/results") / just_filename
     
     if not csv_path.exists():
         print(f"Error: Combined descriptions file not found at: {csv_path}")
-        print("\nPlease run combine_workflow_descriptions.py first to generate the file,")
+        print(f"\nSearched for: {args.input}")
+        print(f"  - {Path.cwd() / args.input}")
+        print(f"  - {Path.cwd() / 'results' / Path(args.input).name}")
+        print(f"  - {get_resource_path('analysis/results') / Path(args.input).name}")
+        print("\nPlease run 'idt combinedescriptions' first to generate the file,")
         print("or specify the correct file with --input")
         return 1
     
@@ -426,11 +442,9 @@ Examples:
     if len(all_stats) > 1:
         print_comparison(all_stats)
     
-    # Save to CSV in analysis/results directory with safe filename
-    output_dir = get_resource_path("analysis/results")
-    ensure_directory(output_dir)
-    
-    output_csv = output_dir / args.output
+    # Save to CSV - resolve to absolute path like stats_analysis does
+    output_csv = Path(args.output).resolve()
+    ensure_directory(output_csv.parent)
     output_csv = get_safe_filename(output_csv)
     
     save_analysis_csv(all_stats, output_csv)
