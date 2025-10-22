@@ -965,9 +965,14 @@ class WorkflowOrchestrator:
             def monitor_progress():
                 """Monitor the progress file and update status in real-time"""
                 last_count = 0
+                last_status_update = 0
+                checks_without_file = 0
                 while self.step_results.get('describe', {}).get('in_progress', False):
                     try:
                         if progress_file.exists():
+                            if checks_without_file > 0:
+                                self.logger.info(f"Progress file appeared after {checks_without_file} checks: {progress_file}")
+                                checks_without_file = 0
                             # Count lines in progress file (each line = one completed image)
                             with open(progress_file, 'r', encoding='utf-8') as f:
                                 lines = f.readlines()
@@ -978,14 +983,25 @@ class WorkflowOrchestrator:
                                 self.step_results['describe']['processed'] = current_count
                                 # Update status log
                                 self._update_status_log()
+                                # Log every 10 images or when transitioning from 0
+                                if current_count - last_status_update >= 10 or (last_count == 0 and current_count > 0):
+                                    self.logger.info(f"Progress update: {current_count}/{self.step_results['describe']['total']} images described, status.log updated")
+                                    last_status_update = current_count
                                 last_count = current_count
+                        else:
+                            checks_without_file += 1
+                            if checks_without_file == 1:
+                                self.logger.info(f"Waiting for progress file to be created: {progress_file}")
+                            elif checks_without_file % 10 == 0:  # Log every 20 seconds
+                                self.logger.warning(f"Progress file still not found after {checks_without_file} checks ({checks_without_file * 2}s)")
                         
                         time.sleep(2)  # Check every 2 seconds
                     except Exception as e:
-                        self.logger.debug(f"Progress monitoring error: {e}")
+                        self.logger.warning(f"Progress monitoring error: {e}")
                         time.sleep(5)  # Wait longer on error
             
             # Start progress monitoring in background thread
+            self.logger.info(f"Starting progress monitoring thread (checking {progress_file} every 2 seconds)")
             progress_thread = threading.Thread(target=monitor_progress, daemon=True)
             progress_thread.start()
             

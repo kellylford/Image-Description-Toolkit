@@ -3,8 +3,8 @@ REM ============================================================================
 REM Release All Applications - Complete Build and Package
 REM ============================================================================
 REM This master script does everything needed for a complete release:
-REM   1. Builds all four applications (builditall.bat)
-REM   2. Packages all four applications (packageitall.bat)
+REM   1. Builds all five applications (builditall.bat)
+REM   2. Packages all five applications (packageitall.bat)
 REM   3. All distribution packages ready in releases/ directory
 REM
 REM Prerequisites:
@@ -16,6 +16,7 @@ REM   - releases/ImageDescriptionToolkit_v[VERSION].zip
 REM   - releases/viewer_v[VERSION]_[ARCH].zip
 REM   - releases/prompt_editor_v[VERSION]_[ARCH].zip
 REM   - releases/imagedescriber_v[VERSION]_[ARCH].zip
+REM   - releases/idtconfigure_v[VERSION].zip
 REM   - releases/idt2.zip (master package containing all individual packages)
 REM ============================================================================
 
@@ -24,11 +25,12 @@ echo ========================================================================
 echo COMPLETE RELEASE BUILD
 echo ========================================================================
 echo.
-echo This will build and package all four applications:
+echo This will build and package all five applications:
 echo   1. IDT (main toolkit)
 echo   2. Viewer
 echo   3. Prompt Editor
 echo   4. ImageDescriber
+echo   5. IDTConfigure
 echo.
 echo All distribution packages will be created in releases/ directory.
 echo A master package (idt2.zip) will also be created containing all packages.

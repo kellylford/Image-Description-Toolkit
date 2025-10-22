@@ -2,11 +2,12 @@
 REM ============================================================================
 REM Package All Applications - Master Packaging Script
 REM ============================================================================
-REM This script creates distribution packages for all four applications:
+REM This script creates distribution packages for all five applications:
 REM   1. IDT (main command-line toolkit)
 REM   2. Viewer (image description viewer GUI)
 REM   3. Prompt Editor (prompt configuration GUI)
 REM   4. ImageDescriber (batch processing GUI)
+REM   5. IDTConfigure (configuration management GUI)
 REM
 REM Prerequisites:
 REM   - All applications built (run builditall.bat first)
@@ -16,6 +17,7 @@ REM   - releases/ImageDescriptionToolkit_v[VERSION].zip
 REM   - releases/viewer_v[VERSION].zip
 REM   - releases/prompt_editor_v[VERSION].zip
 REM   - releases/imagedescriber_v[VERSION].zip
+REM   - releases/idtconfigure_v[VERSION].zip
 REM   - releases/install_idt.bat (universal installer)
 REM   - releases/README.md (installation instructions)
 REM ============================================================================
@@ -25,7 +27,7 @@ echo ========================================================================
 echo PACKAGE ALL APPLICATIONS
 echo ========================================================================
 echo.
-echo This will create distribution packages for all four applications
+echo This will create distribution packages for all five applications
 echo and copy installer scripts to the releases directory.
 echo All packages will be placed in the releases/ directory.
 echo.
@@ -129,7 +131,33 @@ cd ..
 
 REM ============================================================================
 echo.
-echo [5/5] Copying installer script to releases...
+echo [5/5] Packaging IDTConfigure...
+echo ========================================================================
+echo.
+
+cd idtconfigure
+call package_idtconfigure.bat
+if errorlevel 1 (
+    echo ERROR: IDTConfigure packaging failed!
+    set /a PACKAGE_ERRORS+=1
+) else (
+    echo SUCCESS: IDTConfigure packaged successfully
+    REM Move idtconfigure package to main releases directory
+    if exist "idtconfigure_releases\*.zip" (
+        echo Moving idtconfigure package to releases\...
+        move /Y "idtconfigure_releases\*.zip" "..\releases\" >nul
+        if errorlevel 1 (
+            echo WARNING: Failed to move idtconfigure package
+        ) else (
+            echo IDTConfigure package moved to releases\
+        )
+    )
+)
+cd ..
+
+REM ============================================================================
+echo.
+echo [6/6] Copying installer script to releases...
 echo ========================================================================
 echo.
 

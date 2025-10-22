@@ -28,6 +28,7 @@ IDT v2.0 includes **multiple applications** that can be used independently or to
 | **Results Viewer** | `viewer.exe` | Browse and monitor workflow results | GUI |
 | **ImageDescriber** | `imagedescriber.exe` | Interactive batch processing | GUI |
 | **Prompt Editor** | `prompteditor.exe` | Visual prompt template editor | GUI |
+| **IDTConfigure** | `idtconfigure.exe` | Configuration file management | GUI |
 
 ### **Usage Patterns**
 
@@ -66,6 +67,7 @@ idt workflow              # Direct workflow execution
 idt viewer                # Launch results viewer GUI
 idt imagedescriber        # Launch batch processing GUI  
 idt prompteditor          # Launch prompt editor GUI
+idt configure             # Launch configuration management GUI
 
 # Analysis Tools
 idt combinedescriptions   # Export workflows to CSV/Excel (date-sorted by default)
@@ -353,6 +355,54 @@ idt imagedescriber
 # Launch ImageDescriber GUI
 idt imagedescriber
 ```
+
+#### `configure` - Configuration Management
+
+```bash
+idt configure
+```
+
+**What it does:**
+- Launches IDTConfigure GUI for managing all toolkit configuration files
+- Visual editor for AI model settings, prompts, video extraction, processing options, workflows, and output formats
+- Menu-driven interface with 30+ configurable settings
+- No need to manually edit JSON files
+- Changes take effect immediately for new workflows
+
+**Configuration Categories:**
+1. **AI Model Settings** - Provider, model, API keys, timeout, batch size
+2. **Prompt Styles** - Add/edit/delete custom prompt templates
+3. **Video Frame Extraction** - Frame interval, quality, limit, extraction mode
+4. **Processing Options** - HEIC conversion, image resizing, skip existing
+5. **Workflow Settings** - Auto resume, max retries, HTML generation
+6. **Output Format** - CSV/TSV/ATSV, sort order, metadata inclusion
+
+**Common Use Cases:**
+```bash
+# Change video extraction to 1 frame every 30 seconds
+idt configure
+# Navigate to "Video Frame Extraction" → "Frame Interval" → Set to 30.0
+
+# Increase timeout for slow models
+idt configure
+# Navigate to "AI Model Settings" → "Timeout" → Set to 360
+
+# Add custom prompt style
+idt configure
+# Navigate to "Prompt Styles" → "Add New Prompt"
+
+# Switch AI provider
+idt configure
+# Navigate to "AI Model Settings" → "Provider" → Select "claude" or "openai"
+```
+
+**Example:**
+```bash
+# Launch configuration GUI
+idt configure
+```
+
+**Alternative:** Run `idtconfigure.exe` directly
 
 ### Analysis Tools
 
@@ -902,10 +952,37 @@ idt contentreview > analysis/content_review.txt
 idt descriptions-to-html Descriptions/workflow_batch_* --output reports/full_report.html
 ```
 
+### Configuration Management
+```bash
+# Change video extraction settings for long videos
+idt configure
+# Set Frame Interval to 30.0 seconds
+# Set Frame Limit to 300
+
+# Adjust timeout for slow models like LLaVA 34B
+idt configure
+# Navigate to AI Model Settings → Timeout → Set to 360
+
+# Switch providers and models
+idt configure
+# Set Provider to "claude"
+# Set Model to "claude-3-haiku-20240307"
+# Enter API key in API Keys section
+
+# Create custom prompt for technical documentation
+idt configure
+# Navigate to Prompt Styles → Add New Prompt
+# Name: "technical_docs"
+# Text: "Describe this image in technical detail..."
+```
+
 ### GUI Application Workflows
 ```cmd
 REM Windows batch file example
 REM Process images with GUI tools
+
+REM Configure settings first
+idt configure
 
 REM Launch batch processing
 imagedescriber.exe
@@ -913,7 +990,7 @@ imagedescriber.exe
 REM View results (can run simultaneously)
 viewer.exe
 
-REM Edit prompts for next run
+REM Edit prompts for quick changes
 prompteditor.exe scripts\image_describer_config.json
 ```
 
