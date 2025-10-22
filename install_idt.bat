@@ -11,6 +11,7 @@ REM     * ImageDescriptionToolkit_v*.zip (main toolkit)
 REM     * viewer_v*.zip (viewer GUI)
 REM     * prompt_editor_v*.zip (prompt editor GUI)
 REM     * imagedescriber_v*.zip (image describer GUI)
+REM     * idtconfigure_v*.zip (configuration GUI)
 REM   - PowerShell available (for unzipping)
 REM
 REM Output:
@@ -73,6 +74,16 @@ if "%DESCRIBER_PACKAGE%"=="" (
     echo Found: %DESCRIBER_PACKAGE%
 )
 
+REM Find the idtconfigure package
+set IDTCONFIG_PACKAGE=
+for %%f in (idtconfigure_v*.zip) do set IDTCONFIG_PACKAGE=%%f
+if "%IDTCONFIG_PACKAGE%"=="" (
+    echo ERROR: IDTConfigure package not found ^(idtconfigure_v*.zip^)
+    set /a MISSING_PACKAGES+=1
+) else (
+    echo Found: %IDTCONFIG_PACKAGE%
+)
+
 echo.
 
 if %MISSING_PACKAGES% gtr 0 (
@@ -105,11 +116,12 @@ mkdir "idt"
 mkdir "idt\Viewer"
 mkdir "idt\ImageDescriber"
 mkdir "idt\PromptEditor"
+mkdir "idt\IDTConfigure"
 echo Done.
 echo.
 
 REM Extract main IDT package to root
-echo [1/4] Installing main IDT toolkit...
+echo [1/5] Installing main IDT toolkit...
 powershell -Command "Expand-Archive -Path '%IDT_PACKAGE%' -DestinationPath 'idt' -Force"
 if errorlevel 1 (
     echo ERROR: Failed to extract main IDT package
@@ -120,7 +132,7 @@ echo Done.
 echo.
 
 REM Extract Viewer package
-echo [2/4] Installing Viewer...
+echo [2/5] Installing Viewer...
 powershell -Command "Expand-Archive -Path '%VIEWER_PACKAGE%' -DestinationPath 'idt\Viewer' -Force"
 if errorlevel 1 (
     echo ERROR: Failed to extract Viewer package
@@ -131,7 +143,7 @@ echo Done.
 echo.
 
 REM Extract Prompt Editor package
-echo [3/4] Installing Prompt Editor...
+echo [3/5] Installing Prompt Editor...
 powershell -Command "Expand-Archive -Path '%PROMPT_PACKAGE%' -DestinationPath 'idt\PromptEditor' -Force"
 if errorlevel 1 (
     echo ERROR: Failed to extract Prompt Editor package
@@ -142,10 +154,21 @@ echo Done.
 echo.
 
 REM Extract ImageDescriber package
-echo [4/4] Installing ImageDescriber...
+echo [4/5] Installing ImageDescriber...
 powershell -Command "Expand-Archive -Path '%DESCRIBER_PACKAGE%' -DestinationPath 'idt\ImageDescriber' -Force"
 if errorlevel 1 (
     echo ERROR: Failed to extract ImageDescriber package
+    pause
+    exit /b 1
+)
+echo Done.
+echo.
+
+REM Extract IDTConfigure package
+echo [5/5] Installing IDTConfigure...
+powershell -Command "Expand-Archive -Path '%IDTCONFIG_PACKAGE%' -DestinationPath 'idt\IDTConfigure' -Force"
+if errorlevel 1 (
+    echo ERROR: Failed to extract IDTConfigure package
     pause
     exit /b 1
 )
@@ -163,6 +186,7 @@ echo   idt\                   - Main toolkit with idt.exe
 echo   idt\Viewer\            - Viewer GUI application
 echo   idt\ImageDescriber\    - ImageDescriber GUI application
 echo   idt\PromptEditor\      - Prompt Editor GUI application
+echo   idt\IDTConfigure\      - IDTConfigure GUI application
 echo.
 echo NEXT STEPS:
 echo.
