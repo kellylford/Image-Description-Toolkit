@@ -47,17 +47,22 @@ def parse_workflow_directory(dir_name: str) -> Optional[Tuple[str, str, str, str
     workflow_name = parts[0]
     provider = parts[1]
     
-    # Find timestamp (last part, numeric)
-    timestamp_idx = -1
-    for i in range(len(parts) - 1, -1, -1):
-        if parts[i].replace('-', '').replace(':', '').isdigit():
-            timestamp_idx = i
-            break
+    # Find timestamp - it's the last TWO parts (YYYYMMDD_HHMMSS)
+    # Both should be numeric (digits only)
+    if len(parts) < 2:
+        return None
+    
+    # Check if last two parts form a valid timestamp
+    if (parts[-2].isdigit() and len(parts[-2]) == 8 and  # Date: YYYYMMDD
+        parts[-1].isdigit() and len(parts[-1]) == 6):    # Time: HHMMSS
+        timestamp_idx = len(parts) - 2  # Index of date part
+    else:
+        return None
     
     if timestamp_idx < 4:
         return None
     
-    # Prompt style is before timestamp
+    # Prompt style is before timestamp (before date part)
     prompt_style = parts[timestamp_idx - 1]
     
     # Model is everything between provider and prompt_style
@@ -94,8 +99,9 @@ def extract_descriptions(desc_file: Path) -> Dict[str, Dict[str, str]]:
             prompt_match = re.search(r'^Prompt Style:\s*(.+?)$', block, re.MULTILINE)
             timestamp_match = re.search(r'^Timestamp:\s*(.+?)$', block, re.MULTILINE)
             
-            # Extract description (everything after "Description:" up to "Timestamp:")
-            desc_match = re.search(r'Description:\s*\n(.*?)\n\s*Timestamp:', block, re.DOTALL)
+            # Extract description (everything after "Description: " up to "Timestamp:")
+            # Description can start on same line or next line
+            desc_match = re.search(r'Description:\s*(.*?)\s*Timestamp:', block, re.DOTALL)
             
             if file_match and desc_match:
                 file_path = file_match.group(1).strip()
@@ -206,9 +212,10 @@ def write_output_files(data: Dict, output_dir: Path):
     
     # Generate and write index
     config = generate_config_index(data)
+    from datetime import datetime
     index_data = {
         'configs': config,
-        'generated': Path.ctime(output_dir).__str__(),
+        'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'total_configurations': sum(
             len(prompts) 
             for models in data.values() 
