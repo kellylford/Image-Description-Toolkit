@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDT Demo Gallery - AI Image Descriptions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #0099ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            color: #aaa;
+            font-size: 14px;
+        }
+        
+        .config-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .config-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .config-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .config-group label {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        select {
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        select:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #0099ff;
+        }
+        
+        .status-bar {
+            background: rgba(0, 153, 255, 0.1);
+            border-left: 3px solid #0099ff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #00d4ff;
+        }
+        
+        .gallery-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        @media (min-width: 1024px) {
+            .gallery-container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        .image-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .image-container {
+            position: relative;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #0099ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .description-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .description-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .description-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+        
+        .model-badge {
+            background: rgba(0, 153, 255, 0.2);
+            color: #00d4ff;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .description-text {
+            color: #ddd;
+            line-height: 1.8;
+            font-size: 15px;
+        }
+        
+        .description-text p {
+            margin-bottom: 15px;
+        }
+        
+        .no-description {
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #0099ff, #00d4ff);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-weight: 500;
+            box-shadow: 0 4px 15px rgba(0, 153, 255, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 153, 255, 0.5);
+        }
+        
+        button:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            cursor: not-allowed;
+            opacity: 0.5;
+            box-shadow: none;
+            transform: none;
+        }
+        
+        .image-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .counter {
+            font-size: 16px;
+            font-weight: 500;
+            color: #aaa;
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        .metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .metadata-item {
+            font-size: 12px;
+        }
+        
+        .metadata-label {
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metadata-value {
+            color: #ddd;
+            font-weight: 500;
+            margin-top: 3px;
+        }
+        
+        .keyboard-hint {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 Image Description Toolkit - Interactive Demo</h1>
+        <p>Compare AI vision models across different providers and configurations</p>
+    </div>
+
+    <div class="config-panel">
+        <div class="config-row">
+            <div class="config-group">
+                <label for="providerSelect">AI Provider</label>
+                <select id="providerSelect" onchange="updateModelOptions()">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            
+            <div class="config-group">
+                <label for="modelSelect">Model</label>
+                <select id="modelSelect" onchange="updatePromptOptions()">
+                    <option value="">Select provider first...</option>
+                </select>
+            </div>
+            
+            <div class="config-group">
+                <label for="promptSelect">Prompt Style</label>
+                <select id="promptSelect" onchange="loadDescription()">
+                    <option value="">Select model first...</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="status-bar" id="statusBar">
+            Ready - Select configuration to view descriptions
+        </div>
+    </div>
+
+    <div class="gallery-container">
+        <div class="image-panel">
+            <div class="image-container" id="imageContainer">
+                <div class="loading-spinner"></div>
+            </div>
+            <div class="image-info" id="imageInfo">Loading image...</div>
+            <div class="counter" id="counter"></div>
+        </div>
+        
+        <div class="description-panel">
+            <div class="description-header">
+                <div class="description-title">AI Description</div>
+                <div class="model-badge" id="modelBadge">No model selected</div>
+            </div>
+            <div class="description-text" id="descriptionText">
+                <div class="no-description">
+                    Select an AI provider, model, and prompt style to see the description.
+                </div>
+            </div>
+            <div class="metadata" id="metadata" style="display: none;">
+                <div class="metadata-item">
+                    <div class="metadata-label">Provider</div>
+                    <div class="metadata-value" id="metaProvider">-</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">Model</div>
+                    <div class="metadata-value" id="metaModel">-</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">Prompt</div>
+                    <div class="metadata-value" id="metaPrompt">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="prevBtn" onclick="previousImage()">← Previous</button>
+        <button id="nextBtn" onclick="nextImage()">Next →</button>
+    </div>
+    
+    <div class="keyboard-hint">Use ← → arrow keys to navigate</div>
+
+    <script>
+        // Configuration - Update this when deploying
+        const CONFIG = {
+            imagesBaseUrl: './',  // Where images are stored
+            descriptionsBaseUrl: './descriptions/',  // Where JSON description files are stored
+            workflowPattern: '25imagetest'  // Pattern to match workflow directories
+        };
+
+        // Global state
+        let currentImageIndex = 0;
+        let images = [];
+        let descriptionsData = {};
+        let availableConfigs = {
+            providers: [],
+            models: {},
+            prompts: {}
+        };
+
+        // Initialize on load
+        window.addEventListener('load', async () => {
+            await loadImageList();
+            await loadDescriptionsIndex();
+            populateProviderDropdown();
+            updateImage();
+        });
+
+        async function loadImageList() {
+            // Image list - update this list as you add more images
+            images = [
+                'IMG_4276.jpg',
+                'IMG_4277.jpg',
+                'IMG_4279.jpg',
+                'IMG_4280.jpg',
+                'IMG_4281.jpg',
+                'IMG_4282.jpg',
+                'IMG_4283.jpg',
+                'IMG_4284.jpg',
+                'IMG_4286.jpg',
+                'IMG_4287.jpg',
+                'IMG_4288.jpg',
+                'IMG_4289.jpg',
+                'IMG_4290.jpg',
+                'IMG_4291.jpg',
+                'IMG_4293.jpg',
+                'IMG_4294.jpg',
+                'IMG_4295.jpg',
+                'IMG_4296.jpg',
+                'IMG_4297.jpg',
+                'IMG_4298.jpg',
+                'IMG_4299.jpg',
+                'IMG_4300.jpg',
+                'IMG_4301.jpg',
+                'IMG_4302.jpg',
+                'photo-20825_singular_display_fullPicture.jpg'
+            ];
+        }
+
+        async function loadDescriptionsIndex() {
+            // Load the descriptions index file
+            // This file should be generated by a Python script that scans workflow directories
+            try {
+                const response = await fetch(CONFIG.descriptionsBaseUrl + 'index.json');
+                const data = await response.json();
+                
+                descriptionsData = data.descriptions;
+                availableConfigs = data.configs;
+                
+                updateStatus(`Loaded ${Object.keys(descriptionsData).length} description sets`);
+            } catch (error) {
+                console.error('Error loading descriptions index:', error);
+                updateStatus('Error loading descriptions data', 'error');
+                
+                // Fallback: Use sample data structure
+                createSampleData();
+            }
+        }
+
+        function createSampleData() {
+            // This demonstrates the expected data structure
+            // In production, this comes from index.json
+            availableConfigs = {
+                providers: ['ollama', 'claude', 'openai'],
+                models: {
+                    'ollama': ['llava:7b', 'llava:13b', 'granite3.2-vision', 'moondream'],
+                    'claude': ['claude-3-haiku', 'claude-opus-4'],
+                    'openai': ['gpt-4o', 'gpt-4o-mini']
+                },
+                prompts: {
+                    'ollama': {
+                        'llava:7b': ['narrative', 'detailed', 'colorful'],
+                        'llava:13b': ['narrative'],
+                        'granite3.2-vision': ['colorful', 'narrative'],
+                        'moondream': ['narrative']
+                    },
+                    'claude': {
+                        'claude-3-haiku': ['narrative'],
+                        'claude-opus-4': ['narrative']
+                    },
+                    'openai': {
+                        'gpt-4o': ['narrative'],
+                        'gpt-4o-mini': ['narrative']
+                    }
+                }
+            };
+        }
+
+        function populateProviderDropdown() {
+            const select = document.getElementById('providerSelect');
+            select.innerHTML = '<option value="">Select provider...</option>';
+            
+            availableConfigs.providers.forEach(provider => {
+                const option = document.createElement('option');
+                option.value = provider;
+                option.textContent = provider.charAt(0).toUpperCase() + provider.slice(1);
+                select.appendChild(option);
+            });
+        }
+
+        function updateModelOptions() {
+            const provider = document.getElementById('providerSelect').value;
+            const modelSelect = document.getElementById('modelSelect');
+            
+            modelSelect.innerHTML = '<option value="">Select model...</option>';
+            document.getElementById('promptSelect').innerHTML = '<option value="">Select model first...</option>';
+            
+            if (provider && availableConfigs.models[provider]) {
+                availableConfigs.models[provider].forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+                updateStatus(`Provider: ${provider} - Select a model`);
+            }
+        }
+
+        function updatePromptOptions() {
+            const provider = document.getElementById('providerSelect').value;
+            const model = document.getElementById('modelSelect').value;
+            const promptSelect = document.getElementById('promptSelect');
+            
+            promptSelect.innerHTML = '<option value="">Select prompt...</option>';
+            
+            if (provider && model && availableConfigs.prompts[provider] && availableConfigs.prompts[provider][model]) {
+                availableConfigs.prompts[provider][model].forEach(prompt => {
+                    const option = document.createElement('option');
+                    option.value = prompt;
+                    option.textContent = prompt.charAt(0).toUpperCase() + prompt.slice(1);
+                    promptSelect.appendChild(option);
+                });
+                updateStatus(`Model: ${model} - Select a prompt style`);
+            }
+        }
+
+        function updateImage() {
+            const img = document.getElementById('imageContainer');
+            const info = document.getElementById('imageInfo');
+            const counter = document.getElementById('counter');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            // Show loading spinner
+            img.innerHTML = '<div class="loading-spinner"></div>';
+            
+            // Create and load image
+            const imgEl = document.createElement('img');
+            imgEl.src = CONFIG.imagesBaseUrl + images[currentImageIndex];
+            imgEl.alt = images[currentImageIndex];
+            
+            imgEl.onload = () => {
+                img.innerHTML = '';
+                img.appendChild(imgEl);
+            };
+            
+            imgEl.onerror = () => {
+                img.innerHTML = '<div style="color: #ff6b6b; padding: 40px;">Image failed to load</div>';
+            };
+            
+            // Update info
+            info.textContent = images[currentImageIndex];
+            counter.textContent = `${currentImageIndex + 1} of ${images.length}`;
+            
+            // Update button states
+            prevBtn.disabled = currentImageIndex === 0;
+            nextBtn.disabled = currentImageIndex === images.length - 1;
+            
+            // Reload description for new image
+            loadDescription();
+        }
+
+        async function loadDescription() {
+            const provider = document.getElementById('providerSelect').value;
+            const model = document.getElementById('modelSelect').value;
+            const prompt = document.getElementById('promptSelect').value;
+            
+            const descText = document.getElementById('descriptionText');
+            const modelBadge = document.getElementById('modelBadge');
+            const metadata = document.getElementById('metadata');
+            
+            if (!provider || !model || !prompt) {
+                descText.innerHTML = '<div class="no-description">Select all configuration options to see descriptions</div>';
+                modelBadge.textContent = 'No configuration';
+                metadata.style.display = 'none';
+                return;
+            }
+            
+            // Build key to find description
+            const imageName = images[currentImageIndex];
+            const key = `${provider}_${model}_${prompt}`;
+            
+            // Show loading state
+            descText.innerHTML = '<div class="no-description"><div class="loading-spinner" style="display: inline-block; width: 20px; height: 20px; margin-right: 10px;"></div>Loading description...</div>';
+            
+            try {
+                // Load description file for this configuration
+                const descFile = `${CONFIG.descriptionsBaseUrl}${key}.json`;
+                const response = await fetch(descFile);
+                
+                if (!response.ok) {
+                    throw new Error('Description file not found');
+                }
+                
+                const data = await response.json();
+                
+                // Find description for current image
+                const imageDesc = data.images[imageName];
+                
+                if (imageDesc) {
+                    // Format description text (split into paragraphs)
+                    const paragraphs = imageDesc.description.split('\n\n').filter(p => p.trim());
+                    const formattedDesc = paragraphs.map(p => `<p>${p}</p>`).join('');
+                    
+                    descText.innerHTML = formattedDesc;
+                    modelBadge.textContent = model;
+                    
+                    // Update metadata
+                    document.getElementById('metaProvider').textContent = provider;
+                    document.getElementById('metaModel').textContent = model;
+                    document.getElementById('metaPrompt').textContent = prompt;
+                    metadata.style.display = 'grid';
+                    
+                    updateStatus(`Viewing: ${provider} / ${model} / ${prompt}`);
+                } else {
+                    descText.innerHTML = '<div class="no-description">No description available for this image</div>';
+                    metadata.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading description:', error);
+                descText.innerHTML = `<div class="no-description">Description not available<br><small style="color: #666;">${error.message}</small></div>`;
+                metadata.style.display = 'none';
+            }
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusBar = document.getElementById('statusBar');
+            statusBar.textContent = message;
+            statusBar.style.borderLeftColor = type === 'error' ? '#ff6b6b' : '#0099ff';
+            statusBar.style.color = type === 'error' ? '#ff6b6b' : '#00d4ff';
+        }
+
+        function nextImage() {
+            if (currentImageIndex < images.length - 1) {
+                currentImageIndex++;
+                updateImage();
+            }
+        }
+
+        function previousImage() {
+            if (currentImageIndex > 0) {
+                currentImageIndex--;
+                updateImage();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                nextImage();
+            } else if (e.key === 'ArrowLeft') {
+                previousImage();
+            }
+        });
+    </script>
+</body>
+</html>
