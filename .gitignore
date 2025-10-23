@@ -79,3 +79,10 @@ current_models.json
 debug_*.bat
 # Note: Test batch files moved to tools/ directory
 fix_*.sh
+
+# ImageGallery generated data and test files
+tools/ImageGallery/descriptions/
+tools/ImageGallery/test_output/
+tools/ImageGallery/*.jpg
+tools/ImageGallery/*.HEIC
+tools/ImageGallery/.venv/
