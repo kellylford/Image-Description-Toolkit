@@ -59,16 +59,23 @@ python generate_descriptions.py
 ```
 
 **Options:**
-- `--descriptions-dir PATH` - Source directory with workflows (default: c:/idt/Descriptions)
+- `--input-dir PATH` or `--descriptions-dir PATH` - Path to Descriptions directory containing workflows (default: c:/idt/Descriptions)
 - `--output-dir PATH` - Output directory for JSON files (default: descriptions)
 - `--pattern PATTERN` - Workflow name pattern to match (default: 25imagetest)
 
-**Example with custom options:**
+**Example with custom input directory:**
 ```bash
+# If your workflow data is in a different location
 python generate_descriptions.py \
-    --descriptions-dir c:/idt/Descriptions \
+    --input-dir /path/to/your/Descriptions \
     --output-dir web_data \
     --pattern multipletest
+```
+
+**Example for generating from a specific Descriptions folder:**
+```bash
+# Generate from c:/mydata/Descriptions
+python generate_descriptions.py --input-dir c:/mydata/Descriptions --pattern 25imagetest
 ```
 
 ### 2. Prepare Images

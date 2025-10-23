@@ -256,10 +256,12 @@ def main():
         description='Generate JSON description files from IDT workflows for web gallery'
     )
     parser.add_argument(
+        '--input-dir',
         '--descriptions-dir',
+        dest='descriptions_dir',
         type=Path,
         default=Path('c:/idt/Descriptions'),
-        help='Directory containing workflow subdirectories (default: c:/idt/Descriptions)'
+        help='Path to Descriptions directory containing workflow subdirectories (default: c:/idt/Descriptions)'
     )
     parser.add_argument(
         '--output-dir',
