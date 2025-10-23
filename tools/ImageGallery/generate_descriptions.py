@@ -146,15 +146,6 @@ def scan_workflows(descriptions_dir: Path, pattern: str) -> Dict[str, Dict[str, 
     for workflow_dir in workflow_dirs:
         print(f"Processing: {workflow_dir.name}")
         
-        # Parse directory name
-        parsed = parse_workflow_directory(workflow_dir.name)
-        if not parsed:
-            print(f"  Skipping: Could not parse directory name")
-            continue
-        
-        workflow_name, provider, model, prompt_style = parsed
-        print(f"  Parsed: provider={provider}, model={model}, prompt={prompt_style}")
-        
         # Find description file
         desc_file = workflow_dir / 'descriptions' / 'image_descriptions.txt'
         if not desc_file.exists():
@@ -164,6 +155,23 @@ def scan_workflows(descriptions_dir: Path, pattern: str) -> Dict[str, Dict[str, 
         # Extract descriptions
         descriptions = extract_descriptions(desc_file)
         print(f"  Found {len(descriptions)} image descriptions")
+        
+        if not descriptions:
+            print(f"  Skipping: No valid descriptions extracted")
+            continue
+        
+        # Get provider, model, and prompt from the actual description data (not directory name)
+        # All images should have the same provider/model/prompt, so use first one
+        first_desc = next(iter(descriptions.values()))
+        provider = first_desc.get('provider', '')
+        model = first_desc.get('model', '')
+        prompt_style = first_desc.get('prompt_style', '')
+        
+        if not provider or not model or not prompt_style:
+            print(f"  Skipping: Missing provider/model/prompt in description data")
+            continue
+            
+        print(f"  Using: provider={provider}, model={model}, prompt={prompt_style}")
         
         # Store in nested structure
         # If we already have data for this config, merge (keep existing if duplicate)
