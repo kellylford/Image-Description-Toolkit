@@ -88,57 +88,57 @@ echo.
 REM Claude Haiku 3.5
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Haiku 3.5 + narrative
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Haiku 3.5 + colorful
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Haiku 3.5 + technical
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 REM Claude Opus 4
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Opus 4 + narrative
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-opus-4-20250514 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-opus-4-20250514 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Opus 4 + colorful
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-opus-4-20250514 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-opus-4-20250514 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Opus 4 + technical
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-opus-4-20250514 --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-opus-4-20250514 --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 REM Claude Sonnet 4.5
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Sonnet 4.5 + narrative
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-sonnet-4-5-20250929 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-sonnet-4-5-20250929 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Sonnet 4.5 + colorful
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-sonnet-4-5-20250929 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-sonnet-4-5-20250929 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Sonnet 4.5 + technical
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-sonnet-4-5-20250929 --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider claude --model claude-sonnet-4-5-20250929 --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
@@ -155,38 +155,38 @@ echo.
 REM GPT-4o-mini
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o-mini + narrative
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o-mini + colorful
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o-mini + technical
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 REM GPT-4o
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o + narrative
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o + colorful
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o + technical
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
@@ -203,76 +203,76 @@ echo.
 REM Qwen3-VL (Cloud)
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Qwen3-VL Cloud + narrative
-idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Qwen3-VL Cloud + colorful
-idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Qwen3-VL Cloud + technical
-idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 REM Llava
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Llava + narrative
-idt workflow "%IMAGE_DIR%" --provider ollama --model llava:latest --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model llava:latest --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Llava + colorful
-idt workflow "%IMAGE_DIR%" --provider ollama --model llava:latest --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model llava:latest --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Llava + technical
-idt workflow "%IMAGE_DIR%" --provider ollama --model llava:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model llava:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 REM Gemma3
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Gemma3 + narrative
-idt workflow "%IMAGE_DIR%" --provider ollama --model gemma3:latest --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model gemma3:latest --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Gemma3 + colorful
-idt workflow "%IMAGE_DIR%" --provider ollama --model gemma3:latest --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model gemma3:latest --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Gemma3 + technical
-idt workflow "%IMAGE_DIR%" --provider ollama --model gemma3:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model gemma3:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 REM Moondream
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Moondream + narrative
-idt workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Moondream + colorful
-idt workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Moondream + technical
-idt workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR%
+idt workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
