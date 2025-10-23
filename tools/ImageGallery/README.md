@@ -1,0 +1,295 @@
+# IDT Interactive Demo Gallery
+
+An interactive web-based gallery that showcases the Image Description Toolkit's capabilities by allowing users to compare AI-generated image descriptions across different providers, models, and prompt styles.
+
+## Purpose
+
+This is a "one-time demo project to show the power of the IDT without having to install anything." Users can:
+
+- View a collection of 25 test images
+- Select different AI providers (Ollama, OpenAI, Claude)
+- Choose from various models (llava, granite, gpt-4o, claude, etc.)
+- Pick prompt styles (narrative, detailed, colorful, etc.)
+- See how different configurations describe the same images
+
+## Architecture
+
+### Files
+
+1. **index.html** - Single-page interactive gallery
+   - Responsive design (mobile and desktop)
+   - Provider/Model/Prompt dropdowns
+   - Image viewer with prev/next navigation
+   - Description display panel
+   - Keyboard shortcuts (arrow keys)
+
+2. **generate_descriptions.py** - Data extraction script
+   - Scans IDT workflow directories
+   - Parses description files
+   - Generates JSON files for web consumption
+   - Designed to handle growing datasets
+
+3. **descriptions/** - Generated JSON data
+   - index.json - Configuration index
+   - {provider}_{model}_{prompt}.json - Individual description sets
+
+### Data Flow
+
+```
+Workflow Directories (c:\idt\Descriptions)
+    ↓
+generate_descriptions.py (scans & parses)
+    ↓
+JSON Files (descriptions/*.json)
+    ↓
+index.html (loads & displays)
+    ↓
+User's Browser
+```
+
+## Setup Instructions
+
+### 1. Generate Description Data
+
+Run the Python script to extract descriptions from your workflow directories:
+
+```bash
+cd tools/ImageGallery
+python generate_descriptions.py
+```
+
+**Options:**
+- `--descriptions-dir PATH` - Source directory with workflows (default: c:/idt/Descriptions)
+- `--output-dir PATH` - Output directory for JSON files (default: descriptions)
+- `--pattern PATTERN` - Workflow name pattern to match (default: 25imagetest)
+
+**Example with custom options:**
+```bash
+python generate_descriptions.py \
+    --descriptions-dir c:/idt/Descriptions \
+    --output-dir web_data \
+    --pattern multipletest
+```
+
+### 2. Prepare Images
+
+Copy your converted JPG images to the deployment directory:
+
+```bash
+# From your workflow's converted_images directory
+cp c:/idt/Descriptions/wf_25imagetest_*/converted_images/*.jpg ./
+```
+
+Or use the source images directory:
+```bash
+cp c:/idt/images/*.jpg ./
+```
+
+### 3. Update Image List (if needed)
+
+If you add more images, update the `images` array in index.html:
+
+```javascript
+images = [
+    'IMG_4276.jpg',
+    'IMG_4277.jpg',
+    // ... add more images here
+];
+```
+
+### 4. Deploy to Web Server
+
+Copy these files to your web server:
+- index.html
+- descriptions/ (entire directory)
+- *.jpg (all image files)
+
+**Example using FTP:**
+```bash
+# In FTP client
+cd /public_html/testimages
+put index.html
+mkdir descriptions
+cd descriptions
+mput descriptions/*.json
+cd ..
+mput *.jpg
+```
+
+**Example using network drive:**
+```powershell
+# In PowerShell
+Copy-Item -Path "index.html" -Destination "Z:\testimages\"
+Copy-Item -Path "descriptions" -Destination "Z:\testimages\" -Recurse
+Copy-Item -Path "*.jpg" -Destination "Z:\testimages\"
+```
+
+## Adding More Data
+
+The system is designed to scale easily:
+
+1. **Run more workflows** - Use IDT with different configurations
+   - Make sure workflow names include your pattern (e.g., "25imagetest")
+   - Use consistent image sets across workflows for comparison
+
+2. **Re-generate JSON** - Run the script again to pick up new workflows
+   ```bash
+   python generate_descriptions.py
+   ```
+
+3. **Upload updates** - Copy new JSON files to your server
+   ```bash
+   # Only updated files need to be re-uploaded
+   ftp> cd descriptions
+   ftp> mput *.json
+   ```
+
+The gallery will automatically detect and display new configurations!
+
+## Data Structure
+
+### Workflow Directory Naming
+```
+wf_WORKFLOWNAME_PROVIDER_MODEL_[VARIANT_]PROMPTSTYLE_TIMESTAMP/
+    descriptions/
+        image_descriptions.txt
+```
+
+Example:
+```
+wf_25imagetest_ollama_llava_7b_narrative_20251021_200409/
+wf_25imagetest_claude_claude-3-haiku-20240307_narrative_20251022_141523/
+wf_25imagetest_ollama_granite3.2-vision_latest_colorful_20251022_160315/
+```
+
+### Description File Format
+```
+File: converted_images\image.jpg
+Provider: ollama
+Model: llava:7b
+Prompt Style: narrative
+Description: [Multi-paragraph description text]
+Timestamp: 2025-10-21 20:05:26
+--------------------------------------------------------------------------------
+```
+
+### Generated JSON Structure
+
+**index.json:**
+```json
+{
+  "configs": {
+    "providers": ["ollama", "claude", "openai"],
+    "models": {
+      "ollama": ["llava:7b", "granite3.2-vision"],
+      "claude": ["claude-3-haiku"]
+    },
+    "prompts": {
+      "ollama": {
+        "llava:7b": ["narrative", "detailed"],
+        "granite3.2-vision": ["colorful"]
+      }
+    }
+  }
+}
+```
+
+**ollama_llava_7b_narrative.json:**
+```json
+{
+  "provider": "ollama",
+  "model": "llava:7b",
+  "prompt_style": "narrative",
+  "images": {
+    "IMG_4276.jpg": {
+      "description": "The image shows...",
+      "provider": "ollama",
+      "model": "llava:7b",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-21 20:05:26"
+    }
+  }
+}
+```
+
+## Customization
+
+### Styling
+Edit the `<style>` section in index.html to customize:
+- Colors and gradients
+- Layout (single column vs. side-by-side)
+- Font sizes and spacing
+- Mobile breakpoints
+
+### Configuration
+Update the `CONFIG` object in index.html:
+```javascript
+const CONFIG = {
+    imagesBaseUrl: './',              // Image location
+    descriptionsBaseUrl: './descriptions/',  // JSON location
+    workflowPattern: '25imagetest'    // Workflow pattern
+};
+```
+
+### Workflow Pattern
+To include different workflows, change the pattern:
+```bash
+# Generate from all workflows
+python generate_descriptions.py --pattern ""
+
+# Generate from specific test set
+python generate_descriptions.py --pattern "multipletest"
+
+# Generate from model-specific runs
+python generate_descriptions.py --pattern "granite"
+```
+
+## Troubleshooting
+
+### No descriptions showing
+1. Check browser console for errors (F12)
+2. Verify descriptions/index.json exists and loads
+3. Check that JSON filenames match the pattern: `{provider}_{model}_{prompt}.json`
+4. Ensure descriptions directory is in the same location as index.html
+
+### Images not loading
+1. Verify image files are in correct location
+2. Check image filenames match exactly (case-sensitive on some servers)
+3. Ensure images are JPG format (not HEIC)
+
+### Missing configurations
+1. Re-run generate_descriptions.py to scan for new workflows
+2. Verify workflow directories match the naming pattern
+3. Check that description files exist in workflow directories
+
+### Parsing errors
+1. Check workflow directory naming follows the expected format
+2. Verify description files have the expected structure
+3. Look for encoding issues in description files (should be UTF-8)
+
+## Performance Notes
+
+- **Initial Load**: Loads only index.json (~few KB)
+- **Per Configuration**: Loads one JSON file when selection changes (~50-200KB depending on image count)
+- **Images**: Lazy loaded, one at a time as user navigates
+- **Caching**: Browser will cache JSON and images after first load
+
+For best performance:
+- Keep JSON files under 500KB each
+- Optimize images (1200px width recommended)
+- Use a CDN for large deployments
+
+## Future Enhancements
+
+Possible additions:
+- [ ] Side-by-side comparison mode (view 2+ configs at once)
+- [ ] Search/filter functionality
+- [ ] Export descriptions to text file
+- [ ] Direct links to specific image/config combinations
+- [ ] Image zoom/lightbox feature
+- [ ] Statistics display (word count, processing time)
+- [ ] Model performance comparison charts
+
+## License
+
+Part of the Image Description Toolkit project.
