@@ -193,7 +193,7 @@ Detailed reference for all `idt` commands with options and examples.
 **The recommended way to get started!**
 
 ```bash
-idt guideme
+idt guideme [workflow_options]
 ```
 
 **What it does:**
@@ -202,6 +202,25 @@ idt guideme
 - Handles API key setup if needed
 - Launches viewer automatically for real-time monitoring
 - Perfect for screen reader users and beginners
+- **NEW:** Accepts workflow options (like `--timeout`) for advanced control
+
+**Workflow Options Pass-Through:**
+You can pass any workflow option to `guideme` and it will be included in the generated command:
+
+```bash
+# Increase timeout for large vision models
+idt guideme --timeout 300
+
+# Preserve existing descriptions when re-running
+idt guideme --preserve-descriptions
+
+# Combine multiple options
+idt guideme --timeout 180 --preserve-descriptions
+```
+
+Common workflow options that work with guideme:
+- `--timeout SECONDS` - API request timeout (default: 90). Use 180-300 for large models like Qwen
+- `--preserve-descriptions` - Skip images that already have descriptions
 
 **Interactive Steps:**
 1. **Model Selection** - Choose from available Ollama, OpenAI, or Claude models
@@ -210,8 +229,9 @@ idt guideme
 4. **Workflow Naming** - Optional custom name for organization
 5. **Launch Options** - Option to launch viewer for real-time monitoring
 
-**Example Session:**
+**Example Sessions:**
 ```bash
+# Basic interactive workflow
 idt guideme
 # Follow the interactive prompts:
 # > Select AI provider: [ollama] openai claude
@@ -219,6 +239,11 @@ idt guideme
 # > Image directory: C:\Photos
 # > Workflow name (optional): vacation_photos
 # > Launch viewer? [Y/n]: y
+
+# With extended timeout for slow models
+idt guideme --timeout 300
+# Then proceed through the interactive prompts as usual
+# The generated command will include --timeout 300
 ```
 
 #### `workflow` - Direct Workflow Execution

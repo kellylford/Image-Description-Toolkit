@@ -301,6 +301,10 @@ The **Prompt Editor** (`prompt_editor.exe`) is a configuration tool for managing
 
 ```bash
 idt guideme
+
+# Advanced: Pass workflow options for special cases
+idt guideme --timeout 300              # For large/slow models
+idt guideme --preserve-descriptions    # Skip already-described images
 ```
 
 This wizard will:
@@ -319,6 +323,8 @@ This wizard will:
 - Learning the command options
 - Setting up cloud providers
 - Watching your workflow progress live as images are processed
+
+**💡 Pro Tip:** If you're using large vision models (like Qwen) that take longer to process each image, add `--timeout 300` to avoid timeouts.
 
 ### Option 2: Direct Command (Quick & Simple)
 
