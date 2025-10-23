@@ -14,6 +14,19 @@ REM ============================================================================
 
 setlocal enabledelayedexpansion
 
+REM Use the installed IDT executable
+set "IDT_CMD=c:\idt\idt.exe"
+
+if not exist "%IDT_CMD%" (
+    echo ERROR: IDT executable not found at: %IDT_CMD%
+    echo Please ensure IDT is installed at c:\idt\
+    pause
+    exit /b 1
+)
+
+echo Using IDT: %IDT_CMD%
+echo.
+
 if "%~1"=="" (
     echo ERROR: Image directory not specified
     echo.
@@ -55,29 +68,29 @@ echo.
 
 REM Claude Haiku 3.5
 echo [1/6] Claude Haiku 3.5 + narrative
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 echo.
 
 echo [2/6] Claude Haiku 3.5 + colorful
-idt workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 echo.
 
 REM OpenAI GPT-4o-mini
 echo [3/6] GPT-4o-mini + narrative
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 echo.
 
 echo [4/6] GPT-4o-mini + colorful
-idt workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 echo.
 
 REM Ollama Qwen3-VL
 echo [5/6] Qwen3-VL Cloud + narrative
-idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 echo.
 
 echo [6/6] Qwen3-VL Cloud + colorful
-idt workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
 echo.
 
 echo ============================================================================
