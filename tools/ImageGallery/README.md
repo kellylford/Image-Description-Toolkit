@@ -61,7 +61,7 @@ python generate_descriptions.py
 **Options:**
 - `--input-dir PATH` or `--descriptions-dir PATH` - Path to Descriptions directory containing workflows (default: c:/idt/Descriptions)
 - `--output-dir PATH` - Output directory for JSON files (default: descriptions)
-- `--pattern PATTERN` - Workflow name pattern to match (default: 25imagetest)
+- `--name PATTERN` or `--pattern PATTERN` - Workflow name pattern to match in directory names (default: 25imagetest)
 
 **Example with custom input directory:**
 ```bash
@@ -69,13 +69,16 @@ python generate_descriptions.py
 python generate_descriptions.py \
     --input-dir /path/to/your/Descriptions \
     --output-dir web_data \
-    --pattern multipletest
+    --name multipletest
 ```
 
 **Example for generating from a specific Descriptions folder:**
 ```bash
-# Generate from c:/mydata/Descriptions
-python generate_descriptions.py --input-dir c:/mydata/Descriptions --pattern 25imagetest
+# Generate from c:/mydata/Descriptions with default 25imagetest pattern
+python generate_descriptions.py --input-dir c:/mydata/Descriptions
+
+# Or use a different workflow name pattern
+python generate_descriptions.py --input-dir c:/idt/Descriptions --name 10multipletest
 ```
 
 ### 2. Prepare Images
@@ -242,13 +245,13 @@ const CONFIG = {
 To include different workflows, change the pattern:
 ```bash
 # Generate from all workflows
-python generate_descriptions.py --pattern ""
+python generate_descriptions.py --name ""
 
 # Generate from specific test set
-python generate_descriptions.py --pattern "multipletest"
+python generate_descriptions.py --name "multipletest"
 
 # Generate from model-specific runs
-python generate_descriptions.py --pattern "granite"
+python generate_descriptions.py --name "granite"
 ```
 
 ## Troubleshooting

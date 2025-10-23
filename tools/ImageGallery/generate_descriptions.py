@@ -277,10 +277,12 @@ def main():
         help='Output directory for JSON files (default: descriptions)'
     )
     parser.add_argument(
+        '--name',
         '--pattern',
+        dest='pattern',
         type=str,
         default='25imagetest',
-        help='Pattern to match workflow directories (default: 25imagetest)'
+        help='Workflow name pattern to match in directory names (default: 25imagetest)'
     )
     
     args = parser.parse_args()
