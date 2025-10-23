@@ -84,5 +84,7 @@ fix_*.sh
 tools/ImageGallery/descriptions/
 tools/ImageGallery/test_output/
 tools/ImageGallery/*.jpg
+tools/ImageGallery/images/*.jpg
+tools/ImageGallery/images/*.jpeg
 tools/ImageGallery/*.HEIC
 tools/ImageGallery/.venv/

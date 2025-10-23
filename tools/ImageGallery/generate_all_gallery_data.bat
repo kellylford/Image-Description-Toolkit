@@ -14,6 +14,7 @@ REM      - ollama pull qwen3-vl:235b-cloud
 REM      - ollama pull llava:latest
 REM      - ollama pull gemma3:latest
 REM      - ollama pull moondream:latest
+REM      - ollama pull granite3.2-vision:latest
 REM   3. Ensure Ollama service is running
 REM
 REM USAGE:
@@ -62,12 +63,12 @@ echo Image Directory: %IMAGE_DIR%
 echo Workflow Name: %WORKFLOW_NAME%
 echo Output Directory: %OUTPUT_DIR%
 echo.
-echo This will run 27 workflows:
+echo This will run 30 workflows:
 echo   - Claude models: 9 workflows (3 models x 3 prompts)
 echo   - OpenAI models: 6 workflows (2 models x 3 prompts)
-echo   - Ollama models: 12 workflows (4 models x 3 prompts)
+echo   - Ollama models: 15 workflows (5 models x 3 prompts)
 echo.
-echo Total descriptions: 675 (27 workflows x 25 images)
+echo Total descriptions: 750 (30 workflows x 25 images)
 echo.
 echo Press Ctrl+C to cancel, or
 pause
@@ -85,7 +86,7 @@ echo Starting workflow runs...
 echo ============================================================================
 echo.
 
-set TOTAL_WORKFLOWS=27
+set TOTAL_WORKFLOWS=30
 set CURRENT=0
 
 REM ============================================================================
@@ -286,6 +287,38 @@ echo.
 set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Moondream + technical
 "%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+REM ============================================================================
+REM GRANITE 3.2 VISION MODEL (3 workflows)
+REM ============================================================================
+
+echo.
+echo ============================================================================
+echo GRANITE 3.2 VISION MODEL [28-30 of %TOTAL_WORKFLOWS%]
+echo ============================================================================
+echo.
+
+REM Granite 3.2 Vision
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Granite 3.2 Vision + narrative
+echo NOTE: Using extended 300s timeout for model stability
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model granite3.2-vision:latest --prompt-style narrative --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch --timeout 300
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Granite 3.2 Vision + colorful
+echo NOTE: Using extended 300s timeout for model stability
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model granite3.2-vision:latest --prompt-style colorful --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch --timeout 300
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Granite 3.2 Vision + technical
+echo NOTE: Using extended 300s timeout for model stability
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model granite3.2-vision:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch --timeout 300
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 

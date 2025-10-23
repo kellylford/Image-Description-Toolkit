@@ -364,7 +364,7 @@
         
         <div class="description-panel">
             <div class="description-header">
-                <h2 class="description-title">AI Description</h2>
+                <h2 class="description-title" id="descriptionTitle">AI Description</h2>
                 <div class="model-badge" id="modelBadge">No model selected</div>
             </div>
             <div class="description-text" id="descriptionText">
@@ -396,16 +396,14 @@
     </div>
 
     <div class="controls">
-        <button id="prevBtn" onclick="previousImage()">← Previous</button>
-        <button id="nextBtn" onclick="nextImage()">Next →</button>
+        <button id="prevBtn" onclick="previousImage()" aria-label="Previous image (Alt+P)">← Previous</button>
+        <button id="nextBtn" onclick="nextImage()" aria-label="Next image (Alt+N)">Next →</button>
     </div>
-    
-    <div class="keyboard-hint">Use ← → arrow keys to navigate</div>
 
-    <script>
+    <div class="keyboard-hint">Use ← → arrow keys or Alt+P/Alt+N to navigate</div>    <script>
         // Configuration - Update this when deploying
         const CONFIG = {
-            imagesBaseUrl: './',  // Where images are stored
+            imagesBaseUrl: './images/',  // Where images are stored
             descriptionsBaseUrl: './descriptions/',  // Where JSON description files are stored
             workflowPattern: '25imagetest'  // Pattern to match workflow directories
         };
@@ -644,6 +642,11 @@
             if (!provider || !model || !prompt) {
                 descText.innerHTML = '<div class="no-description">Select all configuration options to see descriptions</div>';
                 modelBadge.textContent = 'No configuration';
+                
+                // Reset title to default when no configuration is selected
+                const titleElement = document.getElementById('descriptionTitle');
+                titleElement.textContent = 'AI Description';
+                
                 metadata.style.display = 'none';
                 promptSection.style.display = 'none';
                 return;
@@ -685,6 +688,10 @@
                     descText.innerHTML = formattedDesc;
                     modelBadge.textContent = model;
                     
+                    // Update title with detailed information for screen readers
+                    const titleElement = document.getElementById('descriptionTitle');
+                    titleElement.textContent = `${prompt}, ${model}, ${provider} - AI Description`;
+                    
                     // Update metadata
                     document.getElementById('metaProvider').textContent = provider;
                     document.getElementById('metaModel').textContent = model;
@@ -702,12 +709,22 @@
                     updateStatus(`Viewing: ${provider} / ${model} / ${prompt}`);
                 } else {
                     descText.innerHTML = '<div class="no-description">No description available for this image</div>';
+                    
+                    // Update title even when no description is available
+                    const titleElement = document.getElementById('descriptionTitle');
+                    titleElement.textContent = `${prompt}, ${model}, ${provider} - AI Description`;
+                    
                     metadata.style.display = 'none';
                     promptSection.style.display = 'none';
                 }
             } catch (error) {
                 console.error('Error loading description:', error);
                 descText.innerHTML = `<div class="no-description">Description not available<br><small style="color: #666;">${error.message}</small></div>`;
+                
+                // Update title even when there's an error
+                const titleElement = document.getElementById('descriptionTitle');
+                titleElement.textContent = `${prompt}, ${model}, ${provider} - AI Description`;
+                
                 metadata.style.display = 'none';
                 promptSection.style.display = 'none';
             }
@@ -739,6 +756,12 @@
             if (e.key === 'ArrowRight') {
                 nextImage();
             } else if (e.key === 'ArrowLeft') {
+                previousImage();
+            } else if (e.altKey && e.key.toLowerCase() === 'n') {
+                e.preventDefault();
+                nextImage();
+            } else if (e.altKey && e.key.toLowerCase() === 'p') {
+                e.preventDefault();
                 previousImage();
             }
         });
