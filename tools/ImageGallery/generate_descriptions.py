@@ -170,6 +170,12 @@ def scan_workflows(descriptions_dir: Path, pattern: str) -> Dict[str, Dict[str, 
         if not provider or not model or not prompt_style:
             print(f"  Skipping: Missing provider/model/prompt in description data")
             continue
+        
+        # Normalize model names: treat "model" and "model:latest" as the same
+        # This prevents duplicates like moondream and moondream:latest
+        if provider == 'ollama' and ':' not in model:
+            model = f"{model}:latest"
+            print(f"  Normalized model name to: {model}")
             
         print(f"  Using: provider={provider}, model={model}, prompt={prompt_style}")
         
