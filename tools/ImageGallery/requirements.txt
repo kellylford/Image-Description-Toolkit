@@ -1,0 +1,13 @@
+# Requirements for ImageGallery data generation script
+# Used by generate_descriptions.py to extract and convert IDT workflow descriptions to JSON
+
+# No external dependencies required - uses Python standard library only:
+# - pathlib (Path handling)
+# - argparse (command-line arguments)
+# - json (JSON file generation)
+# - re (regular expression parsing)
+# - os, sys (file system operations)
+# - collections (defaultdict)
+# - typing (type hints)
+
+# Python 3.7+ required
