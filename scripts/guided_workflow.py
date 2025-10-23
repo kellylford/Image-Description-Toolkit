@@ -553,7 +553,6 @@ def guided_workflow():
         try:
             # Import and call the workflow directly
             from workflow import main as workflow_main
-            import sys
             
             # Build arguments for workflow
             workflow_args = [img_dir, "--provider", provider, "--model", model, "--output-dir", output_dir]
