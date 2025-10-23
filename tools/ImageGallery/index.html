@@ -420,16 +420,28 @@
             try {
                 // Add cache-busting parameter to always get fresh data
                 const cacheBuster = '?t=' + new Date().getTime();
-                const response = await fetch(CONFIG.descriptionsBaseUrl + 'index.json' + cacheBuster);
+                const url = CONFIG.descriptionsBaseUrl + 'index.json' + cacheBuster;
+                console.log('Fetching descriptions from:', url);
+                
+                const response = await fetch(url);
+                console.log('Response status:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
+                console.log('Loaded data:', data);
                 
                 descriptionsData = data.descriptions;
                 availableConfigs = data.configs;
                 
+                console.log('Available configs:', availableConfigs);
                 updateStatus(`Loaded ${Object.keys(descriptionsData).length} description sets`);
             } catch (error) {
                 console.error('Error loading descriptions index:', error);
-                updateStatus('Error loading descriptions data', 'error');
+                console.error('Error details:', error.message, error.stack);
+                updateStatus('Error loading descriptions data - using sample data', 'error');
                 
                 // Fallback: Use sample data structure
                 createSampleData();
