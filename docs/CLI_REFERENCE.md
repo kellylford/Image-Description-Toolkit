@@ -210,8 +210,10 @@ idt guideme [workflow_options]
 You can pass any workflow option to `guideme` and it will be included in the generated command:
 
 ```bash
-# Increase timeout for large vision models
+# Increase timeout for large vision models (use any value in seconds)
 idt guideme --timeout 300
+idt guideme --timeout 180
+idt guideme --timeout 600
 
 # Preserve existing descriptions when re-running
 idt guideme --preserve-descriptions
@@ -221,7 +223,7 @@ idt guideme --timeout 180 --preserve-descriptions
 ```
 
 Common workflow options that work with guideme:
-- `--timeout SECONDS` - API request timeout (default: 90). Use 180-300 for large models like Qwen
+- `--timeout SECONDS` - API request timeout (default: 90). Recommended: 180-300 for large models like Qwen
 - `--preserve-descriptions` - Skip images that already have descriptions
 
 **Interactive Steps:**
