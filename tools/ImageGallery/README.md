@@ -12,6 +12,42 @@ This is a "one-time demo project to show the power of the IDT without having to 
 - Pick prompt styles (narrative, detailed, colorful, etc.)
 - See how different configurations describe the same images
 
+## Quick Start
+
+### 1. Collect Gallery Data
+
+Run workflows for all provider/model/prompt combinations:
+
+```bash
+# Full data collection (27 workflows)
+generate_all_gallery_data.bat c:\idt\images
+
+# Or test first (6 workflows)
+generate_test_gallery_data.bat c:\idt\images
+```
+
+See `GALLERY_DATA_CHECKLIST.md` for detailed progress tracking.
+
+### 2. Generate JSON Files
+
+```bash
+cd tools\ImageGallery
+python generate_descriptions.py --name 25imagetest
+```
+
+### 3. Test Locally
+
+```bash
+test_gallery.bat
+```
+
+### 4. Deploy to Web Server
+
+Copy these files to your web server:
+- `index.html`
+- `descriptions/` folder (with all JSON files)
+- `*.jpg` files (25 images)
+
 ## Architecture
 
 ### Files
@@ -21,15 +57,31 @@ This is a "one-time demo project to show the power of the IDT without having to 
    - Provider/Model/Prompt dropdowns
    - Image viewer with prev/next navigation
    - Description display panel
+   - Collapsible prompt text viewer
    - Keyboard shortcuts (arrow keys)
 
 2. **generate_descriptions.py** - Data extraction script
    - Scans IDT workflow directories
    - Parses description files
    - Generates JSON files for web consumption
-   - Designed to handle growing datasets
+   - Normalizes Ollama model names (treats "model" and "model:latest" as same)
 
-3. **descriptions/** - Generated JSON data
+3. **generate_all_gallery_data.bat** - Comprehensive data collection
+   - Runs 27 workflows (3 providers × 3-4 models × 3 prompts)
+   - Claude: Haiku 3.5, Opus 4, Sonnet 4.5
+   - OpenAI: GPT-4o-mini, GPT-4o
+   - Ollama: Qwen3-VL Cloud, Llava, Gemma3, Moondream
+
+4. **generate_test_gallery_data.bat** - Quick test (6 workflows)
+   - One model per provider, 2 prompts each
+   - Good for testing before full run
+
+5. **GALLERY_DATA_CHECKLIST.md** - Progress tracking
+   - Checklist for all 27 workflows
+   - Prerequisites and setup instructions
+   - Ollama model installation commands
+
+6. **descriptions/** - Generated JSON data
    - index.json - Configuration index
    - {provider}_{model}_{prompt}.json - Individual description sets
 
@@ -47,7 +99,65 @@ index.html (loads & displays)
 User's Browser
 ```
 
-## Setup Instructions
+## Data Collection
+
+## Data Collection
+
+### Automated Data Collection (Recommended)
+
+Use the batch files to automatically run all needed workflows:
+
+**Full Collection (27 workflows):**
+```bash
+generate_all_gallery_data.bat c:\idt\images
+```
+
+This runs:
+- Claude: 3 models × 3 prompts = 9 workflows
+- OpenAI: 2 models × 3 prompts = 6 workflows
+- Ollama: 4 models × 3 prompts = 12 workflows
+
+**Test Collection (6 workflows):**
+```bash
+generate_test_gallery_data.bat c:\idt\images
+```
+
+Good for testing before committing to the full 27-workflow run.
+
+### Prerequisites
+
+Before running data collection:
+
+1. **Set up API keys:**
+   ```bash
+   # In bat/ directory
+   setup_claude_key.bat
+   setup_openai_key.bat
+   ```
+
+2. **Install Ollama models:**
+   ```bash
+   ollama pull qwen3-vl:235b-cloud
+   ollama pull llava:latest
+   ollama pull gemma3:latest
+   ollama pull moondream:latest
+   ```
+
+3. **Ensure Ollama is running**
+
+See `GALLERY_DATA_CHECKLIST.md` for detailed tracking of workflow completion.
+
+### Manual Data Collection
+
+If you prefer to run workflows individually:
+
+```bash
+idt workflow c:\idt\images --provider claude --model claude-3-5-haiku-20241022 --prompt-style narrative --name 25imagetest
+idt workflow c:\idt\images --provider openai --model gpt-4o-mini --prompt-style colorful --name 25imagetest
+# ... etc
+```
+
+## Data Generation
 
 ### 1. Generate Description Data
 
