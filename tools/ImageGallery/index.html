@@ -199,6 +199,44 @@
             padding: 40px 20px;
         }
         
+        .prompt-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .prompt-toggle {
+            background: none;
+            border: none;
+            color: #00d4ff;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 8px 0;
+            text-decoration: underline;
+            display: inline-block;
+        }
+        
+        .prompt-toggle:hover {
+            color: #33e0ff;
+        }
+        
+        .prompt-text {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid #00d4ff;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #aaa;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            display: none;
+        }
+        
+        .prompt-text.visible {
+            display: block;
+        }
+        
         .controls {
             display: flex;
             gap: 15px;
@@ -334,6 +372,12 @@
                     Select an AI provider, model, and prompt style to see the description.
                 </div>
             </div>
+            
+            <div class="prompt-section" id="promptSection" style="display: none;">
+                <button class="prompt-toggle" id="promptToggle" onclick="togglePrompt()">Show Prompt Text</button>
+                <div class="prompt-text" id="promptText"></div>
+            </div>
+            
             <div class="metadata" id="metadata" style="display: none;">
                 <div class="metadata-item">
                     <div class="metadata-label">Provider</div>
@@ -365,6 +409,17 @@
             descriptionsBaseUrl: './descriptions/',  // Where JSON description files are stored
             workflowPattern: '25imagetest'  // Pattern to match workflow directories
         };
+        
+        // Prompt definitions from image_describer_config.json
+        const PROMPT_TEXTS = {
+            "detailed": "Describe this image in detail, including:\n- Main subjects/objects\n- Setting/environment\n- Key colors and lighting\n- Notable activities or composition\nKeep it comprehensive and informative for metadata.",
+            "concise": "Describe this image concisely, including:\n- Main subjects/objects\n- Setting/environment\n- Key colors and lighting\n- Notable activities or composition.",
+            "narrative": "Provide a narrative description including objects, colors and detail. Avoid interpretation, just describe.",
+            "artistic": "Analyze this image from an artistic perspective, describing:\n- Visual composition and framing\n- Color palette and lighting mood\n- Artistic style or technique\n- Emotional tone or atmosphere\n- Subject matter and symbolism",
+            "technical": "Provide a technical analysis of this image:\n- Camera settings and photographic technique\n- Lighting conditions and quality\n- Composition and framing\n- Image quality and clarity\n- Technical strengths or weaknesses",
+            "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition.",
+            "Simple": "Describe."
+        };
 
         // Global state
         let currentImageIndex = 0;
@@ -375,6 +430,19 @@
             models: {},
             prompts: {}
         };
+        
+        function togglePrompt() {
+            const promptText = document.getElementById('promptText');
+            const toggleBtn = document.getElementById('promptToggle');
+            
+            if (promptText.classList.contains('visible')) {
+                promptText.classList.remove('visible');
+                toggleBtn.textContent = 'Show Prompt Text';
+            } else {
+                promptText.classList.add('visible');
+                toggleBtn.textContent = 'Hide Prompt Text';
+            }
+        }
 
         // Initialize on load
         window.addEventListener('load', async () => {
@@ -570,11 +638,14 @@
             const descText = document.getElementById('descriptionText');
             const modelBadge = document.getElementById('modelBadge');
             const metadata = document.getElementById('metadata');
+            const promptSection = document.getElementById('promptSection');
+            const promptTextEl = document.getElementById('promptText');
             
             if (!provider || !model || !prompt) {
                 descText.innerHTML = '<div class="no-description">Select all configuration options to see descriptions</div>';
                 modelBadge.textContent = 'No configuration';
                 metadata.style.display = 'none';
+                promptSection.style.display = 'none';
                 return;
             }
             
@@ -620,15 +691,25 @@
                     document.getElementById('metaPrompt').textContent = prompt;
                     metadata.style.display = 'grid';
                     
+                    // Show prompt text if available
+                    if (PROMPT_TEXTS[prompt]) {
+                        promptTextEl.textContent = PROMPT_TEXTS[prompt];
+                        promptSection.style.display = 'block';
+                    } else {
+                        promptSection.style.display = 'none';
+                    }
+                    
                     updateStatus(`Viewing: ${provider} / ${model} / ${prompt}`);
                 } else {
                     descText.innerHTML = '<div class="no-description">No description available for this image</div>';
                     metadata.style.display = 'none';
+                    promptSection.style.display = 'none';
                 }
             } catch (error) {
                 console.error('Error loading description:', error);
                 descText.innerHTML = `<div class="no-description">Description not available<br><small style="color: #666;">${error.message}</small></div>`;
                 metadata.style.display = 'none';
+                promptSection.style.display = 'none';
             }
         }
 
