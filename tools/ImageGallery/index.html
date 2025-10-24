@@ -1190,15 +1190,6 @@
             // Get alt text for the image
             const altText = await getAltText(imageName);
             
-            // DEBUG TEST: Add a visible test at the very top
-            const debugTest = document.createElement('div');
-            debugTest.style.cssText = 'background: red; color: white; padding: 20px; margin: 20px; font-size: 16px;';
-            debugTest.innerHTML = `
-                <h3>DEBUG TEST</h3>
-                <p>Testing getPromptText with "narrative":</p>
-                <pre style="background: black; padding: 10px; white-space: pre-wrap;">${getPromptText('narrative')}</pre>
-            `;
-            
             // Create image display at the top
             const imageDisplay = document.createElement('div');
             imageDisplay.className = 'explorer-image-display';
@@ -1230,9 +1221,8 @@
                 cardsContainer.appendChild(card);
             }
             
-            // Replace existing content with debug test + image + cards
+            // Replace existing content with image + cards
             explorerPanel.innerHTML = '';
-            explorerPanel.appendChild(debugTest);
             explorerPanel.appendChild(imageDisplay);
             explorerPanel.appendChild(cardsContainer);
             
@@ -1321,15 +1311,6 @@
             // Get prompt text if promptKey is provided
             const promptTextContent = data.promptKey ? getPromptText(data.promptKey) : '';
             
-            // DEBUG: Alert the actual content
-            if (data.promptKey) {
-                console.error('=== DEBUG INFO ===');
-                console.error('data.promptKey:', data.promptKey);
-                console.error('promptTextContent:', promptTextContent);
-                console.error('promptTextContent length:', promptTextContent.length);
-                console.error('First 100 chars:', promptTextContent.substring(0, 100));
-            }
-            
             card.innerHTML = `
                 <div class="card-header">
                     <h3 class="card-title">${data.title}</h3>
@@ -1341,10 +1322,7 @@
                         <button class="prompt-toggle-btn" onclick="togglePromptText('${promptId}')" aria-expanded="false">
                             Show Prompt Text
                         </button>
-                        <div class="prompt-text-container" id="${promptId}" style="display: none;" role="region" aria-live="polite">
-                            <div style="background: yellow; color: black; padding: 5px; margin-bottom: 5px;">
-                                DEBUG: promptKey="${data.promptKey}" | length=${promptTextContent.length} | First chars: ${promptTextContent.substring(0, 50)}
-                            </div>
+                        <div class="prompt-text-container" id="${promptId}" style="display: none;" role="region" aria-live="polite" aria-label="Prompt text for ${data.promptKey}">
                             <div class="prompt-text">${promptTextContent}</div>
                         </div>
                     </div>
@@ -1385,8 +1363,7 @@
                 'detailed': 'Provide an extremely detailed description of this image, covering all visible elements, their relationships, colors, textures, spatial arrangement, and any notable features or patterns.'
             };
             
-            const result = prompts[promptKey] || `DEBUG: Prompt key "${promptKey}" not found. Available keys: ${Object.keys(prompts).join(', ')}`;
-            return result;
+            return prompts[promptKey] || 'Prompt text not available for this prompt type.';
         }
         
         function getAvailablePrompts() {
