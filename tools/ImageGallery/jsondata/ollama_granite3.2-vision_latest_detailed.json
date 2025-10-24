@@ -1,0 +1,207 @@
+{
+  "provider": "ollama",
+  "model": "granite3.2-vision:latest",
+  "prompt_style": "detailed",
+  "images": {
+    "photo-20825_singular_display_fullPicture.jpg": {
+      "description": "The photograph captures a serene suburban neighborhood with two cars parked on the side of an empty street, under a clear blue sky dotted with white clouds. The houses in the background are painted light-colored with dark roofs; one is gray and features multiple windows while another has a more traditional design with fewer visible details due to its distance from viewpoint.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:38:47",
+      "alt_text": "Suburban street on a sunny day with neatly maintained houses, parked cars, and young trees lining well-kept lawns and concrete sidewalks under a bright blue sky with white clouds."
+    },
+    "IMG_4276.jpg": {
+      "description": "The photograph captures a close view of someone's feet standing on the ground near an open fire pit, with visible flames burning within its confines. The surrounding area is covered in dry grass and pine needles, suggesting an outdoor setting possibly during autumn or winter when such vegetation would be present.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:41:33",
+      "alt_text": "A steel fire pit with cut-out designs burns pine needles on a golden-brown ground of dry needles, with concrete blocks nearby and a person's sneakers and jeans partially visible."
+    },
+    "IMG_4277.jpg": {
+      "description": "The photograph captures a close-up view from above of someone's feet standing on the ground with their legs slightly apart, looking down at an open fire pit that is actively burning amidst dry grass and pine needles scattered around it. The person wears blue jeans and white sneakers; a red garment partially covers one leg in front of them.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:44:16",
+      "alt_text": "Outdoor burn barrel with active flame, surrounded by pine needles and branches. Partial view of person wearing sneakers, blue jeans, and a red garment, standing near controlled fire on concrete blocks."
+    },
+    "IMG_4279.jpg": {
+      "description": "The photograph captures a close-up view from above of someone's feet standing on the ground with their legs slightly apart, looking down at an open fire pit surrounded by scattered pine needles. The person is wearing blue jeans and white sneakers; only part of them are visible in frame due to perspective distortion caused by a fisheye lens effect that creates a wide-angle view with the foreground appearing closer than it actually is, making details hard to discern clearly.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:47:01",
+      "alt_text": "A small fire burns in a metal container filled with pine needles and branches, with a person's feet in gray sneakers and blue jeans standing nearby on a pine needle-covered ground."
+    },
+    "IMG_4280.jpg": {
+      "description": "The photograph captures a close-up view from above of someone's feet standing on the ground with their legs slightly apart, looking down at an open fire pit that is actively burning amidst scattered pine needles. The perspective suggests it was taken by another person observing this scene directly below them.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:49:42",
+      "alt_text": "A small fire burns in a black metal barrel on concrete blocks, surrounded by dry pine needles. A person wearing gray sneakers, blue jeans, and a hint of red stands nearby, tending to the flame."
+    },
+    "IMG_4281.jpg": {
+      "description": "The photograph captures a close-up view from above of someone's feet standing on the ground amidst dried grass, with their legs prominently featured in the foreground against an overcast sky backdrop that suggests either early morning or late afternoon light conditions. The image is taken at such a low angle and perspective as to obscure any textual elements within it.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:52:26",
+      "alt_text": "Overhead view of a smoking metal burn barrel surrounded by cinder blocks and dry pine needles, with blue jeans and sneakers visible, smoke billowing against a textured outdoor ground surface."
+    },
+    "IMG_4282.jpg": {
+      "description": "The photograph captures a serene lakeside scene with calm water reflecting the clear blue sky above, dotted sparsely by trees in the distance under bright sunlight that bathes the landscape evenly across its expanse.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:55:04",
+      "alt_text": "Serene lake scene with sandy shore, smooth grayish-blue water reflecting a clear sky. Dense forest with autumn colors lines the horizon, a small red structure nestled among trees, creating a tranquil landscape."
+    },
+    "IMG_4283.jpg": {
+      "description": "The photograph captures a serene beach scene with calm water reflecting the clear blue sky above, devoid of any textual elements to describe.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 00:57:40",
+      "alt_text": "Serene lake scene with smooth gray-blue water reflecting a gradient blue sky. Dense treeline on horizon, sandy foreground with textured shoreline and minimal shadows, creating a vast, tranquil landscape."
+    },
+    "IMG_4284.jpg": {
+      "description": "The image depicts a serene water surface with gentle ripples that create an abstract pattern, suggesting movement in the stillness of calm waters. The color palette is dominated by shades of blue, ranging from light to darker tones, which may indicate varying depth or reflection levels on the water's surface. There are no discernible objects, figures, or text present within this tranquil scene; it focuses solely on the natural beauty and fluidity of a body of water under soft sunlight filtering through foliage overhead.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:00:29",
+      "alt_text": "Layered water surface transitions from light blue-gray ripples to deeper blue waves, ending in a flat sandy-brown texture, depicting a serene shoreline or shallow water landscape."
+    },
+    "IMG_4286.jpg": {
+      "description": "The image depicts a serene autumnal scene featuring trees with leaves displaying hues of red, orange, yellow, green, and brown against the backdrop of an overcast sky. The tranquil body of water in front reflects these vibrant colors subtly, creating a mirror-like effect that enhances the visual impact. In the distance on the right side, there is a small structure with white walls and windows, possibly indicating human habitation or recreational use near this natural setting. The overall composition suggests peacefulness and seasonal change in nature's cycle of growth and decay.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:03:17",
+      "alt_text": "Serene autumn lakeside scene with trees in vibrant fall colors - yellows, oranges, and reds - reflecting in calm green-gray waters. Wooden cabins and a dock nestled among evergreen and deciduous trees under a misty, soft-toned sky."
+    },
+    "IMG_4287.jpg": {
+      "description": "The image depicts a serene landscape featuring calm water with ripples reflecting the surrounding environment, which includes densely packed trees on one side of the frame. The sky above is overcast, contributing to an overall subdued color palette dominated by shades of gray and greenish-blue tones. There are no discernible texts or human figures present in this tranquil scene.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:05:59",
+      "alt_text": "Serene lake scene with rippled gray water, rocky shoreline, and dense pine forest. A white cabin nestles among trees, creating a tranquil landscape under an overcast sky with soft, muted colors."
+    },
+    "IMG_4288.jpg": {
+      "description": "The image depicts a tranquil night scene at the water's edge with gentle ripples on its surface, suggesting calm waters under an overcast sky filled with numerous small lights that could be distant city or town illumination. The foreground is dominated by sandy terrain interspersed with scattered debris and possibly a few objects like bottles or plastic items, adding to the natural yet somewhat neglectful ambiance of this nocturnal setting.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:08:40",
+      "alt_text": "Nighttime beach scene with sandy shore, scattered debris, and dark rippling waves. Distant city lights create a thin, glowing horizon against a black sky, casting minimal illumination on the textured, muted landscape."
+    },
+    "IMG_4289.jpg": {
+      "description": "The image depicts a nighttime scene with an expansive body of water that stretches out into the horizon, illuminated by faint lights from distant sources on its surface. The lighting creates subtle ripples across the dark waters' surface and casts soft shadows around the edges where it meets the skyline or any visible landforms in the distance. There are no discernible texts within this image, as there is a significant amount of visual noise present that obscures finer details.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:11:22",
+      "alt_text": "Turbulent nighttime seascape with dark navy sky and textured brown waves. A faint blue light in the upper right hints at a distant boat, creating a moody, ominous maritime scene with minimal visibility."
+    },
+    "IMG_4290.jpg": {
+      "description": "The photograph captures a nighttime scene with an expansive body of water stretching into the distance, illuminated by distant lights that appear as faint specks against the dark sky. The image is taken from a low angle looking upwards towards these lights and beyond them lies a horizon line where silhouettes of trees or vegetation are visible in the background.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:14:03",
+      "alt_text": "Nighttime landscape with dark green and black foreground, murky green-brown sky, and a line of bright white and blue lights reflecting vertically, creating contrast against a silhouetted horizon of trees or forest edge."
+    },
+    "IMG_4291.jpg": {
+      "description": "The photograph captures a nighttime scene with an expansive body of water stretching out into the horizon, illuminated by faint lights that suggest distant structures on land across the dark skyline.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:16:40",
+      "alt_text": "Nighttime landscape with muted green and black tones, blurred horizon, and faint distant lights. Silhouetted treeline against an overcast sky creates a moody, obscure scene with indistinct boundaries between land and water."
+    },
+    "IMG_4293.jpg": {
+      "description": "The image captures a serene autumnal scene featuring trees with leaves displaying hues of yellow and orange, suggesting the season is fall. The foliage creates an impressionistic effect through brush strokes that blend colors seamlessly across their surfaces. A road runs parallel to this natural tableau on one side, while a gravel pathway lies adjacent in front of it. This composition evokes tranquility and captures the essence of nature's seasonal transformation under clear skies with ample sunlight illuminating both elements within the frame.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:19:23",
+      "alt_text": "Autumn forest road winds through bare trees, with fallen leaves in yellow, orange, and brown carpeting the ground. Sparse branches reach against a pale blue sky, creating a layered, depth-filled woodland scene."
+    },
+    "IMG_4294.jpg": {
+      "description": "The image captures a serene autumnal scene with bare trees adorned by yellow leaves against the backdrop of an orange sunset, casting warm hues across the sky. The foreground features a road bordered by grassy areas interspersed with fallen foliage and scattered rocks or debris on its surface.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:22:04",
+      "alt_text": "Autumn forest path with golden sunlight filtering through bare trees, creating a warm glow. Fallen yellow and brown leaves carpet the ground, highlighting the seasonal transition and soft morning light."
+    },
+    "IMG_4295.jpg": {
+      "description": "The photograph captures a serene autumnal forest scene with leafy trees displaying vibrant yellows, oranges, and greens against the backdrop of an overcast sky. The sun is partially visible through the foliage on the right side, casting dappled light across the ground covered in fallen leaves that create a textured pattern beneath them.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:24:44",
+      "alt_text": "Autumn forest with bare gray trees and golden leaves, sunlight filtering through branches. Dense leaf-covered ground and layered landscape showcase seasonal transition from green to yellow and brown."
+    },
+    "IMG_4296.jpg": {
+      "description": "The photograph captures a serene forest scene with dense foliage of trees displaying autumnal hues, predominantly shades of yellows, oranges, reds, and greens against the backdrop of an overcast sky. The ground is covered in fallen leaves that exhibit various colors from brown to red and hints of green amongst them.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:27:25",
+      "alt_text": "Autumn forest scene with bare trees and golden-brown fallen leaves. Soft light filters through sparse canopy, highlighting gray tree trunks and yellow-orange foliage in a tranquil, layered woodland landscape."
+    },
+    "IMG_4297.jpg": {
+      "description": "The photograph captures a serene autumnal scene featuring an asphalt road flanked by leafy trees with vibrant yellow, orange, and green foliage against the backdrop of clear blue skies. The sunlight filters through the leaves, casting dappled shadows on the ground below. A solitary white utility box stands to one side near a curb adorned with fallen autumnal leaves.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:30:05",
+      "alt_text": "Autumn road curves through a forest with yellow, orange, and green trees. Fallen leaves cover the ground and road, with a mix of deciduous and evergreen trees against a light blue sky."
+    },
+    "IMG_4298.jpg": {
+      "description": "The photograph captures a serene autumnal forest scene with trees adorned by vibrant yellow leaves, suggesting the season is fall. The ground beneath features an array of fallen foliage in shades ranging from green to brown, indicating that it's likely early winter when many tree species have shed their leaves. A utility box stands on a gravel pathway adjacent to this natural setting, adding a touch of human presence amidst the wild beauty. The sky above is clear with no visible clouds, and sunlight filters through the trees casting dappled shadows across the ground below.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:32:51",
+      "alt_text": "Autumn forest path with asphalt road, scattered brown and yellow fallen leaves. Sparse trees in gold, orange, and green hues, with evergreen pines, under a clear blue sky."
+    },
+    "IMG_4299.jpg": {
+      "description": "The photograph captures a serene natural scene with frosted grass at the forefront transitioning into dense, leafless shrubbery in the background under soft sunlight that bathes everything gently in warm tones of yellow-green hues and subtle blue shadows.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:35:30",
+      "alt_text": "Frosty morning landscape with delicate frost-covered grass, scattered fallen leaves in yellow and brown, and golden-hued shrubs against a soft, misty background signaling the transition from autumn to winter."
+    },
+    "IMG_4300.jpg": {
+      "description": "The photograph captures a dilapidated room with an open door revealing scattered debris on the floor, including wooden planks, broken furniture pieces like dressers and cabinets, and various other items that appear to be in disarray or awaiting salvage. The walls are covered partially by plywood panels, which have been stripped away from their original state of repair. A large white door is prominent on the right side of the image with a visible hinge mechanism at its top edge.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:38:12",
+      "alt_text": "Abandoned interior room viewed through a white door, revealing damaged wood-paneled walls, a deteriorating ceiling, and scattered debris including a red chair, white shelves, and cardboard boxes."
+    },
+    "IMG_4301.jpg": {
+      "description": "The photograph captures a close-up view of an interior space filled with various wooden planks scattered haphazardly, creating a chaotic yet intriguing visual effect that suggests disarray or the aftermath of construction work. The lighting is dim and focused on specific areas within this scene, highlighting textures and patterns inherent to the materials present while casting shadows across other parts of the image.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:40:52",
+      "alt_text": "Weathered wooden beams and planks fill a dim, cluttered attic space, revealing layers of aged wood in grayish-white and brown tones, with scattered debris and intersecting structural elements suggesting years of disuse."
+    },
+    "IMG_4302.jpg": {
+      "description": "The photograph captures a close-up view of an interior space dominated by wooden beams and rafters, with the perspective suggesting depth from above. The image is taken in natural daylight that highlights the textures and patterns on the surfaces while casting shadows beneath them. There are no discernible texts or distinctive markings within this scene to provide additional contextual information about its location or purpose beyond what can be inferred visually.",
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "2025-10-24 01:43:34",
+      "alt_text": "Weathered wooden interior with grayish-brown planks, textured walls, and a white vertical beam. Subdued lighting highlights the aged wood's rich textures and muted color palette, with a hint of reddish-brown in the scene."
+    }
+  }
+}
