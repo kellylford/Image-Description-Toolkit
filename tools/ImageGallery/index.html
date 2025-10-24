@@ -1354,7 +1354,8 @@
                 'detailed': 'Provide an extremely detailed description of this image, covering all visible elements, their relationships, colors, textures, spatial arrangement, and any notable features or patterns.'
             };
             
-            return prompts[promptKey] || 'Prompt text not available';
+            const result = prompts[promptKey] || `DEBUG: Prompt key "${promptKey}" not found. Available keys: ${Object.keys(prompts).join(', ')}`;
+            return result;
         }
         
         function getAvailablePrompts() {
