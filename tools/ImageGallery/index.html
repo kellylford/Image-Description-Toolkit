@@ -1257,9 +1257,16 @@
             promptSection.style.cssText = 'margin-bottom: 30px; padding: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);';
             
             const promptTextContent = getPromptText(prompt);
-            console.error('DEBUG: prompt value:', prompt);
-            console.error('DEBUG: promptTextContent:', promptTextContent);
-            promptSection.innerHTML = `
+            
+            // DEBUG: Display values on the page for screen reader accessibility
+            const debugInfo = `<div style="background: red; color: white; padding: 10px; margin-bottom: 10px;">
+                DEBUG INFO:<br>
+                Prompt value: "${prompt}"<br>
+                Prompt text content: "${promptTextContent}"<br>
+                Prompt text length: ${promptTextContent.length}
+            </div>`;
+            
+            promptSection.innerHTML = debugInfo + `
                 <button class="prompt-toggle-btn" onclick="togglePromptText('shared-prompt')" aria-expanded="false" style="margin-bottom: 10px;">
                     Show Prompt Text
                 </button>
