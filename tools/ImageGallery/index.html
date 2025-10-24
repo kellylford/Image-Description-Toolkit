@@ -1320,6 +1320,9 @@
                             Show Prompt Text
                         </button>
                         <div class="prompt-text-container" id="${promptId}" style="display: none;">
+                            <div style="background: yellow; color: black; padding: 5px; margin-bottom: 5px;">
+                                DEBUG: promptKey="${data.promptKey}" | length=${promptTextContent.length}
+                            </div>
                             <div class="prompt-text">${promptTextContent}</div>
                         </div>
                     </div>
