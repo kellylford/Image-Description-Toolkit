@@ -83,6 +83,25 @@ Edit JSON files directly to add alt text:
 - ❌ Too long: "Here's a detailed description of the image: The scene depicts a suburban residential street on a clear, bright day with a vivid blue sky dotted with white puffy clouds..."
 - ❌ Too short: "Houses and cars"
 
+## Important Technical Note: Direct Image Alt Text Generation
+
+**Issue Identified (October 2024)**: When using vision AI models to generate alt text directly from images (using prompts like "Write 30 words of alt text"), all tested models consistently ignore word limits and produce detailed descriptions instead.
+
+### Tested Models & Results:
+- **Claude 3.5 Haiku**: Ignores "30 words maximum" instruction, produces 200+ word detailed descriptions
+- **Claude Opus 4**: Ignores word limits, produces even longer detailed descriptions  
+- **Gemma3**: Completely ignores alt text instruction, responds with "detailed description suitable for metadata"
+
+### Root Cause:
+Vision AI models appear to be fundamentally trained to provide comprehensive descriptions when viewing images, overriding specific brevity instructions.
+
+### Working Solution:
+The **two-step process** used by this Image Gallery system:
+1. Generate detailed descriptions from images (what models do naturally)
+2. Convert existing descriptions to alt text using text-to-text processing (works reliably)
+
+This explains why the Image Gallery alt text generation script works perfectly while direct image-to-alt-text generation fails consistently across all providers.
+
 ## Testing Alt Text
 
 1. **Open the Image Gallery** in your browser

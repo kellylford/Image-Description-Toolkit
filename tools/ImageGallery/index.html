@@ -44,6 +44,7 @@
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 30px;
+            -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
         }
         
@@ -119,6 +120,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 20px;
+            -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
         }
         
@@ -190,12 +192,13 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 20px;
+            -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
         }
         
         .description-header {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
             align-items: center;
             margin-bottom: 15px;
             padding-bottom: 15px;
@@ -420,6 +423,197 @@
             display: block;
         }
         
+        /* Comparison Options */
+        .comparison-fieldset {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .comparison-fieldset legend {
+            color: #00d4ff;
+            font-weight: 600;
+            padding: 0 10px;
+        }
+        
+        .comparison-options {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .comparison-option {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            cursor: pointer;
+            color: #ddd;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .comparison-option input[type="radio"] {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+        }
+        
+        .comparison-option small {
+            color: #888;
+            font-size: 12px;
+            margin-left: 24px;
+            font-weight: normal;
+        }
+        
+        .comparison-option:hover {
+            color: #fff;
+        }
+        
+        .comparison-option:hover small {
+            color: #aaa;
+        }
+        
+        #explorerConfig {
+            display: none;
+        }
+        
+        #explorerConfig.active {
+            display: block;
+        }
+        
+        #promptsConfig {
+            display: none;
+        }
+        
+        #promptsConfig.active {
+            display: flex;
+        }
+        
+        #providersConfig {
+            display: none;
+        }
+        
+        #providersConfig.active {
+            display: flex;
+        }
+        
+        /* Description Explorer View */
+        #descriptionExplorerPanel {
+            display: none;
+            padding: 20px;
+        }
+        
+        #descriptionExplorerPanel.active {
+            display: block;
+        }
+        
+        .description-cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .description-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .card-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #00d4ff;
+            margin: 0;
+        }
+        
+        .card-badge {
+            background: rgba(0, 153, 255, 0.2);
+            color: #00d4ff;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .card-description {
+            color: #ddd;
+            line-height: 1.8;
+            font-size: 15px;
+            flex-grow: 1;
+        }
+        
+        .card-prompt-section {
+            margin-top: 10px;
+        }
+        
+        .prompt-toggle-btn {
+            background: rgba(0, 153, 255, 0.2);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .prompt-toggle-btn:hover {
+            background: rgba(0, 153, 255, 0.3);
+            border-color: rgba(0, 212, 255, 0.5);
+        }
+        
+        .prompt-toggle-btn:focus {
+            outline: 2px solid #00d4ff;
+            outline-offset: 2px;
+        }
+        
+        .prompt-text-container {
+            margin-top: 10px;
+        }
+        
+        .prompt-text {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid #00d4ff;
+            padding: 12px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 13px;
+            color: #aaa;
+            line-height: 1.6;
+            border-radius: 4px;
+        }
+        
+        .card-footer {
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 12px;
+            color: #888;
+        }
+        
         /* Image Browser View */
         .image-browser-container {
             display: none;
@@ -428,6 +622,45 @@
         
         .image-browser-container.active {
             display: block;
+        }
+        
+        .browser-display-options {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .browser-display-options legend {
+            color: #00d4ff;
+            font-weight: 600;
+            padding: 0 10px;
+        }
+        
+        .browser-options {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .browser-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #ddd;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .browser-option input[type="radio"] {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .browser-option:hover {
+            color: #fff;
         }
         
         .image-browser-grid {
@@ -468,6 +701,16 @@
             min-height: 60px;
             display: flex;
             align-items: center;
+        }
+        
+        /* Hide alt text when images-only mode is selected */
+        .image-browser-container.images-only .alt-text {
+            display: none;
+        }
+        
+        /* Adjust image height when alt text is hidden */
+        .image-browser-container.images-only .image-browser-item img {
+            height: 250px;
         }
         
         .image-browser-item .image-name {
@@ -618,68 +861,68 @@
                         <span>Image Browser</span>
                     </label>
                     <label class="view-mode-option">
-                        <input type="radio" name="viewMode" value="single" aria-describedby="single-desc">
-                        <span>Single View</span>
-                    </label>
-                    <label class="view-mode-option">
-                        <input type="radio" name="viewMode" value="provider-compare" aria-describedby="provider-desc">
-                        <span>Provider Compare</span>
-                    </label>
-                    <label class="view-mode-option">
-                        <input type="radio" name="viewMode" value="prompt-matrix" aria-describedby="prompt-desc">
-                        <span>Prompt Matrix</span>
+                        <input type="radio" name="viewMode" value="description-explorer" aria-describedby="explorer-desc">
+                        <span>Description Explorer</span>
                     </label>
                 </div>
                 <div class="view-mode-descriptions">
                     <div id="browser-desc" class="view-description">Browse all images with accessible alt text - Click any image to explore AI descriptions</div>
-                    <div id="single-desc" class="view-description">View one description at a time - Select provider, model, and prompt</div>
-                    <div id="provider-desc" class="view-description">Compare how different providers handle the same prompt - Just select the prompt style you want to compare</div>
-                    <div id="prompt-desc" class="view-description">Compare all prompt styles from the same model - Select provider and model</div>
+                    <div id="explorer-desc" class="view-description">Compare AI descriptions side-by-side - See how different prompts or providers describe the same image</div>
                 </div>
             </fieldset>
         </div>
-        
-        <div class="config-row">
-            <div class="config-group">
-                <label for="providerSelect">AI Provider</label>
-                <select id="providerSelect" onchange="updateModelOptions()">
-                    <option value="">Loading...</option>
-                </select>
+
+        <div class="config-panel" id="explorerConfig">
+            <fieldset class="comparison-fieldset">
+                <legend>Show me:</legend>
+                <div class="comparison-options">
+                    <label class="comparison-option">
+                        <input type="radio" name="comparisonMode" value="all-prompts" checked>
+                        <span>All prompts for one model</span>
+                        <small>See narrative, colorful, technical side-by-side</small>
+                    </label>
+                    <label class="comparison-option">
+                        <input type="radio" name="comparisonMode" value="same-prompt">
+                        <span>Same prompt across providers</span>
+                        <small>Compare how different AIs handle the same prompt</small>
+                    </label>
+                </div>
+            </fieldset>
+
+            <div class="config-row">
+                <div class="config-group">
+                    <label for="imageSelect">Select Image</label>
+                    <select id="imageSelect" onchange="handleImageChange()">
+                        <option value="">Loading images...</option>
+                    </select>
+                </div>
             </div>
-            
-            <div class="config-group">
-                <label for="modelSelect">Model</label>
-                <select id="modelSelect" onchange="updatePromptOptions()">
-                    <option value="">Select provider first...</option>
-                </select>
+
+            <div id="promptsConfig" class="config-row">
+                <div class="config-group">
+                    <label for="providerSelect">Provider</label>
+                    <select id="providerSelect" onchange="updateModelOptions()">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                
+                <div class="config-group">
+                    <label for="modelSelect">Model</label>
+                    <select id="modelSelect" onchange="handleModelChange()">
+                        <option value="">Select provider first...</option>
+                    </select>
+                </div>
             </div>
-            
-            <div class="config-group">
-                <label for="promptSelect">Prompt Style</label>
-                <select id="promptSelect" onchange="updateStatusAfterPromptSelection()">
-                    <option value="">Select model first...</option>
-                </select>
+
+            <div id="providersConfig" class="config-row">
+                <div class="config-group">
+                    <label for="promptSelect">Prompt Style</label>
+                    <select id="promptSelect" onchange="handlePromptChange()">
+                        <option value="">Select prompt...</option>
+                    </select>
+                </div>
             </div>
-            
-            <div class="config-group">
-                <button id="updateBtn" onclick="handleUpdate()" style="
-                    padding: 10px 20px;
-                    background: #00d4ff;
-                    color: #000;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    transition: background-color 0.2s;
-                " onmouseover="this.style.background='#00b8e6'" onmouseout="this.style.background='#00d4ff'"
-                aria-label="Apply selected view mode and configuration">
-                    Update View
-                </button>
-            </div>
-        </div>
-        
-        <div class="status-bar" id="statusBar">
+        </div>        <div class="status-bar" id="statusBar">
             Ready - Select configuration to view descriptions
         </div>
     </div>
@@ -693,42 +936,9 @@
             <div class="counter" id="counter"></div>
         </div>
         
-        <!-- Single View Description Panel -->
-        <div class="description-panel" id="singleDescriptionPanel">
-            <div class="description-header">
-                <h2 class="description-title" id="descriptionTitle">AI Description</h2>
-                <div class="model-badge" id="modelBadge">No model selected</div>
-            </div>
-            <div class="description-text" id="descriptionText">
-                <div class="no-description">
-                    Select an AI provider, model, and prompt style to see the description.
-                </div>
-            </div>
-            
-            <div class="prompt-section prompt-section-hidden" id="promptSection">
-                <button class="prompt-toggle" id="promptToggle" onclick="togglePrompt()">Show Prompt Text</button>
-                <div class="prompt-text" id="promptText"></div>
-            </div>
-            
-            <div class="metadata metadata-hidden" id="metadata">
-                <div class="metadata-item">
-                    <div class="metadata-label">Provider</div>
-                    <div class="metadata-value" id="metaProvider">-</div>
-                </div>
-                <div class="metadata-item">
-                    <div class="metadata-label">Model</div>
-                    <div class="metadata-value" id="metaModel">-</div>
-                </div>
-                <div class="metadata-item">
-                    <div class="metadata-label">Prompt</div>
-                    <div class="metadata-value" id="metaPrompt">-</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Multi-View Description Panel -->
-        <div class="multi-description-panel hidden" id="multiDescriptionPanel" aria-live="polite">
-            <!-- Content will be populated by JavaScript -->
+        <!-- Description Explorer Panel - Side-by-side comparison cards -->
+        <div class="description-explorer-panel" id="descriptionExplorerPanel">
+            <!-- Content will be populated by JavaScript with comparison cards -->
         </div>
     </div>
 
@@ -737,6 +947,21 @@
         <div class="image-browser-header">
             <h2>Image Browser</h2>
             <p>Browse all images with accessible alt text - Click any image to explore AI descriptions</p>
+            
+            <!-- Alt Text Display Options -->
+            <fieldset class="browser-display-options">
+                <legend>Show me:</legend>
+                <div class="browser-options">
+                    <label class="browser-option">
+                        <input type="radio" name="browserDisplay" value="images-only" onchange="toggleAltTextDisplay()">
+                        <span>Images only</span>
+                    </label>
+                    <label class="browser-option">
+                        <input type="radio" name="browserDisplay" value="images-with-alt" checked onchange="toggleAltTextDisplay()">
+                        <span>Images with visible alt text</span>
+                    </label>
+                </div>
+            </fieldset>
         </div>
         <div class="image-browser-grid" id="imageBrowserGrid">
             <!-- Image grid will be populated by JavaScript -->
@@ -811,8 +1036,6 @@
                 providerModelIndexes[provider] = 0;
             }
             
-            console.log(`Changed ${provider} model from index ${oldIndex} to ${providerModelIndexes[provider]} (${models[providerModelIndexes[provider]]})`);
-            
             // Regenerate the provider comparison view
             const imageName = document.getElementById('imageSelect').value;
             const promptStyle = document.getElementById('promptSelect').value;
@@ -830,122 +1053,401 @@
             const browserDesc = document.getElementById('browser-desc');
             if (browserDesc) {
                 browserDesc.classList.add('active');
-            } else {
-                console.error('browser-desc element not found');
             }
             
             viewModeInputs.forEach(input => {
                 input.addEventListener('change', (e) => {
                     if (e.target.checked) {
-                        // Only update the description text, don't change the view yet
+                        // Update the description text
                         descriptions.forEach(desc => desc.classList.remove('active'));
-                        const targetDesc = document.getElementById(`${e.target.value.replace('-', '-')}-desc`);
+                        const targetDesc = document.getElementById(`${e.target.value}-desc`);
                         if (targetDesc) targetDesc.classList.add('active');
                         
-                        // Update status to prompt user to click Update
-                        updateStatus('View mode selected. Click "Update View" to apply changes.');
+                        // Automatically apply the view mode change
+                        currentViewMode = e.target.value;
+                        
+                        // Update the layout
+                        updateViewMode();
+                        
+                        // Initialize comparison mode for description-explorer
+                        if (currentViewMode === 'description-explorer') {
+                            initializeComparisonMode();
+                        }
+                        
+                        // Update status based on view mode
+                        updateStatusForViewMode();
                     }
                 });
             });
         }
         
-        function handleUpdate() {
-            console.log('=== UPDATE BUTTON CLICKED ===');
+        function initializeComparisonMode() {
+            const comparisonInputs = document.querySelectorAll('input[name="comparisonMode"]');
             
-            // Get the selected view mode
-            const selectedMode = document.querySelector('input[name="viewMode"]:checked');
-            if (selectedMode) {
-                currentViewMode = selectedMode.value;
-                console.log('Applying view mode:', currentViewMode);
-                
-                // Update the layout
-                updateViewMode();
-                
-                // Update status based on view mode
-                updateStatusForViewMode();
-                
-                // For non-image-browser modes, update dropdown options and data
-                if (currentViewMode === 'provider-compare') {
-                    populatePromptOptions();
-                } else if (currentViewMode !== 'image-browser') {
-                    updateModelOptions();
+            // Check if a comparison mode is already selected
+            let hasSelection = false;
+            comparisonInputs.forEach(input => {
+                if (input.checked) {
+                    hasSelection = true;
+                    handleComparisonModeChange(input.value);
                 }
-                
-                // Update data based on new mode (not needed for image browser)
-                if (currentViewMode !== 'image-browser') {
-                    updateImage();
-                }
-            } else {
-                console.error('No view mode selected');
-                updateStatus('Please select a view mode first.');
+            });
+            
+            // If no selection, default to first option (all-prompts)
+            if (!hasSelection && comparisonInputs.length > 0) {
+                comparisonInputs[0].checked = true;
+                handleComparisonModeChange(comparisonInputs[0].value);
             }
+            
+            // Add change listeners
+            comparisonInputs.forEach(input => {
+                input.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        handleComparisonModeChange(e.target.value);
+                    }
+                });
+            });
+        }
+        
+        async function handleComparisonModeChange(mode) {
+            const providersConfig = document.getElementById('providersConfig');
+            const promptsConfig = document.getElementById('promptsConfig');
+            
+            // Always populate image selector when in description explorer
+            await populateImageSelect();
+            
+            if (mode === 'all-prompts') {
+                // Show provider/model selector, hide prompt selector
+                if (promptsConfig) promptsConfig.classList.add('active');
+                if (providersConfig) providersConfig.classList.remove('active');
+                
+                // Auto-select first provider and model
+                populateProviderDropdown();
+                
+                // Load descriptions for all prompts with the selected model
+                if (document.getElementById('imageSelect').value) {
+                    loadAllPromptsView();
+                }
+            } else if (mode === 'same-prompt') {
+                // Show prompt selector, hide provider/model selector
+                if (promptsConfig) promptsConfig.classList.remove('active');
+                if (providersConfig) providersConfig.classList.add('active');
+                
+                // Auto-select first prompt
+                populatePromptOptions();
+                
+                // Load descriptions for same prompt across providers
+                if (document.getElementById('imageSelect').value) {
+                    loadSamePromptView();
+                }
+            }
+        }
+        
+        async function loadAllPromptsView() {
+            const provider = document.getElementById('providerSelect').value;
+            const model = document.getElementById('modelSelect').value;
+            const imageName = document.getElementById('imageSelect').value;
+            
+            if (!provider || !model || !imageName) {
+                updateStatus('Configuring view...');
+                return;
+            }
+            
+            updateStatus('Loading all prompts for selected model...');
+            
+            const explorerPanel = document.getElementById('descriptionExplorerPanel');
+            
+            // Create image display at the top
+            const imageDisplay = document.createElement('div');
+            imageDisplay.className = 'explorer-image-display';
+            imageDisplay.innerHTML = `
+                <img src="${CONFIG.imagesBaseUrl}${imageName}" 
+                     alt="${imageName}" 
+                     style="max-width: 100%; max-height: 400px; border-radius: 8px; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
+                <div style="text-align: center; color: #888; font-size: 14px; margin-bottom: 30px;">${imageName}</div>
+            `;
+            
+            const cardsContainer = document.createElement('div');
+            cardsContainer.className = 'description-cards-container';
+            
+            // Load all available prompts
+            const prompts = getAvailablePrompts();
+            
+            for (const prompt of prompts) {
+                const description = await loadDescriptionForConfig(imageName, provider, model, prompt);
+                
+                const card = createDescriptionCard({
+                    title: formatPromptName(prompt),
+                    badge: `${provider} - ${model}`,
+                    description: description || 'No description available',
+                    footer: `Prompt: ${prompt}`,
+                    imageName: imageName,
+                    promptKey: prompt
+                });
+                
+                cardsContainer.appendChild(card);
+            }
+            
+            // Replace existing content with image + cards
+            explorerPanel.innerHTML = '';
+            explorerPanel.appendChild(imageDisplay);
+            explorerPanel.appendChild(cardsContainer);
+            
+            updateStatus(`Showing ${prompts.length} prompts for ${provider} ${model}`);
+        }
+        
+        async function loadSamePromptView() {
+            const prompt = document.getElementById('promptSelect').value;
+            const imageName = document.getElementById('imageSelect').value;
+            
+            if (!prompt || !imageName) {
+                updateStatus('Configuring view...');
+                return;
+            }
+            
+            updateStatus('Loading same prompt across providers...');
+            
+            const explorerPanel = document.getElementById('descriptionExplorerPanel');
+            
+            // Create image display at the top
+            const imageDisplay = document.createElement('div');
+            imageDisplay.className = 'explorer-image-display';
+            imageDisplay.innerHTML = `
+                <img src="${CONFIG.imagesBaseUrl}${imageName}" 
+                     alt="${imageName}" 
+                     style="max-width: 100%; max-height: 400px; border-radius: 8px; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
+                <div style="text-align: center; color: #888; font-size: 14px; margin-bottom: 30px;">${imageName}</div>
+            `;
+            
+            const cardsContainer = document.createElement('div');
+            cardsContainer.className = 'description-cards-container';
+            
+            // Load all provider/model combinations
+            const combinations = getAllProviderModelCombinations();
+            
+            for (const combo of combinations) {
+                const description = await loadDescriptionForConfig(imageName, combo.provider, combo.model, prompt);
+                
+                const card = createDescriptionCard({
+                    title: `${combo.provider} - ${combo.model}`,
+                    badge: formatPromptName(prompt),
+                    description: description || 'No description available',
+                    footer: `Provider: ${combo.provider}`,
+                    imageName: imageName,
+                    promptKey: prompt
+                });
+                
+                cardsContainer.appendChild(card);
+            }
+            
+            // Replace existing content with image + cards
+            explorerPanel.innerHTML = '';
+            explorerPanel.appendChild(imageDisplay);
+            explorerPanel.appendChild(cardsContainer);
+            
+            updateStatus(`Showing ${combinations.length} providers for prompt "${formatPromptName(prompt)}"`);
+        }
+        
+        function createDescriptionCard(data) {
+            const card = document.createElement('div');
+            card.className = 'description-card';
+            card.setAttribute('role', 'article');
+            card.setAttribute('aria-label', `Description: ${data.title}`);
+            
+            // Create unique ID for prompt toggle
+            const promptId = `prompt-${Math.random().toString(36).substr(2, 9)}`;
+            
+            card.innerHTML = `
+                <div class="card-header">
+                    <h3 class="card-title">${data.title}</h3>
+                    <span class="card-badge" aria-label="Model">${data.badge}</span>
+                </div>
+                <div class="card-description">${data.description}</div>
+                ${data.promptKey ? `
+                    <div class="card-prompt-section">
+                        <button class="prompt-toggle-btn" onclick="togglePromptText('${promptId}')" aria-expanded="false">
+                            Show Prompt Text
+                        </button>
+                        <div class="prompt-text-container" id="${promptId}" style="display: none;">
+                            <div class="prompt-text">${getPromptText(data.promptKey)}</div>
+                        </div>
+                    </div>
+                ` : ''}
+                <div class="card-footer">${data.footer}</div>
+            `;
+            
+            return card;
+        }
+        
+        function togglePromptText(promptId) {
+            const container = document.getElementById(promptId);
+            const button = container.previousElementSibling;
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                button.textContent = 'Hide Prompt Text';
+                button.setAttribute('aria-expanded', 'true');
+            } else {
+                container.style.display = 'none';
+                button.textContent = 'Show Prompt Text';
+                button.setAttribute('aria-expanded', 'false');
+            }
+        }
+        
+        function getPromptText(promptKey) {
+            // Return the full prompt text for the given prompt key
+            const prompts = {
+                'narrative': 'Describe this image in detail, focusing on the main subjects, their actions, and the setting. Use clear, descriptive language.',
+                'colorful': 'Describe this image with vivid, expressive language. Emphasize colors, textures, mood, and atmosphere.',
+                'technical': 'Provide a technical description of this image, including composition, lighting, perspective, and any notable photographic or artistic techniques.',
+                'detailed': 'Provide an extremely detailed description of this image, covering all visible elements, their relationships, colors, textures, spatial arrangement, and any notable features or patterns.'
+            };
+            
+            return prompts[promptKey] || 'Prompt text not available';
+        }
+        
+        function getAvailablePrompts() {
+            // Get all unique prompt types from availableConfigs
+            const prompts = new Set();
+            
+            // Iterate through all providers and models to find all available prompts
+            for (const provider in availableConfigs.prompts) {
+                for (const model in availableConfigs.prompts[provider]) {
+                    availableConfigs.prompts[provider][model].forEach(prompt => prompts.add(prompt));
+                }
+            }
+            
+            // Define preferred order
+            const preferredOrder = ['narrative', 'colorful', 'technical', 'detailed'];
+            
+            // If we found prompts, return them sorted by preferred order
+            if (prompts.size > 0) {
+                const promptArray = Array.from(prompts);
+                
+                // Sort by preferred order, then alphabetically for any extras
+                return promptArray.sort((a, b) => {
+                    const indexA = preferredOrder.indexOf(a);
+                    const indexB = preferredOrder.indexOf(b);
+                    
+                    // If both are in preferred order, sort by their position
+                    if (indexA !== -1 && indexB !== -1) {
+                        return indexA - indexB;
+                    }
+                    // If only a is in preferred order, it comes first
+                    if (indexA !== -1) return -1;
+                    // If only b is in preferred order, it comes first
+                    if (indexB !== -1) return 1;
+                    // Otherwise alphabetically
+                    return a.localeCompare(b);
+                });
+            }
+            
+            // Otherwise fall back to standard prompts in preferred order
+            return ['narrative', 'colorful', 'technical', 'detailed'];
+        }
+        
+        function getAllProviderModelCombinations() {
+            const combinations = [];
+            
+            // Iterate through availableConfigs to get all provider/model combinations
+            for (const provider of availableConfigs.providers) {
+                if (availableConfigs.models[provider]) {
+                    for (const model of availableConfigs.models[provider]) {
+                        combinations.push({ provider, model });
+                    }
+                }
+            }
+            
+            return combinations;
+        }
+        
+        async function loadDescriptionForConfig(imageName, provider, model, prompt) {
+            try {
+                // Use getDescription to load on-demand
+                const descData = await getDescription(provider, model, prompt, imageName);
+                if (descData) {
+                    // Return the description text, not the whole object
+                    return descData.description || descData;
+                }
+                return null;
+            } catch (error) {
+                console.error('Error loading description:', error);
+                return null;
+            }
+        }
+        
+        function formatPromptName(prompt) {
+            // Convert prompt key to readable name
+            return prompt
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+        
+        function handleUpdate() {
+            // Refresh the current view mode with current settings
+            
+            // Update data based on current mode
+            if (currentViewMode === 'image-browser') {
+                // Reload the image browser
+                populateImageBrowser();
+            } else if (currentViewMode === 'description-explorer') {
+                // Reload description explorer based on comparison mode
+                const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
+                if (comparisonMode === 'all-prompts') {
+                    loadAllPromptsView();
+                } else if (comparisonMode === 'same-prompt') {
+                    loadSamePromptView();
+                }
+            }
+            
+            // Update status
+            updateStatusForViewMode();
+            updateStatus('View refreshed with current configuration');
         }
         
         function updateViewMode() {
-            console.log('=== updateViewMode START ===');
-            console.log('currentViewMode:', currentViewMode);
-            
-            const galleryContainer = document.getElementById('galleryContainer');
             const imageBrowserContainer = document.getElementById('imageBrowserContainer');
+            const explorerPanel = document.getElementById('descriptionExplorerPanel');
+            const explorerConfig = document.getElementById('explorerConfig');
+            const providersConfig = document.getElementById('providersConfig');
+            const promptsConfig = document.getElementById('promptsConfig');
             
-            console.log('galleryContainer found:', !!galleryContainer);
-            console.log('imageBrowserContainer found:', !!imageBrowserContainer);
+            // Hide all containers first
+            if (imageBrowserContainer) imageBrowserContainer.classList.remove('active');
+            if (explorerPanel) explorerPanel.classList.remove('active');
+            if (explorerConfig) explorerConfig.classList.remove('active');
+            if (providersConfig) providersConfig.classList.remove('active');
+            if (promptsConfig) promptsConfig.classList.remove('active');
             
             if (currentViewMode === 'image-browser') {
-                console.log('=== IMAGE BROWSER MODE DETECTED ===');
-                
-                if (galleryContainer) {
-                    galleryContainer.style.display = 'none';
-                    console.log('Gallery hidden');
+                // Clear description explorer content to prevent screen readers from reading old content
+                if (explorerPanel) {
+                    explorerPanel.innerHTML = '';
+                    explorerPanel.setAttribute('aria-hidden', 'true');
                 }
                 
                 if (imageBrowserContainer) {
-                    imageBrowserContainer.style.display = 'block';
-                    console.log('Image browser container shown');
+                    imageBrowserContainer.classList.add('active');
+                    imageBrowserContainer.removeAttribute('aria-hidden');
                     
-                    // Now populate with actual image list
+                    // Populate with actual image list
                     populateImageBrowser();
-                } else {
-                    console.error('imageBrowserContainer not found!');
                 }
-            } else {
-                console.log('Not image browser mode:', currentViewMode);
-                if (galleryContainer) galleryContainer.style.display = 'block';
-                if (imageBrowserContainer) imageBrowserContainer.style.display = 'none';
-            }
-        }
-        
-        function updateConfigurationLabels() {
-            const providerGroup = document.querySelector('.config-group:nth-child(1)');
-            const modelGroup = document.querySelector('.config-group:nth-child(2)');
-            const promptGroup = document.querySelector('.config-group:nth-child(3)');
-            
-            const providerLabel = document.querySelector('label[for="providerSelect"]');
-            const modelLabel = document.querySelector('label[for="modelSelect"]');
-            const promptLabel = document.querySelector('label[for="promptSelect"]');
-            
-            // Remove any existing indicators
-            providerLabel.textContent = 'AI Provider';
-            modelLabel.textContent = 'Model';
-            promptLabel.textContent = 'Prompt Style';
-            
-            // Add visual indicators based on view mode
-            if (currentViewMode === 'provider-compare') {
-                promptLabel.textContent = 'Prompt Style (Required)';
-                promptGroup.style.border = '2px solid #00d4ff';
-                providerGroup.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-                modelGroup.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-            } else if (currentViewMode === 'prompt-matrix') {
-                providerLabel.textContent = 'AI Provider (Required)';
-                modelLabel.textContent = 'Model (Required)';
-                providerGroup.style.border = '2px solid #00d4ff';
-                modelGroup.style.border = '2px solid #00d4ff';
-                promptGroup.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-            } else {
-                // Single view - all required
-                providerGroup.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-                modelGroup.style.border = '1px solid rgba(255, 255, 255, 0.1)';
-                promptGroup.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+            } else if (currentViewMode === 'description-explorer') {
+                // Hide image browser from screen readers
+                if (imageBrowserContainer) {
+                    imageBrowserContainer.setAttribute('aria-hidden', 'true');
+                }
+                
+                if (explorerPanel) {
+                    explorerPanel.classList.add('active');
+                    explorerPanel.removeAttribute('aria-hidden');
+                }
+                if (explorerConfig) explorerConfig.classList.add('active');
+                
+                // Initialize comparison mode
+                initializeComparisonMode();
             }
         }
         
@@ -953,55 +1455,47 @@
             let status = '';
             let title = 'Image Description Toolkit - ';
             
+            const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
             const provider = document.getElementById('providerSelect').value;
             const model = document.getElementById('modelSelect').value;
             const prompt = document.getElementById('promptSelect').value;
+            const imageName = document.getElementById('imageSelect').value;
             
             if (currentViewMode === 'image-browser') {
                 status = 'Image browser: Browse all images with alt text - Click any image to explore AI descriptions';
                 title += 'Image Browser';
-            } else if (currentViewMode === 'single') {
-                // Check if configuration is complete
-                if (provider && model && prompt) {
-                    status = `Configuration complete: ${provider} / ${model} / ${prompt} - Ready to view descriptions`;
-                } else if (provider && model) {
-                    status = `Model: ${model} - Select a prompt style`;
-                } else if (provider) {
-                    status = `Provider: ${provider} - Select a model`;
+            } else if (currentViewMode === 'description-explorer') {
+                if (comparisonMode === 'all-prompts') {
+                    if (provider && model && imageName) {
+                        status = `Showing all prompts for ${model} (${provider})`;
+                        title += `Description Explorer - All Prompts - ${model}`;
+                    } else if (provider && model) {
+                        status = 'Select an image to view all prompt descriptions';
+                        title += 'Description Explorer - All Prompts';
+                    } else {
+                        status = 'Configuring view...';
+                        title += 'Description Explorer';
+                    }
+                } else if (comparisonMode === 'same-prompt') {
+                    if (prompt && imageName) {
+                        const promptName = formatPromptName(prompt);
+                        status = `Comparing "${promptName}" across all providers`;
+                        title += `Description Explorer - ${promptName}`;
+                    } else if (prompt) {
+                        status = 'Select an image to compare providers';
+                        title += 'Description Explorer - Provider Compare';
+                    } else {
+                        status = 'Configuring view...';
+                        title += 'Description Explorer';
+                    }
                 } else {
-                    status = 'Single view: Select provider, model, and prompt style';
-                }
-                title += 'Single View';
-                if (images[currentImageIndex]) {
-                    title += ` - ${images[currentImageIndex]}`;
-                }
-            } else if (currentViewMode === 'provider-compare') {
-                if (prompt) {
-                    status = `Provider comparison: Comparing all providers using "${prompt}" prompt`;
-                } else {
-                    status = 'Provider comparison: Select the prompt style you want to compare across all providers';
-                }
-                title += 'Provider Compare';
-                if (images[currentImageIndex]) {
-                    title += ` - ${images[currentImageIndex]}`;
-                }
-            } else if (currentViewMode === 'prompt-matrix') {
-                if (provider && model) {
-                    status = `Prompt comparison: Comparing all prompts for ${model} (${provider})`;
-                } else if (provider) {
-                    status = `Provider: ${provider} - Select a model to see prompt comparisons`;
-                } else {
-                    status = 'Prompt comparison: Select provider and model to see how different prompts affect the same model';
-                }
-                title += 'Prompt Matrix';
-                if (images[currentImageIndex]) {
-                    title += ` - ${images[currentImageIndex]}`;
+                    status = 'Select a comparison mode to get started';
+                    title += 'Description Explorer';
                 }
             }
             
             updateStatus(status);
             document.title = title;
-            console.log('Window title updated to:', title);
         }
         
         async function updateMultiDescriptions() {
@@ -1009,8 +1503,6 @@
             const provider = document.getElementById('providerSelect').value;
             const model = document.getElementById('modelSelect').value;
             const prompt = document.getElementById('promptSelect').value;
-            
-            console.log('updateMultiDescriptions called:', { provider, model, prompt, currentViewMode, currentImageIndex });
             
             if (!images[currentImageIndex]) {
                 multiPanel.innerHTML = '<div class="no-description">No image selected</div>';
@@ -1048,7 +1540,6 @@
                     button.addEventListener('click', async function() {
                         const provider = this.dataset.provider;
                         const direction = parseInt(this.dataset.direction);
-                        console.log(`Button clicked: provider=${provider}, direction=${direction}`);
                         await changeProviderModel(provider, direction);
                     });
                 });
@@ -1065,17 +1556,12 @@
             
             const providers = availableConfigs.providers;
             
-            console.log('Generating provider comparison for:', imageName, promptStyle);
-            console.log('Available providers:', providers);
-            console.log('Available models:', availableConfigs.models);
-            
             let cardCount = 0;
             let modelSummary = [];
             
             for (const provider of providers) {
                 const models = availableConfigs.models[provider] || [];
                 if (models.length === 0) {
-                    console.log(`No models available for provider: ${provider}`);
                     continue;
                 }
                 
@@ -1092,8 +1578,6 @@
                 const currentModelIndex = providerModelIndexes[provider];
                 const model = models[currentModelIndex];
                 modelSummary.push(`${provider}: ${model} (${currentModelIndex + 1}/${models.length})`);
-                
-                console.log(`Loading description for: ${provider} / ${model} / ${promptStyle}`);
                 
                 const description = await getDescription(provider, model, promptStyle, imageName);
                 
@@ -1157,12 +1641,9 @@
             
             const prompts = ['narrative', 'colorful', 'technical'];
             
-            console.log('Generating prompt matrix for:', imageName, provider, model);
-            
             let cardCount = 0;
             
             for (const promptStyle of prompts) {
-                console.log(`Loading description for: ${provider} / ${model} / ${promptStyle}`);
                 const description = await getDescription(provider, model, promptStyle, imageName);
                 
                 const promptDisplayName = promptStyle.charAt(0).toUpperCase() + promptStyle.slice(1);
@@ -1295,182 +1776,102 @@
         }
         
         async function populateImageBrowser() {
-            console.log('=== populateImageBrowser START ===');
-            console.log('Images available:', images.length);
-            
-            const container = document.getElementById('imageBrowserContainer');
-            if (!container) {
-                console.error('imageBrowserContainer not found');
+            const grid = document.getElementById('imageBrowserGrid');
+            if (!grid) {
+                console.error('imageBrowserGrid not found');
                 return;
             }
             
             if (!images || images.length === 0) {
-                container.innerHTML = '<div role="alert" style="color: red; padding: 40px; text-align: center;">No images found</div>';
+                grid.innerHTML = '<div role="alert" style="color: red; padding: 40px; text-align: center; grid-column: 1/-1;">No images found</div>';
                 return;
             }
             
-            // First, create the list structure immediately without waiting for alt text
-            let html = `
-                <div style="color: white; padding: 20px; font-size: 20px; text-align: center;">
-                    <h2>Image Browser</h2>
-                    <p>${images.length} images available</p>
-                </div>
-                <nav role="navigation" aria-label="Image selection">
-                    <ul style="list-style: none; padding: 20px; margin: 0;">
-            `;
+            // Clear existing content
+            grid.innerHTML = '';
             
-            // Create basic structure first
+            // Create grid items for each image
             for (let i = 0; i < images.length; i++) {
                 const imageName = images[i];
                 
-                html += `
-                    <li style="margin: 12px 0;">
-                        <button onclick="selectImageFromBrowser(${i})" 
-                                id="browserButton${i}"
-                                style="
-                                    width: 100%;
-                                    text-align: left;
-                                    padding: 15px; 
-                                    border: 1px solid #00d4ff; 
-                                    cursor: pointer; 
-                                    background: #2a2a2a;
-                                    color: #e0e0e0;
-                                    font-size: 16px;
-                                    border-radius: 4px;
-                                    transition: background-color 0.2s;
-                                    line-height: 1.4;
-                                    display: flex;
-                                    align-items: flex-start;
-                                    gap: 15px;
-                                "
-                                onmouseover="this.style.background='#3a3a3a'" 
-                                onmouseout="this.style.background='#2a2a2a'"
-                                aria-label="Image ${i + 1}: Loading...">
-                            <div style="
-                                width: 80px; 
-                                height: 60px; 
-                                background: #444;
-                                border-radius: 4px;
-                                flex-shrink: 0;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                color: #888;
-                                font-size: 12px;
-                            ">Loading...</div>
-                            <div style="flex: 1; min-width: 0;" id="altText${i}">
-                                Loading description for ${imageName}...
-                            </div>
-                        </button>
-                    </li>
-                `;
+                // Create item container
+                const item = document.createElement('div');
+                item.className = 'image-browser-item';
+                item.onclick = () => selectImageFromBrowser(i);
+                item.setAttribute('role', 'button');
+                item.setAttribute('tabindex', '0');
+                item.setAttribute('aria-label', `Image ${i + 1}: Loading...`);
+                
+                // Create image element with loading placeholder
+                const img = document.createElement('img');
+                img.src = CONFIG.imagesBaseUrl + imageName;
+                img.alt = 'Loading...';
+                img.loading = 'lazy';
+                
+                // Create alt text container
+                const altTextDiv = document.createElement('div');
+                altTextDiv.className = 'alt-text';
+                altTextDiv.textContent = 'Loading description...';
+                altTextDiv.id = `altText${i}`;
+                
+                // Assemble item
+                item.appendChild(img);
+                item.appendChild(altTextDiv);
+                
+                grid.appendChild(item);
+                
+                // Load alt text asynchronously
+                loadAltTextForItem(i, imageName, img, altTextDiv, item);
             }
-            
-            html += `
-                    </ul>
-                </nav>
-            `;
-            
-            container.innerHTML = html;
-            console.log('=== Basic structure created, now loading images and alt text ===');
-            
-            // Now progressively load images and alt text
-            loadImagesAndAltText();
         }
         
-        async function loadImagesAndAltText() {
-            for (let i = 0; i < images.length; i++) {
-                try {
-                    const imageName = images[i];
-                    const button = document.getElementById(`browserButton${i}`);
-                    const altTextDiv = document.getElementById(`altText${i}`);
-                    
-                    if (!button || !altTextDiv) continue;
-                    
-                    // Load alt text
-                    let altText = imageName;
-                    try {
-                        altText = await getAltTextForBrowser(imageName);
-                    } catch (error) {
-                        console.warn('Could not get alt text for', imageName);
-                    }
-                    
-                    // Update alt text
+        async function loadAltTextForItem(index, imageName, imgElement, altTextDiv, itemElement) {
+            try {
+                const altText = await getAltTextForBrowser(imageName);
+                
+                // Update alt text display
+                if (altText && altText !== imageName) {
                     altTextDiv.textContent = altText;
-                    button.setAttribute('aria-label', `Image ${i + 1}: ${altText}`);
-                    
-                    // Replace loading placeholder with actual image
-                    const loadingDiv = button.querySelector('div');
-                    if (loadingDiv && loadingDiv.textContent === 'Loading...') {
-                        loadingDiv.innerHTML = `<img src="images/${imageName}" 
-                                                    alt="" 
-                                                    style="
-                                                        width: 80px; 
-                                                        height: 60px; 
-                                                        object-fit: cover; 
-                                                        border-radius: 4px;
-                                                    ">`;
-                    }
-                    
-                    // Small delay to prevent browser freeze
-                    if (i % 5 === 0) {
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                    }
-                    
-                } catch (error) {
-                    console.error('Error loading content for image', i, error);
+                    imgElement.alt = altText;
+                    itemElement.setAttribute('aria-label', `Image ${index + 1}: ${imageName} - ${altText}`);
+                } else {
+                    altTextDiv.textContent = imageName;
+                    imgElement.alt = imageName;
+                    itemElement.setAttribute('aria-label', `Image ${index + 1}: ${imageName}`);
                 }
+            } catch (error) {
+                console.warn('Could not get alt text for', imageName, error);
+                altTextDiv.textContent = imageName;
+                imgElement.alt = imageName;
+                itemElement.setAttribute('aria-label', `Image ${index + 1}: ${imageName}`);
+                itemElement.setAttribute('aria-label', `Image ${index + 1}: ${imageName}`);
             }
-            
-            console.log('=== All images and alt text loaded ===');
         }
         
-        async function loadAltTextForBrowser() {
-            // Update alt text asynchronously after the grid is visible
-            const items = document.querySelectorAll('.image-browser-item');
+        function toggleAltTextDisplay() {
+            const container = document.getElementById('imageBrowserContainer');
+            const selectedValue = document.querySelector('input[name="browserDisplay"]:checked')?.value;
             
-            for (let i = 0; i < Math.min(items.length, images.length); i++) {
-                try {
-                    const imageName = images[i];
-                    const altText = await getAltText(imageName);
-                    
-                    // Update the alt text div and img alt attribute
-                    const item = items[i];
-                    const altTextDiv = item.querySelector('.alt-text');
-                    const img = item.querySelector('img');
-                    
-                    if (altTextDiv && altText && altText !== imageName) {
-                        altTextDiv.textContent = altText;
-                        img.alt = altText;
-                        item.setAttribute('aria-label', `Select ${imageName} - ${altText}`);
-                    } else {
-                        altTextDiv.textContent = imageName;
-                    }
-                } catch (error) {
-                    console.warn('Could not load alt text for', images[i]);
-                    const item = items[i];
-                    const altTextDiv = item.querySelector('.alt-text');
-                    if (altTextDiv) {
-                        altTextDiv.textContent = images[i];
-                    }
-                }
+            // Remove both classes first
+            container.classList.remove('images-only', 'images-with-alt');
+            
+            // Add the appropriate class based on selection
+            if (selectedValue === 'images-only') {
+                container.classList.add('images-only');
+            } else {
+                container.classList.add('images-with-alt');
             }
         }
         
         function selectImageFromBrowser(imageIndex) {
-            console.log('selectImageFromBrowser called with index:', imageIndex);
-            
             // Switch to single view mode
             currentViewMode = 'single';
             currentImageIndex = imageIndex;
-            
-            console.log('Set currentViewMode to:', currentViewMode, 'currentImageIndex to:', currentImageIndex);
             
             // Update the radio button selection
             const singleRadio = document.getElementById('single');
             if (singleRadio) {
                 singleRadio.checked = true;
-                console.log('Single radio button checked');
             } else {
                 console.error('Single radio button not found');
             }
@@ -1481,14 +1882,12 @@
             const singleDesc = document.getElementById('single-desc');
             if (singleDesc) {
                 singleDesc.classList.add('active');
-                console.log('Single description activated');
             }
             
             // Update the view
             updateViewMode();
             updateImage();
             updateStatusForViewMode(); // This will now also update the window title
-            console.log('View updated, should now show single view with image:', images[imageIndex]);
         }
         
         async function updateDescriptions() {
@@ -1508,34 +1907,22 @@
 
         // Initialize on load
         window.addEventListener('load', async () => {
-            console.log('=== PAGE LOAD EVENT FIRED ===');
-            
-            // Add a visible test message to the page immediately
-            document.body.innerHTML += '<div id="debugTest" style="position: fixed; top: 0; right: 0; background: red; color: white; padding: 10px; z-index: 9999;">JAVASCRIPT IS RUNNING</div>';
-            
             try {
-                console.log('Starting initialization...');
                 await loadImageList();
-                console.log('Images loaded:', images.length, 'images');
                 await loadDescriptionsIndex();
-                console.log('Descriptions index loaded');
                 populateProviderDropdown();
-                console.log('Provider dropdown populated');
                 initializeViewModeSelector();
-                console.log('View mode selector initialized, currentViewMode:', currentViewMode);
-                handleUpdate(); // Apply initial view mode (image browser by default)
-                console.log('Initial view applied');
-                console.log('Initialization complete');
                 
-                // Remove the test message after 3 seconds
-                setTimeout(() => {
-                    const testDiv = document.getElementById('debugTest');
-                    if (testDiv) testDiv.remove();
-                }, 3000);
+                // Apply initial view mode (image browser by default)
+                updateViewMode();
+                updateStatusForViewMode();
+                if (currentViewMode === 'image-browser') {
+                    populateImageBrowser();
+                }
                 
             } catch (error) {
                 console.error('Error during initialization:', error);
-                document.body.innerHTML += '<div style="position: fixed; top: 50px; right: 0; background: red; color: white; padding: 10px; z-index: 9999;">ERROR: ' + error.message + '</div>';
+                updateStatus('Error loading gallery: ' + error.message, 'error');
             }
         });
 
@@ -1577,22 +1964,18 @@
                 // Add cache-busting parameter to always get fresh data
                 const cacheBuster = '?t=' + new Date().getTime();
                 const url = CONFIG.descriptionsBaseUrl + 'index.json' + cacheBuster;
-                console.log('Fetching descriptions index from:', url);
                 
                 const response = await fetch(url);
-                console.log('Response status:', response.status, response.statusText);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();
-                console.log('Loaded index data:', data);
                 
                 // The index.json only contains configs, not descriptions
                 availableConfigs = data.configs;
                 
-                console.log('Available configs:', availableConfigs);
                 updateStatus(`Loaded ${availableConfigs.providers.length} providers with ${data.total_configurations || 0} configurations`);
             } catch (error) {
                 console.error('Error loading descriptions index:', error);
@@ -1643,21 +2026,20 @@
                 option.textContent = provider.charAt(0).toUpperCase() + provider.slice(1);
                 select.appendChild(option);
             });
+            
+            // Auto-select first provider for description-explorer all-prompts mode
+            const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
+            if (currentViewMode === 'description-explorer' && comparisonMode === 'all-prompts' && availableConfigs.providers.length > 0) {
+                select.value = availableConfigs.providers[0];
+                updateModelOptions(); // Populate models for first provider
+            }
         }
 
         function updateModelOptions() {
             const provider = document.getElementById('providerSelect').value;
             const modelSelect = document.getElementById('modelSelect');
-            const promptSelect = document.getElementById('promptSelect');
             
             modelSelect.innerHTML = '<option value="">Select model...</option>';
-            
-            // In provider-compare mode, prompt options should be available regardless of provider/model selection
-            if (currentViewMode === 'provider-compare') {
-                populatePromptOptions();
-            } else {
-                promptSelect.innerHTML = '<option value="">Select model first...</option>';
-            }
             
             if (provider && availableConfigs.models[provider]) {
                 availableConfigs.models[provider].forEach(model => {
@@ -1666,6 +2048,16 @@
                     option.textContent = model;
                     modelSelect.appendChild(option);
                 });
+                
+                // Auto-select first model for description-explorer all-prompts mode
+                const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
+                if (currentViewMode === 'description-explorer' && comparisonMode === 'all-prompts' && 
+                    availableConfigs.models[provider].length > 0) {
+                    modelSelect.value = availableConfigs.models[provider][0];
+                    
+                    // Trigger view update
+                    loadAllPromptsView();
+                }
             }
             
             // Update status to reflect current state
@@ -1673,43 +2065,91 @@
         }
 
         function updatePromptOptions() {
-            const provider = document.getElementById('providerSelect').value;
-            const model = document.getElementById('modelSelect').value;
-            const promptSelect = document.getElementById('promptSelect');
-            
-            // In provider-compare mode, we always show prompt options regardless of provider/model selection
-            if (currentViewMode === 'provider-compare') {
-                populatePromptOptions();
-                return;
-            }
-            
-            promptSelect.innerHTML = '<option value="">Select prompt...</option>';
-            
-            if (provider && model && availableConfigs.prompts[provider] && availableConfigs.prompts[provider][model]) {
-                availableConfigs.prompts[provider][model].forEach(prompt => {
-                    const option = document.createElement('option');
-                    option.value = prompt;
-                    option.textContent = prompt.charAt(0).toUpperCase() + prompt.slice(1);
-                    promptSelect.appendChild(option);
-                });
-            }
-            
-            // Update status to reflect current state
-            updateStatusForViewMode();
-        }
-
-        function populatePromptOptions() {
             const promptSelect = document.getElementById('promptSelect');
             promptSelect.innerHTML = '<option value="">Select prompt...</option>';
             
-            // For provider comparison, show all available prompt styles
-            const standardPrompts = ['narrative', 'colorful', 'technical'];
-            standardPrompts.forEach(prompt => {
+            // Get all available prompts dynamically (in correct order)
+            const availablePrompts = getAvailablePrompts();
+            
+            availablePrompts.forEach(prompt => {
                 const option = document.createElement('option');
                 option.value = prompt;
                 option.textContent = prompt.charAt(0).toUpperCase() + prompt.slice(1);
                 promptSelect.appendChild(option);
             });
+            
+            // Auto-select first prompt for same-prompt mode
+            const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
+            if (currentViewMode === 'description-explorer' && comparisonMode === 'same-prompt' && availablePrompts.length > 0) {
+                promptSelect.value = availablePrompts[0];
+                
+                // Trigger view update
+                loadSamePromptView();
+            }
+        }
+
+        function populatePromptOptions() {
+            // Same as updatePromptOptions - can call that
+            updatePromptOptions();
+        }
+        
+        function handleModelChange() {
+            // When model changes in all-prompts mode, reload the view
+            const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
+            if (currentViewMode === 'description-explorer' && comparisonMode === 'all-prompts') {
+                loadAllPromptsView();
+            }
+            updateStatusForViewMode();
+        }
+        
+        function handlePromptChange() {
+            // When prompt changes in same-prompt mode, reload the view
+            const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
+            if (currentViewMode === 'description-explorer' && comparisonMode === 'same-prompt') {
+                loadSamePromptView();
+            }
+            updateStatusForViewMode();
+        }
+        
+        function handleImageChange() {
+            // When image changes, reload the current view
+            const comparisonMode = document.querySelector('input[name="comparisonMode"]:checked')?.value;
+            if (currentViewMode === 'description-explorer') {
+                if (comparisonMode === 'all-prompts') {
+                    loadAllPromptsView();
+                } else if (comparisonMode === 'same-prompt') {
+                    loadSamePromptView();
+                }
+            }
+            updateStatusForViewMode();
+        }
+        
+        async function populateImageSelect() {
+            const select = document.getElementById('imageSelect');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">Select an image...</option>';
+            
+            // Load images with alt text
+            for (const imageName of images) {
+                const option = document.createElement('option');
+                option.value = imageName;
+                
+                // Get alt text and combine with image name
+                const altText = await getAltTextForBrowser(imageName);
+                if (altText && altText !== imageName) {
+                    option.textContent = `${imageName} - ${altText}`;
+                } else {
+                    option.textContent = imageName;
+                }
+                
+                select.appendChild(option);
+            }
+            
+            // Auto-select first image if available
+            if (images.length > 0) {
+                select.value = images[0];
+            }
         }
 
         function updateStatusAfterPromptSelection() {
@@ -1738,7 +2178,6 @@
             getAltText(images[currentImageIndex]).then(altText => {
                 if (altText && altText !== images[currentImageIndex]) {
                     imgEl.alt = altText;
-                    console.log(`Updated alt text for ${images[currentImageIndex]}: ${altText}`);
                 }
             }).catch(error => {
                 console.warn('Failed to load alt text:', error);
@@ -1775,14 +2214,12 @@
             const prompt = document.getElementById('promptSelect').value;
             
             const descText = document.getElementById('descriptionText');
-            const modelBadge = document.getElementById('modelBadge');
             const metadata = document.getElementById('metadata');
             const promptSection = document.getElementById('promptSection');
             const promptTextEl = document.getElementById('promptText');
             
             if (!provider || !model || !prompt) {
                 descText.innerHTML = '<div class="no-description">Select all configuration options to see descriptions</div>';
-                modelBadge.textContent = 'No configuration';
                 
                 // Reset title to default when no configuration is selected
                 const titleElement = document.getElementById('descriptionTitle');
@@ -1798,7 +2235,6 @@
             const safeModel = model.replace(/:/g, '_');
             const filename = `${provider}_${safeModel}_${prompt}.json`;
             
-            console.log('Loading description file:', filename, 'for image:', imageName);
             
             // Show loading state
             descText.innerHTML = '<div class="no-description"><div class="loading-spinner" style="display: inline-block; width: 20px; height: 20px; margin-right: 10px;"></div>Loading description...</div>';
@@ -1807,7 +2243,6 @@
                 // Load description file for this configuration
                 const cacheBuster = '?t=' + new Date().getTime();
                 const descFile = `${CONFIG.descriptionsBaseUrl}${filename}${cacheBuster}`;
-                console.log('Fetching:', descFile);
                 
                 const response = await fetch(descFile);
                 
@@ -1816,7 +2251,6 @@
                 }
                 
                 const data = await response.json();
-                console.log('Loaded description data:', data);
                 
                 // Find description for current image
                 const imageDesc = data.images[imageName];
@@ -1827,7 +2261,6 @@
                     const formattedDesc = paragraphs.map(p => `<p>${p}</p>`).join('');
                     
                     descText.innerHTML = formattedDesc;
-                    modelBadge.textContent = model;
                     
                     // Update title with detailed information for screen readers
                     const titleElement = document.getElementById('descriptionTitle');
