@@ -27,16 +27,19 @@
       "claude": {
         "claude-3-5-haiku-20241022": [
           "colorful",
+          "detailed",
           "narrative",
           "technical"
         ],
         "claude-opus-4-20250514": [
           "colorful",
+          "detailed",
           "narrative",
           "technical"
         ],
         "claude-sonnet-4-5-20250929": [
           "colorful",
+          "detailed",
           "narrative",
           "technical"
         ]
@@ -44,15 +47,20 @@
       "ollama": {
         "gemma3:latest": [
           "colorful",
+          "detailed",
           "narrative",
           "technical"
         ],
         "granite3.2-vision:latest": [
           "colorful",
-          "narrative"
+          "detailed",
+          "narrative",
+          "technical"
         ],
         "llava:latest": [
           "colorful",
+          "detailed",
+          "narrative",
           "technical"
         ],
         "moondream:latest": [
@@ -61,6 +69,7 @@
         ],
         "qwen3-vl:235b-cloud": [
           "colorful",
+          "detailed",
           "narrative",
           "technical"
         ]
@@ -68,17 +77,19 @@
       "openai": {
         "gpt-4o-mini": [
           "colorful",
+          "detailed",
           "narrative",
           "technical"
         ],
         "gpt-4o": [
           "colorful",
+          "detailed",
           "narrative",
           "technical"
         ]
       }
     }
   },
-  "generated": "2025-10-23 21:11:05",
-  "total_configurations": 27
+  "generated": "2025-10-24 05:52:03",
+  "total_configurations": 38
 }

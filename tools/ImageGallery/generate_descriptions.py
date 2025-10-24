@@ -286,8 +286,8 @@ def main():
         '--descriptions-dir',
         dest='descriptions_dir',
         type=Path,
-        default=Path('c:/idt/Descriptions'),
-        help='Path to Descriptions directory containing workflow subdirectories (default: c:/idt/Descriptions)'
+        default=Path('Descriptions'),
+        help='ONLY source: relative Descriptions directory (default: ./Descriptions)'
     )
     parser.add_argument(
         '--output-dir',
