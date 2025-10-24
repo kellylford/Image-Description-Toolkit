@@ -1255,12 +1255,14 @@
             // Add prompt text display once at the top (since all cards use the same prompt)
             const promptSection = document.createElement('div');
             promptSection.style.cssText = 'margin-bottom: 30px; padding: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);';
+            
+            const promptTextContent = getPromptText(prompt);
             promptSection.innerHTML = `
                 <button class="prompt-toggle-btn" onclick="togglePromptText('shared-prompt')" aria-expanded="false" style="margin-bottom: 10px;">
                     Show Prompt Text
                 </button>
                 <div class="prompt-text-container" id="shared-prompt" style="display: none;">
-                    <div class="prompt-text">${getPromptText(prompt)}</div>
+                    <div class="prompt-text">${promptTextContent}</div>
                 </div>
             `;
             
