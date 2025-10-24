@@ -1157,12 +1157,15 @@
             
             const explorerPanel = document.getElementById('descriptionExplorerPanel');
             
+            // Get alt text for the image
+            const altText = await getAltText(imageName);
+            
             // Create image display at the top
             const imageDisplay = document.createElement('div');
             imageDisplay.className = 'explorer-image-display';
             imageDisplay.innerHTML = `
                 <img src="${CONFIG.imagesBaseUrl}${imageName}" 
-                     alt="${imageName}" 
+                     alt="${altText || imageName}" 
                      style="max-width: 100%; max-height: 400px; border-radius: 8px; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
                 <div style="text-align: center; color: #888; font-size: 14px; margin-bottom: 30px;">${imageName}</div>
             `;
@@ -1209,12 +1212,15 @@
             
             const explorerPanel = document.getElementById('descriptionExplorerPanel');
             
+            // Get alt text for the image
+            const altText = await getAltText(imageName);
+            
             // Create image display at the top
             const imageDisplay = document.createElement('div');
             imageDisplay.className = 'explorer-image-display';
             imageDisplay.innerHTML = `
                 <img src="${CONFIG.imagesBaseUrl}${imageName}" 
-                     alt="${imageName}" 
+                     alt="${altText || imageName}" 
                      style="max-width: 100%; max-height: 400px; border-radius: 8px; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;">
                 <div style="text-align: center; color: #888; font-size: 14px; margin-bottom: 30px;">${imageName}</div>
             `;
