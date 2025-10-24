@@ -1319,7 +1319,7 @@
                         <button class="prompt-toggle-btn" onclick="togglePromptText('${promptId}')" aria-expanded="false">
                             Show Prompt Text
                         </button>
-                        <div class="prompt-text-container" id="${promptId}" style="display: none;">
+                        <div class="prompt-text-container" id="${promptId}" style="display: none;" role="region" aria-live="polite">
                             <div style="background: yellow; color: black; padding: 5px; margin-bottom: 5px;">
                                 DEBUG: promptKey="${data.promptKey}" | length=${promptTextContent.length}
                             </div>
@@ -1341,6 +1341,12 @@
                 container.style.display = 'block';
                 button.textContent = 'Hide Prompt Text';
                 button.setAttribute('aria-expanded', 'true');
+                // Make the first element inside the container focusable and focus it
+                const firstElement = container.querySelector('.prompt-text');
+                if (firstElement) {
+                    firstElement.setAttribute('tabindex', '-1');
+                    setTimeout(() => firstElement.focus(), 100);
+                }
             } else {
                 container.style.display = 'none';
                 button.textContent = 'Show Prompt Text';
