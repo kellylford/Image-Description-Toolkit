@@ -1258,15 +1258,7 @@
             
             const promptTextContent = getPromptText(prompt);
             
-            // DEBUG: Display values on the page for screen reader accessibility
-            const debugInfo = `<div style="background: red; color: white; padding: 10px; margin-bottom: 10px;">
-                DEBUG INFO:<br>
-                Prompt value: "${prompt}"<br>
-                Prompt text content: "${promptTextContent}"<br>
-                Prompt text length: ${promptTextContent.length}
-            </div>`;
-            
-            promptSection.innerHTML = debugInfo + `
+            promptSection.innerHTML = `
                 <button class="prompt-toggle-btn" onclick="togglePromptText('shared-prompt')" aria-expanded="false" style="margin-bottom: 10px;">
                     Show Prompt Text
                 </button>
@@ -1313,6 +1305,9 @@
             // Create unique ID for prompt toggle
             const promptId = `prompt-${Math.random().toString(36).substr(2, 9)}`;
             
+            // Get prompt text if promptKey is provided
+            const promptTextContent = data.promptKey ? getPromptText(data.promptKey) : '';
+            
             card.innerHTML = `
                 <div class="card-header">
                     <h3 class="card-title">${data.title}</h3>
@@ -1325,7 +1320,7 @@
                             Show Prompt Text
                         </button>
                         <div class="prompt-text-container" id="${promptId}" style="display: none;">
-                            <div class="prompt-text">${getPromptText(data.promptKey)}</div>
+                            <div class="prompt-text">${promptTextContent}</div>
                         </div>
                     </div>
                 ` : ''}
