@@ -63,12 +63,13 @@ echo Image Directory: %IMAGE_DIR%
 echo Workflow Name: %WORKFLOW_NAME%
 echo Output Directory: %OUTPUT_DIR%
 echo.
-echo This will run 30 workflows:
-echo   - Claude models: 9 workflows (3 models x 3 prompts)
-echo   - OpenAI models: 6 workflows (2 models x 3 prompts)
-echo   - Ollama models: 15 workflows (5 models x 3 prompts)
+echo This will run 40 workflows:
+echo   - Claude models: 12 workflows (3 models x 4 prompts)
+echo   - OpenAI models: 8 workflows (2 models x 4 prompts)
+echo   - Ollama models: 20 workflows (5 models x 4 prompts)
+echo   - Prompts: narrative, colorful, technical, detailed
 echo.
-echo Total descriptions: 750 (30 workflows x 25 images)
+echo Total descriptions: 1000 (40 workflows x 25 images)
 echo.
 echo Press Ctrl+C to cancel, or
 pause
@@ -86,7 +87,7 @@ echo Starting workflow runs...
 echo ============================================================================
 echo.
 
-set TOTAL_WORKFLOWS=30
+set TOTAL_WORKFLOWS=40
 set CURRENT=0
 
 REM ============================================================================
@@ -319,6 +320,90 @@ set /a CURRENT+=1
 echo [%CURRENT%/%TOTAL_WORKFLOWS%] Granite 3.2 Vision + technical
 echo NOTE: Using extended 300s timeout for model stability
 "%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model granite3.2-vision:latest --prompt-style technical --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch --timeout 300
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+REM ============================================================================
+REM DETAILED PROMPT WORKFLOWS [31-39 of 39]
+REM ============================================================================
+echo.
+echo ============================================================================
+echo DETAILED PROMPT WORKFLOWS [31-40 of %TOTAL_WORKFLOWS%]
+echo ============================================================================
+echo Running all models with detailed prompt style for comprehensive coverage
+echo.
+
+REM Claude Models - Detailed
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Haiku 3.5 + detailed
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider claude --model claude-3-5-haiku-20241022 --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Opus 4 + detailed
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider claude --model claude-opus-4-20250514 --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Claude Sonnet 4.5 + detailed
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider claude --model claude-sonnet-4-5-20250929 --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+REM OpenAI Models - Detailed
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o-mini + detailed
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider openai --model gpt-4o-mini --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] GPT-4o + detailed
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider openai --model gpt-4o --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+REM Ollama Models - Detailed
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Qwen3-VL Cloud + detailed
+echo Adding delay for Ollama stability...
+timeout /t 30 /nobreak >nul
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model qwen3-vl:235b-cloud --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Llava + detailed
+echo Adding delay for Ollama stability...
+timeout /t 30 /nobreak >nul
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model llava:latest --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Gemma3 + detailed
+echo Adding delay for Ollama stability...
+timeout /t 30 /nobreak >nul
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model gemma3:latest --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Moondream + detailed
+echo Adding delay for Ollama stability...
+timeout /t 30 /nobreak >nul
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model moondream:latest --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch
+if errorlevel 1 echo WARNING: Workflow failed, continuing...
+echo.
+
+set /a CURRENT+=1
+echo [%CURRENT%/%TOTAL_WORKFLOWS%] Granite 3.2 Vision + detailed
+echo Adding delay for Ollama stability...
+timeout /t 30 /nobreak >nul
+echo NOTE: Using extended 300s timeout for model stability
+"%IDT_CMD%" workflow "%IMAGE_DIR%" --provider ollama --model granite3.2-vision:latest --prompt-style detailed --name %WORKFLOW_NAME% --output-dir %OUTPUT_DIR% --batch --timeout 300
 if errorlevel 1 echo WARNING: Workflow failed, continuing...
 echo.
 
