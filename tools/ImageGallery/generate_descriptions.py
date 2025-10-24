@@ -12,6 +12,11 @@ The script is designed to be flexible and handle growing datasets:
 - Generates index.json with available configurations
 - Creates individual JSON files for each provider/model/prompt combination
 
+Directory Structure:
+- Script writes JSON files to 'jsondata/' directory by default
+- Web gallery looks for JSON files in 'descriptions/' directory
+- Copy files from jsondata/ to descriptions/ for deployment
+
 Usage:
     python generate_descriptions.py [--descriptions-dir PATH] [--output-dir PATH] [--pattern PATTERN]
 """
@@ -287,8 +292,8 @@ def main():
     parser.add_argument(
         '--output-dir',
         type=Path,
-        default=Path('descriptions'),
-        help='Output directory for JSON files (default: descriptions)'
+        default=Path('jsondata'),
+        help='Output directory for JSON files (default: jsondata)'
     )
     parser.add_argument(
         '--name',

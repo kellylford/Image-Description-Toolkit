@@ -1,0 +1,182 @@
+{
+  "provider": "ollama",
+  "model": "qwen3-vl:235b-cloud",
+  "prompt_style": "narrative",
+  "images": {
+    "photo-20825_singular_display_fullPicture.jpg": {
+      "description": "A clear blue sky with scattered white clouds stretches overhead. Below, a concrete sidewalk runs straight into the distance, flanked on both sides by neatly trimmed grass lawns. On the left, a two-story house with light gray siding and stone accents stands beside a driveway where a dark blue sedan is parked. Further down, another similar house with a dark gray roof and white trim is visible, with a white minivan parked in front. A small tree with green leaves stands between the houses.\n\nOn the right side of the sidewalk, a large tree with dense green foliage overhangs the scene, casting a dark shadow on the grass and pavement below. Parked along the curb are two vehicles: a dark-colored sedan and, in front of it, a silver SUV. The street surface is smooth asphalt, and the curb lines are clean and straight. The overall lighting is bright and even, suggesting midday sun. No people are visible.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:52:02"
+    },
+    "IMG_4276.jpg": {
+      "description": "A circular black metal fire pit sits on a ground covered with dry, golden-brown pine needles and dark soil. Inside the fire pit, a small flame flickers at the base of a slender, light-brown stick that leans diagonally across the interior. The pit\u2019s inner surface is darkened with soot and ash, and scattered pine needles and small charred fragments rest at the bottom. Four evenly spaced, rectangular metal tabs protrude inward from the rim of the pit.\n\nSurrounding the fire pit are gray concrete blocks arranged in a rough circle. Some blocks are whole, others broken or partially buried in the ground. Pine needles are caught in the crevices and on top of the blocks. A pair of feet wearing light gray mesh sneakers and blue denim jeans stand just outside the circle, angled slightly inward toward the fire. The hem of a red garment with white drawstrings is visible at the bottom edge of the frame. The lighting is natural and diffuse, casting soft shadows.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:52:12"
+    },
+    "IMG_4277.jpg": {
+      "description": "A circular metal fire pit, dark gray and slightly weathered, sits on a ground covered with dry, golden-brown pine needles and scattered dark soil. Inside the pit, a small fire flickers with orange and yellow flames, consuming a pile of pine needles and small twigs. A single, slender stick rests diagonally across the pit, extending from the upper left toward the center. Ashes and charred remnants are visible beneath the flames.\n\nSurrounding the fire pit are several gray concrete blocks, some with hollow rectangular openings, arranged in a rough circle. One block lies flat near the bottom edge of the frame, partially covered with pine needles. A person stands just outside the pit, visible from the waist down. They wear blue denim jeans and light gray athletic shoes with white soles. A red fabric garment, possibly a hoodie or jacket, hangs down in the foreground, with white drawstrings dangling near the bottom edge. The ground around the blocks and pit is uneven, with patches of dark earth and scattered dry vegetation.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:52:22"
+    },
+    "IMG_4279.jpg": {
+      "description": "A circular metal fire pit, dark gray and slightly rusted, sits centered in the frame. Inside, a small cluster of orange and yellow flames flickers among scattered pine needles, ash, and charred debris. A single thin stick rests diagonally across the pit\u2019s interior. The fire pit is supported by four triangular metal brackets welded to its rim, each pointing outward. Surrounding the pit are gray concrete cinder blocks arranged in a rough circle, some upright, others lying flat. The ground beneath is a mix of dark soil and dry, golden-brown pine needles. In the lower portion of the image, a person\u2019s legs and feet are visible: they wear blue denim jeans and light gray mesh sneakers with white soles. A red fabric garment, possibly a hoodie or jacket, drapes over the lower torso, with white drawstrings hanging down. The scene is lit by natural daylight, casting soft shadows.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:52:32"
+    },
+    "IMG_4280.jpg": {
+      "description": "A circular metal fire pit, dark gray and weathered, sits atop a ring of gray concrete cinder blocks arranged on the ground. Inside the pit, a small fire flickers with orange and yellow flames, consuming dry pine needles and small bits of charred wood. Ashes and soot coat the bottom of the pit, mingling with scattered pine needles and a few small stones. A long, light brown stick rests diagonally across the pit\u2019s interior, partially over the flames. Outside the pit, the ground is covered with dry, golden-brown pine needles and patches of dark soil. A pair of feet in light gray mesh sneakers with white soles stand just below the frame, clad in blue denim jeans. The hem of a red garment is visible at the bottom edge of the image. The cinder blocks show signs of wear, with chipped edges and embedded debris. A few fallen leaves and twigs lie scattered around the base of the fire pit. The lighting is natural and diffuse, suggesting an overcast or shaded outdoor setting.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:52:42"
+    },
+    "IMG_4281.jpg": {
+      "description": "A top-down view shows a person standing before a large, dark metal fire pit. Inside the pit, wisps of white and gray smoke rise from a bed of dry, golden-brown pine needles and scattered ash. A single, slender wooden stick rests diagonally across the pit\u2019s interior. The fire pit sits atop a rough, circular arrangement of gray concrete blocks, some with hollow rectangular centers, others solid and weathered. Pine needles and small bits of debris litter the dark, uneven ground surrounding the blocks. The person\u2019s lower legs and feet are visible: they wear faded blue denim jeans and light gray athletic shoes with white soles. A red garment, possibly a shirt or jacket, is visible at the bottom edge of the frame. A black curved object, perhaps a handle or strap, intrudes slightly into the lower-left corner. The lighting is diffuse, suggesting an overcast day, and the overall scene is earthy and textured, dominated by grays, browns, and muted blues.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:52:52"
+    },
+    "IMG_4282.jpg": {
+      "description": "The image shows a calm body of water extending to a distant tree line under a pale blue sky. The sky is mostly clear, with faint, wispy horizontal clouds near the horizon. The water is smooth, with gentle, parallel ripples moving toward the shore. Near the foreground, the water becomes shallow and translucent, revealing a sandy bottom with scattered small stones and bits of organic debris. The shoreline is composed of fine, light brown sand, damp near the water\u2019s edge and drier further back. Along the waterline, there are scattered pieces of dried vegetation \u2014 thin, brownish stems and leaves \u2014 as well as small, dark fragments that may be twigs or shells. A single, dark, elongated object, possibly a piece of driftwood or a root, lies horizontally on the sand near the water\u2019s edge. The distant treeline is dense and continuous, composed of trees with green and muted autumnal foliage \u2014 browns, yellows, and hints of red. The overall lighting is soft and even, suggesting a time near midday or early afternoon. No people, animals, or man-made structures are visible in the scene.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:53:02"
+    },
+    "IMG_4283.jpg": {
+      "description": "The foreground is composed of light brown, damp sand, textured with scattered footprints, small twigs, dried leaves, and bits of dark organic debris. A few yellow and brown leaves are embedded in the sand near the center. The waterline is gentle, with shallow, translucent water lapping at the shore, revealing the sandy bottom beneath. The water extends outward in calm, horizontal ripples, transitioning from a murky brown near the shore to a clearer, pale blue-gray further out. Across the water, a distant treeline runs horizontally, composed of dense, dark green and muted brown foliage, with occasional hints of autumnal red and orange. Above, the sky is a vast expanse of pale blue, streaked with thin, wispy white clouds that stretch diagonally from upper left to upper right. The horizon is flat and unbroken, separating the water from the sky and treeline with a clean, straight line.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:53:11"
+    },
+    "IMG_4284.jpg": {
+      "description": "The image shows a body of water with gentle, parallel ripples extending across the frame. The water is a muted blue-gray, reflecting a soft, diffused light. Near the bottom of the image, the water becomes shallower, revealing a sandy or silty bottom with a brownish-gray tone. The submerged surface is uneven, with subtle variations in texture and color, including a few darker patches that may be small stones or shadows. The transition from deeper to shallower water is gradual, with the ripples becoming less distinct as they approach the bottom. There are no visible objects, animals, or human-made structures in the scene. The overall impression is one of stillness and natural simplicity.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:53:19"
+    },
+    "IMG_4286.jpg": {
+      "description": "The image shows a calm body of water in the foreground, its surface reflecting the trees and sky above with gentle ripples distorting the mirrored image. Along the far shore, a dense line of trees displays autumn foliage in varying shades: bright reds, golden yellows, muted oranges, and patches of lingering green. Some trees are bare, their thin branches silhouetted against the sky. A tall, dark green conifer stands prominently on the right side of the treeline.\n\nNestled among the trees on the right is a small, single-story structure with light brown siding, white trim around the windows, and a visible door. A small white outbuilding or shed is attached or adjacent to it. Near the water\u2019s edge on the left, a small boat rests on a trailer, partially obscured by foliage. A white bench or chair is visible on the shore near the boat. The ground along the bank is covered with fallen leaves and dry grasses, appearing brown and muted.\n\nThe sky above is overcast, a uniform pale gray-white, casting diffuse, even light across the scene. No people or animals are visible. The overall color palette is dominated by earth tones, autumnal hues, and the gray of the sky, with the water reflecting these colors in a darker, more subdued manner.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:53:29"
+    },
+    "IMG_4287.jpg": {
+      "description": "The image shows a body of water in the foreground, its surface textured with small, overlapping ripples that reflect muted tones of gray and silver under diffuse light. The water extends horizontally across the lower two-thirds of the frame.\n\nBeyond the waterline, a narrow strip of land is visible, appearing as a dark, sandy or pebbled shore. Along this shore, several structures are nestled among dense trees. On the right, a building with a light-colored, possibly white or pale gray, gabled roof stands out. Its walls appear dark, and a small chimney or vent is visible near the peak of the roof. To the left of this structure, another smaller building with a similar light-colored roof is partially obscured by trees and shadow.\n\nThe background is dominated by a thick treeline composed of coniferous and deciduous trees. The foliage is dark green to nearly black, suggesting low light conditions or shadowing. The trees vary in height and density, forming an irregular, natural silhouette against the sky.\n\nAbove the treeline, the sky is a uniform, pale gray, with no visible clouds or sun. The overall lighting is flat and even, with no strong highlights or deep shadows, giving the scene a subdued, overcast appearance. The horizon line is straight and clearly defined where the water meets the land.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:53:39"
+    },
+    "IMG_4288.jpg": {
+      "description": "The image captures a nighttime scene at a shoreline. The foreground consists of damp, light brown sand, textured with small ridges and scattered with bits of organic debris\u2014twigs, dried leaves, and fragments of plant matter. A thin, irregular line of white foam and small debris marks the water\u2019s edge, where gentle ripples meet the shore.\n\nBeyond the shore, the water stretches into darkness, its surface dimly illuminated by a faint, diffuse light source, possibly from the camera\u2019s flash or nearby artificial lighting. The water shows subtle, parallel wave patterns, reflecting faint glimmers of light. In the distance, across the water, a dark silhouette of land is visible, punctuated by small, scattered points of artificial light\u2014white, yellow, and a single blue glow\u2014suggesting distant buildings or structures along the far shore.\n\nThe sky above is uniformly black, devoid of visible stars or clouds, blending seamlessly with the horizon. A vertical column of reflected light, likely from a distant lamp or beacon, extends from the horizon down the center of the water\u2019s surface, creating a narrow, shimmering path of brightness that fades as it approaches the shore.\n\nNo people, animals, or moving objects are visible. The overall scene is still, quiet, and dominated by shades of black, dark gray, and muted brown, with small, isolated points of artificial color breaking the darkness.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:53:50"
+    },
+    "IMG_4289.jpg": {
+      "description": "The image is taken at night, under low-light conditions. The upper portion of the frame is dominated by a deep, uniform blackness, suggesting a night sky with no visible stars or moon. Below this, a dark, indistinct horizontal band stretches across the middle, possibly a distant shoreline or treeline, rendered nearly featureless by the darkness.\n\nIn the lower half of the image, a textured surface is visible, illuminated faintly from an unseen source. This surface appears granular and uneven, with subtle ridges and depressions catching the light. The color is a muted, earthy brown or beige, with variations in tone suggesting moisture or shadow. Small, scattered bright spots, likely reflections or wet patches, are visible across this surface.\n\nNear the center-right of the frame, a small cluster of artificial lights is visible in the distance. These lights are out of focus, appearing as soft, elongated streaks and blobs. The colors include white, yellow, and a distinct blue shape, possibly from a neon sign or decorative lighting. The lights are faint and appear to float against the dark background, with no clear structure or object associated with them.\n\nThe overall image is blurry, with motion blur or camera shake evident in the streaking of the distant lights and the soft focus of the foreground. There are no clearly defined objects, people, or identifiable structures. The scene is quiet, dark, and ambiguous, with minimal visual information beyond the textures of the ground and the distant, blurred lights.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:54:01"
+    },
+    "IMG_4290.jpg": {
+      "description": "The image captures a nighttime scene over a body of water. The sky is dark, with a faint gradient of gray near the horizon, suggesting residual twilight or distant ambient light. A thin, horizontal band of pale yellowish haze stretches across the upper right portion of the sky.\n\nAlong the horizon, a dark, continuous silhouette of land is visible, possibly a treeline or distant shore. Scattered along this silhouette are small, dim points of light \u2014 some white, one distinctly blue \u2014 likely from buildings or structures on the far shore. These lights cast elongated, shimmering reflections on the water\u2019s surface, particularly the blue light, which creates a vertical, broken streak of bright blue and white shimmering down the right side of the frame.\n\nThe water itself is mostly dark, with subtle variations in tone \u2014 a muted greenish-gray near the horizon, fading into near-black in the foreground. The surface appears calm, with gentle ripples distorting the reflections. No distinct objects such as boats or people are visible on the water. The lower half of the image is almost entirely black, suggesting the immediate foreground is unlit and possibly closer to the viewer\u2019s vantage point.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:54:10"
+    },
+    "IMG_4291.jpg": {
+      "description": "The image is predominantly dark, with a nearly black foreground that occupies the lower two-thirds of the frame. Above this, a horizontal band of muted, murky greenish-gray stretches across the middle, suggesting a body of water under low light. The surface of this band is mostly flat, with faint, indistinct reflections or ripples barely visible. Along the horizon, a dark, jagged silhouette of land or trees runs horizontally, broken only by a few small, scattered points of white or pale yellow light\u2014possibly distant lamps or windows. Above the silhouette, the sky is a uniform, dim gradient of dark gray to brownish-green, with no visible stars, clouds, or moon. The overall lighting is extremely low, resulting in minimal contrast and obscured detail throughout.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:54:19"
+    },
+    "IMG_4293.jpg": {
+      "description": "A paved asphalt road curves gently from the lower left toward the center of the frame, its dark gray surface textured with small stones and scattered with a few dry leaves. Along the right edge of the road, a narrow strip of dry, straw-colored grass separates the pavement from a sloping bank covered in fallen leaves\u2014mostly brown and gray, with occasional yellow and orange fragments. The bank rises into a dense thicket of shrubs and young trees, their branches interlaced and mostly bare, though some retain clusters of yellow and pale green leaves. Behind this understory, taller trees stand with slender, dark trunks and intricate networks of branches reaching upward. A few of these trees still hold sparse foliage\u2014some leaves are bright yellow, others a muted orange or reddish-brown. The sky, visible through the canopy, is a pale, clear blue with no visible clouds. The lighting suggests late afternoon, casting soft shadows and highlighting the textures of bark, leaves, and pavement.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:54:28"
+    },
+    "IMG_4294.jpg": {
+      "description": "The image shows a roadside scene at what appears to be late afternoon or early evening. In the foreground, a dark gray asphalt road edge runs horizontally across the bottom of the frame. Just beyond the road, a narrow strip of dry, straw-colored grass separates the pavement from a thick carpet of fallen leaves. These leaves are mostly brown, tan, and gray, with some still retaining muted yellows and greens, scattered densely across the ground.\n\nBehind the leaf litter rises a dense thicket of shrubs and young trees, their foliage a mix of yellow-green and golden hues, catching the low-angle sunlight. Taller, mature trees stand behind them, their trunks dark brown and mostly bare, with thin, leafless branches stretching upward and crisscrossing against the sky. A few scattered leaves remain on these taller trees, mostly yellow and orange.\n\nThe sun is visible near the center-right of the image, partially obscured by tree trunks, emitting a bright, warm yellow-orange glow. A lens flare extends diagonally from the sun toward the lower right, appearing as a soft, hazy streak of light with faint rainbow-colored edges. The sky above is a pale, clear blue, visible through the gaps in the branches. The overall lighting casts long, soft shadows and bathes the scene in a golden, diffused light.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:54:38"
+    },
+    "IMG_4295.jpg": {
+      "description": "The image captures a woodland scene during what appears to be late autumn. The ground is densely covered with fallen leaves in shades of brown, tan, pale yellow, and muted orange, interspersed with small patches of green moss or grass. Several tall, slender tree trunks rise vertically, their bark dark gray and textured with ridges and furrows. Many of the trees are bare, their branches thin and intricate against the sky, while others retain sparse clusters of leaves\u2014some still green, others turned yellow, orange, or russet. In the mid-ground, a smaller tree or large shrub displays a mix of yellow and green leaves, catching the sunlight. To the right, the sun is visible as a bright, diffused orb, partially obscured by branches, casting a warm, golden glow and creating lens flare. The sky above is a pale, clear blue, visible through the canopy gaps. The overall lighting suggests late afternoon, with long shadows and a soft, directional illumination highlighting the textures of bark and foliage.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:54:48"
+    },
+    "IMG_4296.jpg": {
+      "description": "The image shows a woodland scene during autumn. The ground is covered in a thick layer of fallen leaves in shades of brown, tan, gray, and muted red. Scattered among the leaves are small green plants with compound leaves, some showing hints of red at their edges. Low-growing shrubs with green and yellowing leaves form a dense understory, rising to about waist height in places.\n\nTall, slender tree trunks rise vertically through the frame, their bark mostly gray and smooth with occasional patches of lichen or rough texture. Many branches are bare, extending upward and outward against a pale blue sky. Some trees retain sparse clusters of leaves in orange, yellow, and brown tones, particularly in the upper canopy. A few leaves still clinging to branches show a mix of green fading into autumnal hues.\n\nIn the background, the forest thickens, with more trees and undergrowth creating a layered effect. A small, bright red object\u2014possibly a flag or marker\u2014is visible through the trees in the middle distance, slightly to the right of center. The sunlight filters through the canopy from the right side, casting a warm glow and creating subtle highlights on some leaves and branches. The overall lighting suggests late afternoon, with soft shadows and a gentle contrast between illuminated and shaded areas.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:54:59"
+    },
+    "IMG_4297.jpg": {
+      "description": "A paved asphalt road curves gently to the left, its dark gray surface textured with small aggregate and scattered with a few fallen leaves. Along the right edge of the road, a narrow strip of dry, brown pine needles borders a thick carpet of fallen leaves in shades of brown, tan, and muted orange. Beyond the leaf litter, a dense stand of trees rises, their trunks slender and mostly bare, with branches extending upward and outward. The foliage on the trees displays autumn colors: golden yellow, burnt orange, and patches of lingering green. A few evergreen trees with dark green needles are interspersed among the deciduous trees. On the far right, near the edge of the frame, a gray metal utility box is mounted on a wooden post, with a small white cap on top. The sky, visible through gaps in the canopy, is pale blue with faint wisps of white cloud. In the distance, the road continues, flanked by more trees and a glimpse of a mailbox on the left side. The lighting is soft and even, suggesting late afternoon.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:55:08"
+    },
+    "IMG_4298.jpg": {
+      "description": "A paved asphalt path curves gently from the lower left toward the center of the frame, its dark gray surface bordered by a narrow strip of dry, straw-colored grass. Beyond the grass, the ground is thickly carpeted with fallen leaves in shades of brown, tan, and muted orange, interspersed with scattered pine needles. A small, light gray utility box mounted on a metal post stands upright on the right side of the leaf-covered ground. The box has a circular meter face and a hinged door.\n\nBehind the utility box and extending across the entire background is a dense woodland. Tall, slender tree trunks rise vertically, many bare or sparsely leafed, revealing a pale blue sky through the canopy. The foliage still clinging to branches displays autumnal hues: golden yellow, russet orange, and patches of lingering green. A prominent evergreen tree with dark green needles stands near the center, its branches extending outward and downward. Smaller shrubs and undergrowth in muted greens and yellows fill the spaces between the larger trees. The lighting is soft and even, suggesting late afternoon or an overcast day, casting no sharp shadows.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:55:19"
+    },
+    "IMG_4299.jpg": {
+      "description": "The foreground is a patch of grass covered in a fine, crystalline layer of frost. The blades of grass are bent and matted in places, their green color muted beneath the white frost, which catches the light and glimmers. Scattered among the grass are a few dry, brown leaves and small twigs. The frost thins toward the bottom right, revealing more of the dark, damp soil beneath.\n\nBehind the frosted grass, a dense thicket of tall, dry reeds and shrubs rises. The reeds are pale beige and gray, standing upright and interwoven. Behind them, a wall of bushes and small trees displays autumn foliage\u2014leaves in shades of yellow, gold, and muted green, with some branches bare. The foliage is dense, creating a textured backdrop.\n\nIn the upper right corner, sunlight filters through the trees, casting a warm, golden glow that bleeds into the scene, slightly overexposing the leaves and creating a soft halo effect. The sky is not visible, but the light suggests a low sun, possibly early morning. The overall scene is still, with no visible movement or animals.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:55:29"
+    },
+    "IMG_4300.jpg": {
+      "description": "The image shows the interior of a room viewed from a doorway. The ceiling is partially collapsed, exposing wooden beams and hanging strips of white ceiling material. The walls are paneled with vertical, light brown wood strips. A white, six-panel door is open on the right, revealing a glimpse of the room beyond.\n\nInside the room, the floor is littered with debris: broken wood planks, cardboard boxes, and scattered household items. A light-colored wooden dresser with multiple drawers stands near the center, its surface cluttered with fabric and small objects. To the left of the dresser, a reddish-brown wooden structure, possibly part of a broken cabinet or chair, leans against the wall. Behind it, a stack of white plastic crates and a black appliance or piece of equipment are visible.\n\nIn the foreground, two long wooden planks lie across the threshold, one weathered gray and the other a lighter, natural wood tone. A blue and white cardboard box rests on the floor near the dresser, alongside a red plastic bowl and a wooden ruler or stick. A striped fabric, possibly a blanket or curtain, hangs draped over an object behind the dresser. The floor appears uneven and covered in dust and small fragments of material. The lighting is diffuse, suggesting daylight entering from an unseen source.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:55:39"
+    },
+    "IMG_4301.jpg": {
+      "description": "The image presents a downward-looking view into a cluttered, unfinished interior space, likely a basement, crawl space, or construction area. The floor is composed of uneven, compacted earth and gravel, scattered with debris.\n\nIn the upper right quadrant, a large, disorganized pile of weathered wooden planks and beams leans against a wall or structure. These planks vary in length and width, displaying shades of gray, brown, and faded tan, with visible grain, splinters, and areas of peeling paint or discoloration.\n\nNear the center, a dark green or black plastic bucket sits on the ground, partially filled with indistinct material. A thin, light-colored stick or rod protrudes vertically from inside the bucket. Behind the bucket, a crumpled brown paper bag rests on the dirt.\n\nTo the left of the bucket, a section of a wooden ladder or truss lies flat on the ground. It is constructed of dark brown wood with diagonal cross-bracing. A small, rectangular blue and white object, possibly a label or tag, is affixed to one of its side rails.\n\nScattered across the dirt floor are numerous smaller pieces of wood, broken fragments, and chunks of concrete or masonry. A few small, light-colored rectangular blocks, possibly bricks or concrete pavers, lie near the center.\n\nIn the lower left, a large, light gray metal beam or pipe runs diagonally across the frame. Its surface is smooth and slightly reflective, with some minor scuffs and dirt.\n\nDominating the lower right foreground is a thick, weathered wooden beam or plank, angled diagonally. Its surface is rough, with peeling layers of faded yellow and white paint revealing the darker wood beneath. The wood grain is prominent, and the edges show signs of wear and tear.\n\nThe overall lighting is dim and diffuse, casting soft shadows and highlighting the textures of the dirt, wood, and metal. The scene conveys a sense of disuse or ongoing work, with materials and tools left in place.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:55:51"
+    },
+    "IMG_4302.jpg": {
+      "description": "The image shows a cluttered, partially dismantled interior space, likely under renovation or demolition. The dominant feature is a sloped wooden ceiling or roof structure composed of horizontal, weathered wooden planks, grayed and stained with age, showing visible grain and some discoloration. Several wooden beams and supports, varying in thickness and condition, intersect at angles beneath the ceiling. One prominent diagonal beam, dark brown and rough-textured, extends from the upper left toward the center. A long, narrow, light-colored wooden strip, possibly painted white but now chipped and worn, hangs vertically near the center, leaning against other structural elements.\n\nTo the right, a white-framed window or door opening reveals a glimpse into an adjacent room. Inside that room, a reddish-brown wooden cabinet or shelving unit is visible, with some yellow and red objects resting on its surface. The floor below is littered with debris: scattered wooden planks, broken pieces of wood, and dust. A black plastic bucket sits on the floor near the center, partially obscured by debris. A coiled black hose or cable lies near the bucket. The lower left wall is painted a faded light blue or gray, showing signs of wear and peeling paint. The overall lighting is dim and diffuse, casting soft shadows and highlighting the textures of the wood and dust. The scene conveys a sense of disarray and ongoing work, with no people present.",
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:56:02"
+    }
+  }
+}

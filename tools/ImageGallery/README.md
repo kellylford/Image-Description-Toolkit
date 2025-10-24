@@ -54,11 +54,13 @@ Copy these files to your web server:
 
 1. **index.html** - Single-page interactive gallery
    - Responsive design (mobile and desktop)
-   - Provider/Model/Prompt dropdowns
-   - Image viewer with prev/next navigation
-   - Description display panel
+   - Three view modes: Single, Provider Comparison, Prompt Matrix
+   - Provider/Model/Prompt dropdowns with smart validation
+   - Image viewer with prev/next navigation (Alt+P/Alt+N)
+   - Model navigation buttons in Provider Comparison mode
+   - Description display panel with accessibility features
    - Collapsible prompt text viewer
-   - Keyboard shortcuts (arrow keys)
+   - WCAG 2.2 AA compliant interface
 
 2. **generate_descriptions.py** - Data extraction script
    - Scans IDT workflow directories
@@ -146,6 +148,36 @@ Before running data collection:
 3. **Ensure Ollama is running**
 
 See `GALLERY_DATA_CHECKLIST.md` for detailed tracking of workflow completion.
+
+## Interface Features
+
+### View Modes
+
+1. **Single View**: Traditional image gallery with individual model/prompt selection
+2. **Provider Comparison**: Compare how different providers handle the same prompt style
+3. **Prompt Matrix**: See all prompt styles for a selected model across multiple images
+
+### Model Navigation (Provider Comparison)
+
+The Provider Comparison view includes model navigation buttons (‹ and ›) for each provider that has multiple models available:
+
+- **Navigation**: Click ‹ or › to cycle through available models for each provider
+- **State Persistence**: Model selections are remembered throughout the session
+- **Model Count Display**: Shows current model and total count (e.g., "2/4")
+- **Accessibility**: Buttons include proper ARIA labels for screen readers
+- **Smart Disable**: Navigation buttons are disabled when only one model is available
+
+Example: When comparing the "narrative" prompt across providers, you might see:
+- Claude: Sonnet 4.5 (1/3) with navigation to Haiku 3.5 and Opus 4
+- OpenAI: GPT-4o (1/2) with navigation to GPT-4o-mini  
+- Ollama: Llava (1/4) with navigation to Qwen3-VL, Gemma3, and Moondream
+
+### Keyboard Shortcuts
+
+- **Alt+P**: Previous image
+- **Alt+N**: Next image
+- **Arrow Keys**: Navigate through dropdowns and buttons
+- **Enter/Space**: Activate buttons and selections
 
 ### Manual Data Collection
 

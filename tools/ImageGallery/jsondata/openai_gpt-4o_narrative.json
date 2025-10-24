@@ -1,0 +1,182 @@
+{
+  "provider": "openai",
+  "model": "gpt-4o",
+  "prompt_style": "narrative",
+  "images": {
+    "photo-20825_singular_display_fullPicture.jpg": {
+      "description": "The image depicts a suburban street scene. On the left, there are a series of residential houses with different facades; one house has light gray siding with stone accents. In front of the houses, there's a neatly paved sidewalk running parallel to the street. Parked on the driveway of the nearest house is a blue car.\n\nAdjacent to the sidewalk, there's a stretch of green grass, divided by the pathway. On the right side, a tree with green leaves partially overhangs the sidewalk, casting a shadow on the grass below. Further down the street, a silver car is parked on the curb. \n\nAbove, the sky is a clear blue with scattered, fluffy white clouds, suggesting a bright, sunny day.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:26:55"
+    },
+    "IMG_4276.jpg": {
+      "description": "The image shows a metal fire pit surrounded by concrete blocks, with pine needles scattered on the ground. Inside the fire pit, there is a thin, vertical stick with small flames burning at its base. Ashes and more pine needles are visible inside the pit. A person is standing nearby, wearing light gray shoes, blue jeans, and part of what appears to be a red shirt. White earbud cords can be seen hanging down from the person\u2019s shirt.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:27:06"
+    },
+    "IMG_4277.jpg": {
+      "description": "The image shows a circular fire pit with a small flame burning inside. The ground of the pit is covered with pine needles and ashes. A single stick stands upright inside the pit. Surrounding the fire pit are concrete blocks and slabs, which are resting on the ground covered with more pine needles. \n\nIn the foreground, a person is visible from the waist down, wearing a red shirt, blue jeans, and gray shoes. The person appears to be holding white earphones.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:27:16"
+    },
+    "IMG_4279.jpg": {
+      "description": "The image shows a partial view of a person standing near a fire pit. The lower part of the person is visible, showing light gray shoes and blue jeans. They are wearing a red shirt, and white earbud wires are visible against the shirt.\n\nThe fire pit is circular and made of a dark metal. Inside the pit, there are scattered pine needles, ash, and a small visible flame. A long, thin stick is placed inside the pit. The ground surrounding the pit is covered in dry pine needles. Parts of cinder blocks and a concrete slab are arranged around the base of the pit.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:27:36"
+    },
+    "IMG_4280.jpg": {
+      "description": "The image shows a black fire pit containing scattered pine needles and some gray ash. Inside, a small fire burns, with visible orange flames. A long stick lies diagonally across the surface of the pit. Surrounding the fire pit are concrete cinder blocks and a gray stone slab. The ground is covered in more pine needles, and a person stands nearby wearing blue jeans and light gray shoes. A portion of a red shirt is also visible.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:27:47"
+    },
+    "IMG_4281.jpg": {
+      "description": "The image shows a circular metal fire pit containing ashes, fallen pine needles, and a stick, with smoke rising from within. Surrounding the fire pit are several gray concrete cinder blocks and a rectangular stone slab, also with pine needles scattered on them. At the bottom of the image, two feet in light-colored shoes with laces are visible, standing on a ground covered in pine needles and patches of bare earth. The person is wearing blue jeans and a red garment. The overall scene gives an outdoor setting with natural and man-made elements.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:27:59"
+    },
+    "IMG_4282.jpg": {
+      "description": "The image depicts a tranquil lakeside scene. In the foreground, there is a sandy shoreline with a mixture of small stones, dry twigs, and scattered leaves. Some pieces of grass and debris are visible near the water's edge. The water is calm with a light ripple, showing varying shades of blue and reflecting the sky. In the background, across the lake, there are trees forming a dense, dark green line along the horizon. The sky above is clear and light blue with a few thin, wispy clouds. Overall, the image conveys a peaceful and serene natural setting.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:28:14"
+    },
+    "IMG_4283.jpg": {
+      "description": "The image shows a sandy lake shore in the foreground. The sand is light brown, and there are footprints and a scattering of small pebbles and leaves. Some small pieces of driftwood and twigs are scattered along the sand as well. The water is calm, with gentle ripples extending outwards. The lake stretches to the horizon, meeting a line of dark green tree tops. Above, the sky is a pale blue with a few streaks of white clouds, suggesting a clear day.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:28:21"
+    },
+    "IMG_4284.jpg": {
+      "description": "The image shows a body of water with gentle ripples on its surface. The water is a combination of blue and brownish tones. The light reflects off the ripples, creating a pattern of light and darker shades across the surface. There is no additional visible detail in the water beyond the interplay of colors and textures created by the light and ripples.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:28:28"
+    },
+    "IMG_4286.jpg": {
+      "description": "The image depicts a serene lakeside scene in autumn. The foreground shows a body of water with a calm surface reflecting the colors of the surroundings. The water displays hues of green and hints of orange and red, mirroring the fall foliage.\n\nAcross the lake, there's a wooded area with a variety of trees in full autumn colors. The leaves range from deep green to vibrant shades of yellow, orange, and red. The trees have lost some leaves, revealing slender, gray trunks and branches.\n\nOn the right side of the image is a small structure resembling a cabin, with beige siding and white windows. The cabin is nestled among the trees, close to the water's edge. In front of the cabin, there is a grassy area with scattered brown leaves.\n\nTo the left, near the water, are two boats positioned on the shore. One appears to be a small paddle boat, and next to it is another boat partly visible, white in color. The sky above is pale and overcast, adding a soft, diffused light to the scene.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:28:39"
+    },
+    "IMG_4287.jpg": {
+      "description": "The image depicts a calm water body in the foreground with gentle ripples. The water surface has a reflective appearance, displaying shades of gray and hints of blue. In the background, there is a shoreline lined with dense trees. The trees are a mix of dark green, with some lighter and darker variations visible, indicating different types of foliage. Partially obscured by the trees, there are several structures with white or light-colored roofs, suggesting houses or cabins. The sky above is mostly overcast, displaying lighter gray tones.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:28:48"
+    },
+    "IMG_4288.jpg": {
+      "description": "The image shows a sandy shoreline at night. In the foreground, the sand is light brown and speckled with various small debris such as bits of grass and small pieces of litter. Some of the litter appears to be white and red in color. The water at the shore is calm and reflects a similar light brown tone, with gentle waves visible. Beyond the water, the sky is dark, with a faint glow at the horizon, which may be due to distant lights or low clouds. In the distance across the water, there are small, scattered points of bright light, likely from buildings or boats. The reflected light creates a faint vertical line on the surface of the water, indicating a light source from across the body of water.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:29:00"
+    },
+    "IMG_4289.jpg": {
+      "description": "The image depicts a dark nighttime scene. The foreground shows a sandy surface with a subtle, rippling texture, illuminated faintly by an unknown light source, giving it a brown and slightly reflective appearance. In the distance, there is a body of water or beach area with minimal visibility due to the darkness. Towards the upper right, a collection of small, blurred lights can be seen, displaying blue and white hues. The sky appears predominantly black, merging with the distant horizon.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:29:07"
+    },
+    "IMG_4290.jpg": {
+      "description": "The image shows a dark scene with a body of water occupying the lower portion. The water appears calm with faint reflections of lights from the background. On the horizon, there's a dark silhouette, likely of a tree line or landscape. Above, the sky is cloudy with a dim orange glow near the horizon, possibly from ambient light or a distant city. A few small, bright points of light are visible, possibly from distant structures or streetlights, and there is a faint reflection indicating the presence of light on the water's surface. The overall scene is dimly lit and the colors are muted.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:29:16"
+    },
+    "IMG_4291.jpg": {
+      "description": "The image depicts a dark scene, likely taken at night. The foreground is barely visible, appearing mostly black with faint hints of dark green or blue, possibly water. The middle section of the image shows a silhouette of a tree line or horizon in very dark shades against a dimly lit sky. The sky above the horizon has a muted, cloudy appearance, blending shades of dark gray, brown, and green. Small, scattered points of light are visible along the horizon, suggesting distant artificial lights. The overall atmosphere is dim and subdued, with low visibility.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:29:27"
+    },
+    "IMG_4293.jpg": {
+      "description": "The image displays a scene of a forested area during what appears to be autumn. In the foreground, there is a paved road with a dark gray color. Alongside the road, there is a strip of ground covered with a mix of dried leaves and light brown pine needles.\n\nTo the right of the road, a variety of trees are visible, some with leaves that are a mix of yellow and orange, characteristic of fall foliage. Other trees have already shed most of their leaves, showing bare branches against the sky. Interspersed among these are smaller shrubs and undergrowth, displaying a mix of green and brown tones. \n\nThe sky above the trees is clear and light blue, indicating a sunny day. The warm colors of the leaves suggest a calm and serene atmosphere in this natural setting.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:29:58"
+    },
+    "IMG_4294.jpg": {
+      "description": "The image captures a scene in a wooded area during what appears to be fall. In the foreground, there is a paved path bordered by a strip of dry grass. The ground is scattered with fallen leaves in shades of brown and tan.\n\nOn the right side of the path, there is a dense area of trees with thin trunks, some of which are bare while others have leaves. The leaves vary in color from shades of green to bright yellow, indicating the changing season. The sun is partially visible near the horizon, shining through the trees and casting a warm glow on the leaves and ground. The sky is mostly clear with a hint of blue. There is a soft, diffused light coming from the sun, creating a serene and autumnal atmosphere.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:30:10"
+    },
+    "IMG_4295.jpg": {
+      "description": "The image depicts a forested area with numerous tall, slender trees that have mostly bare trunks and branches. Some trees still have leaves, predominantly in shades of green and yellow. Interspersed among the trees are patches of orange and brown leaves, suggesting seasonal change. The ground is covered with a thick layer of fallen leaves, displaying a mix of brown, tan, and red colors. In the distance, a bright sun is visible, casting a warm, golden light over the scene. The sky is a clear blue, visible through the branches and adding a serene backdrop to the natural landscape.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:30:23"
+    },
+    "IMG_4296.jpg": {
+      "description": "The scene depicts a wooded area with numerous tall trees. The trees have thin trunks with bark in shades of gray, and their branches are covered with leaves in various colors, including green, yellow, and hints of orange and red, suggesting a fall setting. The ground is carpeted with fallen leaves, primarily brown, with scattered patches of red and yellow leaves. In the background, the sky is blue with the sun partially visible, casting a warm glow. Sunlight filters through the branches, creating a dappled effect on the ground. Bushes with green foliage are visible between the tree trunks.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:30:59"
+    },
+    "IMG_4297.jpg": {
+      "description": "The image shows a paved road curving gently to the left, bordered by a layer of fallen leaves on one side. The road is dark gray with a smooth texture and dotted with small, light-colored speckles. On the right side, there's a narrow strip of ground covered in dry leaves in various shades of brown. A row of trees lines this side, their trunks thin and mostly vertical. The trees have a mix of green and autumnal foliage in shades of orange and yellow. The sky above is light blue with a few scattered clouds visible through the tree branches. On the far right, a utility box is attached to a tree. The overall scene suggests a rural or suburban setting in a forested area.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:31:09"
+    },
+    "IMG_4298.jpg": {
+      "description": "The image shows a roadside scene during autumn. On the left, there is a black asphalt road with a slight patch. Next to the road, there is an area covered with dry, fallen leaves and a few pine needles. The leaves are mostly brown with hints of orange, yellow, and some green.\n\nTo the right, a utility box or electrical pole with a circular meter is visible. It has a neutral gray color. The background is filled with trees of various sizes. Some trees have bare branches, while others still hold onto green foliage, particularly the coniferous trees. Deciduous trees display a mix of autumn colors like orange and yellow leaves, contrasting with the green of the evergreen trees.\n\nThe sky peeks through the branches with a light blue color, indicating clear weather. The overall scene captures the transition of seasons, with the vibrant colors of fall displayed throughout the woodland area.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:31:23"
+    },
+    "IMG_4299.jpg": {
+      "description": "The image shows an outdoor scene with grass and vegetation. The foreground features grass covered in a layer of frost, giving it a silvery-white appearance. The grass varies in color, with patches of green visible beneath the frost. In the background, there are dense bushes and tall grass with leaves that transition from green to shades of yellow and brown. The vegetation appears slightly illuminated by soft sunlight, creating a warm, diffused light effect. The overall atmosphere suggests a cold, possibly early morning environment.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:31:40"
+    },
+    "IMG_4300.jpg": {
+      "description": "The image depicts an interior scene viewed through an open door. The door is white with panel detailing. Inside, the ceiling is damaged with several white panels missing, revealing dark areas, and some panels are stained. The walls have a wood panel design.\n\nThe flooring is cluttered with various objects, including two large, weathered wooden planks leading into the room. The planks are placed over an uneven surface possibly leading to a lower level.\n\nInside, there is an overturned brown chair and a white dresser with some drawers open. On top of the dresser are several items, including a piece of cloth and small objects. The floor is littered with debris and a colorful cardboard box. In the background are other scattered items, adding to the disordered appearance.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:31:50"
+    },
+    "IMG_4301.jpg": {
+      "description": "The image shows what appears to be a construction or storage area with various materials scattered on the ground. A series of wooden planks and beams, of varying shades of brown and gray, are stacked and leaning against a wall on the right. Nearby, there are several pink boards or sheets piled horizontally. \n\nIn the center, there is a greenish-gray metal bucket, standing upright. Long-handled tools protrude from the bucket. On the ground, several more wooden planks are scattered amidst small debris on a dirt floor. Leaves and dust are visible amongst the debris. \n\nIn the lower part of the image, a ladder-like structure with a triangular pattern can be seen. A white cylindrical column or pipe is positioned vertically on the left side of the image. The view seems to be from an elevated position looking downward, with a roughly textured wooden board partially visible in the foreground on the right side.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:32:03"
+    },
+    "IMG_4302.jpg": {
+      "description": "The image shows an interior space with various wooden structures. The wall is made of horizontal wooden panels, weathered brown and greyish in color. Several wooden beams and planks are present, leaning and intersecting at various angles. There is a vertical white stick or rod resting against one of the panels. Piles of other wooden planks are scattered haphazardly along the bottom area. A partially visible room on the right has an orange-brown wooden item, possibly a piece of furniture. There are some light wooden textures and surfaces visible around the scene. The floor appears cluttered with additional wood and debris.",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "2025-10-23 11:32:15"
+    }
+  }
+}
