@@ -32,7 +32,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 import json
-from analysis_utils import get_safe_filename, ensure_directory
+from analysis_utils import get_safe_filename, ensure_directory, load_prompt_styles_from_config
 
 # Fix Windows terminal encoding issues
 if sys.platform == 'win32':
@@ -197,10 +197,10 @@ def parse_workflow_log(log_path: Path) -> Dict:
             stats['model'] = parts[2]
         
         # Prompt style is typically in parts[3] or parts[4] (if model has variant)
-        # Known prompt styles to look for
-        prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic']
+        # Load prompt styles dynamically from config
+        prompt_styles = load_prompt_styles_from_config()
         for i in range(3, len(parts)):
-            if parts[i] in prompt_styles:
+            if parts[i].lower() in prompt_styles:
                 stats['prompt_style'] = parts[i]
                 break
     
