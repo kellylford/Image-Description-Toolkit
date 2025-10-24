@@ -356,6 +356,27 @@
             margin-top: 20px;
         }
         
+        /* Footer */
+        .site-footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 40px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+            color: #888;
+        }
+        
+        .site-footer a {
+            color: #00d4ff;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .site-footer a:hover {
+            color: #00ffff;
+            text-decoration: underline;
+        }
+        
         /* View Mode Panel */
         .view-mode-panel {
             background: rgba(255, 255, 255, 0.05);
@@ -973,7 +994,13 @@
         <button id="nextBtn" onclick="nextImage()" aria-label="Next image (Alt+N)">Next →</button>
     </div>
 
-    <div class="keyboard-hint">Use ← → arrow keys or Alt+P/Alt+N to navigate</div>    <script>
+    <div class="keyboard-hint">Use ← → arrow keys or Alt+P/Alt+N to navigate</div>
+    
+    <footer class="site-footer">
+        <p>Powered by <a href="https://github.com/kellylford/Image-Description-Toolkit" target="_blank" rel="noopener noreferrer">The Image Description Toolkit</a></p>
+    </footer>
+
+    <script>
         // Configuration - Update this when deploying
         const CONFIG = {
             imagesBaseUrl: './images/',  // Where images are stored
