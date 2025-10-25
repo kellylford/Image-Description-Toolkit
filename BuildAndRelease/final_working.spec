@@ -11,27 +11,27 @@ MAINTENANCE NOTES:
 """
 
 a = Analysis(
-    ['idt_cli.py'],
-    pathex=['.', 'scripts'],
+    ['../idt_cli.py'],
+    pathex=['..', '../scripts'],
     binaries=[],
     datas=[
         # Include ALL scripts files individually
-        ('scripts/workflow.py', 'scripts'),
-        ('scripts/workflow_utils.py', 'scripts'), 
-        ('scripts/image_describer.py', 'scripts'),
-        ('scripts/ConvertImage.py', 'scripts'),
-        ('scripts/descriptions_to_html.py', 'scripts'),
-        ('scripts/video_frame_extractor.py', 'scripts'),
-        ('scripts/config_loader.py', 'scripts'),
-        ('scripts/guided_workflow.py', 'scripts'),
-        ('scripts/list_prompts.py', 'scripts'),
-        ('scripts/list_results.py', 'scripts'),
-        ('scripts/workflow_config.json', 'scripts'),
-        ('scripts/image_describer_config.json', 'scripts'),
+        ('../scripts/workflow.py', 'scripts'),
+        ('../scripts/workflow_utils.py', 'scripts'), 
+        ('../scripts/image_describer.py', 'scripts'),
+        ('../scripts/ConvertImage.py', 'scripts'),
+        ('../scripts/descriptions_to_html.py', 'scripts'),
+        ('../scripts/video_frame_extractor.py', 'scripts'),
+        ('../scripts/config_loader.py', 'scripts'),
+        ('../scripts/guided_workflow.py', 'scripts'),
+        ('../scripts/list_prompts.py', 'scripts'),
+        ('../scripts/list_results.py', 'scripts'),
+        ('../scripts/workflow_config.json', 'scripts'),
+        ('../scripts/image_describer_config.json', 'scripts'),
         # Include essential directories
-        ('models', 'models'),
-        ('analysis', 'analysis'),
-        ('VERSION', '.'),
+        ('../models', 'models'),
+        ('../analysis', 'analysis'),
+        ('../VERSION', '.'),
     ],
     hiddenimports=[
         # EXPLICITLY include every module we need
