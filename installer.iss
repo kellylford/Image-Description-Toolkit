@@ -62,6 +62,7 @@ Name: "{group}\Viewer"; Filename: "{app}\Viewer\viewer.exe"; WorkingDir: "{app}\
 Name: "{group}\Prompt Editor"; Filename: "{app}\PromptEditor\prompteditor.exe"; WorkingDir: "{app}\PromptEditor"
 Name: "{group}\Documentation"; Filename: "{app}\docs"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber\imagedescriber.exe"; WorkingDir: "{app}\ImageDescriber"; Tasks: desktopicon
 
 [Code]
@@ -128,6 +129,10 @@ begin
     // Extract Prompt Editor
     Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\prompt_editor_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\PromptEditor') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     
+    // Set IDT_CONFIG_DIR environment variable to point to scripts directory
+    RegWriteStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'IDT_CONFIG_DIR', ExpandConstant('{app}\scripts'));
+    Log('Set IDT_CONFIG_DIR environment variable to: ' + ExpandConstant('{app}\scripts'));
+    
     // Add to PATH if selected
     if WizardIsTaskSelected('addtopath') then
       EnvAddPath(ExpandConstant('{app}'));
@@ -141,6 +146,9 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
+    // Remove IDT_CONFIG_DIR environment variable
+    RegDeleteValue(HKEY_CURRENT_USER, 'Environment', 'IDT_CONFIG_DIR');
+    
     // Remove from PATH if it was added
     AppDir := ExpandConstant('{app}');
     if RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path) then
@@ -160,6 +168,7 @@ begin
 end;
 
 [Run]
-Filename: "{app}\ImageDescriber\imagedescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent
+Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\ImageDescriber\imagedescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent unchecked
 Filename: "https://ollama.com"; Description: "Open Ollama website to download (if not installed)"; Flags: shellexec postinstall skipifsilent unchecked
 Filename: "{app}\docs"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked
