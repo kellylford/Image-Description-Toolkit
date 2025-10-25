@@ -281,10 +281,32 @@ def validate_directory(path):
 
 def guided_workflow():
     """Interactive guided workflow builder"""
+    # Parse any extra workflow arguments passed through (e.g., --timeout 300)
+    # These will be appended to the final workflow command
+    extra_workflow_args = []
+    if len(sys.argv) > 1:
+        # Filter out any arguments that are meant for the workflow
+        i = 1
+        while i < len(sys.argv):
+            arg = sys.argv[i]
+            # Known workflow flags to pass through
+            if arg in ['--timeout', '--preserve-descriptions']:
+                extra_workflow_args.append(arg)
+                # Check if next arg is the value for this flag
+                if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith('--'):
+                    i += 1
+                    extra_workflow_args.append(sys.argv[i])
+            i += 1
+    
     print_header("Image Description Toolkit - Guided Workflow")
     
     print("Welcome! This wizard will help you set up and run an image description workflow.")
-    print("You can press Ctrl+C at any time to exit.\n")
+    print("You can press Ctrl+C at any time to exit.")
+    
+    # Show any extra workflow options that were provided
+    if extra_workflow_args:
+        print(f"\nAdditional workflow options: {' '.join(extra_workflow_args)}")
+    print()
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
@@ -448,6 +470,10 @@ def guided_workflow():
     if prompt_style:
         cmd_parts.extend(["--prompt-style", prompt_style])
     
+    # Add any extra workflow arguments passed to guideme
+    if extra_workflow_args:
+        cmd_parts.extend(extra_workflow_args)
+    
     # Display the command
     command_str = " ".join(f'"{part}"' if ' ' in part else part for part in cmd_parts)
     print("The following command will be executed:\n")
@@ -507,6 +533,10 @@ def guided_workflow():
         if prompt_style:
             cmd_parts.extend(["--prompt-style", prompt_style])
         
+        # Add any extra workflow arguments
+        if extra_workflow_args:
+            cmd_parts.extend(extra_workflow_args)
+        
         command_str = " ".join(f'"{part}"' if ' ' in part else part for part in cmd_parts)
         
         print_header("Running Workflow")
@@ -523,7 +553,6 @@ def guided_workflow():
         try:
             # Import and call the workflow directly
             from workflow import main as workflow_main
-            import sys
             
             # Build arguments for workflow
             workflow_args = [img_dir, "--provider", provider, "--model", model, "--output-dir", output_dir]
@@ -533,6 +562,9 @@ def guided_workflow():
                 workflow_args.extend(["--name", workflow_name])
             if prompt_style:
                 workflow_args.extend(["--prompt-style", prompt_style])
+            # Add any extra workflow arguments (e.g., --timeout)
+            if extra_workflow_args:
+                workflow_args.extend(extra_workflow_args)
             
             # Save original argv and replace with our args
             original_argv = sys.argv
