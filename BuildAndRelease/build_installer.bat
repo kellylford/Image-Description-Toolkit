@@ -7,6 +7,9 @@ echo Building Image Description Toolkit Installer
 echo ================================================
 echo.
 
+REM Change to project root directory
+cd /d "%~dp0.."
+
 REM Check if Inno Setup is installed
 set "INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if not exist "%INNO_PATH%" (
@@ -48,7 +51,7 @@ if not exist "releases\prompt_editor_v3.0.1.zip" (
 echo All required files found.
 echo.
 echo Compiling installer...
-"%INNO_PATH%" installer.iss
+"%INNO_PATH%" BuildAndRelease\installer.iss
 
 if %ERRORLEVEL% EQU 0 (
     echo.

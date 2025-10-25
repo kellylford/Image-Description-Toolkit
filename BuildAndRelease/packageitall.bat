@@ -30,6 +30,9 @@ echo and copy installer scripts to the releases directory.
 echo All packages will be placed in the releases/ directory.
 echo.
 
+REM Change to project root directory
+cd /d "%~dp0.."
+
 set PACKAGE_ERRORS=0
 
 REM Create main releases directory if it doesn't exist
@@ -41,7 +44,7 @@ echo [1/4] Packaging IDT (main toolkit)...
 echo ========================================================================
 echo.
 
-call package_idt.bat
+call BuildAndRelease\package_idt.bat
 if errorlevel 1 (
     echo ERROR: IDT packaging failed!
     set /a PACKAGE_ERRORS+=1

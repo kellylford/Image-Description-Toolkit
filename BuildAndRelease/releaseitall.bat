@@ -36,13 +36,16 @@ echo.
 echo Starting release process...
 echo.
 
+REM Change to project root directory
+cd /d "%~dp0.."
+
 REM ============================================================================
 echo ========================================================================
 echo PHASE 1: BUILD ALL APPLICATIONS
 echo ========================================================================
 echo.
 
-call builditall.bat
+call BuildAndRelease\builditall.bat
 if errorlevel 1 (
     echo.
     echo ERROR: Build phase failed!
@@ -59,7 +62,7 @@ echo PHASE 2: PACKAGE ALL APPLICATIONS
 echo ========================================================================
 echo.
 
-call packageitall.bat
+call BuildAndRelease\packageitall.bat
 if errorlevel 1 (
     echo.
     echo ERROR: Package phase failed!
