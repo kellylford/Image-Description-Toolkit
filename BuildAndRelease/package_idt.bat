@@ -23,6 +23,9 @@ echo Creating Distribution Package
 echo ========================================================================
 echo.
 
+REM Change to project root directory
+cd /d "%~dp0.."
+
 REM Check if executable exists
 if not exist "dist\idt.exe" (
     echo ERROR: Executable not found!

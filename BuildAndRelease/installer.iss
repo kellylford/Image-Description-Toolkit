@@ -19,8 +19,8 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={sd}\idt
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=LICENSE
-OutputDir=releases
+LicenseFile=..\LICENSE
+OutputDir=..\releases
 OutputBaseFilename=ImageDescriptionToolkit_Setup_v{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
@@ -43,17 +43,17 @@ Name: "addtopath"; Description: "Add to PATH (allows running 'idt' from any comm
 
 [Files]
 ; Main toolkit files (from ImageDescriptionToolkit zip)
-Source: "releases\ImageDescriptionToolkit_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
-Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\releases\ImageDescriptionToolkit_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Viewer
-Source: "releases\viewer_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\releases\viewer_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; ImageDescriber
-Source: "releases\imagedescriber_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\releases\imagedescriber_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; Prompt Editor
-Source: "releases\prompt_editor_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\releases\prompt_editor_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"
