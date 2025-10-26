@@ -1,0 +1,26 @@
+{
+  "gallery_name": "Mountain Adventures",
+  "sources": {
+    "directories": [
+      "./descriptions"
+    ],
+    "workflow_patterns": ["*travel*", "*vacation*", "*outdoor*"]
+  },
+  "content_rules": {
+    "required_keywords": ["mountain"],
+    "preferred_keywords": ["hiking", "peak", "summit", "trail", "alpine", "valley", "ridge", "panorama", "landscape"],
+    "excluded_keywords": ["indoor", "urban", "city"],
+    "min_keyword_matches": 2,
+    "case_sensitive": false
+  },
+  "filters": {
+    "min_description_length": 80,
+    "preferred_prompts": ["detailed", "technical"],
+    "preferred_models": []
+  },
+  "output": {
+    "max_images": 30,
+    "sort_by": "keyword_relevance",
+    "include_metadata": true
+  }
+}

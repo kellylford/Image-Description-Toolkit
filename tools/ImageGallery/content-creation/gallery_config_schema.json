@@ -1,0 +1,230 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kellylford/Image-Description-Toolkit/gallery_config_schema.json",
+  "title": "Gallery Configuration Schema",
+  "description": "Configuration schema for identify_gallery_content.py tool",
+  "type": "object",
+  "required": ["gallery_name", "content_rules"],
+  "properties": {
+    "gallery_name": {
+      "type": "string",
+      "description": "Name of the gallery being created",
+      "minLength": 1,
+      "examples": ["Sunshine On The Water Makes Me Happy", "Europe Travel 2025"]
+    },
+    "sources": {
+      "type": "object",
+      "description": "Data source configuration",
+      "properties": {
+        "directories": {
+          "type": "array",
+          "description": "List of directories to scan for workflow results",
+          "items": {
+            "type": "string"
+          },
+          "default": ["./descriptions"],
+          "examples": [
+            ["./descriptions"],
+            ["//qnap/home/idt/descriptions", "./descriptions"]
+          ]
+        },
+        "workflow_patterns": {
+          "type": "array",
+          "description": "Workflow name patterns to include (supports wildcards)",
+          "items": {
+            "type": "string"
+          },
+          "default": ["*"],
+          "examples": [
+            ["*europe*", "*vacation*"],
+            ["*travel*"]
+          ]
+        },
+        "date_range": {
+          "type": "object",
+          "description": "Date range filter for workflow timestamps",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date",
+              "description": "Start date in YYYY-MM-DD format",
+              "examples": ["2025-10-01"]
+            },
+            "end": {
+              "type": "string",
+              "format": "date",
+              "description": "End date in YYYY-MM-DD format",
+              "examples": ["2025-10-31"]
+            }
+          }
+        }
+      }
+    },
+    "content_rules": {
+      "type": "object",
+      "description": "Content identification rules",
+      "required": [],
+      "properties": {
+        "required_keywords": {
+          "type": "array",
+          "description": "Keywords that MUST be present (AND logic)",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [
+            ["water", "sun"],
+            ["mountain", "snow"]
+          ]
+        },
+        "preferred_keywords": {
+          "type": "array",
+          "description": "Keywords that are preferred but not required",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [
+            ["sunset", "sunrise", "reflection", "clouds", "moon", "golden hour"],
+            ["hiking", "trail", "forest", "trees"]
+          ]
+        },
+        "excluded_keywords": {
+          "type": "array",
+          "description": "Keywords that disqualify an image",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [
+            ["indoor", "night", "dark"],
+            ["urban", "building", "city"]
+          ]
+        },
+        "min_keyword_matches": {
+          "type": "integer",
+          "description": "Minimum total number of keyword matches required",
+          "minimum": 1,
+          "default": 1,
+          "examples": [2, 3]
+        },
+        "case_sensitive": {
+          "type": "boolean",
+          "description": "Whether keyword matching should be case-sensitive",
+          "default": false
+        }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "description": "Advanced filtering options",
+      "properties": {
+        "min_description_length": {
+          "type": "integer",
+          "description": "Minimum character length for descriptions",
+          "minimum": 0,
+          "default": 0,
+          "examples": [100, 200]
+        },
+        "preferred_prompts": {
+          "type": "array",
+          "description": "Preferred prompt styles (bonus points)",
+          "items": {
+            "type": "string",
+            "enum": ["narrative", "colorful", "technical", "detailed"]
+          },
+          "default": [],
+          "examples": [
+            ["narrative", "colorful"],
+            ["detailed"]
+          ]
+        },
+        "preferred_models": {
+          "type": "array",
+          "description": "Preferred AI models (bonus points)",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [
+            ["claude-opus-4", "claude-sonnet-4"],
+            ["gpt-4o", "llava"]
+          ]
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "Output configuration",
+      "properties": {
+        "max_images": {
+          "type": "integer",
+          "description": "Maximum number of images to return (0 = unlimited)",
+          "minimum": 0,
+          "default": 50,
+          "examples": [25, 50, 100]
+        },
+        "sort_by": {
+          "type": "string",
+          "description": "How to sort the results",
+          "enum": ["keyword_relevance", "filename"],
+          "default": "keyword_relevance"
+        },
+        "include_metadata": {
+          "type": "boolean",
+          "description": "Include provider/model/prompt metadata in output",
+          "default": true
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "gallery_name": "Sunshine On The Water Makes Me Happy",
+      "sources": {
+        "directories": [
+          "//qnap/home/idt/descriptions",
+          "./descriptions"
+        ],
+        "workflow_patterns": ["*europe*", "*vacation*"],
+        "date_range": {
+          "start": "2025-10-01",
+          "end": "2025-10-31"
+        }
+      },
+      "content_rules": {
+        "required_keywords": ["water", "sun"],
+        "preferred_keywords": ["sunset", "sunrise", "reflection", "clouds", "moon", "golden hour"],
+        "excluded_keywords": ["indoor", "night", "dark"],
+        "min_keyword_matches": 2,
+        "case_sensitive": false
+      },
+      "filters": {
+        "min_description_length": 100,
+        "preferred_prompts": ["narrative", "colorful"],
+        "preferred_models": ["claude-opus-4", "claude-sonnet-4"]
+      },
+      "output": {
+        "max_images": 50,
+        "sort_by": "keyword_relevance",
+        "include_metadata": true
+      }
+    },
+    {
+      "gallery_name": "Mountain Adventures",
+      "sources": {
+        "directories": ["./descriptions"]
+      },
+      "content_rules": {
+        "required_keywords": ["mountain"],
+        "preferred_keywords": ["hiking", "peak", "summit", "trail", "alpine"],
+        "excluded_keywords": ["indoor"],
+        "min_keyword_matches": 1
+      },
+      "output": {
+        "max_images": 30,
+        "sort_by": "keyword_relevance"
+      }
+    }
+  ]
+}
