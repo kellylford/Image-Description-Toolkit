@@ -1,0 +1,30 @@
+{
+  "gallery_name": "Sunshine On The Water Makes Me Happy",
+  "sources": {
+    "directories": [
+      "./descriptions"
+    ],
+    "workflow_patterns": ["*"],
+    "date_range": {
+      "start": "2025-01-01",
+      "end": "2025-12-31"
+    }
+  },
+  "content_rules": {
+    "required_keywords": ["water", "sun"],
+    "preferred_keywords": ["sunset", "sunrise", "reflection", "clouds", "moon", "golden hour", "shimmering", "sparkling"],
+    "excluded_keywords": ["indoor", "night", "dark", "stormy"],
+    "min_keyword_matches": 2,
+    "case_sensitive": false
+  },
+  "filters": {
+    "min_description_length": 100,
+    "preferred_prompts": ["narrative", "colorful"],
+    "preferred_models": ["claude-opus-4", "claude-sonnet-4"]
+  },
+  "output": {
+    "max_images": 50,
+    "sort_by": "keyword_relevance",
+    "include_metadata": true
+  }
+}
