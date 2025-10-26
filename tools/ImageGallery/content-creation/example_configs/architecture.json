@@ -1,0 +1,25 @@
+{
+  "gallery_name": "Urban Architecture",
+  "sources": {
+    "directories": [
+      "./descriptions"
+    ]
+  },
+  "content_rules": {
+    "required_keywords": ["building"],
+    "preferred_keywords": ["architecture", "skyscraper", "modern", "glass", "steel", "concrete", "urban", "city", "structure", "facade"],
+    "excluded_keywords": ["nature", "forest", "ocean", "mountain"],
+    "min_keyword_matches": 2,
+    "case_sensitive": false
+  },
+  "filters": {
+    "min_description_length": 100,
+    "preferred_prompts": ["technical", "detailed"],
+    "preferred_models": []
+  },
+  "output": {
+    "max_images": 40,
+    "sort_by": "keyword_relevance",
+    "include_metadata": true
+  }
+}
