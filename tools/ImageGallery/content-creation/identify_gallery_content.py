@@ -60,6 +60,10 @@ class GalleryContentIdentifier:
         self.filters = config.get('filters', {})
         self.output_config = config.get('output', {})
         
+        # Set case sensitivity first (needed by _normalize_keywords)
+        self.case_sensitive = self.content_rules.get('case_sensitive', False)
+        self.min_keyword_matches = self.content_rules.get('min_keyword_matches', 1)
+        
         # Process keywords
         self.required_keywords = self._normalize_keywords(
             self.content_rules.get('required_keywords', [])
@@ -70,8 +74,6 @@ class GalleryContentIdentifier:
         self.excluded_keywords = self._normalize_keywords(
             self.content_rules.get('excluded_keywords', [])
         )
-        self.case_sensitive = self.content_rules.get('case_sensitive', False)
-        self.min_keyword_matches = self.content_rules.get('min_keyword_matches', 1)
         
         # Filters
         self.min_description_length = self.filters.get('min_description_length', 0)
@@ -140,8 +142,12 @@ class GalleryContentIdentifier:
         workflow_lower = workflow_name.lower()
         for pattern in patterns:
             pattern_lower = pattern.lower()
-            # Simple wildcard matching
-            if pattern_lower == '*' or pattern_lower in workflow_lower:
+            # Simple wildcard matching - strip * and check if substring is present
+            if pattern_lower == '*':
+                return True
+            # Remove wildcards and check if the term is in the workflow name
+            search_term = pattern_lower.replace('*', '')
+            if search_term in workflow_lower:
                 return True
         return False
     
@@ -218,7 +224,9 @@ class GalleryContentIdentifier:
         
         # Extract fields using regex
         file_match = re.search(r'^File:\s*(.+)$', block, re.MULTILINE)
-        desc_match = re.search(r'^Description:\s*(.+?)(?=^(?:File:|Provider:|Model:|Prompt:|Cost:|Tokens:|Time:|$))', 
+        # Match description until we hit another field or end of block
+        # Use lookahead that checks for newline followed by field name, or end of string
+        desc_match = re.search(r'^Description:\s*(.+?)(?:\n(?=Provider:|Model:|Prompt:|Cost:|Tokens:|Time:)|\Z)', 
                               block, re.MULTILINE | re.DOTALL)
         provider_match = re.search(r'^Provider:\s*(.+)$', block, re.MULTILINE)
         model_match = re.search(r'^Model:\s*(.+)$', block, re.MULTILINE)

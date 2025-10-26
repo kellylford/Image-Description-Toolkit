@@ -134,29 +134,21 @@ All documentation is in the `documentation/` directory:- **Multiple Prompt Style
 
 
 
-All tools are in the `content-creation/` directory:### Gallery Capabilities
+All tools are in the `content-creation/` directory:
 
-- Side-by-side comparison of different AI descriptions
+### Python Scripts
 
-### Python Scripts- Filter by provider, model, or prompt style
-
-- **build_gallery.py** - Automatically updates image list in index.html- Responsive design (desktop and mobile)
-
-- **generate_descriptions.py** - Converts workflow outputs to JSON- Works offline (static files)
-
-- **generate_alt_text.py** - Adds accessibility alt text- No backend required
-
+- **identify_gallery_content.py** - NEW! Identify images for galleries by keywords and filters
+- **build_gallery.py** - Automatically updates image list in index.html
+- **generate_descriptions.py** - Converts workflow outputs to JSON
+- **generate_alt_text.py** - Adds accessibility alt text
 - **check_data_status.py** - Verifies gallery data
-
-- **evaluate_alt_text_generation.py** - Tests alt text quality---
-
+- **evaluate_alt_text_generation.py** - Tests alt text quality
 - **export_analysis_data.py** - Exports analysis data
-
-## Architecture Overview
 
 ### Batch Files (Windows)
 
-- **generate_all_gallery_data.bat** - Full workflow automation```
+- **generate_all_gallery_data.bat** - Full workflow automation
 
 - **generate_alt_text.bat** - Alt text generationGallery Directory Structure:
 
@@ -232,9 +224,42 @@ python -m http.server 8000- **Time:** 30-45 minutes for complete gallery
 
 
 
-# 6. Deploy: Upload to server---
-
+# 6. Deploy: Upload to server
 ```
+
+## 🆕 Creating Themed Galleries (New!)
+
+The new `identify_gallery_content.py` tool helps you automatically select images for themed galleries:
+
+### Quick Example
+```bash
+cd content-creation
+
+# Option 1: Use a config file
+python identify_gallery_content.py --config example_configs/sunset_water.json
+
+# Option 2: Use command-line
+python identify_gallery_content.py \
+  --name "Water Scenes" \
+  --required water \
+  --keywords sunset,ocean,lake \
+  --max-images 30 \
+  --output water_candidates.json
+
+# Review results and copy selected images to gallery
+# See documentation/GALLERY_CONTENT_IDENTIFICATION.md for complete guide
+```
+
+### Workflow Integration
+1. **Run IDT workflows** on your complete image library
+2. **Identify content** using keyword rules and filters
+3. **Review candidates** from generated JSON output
+4. **Copy selected images** to new gallery directory
+5. **Build and deploy** gallery as usual
+
+See [documentation/GALLERY_CONTENT_IDENTIFICATION.md](documentation/GALLERY_CONTENT_IDENTIFICATION.md) for detailed guide with examples.
+
+---
 
 ## Common Tasks
 
@@ -373,6 +398,23 @@ python generate_descriptions.py --descriptions-dir descriptions/ --output-dir de
 ## Scripts Reference
 
 ### Data Generation
+- **`generate_descriptions.py`** - Convert IDT workflow outputs to JSON
+  ```bash
+### Data Generation
+
+- **`identify_gallery_content.py`** - Identify images for themed galleries
+  ```bash
+  # Using configuration file
+  python identify_gallery_content.py --config sunset_water.json
+  
+  # Using command-line parameters
+  python identify_gallery_content.py \
+    --required water,sun \
+    --keywords sunset,reflection \
+    --output candidates.json
+  ```
+  See [GALLERY_CONTENT_IDENTIFICATION.md](documentation/GALLERY_CONTENT_IDENTIFICATION.md) for complete guide.
+
 - **`generate_descriptions.py`** - Convert IDT workflow outputs to JSON
   ```bash
   python generate_descriptions.py \
