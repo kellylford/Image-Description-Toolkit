@@ -224,10 +224,13 @@ class GalleryContentIdentifier:
         
         # Extract fields using regex
         file_match = re.search(r'^File:\s*(.+)$', block, re.MULTILINE)
+        
         # Match description until we hit another field or end of block
-        # Use lookahead that checks for newline followed by field name, or end of string
+        # The lookahead checks for: newline + field name, or end of string (\Z)
+        # This allows multi-line descriptions that stop at the next field
         desc_match = re.search(r'^Description:\s*(.+?)(?:\n(?=Provider:|Model:|Prompt:|Cost:|Tokens:|Time:)|\Z)', 
                               block, re.MULTILINE | re.DOTALL)
+        
         provider_match = re.search(r'^Provider:\s*(.+)$', block, re.MULTILINE)
         model_match = re.search(r'^Model:\s*(.+)$', block, re.MULTILINE)
         prompt_match = re.search(r'^Prompt Style:\s*(.+)$', block, re.MULTILINE)
