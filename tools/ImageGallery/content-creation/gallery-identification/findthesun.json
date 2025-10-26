@@ -1,0 +1,34 @@
+{
+  "gallery_name": "Find The Sun - Sunshine Gallery",
+  "sources": {
+    "directories": [
+      "//qnap/home/idt/descriptions"
+    ],
+    "workflow_patterns": ["*"],
+    "date_range": {
+      "start": "2024-01-01",
+      "end": "2025-12-31"
+    }
+  },
+  "content_rules": {
+    "required_keywords": ["sun"],
+    "preferred_keywords": [
+      "sunshine", "sunny", "sunlight", "sunrise", "sunset", 
+      "golden hour", "bright", "warm light", "solar", "radiant",
+      "glowing", "illuminated", "daylight", "morning light", "evening light"
+    ],
+    "excluded_keywords": ["dark", "night", "shadow", "cloudy", "overcast", "dim"],
+    "min_keyword_matches": 2,
+    "case_sensitive": false
+  },
+  "filters": {
+    "min_description_length": 80,
+    "preferred_prompts": ["narrative", "colorful", "detailed"],
+    "preferred_models": ["claude-opus-4", "claude-sonnet-4", "gpt-4o"]
+  },
+  "output": {
+    "max_images": 100,
+    "sort_by": "keyword_relevance",
+    "include_metadata": true
+  }
+}

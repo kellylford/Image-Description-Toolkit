@@ -1,0 +1,2561 @@
+{
+  "gallery_name": "Find The Sun - Sunshine Gallery",
+  "generated_at": "2025-10-26T06:20:10.122528",
+  "configuration": {
+    "required_keywords": [
+      "sun"
+    ],
+    "preferred_keywords": [
+      "sunshine",
+      "sunny",
+      "sunlight",
+      "sunrise",
+      "sunset",
+      "golden hour",
+      "bright",
+      "warm light",
+      "solar",
+      "radiant",
+      "glowing",
+      "illuminated",
+      "daylight",
+      "morning light",
+      "evening light"
+    ],
+    "excluded_keywords": [
+      "dark",
+      "night",
+      "shadow",
+      "cloudy",
+      "overcast",
+      "dim"
+    ],
+    "min_keyword_matches": 2,
+    "max_images": 100
+  },
+  "total_candidates": 100,
+  "candidates": [
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_5682.97s.jpg",
+      "score": 42.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "A large, four-engine jet aircraft is captured in silhouette against a glowing sky. The sun, positioned directly behind the aircraft’s fuselage, creates a bright, diffused halo that obscures fine details of the plane’s body. The aircraft’s wings extend outward, each bearing two engines mounted beneath. The tail fin is clearly visible, rising vertically from the rear. Below the aircraft, a dense layer of clouds stretches across the frame, their tops illuminated in warm golden and orange tones by the low-angle sunlight. The sky above the clouds transitions from a pale yellow near the horizon to a muted, dusky orange and then to a soft gray-blue at the top edge of the frame. The overall lighting suggests either sunrise or sunset, casting the entire scene in a warm, ambient glow. No markings, text, or interior details of the aircraft are visible due to the backlighting. The clouds appear soft and voluminous, with subtle variations in shading indicating depth and texture.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset",
+          "bright",
+          "glowing",
+          "illuminated"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "converted_images\\IMG_4299.jpg",
+      "score": 37.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_10multipletest_ollama_minicpm-v_latest_narrative_20251021_180518",
+      "workflow_name": "10multipletest",
+      "description": "The image depicts an outdoor scene during what appears to be early morning or late afternoon light conditions given the warm tones near where sunlight is hitting trees on one side of frame.\n\nIn this natural setting:\n- The foreground shows grass covered with a frosty layer that gives it silvery-white hues, indicating cold temperatures.\n  - This frosted vegetation extends across most visible ground area and varies in density from thick clusters to sparse patches. Some areas have more pronounced frosting than others due possibly varying exposure or temperature differences within the scene.\n\n- The middle-ground is dominated by a dense thicket of shrubs with yellowish-brown leaves, suggesting it could be autumn.\n  - These plants are tall enough that they partially obscure what lies behind them but still allow for glimpses through their branches and foliage. Their colors range from deep brown to bright golden-yellow.\n\n- The background features trees exhibiting fall coloration—some have green needles while others display yellow or reddish-brown leaves, indicating a transition in seasons.\n  - These taller tree trunks are mostly obscured by the shrubbery but can be seen peeking through at intervals. Their presence adds depth to this natural landscape.\n\n- The sky is not fully visible due mainly because of these trees and bushes; however,\n    it appears clear with no clouds, which could suggest fair weather conditions.\n  - Sunlight seems soft yet bright enough that the edges where light hits leaves or branches are slightly illuminated by a golden hue. This suggests either sunrise on one side (left) as indicated in part due to warm tones near those trees.\n\nOverall this image captures an early morning scene with frost-covered grass, autumnal shrubbery and hints of fall-colored foliage from taller tree species set against what appears likely be clear skies during daylight hours when the sun is low.\nTimestamp: 2025-10-21 18:12:44",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "bright",
+          "illuminated",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "minicpm-v:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251021_180518"
+    },
+    {
+      "filename": "converted_images\\IMG_4294.jpg",
+      "score": 32.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_10multipletest_ollama_llava_34b_narrative_20251021_181612",
+      "workflow_name": "10multipletest",
+      "description": "The image depicts an outdoor scene during what appears to be either sunrise or sunset due to the warm hues in the sky. The sun is partially obscured by trees on the horizon line, casting a bright glow that creates lens flare effects across the frame of the photograph. \n\nIn front of this backdrop are silhouetted tree branches with leaves showing signs of autumn change; some leaves have turned yellow and others appear to be in various stages of transition from green to brown or orange colors typical for fall foliage. The ground is covered by fallen leaves, which suggests that it might still be early enough in the season where not all trees are fully bare yet.\n\nThe foreground shows a paved road with no visible traffic; its surface reflects some light due to the low angle of sunlight and possibly moisture on the asphalt. There's also an indication of human presence or activity, such as tire tracks leading up towards the camera position from where this photo was taken. The overall atmosphere is serene and naturalistic without any artificial structures dominating the scene.\nTimestamp: 2025-10-21 18:25:54",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "llava:34b",
+      "prompt_style": "narrative",
+      "timestamp": "20251021_181612"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_0986.JPG",
+      "score": 32.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an empty baseball stadium with rows of green chairs neatly arranged in the stands facing towards home plate on what appears to be a sunny day during daytime hours under clear skies without any visible clouds or weather-related obstructions such as trees that might block sunlight from entering through windows, and no signs indicating rain. The seats are all occupied by empty spectators who have not yet arrived at this location for the game being played in front of them on an outdoor field with a grassy area surrounding it under bright daylight conditions which is typical during daytime hours when baseball games take place outdoors without any obstructions from trees or other structures blocking sunlight and visibility.\nTimestamp: 2025-10-26 01:09:06",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_1002.JPG",
+      "score": 32.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an empty baseball stadium with rows of green chairs facing the field in front of it where players are standing ready to play or warm up for their next game session on this sunny day at home plate during daylight hours when there is no sun glare visible through windows and doors that can be seen. The seats appear unoccupied, suggesting a lack of spectators attending today's baseball match due to the weather conditions outside being too bright with sunlight reflecting off surfaces like mirrors or other shiny objects in close proximity which could cause discomfort for some viewers inside this stadium during daytime hours when there is no sun glare visible through windows and doors that can be seen.\nTimestamp: 2025-10-26 01:13:41",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\Parliament bldg with moon.JPG",
+      "score": 30.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a striking late afternoon or early evening photograph of the Palace of Westminster in London, featuring the iconic Elizabeth Tower (commonly known as Big Ben) on the right.\n\n**Key Features:**\n\n- **Elizabeth Tower (Big Ben):** Dominates the right side of the frame. Its clock faces are clearly visible, showing the time as approximately 3:58 PM — which is confirmed by the red digital timestamp in the bottom right corner of the image. The tower is illuminated with warm, golden lights against the deepening blue sky, highlighting its Gothic Revival architecture.\n\n- **Palace of Westminster:** The expansive, ornate facade of the Houses of Parliament stretches across the image. Its intricate stonework, pointed spires, and rows of tall, narrow windows are bathed in the warm, golden light of the setting sun, creating a rich, textured appearance.\n\n- **Sky and Moon:** The sky is a clear, deep blue, indicating fair weather. A faint, pale moon is visible in the upper left quadrant, adding a subtle celestial element to the scene.\n\n- **Lighting and Atmosphere:** The photograph is taken during the “golden hour,” just before sunset. The low-angle sunlight casts a warm, golden glow on the stone buildings, creating strong contrasts and emphasizing architectural details. The overall mood is serene and majestic.\n\n- **Digital Overlay:** A red digital timestamp in the bottom right corner reads “16 3:58 PM,” likely indicating the date (16th) and time the photo was taken.\n\nThis image beautifully captures the grandeur and historic character of one of London’s most famous landmarks at a picturesque time of day.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunset",
+          "golden hour",
+          "illuminated"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\england\\09-16-2003\\DSC00528.JPG",
+      "score": 30.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a low-angle, wide shot of the magnificent **Bath Abbey** in Bath, England, captured on a bright, sunny day. The image emphasizes the grandeur and verticality of the Gothic architecture.\n\n**Architectural Features:**\n- The **west front** of the abbey dominates the frame, showcasing its ornate stonework, pointed arches, and intricate tracery.\n- A massive, multi-light **stained-glass window** with elaborate stone mullions and tracery is the centerpiece.\n- The facade is richly decorated with **statues and carvings** set into niches, typical of Perpendicular Gothic style.\n- Two prominent **towers** flank the central window, each topped with delicate pinnacles and crockets, adding to the sense of height and intricacy.\n- The stonework is a warm, golden color, glowing in the sunlight.\n- Above the main facade, part of the **roofline and gable** of the nave or transept is visible, showing more Gothic detailing.\n\n**Human Element:**\n- Several **tourists** are scattered across the paved courtyard in front of the abbey, giving a sense of scale to the massive structure.\n- People are seen walking, taking photos, and observing the building, indicating it’s a popular attraction.\n- Their casual clothing suggests a modern, everyday scene.\n\n**Composition and Atmosphere:**\n- The **low-angle perspective** makes the abbey appear even more imposing and majestic.\n- The **bright blue sky** provides a clean, contrasting backdrop that highlights the abbey’s details.\n- The overall atmosphere is one of awe and historical grandeur, with the lively presence of visitors adding a contemporary, human touch.\n\nThis image beautifully captures the essence of Bath Abbey — a stunning example of English Gothic architecture, alive with visitors appreciating its beauty.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright",
+          "glowing"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\DSC01723.JPG",
+      "score": 30.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a photograph of the **main gateway (Darwaza-i Rauza)** to the **Taj Mahal** in Agra, India — often referred to as the **Great Gate** or **Darwaza-i Rauza**.\n\n### Architectural Description:\n- **Material & Color**: The structure is built primarily of **red sandstone**, with intricate **white marble inlay work** (pietra dura) forming floral and geometric patterns, especially around the arches and on the facade.\n- **Design**: It features a massive **central iwan (arched entrance)** flanked by smaller arched niches and recessed panels. The gateway is symmetrical and imposing, designed to frame the view of the Taj Mahal beyond.\n- **Top Structure**: The roofline is adorned with a **chhatri (domed kiosk)**-lined parapet and small **onion-shaped domes** (guldastas) along the edge, characteristic of Mughal architecture.\n- **Towers**: Two octagonal **minarets or pavilions** with balconies flank the main structure, each topped with a small dome and finial.\n- **Inscriptions**: Arabic calligraphy, likely verses from the Quran, is visible in white marble inlay along the arches and panels.\n\n### Human Activity:\n- The foreground is bustling with **tourists and visitors**, dressed in a mix of traditional Indian attire (saris, salwar kameez) and Western clothing.\n- People are walking, taking photos, and gathering near the entrance, indicating this is a popular tourist destination.\n- A few individuals are ascending the steps toward the gateway’s entrance.\n\n### Time & Atmosphere:\n- The timestamp in the bottom right corner reads **“2 6:15 PM”**, suggesting the photo was taken in the late afternoon.\n- The warm, golden light bathes the red sandstone, enhancing its rich color and texture — typical of the “golden hour” before sunset.\n- The sky is pale and clear, indicating fair weather.\n\n### Significance:\nThis gateway serves as the **main entrance to the Taj Mahal complex**. It was designed not only as a functional entry but also as a symbolic threshold — its grandeur prepares visitors for the awe-inspiring beauty of the Taj Mahal beyond. The architectural harmony, symmetry, and decorative detail exemplify the pinnacle of **Mughal architecture** under Emperor Shah Jahan.\n\n---\n\n**In summary**: This is a vibrant, late-afternoon scene at the majestic red sandstone gateway to the Taj Mahal, teeming with visitors and glowing under the warm sunlight — a testament to both historical grandeur and enduring global appeal.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunset",
+          "golden hour",
+          "glowing"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "extracted_frames\\video-12816_singular_display\\video-12816_singular_display_69.99s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a busy pedestrian shopping area or town square on a sunny day. In the foreground, there's a street performer with a microphone stand and an open instrument case on the gray paved ground. Groups of people are seated on stone or concrete benches arranged around a large, leafy green tree that provides shade in the center of the space. \n\nThe scene is framed by traditional British-style buildings - a mix of brick structures in reddish-brown tones and painted buildings in cream or pale yellow. The shops at street level include visible storefronts, with \"Barnitts\" clearly visible on one of the shop signs on the left. The buildings are typically 2-3 stories tall with white-framed windows.\n\nThe sky is bright blue with white clouds, and sunlight filters through the green foliage of several mature trees that line the pedestrian area. People of various ages are scattered throughout the scene - some sitting on benches, others standing or walking. The atmosphere appears relaxed and social, typical of a town center on a pleasant day. A few fallen leaves on the pavement suggest it might be late summer or early autumn.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "extracted_frames\\video-12818_singular_display\\video-12818_singular_display_134.98s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a busy pedestrian shopping area on a sunny day with a bright blue sky and white fluffy clouds. In the center of the scene is a large, leafy green tree providing shade over a wooden bench structure where numerous people are sitting and standing. The ground is paved with gray stone tiles, and there are some fallen leaves scattered across it.\n\nThe surrounding buildings are a mix of architectural styles - there are red brick buildings with white-framed windows on the right side, and lighter colored buildings with storefronts on the left. The shops appear to be typical high street retailers, with visible signage including what appears to be \"Barnitts\" on one of the stores.\n\nPeople of various ages are scattered throughout the scene - some sitting on the benches, others standing and walking through the area. Their clothing suggests casual, warm weather attire in colors including red, black, and white. In the foreground, there appears to be a street performer's setup with what looks like an open instrument case on the ground.\n\nPower lines are visible crossing the upper portion of the image, and the tree's branches create a natural canopy effect with dappled sunlight filtering through onto the pavement below. The overall atmosphere appears to be that of a pleasant day in what seems to be a British town center or shopping district.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "extracted_frames\\video-12818_singular_display\\video-12818_singular_display_35.00s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a bustling pedestrian shopping area on a sunny day with a bright blue sky and white clouds. In the center of the scene, a young street performer in light-colored clothing stands at a microphone on a stand, with an open instrument case on the ground containing what appears to be a purple lining. \n\nThe performer is surrounded by an audience of people sitting on wooden benches arranged around a large, leafy green tree that provides shade over the area. The crowd includes adults and children in casual clothing, with many wearing light colors suitable for warm weather.\n\nThe setting is a paved plaza with gray stone tiles, and fallen leaves are scattered on the ground. Behind the gathering, there are multi-story buildings with a mix of architectural styles - some with red brick facades and others with cream or white-painted fronts. The buildings house various shops with visible storefronts and signage at street level.\n\nAdditional green trees frame the scene on both the left and right sides of the image, their foliage bright green in the sunlight. The overall atmosphere appears to be that of a lively town center or high street during what seems to be a pleasant spring or summer day.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "converted_images\\IMG_4280.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_testingmultiple_ollama_moondream_latest_colorful_20251021_120315",
+      "workflow_name": "testingmultiple",
+      "description": "The image shows an outdoor scene with two people standing in front of what appears as either a fire pit or a black metal pot filled with burning coals inside it during daylight hours under bright sunlight that illuminates various elements within their surroundings such as trees, rocks, grassy areas around them and the sky. One person is wearing white shoes while they stand next to each other in front of this outdoor setting which seems like an interesting or unusual activity at a particular time when there are no visible texts present on it but rather relies heavily upon its visual elements for interpretation by viewers who can imagine what might be going on around them, such as the fire pit and pot.\nTimestamp: 2025-10-21 12:05:29",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "colorful",
+      "timestamp": "20251021_120315"
+    },
+    {
+      "filename": "converted_images\\IMG_4295.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_10multipletest_ollama_llava_13b_narrative_20251021_190030",
+      "workflow_name": "10multipletest",
+      "description": "The image depicts an autumnal scene with trees that have shed their leaves in shades of orange, yellow, red, and green hues indicative of the season's change. Sunlight filters through these bare branches onto a carpeted ground covered by fallen foliage. There is no text present on any visible objects within this image to provide additional context or information about its location or significance beyond what can be observed directly from the photograph itself. The style appears naturalistic, capturing an outdoor setting during daylight with soft lighting conditions that suggest either early morning or late afternoon sunshine.\nTimestamp: 2025-10-21 19:05:04",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunshine",
+          "sunlight",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "llava:13b",
+      "prompt_style": "narrative",
+      "timestamp": "20251021_190030"
+    },
+    {
+      "filename": "converted_images\\IMG_4295.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_moondream_narrative_20251023_070536",
+      "workflow_name": "25imagetest",
+      "description": "The image depicts an autumn scene in the woods with trees displaying yellow leaves on their branches against what appears to be clear blue skies above them during sunset or sunrise hours as indicated by sunlight filtering through some of these leafy canopies at a distance from which we are able to see only half, suggesting that it is either early morning (with sun rising) in the background and late afternoon/early evening with its setting.\nThe trees have leaves on their branches but not all over them as they stand tall against this backdrop of clear skies or during sunrise when sunlight filters through some leafy canopies at a distance from which we are able to see only half, suggesting that it is either early morning (with sun rising) in the background and late afternoon/early evening with its setting.\nTimestamp: 2025-10-23 07:11:35",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_070536"
+    },
+    {
+      "filename": "converted_images\\photo-16310_singular_display_fullPicture.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-3-haiku-20240307_narrative_20251015_001947",
+      "workflow_name": "europe",
+      "description": "The image depicts a large, multi-story building with a distinctive architectural style, situated on a gravel-covered plaza. The building's exterior is made of stone or concrete, with a gabled roof and several chimneys. The sky above is a brilliant blue, with the sun shining brightly and casting a warm glow over the scene.\n\nIn the foreground, the gravel plaza stretches out, creating a vast, open space. A few people can be seen walking across the plaza, their figures silhouetted against the bright sunlight.\n\nThe overall impression is one of a grand, historic structure set against a clear, sunny day, creating a serene and contemplative atmosphere.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-3-haiku-20240307",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_001947"
+    },
+    {
+      "filename": "extracted_frames\\video-17260_singular_display\\video-17260_singular_display_20.00s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-3-haiku-20240307_narrative_20251015_001947",
+      "workflow_name": "europe",
+      "description": "The image shows an outdoor seating area at what appears to be a Hofbräu München beer garden. The space is filled with green picnic tables and benches, providing ample seating for the large crowd of people gathered there. Colorful yellow and white umbrellas cover the tables, offering shade from the bright sunlight. In the background, a wooden structure with a distinctive design can be seen, likely a traditional German pavilion or gazebo. The overall scene conveys a lively, social atmosphere, with people enjoying the sunny day and each other's company in this outdoor gathering space.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-3-haiku-20240307",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_001947"
+    },
+    {
+      "filename": "test_data\\nested\\red_square.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_quick_test_ollama_qwen3-coder_480b-cloud_narrative_20251017_011414",
+      "workflow_name": "quick_test",
+      "description": "A weathered wooden table sits in the corner of a sunlit room. Golden sunlight streams through a tall window, casting rectangular patches of light across the table's scarred surface. The wood shows deep grooves and circular rings from years of use, stained in places where water glasses once sat. \n\nOn the table rests a ceramic bowl painted with blue and white geometric patterns. Beside it, a silver spoon catches the light, its handle worn smooth. A red apple sits nearby, its skin glossy and unblemished, contrasting with the faded green of an old cloth napkin folded neatly at the table's edge.\n\nDust motes dance in the air, illuminated by the bright beams. The window frame is white-painted wood, slightly chipped at the corners. Outside, the blue sky is visible through clear glass panes. A small crack runs diagonally across one pane, barely noticeable against the brightness.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "illuminated"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-coder:480b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251017_011414"
+    },
+    {
+      "filename": "converted_images\\IMG_4294.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_claude_claude-sonnet-4-5-20250929_colorful_20251023_105146",
+      "workflow_name": "25imagetest",
+      "description": "# Autumn's Golden Embrace\n\nThis scene captures the ethereal beauty of late autumn in a woodland setting, where nature's color palette shifts into warm, nostalgic tones.\n\n## The Golden Hour Illumination\n\nThe sun, positioned directly through the tree trunks, creates a brilliant starburst of light that bathes the entire scene in honey-golden luminescence. This backlighting transforms the landscape into a study of amber and bronze, with rays filtering through the bare and semi-clothed branches like liquid gold.\n\n## Layered Color Symphony\n\n**Upper Canopy**: The sky peeks through in soft powder blues and pale aquamarine, providing a cool counterpoint to the warmth below. Silhouetted branches create intricate lacework against this delicate backdrop.\n\n**Mid-Level Foliage**: Here, the remaining autumn leaves glow in shades of:\n- Bright golden yellow\n- Burnished amber\n- Touches of chartreuse green where leaves still cling to summer\n- Deep orange where sunlight intensifies the color\n\n**Forest Floor**: A rich tapestry of fallen leaves carpets the ground in:\n- Russet browns\n- Ochre and tan\n- Weathered beige\n- Subtle hints of remaining green grass\n\n## Atmospheric Mood\n\nThe lens flare and diffused light create a dreamy, almost mystical quality—a gentle melancholy characteristic of autumn's transitional beauty. The scene evokes warmth despite the approaching dormancy, celebrating the quiet, contemplative peace of a woodland at day's end.\nTimestamp: 2025-10-23 10:56:54",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "golden hour",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-sonnet-4-5-20250929",
+      "prompt_style": "colorful",
+      "timestamp": "20251023_105146"
+    },
+    {
+      "filename": "converted_images\\IMG_4294.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_10multipletest_ollama_minicpm-v_8b_narrative_20251021_175423",
+      "workflow_name": "10multipletest",
+      "description": "The image captures an autumnal scene with trees in various stages of shedding their leaves against the backdrop of what appears to be either sunrise or sunset due to its golden hue near where sunlight is visible through branches on one side.\n\nForeground: The ground covered by fallen brown and yellowish-brown leaf litter, indicative that it's likely late fall. There are also some green plants peeking out from beneath this layer.\nMiddle Ground (trees): A mix of deciduous trees with bare limbs suggesting they have shed their leaves for the season or possibly due to a lack in sunlight during certain months which affects growth and shedding cycles.\n\nBackground: The sky is clear blue, hinting at good weather conditions. Sunlight filters through branches creating lens flares on camera lenses.\nOverall color palette includes earthy tones of brown from fallen foliage contrasted with vibrant yellows still clinging onto the trees' limbs against a backdrop that transitions smoothly between warm and cool colors.\n\nThe scene exudes tranquility as there are no visible signs or indications for human activity, suggesting it might be located in an undisturbed natural setting.\nTimestamp: 2025-10-21 17:56:53",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "minicpm-v:8b",
+      "prompt_style": "narrative",
+      "timestamp": "20251021_175423"
+    },
+    {
+      "filename": "converted_images\\IMG_4296.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_10multipletest_ollama_minicpm-v_8b_narrative_20251021_175423",
+      "workflow_name": "10multipletest",
+      "description": "The image depicts an autumnal forest scene with trees in various stages of seasonal change—some still green while others have turned yellow or red at the tips before fully shedding their leaves for winter.\n\nForeground:\n- A ground layer covered densely by fallen brown leaf litter.\n  - Some scattered bright orange and reddish-brown foliage, indicating early signs that some plants are beginning to shed in preparation. \n    These include ferns with distinct fronds visible among other plant debris like small twigs or branches lying on the forest floor.\n\nMidground:\n- A mix of deciduous trees showing a transition from green leaves turning yellow and red.\n  - The sunlight filters through these changing colors, creating dappled light patterns across parts where foliage is sparse. \n\nBackground (upper part):\nThe sky peeks out in patches behind tall tree trunks that dominate the upper half.\n\nOverall color palette includes earthy browns of decaying leaf litter contrasting with vibrant yellows and reds from autumn leaves against a backdrop suggesting late afternoon or early evening light, as indicated by warm tones near where sunlight hits.\nTimestamp: 2025-10-21 17:58:54",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "evening light"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "minicpm-v:8b",
+      "prompt_style": "narrative",
+      "timestamp": "20251021_175423"
+    },
+    {
+      "filename": "Pictures\\FromWebpictures\\kathy\\IMG_0031.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "The image shows an aerial view of the stands at Teatro Colón in Mexico City during what appears to be sunset or sunrise hours on this particular day due to its hazy appearance with sunlight filtering through it from above. The stadium is filled up with a large crowd and there are numerous people visible throughout, some sitting down while others stand around watching an event unfold before them at the top of their seats in various rows spread across multiple levels within the stands.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "converted_images\\IMG_4302.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_moondream_latest_colorful_20251023_184952",
+      "workflow_name": "25imagetest",
+      "description": "The image depicts an old wooden structure with peeling paint that has been partially collapsed by termites or other pests over time due in part from weathering conditions such as rainwater seeping into its wood fibers causing it to weaken progressively until eventually leading to a collapse of some sections, including the roof. The scene is captured during daylight hours under bright sunlight which highlights various colors and textures within this dilapidated structure that contribute towards creating an atmosphere evocative enough for viewers who can appreciate these elements in their own way or even identify with them as they interpret what it means when looking at a similar setting from different perspectives, angles.\nTimestamp: 2025-10-23 18:57:46",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "colorful",
+      "timestamp": "20251023_184952"
+    },
+    {
+      "filename": "converted_images\\IMG_4295.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_moondream_latest_narrative_20251023_072706",
+      "workflow_name": "25imagetest",
+      "description": "The image depicts an autumn scene in the woods with trees displaying yellow leaves on their branches against what appears to be clear blue skies above them during sunset or sunrise hours as indicated by sunlight filtering through some of these leafy canopies at a distance from which we are able to see only half, suggesting that it is either early morning (with sun rising) in the upper portion and late afternoon/early evening with its reflection on lower branches.\nTimestamp: 2025-10-23 07:33:06",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_072706"
+    },
+    {
+      "filename": "converted_images\\IMG_4294.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_granite3.2-vision_latest_narrative_20251023_031903",
+      "workflow_name": "25imagetest",
+      "description": "The image depicts a serene autumnal forest scene during sunrise or sunset due to the low position of the sun in the sky. The foreground is dominated by densely packed trees with leaves that have turned yellowish-orange and are beginning to fall, indicating it's likely early autumn. These leafy branches create an interesting pattern against a clear blue background.\n\nIn front of these trees lies what appears to be a gravel path or roadway made up of small stones and pebbles arranged in neat rows. The ground is covered with fallen leaves, which are scattered across the surface but not completely covering it entirely. This suggests that while some areas have been cleared for walking, others remain untouched by human activity.\n\nThe sun's position near the horizon creates a lens flare effect in parts of the image due to its rays passing through water droplets or mist on the camera lens. The light is diffused and softens as it passes through these elements, adding an ethereal quality to the scene. This interplay between natural colors (yellows, oranges) and blues creates a visually appealing contrast that enhances the overall mood of tranquility mixed with warmth from the sunrise or sunset lighting.\n\nThe image does not contain any human figures or man-made structures other than the pathway itself; it is purely natural, focusing on elements such as trees and foliage in their seasonal transition phase. The absence of people suggests a quiet moment captured either early morning before visitors arrive or late evening after they have left for the day.\n\nIn summary: \n- **Foreground**: Dense cluster of yellowish-orange leaves, gravel pathway made up of small stones and pebbles arranged in neat rows with scattered fallen leaves on top.\n- **Midground/Background**: Thick forest consisting of tall trees transitioning into autumn colors; sunlight creating a lens flare effect due to water droplets or mist, casting soft light through the scene. \n- **Sky and Weather Conditions**: Clear blue sky with no visible clouds, indicating fair weather conditions typical for early morning in many temperate regions during fall season.\nTimestamp: 2025-10-23 04:13:38",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_031903"
+    },
+    {
+      "filename": "extracted_frames\\101\\101_39.93s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an ocean with white waves crashing against the shoreline in shades of blue-green coloration under what appears to be daylight conditions on either side due to its slightly blurred appearance as if it was taken during sunset or sunrise when light is diffused by clouds and atmospheric particles, creating a soft glow. The horizon line where land meets water can also appear blurry at times depending upon the camera's focus settings used for capturing this scene in black-and-white tones with white lines to define its boundaries against an otherwise colorless background of sky or sea foam on either side that is slightly blurred due to light scattering and atmospheric conditions.\nTimestamp: 2025-10-26 00:44:14",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunrise",
+          "sunset",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "iphone\\2018\\06\\IMG_0696.JPG",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an aerial view of what appears to be the inside of a baseball stadium during daylight hours on a sunny day with clear skies visible through some clouds in the background. The field is bathed in sunlight under blue sky conditions as well as green grass that contrasts beautifully against it, and players are scattered across its expanse engaged in various activities such as running or standing still near home plate area which has several people present around them including a player holding his glove on one side of an empty chair.\nTimestamp: 2025-10-26 00:51:20",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_0957.JPG",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an aerial view of the interior seating area at a baseball stadium during daylight hours under clear skies with bright sunlight illuminating various parts of it in different angles as well as highlighting certain areas like bleachers or chairs that are green colorfully arranged to accommodate spectators for watching games and events, which is typical. The scene also includes several people scattered around within this space who appear engaged either by the game itself being played on a field visible at one end partaking of their time in anticipation while others might be waiting patiently as they watch or enjoy other aspects such as food stands nearby offering refreshments like ice cream cones and hot dogs, which are available for purchase.\nThe image also contains several signs that could possibly provide information about the event taking place here today including a scoreboard on one side of an empty stadium seat with its back facing towards it while another sign is located at some distance from this particular seating area in front to right where two people can be seen sitting down and enjoying their time.\nTimestamp: 2025-10-26 01:00:15",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_0967.JPG",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an empty baseball stadium with rows of green chairs facing the field in front of it under bright sunlight on what appears to be either early morning or late afternoon hours during daytime conditions as indicated by their color contrast against a clear sky background which is blue and sunny without any clouds visible, suggesting good weather. The seats are arranged neatly along both sides of an empty stadium with no people present at the moment captured in time-lapse photography for better detail appreciation; however there's still some activity happening on these chairs as they appear to be occupied by a few individuals who seem focused and engaged during this particular scene, possibly watching or waiting.\nTimestamp: 2025-10-26 01:03:17",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_0987.JPG",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an empty baseball stadium with rows of green chairs facing the field in front of it under bright sunlight on what appears to be either early morning or late afternoon hours during daylight saving time (DST). There are at least 15 visible seats arranged neatly along both sides and levels, creating a sense of anticipation for future games. The clear blue sky above adds an airy atmosphere over this empty stadium scene with the field in focus below it as if waiting to be filled by cheering fans soon enough after these chairs have been occupied during gameplay or other events at the venue.\nTimestamp: 2025-10-26 01:09:24",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "converted_images\\2021\\05\\IMG_0479.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "In the image of an American flag flying high over some sand dunes on what appears to be a beach or shoreline in California with mountains visible behind it under clear skies as well-lit by daylight hours from either sunrise/sunset time period (possibly late afternoon). A group is standing near this scene, and there are several people scattered around the area. The main focus of interest seems to be an American flag flying high above a man who appears to have captured some bubbles in his hand using soap or bubble solution for blowing them up into large spheres that float away from him towards other beachgoers below it all while he stands on top sand dune, with mountains visible behind the scene.\nTimestamp: 2025-10-26 04:05:46",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunrise",
+          "sunset",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "converted_images\\2021\\08\\IMG_0526.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an outdoor scene with lush green trees in the background under bright sunlight filtering through their leaves onto what appears to be grassy terrain near water or river banks on one side of another part where there are wooden fences visible as well. The area is enclosed by a fence and has two poles standing next to each other, possibly serving different purposes such as marking boundaries for safety reasons in the park-like setting with trees surrounding it from all sides including those at both ends which could be providing shade or privacy within this outdoor space where people can enjoy nature without being disturbed.\nThe image is taken during daylight hours and features a variety of colors that make up its vibrant scenery, creating an inviting atmosphere for visitors to the park-like setting with trees surrounding it from all sides including those at both ends which could be providing shade or privacy within this outdoor space where people can enjoy nature without being disturbed.\nTimestamp: 2025-10-26 04:25:26",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0557_2\\IMG_0557_2_65.00s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows the tranquil waters of an outdoor pond surrounded by rocks on one side that are partially covered in green vegetation such as trees or bushes with leaves turning yellowish-green due to sunlight exposure over time. The water is a murky shade of brown color and reflects some greenery, creating ripples across its surface which can be seen clearly from the shoreline where it meets another body of land visible at one end on top right corner in this image taken during daytime with bright sunshine illuminating everything around them including trees that are greenish-yellow.\nTimestamp: 2025-10-26 04:45:08",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunshine",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0604\\IMG_0604_0.00s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "In this black-and-white photo of the ocean's edge from inside on board an unseen boat or ship with two people sitting in chairs facing out towards water waves crashing against it as they enjoy their time together at sea during a sunny day under clear skies and bright sunlight that illuminates everything. The image is captured by someone who appears to be taking pictures, possibly for sharing the moment later when returning home from an oceanic adventure or simply capturing memories of this beautiful scene on board with friends in tow as they enjoy their time together at sea during a sunny day under clear skies and bright sunlight that illuminates everything.\nTimestamp: 2025-10-26 05:28:18",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0633\\IMG_0633_94.45s.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows an older man sitting at the kitchen counter with his hands on it while wearing glasses that have red frames around them as well as sunglasses in front of him to protect from sunlight or glare coming through windows behind him which are open allowing natural light into space and making a room appear brighter than usual. The scene is set against white walls, giving an impressionable atmosphere for the image captured at home during daytime hours with ample daylight streaming in due to window openings that allow more visibility of objects around them like chairs or dining table located near his position on top counter which are not visible from this angle and thus remain hidden by windows.\nTimestamp: 2025-10-26 05:55:55",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "converted_images\\IMG_1317.jpg",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2024_07_ollama_moondream_latest_narrative_20251015_002306",
+      "workflow_name": "2024_07",
+      "description": "The image shows the wake of an engine trailing behind it as seen from across calm water at sunset or sunrise on Lake Michigan in Chicago Illinois USA with trees visible along its shoreline under orange sky tones that indicate either early morning hours when sun is rising to late evening where day has ended, and a beautiful view. The boat's motor spurt creates ripples which spread outwards over the surface of lake waters reflecting sunlight creating an interesting pattern on water body surfaces as well as in air above it with warm hues from sunset or sunrise colors that make for picturesque scenery across Lake Michigan at this time period when there is no discernible text.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "sunrise",
+          "sunset"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_002306"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_0949.JPG",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_fullimagerun_ollama_moondream_narrative_20251025_224247",
+      "workflow_name": "fullimagerun",
+      "description": "The image shows the interior of an empty baseball stadium with rows upon rows of green seats facing each other in two directions under bright sunlight streaming through clear blue skies above them all day long without any clouds visible on this sunny afternoon scene at a ballpark or sports field where people are sitting and enjoying their time. The chairs, which appear to be made from plastic material as they have an odd shape with no backrests for the seats in front of it seem empty apart from two individuals who can barely make out each other's faces due to distance between them but still enjoy watching a baseball game together under this beautiful day outside at their favorite ballpark.\nThe stadium appears well-maintained and clean, which is evident by its bright green color that contrasts with the clear blue sky above it all while also highlighting how empty these seats are in comparison; they seem to be waiting for people who will soon fill them up as a crowd of fans gathers at this baseball game.\nTimestamp: 2025-10-26 04:28:52",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_224247"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_0957.JPG",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_fullimagerun_ollama_moondream_narrative_20251025_224247",
+      "workflow_name": "fullimagerun",
+      "description": "The image shows an aerial view of the interior seating area at a baseball stadium during daylight hours under clear skies with bright sunlight illuminating every corner below it. The seats are arranged in rows facing each other to accommodate spectators for various teams playing throughout the day's games on this particular field or park, which is located near water and surrounded by buildings that add depth to its overall appearance as well as provide a sense of scale due to their size compared with those visible from above at ground level.\nTimestamp: 2025-10-26 04:32:16",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_224247"
+    },
+    {
+      "filename": "iphone\\2018\\07\\IMG_0977.JPG",
+      "score": 27.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_fullimagerun_ollama_moondream_narrative_20251025_224247",
+      "workflow_name": "fullimagerun",
+      "description": "The image shows an empty stadium filled with rows of green chairs facing the field in front where people are playing baseball or softball games on sunny days during springtime when there is no rain visible outside due to its bright sunlight reflecting off a nearby building's windows and onto some seats at home plate, which appear unoccupied.\nTimestamp: 2025-10-26 04:40:56",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_224247"
+    },
+    {
+      "filename": "images\\CoCoDoughnut\\COCO_val2014_000000147818.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cocotest_ollama_qwen3-vl_235b-cloud_Simple_20251016_213921",
+      "workflow_name": "cocotest",
+      "description": "This image captures a vibrant, sunlit scene at what appears to be an outdoor farmers market or street food stall.\n\n**Foreground:**\nIn the immediate foreground, a person is holding a white paper food container lined with wax paper. Inside are two golden-brown, deep-fried pastries — likely doughnuts or fritters — generously coated in coarse sugar. One pastry is broken open, revealing a soft, light-colored, airy interior, suggesting it’s freshly made and warm. The bright sunlight catches the sugar crystals and the moist texture of the inside, making it look very appetizing.\n\n**Background:**\nBehind the pastries, wooden shelves are laden with fresh produce and baked goods.\n\n- **Strawberries:** The most prominent items are dozens of small, white cardboard pint containers overflowing with bright red, ripe strawberries. Their green leafy tops are still attached, indicating freshness. The containers are stacked neatly on multiple shelves.\n  \n- **Bread:** To the right and slightly behind the strawberries, there are several loaves of rustic bread, possibly sourdough or artisanal boules, wrapped in clear plastic bags. Some bags have red twist ties.\n\n- **Signage:** A small, handwritten chalkboard sign is partially visible among the bread, likely indicating prices or types of bread, though the text is not legible.\n\n**Overall Impression:**\nThe photo has a warm, inviting, and slightly candid feel — as if taken by someone enjoying a treat while browsing the market. The contrast between the indulgent fried pastry in the foreground and the fresh, healthy strawberries and bread in the background creates a rich sensory experience. The bright daylight enhances the colors and textures, making the food look especially appealing.\n\nIt’s a snapshot of simple, delicious market fare — the perfect combination of sweet, fresh, and rustic.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_213921"
+    },
+    {
+      "filename": "images\\CoCoDoughnut\\COCO_val2014_000000289400.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cocotest_ollama_qwen3-vl_235b-cloud_Simple_20251016_213921",
+      "workflow_name": "cocotest",
+      "description": "This is a vibrant, eye-catching photograph of the famous **“Donut King”** roadside attraction — a giant, oversized donut sculpture perched atop a small, retro-style donut shop.\n\n### Key Features:\n\n- **Giant Donut Sculpture**: The centerpiece is a massive, yellow-glazed donut with a textured surface mimicking real dough. In bold red letters, it reads:\n  > **“DONUT KING”** (curved along the top)\n  > **“HOT-FRESH”** (curved along the bottom)\n\n  The donut is mounted on a white support structure above the shop’s roof.\n\n- **Shop Structure**: Below the donut is a modest, single-story building with a green roof and white pillars. A sign on the front says **“OPEN”** and displays the price **“24¢”** — likely a nostalgic nod to the shop’s history, not current pricing. The shop has a classic mid-20th-century roadside aesthetic.\n\n- **People & Activity**: Several customers are lined up at the walk-up window, suggesting the shop is active and popular. One person appears to be ordering, while others wait nearby.\n\n- **Surroundings**:\n  - A black pickup truck is parked to the left.\n  - A green sedan is stopped or parked on the street to the right.\n  - Power lines and utility poles crisscross the sky, typical of a suburban or urban roadside setting.\n  - Trees and other buildings are visible in the background.\n  - An American flag is displayed on a pole to the left of the shop.\n\n- **Atmosphere**: The scene is bathed in bright daylight under a clear blue sky with a few wispy clouds. The overall mood is nostalgic, cheerful, and quintessentially American — evoking the golden age of roadside Americana and mid-century advertising.\n\n### Cultural Context:\nThis is likely the **“Donut King”** located in **Los Angeles, California** — a well-known local landmark and photo op. Giant food sculptures like this were popular in the 1950s–70s to attract drivers and symbolize the product being sold. It’s a beloved piece of pop culture and architectural whimsy.\n\n---\n\n**In short**: A giant, eye-catching donut sculpture towers over a small, retro donut shop, drawing customers and passersby in a sunny, nostalgic roadside scene.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_213921"
+    },
+    {
+      "filename": "images\\CoCoDoughnut\\COCO_val2014_000000455946.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cocotest_ollama_qwen3-vl_235b-cloud_Simple_20251016_213921",
+      "workflow_name": "cocotest",
+      "description": "This is a close-up, first-person perspective photo of someone holding a glazed donut.\n\n**Main Subject:**\n- A classic ring-shaped donut with a shiny, translucent glaze.\n- The donut appears to be yeast-raised, with a slightly uneven, puffy texture and a golden-brown color.\n- It’s nestled in a white, crinkled paper liner, likely from a bakery or donut shop.\n\n**Hand and Foreground:**\n- A person’s hand is visible on the right, holding the paper liner.\n- The thumb is partially in frame, pressing against the paper.\n\n**Background:**\n- The setting is outdoors on a concrete sidewalk, visible in the upper left.\n- A person’s legs and feet are in the background — they’re wearing black slide sandals and appear to be sitting or crouching.\n- A small white object (possibly a cigarette or piece of litter) lies on the pavement.\n\n**Lighting and Mood:**\n- Bright, natural daylight suggests it’s daytime, likely sunny.\n- The photo has a casual, candid, “in-the-moment” feel — as if someone paused to enjoy a treat outdoors.\n\nOverall, it’s a simple, appetizing snapshot of enjoying a fresh donut on a sunny day.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_213921"
+    },
+    {
+      "filename": "images\\CoCoRandom\\COCO_val2014_000000204887.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cocotest_ollama_qwen3-vl_235b-cloud_Simple_20251016_213921",
+      "workflow_name": "cocotest",
+      "description": "This is a daytime street-level photograph of a public transit bus stopped at a curb in an urban setting.\n\n**Main Subject:**\n- A white, low-floor transit bus, likely from the Los Angeles County Metropolitan Transportation Authority (Metro), as suggested by the color scheme and partial logo.\n- The bus’s destination sign at the top front reads “43 FULLERTON” in bright orange LED letters.\n- The bus number “7417” is visible on the front below the windshield.\n- A bicycle with blue wheels is mounted on a front bike rack attached to the bus.\n- The bus’s internal display shows “4311,” possibly a route or trip identifier.\n- The front features large, curved windshield glass, black wipers, and orange and red reflective stripes along the lower body.\n\n**Foreground:**\n- A bright yellow fire hydrant sits on the sidewalk in the bottom left corner.\n- The sidewalk is concrete and slopes gently toward the street.\n\n**Background & Surroundings:**\n- The bus is stopped at an intersection. A street sign for “Chapman” is visible above the traffic light.\n- A green traffic light is illuminated.\n- A silver sedan is visible behind the bus, and another car is partially seen on the far right.\n- Across the street, there are palm trees, pedestrians on the sidewalk, and multi-story buildings with warm-toned facades — suggesting a commercial or downtown area, possibly in Southern California.\n- The lighting is bright and even, indicating a clear day.\n\n**Overall Impression:**\nThe image captures a typical moment in urban public transportation — a bus paused at a stop, ready to serve passengers, with a cyclist’s bike secured on front, highlighting multimodal transit options. The scene feels calm and orderly, with clean infrastructure and a sunny, pleasant atmosphere.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright",
+          "illuminated"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_213921"
+    },
+    {
+      "filename": "images\\CoCoRandom\\COCO_val2014_000000309391.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cocotest_ollama_qwen3-vl_235b-cloud_Simple_20251016_213921",
+      "workflow_name": "cocotest",
+      "description": "This is a daytime, eye-level photograph of a multi-lane urban street, likely in a city with a streetcar or light rail system, given the visible tracks embedded in the road surface.\n\n**Key Elements:**\n\n- **Street Layout & Traffic:** The street is wide, with multiple lanes for vehicles, including dedicated bike lanes marked with white lines and bicycle symbols. Traffic is moderate — cars are visible in both directions, including a black SUV in the left lane and a silver sedan ahead of it. A blue public transit bus is prominent in the right lane, viewed from the rear. A cyclist is riding in the bike lane, and another is visible further down the street.\n\n- **Traffic Control & Signage:**\n  - Numerous traffic lights are visible, many showing red, indicating a stop for traffic in this direction.\n  - A “ONE WAY” sign with a left-pointing arrow is mounted on a pole on the left.\n  - A “NO TURNS” sign is posted above the street.\n  - Overhead wires suggest the presence of trolleybuses or streetcars.\n\n- **Pedestrians & Sidewalks:** People are walking along the sidewalks on both sides of the street. Some are waiting near crosswalks or bus stops. A person in a blue jacket is visible on the left sidewalk.\n\n- **Environment & Season:**\n  - The trees lining the street are bare, suggesting it is late autumn, winter, or early spring.\n  - The lighting is bright and clear, indicating a sunny day.\n  - Banners are hung between poles — one visible blue banner reads “San Jose State University,” suggesting the location may be near or in San Jose, California.\n\n- **Infrastructure:**\n  - The street surface includes red brick-colored pavement in some areas, possibly indicating transit-only lanes or decorative crosswalks.\n  - Utility poles and wires crisscross above the street.\n  - A “STOP” sign is visible on the right side of the road.\n\n**Overall Impression:**\nThe image captures a typical, active urban scene — orderly, with clear traffic control, mixed modes of transportation (cars, bus, bikes, pedestrians), and seasonal bare trees under bright sunlight. The presence of university banners and the “San Jose” reference strongly suggest this is a street in downtown San Jose, likely along a major corridor like 1st Street or Santa Clara Street, which feature light rail and trolleybus infrastructure.\n\n---\n\n**Note:** The image appears to be a real photograph, not AI-generated, and depicts a recognizable urban environment.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_213921"
+    },
+    {
+      "filename": "images\\CoCoRandom\\COCO_val2014_000000399595.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cocotest_ollama_qwen3-vl_235b-cloud_Simple_20251016_213921",
+      "workflow_name": "cocotest",
+      "description": "This is a daytime photograph of **Union Station** in **Denver, Colorado**, a historic and iconic transportation hub.\n\n### Key Features:\n\n- **Architecture**: The building showcases grand **Beaux-Arts architecture**, characterized by its symmetrical design, ornate stone facade, large arched windows, and classical detailing. The structure is made of light-colored stone, giving it a stately and monumental appearance.\n\n- **Signage**: Prominently displayed at the top is a large, illuminated **orange neon sign** that reads “**UNION STATION**” in bold, curved letters. Below it, smaller text reads “**TRAVEL BY TRAIN**,” emphasizing its original purpose as a railroad terminal.\n\n- **Canopy and Entrance**: A wide, green metal canopy extends over the sidewalk in front of the station, supported by decorative brackets. Beneath the canopy, a smaller sign reads “**DEN LIGHT RAIL**,” indicating the station’s current role as a multi-modal transit center serving both Amtrak and RTD light rail.\n\n- **Surroundings**: The station is situated on a city street with vehicles visible — including a purple taxi, a small green utility truck, and a white shuttle bus. Trees with sparse spring foliage frame the image on the left and right. In the background, modern high-rise buildings contrast with the historic station, highlighting Denver’s urban development.\n\n- **Atmosphere**: The sky is clear and bright blue, suggesting a sunny day. The scene is calm, with no large crowds, giving the station a serene, almost cinematic quality.\n\n### Historical & Functional Context:\nOriginally opened in 1881, Denver Union Station was renovated and reopened in 2014 as a mixed-use complex including a hotel, restaurants, shops, and transit hub — blending historic preservation with modern urban life. It remains a central landmark and transportation nexus for the city.\n\nThis image captures the station’s architectural grandeur and its enduring role as a gateway to Denver.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright",
+          "illuminated"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_213921"
+    },
+    {
+      "filename": "images\\CoCoRandom\\COCO_val2014_000000389389.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cocotest_ollama_qwen3-vl_235b-cloud_Simple_20251016_213921",
+      "workflow_name": "cocotest",
+      "description": "This is a close-up, first-person photo of someone holding a large, freshly cut burrito outdoors at what appears to be a park or festival.\n\n**The Burrito:**\n- It’s sliced in half, revealing a generous, colorful filling.\n- The filling includes seasoned ground meat (likely beef or pork), melted cheese, diced pink pickled onions or radishes, and possibly some green peppers or jalapeños.\n- The tortilla is large and slightly toasted or grilled.\n- The burrito is wrapped in aluminum foil and held with white paper napkins for grip and cleanliness.\n\n**The Setting:**\n- The background is softly blurred, suggesting a shallow depth of field focused on the food.\n- You can see green grass, trees, and a few people in the distance.\n- There’s a white tent and a bicycle visible, reinforcing the outdoor, casual, possibly market or festival atmosphere.\n- The lighting is bright and natural — likely midday sunlight.\n\n**The Hand:**\n- A person’s hand is holding the burrito, with fingers visible gripping the napkins and foil.\n- The perspective makes the viewer feel like they’re about to take a bite.\n\n**Overall Impression:**\nThis is a mouthwatering, casual food photo that captures the joy of eating a hearty, flavorful burrito in a relaxed, sunny outdoor setting. It evokes feelings of comfort, indulgence, and enjoying good food in good company — or simply savoring a delicious meal on the go.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_213921"
+    },
+    {
+      "filename": "converted_images\\IMG_4299.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_openai_gpt-4o_narrative_20251023_112606",
+      "workflow_name": "25imagetest",
+      "description": "The image shows an outdoor scene with grass and vegetation. The foreground features grass covered in a layer of frost, giving it a silvery-white appearance. The grass varies in color, with patches of green visible beneath the frost. In the background, there are dense bushes and tall grass with leaves that transition from green to shades of yellow and brown. The vegetation appears slightly illuminated by soft sunlight, creating a warm, diffused light effect. The overall atmosphere suggests a cold, possibly early morning environment.\nTimestamp: 2025-10-23 11:31:40",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "illuminated"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_model": true,
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_112606"
+    },
+    {
+      "filename": "Pictures\\hawaii\\boat\\P1012366.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a vibrant, eye-level photograph taken at the surface of the ocean, capturing three people snorkeling together on a sunny day.\n\n**Foreground:**\n- Three individuals — two women and one man — are floating side-by-side in clear, blue water, their heads and shoulders above the surface.\n- All are wearing snorkel masks and snorkels:\n  - The person on the left (a man) has a bright turquoise mask and a yellow snorkel.\n  - The person in the center (a woman) wears a lavender or light purple mask.\n  - The person on the right (a woman) has a light blue or aqua mask.\n- Their expressions are cheerful and relaxed, suggesting they’re enjoying the experience. The central woman is smiling broadly.\n- The water is rippling around them, with sunlight reflecting off the surface, creating shimmering patterns. Some water droplets are visible in the air, adding to the dynamic, in-the-moment feel.\n\n**Background:**\n- Behind them, a large white tour boat is anchored. The name “MAUI” is partially visible on its side, suggesting the location is likely Maui, Hawaii.\n- Several other people can be seen on the upper deck of the boat, enjoying the view or preparing to snorkel.\n- To the far left, a green, hilly coastline is visible under a bright blue sky with a few scattered white clouds.\n\n**Overall Impression:**\nThe image conveys a sense of joy, adventure, and tropical vacation vibes. The composition — with the snorkelers centered and the boat and landscape framing them — creates a balanced and inviting scene. The bright colors, clear water, and sunny weather all contribute to a cheerful, idyllic atmosphere.\n\n**Note:** The image appears to be taken with a wide-angle or fisheye lens, which slightly distorts the edges and enhances the immersive, underwater perspective.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\hawaii\\boat\\P1012373.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a vibrant, close-up underwater selfie of a man and a woman snorkeling together. They are both wearing snorkel masks and smiling directly at the camera, capturing a joyful, intimate moment beneath the surface.\n\n**The Man (left):**\n- Wears a black snorkel mask with a bright turquoise-blue frame.\n- Has a mustache and visible chest hair.\n- His mouth is slightly open, showing a playful or surprised expression.\n- He’s shirtless, and sunlight filters through the water, creating dappled patterns on his skin.\n\n**The Woman (right):**\n- Wears a white-framed snorkel mask.\n- Has long, light brown or blonde hair flowing around her head in the water.\n- She’s smiling broadly, showing her teeth, and appears to be wearing a black bikini top.\n- Her arm is wrapped around the man’s shoulder, suggesting closeness and affection.\n\n**Environment:**\n- The water is a clear, bright turquoise blue, indicating good visibility and likely a tropical or sunny location.\n- Sunlight streams down from above, creating shimmering highlights and bubbles around them.\n- The surface of the water is visible at the top of the frame, with ripples and reflections adding to the dynamic underwater feel.\n\n**Overall Mood:**\nThe image radiates happiness, adventure, and connection. It’s a candid, fun snapshot of a couple enjoying a shared experience in the ocean — carefree, spontaneous, and full of life. The slight distortion from the water and the close framing make it feel personal and immersive.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\Aimee overlooking Thames and Parliament.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a cheerful, sunlit photograph of a woman posing in front of London’s iconic Palace of Westminster and the Elizabeth Tower (commonly known as Big Ben).\n\n**Foreground:**\n- A smiling woman with short, blonde hair and glasses stands in the center-left of the frame.\n- She is wearing a bright royal blue fleece jacket with black shoulder panels and a vibrant pink, purple, and white patterned scarf.\n- Her arms are crossed gently in front of her, and she looks directly at the camera with a warm, happy expression.\n- She is standing on a stone bridge or riverside walkway, with a low stone parapet visible in the immediate foreground.\n\n**Background:**\n- The majestic Palace of Westminster stretches across the background, its Gothic Revival architecture bathed in golden afternoon sunlight.\n- The Elizabeth Tower, with its famous clock face, stands prominently on the right side of the image.\n- The River Thames flows between the woman and the palace, its surface shimmering with reflections of the sun and buildings.\n- On the far right, part of a stone bridge (likely Westminster Bridge) is visible, with ornate lampposts.\n- The sky is clear and pale blue, suggesting a crisp, sunny day.\n\n**Additional Details:**\n- A small airplane is faintly visible in the upper left sky.\n- A red digital timestamp in the bottom right corner reads “16 3:48 PM,” indicating the photo was taken in the late afternoon.\n- The overall mood is joyful and picturesque — a classic tourist snapshot capturing a beautiful moment in London.\n\nThis image beautifully combines a personal, happy moment with one of the world’s most recognizable landmarks.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\city palace detail.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This image captures a stunning example of traditional Rajasthani architecture, likely from a palace or haveli in India — possibly the City Palace in Jaipur, given the distinctive style.\n\n**Architectural Features:**\n\n- **Central Jharokha (Balcony):** The focal point is an ornate, projecting balcony known as a *jharokha*. It features three arched openings supported by intricately carved and painted pillars. The arches are scalloped and decorated with floral and geometric motifs in blue, green, and gold.\n\n- **Painted Decoration:** The entire structure is richly adorned with hand-painted frescoes. The balcony’s base and pillars display stylized peacocks and floral patterns, rendered in vibrant blues, greens, ochres, and whites — a hallmark of Jaipur’s artistic heritage.\n\n- **Roof and Finials:** Above the balcony, a decorative chhajja (overhanging eave) is topped with a sculpted parapet featuring carved figures (possibly mythical creatures or birds) and golden finials, adding to the regal appearance.\n\n- **Background Structure:** Behind the jharokha, the main building facade is painted in a soft yellow with red accents. The windows are framed with red latticework (jali), allowing ventilation and privacy while adding texture and color contrast.\n\n- **Balustrade:** A red-painted railing with vertical balusters runs along the upper level, framing the scene against the clear blue sky.\n\n**Atmosphere and Context:**\n\nThe bright sunlight and deep blue sky suggest a clear, sunny day — likely in the late afternoon, as indicated by the red timestamp “3:53 PM” in the bottom right corner. The overall impression is one of opulence, craftsmanship, and cultural richness, characteristic of royal residences in Rajasthan.\n\nThis structure exemplifies the fusion of Mughal and Rajput architectural styles, emphasizing symmetry, ornamentation, and vibrant color — all designed to impress and reflect the grandeur of its patrons.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\Sahastradhara cold springs.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a scenic, sunlit photograph of a small, man-made waterfall or weir in a natural, rocky river setting — likely in a hilly or mountainous region.\n\n**Foreground:**\n- A low, rectangular weir constructed of stone and concrete spans the river, creating a gentle cascade of water that tumbles over its edge into a shallow pool below.\n- The weir’s surface is covered in vibrant green moss and algae, indicating constant moisture and a healthy aquatic environment.\n- A large, smooth, yellowish-brown boulder sits prominently in the rushing water just below the falls.\n- To the right, a concrete walkway or platform with steps leads down toward the water, suggesting this is a place visited by people — perhaps for recreation or bathing.\n\n**Midground:**\n- The river flows calmly beyond the weir, its surface reflecting the sunlight and surrounding greenery.\n- The riverbed is strewn with large, rounded boulders and smaller stones, typical of mountain streams.\n- On the far bank, a low stone wall or embankment lines the river, possibly for erosion control or to define a path.\n\n**Background:**\n- A steep, rocky hillside rises behind the river, covered with sparse vegetation — grasses, shrubs, and scattered trees with thin trunks and green leaves.\n- A few small, simple structures — possibly sheds or small buildings — are nestled into the hillside, partially obscured by trees.\n- A wall or barrier on the right side of the image is covered with faded advertisements, including recognizable Coca-Cola logos, hinting at a nearby village or roadside area.\n\n**Atmosphere & Details:**\n- The lighting is bright and natural, suggesting a sunny afternoon — confirmed by the red timestamp in the bottom right corner reading “11 2:06 PM” (likely November 11th, 2:06 PM).\n- The overall mood is peaceful and rustic, blending natural beauty with subtle human presence.\n- The water appears clear and inviting, and the scene evokes a sense of tranquility and connection with nature.\n\nThis location could be a popular local spot for picnics, swimming, or simply enjoying the sound of flowing water in a rural or semi-rural setting — perhaps in the Himalayan foothills or similar terrain in South Asia.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\FromWebpictures\\mompics\\Fords1.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a cheerful, outdoor group photograph of 17 adults — 10 women and 7 men — posing together in a backyard setting. The group appears to be friends, family, or coworkers gathered for a casual celebration, possibly a birthday or reunion, suggested by the cluster of colorful balloons (yellow, orange, blue, and white) tied to a stick and held near the top left.\n\n**Setting:**\n- The photo is taken on a well-maintained green lawn.\n- Behind the group is a wooden fence, lush green shrubbery, and flowering plants, including red blooms and a sunflower.\n- A bird feeder hangs from a tree branch in the background.\n- The lighting is natural daylight, suggesting a daytime gathering.\n\n**Group Composition:**\n- The group is arranged in three informal rows: a front row standing, a middle row slightly elevated, and a back row standing on a higher surface or stepping up.\n- Most people are smiling and looking at the camera, creating a warm, relaxed atmosphere.\n- Clothing is casual and summery: t-shirts, shorts, sandals, sundresses, and light pants. One woman wears a blue “BOSTON MASSACHUSETTS” hoodie, and one man wears a bright Hawaiian shirt.\n\n**Notable Details:**\n- The woman in the front row, second from left, wears all white — a long-sleeve shirt and capri pants — and glasses.\n- The woman in the center front wears a blue hoodie and white shorts, standing barefoot.\n- The man on the far right wears a white polo shirt and white shorts, with flip-flops.\n- Several people are wearing sunglasses or have them perched on their heads.\n- One woman in the front row (second from right) holds sunglasses in her hand.\n- A pair of black flip-flops lies on the grass near the center front.\n\nOverall, the image captures a joyful, informal moment of camaraderie among a diverse group of adults enjoying a sunny day outdoors. The mood is lighthearted and celebratory.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\england\\09-15-2003\\DSC00478.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This image captures a striking juxtaposition of ancient history and modern event production, set against the backdrop of the Tower of London.\n\n**Foreground:**\n- The River Thames flows at the very bottom of the frame.\n- A stone embankment or quay wall runs horizontally across the lower third of the image. It features a small, arched opening with green algae or moss growing on its base.\n- Engraved on the wall, just above the arch, is the inscription: “ENTRY TO THE TRAITORS’ GATE” — a historically significant entrance to the Tower, once used to bring prisoners by water.\n\n**Midground:**\n- A large, temporary outdoor stage structure dominates the right side of the image. It’s made of metal trusses and is equipped with numerous stage lights, speakers, and rigging.\n- Behind the stage, a large banner or backdrop is partially visible, with bold red lettering — the word “RESTORATION” can be discerned, suggesting the event may be a concert, festival, or theatrical production.\n- People are visible on and around the stage, likely crew or performers preparing for an event.\n- A metal fence separates the stage area from the riverbank.\n\n**Background:**\n- The iconic stone walls and towers of the Tower of London rise majestically behind the stage. The architecture features classic medieval design — crenellated battlements, narrow arched windows, and robust stone construction.\n- Lush green trees partially obscure the upper portions of the Tower and the sky.\n- A red construction crane is visible peeking above the trees in the upper right, hinting at ongoing development or restoration work nearby.\n\n**Atmosphere:**\nThe scene is bathed in bright daylight under a clear blue sky, suggesting a warm, sunny day. The contrast between the ancient fortress and the modern stage creates a dynamic, almost surreal visual — a historic landmark temporarily transformed into a venue for contemporary entertainment.\n\n**Overall:**\nThis is a compelling image of the Tower of London’s Traitors’ Gate area being used as a venue for a large-scale public event, blending centuries of history with modern spectacle.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\england\\09-15-2003\\DSC00484.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This image captures a dynamic urban scene, likely taken from a moving vehicle — possibly a red double-decker tour bus, given the prominent red structure in the foreground with a loudspeaker attached.\n\n**Key elements:**\n\n- **Monument in the Background:** The centerpiece is the **Monument to the Great Fire of London**, a tall, fluted Doric column topped with a golden urn. It stands out against a clear, bright blue sky, suggesting a sunny day.\n\n- **Surrounding Architecture:**\n  - To the left: A tall, light-colored stone building with classical detailing and evenly spaced windows.\n  - To the right: A modern building with a glass and concrete facade, contrasting with the historic monument.\n  - Behind the monument: A mix of modern office buildings, including one with a distinctive curved glass front.\n\n- **Foreground Details:**\n  - A bright red structure, likely part of a tour bus, dominates the lower right. It includes a loudspeaker, suggesting it’s used for guided commentary.\n  - The back of a man’s head with gray hair and glasses is visible in the bottom right corner, reinforcing the perspective of a passenger on a tour.\n\n**Overall Impression:**\nThe photo offers a layered view of London — blending historic landmarks with modern architecture, framed by the experience of a tourist. The bright sunlight and clear sky create a vibrant, lively atmosphere. The composition suggests movement and discovery, capturing a moment of sightseeing in the heart of the city.\n\n**Location:** London, England — specifically the City of London, near the site of the Great Fire of 1666.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\england\\09-25-2003\\DSC00607.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a scenic, sun-drenched panoramic view from an elevated vantage point — likely Edinburgh Castle — overlooking the city of Edinburgh, Scotland.\n\n**Foreground:**\n- A weathered stone parapet or wall curves along the bottom right, suggesting the viewer is standing on a historic fortification or rampart.\n- A person in a white jacket and carrying a backpack is partially visible on the far right, looking out over the city — adding a human element and sense of scale.\n\n**Midground:**\n- Lush green trees dominate the middle of the frame, partially obscuring the city below.\n- Peeking through the foliage are the rooftops and spires of Edinburgh’s Old Town — including a prominent, slender church spire rising above the treeline.\n- The architecture is classic Scottish: stone buildings with steeply pitched roofs and historic towers.\n\n**Background:**\n- In the distance, the iconic silhouette of **Arthur’s Seat** — an extinct volcano and popular hiking spot — rises against the horizon.\n- The sky is bright and mostly clear, with the sun creating a soft glare in the upper right, suggesting late afternoon or early morning light.\n- The distant horizon hints at the Firth of Forth or the sea, with a faint haze softening the farthest views.\n\n**Overall Impression:**\nThe image captures the timeless beauty of Edinburgh — a harmonious blend of historic architecture, natural greenery, and dramatic topography. The warm sunlight and expansive view evoke a sense of peace, grandeur, and the enduring charm of Scotland’s capital city.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "morning light"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\DSC01599.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is an elevated, slightly angled photograph of a busy urban street corner, likely in London, captured during the late afternoon or early evening — as indicated by the timestamp “28 2:40 PM” in the bottom right corner (though the lighting suggests it may be closer to dusk).\n\n**Key Features:**\n\n- **Architecture**: The scene is dominated by a prominent corner building with red brick and white stone trim, typical of late Victorian or Edwardian commercial architecture. The ground floor houses retail shops, including “SUMMIT” and “San Miguel’s.” Adjacent buildings vary in style — one to the left is modern with a glass curtain wall, while others are traditional brick facades.\n\n- **Vehicles**: Two iconic red double-decker buses are visible — one turning the corner, the other partially seen in the foreground. A black taxi cab is also present near the intersection. A yellow construction vehicle (possibly a crane or cherry picker) is parked on the sidewalk.\n\n- **Street Details**: The road features yellow box junction markings, traffic lights, and pedestrian crossings. A few pedestrians can be seen on the sidewalks, though they are small and indistinct due to the distance and lighting.\n\n- **Lighting & Atmosphere**: The image has a warm, reddish-orange tint, suggesting either the golden hour before sunset or the effect of artificial lighting and camera white balance. The overall mood is slightly hazy or grainy, giving it a nostalgic or candid feel.\n\n- **Signage**: A bright green neon sign for “MARKS & SPENCER” is visible on the lower left, confirming the UK setting. Other shop signs are partially legible.\n\n**Overall Impression**:  \nThis is a classic London street scene — bustling, layered with architectural history, and alive with the movement of public transport and pedestrians. The high-angle perspective gives a sense of urban density and rhythm, capturing a moment in the daily life of a major city.\n\n*(Note: The timestamp “2:40 PM” may be inaccurate or mislabeled — the lighting strongly suggests late afternoon or early evening, possibly 4:40 PM or later.)*",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunset",
+          "golden hour",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\DSC01763.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a tilted, low-angle photograph of a grand, historic red sandstone building — likely a Mughal-era structure such as a palace, tomb, or mosque — with several visitors gathered near its entrance. The image is rotated approximately 90 degrees clockwise, making the building appear to lean sideways.\n\n**Architecture:**\n- The building is constructed from rich, reddish-pink sandstone, typical of Mughal architecture in India (e.g., Fatehpur Sikri or Agra Fort).\n- It features ornate carvings, arched doorways with decorative borders, and projecting balconies (jharokhas) with intricate latticework.\n- Two small domed chhatris (pavilions) are visible on the upper left, adding to the building’s symmetry and grandeur.\n- The entrance is a large, recessed archway, inviting visitors inside.\n\n**People:**\n- A group of tourists or visitors is clustered near the entrance on the right side of the frame (which is actually the bottom due to the tilt).\n- One man in a bright orange shirt and jeans stands prominently, leaning casually against the wall.\n- Others are dressed in traditional and casual attire, some wearing caps or headscarves, suggesting a mix of local and international visitors.\n- They appear to be waiting, chatting, or preparing to enter.\n\n**Photographic Details:**\n- The photo is taken in bright daylight under a clear, pale blue sky.\n- A red digital timestamp in the bottom-right corner (which is actually the bottom-left due to rotation) reads “3 1:55 PM,” indicating the time and possibly the date (March 3rd or Day 3).\n- The image has a slightly grainy, vintage quality, suggesting it was taken with an older digital camera or phone.\n\n**Overall Impression:**\nDespite the awkward tilt, the photo captures the majestic scale and intricate beauty of Mughal architecture, juxtaposed with the casual presence of modern-day visitors. The warm tones of the stone and the bright sunlight evoke a sense of history and cultural richness.\n\n*(Note: To view the image correctly, rotate it 90 degrees counter-clockwise.)*",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\DSC01862.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a wide-angle, daytime photograph of the **Amber Fort (Amer Fort)**, a historic palace-fortress located in Jaipur, Rajasthan, India.\n\n**Key Features:**\n\n- **Architecture**: The fort is built in a grand Rajput architectural style, with massive sandstone walls in warm beige and ochre tones. It features multiple levels, courtyards, towers (chhatris), and ornate balconies. The structure cascades down a hillside, showcasing its imposing scale and strategic placement.\n\n- **Setting**: The fort is perched atop a rugged, arid hill dotted with sparse green shrubs and trees. The foreground shows the sloping terrain leading up to the fort’s lower walls.\n\n- **Sky**: The sky is a clear, pale blue, indicating a bright, sunny day with no clouds.\n\n- **Human Presence**: Tiny figures of people can be seen along the fort’s ramparts and pathways, giving a sense of the structure’s immense size.\n\n- **Time Stamp**: In the bottom right corner, a red digital timestamp reads “7 11:00 AM,” likely indicating the photo was taken on the 7th of a month at 11:00 AM.\n\n**Overall Impression**:\nThe image captures the majestic and timeless beauty of the Amber Fort, highlighting its harmonious blend with the natural landscape and its enduring presence as a symbol of Rajput heritage. The warm sunlight enhances the golden hue of the stone, making the fort glow against the blue sky.\n\nThis UNESCO World Heritage Site is renowned for its artistic Hindu-style elements, including carved marble, mirror work, and intricate frescoes — though these finer details are not clearly visible from this distance.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\DSC01893.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This image captures a stunning example of Rajasthani architecture, likely from a palace or haveli in Jaipur, India — possibly the City Palace or a similar historic structure. The focal point is an ornate, projecting balcony known as a *jharokha*, a hallmark of Mughal and Rajput architecture.\n\n**Architectural Details:**\n\n- **Structure:** The balcony is multi-tiered and supported by intricately carved pillars. It features three arched openings, each framed with delicate stucco or painted decoration.\n- **Decorative Elements:** The entire balcony is lavishly adorned with traditional Indian motifs — including floral patterns, geometric designs, and stylized peacocks (a symbol of royalty and beauty in Indian culture). The color palette includes cream, blue, green, and gold, creating a rich, harmonious effect.\n- **Roof and Finials:** The roof of the balcony is scalloped and crowned with golden finials, adding to its regal appearance. The eaves are decorated with repeating patterns, and the underside of the balcony features painted peacock motifs.\n- **Background Building:** Behind the balcony, the main building facade is painted in a soft yellow with red accents. The windows are framed with red latticework (*jali*), allowing ventilation and privacy while adding visual texture.\n- **Balustrade:** A red-painted railing with vertical balusters runs along the upper level, contrasting beautifully with the pale sky.\n\n**Atmosphere and Context:**\n\nThe bright, clear blue sky suggests a sunny day, enhancing the vividness of the colors. The timestamp in the corner — “7 3:53 PM” — indicates the photo was taken in the late afternoon, when the warm light would accentuate the textures and hues of the architecture.\n\nThis structure exemplifies the fusion of art, function, and symbolism in Indian palace architecture — designed not only for aesthetic grandeur but also for royal observation and ceremonial purposes.\n\n**In summary:** A beautifully ornate Rajasthani *jharokha* balcony, rich in color and detail, set against a palace facade under a clear blue sky — a testament to India’s architectural heritage and artistic craftsmanship.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright",
+          "warm light"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\DSC01945.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a scenic, sunlit photograph of a small, man-made waterfall or weir in a natural river setting, likely in a hilly or mountainous region.\n\n**Foreground:**\n- A low, stepped stone weir spans the width of the river, creating a gentle cascade of white, frothy water.\n- The stones of the weir are covered in green moss and algae, indicating constant moisture.\n- In the shallow, clear water just below the weir, a large, smooth, yellowish-brown boulder is partially submerged.\n- To the right, a concrete or stone embankment or walkway runs alongside the river.\n\n**Midground:**\n- The river flows calmly behind the weir, its surface reflecting the sunlight and surrounding greenery.\n- Large, rounded boulders are scattered throughout the riverbed and along its banks.\n- A particularly large, light-gray boulder sits prominently on the left bank.\n\n**Background:**\n- The river is flanked by a steep, rocky hillside covered with sparse vegetation, including small trees, shrubs, and dry grasses.\n- On the right bank, partially obscured by trees, are small, simple structures — possibly small shops or shelters — with visible signage, including faded Coca-Cola logos.\n- The overall landscape suggests a rural or semi-developed area nestled in nature.\n\n**Atmosphere & Details:**\n- The lighting is bright and warm, suggesting a sunny afternoon.\n- The red timestamp in the bottom right corner reads “11 2:06 PM,” likely indicating the date (November 11) and time the photo was taken.\n- The scene evokes a sense of tranquility and rustic charm, blending natural beauty with subtle human presence.\n\nOverall, it’s a peaceful snapshot of a river in a hilly region, where human engineering (the weir) harmonizes with the natural environment.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "Pictures\\Ireland India England\\DSC01948.JPG",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_bigdaddyrun_ollama_qwen3-vl_235b-cloud_Simple_20251016_080325",
+      "workflow_name": "bigdaddyrun",
+      "description": "This is a sunlit, natural landscape photograph capturing a rocky mountain stream flowing through a verdant valley. The scene is framed by lush green foliage in the foreground and on the right, with a leafless, twiggy bush on the left adding textural contrast. The stream, filled with numerous smooth, gray boulders of various sizes, tumbles gently over rocks, creating white ripples and sparkling reflections in the bright sunlight.\n\nPerched on the steep, forested hillside above the stream are several rustic, multi-story buildings made of brick and concrete. They appear to be homes or small structures, nestled into the slope and partially obscured by trees and shrubs. Power lines are visible stretching across the upper part of the image, hinting at human habitation in this remote setting.\n\nThe overall atmosphere is peaceful and rural, blending natural beauty with signs of human settlement. The lighting suggests a sunny afternoon, confirmed by the red digital timestamp in the bottom right corner reading “11 2:40 PM,” likely indicating November 11th at 2:40 PM.\n\nIn summary: A serene mountain stream flows over rocks beneath rustic hillside homes, surrounded by lush greenery and bathed in afternoon sunlight.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "Simple",
+      "timestamp": "20251016_080325"
+    },
+    {
+      "filename": "converted_images\\photo-20825_singular_display_fullPicture.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_openai_gpt-4o_detailed_20251023_222958",
+      "workflow_name": "25imagetest",
+      "description": "The image depicts a suburban neighborhood scene. \n\n- **Main Subjects/Objects**: The main subjects include several modern two-story houses lined along both sides of a concrete sidewalk. A few cars are parked in the driveways and on the street. There is a prominent tree on the right, with its branches and leaves partially visible.\n\n- **Setting/Environment**: The setting is a residential area with well-maintained houses featuring a mix of siding and brick facades. The lawns are neatly trimmed, and the environment appears quiet and orderly, typical of suburban settings.\n\n- **Key Colors and Lighting**: The scene is brightly lit, indicating daytime, likely with clear weather. The sky is a vivid blue with scattered white clouds. The houses are painted in neutral tones, such as grays and beiges, while the cars include colors like blue and silver. Green dominates the image due to grass and tree foliage.\n\n- **Notable Activities or Composition**: There are no visible human activities captured in the image, suggesting a peaceful, calm moment in the neighborhood. The composition leads the eye down the sidewalk, creating a sense of depth and perspective.\n\nOverall, the image conveys a typical, serene suburban streetscape on a sunny day.\nTimestamp: 2025-10-23 22:31:05",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_model": true,
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "openai",
+      "model": "gpt-4o",
+      "prompt_style": "detailed",
+      "timestamp": "20251023_222958"
+    },
+    {
+      "filename": "converted_images\\IMG_4295.jpg",
+      "score": 25.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cottage_ollama_llava_latest_Simple_20251021_110055",
+      "workflow_name": "cottage",
+      "description": "The image shows a tranquil autumn scene with trees in the foreground that have shed their leaves, indicating it's likely fall season. In the background, there is an open field or clearing where more bare trees can be seen under what appears to be either sunrise or sunset due to the warm light illuminating them from one side of the image. The sky above has a gradient of colors ranging from orange near the horizon to blue at higher altitudes, suggesting it's dusk time. There are no visible texts on the image.\nTimestamp: 2025-10-21 11:16:05",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunrise",
+          "sunset",
+          "warm light"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "llava:latest",
+      "prompt_style": "Simple",
+      "timestamp": "20251021_110055"
+    },
+    {
+      "filename": "converted_images\\01\\IMG_0859.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330",
+      "workflow_name": "archive2024",
+      "description": "A man is centered in the foreground, facing the camera directly. He wears a red polo shirt with a collar and a single visible white button at the placket. Over his ears are white wired earbuds, the wires running down his chest. He wears a baseball cap with a gray brim and a red underside; the crown of the cap is white with a red logo or design on the front. His skin is fair with visible pores and slight redness on the cheeks and nose. His eyes are light-colored, and his expression is neutral, with lips closed and slightly pursed. Behind him, the ocean stretches to the horizon, with white foam from breaking waves visible on the right side of the frame. The water is a muted blue-gray. To the left, a sandy beach is visible, with a line of green palm trees and vegetation along the shore. The sky above is a clear, bright blue with thin, wispy white clouds scattered across it. The lighting is bright and even, suggesting midday sunlight.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_062330"
+    },
+    {
+      "filename": "converted_images\\01\\IMG_0910.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330",
+      "workflow_name": "archive2024",
+      "description": "A woman sits on a low, textured, beige stucco wall under bright daylight. She wears a light blue long-sleeved shirt, white-framed sunglasses, and a white baseball cap with a circular blue and white logo on the front. Her hands are clasped in her lap. Over her left shoulder is a black strap, part of a bag or crossbody purse. Draped over her left arm is a folded item with a geometric pattern in shades of blue, yellow, and gray.\n\nTo her right, resting on the brick-paved ground beside the wall, is a clear plastic bottle of Coca-Cola with a red label and silver cap. The bottle is about half full.\n\nBehind her, a two-story building with a pale yellow stucco facade features white louvered shutters above large glass windows. A stylized black “P” logo with a small leaf motif sits centered above the shutters. Below the windows, a decorative tile border in blue, brown, and cream runs horizontally.\n\nFurther back, a white wooden railing with crisscross patterns borders a paved walkway. Behind the railing are rectangular white planters holding green shrubs. A white pergola structure with a slatted roof extends over the walkway, supported by white posts. Beyond the pergola, palm trees and a hillside are visible under a bright blue sky streaked with thin, wispy white clouds. The ground is paved with interlocking gray and reddish-brown bricks. A small, square patch of peeling blue paint is visible on the wall near the Coca-Cola bottle.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_062330"
+    },
+    {
+      "filename": "converted_images\\05\\IMG_1056.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330",
+      "workflow_name": "archive2024",
+      "description": "The image shows a wide expanse of water under a clear sky. The water, occupying the lower two-thirds of the frame, is a deep turquoise with subtle ripples and small wavelets across its surface, reflecting sunlight in scattered highlights. The horizon line is slightly tilted, running diagonally from the lower left to the upper right. Along the horizon, on the far left, a faint silhouette of a distant shoreline is visible, with low, indistinct structures. On the far right, near the horizon, a small white vessel with a visible mast is present, appearing distant and tiny against the water. The sky above is a vibrant, clear blue, gradually lightening toward the horizon. Scattered across the sky are several fluffy, white cumulus clouds, varying in size and density. Some clouds are clustered near the center and upper left, while smaller, isolated puffs appear toward the upper right. The overall lighting is bright and even, suggesting midday sun. No land, people, or other objects are visible in the immediate foreground or midground.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_062330"
+    },
+    {
+      "filename": "converted_images\\photo-12758_singular_display_fullPicture.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This street scene shows a bright blue compact car (appears to be a Ford) parked on a street in front of historic buildings. The architecture displays a striking contrast between styles - on the left are more conventional brick and rendered buildings with black trim, including a pub called \"Golden Fleece\" with hanging flower baskets displaying pink and purple blooms. To the right are two prominent Tudor-style timber-framed buildings with distinctive black and white half-timbering patterns, featuring pointed gable roofs and diamond-paned windows. \n\nThe ground floor of the rightmost Tudor building houses what appears to be a \"York Gin\" shop. Several pedestrians can be seen on the sidewalk, including people in blue and pink clothing. The sky is bright blue with some wispy clouds, and strong sunlight creates a bright spot visible behind the Tudor buildings. The street appears to be in a historic town center, likely in York, England, given the architectural style and shop signage.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "extracted_frames\\video-12816_singular_display\\video-12816_singular_display_74.99s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a bustling pedestrian area on a sunny day with a bright blue sky dotted with white clouds. Large, leafy green trees provide shade over a paved plaza or square. In the center of the scene, there's a street performer dressed in black standing next to an open instrument case on the ground. \n\nMultiple wooden benches are arranged in the space, with numerous people sitting on them - families, couples, and individuals of various ages are relaxing and socializing. The crowd includes people wearing casual clothing in various colors including black, purple, pink, and white.\n\nBehind the seating area, there's a row of traditional British-style buildings with a mix of architectural features. The buildings include red brick structures and cream or white-painted facades. Visible storefronts include \"Barnitts\" on the left side, and other retail shops with large windows at street level. The buildings are mostly 2-3 stories tall with traditional windows and varied rooflines.\n\nThe ground appears to be gray paving stones, and there are some fallen leaves scattered on the surface. The overall atmosphere appears lively and pleasant, with people walking through the space and others stopped to enjoy the street performance or simply rest on the benches.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "extracted_frames\\video-12818_singular_display\\video-12818_singular_display_129.98s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a bustling pedestrian area or town square on a sunny day. In the foreground, there's a street performer standing at a microphone with an open instrument case on the ground for tips. The performer appears to be entertaining a diverse crowd of people who are sitting on wooden benches and standing around the area.\n\nThe scene is framed by large, leafy green trees that provide dappled shade across the grey paved ground, where fallen leaves are scattered. Behind the gathering, there's a row of mixed-architecture buildings - including both red brick structures and cream-colored facades with traditional shopfronts at street level. The shops have large windows and appear to be retail establishments.\n\nThe sky above is bright blue with white puffy clouds. The crowd includes people of various ages - adults and children - dressed in casual clothing including red, black, white and other colored garments. Some people are walking through the space while others are seated or standing to watch the performance. The overall atmosphere appears relaxed and communal, typical of a town center or market square on a pleasant day.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "extracted_frames\\video-12818_singular_display\\video-12818_singular_display_169.98s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a bustling pedestrian shopping area on a sunny day with scattered white clouds in a blue sky. The scene is centered around a paved plaza with gray stone tiles, where a street performer in black clothing is playing music with a microphone stand and open instrument case on the ground. \n\nGroups of people are gathered to watch, with many sitting on concrete steps or benches that border the plaza. The audience includes people of various ages, some wearing casual clothing in colors like red, white, and black. Several elderly individuals can be seen using walking aids.\n\nThe plaza is framed by mature trees with full green foliage that provide dappled shade across the ground. Behind the performance area, there's a row of shops and businesses in buildings of varying heights - including red brick structures and cream-colored facades. Store fronts with large windows are visible at street level, and overhead power lines cross the scene.\n\nThe architecture appears to be a mix of traditional British high street buildings, with both older and more modern storefronts visible. The overall atmosphere suggests this is a town center or shopping district during what appears to be midday, with natural sunlight filtering through the tree canopy.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunlight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "extracted_frames\\video-12818_singular_display\\video-12818_singular_display_49.99s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a bustling pedestrian area on a sunny day with a bright blue sky dotted with white clouds. In the center of the scene, a street performer stands with an open instrument case at their feet, appearing to be singing or speaking to an audience. \n\nThe performer is surrounded by people sitting on stone steps or ledges that form part of the plaza's seating area. The audience includes adults and children, with some wearing casual summer clothing in various colors including red, white, and pink.\n\nLarge mature trees with full green foliage provide dappled shade across the paved area, which appears to be made of grey stone or concrete slabs. A few fallen leaves are scattered on the ground.\n\nIn the background, there's a row of shops and buildings with a mix of architectural styles - some with red brick facades and others with cream or white-painted fronts. Store signs are visible, including what appears to be \"Barnitts\" on the left side. The buildings have traditional features like sash windows and varied rooflines.\n\nThe overall scene captures a typical day of street entertainment in what appears to be a British town center or shopping district, with the community gathering to enjoy outdoor performance in pleasant weather.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "extracted_frames\\video-12818_singular_display\\video-12818_singular_display_84.99s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a bustling town square or pedestrian area on a sunny day with a blue sky dotted with white clouds. Large, leafy green trees provide shade over the paved area. In the center, there's a street performer with a microphone stand and an open instrument case on the ground. Around them, people are gathered - some sitting on stone steps or benches, others standing and watching. \n\nThe audience includes people of various ages, with someone in a bright red jacket visible on the right side. Behind the performance area, there's a row of buildings including brick structures and shops with storefronts. The architecture appears to be a mix of older buildings with both red brick and cream-colored facades. Store signs are visible, including what appears to be retail shops at street level.\n\nThe ground is paved with large gray stone tiles, and there are some fallen leaves scattered on the surface. The overall scene has a pleasant, community atmosphere with people enjoying outdoor entertainment in what appears to be a town center or market square setting.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "converted_images\\photo-14137_singular_display_fullPicture.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a garden pathway with a low stone retaining wall running along its edge. The wall appears to be made of rough-cut limestone or similar pale stone blocks. Along the path, there are several mature trees with deeply textured, cracked bark that appears grayish-white in color. The trees have full canopies of green leaves overhead.\n\nIn the planted area between the trees, there is understory vegetation including what appears to be young shrubs or small plants with broad, palmate leaves. Ferns with bright green fronds are visible growing at the base of the trees. The ground is covered with brown fallen leaves, suggesting early autumn. \n\nBehind the planted area is a wooden lattice fence with a square grid pattern, appearing to be stained a natural brown color. The fence provides a backdrop and boundary for the garden space. A concrete or paved walkway runs alongside the stone wall, with some scattered fallen leaves on its surface. The overall lighting suggests this photo was taken during daytime with filtered sunlight coming through the tree canopy above.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "converted_images\\photo-14703_singular_display_fullPicture.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-opus-4-1-20250805_narrative_20251015_011626",
+      "workflow_name": "europe",
+      "description": "This image shows a seaside promenade on a clear day with a bright blue sky. In the foreground, there's a bronze or green-colored statue of a kneeling figure wearing what appears to be a netted or textured hat and clothing, positioned on a concrete base. A small plaque is visible on the ground near the statue. \n\nThe scene features a well-maintained grassy area with vibrant green lawn that slopes gently toward a paved walkway. Along the waterfront, there's a white metal railing that runs parallel to the ocean. The ocean itself appears deep blue, meeting the horizon under the cloudless sky.\n\nIn the middle distance, several people can be seen gathered near the railing, appearing as small silhouettes against the bright background. There are also some bushes or shrubs visible, and what looks like street lighting poles along the promenade. The paved area shows a mix of textures, with what appears to be both concrete and asphalt surfaces. The overall scene suggests a popular coastal walking area or tourist destination on what appears to be a perfect sunny day.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-1-20250805",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_011626"
+    },
+    {
+      "filename": "converted_images\\IMG_4296.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_cottage_ollama_qwen3-vl_235b-cloud_narrative_20251021_064730",
+      "workflow_name": "cottage",
+      "description": "The image shows a woodland scene during autumn. The ground is covered in a thick layer of fallen leaves in shades of brown, tan, gray, and muted red. Scattered among the leaves are small green ferns and patches of low-lying vegetation with reddish-purple leaves. \n\nTall, slender tree trunks rise vertically, mostly bare of leaves, with smooth to slightly textured bark in gray and brown tones. Some branches still hold sparse clusters of leaves in yellow, orange, and green. A few trees retain more foliage, particularly in the midground, where leaves appear in shades of yellow-green and pale gold.\n\nIn the background, the forest thickens with more trees, some showing hints of red and orange foliage. A small, bright red object—possibly a flag or marker—is visible through the trees in the upper right, partially obscured by branches. The sky, visible through the canopy, is a pale, clear blue. Sunlight filters through the trees from the right, casting a warm glow and creating subtle highlights on leaves and trunks. No animals or human-made structures are visible beyond the red marker.\nTimestamp: 2025-10-21 07:05:22",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251021_064730"
+    },
+    {
+      "filename": "converted_images\\IMG_4298.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_claude_claude-opus-4-20250514_narrative_20251023_090434",
+      "workflow_name": "25imagetest",
+      "description": "This image shows an autumn forest scene with a paved road or path visible along the left edge. The ground is heavily covered with fallen brown leaves. In the center of the image, there's a cluster of evergreen trees (appearing to be pine or similar conifers) with bright green needles that stand out against the surrounding deciduous trees. The deciduous trees in the background display golden-yellow and brown autumn foliage, with their branches creating an intricate pattern against a clear blue sky. Along the roadside on the right, there's a gray utility box or electrical meter mounted on a post. The lighting suggests this photo was taken during daytime, with sunlight filtering through the tree canopy. The overall scene captures the contrast between the evergreen conifers and the seasonal changes in the deciduous forest during fall.\nTimestamp: 2025-10-23 09:09:52",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-opus-4-20250514",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_090434"
+    },
+    {
+      "filename": "converted_images\\IMG_4294.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_moondream_narrative_20251023_070536",
+      "workflow_name": "25imagetest",
+      "description": "The image shows the sun setting behind trees in an autumn forest scene with yellow leaves on some of them against blue sky background showing that it is fall season or late afternoon time when sunlight has to pass through more layers for reaching us from a distance due to Earth's atmosphere and rotation around its axis, making colors appear warmer.\nThe image also contains the words \"Sun\" in orange color near trees which indicates this part of earth where sun sets behind them at an angle that makes it look like they are on fire or burning bright with warm hues as opposed a cool blue sky background seen from another perspective and distance away, making for beautiful autumnal scenery.\nTimestamp: 2025-10-23 07:11:17",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_070536"
+    },
+    {
+      "filename": "converted_images\\IMG_4299.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_qwen3-vl_235b-cloud_narrative_20251023_095048",
+      "workflow_name": "25imagetest",
+      "description": "The foreground is a patch of grass covered in a fine, crystalline layer of frost. Individual blades of grass are visible beneath the frost, some bent or flattened, others standing upright, all coated in a white, granular sheen. The frost appears denser in some areas, creating a textured, almost feathery surface. Scattered among the grass are a few dry, brown leaves and small twigs.\n\nBehind the frosted grass, a dense thicket of tall, dry reeds and shrubs rises. The reeds are pale beige and tan, with thin, wiry stalks that crisscross and lean in various directions. Interspersed among them are leafy shrubs with small, yellowish-green leaves, some tinged with brown. The foliage is dense, forming a wall-like barrier.\n\nIn the background, taller trees are visible, their branches mostly bare or sparsely leafed, with hints of yellow and brown foliage catching the light. The sky above is bright, with a warm, golden glow emanating from the upper right corner, suggesting low-angle sunlight. The light casts a soft, hazy illumination over the scene, particularly highlighting the upper portions of the shrubs and trees. The overall color palette consists of muted greens, browns, tans, and whites, contrasted with the warm golden tones of the sunlight.\nTimestamp: 2025-10-23 09:55:06",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_095048"
+    },
+    {
+      "filename": "converted_images\\IMG_4296.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_gemma3_latest_narrative_20251023_173127",
+      "workflow_name": "25imagetest",
+      "description": "Here's a descriptive narrative of the image:\n\nThe scene depicts a wooded area with a bright, diffused sunlight filtering through the trees. The ground is covered in a thick layer of fallen brown leaves. Scattered throughout the leaf litter are small patches of bright green foliage. Several slender, gray tree trunks rise vertically from the ground. Some of the trunks display patches of red and orange leaves. The branches of the trees extend upwards, creating a dense network of lines against the sky. The overall impression is one of a shaded, wooded area with a mix of brown, green, and red colors.\nTimestamp: 2025-10-23 17:45:30",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "gemma3:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251023_173127"
+    },
+    {
+      "filename": "converted_images\\IMG_4282.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_25imagetest_ollama_granite3.2-vision_latest_detailed_20251024_003518",
+      "workflow_name": "25imagetest",
+      "description": "The photograph captures a serene lakeside scene with calm water reflecting the clear blue sky above, dotted sparsely by trees in the distance under bright sunlight that bathes the landscape evenly across its expanse.\nTimestamp: 2025-10-24 00:55:04",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "granite3.2-vision:latest",
+      "prompt_style": "detailed",
+      "timestamp": "20251024_003518"
+    },
+    {
+      "filename": "converted_images\\IMG_1271.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2024_07_ollama_gemma3_latest_narrative_20251014_165838",
+      "workflow_name": "2024_07",
+      "description": "Here's a descriptive narrative of the image:\n\nThe image depicts a paved sidewalk running alongside a residential street on a bright, sunny day. The sidewalk is a light gray color and appears slightly worn. It curves gently to the right. \n\nOn either side of the sidewalk are mature trees with thick, gray trunks and lush, green foliage. The branches of the trees extend outwards, creating a shaded canopy above the sidewalk. \n\nTo the left of the sidewalk is a single-story, light-colored building with a white roof and several windows. To the right, across the street, is a red and white stop sign. \n\nThe street itself is lined with more trees and houses. A green utility pole stands on the right side of the street. The grass along the sidewalk is a vibrant green. The sky is a pale blue with scattered clouds. The overall scene is a typical suburban streetscape.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "gemma3:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251014_165838"
+    },
+    {
+      "filename": "converted_images\\IMG_1367.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2024_07_ollama_gemma3_latest_narrative_20251014_165838",
+      "workflow_name": "2024_07",
+      "description": "Here's a detailed description of the image, focusing solely on observation and avoiding interpretation:\n\nThe image shows a section of seating within a large, open-air stadium. The stadium’s roof is a massive, white, arched structure with numerous vertical support columns. Sunlight streams through the columns, creating a dappled effect on the seating area below.\n\nThe seating is comprised of rows of green plastic chairs. Each chair has a number “18” printed on the side. Many of the chairs have small, circular stickers with the Milwaukee Brewers logo on them. \n\nPeople are seated in the chairs. There are men and women of various ages. Many are wearing hats, including white baseball caps and a straw hat. Some are wearing sunglasses. Several individuals are holding drinks, including a red beverage in a plastic cup. Some are eating. \n\nIn the background, beyond the immediate seating area, there is a large crowd of people. Many are wearing yellow and blue shirts. There are several figures in the distance, some holding up phones. \n\nThe ground in front of the seating is a light brown color. The overall scene is brightly lit by the sunlight.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "gemma3:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251014_165838"
+    },
+    {
+      "filename": "extracted_frames\\IMG_2716\\IMG_2716_0.00s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2025_04_ollama_moondream_narrative_20251014_133404",
+      "workflow_name": "2025_04",
+      "description": "The image shows an outdoor soccer field with two players on the grassy expanse of green turf under what appears to be clear skies or bright sunshine in daytime conditions as well-lit by natural light from above that illuminates a large building behind them which is made up mostly out of red brick. The player closest, wearing black pants and shoes stands near an advertisement for \"Piggy Wriggly\".",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunshine",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251014_133404"
+    },
+    {
+      "filename": "converted_images\\IMG_2718.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2025_04_ollama_moondream_narrative_20251014_133404",
+      "workflow_name": "2025_04",
+      "description": "The image shows an outdoor soccer field with several people playing on it in the background behind some bleachers that are empty of spectators at this time but filled later when they watch games or events unfold during sunset hours as seen from a high angle above them all looking down upon their game and surroundings, which include tall buildings. \nThe sky is painted pinkish-orange with clouds scattered across it in the background adding to its beauty while also providing some shade for those watching at home plate on this sunny day under these conditions during sunset hours as well.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "sunset"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251014_133404"
+    },
+    {
+      "filename": "extracted_frames\\IMG_2719\\IMG_2719_0.00s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2025_04_ollama_moondream_narrative_20251014_133404",
+      "workflow_name": "2025_04",
+      "description": "The image shows an outdoor soccer game taking place on what appears to be the field of a stadium or sports complex in New York City during daylight hours under clear skies with some clouds visible above them as well. The players are actively engaged in their match while spectators can also be seen watching from various locations around and behind bleachers, which include red seats arranged at different angles for optimal viewing experiences by those seated there to enjoy the game's action unfold on a sunny day like this one under an open sky with some clouds scattered across it.\nThe field is surrounded by tall buildings in New York City that add depth of context about where they are playing and watching from, while also providing shade or shelter for spectators as needed depending upon weather conditions at any given moment during the game's duration - which could range anywhere between a few hours to several days based on when this image was taken.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251014_133404"
+    },
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_1583.29s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "In the foreground, two women stand side by side, facing slightly toward the right of the frame. The woman on the left has long, straight blonde hair and is wearing a red and white raglan-style t-shirt. Her mouth is slightly open, and her expression appears surprised or concerned. The woman on the right has long, wavy brown hair with lighter highlights, and she wears a black lace choker necklace. Her eyebrows are furrowed, and her lips are parted, conveying a look of disbelief or annoyance. She is wearing a red top, though only the straps and upper chest are visible.\n\nBehind them, the background is softly blurred, indicating a shallow depth of field. A crowd of people is visible, some in motion, suggesting an outdoor gathering or party. Several individuals wear red and white clothing, possibly indicating team colors or a themed event. Trees with green foliage form the backdrop, and sunlight filters through, casting dappled light across the scene. To the far right, a green canopy tent is partially visible, with a white pole supporting it. Under the tent, a person in a red top and light-colored shorts stands facing away from the camera. The overall lighting is bright and natural, consistent with a daytime outdoor setting.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_1672.63s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "A woman with blonde hair tied back in a low ponytail is shown in profile, drinking from a clear plastic cup with a lid. The cup contains a brownish-orange liquid with visible ice cubes. Her right hand grips the cup near the top, while her left hand supports the bottom. She wears a long-sleeved, earth-toned brown shirt with visible seams and stitching. A thin gold-colored bracelet is on her right wrist, and a black wristband or watch is on her left. Her ear is visible, adorned with a small stud earring. The background consists of out-of-focus green tree leaves and branches, with patches of bright sky visible through the foliage. Sunlight filters through the trees, creating a dappled effect on the scene. The woman’s eyes are closed as she drinks.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_1677.59s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "A woman with shoulder-length blonde hair stands outdoors, angled slightly to the right, drinking from a clear plastic cup with a lid. The cup contains a reddish-brown liquid with visible ice cubes. She holds the cup with both hands, her right hand gripping the side and her left hand supporting the base. She wears a long-sleeved, earth-toned brown jacket with visible seams and a collar. A thin gold-colored bracelet is visible on her right wrist, and a black wristband or watch is on her left. Her eyes are closed as she drinks. Behind her, a dense canopy of green leaves from tall trees fills the background, with patches of bright sky visible through gaps in the foliage. The lighting is natural and bright, suggesting daytime, with sunlight filtering through the leaves and casting soft highlights on her hair and jacket.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_1687.52s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "The scene is outdoors on a sunny day, with lush green trees forming a backdrop to the left. In the center and right, a large white building with classical columns and multiple windows stands prominently. On the second-floor balcony, several people are visible, some leaning over the railing. A banner hangs from the balcony with the text “TRI PI” in large red letters, followed by smaller text reading “ALL PROCEEDS BENEFIT A CHILDREN’S HOSPITAL.” To the right of the banner, Greek letters “ΣΩΔ” are painted in purple on the white wall.\n\nIn front of the building, a colorful, multi-tiered float or stage structure dominates the foreground. It features bright pink and red panels decorated with cartoonish stickers, including smiley faces, stars, and abstract shapes. Two yellow dome-shaped structures resembling stylized helmets or UFOs sit atop the float, each mounted on a striped base of red, green, and yellow. A tall, vertical pink column rises from the structure, also covered in stickers and topped with a small figure.\n\nTo the left of the float, a woman with blonde hair, wearing a brown top and blue jeans, stands on a raised platform. She holds a microphone and appears to be speaking or singing. Below her, a crowd of people, mostly young women, are gathered. Some are seated on the ground, others standing. Many hold red plastic cups. In the lower left, a red folding table holds more red cups and a large blue cooler. A white pop-up tent is visible behind the table, with people milling around it.\n\nThe ground is grassy and uneven, with scattered blankets and pillows in pastel colors—pink, blue, and white—spread out in front of the float. The overall color palette is vibrant, with bright pinks, yellows, reds, and greens contrasting against the white building and natural greenery. The atmosphere appears festive and organized, with people engaged in watching or participating in the event.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_1697.45s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "In the foreground, a person with light brown hair tied back is bent forward at the waist, arms raised slightly behind them. They wear a brown jacket over a black-and-white horizontally striped shirt and blue jeans. Their face is angled downward, partially obscured by motion blur.\n\nBehind them, a crowd of people is gathered on a grassy lawn and around a white-columned porch. Many hold blue plastic cups. The crowd includes individuals in casual summer attire: tank tops, t-shirts, shorts, and swimsuits. Some wear sunglasses. A few people are clapping or covering their mouths with their hands.\n\nOn the porch, a white railing runs horizontally across the frame. Behind it, several people stand or lean against the railing. One person holds a large white sign with red and black handwritten text: “ALL PROCEEDS BENEFIT ASSBURGERS RESEARCH.” The letters are uneven and bold.\n\nThe background includes green trees and shrubs under bright daylight. The ground is a mix of grass and dirt. A red brick wall is visible beneath the porch. The overall scene is outdoors, crowded, and appears to be during a daytime social gathering.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_4754.83s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "A man with short brown hair, wearing a solid blue long-sleeved shirt, stands in profile facing right. His mouth is open mid-expression, and his eyes are directed forward. He is positioned in the foreground on the right side of the frame. The ground is a flat, dry expanse of light beige sand or dirt, sparsely dotted with small, dry, brownish-yellow tumbleweeds and patches of low, pale green grass. In the background, a range of distant mountains stretches across the horizon, their slopes appearing in muted tones of gray, tan, and faint blue, with some snow visible on the higher peaks. The sky above is a pale, hazy blue with faint, wispy white clouds. The lighting is bright and even, suggesting midday sunlight. The overall scene is arid and open, with no visible structures or other people.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "extracted_frames\\vacation (1989)\\vacation (1989)_5335.54s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_qwen3-vl_235b-cloud_narrative_20251015_063813",
+      "workflow_name": "idt_images",
+      "description": "A large crowd of people is gathered outdoors under bright daylight. In the center of the frame stands a tall, vertical sign with a black background and red decorative borders. The sign reads “VELOCIRAPTOR” in bold, stylized white letters with a red outline, arched over a red circular emblem containing the number “3” in white. Below that, in white capital letters, it says “WAIT TIME” and “HOURS FROM THIS POINT,” with a white downward-pointing arrow beneath. At the bottom of the sign, smaller white text reads “DON’T WAIT!” followed by additional unreadable text and a small rectangular logo.\n\nThe crowd surrounding the sign consists of adults and children of varying ages, dressed in casual clothing. Visible colors include blue, pink, white, gray, and plaid patterns. Some individuals wear hats, sunglasses, or carry bags. The people are standing close together, facing various directions, with some looking toward the sign and others engaged in conversation or looking away. The background shows more people and hints of greenery and structures, suggesting an outdoor amusement park or event setting. The overall atmosphere is busy and populated, with no single individual dominating the scene.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "bright",
+          "daylight"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_063813"
+    },
+    {
+      "filename": "converted_images\\10\\IMG_0085.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2023archive_ollama_qwen3-vl_235b-cloud_narrative_20251015_081702",
+      "workflow_name": "2023archive",
+      "description": "A bright orange SUV with black fender flares and side steps is parked along a curb on a paved street. The vehicle’s side panels feature a geometric pattern in black, gray, and white. Its windows are tinted, reflecting the surrounding buildings and sky. A black bicycle with a rear rack is locked to a silver parking meter on the sidewalk beside the SUV. The sidewalk is made of interlocking gray and reddish-brown pavers, and a circular metal manhole cover is embedded in it near the bike.\n\nBehind the orange SUV, a white sedan is parked, its rear visible, showing sleek taillights and a subtle rear spoiler. Further down the street, a white pickup truck is partially visible. A no-left-turn sign and an orange diamond-shaped construction sign are posted on poles along the curb.\n\nThe buildings lining the street have stucco exteriors in beige and light tan tones. One building features a sign reading “COS BAR” in black letters on a white background, mounted beneath a rolled-up awning. Another sign, framed and hanging from a bracket, reads “Chico’s Fine Art.” A green awning extends over a second-story balcony, where a large turquoise patio umbrella is open. A blue fabric awning with scalloped edges hangs overhead on the left side of the frame, partially obscuring the sky.\n\nThe sky is blue with scattered white clouds. Trees with green foliage and some red-leafed shrubs are visible behind the buildings. A streetlamp with a curved arm stands near the sidewalk, and a few pedestrians can be seen in the distance. The overall lighting suggests a sunny day with clear visibility.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_081702"
+    },
+    {
+      "filename": "converted_images\\10\\IMG_0092.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2023archive_ollama_qwen3-vl_235b-cloud_narrative_20251015_081702",
+      "workflow_name": "2023archive",
+      "description": "A sunny day illuminates a paved sidewalk lined with storefronts. Three women are visible from behind, walking or standing along the walkway. The woman in the center wears a blue patterned blouse with white geometric and floral motifs, light blue jeans, and carries a green patterned shoulder bag. To her left, a woman in a maroon long-sleeve shirt and blue jeans carries a black-and-white patterned crossbody bag. To the right, a woman in a bright blue short-sleeve shirt, black capri pants, and pink slide sandals stands near a shop entrance, wearing a red baseball cap.\n\nAbove them, a large wooden sign painted blue and white reads “YI YO” at the top, with smaller signs beneath listing “JEWELRY ★ GIFTS ★ SUNDRIES” and “BOOKS OF THE SOUTHWEST ★”. A yellow flag and a black flag with white lettering hang from the building’s awning. Below the flags, a smaller sign reads “Cafe Pajarito’s Gallery & Books”.\n\nThe storefront to the right features a large glass window displaying colorful paper banners (papel picado) in red, green, blue, and orange, strung across the top. Inside, shelves hold various items including a green backpack, a blue water bottle, and a large tapestry depicting a forest scene with warm orange and red tones. The window ledge is lined with a decorative tile border in blue and white geometric patterns.\n\nIn the background, a red octagonal stop sign is visible, along with a U.S. flag on a pole, a white delivery van, and a streetlamp. The sky is bright blue with scattered white clouds. The sidewalk is made of interlocking gray pavers, and a portion of an orange-and-white striped traffic barrier is visible on the far left.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_081702"
+    },
+    {
+      "filename": "2023\\10\\IMG_0231.JPG",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2023archive_ollama_qwen3-vl_235b-cloud_narrative_20251015_081702",
+      "workflow_name": "2023archive",
+      "description": "The image is oriented vertically, with the top portion showing a field of dry, golden-brown grass interspersed with patches of green vegetation and bare earth. A wooden fence runs horizontally across the middle of the frame, composed of vertical posts and horizontal rails, with wire mesh attached. Behind the fence, a line of shrubs and small trees displays autumnal colors—yellows, oranges, and muted greens—with some bare branches visible. A single utility pole stands among the trees, with crossarms and insulators, and thin power lines extend horizontally across the lower portion of the image. The sky above is a clear, uniform blue, unbroken by clouds. The entire scene is reflected upside down in a smooth, mirror-like surface below the horizon line, creating a symmetrical composition. The reflection duplicates the fence, vegetation, utility pole, and power lines with precise clarity, and the blue sky is mirrored as a deep, uninterrupted expanse. The lighting is even and bright, suggesting daytime with direct sunlight.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_081702"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0247\\IMG_0247_100.00s.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2023archive_ollama_qwen3-vl_235b-cloud_narrative_20251015_081702",
+      "workflow_name": "2023archive",
+      "description": "The image presents a wide, horizontal landscape under a vast, cloudless sky that transitions from a deep azure at the top to a lighter, pale blue near the horizon. Spanning the upper third of the frame, several thin, parallel power lines stretch horizontally across the sky, supported by unseen poles.\n\nBelow the sky, a rolling hillside rises, covered in a dense mix of trees and shrubs. The foliage displays a variety of greens, from deep forest green to lighter, yellowish-green tones, with some trees showing sparse, pale brown or gray branches. A few leafless, skeletal trees stand out against the greener canopy, particularly on the right side.\n\nIn the mid-ground, nestled among the trees, a light-colored, possibly tan or beige, structure is visible on the crest of the hill. It appears to be a building or a large rock formation, partially obscured by the vegetation.\n\nThe foreground consists of dry, golden-brown grasses and low, silvery-green shrubs, likely sagebrush. A weathered wooden fence with vertical posts and horizontal rails runs across the lower portion of the image, slightly left of center. A metal gate, also weathered and gray, is integrated into the fence line. To the far right, a small, rounded mound of light brown earth or gravel is visible near the fence line. The overall lighting is bright and even, suggesting a clear, sunny day.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_081702"
+    },
+    {
+      "filename": "images\\COCO_val2014_000000000164.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_idt_images_ollama_moondream_latest_narrative_20251016_162905",
+      "workflow_name": "idt_images",
+      "description": "The image shows the interior of an apartment kitchen with white walls that reflect light from above to create bright spots in space below them on either side. The countertops are cluttered but well-organized; there is at least one sink visible near a window under which natural sunlight streams through, illuminating various objects and surfaces within its reach including several wine glasses arranged neatly by the windowsill with their stems pointing towards each other as if they were engaged in conversation or waiting to be filled.\n \nIn addition to these items on display for all eyes can also see an array of dishes stacked atop one another near a shelf, suggesting that this kitchen is well-equipped and used regularly but not necessarily tidily at the moment captured by the image's photographer who has chosen their words carefully while describing it as \"very messy\".",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251016_162905"
+    },
+    {
+      "filename": "converted_images\\photo-18456_singular_display_fullPicture.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2025_09_ollama_qwen3-vl_235b-cloud_narrative_20251015_043151",
+      "workflow_name": "2025_09",
+      "description": "The image captures a section of a large outdoor mural painted on a concrete wall under a bright, clear blue sky. The sun, positioned in the upper left, shines intensely, creating a lens flare and casting strong highlights across the scene.\n\nThe mural features stylized, cartoon-like figures and objects rendered in bold outlines and flat areas of color. Dominating the right side is a large portrait of a woman with shoulder-length, wavy brown hair, blue eyes, and red lips. She wears a red sleeveless top. Her face is depicted with simplified, geometric features.\n\nTo her left, a blue, anthropomorphic bottle with a white label, red eyes, and a smiling mouth stands on red high-heeled shoes, holding a black camera. Beside it, a tall, blue streetlamp with a white, fluted lampshade stands upright. Further left, a light blue, boxy figure with legs and arms, resembling a record player or DJ mixer, has two black vinyl records on its surface and is topped with a red-and-white polka-dotted umbrella. A small, red, stool-like figure with legs and a white, toothy grin sits near the base of the record player.\n\nIn the background, stylized city buildings are visible: one is a tall, gray skyscraper with a grid of white windows, and another is a simpler, blocky structure. The ground plane is rendered in shades of gray.\n\nOn the far right edge of the mural, a white, speech-bubble-shaped area contains handwritten text in red and black ink, including names like “HEYD,” “URSUL,” “UTE,” “MARITA,” “HANNE,” “FRANZI,” “MARIA,” and “MARTI.” Above this, a partial image of a globe is visible within a black rectangular frame. The mural is painted on a weathered concrete wall, with a concrete curb visible at the bottom edge of the frame. The overall color palette includes blues, reds, browns, grays, and white, with the bright blue sky and intense sunlight contrasting with the painted surface.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunlight",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_043151"
+    },
+    {
+      "filename": "converted_images\\photo-18767_singular_display_fullPicture.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_2025_09_ollama_qwen3-vl_235b-cloud_narrative_20251015_043151",
+      "workflow_name": "2025_09",
+      "description": "The image shows the interior of an ice cream shop viewed from a slightly angled perspective, looking into the service area. The floor in the foreground is paved with rectangular tiles in varying shades of gray, beige, and muted brown, arranged in a staggered pattern. To the left, a vertical column or wall section is clad in large, rectangular, off-white ceramic tiles with visible grout lines.\n\nThe counter area is elevated on a beige-painted platform. A long, glass-fronted refrigerated display case runs horizontally across the lower portion of the frame, showcasing multiple rows of pre-packaged ice cream pints and tubs. The containers vary in color and labeling, with some featuring yellow, brown, white, and green packaging. Small white rectangular labels are visible in front of each item inside the case.\n\nAbove the display case, a large, illuminated digital menu board spans the width of the service area. The board is divided into sections with headings such as “MAXI CONO,” “CLASSIC EIS,” “CLASSIC PLUS EIS,” “GOURMET EIS,” and others. Each section includes text descriptions and images of ice cream products, including cones, sundaes, and scoops in bowls. The background of the menu board is white with black and gray text, and the product images are colorful and detailed.\n\nBehind the counter, a person wearing a black long-sleeved shirt and a black beanie stands facing forward, partially visible behind the display case. To their right, shelves are stocked with stacks of white paper cups and containers. A white cash register or point-of-sale terminal with a screen is positioned on the counter. To the left of the register, a wicker basket holds a collection of brown paper ice cream cones. A white wall-mounted dispenser, possibly for napkins or spoons, is visible on the wall behind the counter.\n\nThe ceiling above the menu board features a patterned surface with concentric circular motifs in a light beige or cream color. The lighting is bright and even, illuminating the entire scene clearly. In the background, through a window or opening behind the counter, a glimpse of an adjacent building with red brick and windows is visible.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "bright",
+          "illuminated"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_043151"
+    },
+    {
+      "filename": "converted_images\\photo-11263_singular_display_fullPicture.jpg",
+      "score": 22.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_europe_claude_claude-3-haiku-20240307_narrative_20251015_001947",
+      "workflow_name": "europe",
+      "description": "The image depicts a lively urban street scene. The buildings lining the street have a mix of architectural styles, with brick and colorful facades adding visual interest. A blue Uber Eats sign is prominently displayed, indicating the availability of food delivery services in the area.\n\nPedestrians can be seen walking along the sidewalk, some appearing to be carrying bags or other items. A bicycle is parked near the entrance to one of the buildings, suggesting this area is frequented by cyclists.\n\nThe sky is a bright blue, with scattered clouds, creating a pleasant, sunny atmosphere. The overall scene conveys a sense of activity and liveliness in this urban setting.",
+      "match_details": {
+        "required_matches": [
+          "sun"
+        ],
+        "preferred_matches": [
+          "sunny",
+          "bright"
+        ],
+        "excluded_matches": [],
+        "filter_bonuses": {
+          "preferred_prompt": true
+        },
+        "passes_filters": true
+      },
+      "provider": "claude",
+      "model": "claude-3-haiku-20240307",
+      "prompt_style": "narrative",
+      "timestamp": "20251015_001947"
+    }
+  ]
+}

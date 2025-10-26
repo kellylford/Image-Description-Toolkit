@@ -1,0 +1,34 @@
+{
+  "gallery_name": "test",
+  "sources": {
+    "directories": [
+      "//qnap/home/idt/descriptions"
+    ],
+    "workflow_patterns": [
+      "*"
+    ]
+  },
+  "content_rules": {
+    "required_keywords": [
+      "water"
+    ],
+    "preferred_keywords": [
+      "sun"
+    ],
+    "excluded_keywords": [
+      "building"
+    ],
+    "min_keyword_matches": 1,
+    "case_sensitive": false
+  },
+  "filters": {
+    "min_description_length": 0,
+    "preferred_prompts": [],
+    "preferred_models": []
+  },
+  "output": {
+    "max_images": 100,
+    "sort_by": "keyword_relevance",
+    "include_metadata": true
+  }
+}

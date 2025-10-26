@@ -1,0 +1,1014 @@
+{
+  "version": "1.0",
+  "directory_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330",
+  "directory_paths": [
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330",
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916"
+  ],
+  "items": {
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\03\\IMG_8898.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\03\\IMG_8898.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482740636_0",
+          "text": "A musician with short, white hair stands center stage, holding a bright yellow electric guitar with a black pickguard and white binding. He wears a black, short-sleeved button-up shirt over a white undershirt, and dark pants with a light-colored stripe down the side. His right arm is raised mid-gesture, fingers slightly curled, while his left hand rests near the guitar\u2019s neck. He sings into a microphone mounted on a stand directly in front of him.\n\nBehind him, a drummer with light-colored, tousled hair sits at a drum kit. The kit includes multiple cymbals, some reflecting purple and pink stage lighting, and several drums with dark shells. A microphone is positioned near the drummer\u2019s mouth. To the right of the drummer, a black speaker cabinet and other stage equipment are visible.\n\nThe stage floor is bathed in deep purple light, and the backdrop is a textured wall illuminated in gradients of magenta, pink, and orange. In the foreground, the silhouettes of audience members\u2019 heads are visible, some with hands raised. The overall lighting casts a warm, saturated glow across the scene, with sharp contrasts between the brightly lit performer and the darker foreground and background elements.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\04\\IMG_1015.PNG": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\04\\IMG_1015.PNG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482755323_0",
+          "text": "The image displays a smartphone lock screen with a dark, star-speckled night sky above a rugged, layered rock formation. The rocks are predominantly off-white and light gray, with striations and patches of deep orange and reddish-brown, suggesting sedimentary layers. The top of the screen shows status indicators: \u201cT-Mobile Wi-Fi\u201d on the left, and on the right, a cellular signal icon with two bars, a Wi-Fi symbol, and a battery indicator showing 95%.\n\nCentered near the top, white text reads \u201cWednesday, April 17,\u201d followed by a large digital clock displaying \u201c3:58\u201d in bold, white numerals. To the left of the clock, a vertical, rounded rectangular widget shows a gray bar with a small white speaker icon at the bottom.\n\nBelow the clock, two notification cards appear over the rock background. The top card has a dark brown, semi-transparent background. On the left is a white square with a red header reading \u201cTHU 18.\u201d To the right, white text reads \u201cCar servicing,\u201d followed by \u201cTomorrow at 9:30 AM\u201d and \u201cAdded to Family by Aimee Ford.\u201d The time \u201cTomorrow, 9:30 AM\u201d is aligned to the right of the card.\n\nThe second card, directly below, also has a dark brown, semi-transparent background. On the left is a circular icon with a white background and a blue and orange stylized \u201cX\u201d or starburst. The text reads \u201cEXTRA TIME!\u201d in bold white, followed by \u201cManchester City & Real Madrid are going to extra time! Watch Live Now on WISC-TV 3!\u201d in smaller white text. To the right of the text, a small blue and white thumbnail image is visible, and above it, the word \u201cnow\u201d appears in small white letters.\n\nAt the bottom of the screen, two circular icons are visible: a flashlight icon on the left and a camera icon on the right, both in white on dark gray circular backgrounds. Below them, a translucent black bar contains white text reading: \u201cCALENDAR, Tomorrow, 9:30 AM, Car servicing, Tomorrow at 9.\u201d The \u201c9:30 AM\u201d portion is highlighted in yellow.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_45.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_45.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482770529_0",
+          "text": "The image is predominantly black, occupying nearly the entire frame. In the upper right corner, there is a small, isolated dot of orange-yellow light. The dot is circular and emits a soft glow, contrasting sharply with the surrounding darkness. No other objects, textures, or colors are visible. The rest of the image remains uniformly black, with no gradients, patterns, or discernible shapes. The orange-yellow dot appears static and fixed in position.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0877.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0877.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482787833_0",
+          "text": "The image shows a beach scene under a pale blue sky with scattered, wispy white clouds near the horizon. The ocean stretches across the frame, its surface textured with small, rolling waves. The water near the shore is a mix of gray and muted blue, with white foam forming as waves break and recede. The foam lingers in thin, frothy lines along the wet sand.\n\nThe foreground is a stretch of damp, fine-grained sand, light gray in color, with darker patches where moisture has settled. Scattered across the sand are bits of seaweed\u2014dark green, brown, and black\u2014some clumped, others stretched out. Small, smooth stones and fragments of shells are interspersed among the debris. A few thin, dark twigs lie tangled in the seaweed. One small, bright orange object, possibly a piece of plastic or a shell fragment, stands out against the muted tones.\n\nIn the distance, the horizon line is broken by a faint landmass on the right, with a small, dark structure visible atop it. The sunlight reflects off the water\u2019s surface, creating shimmering highlights that contrast with the darker troughs between waves. The overall lighting is even and natural, suggesting a daytime scene with no direct overhead sun.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_35.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_35.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482805446_0",
+          "text": "The image is predominantly black, occupying nearly the entire frame. In the upper right corner, there is a small, isolated dot of orange-yellow light. The dot is circular and emits a soft glow, contrasting sharply with the surrounding darkness. No other objects, textures, or colors are visible. The composition is minimal, with the dot positioned near the edge of the frame, leaving vast empty space below and to the left. The black background is uniform and devoid of gradients or patterns.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0246\\IMG_0246_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0246\\IMG_0246_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482825229_0",
+          "text": "The image is taken from inside a vehicle, looking outward through the passenger-side window. In the immediate foreground, the interior door panel is visible, upholstered in dark, textured material resembling black leather, with fine, light-colored stitching along its seams. A horizontal trim piece, made of dark wood with a visible grain pattern, is inset into the panel.\n\nOutside the window, centered in the mid-ground, stands a cylindrical traffic barrel. It is painted with alternating horizontal bands of bright orange and white. The top of the barrel is solid orange and features a small, circular, looped handle. The barrel sits on a paved surface, likely asphalt, which borders a grassy area.\n\nBeyond the barrel, a wide expanse of green lawn stretches into the distance. Scattered across the lawn are several trees. One prominent tree on the left displays autumn foliage in shades of orange, red, and yellow, while other trees in the background have sparse or bare branches. A narrow, light-colored paved path runs horizontally across the grassy area. In the far background, a body of water is faintly visible under an overcast, pale gray sky. A few small, indistinct figures can be seen on the distant lawn. Fallen leaves, mostly brown and orange, are scattered along the edge of the pavement near the grass.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\01\\IMG_0893.PNG": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\01\\IMG_0893.PNG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482845015_0",
+          "text": "The image displays a smartphone lock screen with a dark, star-speckled night sky as the upper background. Below the sky, a large, textured rock formation dominates the lower two-thirds of the screen. The rock is primarily white and light gray, with swirling, layered bands of orange, red, and tan running horizontally and diagonally across its surface. A small, dark green shrub is visible near the base of the rock formation, nestled in a sandy, light orange depression.\n\nAt the top left, white text reads \u201cT-Mobile Wi-Fi.\u201d At the top right, status icons show cellular signal strength (two bars), Wi-Fi signal, and a battery indicator displaying \u201c59\u201d with a partially filled battery icon. Centered below the status bar, white text reads \u201cWednesday, January 24,\u201d followed by a large, bold digital clock display reading \u201c1:09.\u201d\n\nOn the left side, a vertical, rounded rectangular control with a dark gray top and light gray body contains a small white headphone icon at its base. At the bottom of the screen, two circular icons are visible: on the left, a flashlight icon; on the right, a camera icon. Between them, centered white text reads \u201cSwipe up to open.\u201d A thin, horizontal white bar is centered at the very bottom edge of the screen.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0907.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0907.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482862955_0",
+          "text": "The image shows a wide expanse of light beige sand, textured with numerous footprints, shallow depressions, and scattered small debris. The sand appears dry and granular, with variations in tone from pale tan to grayish-beige, suggesting areas of shadow and sun exposure. A long, dark, sharply defined shadow stretches diagonally across the sand from the upper right toward the lower left, likely cast by a railing or structure outside the frame.\n\nIn the upper portion of the image, a low, weathered metal barrier runs horizontally. It is rusted along its edges, with patches of orange-brown corrosion visible against its darker base. Behind the barrier, a section of calm, dark blue water is visible, reflecting a muted sky. A white metal railing with vertical posts stands above the barrier, partially visible at the top edge of the frame. The posts are cylindrical and evenly spaced, with the railing extending out of view to the left and right.\n\nScattered across the sand are small, dark fragments \u2014 possibly dried leaves, twigs, or bits of seaweed \u2014 in shades of brown and black. Some areas of the sand show faint, grid-like impressions, possibly from a textured surface that was previously in contact with it. The overall lighting is bright and direct, casting crisp shadows and highlighting the granular texture of the sand.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\04\\IMG_1013.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\04\\IMG_1013.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482882878_0",
+          "text": "A person is wearing a black, short-sleeved cotton t-shirt with a large, detailed graphic printed on the front. The graphic is framed by a thick, ornate border with a yellow-orange gradient and black outlining. At the top of the graphic, in bold, stylized red letters with a yellow outline, the text reads \u201cYESTERDAY IS HERE.\u201d Above that, in smaller yellow script, it says \u201cProte Pinkerton Presents.\u201d Below the main title, in smaller white text, it reads \u201cun onirachi romantico in due atti.\u201d\n\nThe central image is a surreal, densely packed illustration rendered in a mix of black-and-white line art and vibrant color. In the upper portion, a red-orange devil-like figure with horns, sharp teeth, and a wide grin holds a knife. Behind it, a skeleton in a red robe stands beside a red curtain. To the right, a blue-skinned face with wide eyes and a red hat appears, surrounded by flames and a small figure holding a sword. Below, a black cat with glowing white eyes sits on a ledge. A large, detailed black-and-white drawing of a man in a fedora, resting his chin on his hand, occupies the lower half. He is seated in a chair, with a cigarette in his mouth and smoke curling upward. Behind him, a landscape of jagged, rocky terrain stretches into the distance.\n\nTo the right of the man\u2019s head, a white oval contains black text: \u201cA live Music Circus Burlesque tribute to TOM WAITS in celebration of the 30th Anniversary of \u2018Frank\u2019s wild years.\u2019\u201d\n\nAlong the bottom edge of the graphic, a curved banner in white text lists tour dates and venues: \u201c12/6 MIKE, MIRAMAR 8 PM / 12/8 LACROSSE, CAVALIER 8PM / 12/15 MADISON, MAJESTIC 8PM / 12/9 BARABOO, AL RING MANSION 7PM / 12/16 WEYAUWEGA, GEROLD 8PM / 12/10 CHICAGO, REGGIES 7 PM / 12/17 TOLEDO, COLLINGWOOD 3PM.\u201d\n\nThe person wearing the shirt is standing indoors, with hands on hips, against a background of white doors and light-colored walls. The lighting is even, and the shirt appears slightly worn, with some fading around the edges of the print.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\03\\IMG_6358.jpeg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\03\\IMG_6358.jpeg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482902124_0",
+          "text": "A red fox with a bushy tail and black-tipped ears walks along a narrow, light-gray concrete sidewalk. The sidewalk runs diagonally from the lower left toward the upper right of the frame, bordered on its right by a wide expanse of mottled green and brown grass. To the left of the sidewalk, a large, leafless tree with pale gray branches extends upward, its trunk thick and dark. Behind the tree, a small, light-gray metal shed with a sloped roof and a single dark rectangular window sits on the grass. Further back, a white mailbox mounted on a wooden post stands near the edge of the sidewalk. A second, smaller tree with sparse green foliage is visible behind the shed. In the background, a white building with a dark roof is partially obscured by trees. The right edge of the image shows a section of gray asphalt road, separated from the grass by a raised concrete curb. The overall lighting is diffuse, suggesting an overcast day. The fox\u2019s fur is reddish-orange on its back and sides, with white underparts and black lower legs and paws. Its tail curves slightly upward as it moves forward.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0849.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0849.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482922546_0",
+          "text": "A wooden deck extends toward the ocean under a bright blue sky streaked with thin, wispy clouds. Several large, royal blue patio umbrellas are open, casting shadows on the weathered gray wooden planks below. The umbrellas have dark wooden poles and white finials at their tops. A white-painted wooden railing runs along the edge of the deck, partially framing the view. Beyond the railing, the ocean stretches to the horizon, its surface textured with small white-capped waves. In the foreground, a red plastic bucket sits on a low wooden surface, next to a metal basket and folded white napkins. A table holds a glass of amber liquid, a small yellow bowl, and a salt shaker. People are seated at tables: one person wears an orange shirt and a dark cap, another wears a gray shirt and sunglasses. In the background, more patrons sit under umbrellas, some in dark clothing, others in lighter tones. Strings of small, unlit bulbs hang between poles above the seating area. The sunlight creates sharp contrasts of light and shadow across the scene.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0166\\IMG_0166_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0166\\IMG_0166_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482942606_0",
+          "text": "A round, rust-colored metal fire pit sits centered on a light gray concrete driveway. The fire pit has three short, cylindrical legs and a wide, shallow bowl. Its exterior is decorated with cut-out shapes of stars and crescent moons. A black mesh spark screen, also adorned with star and moon cut-outs, covers the top, held in place by a circular metal frame with two curved handles. Inside the pit, small orange and yellow flames flicker over dark gray and black charred wood and ash.\n\nBehind the fire pit, a strip of green grass borders the driveway. Beyond the grass, a blue portable basketball hoop stands on a black base, its backboard angled slightly. A paved street runs horizontally across the middle of the image, with a red fire hydrant visible on the far side near a sidewalk. Across the street, a row of two-story suburban houses with beige, gray, and light brown siding lines the block. The houses have dark shingled roofs, white trim, and attached garages. A white SUV is parked in the driveway of one house. Young trees with thin trunks and sparse green leaves are planted along the sidewalks and front yards. The sky above is pale, suggesting early evening or late afternoon light. The concrete driveway shows faint stains and seams between slabs.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\01\\IMG_0902.PNG": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\2024\\01\\IMG_0902.PNG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482963636_0",
+          "text": "The image displays a smartphone screen with a digital ticket interface for \u201cThe Garibaldi.\u201d At the top left, the time reads \u201c1:56\u201d with a location arrow icon beside it. In the top right corner, status indicators show cellular signal strength, \u201c5G,\u201d and a battery icon at 97% charge. Below that, a circular \u201cX\u201d button is visible in the upper right.\n\nCentered on the screen is the text \u201cThe Garibaldi\u201d in bold black font, followed by smaller text reading \u201cShow operator your ticket.\u201d Beneath this is a large circular graphic with a thick blue outer ring and a white inner circle. Inside the white circle is the logo for \u201cThe Garibaldi,\u201d which features stylized orange and blue text with a small orange fish icon above the \u201ci\u201d in \u201cGaribaldi.\u201d Below the logo, the text \u201cAvalon, CA\u201d appears in small gray font.\n\nProminently displayed below the logo is the current time \u201c1:56:36 PM\u201d in large, bold, dark gray numerals. Beneath the time is a white rectangular card with rounded corners. Inside the card, the text \u201cRegular Day\u201d is enclosed in a thin black rectangular outline. Below that, \u201cAvalon, CA\u201d is written in smaller gray text. At the bottom of the card, it reads \u201cExpires Jan 28, 2024 at 12:00 AM\u201d in gray.\n\nAt the very bottom of the screen, a dark gray bar spans the width, with the text \u201cRegular Day\u201d centered in white.\n\nThe background of the entire screen is white. The layout is clean and minimal, with clear typography and distinct color contrasts between blue, orange, black, gray, and white.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\07\\IMG_0178.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\07\\IMG_0178.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482982924_0",
+          "text": "A wooden dock extends diagonally from the lower left toward the center of the frame, its weathered gray planks showing signs of exposure to water and sun. At the end of the dock, a dark wooden bench with horizontal slats and metal supports sits facing the water. To the right of the bench, a curved metal handrail rises from the dock\u2019s edge, partially submerged. The water surrounding the dock is rippled, reflecting a muted sky, with small waves lapping gently against the structure.\n\nIn the foreground, on a sandy shore, rests a small plastic children\u2019s slide. The slide\u2019s frame is bright blue, with a curved orange slide surface. A yellow horizontal bar connects the two blue side supports near the base. The sand is light brown, scattered with small twigs and bits of organic debris.\n\nBeyond the dock, the lake stretches to a distant tree line. The trees are dense and uniformly green, forming a continuous horizon. Above them, the sky is pale blue with scattered white and gray clouds. A few small, indistinct white objects\u2014possibly boats\u2014are visible near the far shore, nestled among the trees.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_30.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_30.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483010635_0",
+          "text": "The image is predominantly black, filling nearly the entire frame with a uniform, deep, and featureless darkness. In the upper right corner, there is a single, small, circular point of light. This point is orange-yellow in color, with a soft, slightly diffused edge, suggesting a gentle glow. It is isolated and stands in stark contrast to the surrounding blackness. No other objects, textures, gradients, or colors are visible anywhere else in the image. The composition is minimal, with the lone point of light positioned near the top edge and far to the right, leaving the rest of the space entirely unoccupied and dark.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\extracted_frames\\IMG_6358\\IMG_6358_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\extracted_frames\\IMG_6358\\IMG_6358_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483029963_0",
+          "text": "A red fox with a bushy tail and black-tipped ears walks across a paved road from left to right. Its fur is a rich reddish-orange along its back and sides, with white underparts and black legs. The fox is positioned mid-stride, its body low to the ground, and its head turned slightly forward.\n\nIn the foreground, a concrete curb runs horizontally across the bottom of the frame, separating the road from a patch of dormant, yellowish-green grass. A tree trunk with rough, gray-brown bark stands on the left side of the image, partially obscuring the fox\u2019s rear. Behind the fox, the road continues into the background, flanked by more grass and scattered trees\u2014some bare-branched, others evergreen.\n\nOn the far side of the road, two mailboxes are visible: one black with a red flag, mounted on a white post; the other white with a black flag, mounted on a black post. Behind them, several small outbuildings are spaced apart. One is white with a gray roof and a small rectangular window; another is green with a white roof; a third, farther right, is pale yellow with a dark roof. A utility pole stands near the center, and a few leafless trees and shrubs dot the landscape. The sky is overcast, casting diffuse, even light across the scene.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_1046.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_1046.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483065465_0",
+          "text": "The image captures a low-angle view looking upward along the towering masts of a large, traditional sailing vessel against a vivid blue sky scattered with fluffy white clouds. The masts are made of polished, warm-toned wood, rising vertically and tapering slightly as they ascend. Numerous white ropes and lines crisscross the frame, forming a complex network of rigging that extends from the masts to the deck and to unseen points above. Several flags are attached to the rigging: a black flag with a white emblem, a dark blue flag with white lettering, and a small rainbow-colored flag are visible among others.\n\nWhite canvas sails are furled and tightly bound to the wooden yards with thick, coiled ropes. The yards themselves are also made of the same warm-toned wood and are positioned horizontally across the masts. A wooden ladder with rungs is affixed to the side of the nearest mast, extending upward out of the frame. In the lower portion of the image, the backs of several people are visible on the deck. One person wears a black shirt and has short, light-colored hair. Another person has dark hair tied back with a white clip. An orange life raft or buoy with the black letters \u201cRSONS\u201d is partially visible in the bottom left corner. In the background, beyond the ship\u2019s structure, a strip of deep blue ocean meets the horizon under the sky. The lighting is bright and direct, casting sharp shadows and highlighting the textures of the wood, rope, and canvas.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\06\\IMG_0173.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\06\\IMG_0173.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483100238_0",
+          "text": "The interior of a vehicle is shown from the perspective of the driver\u2019s seat, focusing on the passenger-side door panel and side-view mirror. The door panel is black with a textured, leather-like finish. A silver-colored interior door handle is mounted horizontally, with a matching silver trim piece running diagonally above it. Below the handle, a black plastic storage pocket is visible, and within it, a small rectangular black switch or button is embedded. The side-view mirror housing is black and glossy, with a convex glass surface reflecting the scene behind the vehicle. In the reflection, a white SUV is visible, along with part of the road and a grassy area. Outside the window, the environment includes a paved road, a patch of green grass, and a yellow construction vehicle in the distance. An orange traffic cone with white reflective stripes stands near the right edge of the frame. A portion of a human hand, light-skinned, appears in the lower foreground, slightly out of focus. The lighting is bright daylight, casting clear shadows and highlights on the interior surfaces.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1586310257\\RPReplay_Final1586310257_49.92s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1586310257\\RPReplay_Final1586310257_49.92s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483129632_0",
+          "text": "The image displays a mobile application interface with a white background and a top status bar showing the time \u201c8:44\u201d in white text inside a red oval. To the right of the time, icons for cellular signal, Wi-Fi, and battery level are visible.\n\nBelow the status bar is a light gray search bar with a magnifying glass icon and placeholder text \u201cSearch templates\u201d in gray.\n\nUnderneath the search bar is a wide purple banner with white text that reads: \u201cWhat do you want to automate?\u201d followed by smaller text: \u201cStart with a template based on your favorite services, or browse templates by category.\u201d The banner has a faint, blurred cityscape background.\n\nBelow the banner, the section titled \u201cServices\u201d appears in bold black text. To the right of this heading is a blue \u201cSee all\u201d link. Five service icons are displayed horizontally:\n\n1. A dark blue square with a white stylized arrow logo, labeled \u201cDynamics 365\u201d.\n2. A light blue square with the \u201csalesforce\u201d logo in white, labeled \u201cSalesforce\u201d.\n3. A medium blue square with a white cloud icon, labeled \u201cOneDrive\u201d.\n4. A red square with a white monitor icon and \u201cSQL\u201d text, labeled \u201cSQL Server\u201d.\n5. A light blue square with a white open box logo, labeled \u201cDropbox\u201d.\n\nNext is a section titled \u201cMobile\u201d in bold black text, with a blue \u201cSee all\u201d link to the right. Three rectangular cards are displayed horizontally:\n\n- First card: Blue, gray, and red horizontal segments with icons (person, timer, bell). Text reads: \u201cSend myself a reminder in 10 minutes\u201d and \u201cUsed 326706 times\u201d.\n- Second card: Blue, yellow, and red segments with icons (person, sun, bell). Text reads: \u201cGet today\u2019s weather forecast for my current...\u201d and \u201cUsed 233387 times\u201d.\n- Third card: Blue, orange, and red segments with icons (calendar, document, bell). Text reads: \u201cGet a push notification when you receive an...\u201d and \u201cUsed 216876 times\u201d.\n\nBelow that is a section titled \u201cButton\u201d in bold black text, with a blue \u201cSee all\u201d link to the right. Three similar cards are displayed:\n\n- First card: Blue, gray, red segments with icons (person, timer, bell). Text: \u201cSend myself a reminder in 10...\u201d.\n- Second card: Blue, yellow, red segments with icons (person, sun, bell). Text: \u201cGet today\u2019s weather...\u201d.\n- Third card: Blue, teal, teal segments with icons (person, envelope). Text: \u201cClick a button to email a...\u201d.\n\nAt the bottom of the screen is a navigation bar with five icons and labels:\n\n1. \u201cActivity\u201d \u2014 a line graph icon",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0884.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0884.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483159023_0",
+          "text": "The foreground consists of damp, fine-grained sand in shades of gray and beige, marked with subtle ripples and scattered debris. Dark, tangled clumps of seaweed lie strewn across the sand, some appearing wet and glossy, others dry and brittle. Small, dark fragments\u2014possibly shells, pebbles, or organic matter\u2014are interspersed among the seaweed. A single orange-brown leaf rests near the center, contrasting with the muted tones around it. A thin, pale stick lies diagonally near the bottom right.\n\nBeyond the sand, the water\u2019s edge is defined by a frothy, white line of receding surf, glistening with reflected sunlight. The shallow water near shore is translucent, revealing the sandy bottom beneath, while further out, the ocean deepens to a dark gray-blue. Gentle waves roll in, their crests catching the light and breaking into white foam before dissolving into the shore.\n\nThe horizon is a straight, distant line where the ocean meets the sky. Above it, the sky is a pale blue, streaked with thin, wispy clouds that are white and slightly grayed at the edges. Closer to the horizon, a band of denser, flatter clouds stretches across the sky, tinged with soft gray and white. The overall lighting is bright and even, suggesting midday sun, though no direct sun is visible. The scene is devoid of people, animals, or man-made structures.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\04\\IMG_1016.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\04\\IMG_1016.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483184631_0",
+          "text": "The image shows the interior of a large, modern concert hall, viewed from an elevated position in the audience seating. The hall is dimly lit, with focused lighting illuminating the stage and parts of the balconies.\n\nThe stage is wide and dark, with a glossy black floor that reflects the overhead lights. Arranged on the stage are numerous chairs, music stands, and instruments, including a harp on the left, a grand piano near the center, and what appear to be percussion instruments and other orchestral equipment. A large, bright orange podium or lectern stands prominently near the center of the stage. Behind the stage is a massive, curved wall of vertical wooden slats, forming a sculptural acoustic panel with a flowing, wave-like design. The wall is backlit, casting a soft glow through the slats and highlighting their texture.\n\nThe seating area consists of rows of dark brown upholstered chairs with wooden armrests, arranged in a gentle slope toward the stage. The seats are mostly empty, with only a few scattered individuals seated in the lower and upper tiers. To the right, a curved, multi-tiered balcony wraps around the hall, featuring light wood paneling and railings. Small spotlights are mounted along the balcony\u2019s edge, pointing toward the stage. The ceiling above is dark gray, with a large circular speaker or acoustic diffuser centered near the top of the frame.\n\nThe walls of the hall are finished in warm, light-toned wood paneling, contrasting with the darker ceiling and seating. The overall atmosphere is quiet and still, with no visible movement or activity on stage. The lighting is subdued, creating a sense of anticipation or post-performance calm.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_20.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_20.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483211753_0",
+          "text": "The image is predominantly black, filling nearly the entire frame with a uniform, deep, and featureless darkness.\n\nIn the upper right corner, there is a single, small, circular point of light. This point is orange-yellow in color, with a soft, slightly diffuse edge, suggesting a gentle glow rather than a sharp, defined dot. It is isolated against the black background, with no other visible objects, shapes, or variations in tone surrounding it. The rest of the image remains completely black, devoid of texture, gradient, or additional elements.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0838.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0838.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483243831_0",
+          "text": "In the foreground, a dense cluster of vibrant red-orange flowers blooms atop a bush with small, glossy green leaves. The flowers are tubular, slightly curved, and grouped in tight clusters, each petal appearing smooth and slightly waxy under natural light. Interspersed among the blossoms are unopened buds and a few spent blooms, some showing slight browning at the edges. To the left, a separate plant with silvery-green, elongated, fleshy leaves contrasts in texture and hue. Behind the foliage, the ocean stretches across the frame, its surface textured with gentle ripples and subtle variations in blue and gray tones. A dark, rocky outcrop juts into the water near the horizon, partially blurred by atmospheric distance. The sky above is pale and washed out, suggesting bright daylight. The focus remains sharp on the flowers and foliage, while the sea and distant rocks are softly out of focus, creating a layered depth.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\05\\IMG_0166.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\05\\IMG_0166.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483270257_0",
+          "text": "A round, rust-colored metal fire pit sits on a light gray concrete driveway. The fire pit has three short, cylindrical legs and a bowl-shaped body with decorative cutouts of stars and crescent moons along its lower half. Inside the bowl, glowing orange and yellow flames rise from a small pile of dark, charred wood. A black mesh spark screen with a circular frame rests over the top of the fire pit, also featuring star and moon cutouts that allow the firelight to shine through.\n\nIn the background, a suburban street runs horizontally across the image. On the left side of the street, a blue portable basketball hoop stands on a black base in a grassy front yard. Behind it, a row of two-story houses with gray siding, white trim, and dark shingled roofs lines the street. One house has a red front door and a white garage door with small windows. A white SUV is parked in the driveway of the second house from the left.\n\nThe lawn in front of the fire pit is green and neatly trimmed, bordered by the concrete driveway and sidewalk. A tall, slender tree trunk rises on the right side of the frame, with a small patch of grass and a red fire hydrant visible behind it. The sky above is pale, suggesting early evening or late afternoon, with soft, diffused light casting no strong shadows. The overall scene is calm, with no visible people or movement.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_1074.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_1074.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483306260_0",
+          "text": "The image shows an indoor room with light beige walls and a white ceiling. A ceiling fan with a light fixture is centered on the ceiling, emitting a warm glow. The floor is covered with medium-pile gray carpeting.\n\nOn the right side of the frame, a teal-colored fabric sofa is partially visible. Resting on the sofa is a life-sized skeleton figure painted gold, seated with one leg crossed over the other. The skeleton\u2019s skull is tilted slightly to its right. Behind the skeleton, a white pillow with a black concentric circle design and three colored crescents (orange, yellow, and tan) is propped against the back of the sofa. A gray egg carton and a blue plastic bag are also on the sofa near the skeleton.\n\nIn the center and left of the image, several cardboard boxes are stacked. The topmost box is open and flat, with a white shipping label visible along its edge that reads \u201cWe\u2019re here to help.\u201d Below it, a brown box with a red \u201cHome Depot\u201d logo and the word \u201cOVAL\u201d is visible. Beneath that is an Amazon-branded box with the black smile logo and \u201cwww.kohls.com\u201d printed on the side. To the left of the boxes, a black table holds various items including a green and black cordless drill, plastic-wrapped metal rods, and white instruction sheets.\n\nIn the background, a woman stands near a doorway. She has long, wavy brown hair and is wearing a dark gray short-sleeved shirt and black pants. Her left hand is on her hip, and her right arm is extended slightly outward. Behind her, a wooden door is closed. To her right, a black office chair and a yellow plastic pallet are visible, along with a small black desk and various containers and bags stacked on and around it.\n\nA white rolling office chair with a gray base and black wheels is partially visible behind the stacked boxes. On the far right wall, a silver wall-mounted light fixture is installed near the ceiling. A white thermostat or control panel is mounted on the wall near the doorway. The room appears cluttered with unpacked items and furniture in various stages of assembly or placement.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_15.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_15.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483341641_0",
+          "text": "The image is predominantly black, occupying nearly the entire frame. In the upper right corner, there is a small, isolated dot of orange-yellow light. The dot is circular and emits a soft glow, contrasting sharply with the surrounding darkness. No other objects, textures, or colors are visible. The rest of the image remains uniformly black, with no gradients, patterns, or discernible shapes. The orange-yellow dot appears static and centered within its position in the corner.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_40.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_40.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483366065_0",
+          "text": "The image is predominantly black, occupying nearly the entire frame. In the upper right corner, there is a single, small, circular point of light. This point is orange-yellow in color and appears slightly diffuse, with a soft glow that fades into the surrounding darkness. No other objects, shapes, textures, or colors are visible. The rest of the image is uniformly black, with no gradients, patterns, or variations in tone. The composition is minimal, with the single point of light providing the only visual contrast.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_9250.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_9250.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483382607_0",
+          "text": "Two men stand side by side in a narrow hallway, facing the camera. Behind them are two identical maroon doors with vertical frosted glass panels that allow bright light to filter through. The doors are framed by off-white trim, and the walls of the hallway are painted a pale beige with a darker maroon baseboard running along the bottom. The ceiling is composed of white acoustic tiles with a grid pattern.\n\nThe man on the left wears a gray short-sleeved t-shirt with the words \u201cFOUR SEASONS\u201d in orange, followed by \u201cTotal Landscaping\u201d in white script, and \u201cLawn Care \u2013 Press Conference\u201d in smaller white text. Below the text are four circular icons in blue, green, yellow, and orange. He wears a gray and red baseball cap with a white logo, blue jeans, and brown sandals. In his right hand, he holds a white cane with a red lower section and a white tip; the cane\u2019s handle is black with a wrist strap. His left hand holds a black spiral-bound notebook with white text and graphics on the cover.\n\nThe man on the right has gray hair and a gray beard. He wears a short-sleeved blue button-up shirt with a white floral and leaf pattern, khaki pants, and black sandals. He stands with his left hand on his hip and his right arm resting lightly on the shoulder of the man beside him. He is smiling.\n\nThe floor beneath them is painted a worn, peeling green, with visible scuffs and patches of underlying material. The lighting in the space is bright, primarily from the light coming through the glass panels in the doors.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0245\\IMG_0245_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0245\\IMG_0245_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483402835_0",
+          "text": "The image is taken from inside a vehicle, looking out through the passenger-side window. In the foreground, the interior door panel is visible \u2014 it is dark gray or black with a textured, leather-like surface and a horizontal strip of wood-grain trim near the bottom. A small, rectangular sticker is adhered to the lower corner of the window glass; it features the Honda logo, a QR code, and printed text including \u201cTEMPERED,\u201d \u201cDOT 22,\u201d and \u201cE4.\u201d The window frame is black and runs horizontally across the lower third of the image.\n\nOutside, an orange traffic barrel with two white reflective stripes sits on the pavement near the curb. The curb is gray concrete, and scattered brown and orange autumn leaves lie along its edge. Beyond the curb is a wide expanse of green grass, sloping gently upward. A paved sidewalk runs parallel to the curb, cutting across the grassy area. Several trees are visible \u2014 one large tree with green and yellowing leaves dominates the left side of the frame, while smaller, sparser trees appear in the mid- and background. The sky is overcast, pale gray-white, and a distant, hazy horizon line suggests a body of water or open land beyond the field. The overall lighting is diffuse and soft, typical of an overcast day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_10.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_10.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483422140_0",
+          "text": "The image is predominantly black, filling nearly the entire frame with a uniform, deep, and featureless darkness.\n\nIn the upper right corner, there is a single, small, circular point of light. This point is orange-yellow in color, with a soft, slightly diffused edge, suggesting it may be a distant or out-of-focus light source. It is isolated and stands in stark contrast to the surrounding blackness.\n\nNo other objects, shapes, textures, or colors are visible within the frame. The composition is minimal, consisting only of the vast black field and the solitary point of light.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0132\\IMG_0132_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0132\\IMG_0132_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483442832_0",
+          "text": "The image shows a close-up of the data page of a United States passport, held open and slightly angled, with a thumb visible at the top edge pressing down on the page. The background surface beneath the passport is dark and textured, possibly a countertop.\n\nThe passport page features a complex, multicolored security design with a dominant blue and white background, overlaid with fine-line patterns, guilloch\u00e9 work, and a faint image of the Great Seal of the United States. A vertical band on the left side is light gray with microprinting and a repeating \u201cUSA\u201d watermark. The right side of the page has a pink and red gradient design with a partial image of the American flag.\n\nAt the top right, the word \u201cUSA\u201d is printed in large blue letters within a decorative seal. Below this, the text \u201cPASSPORT\u201d appears in English, French (\u201cPASSEPORT\u201d), and Spanish (\u201cPASAPORTE\u201d). The phrase \u201cUNITED STATES OF AMERICA\u201d is printed vertically along the right edge in large blue capital letters.\n\nA color photograph of a man with short dark hair and light skin occupies the upper center portion of the page. The photo has a holographic overlay with shifting iridescent colors, primarily green and gold, visible on the left side of the image.\n\nTo the right of the photo, personal data is printed in black text on a light background with orange and pink horizontal bands. The fields include:\n\n- Surname: FORD\n- Given Names: KELLY LAURENCE\n- Nationality: UNITED STATES OF AMERICA\n- Date of birth: 08 Apr 1967\n- Place of birth: CALIFORNIA, U.S.A.\n- Date of issue: 02 Aug 2018\n- Date of expiration: 01 Aug 2028\n- Sex: M\n- Authority: United States Department of State\n- Passport No.: 585769252\n\nBelow the photo and to the left, the text \u201cSEE PAGE 27\u201d is printed, with \u201cEndorsements / Mentions Sp\u00e9ciales / Anotaciones\u201d beneath it.\n\nA machine-readable zone (MRZ) runs along the bottom edge of the page, consisting of two lines of alphanumeric characters beginning with \u201cP<USAFORD<<KELLY<LAURENCE<<<<<...\u201d.\n\nOn the far right, a signature panel is visible with the heading \u201cSIGNATURE OF BEARER / SIGNATURE DU TITULAIRE / FIRMA DEL TITULAR\u201d in three languages. A handwritten signature in black ink is present, appearing to read \u201cKelly Ford\u201d or similar.\n\nThe passport number \u201c585769252\u201d is also printed vertically along the right edge, near the bottom. The number \u201c3\u201d is faintly visible in the bottom right corner of the page, likely indicating the",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0878.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0878.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483459587_0",
+          "text": "The image shows a beach scene under a partly cloudy sky. The upper portion of the frame is dominated by a pale blue sky streaked with thin, wispy white clouds, and a denser band of low, grayish-white clouds stretches across the horizon. Below the sky, the ocean extends to the horizon, its surface textured with small, rolling waves. The water near the shore is a muted gray-green, reflecting the sky, with white foam forming along the crests of the waves as they break.\n\nA line of dark, wet sand runs horizontally across the middle of the image, marking the tide line where the water meets the beach. The foam from the receding waves lingers along this edge, appearing as a frothy, irregular white border. Scattered across the damp sand in the foreground are small, dark fragments of seaweed, bits of driftwood, and shell fragments. Some pieces are clumped together; others are isolated. A single, small, orange-brown leaf lies near the center of the sandy area.\n\nThe sand itself is a uniform, fine-grained gray, slightly darker where wet, and lighter in patches where it is drier. The overall lighting is diffuse, suggesting an overcast or partially sunny day, with no harsh shadows visible. The horizon line is straight and clear, separating the water from the sky. In the far distance, on the right side of the horizon, a faint, dark landmass or headland is visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\06\\IMG_1147.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\06\\IMG_1147.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483477150_0",
+          "text": "A caterpillar rests on a surface of dark, coarse asphalt composed of irregularly shaped black and gray stones bound by lighter gray mortar. The caterpillar\u2019s body is elongated and covered in dense, fine hairs that appear light brown or tan. Along its dorsal side runs a distinct pattern: a central black stripe bordered on each side by a thin yellow line, and beneath that, a series of red or reddish-orange markings spaced evenly along its segments. Its head is small, dark, and slightly rounded, with visible antennae or sensory appendages. To the right edge of the frame, a curved, off-white object with a textured surface and small circular indentations is partially visible \u2014 likely the side of a shoe or boot. The lighting is even and diffuse, casting no strong shadows, and the focus is sharp on the caterpillar and the immediate surrounding asphalt.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1597857210\\RPReplay_Final1597857210_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1597857210\\RPReplay_Final1597857210_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483488903_0",
+          "text": "The image displays a screen recording interface on a mobile device with a blurred, gradient background transitioning from dark blue at the top to lighter gray at the bottom. At the top of the screen, white text reads: \u201cEverything on your screen, including notifications, will be recorded. Enable Do Not Disturb to prevent unexpected notifications.\u201d\n\nBelow this message is a dark, rounded rectangular panel labeled \u201cScreen Recording\u201d in white text, centered beneath a small white circle icon. Inside the panel, a list of apps is shown with icons and names. The first item is \u201cPhotos,\u201d accompanied by its multicolored flower icon and a white checkmark on the right. The second item is \u201cGoToMeeting,\u201d with its orange starburst icon. A third app is partially visible, showing only a blue circular icon and the beginning of its name, \u201cMe...\u201d.\n\nBeneath the list is a dark gray button with rounded corners labeled \u201cStop Recording\u201d in white text.\n\nAt the bottom center of the screen is a red circular button with a white microphone icon inside. Below it, white text reads \u201cMicrophone On.\u201d The overall interface has a semi-transparent, dark overlay, giving it a floating appearance over the blurred background.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_25.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1600277364\\RPReplay_Final1600277364_25.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483503999_0",
+          "text": "The image is predominantly black, filling nearly the entire frame with a uniform, deep, and featureless darkness.\n\nIn the upper right corner, there is a single, small, circular point of light. This point is orange-yellow in color, with a soft, slightly diffuse edge, suggesting a gentle glow rather than a sharp, defined dot. It is isolated against the black background, with no other visible objects, shapes, or variations in tone surrounding it. The rest of the image remains entirely black, devoid of texture, gradient, or additional elements.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\extracted_frames\\IMG_6357\\IMG_6357_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\extracted_frames\\IMG_6357\\IMG_6357_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483517102_0",
+          "text": "A red fox stands on a concrete sidewalk beside a light gray, single-story house with horizontal siding. The fox\u2019s fur is reddish-orange along its back and sides, with a white underbelly and black-tipped ears and legs. Its bushy tail trails behind as it faces right, head slightly lowered. To the left of the fox, two rounded, dark green shrubs sit in front of the house, flanking a window with a white frame and a partially closed white horizontal blind. A white downspout runs vertically along the corner of the house. A utility meter and a small gray box are mounted on the wall near the window. The lawn in front of the house is patchy, with areas of brown and green grass. A concrete curb separates the lawn from a gray asphalt road in the foreground, which shows fine cracks and texture. In the background, bare-branched trees rise against a pale, overcast sky. To the right, a white shed with a green door and a white garage door are visible behind a large tree trunk. A black metal post with a small fixture stands near the sidewalk. The overall lighting is diffuse and even, suggesting an overcast day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1597857210\\RPReplay_Final1597857210_94.29s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1597857210\\RPReplay_Final1597857210_94.29s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483527281_0",
+          "text": "The image displays a smartphone screen with a focused, semi-transparent folder labeled \u201cBooks\u201d in white sans-serif text at the top center. The folder contains seven app icons arranged in a 3x3 grid, with the bottom-right position empty. The background behind the folder is blurred, showing indistinct app icons and a dark interface, suggesting the home screen of an iOS device.\n\nThe top row of icons includes:\n- Left: A black square icon with a white stylized \u201cK\u201d and red square accent, labeled \u201cKCLS\u201d in gray text below.\n- Center: A light blue square icon with the word \u201choopla\u201d in lowercase white letters, labeled \u201choopla\u201d below.\n- Right: A blue square icon with two white curved lines resembling sound waves, labeled \u201cLearningAllyAu\u2026\u201d (truncated) in gray text.\n\nThe middle row includes:\n- Left: An orange square icon with a white open book and Wi-Fi-like signal lines above it, labeled \u201cAudible\u201d below.\n- Center: A white square icon with a large black serif letter \u201cI\u201d centered, labeled \u201cInstapaper\u201d below. This icon is outlined with a thin gray border, indicating selection or focus.\n- Right: A yellow-orange square icon with a white open book and a red sound wave symbol on the right page, labeled \u201cEasyReader\u201d below.\n\nThe bottom row includes:\n- Left: A maroon square icon with a stylized open book in teal and white, with a small green bookmark, labeled \u201cLibby\u201d below.\n- Center and Right: Empty spaces.\n\nAt the bottom of the folder, two small gray dots indicate multiple pages, with the left dot filled, suggesting the current view is the first page.\n\nThe overall color palette of the folder is a soft gradient of light gray and blue, with rounded corners. The icons vary in color \u2014 black, blue, orange, white, maroon \u2014 and each has a distinct graphic and label. The blurred background includes hints of green, blue, and red app icons, and a faint circular glow behind the folder. The bottom dock of the phone is also blurred, showing four app icons in green, blue, and other muted tones.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_1043.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\05\\IMG_1043.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483538221_0",
+          "text": "A white-hulled sailing vessel is docked at a pier under a bright blue sky scattered with white cumulus clouds. The ship\u2019s name, \u201cWINDY,\u201d is displayed in large white capital letters on a maroon banner affixed to its stern. Below the banner, a vertical wooden panel features hand-drawn illustrations resembling a treasure map, including compass roses, ships, and landmasses in sepia tones.\n\nThe vessel\u2019s deck is visible, lined with metal railings. A man in a dark blue polo shirt and khaki shorts stands near the railing, facing left, with his hands resting on the rail. Behind him, another person in a white shirt and dark shorts leans against the railing, looking out toward the water. A white life preserver with black lettering reading \u201cS/V WINDY\u201d and \u201cChicago\u201d is mounted on the railing near the first man.\n\nThe ship\u2019s masts rise vertically, with wooden spars and black rigging lines extending in multiple directions. A furled white sail is wrapped around one of the lower spars. Several round, black portholes are visible along the side of the hull.\n\nOn the pier, a yellow caution tape stretches horizontally, attached to black stanchions. A small red rectangular sign attached to the tape reads \u201cDO NOT CROSS CHAINS\u201d in white uppercase letters. A bright orange bollard with the number \u201c30\u201d stenciled in black stands near the tape. A large blue buoy rests on the pier beside the bollard, secured with a metal chain.\n\nThe pier surface is paved with rectangular gray stone tiles arranged in a herringbone pattern, with darker gray grout lines. Shadows from the ship\u2019s rigging and the stanchions fall sharply across the pavement, indicating bright sunlight. In the background, calm blue water extends to the horizon, with a faint outline of distant land or structures visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0812.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0812.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483552222_0",
+          "text": "The image shows the exterior of a commercial building under a partly cloudy sky. The building has a flat, overhanging white ceiling with a dark gray or black trim along the edge. Below the ceiling, a stone pillar made of irregularly shaped, earth-toned stones\u2014ranging from beige to gray\u2014supports the structure. To the left of the pillar is a glass storefront with a black-framed door. Above the door, a red neon sign reads \u201c304 OPEN.\u201d The glass window beside the door displays white text that reads \u201cLOVE STUFF\u201d and \u201cOPEN,\u201d along with a small \u201c10% OFF\u201d sign. The window also features faint, stylized silhouettes of figures.\n\nTo the right of the stone pillar is a larger storefront with large glass windows and doors. A white rectangular sign hanging from the ceiling reads \u201cRaphaels Spa\u201d in black cursive lettering. Below it, a red LED sign displays \u201cOPEN MASSAGE\u201d in bright orange-yellow letters. A neon sign in the window glows with a green oval outline and red text reading \u201cMASSAGE\u201d with a phone number \u201c760-366-1123\u201d beneath it. The lower half of the windows is covered with frosted glass panels featuring black silhouettes of bamboo stalks and leaves. Partially visible text on the glass reads \u201cBody Massage\u201d and \u201cFoot Reflexo.\u201d A string of small red lights runs along the top edge of the window frame.\n\nIn the foreground, on the concrete sidewalk, a pink A-frame sign is partially visible, showing the letters \u201cels\u201d and \u201cSpa\u201d in black script. The sidewalk is composed of large, light gray concrete slabs with visible seams. The overall lighting suggests daytime with natural sunlight.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0883.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0883.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483563299_0",
+          "text": "The foreground is a stretch of damp, gray sand, textured with fine grains and scattered with small, dark fragments of seaweed, bits of shell, and slender, dried plant stems. Some seaweed clumps are dark brown and black, matted and tangled, while others are lighter, with hints of orange or tan. A few small, smooth stones are embedded in the sand, varying in size and color from gray to dark brown.\n\nThe shoreline is marked by a thin, frothy line of white seafoam where the water meets the sand. The water beyond is a muted gray-blue, rippling with small, gentle waves that crest into white foam as they roll toward shore. The surface of the water reflects the sky, creating scattered glints of silver and white.\n\nIn the distance, the ocean extends to the horizon, where it meets a pale, hazy band of clouds. Above, the sky is a gradient of blue, lighter near the horizon and deepening upward. Wispy, elongated clouds streak across the upper sky, some thin and feathery, others slightly denser, casting faint shadows on the water below. The overall lighting is bright but diffused, suggesting daylight under a partially clouded sky.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0888.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0888.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483575854_0",
+          "text": "The foreground is a stretch of damp, gray sand, textured with fine grains and scattered with dark, irregular clumps of seaweed and small, weathered debris. Some pieces of seaweed are stringy and tangled, others are broad and leathery. A few small, smooth stones and fragments of shell are embedded or resting on the surface. A single, curled, orange-brown leaf lies near the center.\n\nBeyond the sand, a thin line of white foam marks where a gentle wave has just receded. The water is a muted gray-blue, rippling with small, parallel wavelets that catch the light, creating scattered glints of silver. Further out, the waves grow slightly larger, their crests forming thin, white lines as they roll toward shore.\n\nThe horizon is a straight, distant line where the water meets a pale, hazy sky. Above it, the sky is a gradient of blue, lighter near the horizon and deepening upward. Wispy, scattered clouds drift across the upper portion, thin and white, with some denser, flatter cloud banks visible along the horizon line. A small, dark, indistinct shape, possibly a buoy or distant vessel, is visible on the water near the right edge of the frame. The overall lighting is diffuse, suggesting an overcast or partially cloudy day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\02\\IMG_0928.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\02\\IMG_0928.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483592910_0",
+          "text": "The image captures a wide, open landscape under a vast sky during what appears to be sunrise or sunset. The upper two-thirds of the frame are dominated by a clear, deep blue sky that gradually softens to a pale, yellowish-green near the horizon. A small, bright green lens flare is visible in the upper right quadrant, slightly off-center.\n\nAt the horizon, a thin band of low, scattered clouds stretches across the frame, tinged with pale orange and yellow from the sun\u2019s glow. The sun itself is partially visible on the far left, just above the horizon, emitting a brilliant, diffused golden light that washes over the left side of the image and creates a strong lens flare.\n\nIn the foreground, a dark asphalt road runs horizontally across the bottom of the frame, marked by a solid white line along its right edge. Beyond the road, a flat, arid terrain extends toward the horizon, covered in sparse, dry grasses and low shrubs in muted tones of brown, gray, and dull green. A simple wire fence with evenly spaced posts runs parallel to the road, receding into the distance.\n\nOn the far left, silhouetted against the bright sun, are the dark shapes of what appear to be solar panels mounted on a pole, and behind them, a tall, thin metal tower or antenna. The overall lighting is directional and low, casting long, soft shadows and highlighting the textures of the dry vegetation.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0163\\IMG_0163_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\IMG_0163\\IMG_0163_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483606168_0",
+          "text": "The image shows a close-up, downward-facing view of a countertop and the floor beneath it. The countertop is made of a speckled stone material, primarily beige with irregular patches of dark gray and black. Resting on the countertop is a white, flexible cord, possibly a charging cable, loosely coiled and knotted in places. A small, bright reflection of light is visible on the countertop surface near the cord.\n\nBelow the countertop, the floor is composed of dark brown wooden planks with visible grain patterns. Three bare feet are visible on the floor. Two feet, likely belonging to the same person, are positioned side by side near the bottom center of the frame. A third foot, smaller in size and likely belonging to a child, is visible to the right, slightly further back. The child\u2019s foot is partially covered by a piece of fabric with a pattern that includes orange and gray tones. The lighting in the scene is warm and appears to come from above, casting soft shadows.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0825.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0825.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483618502_0",
+          "text": "The image shows a storefront window display, viewed through glass that reflects the street scene outside \u2014 including palm trees, a clear sky, and parts of buildings and vehicles. Inside the window, merchandise is arranged on white shelving units and within a recessed wooden display case.\n\nOn the left, a white, multi-tiered shelf holds a collection of ceramic mugs. From top to bottom: a white mug with a cartoon-style blonde woman; a white mug with a cartoon woman with dark hair and a red top; a black mug with a stylized white figure; a black mug with a cartoon woman in a black dress and white collar; a white mug with a black-and-white striped figure; and a white mug with a black rim, featuring a cartoon man in a suit and the partial text \u201cBUT I\u2019M PR...\u201d.\n\nIn the central wooden display case, the top shelf holds a white-framed poster titled \u201cPALM SPRINGS PRIDE 2022\u201d with a rainbow and cartoon figures. Below it, a yellow mug with a cartoon family illustration sits beside a smaller white-framed picture of the same family. A black silhouette of three figures appears above the poster.\n\nThe middle shelf of the case contains a variety of items: a purple comic-style card with a speech bubble reading \u201c...I\u2019m sorry, I\u2019m not sure what you\u2019re asking...\u201d; a small green book titled \u201cThe Earth Will Shake...\u201d; a black-and-white photo of a person in a red shirt lying on a car hood; a small stack of colorful postcards or stickers with phrases like \u201cMY GREEN\u201d and \u201cFUCK\u201d; a green and purple metallic cannabis leaf sculpture; and two mugs \u2014 one orange with \u201cwake & bake COFFEE CO.\u201d printed in black, and one gray with the same logo.\n\nThe bottom shelf holds a white tote bag with the text \u201cIt\u2019s all Good\u201d and a cartoon illustration of a green camper van. In front of the bag, a small silver-colored vintage-style radio or cassette player is visible.\n\nTo the right of the display case, a large painting or print depicts a desert scene with tall palm trees, blue sky, and a distant mountain range. Below it, a smaller image shows a pink chair, green grass, and a yellow-and-blue beach ball.\n\nThe entire display is framed by the window\u2019s wooden trim and glass, which reflects the outdoor environment, creating a layered visual effect.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0852.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0852.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483632221_0",
+          "text": "A woman stands centered in the foreground on a wooden pier, facing the camera. She wears a white baseball cap with a circular dark blue logo featuring the letters \u201cNASA\u201d in white. Her dark-rimmed eyeglasses frame her face, and her expression is neutral. She is wearing a raglan-style t-shirt with blue sleeves and a white torso; the shirt displays a printed image of a performer mid-air, wearing a yellow jacket and black pants, with the text \u201cQUEEN LIVE AT WEMBLEY STADIUM\u201d in orange and black lettering above the image. A black crossbody bag with a silver buckle and a small white rectangular label near the bottom hangs over her right shoulder and rests against her torso. The wooden planks of the pier run diagonally from the lower left to the upper right, showing weathered grain and texture. Behind her, to the right, a red Jeep Wrangler is parked on the pier, facing away. Further back, a wooden lifeguard tower with railings and a small green flag on a pole stands against the sky. The sky above is bright with scattered wispy white clouds, and the sun appears as a glowing white orb near the top center, casting a lens flare. The horizon line shows a calm, pale blue-gray ocean meeting the sky. A few indistinct figures are visible in the distance on the pier. A curved lamppost with a dark fixture is visible to the right of the lifeguard tower. The lighting is bright daylight, casting soft shadows on the pier surface.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0827.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2024_ollama_qwen3-vl_235b-cloud_narrative_20251015_062330\\converted_images\\01\\IMG_0827.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483645565_0",
+          "text": "The image captures an outdoor urban scene during daylight, likely late afternoon, under a pale blue sky. In the foreground, a paved walkway composed of interlocking hexagonal pavers in shades of gray and muted red extends diagonally from the bottom left toward the center. A large, cylindrical concrete pillar, textured and weathered with gray and beige tones, dominates the right side of the frame, curving slightly as it supports an overhead structure. Attached to the pillar is a black chalkboard sign with white and yellow lettering, partially visible, reading \u201cCRAFT BEER\u201d and \u201cWINE & CIDER.\u201d\n\nTo the left of the pillar, a white metal railing with vertical bars encloses an outdoor seating area. Inside this area, several people are seated at black metal tables and chairs. One woman, visible from the side, wears a light blue patterned dress and has dark hair; another person beside her wears a white top and denim shorts. Behind them, glass doors and windows reflect the surroundings, and a hanging plant with long, thin green leaves drapes over the railing.\n\nFurther left, two brightly painted utility boxes stand on the sidewalk. One is purple with large yellow and pink flowers; the other is blue with yellow and orange flowers. Behind them, a multi-story concrete parking structure rises, its facade a muted beige with visible levels and openings. Several palm trees with green fronds are interspersed between the building and the sidewalk, their trunks visible.\n\nIn the bottom left corner, a freestanding A-frame sign displays a logo with palm trees and the words \u201cLa Quinta Wine Co.\u201d in red and white script, with \u201cWINE \u2022 CIDER\u201d and \u201cOPEN DAILY\u201d in bold lettering below. The overhead structure above the seating area has exposed red-painted beams and hanging industrial-style light fixtures with dark shades. The overall lighting is soft and diffused, casting gentle shadows.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1594091867\\RPReplay_Final1594091867_5.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1594091867\\RPReplay_Final1594091867_5.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483661365_0",
+          "text": "The image displays a mobile phone screen interface with a white background. At the top left, a red pill-shaped status bar shows the time \u201c10:17\u201d in white text. To the top right, standard iOS status icons are visible: a small orange dot indicating screen recording or microphone use, a cellular signal indicator with four bars, a Wi-Fi symbol, and a battery icon showing approximately half charge.\n\nBelow the status bar, a navigation bar contains a left-pointing arrow followed by the word \u201cBack\u201d in gray text on the left, and centered in blue text is \u201cCreate an Account.\u201d\n\nBeneath this, the Microsoft logo \u2014 a square composed of four smaller squares in red, green, blue, and yellow \u2014 appears to the left of the word \u201cMicrosoft\u201d in gray text.\n\nBelow the logo, the heading \u201cChoose an address\u201d is displayed in bold black text. Underneath, three email addresses are listed in blue, underlined text, indicating they are selectable links:\n\n- kfordmsftvendor1@outlook.com\n- kfordmsftvendor2020@outlook.com\n- kfordmsftvendor1907@outlook.com\n\nTo the right of the email list, a gray rectangular button with rounded corners contains the word \u201cBack\u201d in black text.\n\nAt the bottom of the screen, aligned to the left, are two gray text links: \u201cTerms of Use\u201d and \u201cPrivacy & Cookies,\u201d separated by a small space.\n\nA thick black horizontal bar \u2014 characteristic of the iOS home indicator \u2014 is centered at the very bottom of the screen.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1606136036\\RPReplay_Final1606136036_0.00s.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\extracted_frames\\RPReplay_Final1606136036\\RPReplay_Final1606136036_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483675607_0",
+          "text": "The image displays a screen recording interface on a mobile device with a blurred background gradient transitioning from light gray at the bottom to soft blue at the top. Centered near the top, white text reads: \u201cEverything on your screen, including notifications, will be recorded. Enable Do Not Disturb to prevent unexpected notifications.\u201d\n\nBelow this message is a dark, semi-transparent rounded rectangle labeled \u201cScreen Recording\u201d in white text. Above the label is a small white circle outline. Inside the rectangle, a list of apps appears with icons and names. The first item is \u201cPhotos,\u201d accompanied by its multicolored flower icon and a white checkmark to the right. The second item is \u201cDiscord,\u201d with its purple ghost icon. A third item is partially visible, showing an orange icon and the beginning of the text \u201cGoToMeeting.\u201d\n\nBeneath the list is a dark gray button with rounded corners labeled \u201cStop Recording\u201d in white text.\n\nAt the bottom center of the screen is a red circular button with a white microphone icon inside. Below it, white text reads \u201cMicrophone On.\u201d The overall interface has a modern, minimal design with soft shadows and rounded elements.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\06\\IMG_0174.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\06\\IMG_0174.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483689782_0",
+          "text": "The interior of a vehicle is shown from the perspective of the driver\u2019s seat, focusing on the passenger-side door panel and side-view mirror. The door panel is black with a textured, leather-like finish. A silver-trimmed door handle is recessed into the panel, and below it, a black plastic window switch with a rectangular button is visible. A silver accent strip runs horizontally across the door, just above the armrest area. To the left, part of the dashboard is visible, including a silver-trimmed air vent with horizontal slats.\n\nThe side-view mirror is black plastic with a convex glass surface. Reflected in the mirror is the side of a white SUV parked behind, along with a portion of the driver\u2019s arm and steering wheel. The mirror also reflects a construction zone: orange traffic barrels, striped barricades, and a patch of grass and dirt. A wooden utility pole stands near the edge of the road, and beyond it, green trees and a partly cloudy sky are visible. The curb outside is painted red and white, and a yellow construction vehicle is partially visible in the upper right background. A person\u2019s knee, pale in tone, occupies the lower foreground of the image, slightly out of focus.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\07\\IMG_0179.jpg": {
+      "file_path": "\\\\qnap\\home\\idt\\descriptions\\wf_archive2020_ollama_qwen3-vl_235b-cloud_narrative_20251016_002916\\converted_images\\07\\IMG_0179.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483703788_0",
+          "text": "A sandy beach stretches across the foreground, its surface textured with footprints and small depressions. At the bottom edge of the frame, the weathered gray surface of a wooden picnic table is visible, its grain and knots apparent. To the left, a narrow concrete walkway runs parallel to the shoreline, bordered by a strip of darker, damp sand and sparse green vegetation. A tall, slender lamppost with a black, ornate lantern head stands beside the walkway, its metal pole reflecting faint light.\n\nBeyond the sand, the water of a wide lake extends to the horizon, its surface rippling with small waves and reflecting the blue sky above. A small, colorful plastic slide\u2014blue on the left side, orange on the right\u2014sits partially in the shallow water near the shore. A single pink plastic bucket rests on the sand a short distance away. Further out, a white boat with a canopy is moored near a wooden dock structure, where a few indistinct figures are visible. A metal bench sits on a small pier extending into the water.\n\nThe far shore is lined with a dense treeline of green trees, and beyond that, faint outlines of houses or structures can be seen. The sky above is bright blue, scattered with large, fluffy white cumulus clouds. Dark green pine branches frame the top left and top right corners of the image, partially obscuring the sky. A small red ball lies on the sand in the lower right corner, near the picnic table.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    }
+  },
+  "chat_sessions": {},
+  "imported_workflow_dir": "\\\\qnap\\home\\idt\\descriptions",
+  "created": "2025-10-26T08:01:55.841525",
+  "modified": "2025-10-26T08:01:55.841525"
+}

@@ -1,0 +1,575 @@
+{
+  "gallery_name": "sunny",
+  "generated_at": "2025-10-26T08:06:48.937679",
+  "configuration": {
+    "required_keywords": [
+      "water",
+      "cloud",
+      "sun",
+      "orange",
+      "reflect"
+    ],
+    "preferred_keywords": [],
+    "excluded_keywords": [
+      "building",
+      "people"
+    ],
+    "min_keyword_matches": 1,
+    "max_images": 50
+  },
+  "total_candidates": 23,
+  "candidates": [
+    {
+      "filename": "converted_images\\2025\\04\\IMG_2564.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_aimee_ollama_qwen3-vl_235b-cloud_narrative_20251017_121406",
+      "workflow_name": "aimee",
+      "description": "A large, colorful sign reading “Yo ❤️ Pana” stands prominently in the foreground, mounted on a blue rectangular base. The word “Yo” is rendered in cursive script: the “Y” is green, the “o” is dark blue, both outlined in white. Between “Yo” and “Pana” is a large, solid red heart, also outlined in white. The word “Pana” follows in cursive: the “P” is orange, the “a” is dark blue, the “n” is green, and the final “a” is red — all outlined in white. Below the main text, on the blue base, are three white rectangular panels. The leftmost panel contains three horizontal white lines. The center panel displays the word “COLUA” in white, partially obscured by wear or damage. The rightmost panel shows “COLUA” in white, followed by a small white square containing a black stylized “M” or similar symbol.\n\nThe sign is positioned on a low, weathered concrete wall. Below the wall, the ground is paved with irregular, dark gray cobblestones, some showing signs of wear and discoloration. Shadows from unseen objects fall across the cobblestones, creating patches of dark gray and black.\n\nBehind the sign, a body of water stretches across the midground, its surface reflecting the sky. On the far side of the water, a range of mountains rises, their slopes covered in muted green and brown vegetation. The sky above is a clear, bright blue, with scattered white cumulus clouds near the horizon and a few wispy clouds higher up. Green shrubs and trees are visible on either side of the sign, partially framing the view. The overall lighting is bright and direct, suggesting midday sun.",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251017_121406"
+    },
+    {
+      "filename": "extracted_frames\\Frozen Planet The Complete Series [3 Discs]\\Frozen Planet The Complete Series [3 Discs]_10455.34s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_frozenplanet_ollama_qwen3-vl_235b-cloud_narrative_20251022_204747",
+      "workflow_name": "frozenplanet",
+      "description": "The image captures a wide, tranquil expanse of water under a low-hanging sun near the horizon. The sun emits a brilliant, concentrated yellow-orange glow, casting a long, shimmering reflection across the water’s surface. The sky above is layered with horizontal bands of cloud, tinted in gradients of amber, ochre, and dusky gray, fading into deeper tones at the top edge of the frame.\n\nScattered across the water are numerous icebergs and smaller ice floes, varying in size and shape. Most appear as dark, irregular silhouettes against the glowing water, though some catch the light, revealing pale blue or white surfaces. The water itself is calm, with subtle ripples distorting the reflection of the sun and clouds.\n\nIn the lower right foreground, a dark, sloping landmass or ice shelf extends into the frame. On its surface, several small, dark, indistinct shapes are visible — possibly rocks, equipment, or figures — clustered near the edge. A tall, thin, vertical structure, possibly a mast or pole, rises from the water near the shore, its silhouette stark against the luminous background. Its reflection is faintly visible in the water below.\n\nThe overall color palette is dominated by warm yellows and oranges near the sun, transitioning to cool blues and grays in the water and foreground, creating a strong contrast between light and shadow. The scene is still, with no visible motion, and the lighting suggests either sunrise or sunset.\nTimestamp: 2025-10-22 21:05:05",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251022_204747"
+    },
+    {
+      "filename": "extracted_frames\\Frozen Planet The Complete Series [3 Discs]\\Frozen Planet The Complete Series [3 Discs]_2396.33s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_frozenplanet_ollama_qwen3-vl_235b-cloud_narrative_20251022_204747",
+      "workflow_name": "frozenplanet",
+      "description": "The image presents a wide, atmospheric landscape dominated by cool tones and layered horizons. In the foreground, a dark, glassy surface—likely water or wet ice—reflects the sky above with a muted, blurred fidelity. Scattered across this reflective plane are several flat, irregularly shaped ice floes, varying in size. Their surfaces appear smooth and slightly rounded at the edges, with a pale, off-white to light gray coloration. One small, dark, bird-like silhouette is visible near the left-center, perched or floating on the water.\n\nBeyond the immediate foreground, a dense, low-lying bank of fog or cloud stretches horizontally, obscuring the base of the distant terrain. This fog layer is predominantly white and light gray, with subtle gradients and soft textures. Rising above the fog are dark, jagged mountain ranges or ice-covered landmasses. Their peaks and ridges are sharply defined against the sky, rendered in deep blues, grays, and blacks, suggesting shadow and distance.\n\nThe sky occupies the upper third of the frame. It is filled with a complex arrangement of clouds: lower, dense, and textured cumulus formations in shades of gray and white, interspersed with higher, thinner, and more diffuse cirrus clouds. A band of pale, warm yellow and orange light is visible along the horizon line, just above the fog, suggesting either sunrise or sunset. This light casts a soft glow on the undersides of the clouds directly above it, while the upper portions of the sky remain a muted, overcast blue-gray. The overall lighting is diffuse and subdued, creating a sense of vastness and stillness.\nTimestamp: 2025-10-22 21:52:22",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251022_204747"
+    },
+    {
+      "filename": "extracted_frames\\Frozen Planet The Complete Series [3 Discs]\\Frozen Planet The Complete Series [3 Discs]_3897.76s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_frozenplanet_ollama_qwen3-vl_235b-cloud_narrative_20251022_204747",
+      "workflow_name": "frozenplanet",
+      "description": "The image presents a view from above a vast expanse of dark blue, textured surface, likely water, under low-angle illumination. Scattered across this surface are numerous irregular patches and streaks of a warm, golden-orange hue, suggesting sunlight reflecting off the crests of waves or cloud formations. These illuminated areas vary in size and intensity, creating a dynamic, rippling pattern against the deep blue background.\n\nIn the lower-left quadrant, a distinct, dark, elongated object is visible. It has a somewhat flattened, irregular shape with a slightly lighter, possibly grayish or tan, upper surface and a darker, almost black, trailing edge or underside. The object appears to be floating or moving across the surface, casting a subtle shadow or appearing as a silhouette against the brighter, sunlit areas behind it. The overall lighting suggests either sunrise or sunset, with the sun low on the horizon, casting long shadows and highlighting textures on the surface below.\nTimestamp: 2025-10-22 22:43:08",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251022_204747"
+    },
+    {
+      "filename": "extracted_frames\\Frozen Planet The Complete Series [3 Discs]\\Frozen Planet The Complete Series [3 Discs]_5051.18s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_frozenplanet_ollama_qwen3-vl_235b-cloud_narrative_20251022_204747",
+      "workflow_name": "frozenplanet",
+      "description": "The image captures a wide, open landscape under a pale blue sky streaked with thin, wispy cirrus clouds. The sun, positioned near the center of the upper third of the frame, emits a bright, starburst glare with visible lens flare artifacts — a green circular halo to the lower left of the sun and a smaller reddish-orange flare to the lower right. Below the sun, a dark, rolling mountain range stretches horizontally across the horizon, its silhouette softened by atmospheric haze. In the foreground and midground, the terrain is uneven and covered in dense, low-lying vegetation — a mix of mossy green and brownish-yellow tufts — interspersed with shallow, irregularly shaped pools of still water. These pools reflect the sky and the sun, creating mirror-like surfaces with subtle ripples. Along the lower left edge of the frame, a patch of white, textured snow or ice borders one of the water pools, its surface showing small indentations and granular detail. The overall lighting is bright and directional, casting soft shadows and highlighting the textures of the moss and the reflective quality of the water.\nTimestamp: 2025-10-22 23:23:31",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251022_204747"
+    },
+    {
+      "filename": "extracted_frames\\Frozen Planet The Complete Series [3 Discs]\\Frozen Planet The Complete Series [3 Discs]_7512.14s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_frozenplanet_ollama_qwen3-vl_235b-cloud_narrative_20251022_204747",
+      "workflow_name": "frozenplanet",
+      "description": "The image captures a coastal scene at sunset. The sun, a bright white-yellow orb, sits low on the horizon, partially obscured by a thin band of clouds. Radiating outward from the sun are sharp, golden rays that pierce through the overcast sky, creating a starburst effect. The sky above is layered with dense, textured clouds in shades of gray, lavender, and muted blue, with subtle highlights along their edges where the sunlight catches.\n\nIn the foreground and midground, dark, irregularly shaped rocks emerge from shallow, still water. The rocks are rough-textured, with surfaces appearing dark brown and black, speckled with patches of lighter green and gray, possibly lichen or algae. Their forms are reflected clearly in the water’s surface, which is smooth and glassy, mirroring the sky and rocks with a slight distortion. The water itself is a mix of pale blue, gray, and white, with areas of foam or mist near the shore.\n\nIn the distance, the ocean stretches to the horizon, its surface marked by gentle, rolling waves that appear as soft white lines against the darker water. The horizon line is straight and distinct, separating the sea from the sky. A few small, bright lens flare artifacts—orange and yellow circular spots—are visible in the lower left and center of the image, likely caused by the sun’s direct glare on the camera lens. The overall lighting is soft and diffused, with strong contrast between the illuminated sky and the shadowed rocks.\nTimestamp: 2025-10-23 00:48:50",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251022_204747"
+    },
+    {
+      "filename": "extracted_frames\\Frozen Planet The Complete Series [3 Discs]\\Frozen Planet The Complete Series [3 Discs]_8372.23s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_frozenplanet_ollama_qwen3-vl_235b-cloud_narrative_20251022_204747",
+      "workflow_name": "frozenplanet",
+      "description": "The image captures a wide, low-angle view of a vast colony of penguins silhouetted against a bright, setting or rising sun. The sun, positioned slightly left of center in the upper third of the frame, emits intense white light with prominent starburst rays and lens flare artifacts—circular and elongated streaks of orange, yellow, and green—scattered across the deep blue sky. The sky transitions from a saturated blue at the top to a pale, almost white glow near the horizon.\n\nIn the foreground and midground, hundreds of penguins stand densely packed on dark, uneven terrain that appears rocky or muddy. Their bodies are rendered as dark, rounded silhouettes, with some showing faint outlines of heads and beaks. The penguins are oriented mostly toward the light source, creating long, dark shadows that stretch across the ground toward the viewer.\n\nTo the right, a dark, rugged mountain range rises, its peaks partially dusted with white snow or ice. A few scattered, low-lying clouds hover near the mountain tops, catching the sun’s glow along their edges. In the far distance, a calm body of water reflects the sun’s brilliance, forming a bright horizontal band along the horizon. The overall lighting is high-contrast, with deep shadows dominating the foreground and midground, while the sky and distant water are intensely illuminated.\nTimestamp: 2025-10-23 01:18:13",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251022_204747"
+    },
+    {
+      "filename": "extracted_frames\\Frozen Planet The Complete Series [3 Discs]\\Frozen Planet The Complete Series [3 Discs]_9570.39s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_frozenplanet_ollama_qwen3-vl_235b-cloud_narrative_20251022_204747",
+      "workflow_name": "frozenplanet",
+      "description": "A group of penguins stands on a snow-covered ice floe that extends into dark blue water. The penguins vary in size and posture; some face forward, others turn sideways or look upward. Their bodies are predominantly black on the back and head, with white bellies and chests. Some have yellow or orange markings near the throat or beak. One penguin in the center is captured mid-motion, with its flippers extended and feet off the ice, appearing to leap or step forward. Water droplets are visible around its feet, suggesting recent contact with the water’s surface. The ice floe has a rough, uneven edge with a vertical face where it meets the water, showing layers and texture. Behind the penguins, the ocean stretches to the horizon, shimmering with sunlight reflecting off small waves. In the background, large icebergs or ice formations rise, pale blue and white, with smooth and jagged surfaces. The sky above is bright and pale, with no visible clouds. A few small dark specks, possibly birds, are visible in the distant sky. The overall lighting is bright and even, casting soft shadows on the snow.\nTimestamp: 2025-10-23 01:59:01",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251022_204747"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0952\\IMG_0952_0.00s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_kitchensinkiphone_ollama_qwen3-vl_235b-cloud_narrative_20251025_011100",
+      "workflow_name": "kitchensinkiphone",
+      "description": "The image captures a tranquil lakeside scene under a bright, partly cloudy sky. The upper portion of the frame is dominated by a pale blue sky scattered with soft, white cumulus clouds, some clustered on the left, others more sparse toward the right. A thin, distant tree line or low hills stretches across the horizon, separating the sky from the water.\n\nThe lake itself fills the middle ground, its surface a muted blue-gray with gentle ripples reflecting the sky. The water appears calm, with subtle variations in tone indicating depth and movement. Near the right edge of the water, a small, indistinct orange object—possibly a buoy—is visible.\n\nIn the foreground, a sandy or gravelly shore slopes gently downward toward the water. The ground is light tan, dappled with shadows cast by overhanging foliage. Scattered across the shore are dry leaves, twigs, and patches of low-lying green vegetation. On the right side, a dense, leafy shrub with vibrant green leaves and thin brown branches extends into the frame, partially obscuring the water’s edge. A few bare, thin branches rise from the ground near the center, contrasting with the lush greenery.\n\nAt the very top corners of the image, the tips of tree branches with fresh green leaves intrude slightly into the frame, framing the sky. The overall lighting is bright and natural, suggesting midday sun filtered through foliage.\nTimestamp: 2025-10-25 05:25:37",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_011100"
+    },
+    {
+      "filename": "converted_images\\2022\\05\\IMG_0952.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_kitchensinkiphone_ollama_qwen3-vl_235b-cloud_narrative_20251025_011100",
+      "workflow_name": "kitchensinkiphone",
+      "description": "The image captures a tranquil lakeside scene under a bright, partly cloudy sky. The upper portion of the frame is dominated by a pale blue sky scattered with fluffy, white cumulus clouds, some casting soft shadows below. The horizon line is distant, where a low, tree-covered landmass stretches across the water’s edge, appearing as a muted green and gray silhouette.\n\nThe lake itself fills the middle ground, its surface a calm expanse of blue-gray water with gentle ripples reflecting the sky. Near the shore, the water is slightly clearer, revealing a shallow, sandy bottom with subtle variations in tone.\n\nIn the foreground, a sandy bank slopes gently toward the water. The sand is light beige, interspersed with small pebbles, dried leaves, and scattered twigs. Shadows from overhanging branches dapple the ground, creating patterns of light and dark.\n\nTo the right, a dense shrub with vibrant green leaves extends into the frame, its branches reaching toward the water. On the left, thin, leafless twigs and small green plants emerge from the soil, mingling with patches of dry grass and fallen foliage. The top corners of the image are framed by the edges of tree branches with fresh green leaves, partially obscuring the sky.\n\nA small, orange buoy is visible far out on the water, near the right side of the frame, adding a tiny point of color to the distant expanse. The overall lighting is bright and natural, suggesting midday sun filtered through scattered clouds.\nTimestamp: 2025-10-25 05:25:47",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_011100"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0975\\IMG_0975_0.00s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_kitchensinkiphone_ollama_qwen3-vl_235b-cloud_narrative_20251025_011100",
+      "workflow_name": "kitchensinkiphone",
+      "description": "A light gray, ribbed metal dock extends from the bottom left corner into the water, its surface showing parallel grooves and a small, dark circular fixture near the edge. The water is a mix of green and blue tones, rippling gently with small waves and reflecting the sky above. In the middle distance, a person floats on their back, wearing an orange life vest, with dark hair visible above the waterline. The horizon is lined with a dense treeline of dark green trees, interspersed with glimpses of white and light-colored structures along the shore. Above, the sky is a pale blue, streaked with thin, wispy white clouds and two faint, diagonal contrails. The overall lighting is bright and even, suggesting a clear, sunny day.\nTimestamp: 2025-10-25 05:30:25",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_011100"
+    },
+    {
+      "filename": "converted_images\\2023\\10\\IMG_0595.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_kitchensinkiphone_ollama_qwen3-vl_235b-cloud_narrative_20251025_011100",
+      "workflow_name": "kitchensinkiphone",
+      "description": "The foreground consists of a collection of smooth, rounded river rocks varying in size from small pebbles to large boulders. Their surfaces are predominantly gray, with some showing lighter beige or mottled tones, and many are partially shadowed by overhead foliage. Between the rocks, patches of fine, dark gravel and scattered dry leaves are visible.\n\nBeyond the rocky shore, a calm body of water extends across the middle of the frame. The surface is mostly still, with subtle ripples distorting the reflections of the trees and sky above. The water appears clear near the shore, revealing submerged stones, and deepens to a darker blue-green hue further out.\n\nThe far bank rises gently into a rocky slope covered with dense vegetation. Evergreen trees with dark green needles dominate the hillside, interspersed with deciduous trees displaying bright yellow and golden-orange leaves. The ground beneath the trees is a mix of exposed tan and brown rock, dry grasses, and fallen leaves.\n\nAbove the treeline, the sky is a clear, uniform blue with no visible clouds. Sunlight illuminates the scene from the upper left, casting distinct shadows from the trees onto the rocks and water, and highlighting the textures of the foliage and stone. The overall lighting suggests a bright, clear day.\nTimestamp: 2025-10-25 07:39:59",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-vl:235b-cloud",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_011100"
+    },
+    {
+      "filename": "converted_images\\IMG_4284.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_testingmultiple_ollama_qwen3-coder_480b-cloud_colorful_20251021_110258",
+      "workflow_name": "testingmultiple",
+      "description": "**Crimson Dusk Over the Harbor**\n\nThe sky bleeds molten copper and amber, a fierce sunset dissolving into pools of burnt orange that ripple across the heavens like liquid fire. Wisps of cloud catch the dying light, their edges gilded with gold leaf that seems to flutter against the deepening indigo of the encroaching night. \n\nBelow, the harbor mirrors this celestial drama in fractured reflections—thousands of dancing embers scattered across darkening water. The wooden piers thrust forward in bold strokes of russet and umber, their weathered planks creating a rhythmic pattern that draws the eye toward the horizon. Fishing boats bob gently, their white hulls now transformed to pearl-gray in the dimming light, while their masts stand like thin brushstrokes of midnight blue against the still-glowing sky.\n\nIn the foreground, a cluster of lobster pots creates a rich composition of deep burgundy and forest green, their ropes trailing like dark licorice against the weathered dock. The warm ochre of the lighthouse peels slightly, revealing layers of golden yellow beneath, while its beacon cuts through the gathering dusk in sharp wedges of electric blue-white.\n\nThe overall palette whispers of endings and beginnings—the passionate reds and oranges of day's final breath gradually surrendering to the cool purples and navy blues of approaching night, creating a visual symphony where warmth and coolness dance in perfect tension.\nTimestamp: 2025-10-21 11:05:23",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-coder:480b-cloud",
+      "prompt_style": "colorful",
+      "timestamp": "20251021_110258"
+    },
+    {
+      "filename": "converted_images\\IMG_4286.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_testingmultiple_ollama_qwen3-coder_480b-cloud_colorful_20251021_110258",
+      "workflow_name": "testingmultiple",
+      "description": "**Crimson Dusk Over the Harbor**\n\nThe sky bleeds molten copper and amber, a fierce sunset dissolving into pools of burnt orange that ripple across the heavens like liquid fire. Wisps of cloud catch the dying light, their edges gilded with gold leaf that seems to flutter and dance. Below, the harbor water mirrors this celestial drama—deep indigo depths shot through with ribbons of coral and tangerine reflection.\n\nCrimson fishing boats bob gently at their moorings, their red hulls darkened to burgundy in the shadowed waterline, creating a rich dialogue between the pure scarlet of their sides and the deep purple-black of the sea's embrace. Lanterns begin to flicker amber and honey gold along the weathered码头, their warm glow contrasting sharply with the cool violet shadows that pool beneath the wooden pilings.\n\nThe lighthouse stands sentinel, its white tower now bathed in rose gold light, the red stripe around its middle pulsing like a heartbeat against the softening blue of the approaching evening. Steam rises from a departing vessel in ghostly whispers of pearl gray, catching the last rays of sunlight and transforming into cotton candy pink and lavender wisps.\n\nIn the foreground, salt-stained rocks emerge from the surf in dramatic chiaroscuro—sun-kissed ochre and sienna faces giving way to deep teal and navy shadows where the waves retreat. The entire scene pulses with complementary tensions: warm crimsons against cool blues, bright golds nestled beside muted purples, creating a visual symphony that speaks of endings and beginnings, of day surrendering gracefully to night.\nTimestamp: 2025-10-21 11:05:34",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-coder:480b-cloud",
+      "prompt_style": "colorful",
+      "timestamp": "20251021_110258"
+    },
+    {
+      "filename": "converted_images\\IMG_4287.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_testingmultiple_ollama_qwen3-coder_480b-cloud_colorful_20251021_110258",
+      "workflow_name": "testingmultiple",
+      "description": "**Crimson Dusk Over the Harbor**\n\nThe sky bleeds molten copper and amber, a fierce sunset dissolving into pools of burnt orange that ripple across the heavens like liquid fire. Wisps of cloud catch the dying light, their edges gilded with molten gold that gradually deepens to tangerine and coral pink. Below this pyrotechnic display, the harbor water mirrors the spectacle in shattered fragments of reflection—each wavelet captures a different hue, creating a mosaic of vermillion, rust, and honeyed light that dances and fractures with the gentle swell.\n\nThe silhouettes of fishing boats cut sharp ebony shapes against this luminous backdrop, their masts and rigging rendered as delicate pen and ink drawings in the gathering dusk. Lanterns begin to flicker amber and topaz from the weathered docks, their warm glow contrasting with the cool indigo shadows that pool beneath the wooden pilings. The water laps against the shore in gentle waves that catch the lantern light, sending fingers of liquid silver and pearl across the darkening surface.\n\nIn the foreground, weathered lobster pots sit in deep burgundy shadows, their rope handles the only splash of earthy sienna against the increasingly monochromatic palette. The air itself seems to shimmer with color—warm amber light diffusing through the salt mist, creating an ethereal glow that softens edges and transforms the entire scene into a watercolor of impossible richness, where fire meets water and day surrenders to night in a symphony of complementary hues.\nTimestamp: 2025-10-21 11:05:44",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-coder:480b-cloud",
+      "prompt_style": "colorful",
+      "timestamp": "20251021_110258"
+    },
+    {
+      "filename": "converted_images\\IMG_4293.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_testingmultiple_ollama_qwen3-coder_480b-cloud_colorful_20251021_110258",
+      "workflow_name": "testingmultiple",
+      "description": "**Crimson Dusk Over the Harbor**\n\nThe sky bleeds molten copper and amber, a fierce sunset dissolving into pools of burnt orange that ripple across the heavens like liquid fire. Wisps of cloud catch the dying light, their edges gilded with gold leaf that seems to flutter and dance. Below, the harbor water mirrors this celestial drama—deep indigo depths shot through with ribbons of coral and tangerine reflection.\n\nCrimson fishing boats bob gently at their moorings, their red hulls darkened to burgundy in the shadowed waterline, creating a rich dialogue between the pure scarlet of their sides and the deep purple-black of the sea's embrace. Lanterns begin to flicker amber and honey gold along the weathered码头, their warm glow contrasting sharply with the cool violet shadows that pool beneath the wooden pilings.\n\nThe lighthouse stands sentinel, its white tower now bathed in rose gold light, the red stripe around its middle pulsing like a heartbeat against the softening blue of the approaching evening. Steam rises from a departing vessel in ghostly whispers of pearl gray, catching the last rays of sunlight and transforming into threads of silver and blush pink.\n\nThis is a moment suspended between day and night, where warm crimsons and oranges slowly surrender to the cool embrace of purples and deep blues, creating a visual symphony that speaks of endings that are also beginnings.\nTimestamp: 2025-10-21 11:06:39",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-coder:480b-cloud",
+      "prompt_style": "colorful",
+      "timestamp": "20251021_110258"
+    },
+    {
+      "filename": "converted_images\\IMG_4299.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_testingmultiple_ollama_qwen3-coder_480b-cloud_colorful_20251021_110258",
+      "workflow_name": "testingmultiple",
+      "description": "**Crimson Dusk Over the Harbor**\n\nThe sky bleeds molten copper and amber, a fierce sunset dissolving into pools of burnt orange that ripple across the heavens like liquid fire. Wisps of cloud catch the dying light, their edges gilded with gold leaf that seems to flutter against the deepening indigo of the encroaching night. \n\nBelow, the harbor mirrors this celestial drama in fractured reflections—choppy waters dance with fragments of that amber sky, broken by the deep Prussian blue shadows that pool beneath the weathered wooden docks. Fishing boats bob gently, their white hulls now tinged lavender in the fading light, while rust-red buoys dot the water like scattered rubies.\n\nThe lighthouse stands sentinel at the promontory, its stark white tower now glowing warm amber where the last rays strike its surface, gradually fading to cool pearl gray in the shadowed side that faces the emerging stars. Behind it, pine trees silhouette in rich forest green, their dark forms providing a crucial anchor of depth against the luminous sky.\n\nWarm yellow light spills from the harbor tavern's windows, pooling on the wet cobblestones in golden rectangles that contrast sharply with the cool slate blues and purples of the evening shadows. The interplay between these warm and cool color families creates a visual tension that pulses with the rhythm of the gently lapping waves—a masterful composition where every hue serves the greater emotional symphony of twilight's fleeting beauty.\nTimestamp: 2025-10-21 11:07:42",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-coder:480b-cloud",
+      "prompt_style": "colorful",
+      "timestamp": "20251021_110258"
+    },
+    {
+      "filename": "converted_images\\IMG_4300.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_testingmultiple_ollama_qwen3-coder_480b-cloud_colorful_20251021_110258",
+      "workflow_name": "testingmultiple",
+      "description": "**Crimson Dusk Over the Harbor**\n\nThe sky bleeds molten copper and amber, a fierce sunset dissolving into pools of burnt orange that ripple across the heavens like liquid fire. Wisps of cloud catch the dying light, their edges gilded with molten gold that gradually deepens to tangerine and coral pink. Below this pyrotechnic display, the harbor water mirrors the spectacle in shattered fragments of reflection—each wavelet captures a different hue, creating a mosaic of vermillion, rust, and honeyed light that dances and fractures with the gentle swell.\n\nThe silhouettes of fishing boats cut sharp ebony shapes against this luminous backdrop, their masts and rigging rendered as delicate pen and ink drawings in the gathering dusk. Lanterns begin to flicker amber and topaz from the weathered docks, their warm glow contrasting with the cool indigo shadows that pool beneath the wooden pilings. The water laps against the shore in gentle waves that catch the lantern light, sending scattered diamonds of silver and gold across the darkening surface.\n\nIn the foreground, weathered lobster pots sit in deep burgundy shadows, their rope handles catching the last amber rays. The interplay between the warm sunset palette and the emerging cool blues of twilight creates a visual tension that pulses with quiet drama—the landscape caught in that magical moment when day surrenders to night, and the world exists in perfect chromatic harmony between fire and shadow.\nTimestamp: 2025-10-21 11:07:52",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "qwen3-coder:480b-cloud",
+      "prompt_style": "colorful",
+      "timestamp": "20251021_110258"
+    },
+    {
+      "filename": "converted_images\\2020\\07\\IMG_0178.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "In the image of this serene lakeshore scene at sunset or sunrise on an overcast day with blue skies reflecting off calm water surfaces in front of trees lining up along one side near some docks where two benches are placed - a wooden bench facing towards shore and another metal-framed, orange slide. The dock is made from wood planks extending into the lake's edge while other boats can be seen on its surface at varying distances away from it; all under an overcast sky with clouds in shades of blue that blend harmoniously to create this picturesque lakeside scene where a child could play and enjoy their time near these beautiful surroundings.\nTimestamp: 2025-10-26 02:26:01",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0655\\IMG_0655_0.00s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image depicts the tranquil beauty of nature at sunset over water on an island or peninsula in Lake Michigan during dusk time with orange hues reflecting off its surface as it is calm enough to allow for such picturesque views without any disturbances from boats passing by nearby docks and piers that are not visible. The sky above mirrors this serene scene, adding a sense of peace throughout the image while casting an ethereal glow on everything below in shades ranging between orange-red hues at sunset with some white clouds scattered across it as well to create depth within its frame which makes for perfect photo opportunities and memorable moments captured during such times.\nTimestamp: 2025-10-26 06:04:12",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "converted_images\\2021\\09\\IMG_0656.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image shows the calm waters of Lake Michigan at sunset with orange hues reflecting off its surface as it stretches out into view from across the lake towards an island in the distance where trees are visible on both sides. The sky is filled with clouds that cast a soft light over this picturesque scene, creating long shadows and adding depth to the landscape below.\nTimestamp: 2025-10-26 06:05:06",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "extracted_frames\\IMG_0657\\IMG_0657_0.00s.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_allbutkitchen_sink_ollama_moondream_latest_narrative_20251025_174318",
+      "workflow_name": "allbutkitchen_sink",
+      "description": "The image depicts the serene beauty of nature at sunset over calm waters reflecting an orange sky with pink clouds in front of trees on either side that are silhouetted against this stunning backdrop as they gently sway back-and-forth due to a light breeze blowing across them from left and right sides. This picturesque scene is captured during dusk, creating the perfect atmosphere for reflection or relaxation by those who enjoy spending time near water bodies at sunset with their loved ones while admiring nature's breathtaking view of colors in sky reflected on calm waters below it\nTimestamp: 2025-10-26 06:05:23",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream:latest",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_174318"
+    },
+    {
+      "filename": "converted_images\\2020\\07\\IMG_0178.jpg",
+      "score": 50.0,
+      "workflow_path": "\\\\qnap\\home\\idt\\descriptions\\wf_fullimagerun_ollama_moondream_narrative_20251025_224247",
+      "workflow_name": "fullimagerun",
+      "description": "In the image of this serene lakeshore scene at sunset or sunrise on an overcast day with blue skies partially obscured by clouds above calm water reflecting hues from the sky's palette as well as trees in the distance under a cloudy gray sky near some wooden dock and bench, which is painted orange. The lake itself appears to be still without any visible boats floating around it at this moment of time captured during sunset or sunrise hours when light scatters across its surface creating an ethereal glow that enhances colors like blue from water reflecting sunlight with the warm hues in shades of yellow for sunrises and oranges, reds & browns as a result.\nTimestamp: 2025-10-26 06:36:40",
+      "match_details": {
+        "required_matches": [
+          "water",
+          "cloud",
+          "sun",
+          "orange",
+          "reflect"
+        ],
+        "preferred_matches": [],
+        "excluded_matches": [],
+        "filter_bonuses": {},
+        "passes_filters": true
+      },
+      "provider": "ollama",
+      "model": "moondream",
+      "prompt_style": "narrative",
+      "timestamp": "20251025_224247"
+    }
+  ]
+}

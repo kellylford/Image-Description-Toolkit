@@ -1,0 +1,2011 @@
+{
+  "version": "1.0",
+  "directory_path": "",
+  "directory_paths": [],
+  "items": {
+    "converted_images\\01\\IMG_0856.jpg": {
+      "file_path": "converted_images\\01\\IMG_0856.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482319388_0",
+          "text": "The image shows a body of water viewed from above, likely from a wooden pier or dock. The water is a muted greenish-gray, with gentle ripples and small waves breaking near the top left corner. Sunlight reflects off the surface in scattered, bright white glints, creating a shimmering effect across the middle and upper right portions of the water. Small patches of white foam are visible near the bottom left and along the right edge, where the water meets the structure.\n\nOn the right side of the frame, part of a wooden pier is visible. The wood is weathered, with a light brown to gray tone, showing signs of exposure to the elements. Dark, cylindrical pilings extend downward into the water, partially submerged. One piling is visible near the top right, another near the middle right, and a third near the bottom right. A white PVC pipe runs vertically along the edge of the pier, attached near the bottom right corner. The planks of the pier\u2019s deck are visible in the lower right, arranged horizontally, with visible grain and some darkened areas suggesting moisture or wear. The overall lighting is bright, suggesting daytime, with clear contrast between the sunlit water and the shaded portions of the pier.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0864.jpg": {
+      "file_path": "converted_images\\01\\IMG_0864.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482336073_0",
+          "text": "The image shows an outdoor paved area adjacent to a beach under a partly cloudy sky. The ground is covered with interlocking pavers in varying shades of gray, muted red, and brown, arranged in a herringbone pattern. Two concrete picnic tables with attached benches are visible; their surfaces are smooth and light gray, with rounded edges and thick, blocky legs. The benches are integrated into the table structure, also made of concrete, with visible seams where sections are joined.\n\nBehind the tables, a low concrete retaining wall separates the paved area from the sandy beach. Two dark rectangular signs mounted on short posts are positioned along the wall, facing the beach. The beach itself is wide and flat, composed of fine, light tan sand that extends to the water\u2019s edge. The ocean is calm, with gentle waves visible near shore, reflecting patches of sunlight. In the distance, a rocky jetty or breakwater extends into the water, and a few small, dark objects\u2014possibly buoys or distant boats\u2014are visible on the water\u2019s surface.\n\nThe sky above is a mix of blue and white, with large, soft-edged cumulus clouds stretching across the frame. Sunlight illuminates the scene from the upper left, casting distinct shadows from the tables and signs onto the pavers. On the far right, the top of a tree with green foliage is partially visible, and a small portion of a wooden structure, possibly a trash receptacle or kiosk, appears near the edge of the frame. The overall lighting suggests a bright, partly sunny day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0855.jpg": {
+      "file_path": "converted_images\\01\\IMG_0855.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482353607_0",
+          "text": "The image shows a wide expanse of ocean under a partly cloudy sky. The water dominates the lower two-thirds of the frame, appearing in varying shades of green and blue-green, with darker patches suggesting depth or shadow. White foam and froth are scattered across the surface, particularly in the upper left and middle areas, indicating recent wave activity or turbulence. The water\u2019s surface is textured with small ripples and undulations, catching sunlight in scattered glints and highlights.\n\nIn the upper third of the image, the sky is a pale blue, streaked with thin, wispy white clouds that stretch horizontally across the frame. The horizon line is visible as a faint, straight demarcation where the ocean meets the sky, slightly off-center and tilted slightly downward from left to right. A small, dark, indistinct object\u2014possibly a distant boat or buoy\u2014is visible near the horizon on the left side. The overall lighting is bright and even, suggesting daytime with clear visibility. No land, people, or structures are visible in the frame.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1139.jpg": {
+      "file_path": "converted_images\\06\\IMG_1139.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482374889_0",
+          "text": "The image shows a wide expanse of dark, rippling water under a dramatic sky. The water surface is textured with small, irregular waves, reflecting muted tones of gray and deep blue. Along the horizon, a dark, continuous treeline stretches across the frame, silhouetted against the sky. Above, the sky is a mix of deep blue and voluminous clouds\u2014some bright white and puffy, others dense and shadowed in gray, suggesting depth and movement. In the lower right corner, a portion of a flat, light gray surface is visible, likely a dock or platform, with parallel, fine ridges running diagonally across it. A small, dark circular object, possibly a bolt or fixture, is embedded near the edge of this surface. The overall lighting is natural and diffused, with no direct sunlight visible, casting soft shadows and highlights across the clouds and water.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1194.JPG": {
+      "file_path": "2024\\06\\IMG_1194.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482396119_0",
+          "text": "The image shows a large expanse of light beige sand, occupying most of the frame. The sand surface is textured with subtle ripples and undulations, and scattered across it are small dark specks\u2014possibly bits of organic debris or tiny stones. In the upper left corner, a darker, shadowed area borders the sand, containing what appear to be rocks or clumps of soil. Along the left edge, a narrow strip of water is visible, its surface reflecting light and appearing pale blue or gray. A thin, dark metal railing runs parallel to the water\u2019s edge, with vertical posts spaced at intervals. The railing casts a faint shadow onto the sand. The lighting suggests sunlight, creating soft shadows and highlights across the sand\u2019s surface, particularly a large, diffuse shadow stretching diagonally from the upper left toward the center. The overall composition is tilted, giving the impression that the photo was taken at an angle.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1204.JPG": {
+      "file_path": "2024\\06\\IMG_1204.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482418055_0",
+          "text": "The image shows a large expanse of light beige sand occupying most of the frame, with a slightly uneven, granular texture. Scattered across the sand are small dark specks and fragments, possibly bits of organic debris or small stones. Faint, irregular patterns resembling footprints or wind ripples are visible in places, particularly toward the center and upper right. A shadow, likely cast by an unseen object or foliage, stretches diagonally across the sand from the upper left toward the lower right, creating a gradient of light and dark tones.\n\nAlong the left edge of the image, a narrow strip of water is visible, appearing grayish-blue with a slightly rippled surface. Adjacent to the water is a dark, linear structure running vertically \u2014 possibly a metal railing or fence \u2014 with thin vertical bars and horizontal supports. Some of the bars are partially submerged or reflected in the water. Near the top left corner, a small cluster of dark, rounded objects, possibly rocks or debris, rests at the edge of the sand. The overall lighting suggests daylight, with the sun positioned to cast long, soft shadows. The image is oriented sideways, with the water and railing appearing along the left side rather than the bottom.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1231.jpg": {
+      "file_path": "converted_images\\06\\IMG_1231.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482439120_0",
+          "text": "The image shows a wide expanse of water under a partly cloudy sky. The water is dark green to grayish in color, with small, gentle ripples across its surface, reflecting subtle variations in light. In the lower right corner, the white tip of a boat\u2019s bow is visible, partially submerged, cutting into the water and creating a slight disturbance in the ripples around it. The horizon is flat and distant, lined with a thin, dark band of trees or shoreline vegetation. Above, the sky is a pale blue-gray, filled with scattered cumulus clouds that are white and soft-edged, with some areas appearing denser and slightly shadowed. The overall lighting is diffuse, suggesting an overcast or partially sunny day. No people, animals, or other vessels are visible in the frame.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0884.jpg": {
+      "file_path": "converted_images\\01\\IMG_0884.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482475620_0",
+          "text": "The foreground consists of damp, fine-grained sand in shades of gray and beige, marked with subtle ripples and scattered debris. Dark, tangled clumps of seaweed lie strewn across the sand, some appearing wet and glossy, others dry and brittle. Small, dark fragments\u2014possibly shells, pebbles, or organic matter\u2014are interspersed among the seaweed. A single orange-brown leaf rests near the center, contrasting with the muted tones around it. A thin, pale stick lies diagonally near the bottom right.\n\nBeyond the sand, the water\u2019s edge is defined by a frothy, white line of receding surf, glistening with reflected sunlight. The shallow water near shore is translucent, revealing the sandy bottom beneath, while further out, the ocean deepens to a dark gray-blue. Gentle waves roll in, their crests catching the light and breaking into white foam before dissolving into the shore.\n\nThe horizon is a straight, distant line where the ocean meets the sky. Above it, the sky is a pale blue, streaked with thin, wispy clouds that are white and slightly grayed at the edges. Closer to the horizon, a band of denser, flatter clouds stretches across the sky, tinged with soft gray and white. The overall lighting is bright and even, suggesting midday sun, though no direct sun is visible. The scene is devoid of people, animals, or man-made structures.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\05\\IMG_1042.jpg": {
+      "file_path": "converted_images\\05\\IMG_1042.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482509611_0",
+          "text": "A paved walkway composed of gray, textured rectangular stones extends diagonally from the lower left toward the center of the frame. Along its right edge, a low concrete barrier separates the walkway from a body of water. Black metal bollards are spaced along the barrier, connected by short lengths of heavy chain. A white rectangular box with a circular red-and-white emblem is mounted on a post near the center of the barrier. To the left, a blue recycling bin with a white lid and recycling symbol stands near a coiled yellow rope resting on a small platform.\n\nThe water is a deep teal-blue, rippling gently under sunlight, stretching to the horizon. In the distance, a long pier extends into the water, ending with a small lighthouse structure painted white with a red top. Several dark, vertical buoys or pilings are visible scattered across the water\u2019s surface. A single bird, dark in silhouette, is captured mid-flight against the sky in the upper left quadrant.\n\nThe sky above is a vibrant blue, populated with scattered cumulus clouds\u2014white and puffy with soft gray undersides. The sunlight casts distinct shadows from the bollards onto the pavement, indicating a bright, clear day. The horizon line is straight and unbroken, separating the water from the sky. A few sparse trees are visible on the far end of the pier.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1131.jpg": {
+      "file_path": "converted_images\\06\\IMG_1131.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482526991_0",
+          "text": "The sky above is a gradient of pale to medium blue, populated with scattered, puffy cumulus clouds. These clouds are predominantly white with soft gray undersides, varying in size and density, some appearing more defined while others are wispy and dispersed. The horizon is marked by a continuous, dark green treeline, composed of dense, leafy trees that stretch across the image. Along the treeline, faint structures\u2014possibly houses or docks\u2014are visible, appearing as small, light-colored shapes nestled among the foliage.\n\nBelow the horizon, a wide expanse of still water mirrors the sky and clouds with remarkable clarity. The reflection is slightly distorted by gentle ripples, creating a shimmering, almost painterly effect. The water\u2019s surface transitions from a silvery-blue near the horizon to deeper, darker tones closer to the foreground, where the reflection of the clouds becomes more muted and shadowed. A small white boat is visible near the center of the image, moving left to right, leaving a faint, straight wake behind it. The wake disrupts the reflection slightly, creating a narrow, linear disturbance in the otherwise smooth surface. The overall lighting is bright and even, suggesting daytime with no direct sunlight casting harsh shadows.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\IMG_6388\\IMG_6388_0.00s.jpg": {
+      "file_path": "extracted_frames\\IMG_6388\\IMG_6388_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482545396_0",
+          "text": "A group of white swans floats on a body of dark, rippling water. The water\u2019s surface is textured with small waves and ripples, reflecting muted tones of gray and blue under an overcast sky. The swans are scattered across the middle ground, some with necks raised, others with heads lowered or partially submerged. Their white plumage contrasts sharply with the dark water. In the background, a distant shoreline is visible, lined with bare trees and low vegetation, appearing as a muted band of brown and gray. The sky above is pale and uniform, without visible clouds or sun. No human-made structures or other animals are clearly visible in the frame.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1320.jpg": {
+      "file_path": "converted_images\\07\\IMG_1320.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482563552_0",
+          "text": "The image captures the interior of a pontoon boat during twilight, with the horizon visible through the open rear. The sky transitions from a deep indigo at the top to a soft gradient of lavender, pale orange, and yellow near the horizon line, where the sun has recently set. A thin, wispy contrail stretches diagonally across the upper sky. Below, the water is calm, reflecting the muted colors of the sky with gentle ripples.\n\nInside the boat, the scene is dimly lit, with most details rendered in shadow. On the right, the helm station is visible: a dark steering wheel, a mounted digital display glowing faintly with a map or chart, and a console with various dials and switches. The console and surrounding seating are upholstered in a dark gray or charcoal fabric.\n\nA person sits on the rear bench seat, facing slightly left, wearing a blue hooded sweatshirt and light-colored pants. Their head is bowed, and their hands appear to be resting in their lap. To the left, another person is reclined on a cushioned seat, partially obscured. They wear a patterned shirt with orange and white tones, dark shorts, and white socks. Their right arm rests along the back of the seat, and their left hand holds a dark rectangular object, possibly a phone.\n\nThe boat\u2019s flooring is dark, and the overall interior is shadowed, contrasting with the brighter, colorful sky and water outside. The edge of a dark canopy or bimini top is visible in the upper right corner of the frame. In the distance, a low, dark treeline runs along the horizon.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\IMG_1430\\IMG_1430_0.00s.jpg": {
+      "file_path": "extracted_frames\\IMG_1430\\IMG_1430_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482582339_0",
+          "text": "A sloping grassy bank occupies the foreground, its surface a patchwork of green and pale yellow-brown blades, uneven and textured with small clumps and scattered low-lying weeds. Along the mid-ground, a narrow, shallow waterway runs diagonally from lower left to upper right. Its surface is calm, reflecting muted tones of sky and surrounding foliage, with a few small, dark ripples visible. The banks of the waterway are lined with tall, slender reeds and grasses, their leaves a mix of bright green and sun-bleached yellow, some leaning over the water. Behind the waterway, a steep embankment rises, densely covered in a thick, dark green mat of climbing vines or ivy, creating a uniform, textured wall of foliage. Above this vine-covered slope, a line of taller trees stands against the sky, their canopies a mix of deep green and shadowed areas, with some individual branches and leaves discernible. The sky above is a clear, uniform pale blue, unbroken by clouds. The lighting is bright and direct, casting sharp shadows beneath the reeds and within the foliage, indicating a sunny day. The overall scene is angled, suggesting the photograph was taken from a slightly elevated position looking down and across the slope.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0867.jpg": {
+      "file_path": "converted_images\\01\\IMG_0867.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482600670_0",
+          "text": "The foreground is dominated by a wide expanse of dark, damp sand, textured with numerous footprints, tire tracks, and shallow depressions. A small patch of sparse, low-lying green vegetation grows near the bottom edge. In the middle ground, the sand meets the ocean\u2019s edge, where gentle waves with white foam roll onto the shore. Several small, dark figures are visible in the water, some standing, others partially submerged. Two dark, cylindrical objects, possibly trash bins, stand side by side on the sand near the waterline. The ocean stretches to the horizon, its surface reflecting sunlight in scattered, bright patches. Beyond the water, a low, hazy landmass with indistinct hills or mountains is visible under a vast sky. The sky is a mix of pale blue and streaks of white and gray clouds, some wispy and scattered, others forming broader, layered bands. The overall lighting is bright but diffused, suggesting daylight under partial cloud cover.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1301.jpg": {
+      "file_path": "converted_images\\07\\IMG_1301.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482619017_0",
+          "text": "A man occupies the lower-left portion of the frame, captured from the chest up. He wears a dark gray baseball cap with a curved brim. Embroidered on the front of the cap is a graphic featuring a red vintage car, the number \u201c66\u201d in white with a black outline, and text reading \u201cSALOON ON THE CORNER WINSLOW ARIZONA\u201d in white capital letters. A small black silhouette of a person stands to the right of the text. The man has fair skin, visible wrinkles around his eyes and forehead, and is looking slightly downward toward the camera with a neutral expression. He wears a green short-sleeved shirt. A thin white cord, possibly from earphones, runs along the left side of his neck. Behind him, a wide expanse of dark blue water stretches to the horizon, its surface textured with small, gentle ripples. In the distance, a low, continuous line of dense green trees borders the far shore. Above, the sky is a clear, uniform gradient of blue, lighter near the horizon and deepening toward the top of the frame. The lighting is bright and even, suggesting direct sunlight.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0890.jpg": {
+      "file_path": "converted_images\\01\\IMG_0890.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482636004_0",
+          "text": "The image shows a wide, sunlit beach stretching from the foreground to the horizon. The sand in the foreground is light beige, textured with numerous footprints of varying depths and clarity, some overlapping, others isolated. Small bits of dark debris, possibly seaweed or shells, are scattered sparsely among the prints. The shoreline curves gently from left to right, where shallow, translucent waves with white foam edges roll onto the sand. Beyond the surf, the ocean is a gradient of blue-gray, reflecting the bright sunlight in a shimmering, elongated path that extends from the horizon toward the shore. The sky above is a pale, clear blue, almost white near the sun, which appears as a brilliant, overexposed white disc near the top center of the frame, casting a faint lens flare. A thin, hazy band of cloud or mist lies along the horizon line, separating the sea from the sky. In the far distance, on the right side of the water, a dark, low-lying rock or outcrop is visible. The overall lighting is bright and direct, suggesting midday.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1336.jpg": {
+      "file_path": "converted_images\\07\\IMG_1336.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482654295_0",
+          "text": "The image captures a wide expanse of sky transitioning from deep indigo at the top to a soft gradient of blue, then to a warm band of orange and pale yellow along the horizon. Below the horizon, a calm body of water reflects the fading light, its surface textured with gentle ripples. A dark, low-lying landmass stretches across the horizon, silhouetted against the glow. Several small, bright points of light are visible along this distant shore, evenly spaced and glowing faintly. In the upper left and upper right corners, dark silhouettes of tree branches and leaves intrude slightly into the frame, framing the sky. The overall lighting is dim, characteristic of twilight, with no direct sunlight visible. The sky is clear and cloudless.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1111.jpg": {
+      "file_path": "converted_images\\06\\IMG_1111.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482673809_0",
+          "text": "A long, narrow dock extends diagonally from the lower left foreground into the center of the frame, receding toward the middle distance. The dock\u2019s surface is made of light gray, ribbed metal panels, with visible seams and fasteners. Black metal support posts are spaced along its edges, and a black cylindrical float is attached beneath the right side near the foreground.\n\nAt the far end of the dock, a small, elevated platform with a metal railing and bench-like structure juts out over the water. The water is calm, with gentle ripples, and appears murky brownish-gray, reflecting the overcast sky. Near the horizon, a small white motorboat with a dark hull is visible, moving left to right, leaving a faint wake.\n\nThe far shoreline is lined with a dense, dark green treeline, stretching horizontally across the background. Above, the sky is uniformly overcast, filled with soft, diffuse gray clouds with no visible sun or blue patches. In the lower right corner, a narrow strip of light brown sandy shore is visible, with faint footprints or disturbances in the sand. A single, weathered wooden post stands upright in the water on the far right, partially submerged.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1124.JPG": {
+      "file_path": "2024\\06\\IMG_1124.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482690834_0",
+          "text": "The image is oriented vertically, with the top of the frame showing a bright blue sky scattered with small, wispy white clouds. Below the sky, a wide expanse of calm, blue-gray water stretches horizontally across the middle of the image, reflecting the sky above. The far shore is lined with a dense, dark green treeline.\n\nIn the foreground and to the right, a wide sandy beach occupies the lower half of the frame. The sand is light tan, with darker patches and shadows cast by trees. A wooden picnic table with attached benches sits on the sand, angled slightly toward the water. Its surface and legs are dark brown, weathered wood.\n\nTo the left, large leafy trees with vibrant green foliage overhang the scene, their branches extending into the upper left corner. One tree trunk is visible, leaning slightly, with rough, dark bark. Below, a darker, coniferous tree with dense, needle-like leaves fills the lower left corner, its shadow falling across the sand.\n\nA narrow, light gray concrete or paved walkway runs diagonally from the lower center toward the water\u2019s edge, bordered by sand on both sides. Along the walkway, a closed, dark blue patio umbrella is visible, mounted on a metal pole. Further down the path, a lamppost with a classic-style lantern head stands near the water\u2019s edge.\n\nIn the distance, along the shoreline, several small boats are moored at docks. One white boat is clearly visible, and others are partially obscured. A few people can be seen near the water, appearing small due to distance \u2014 one in red clothing, another near a dock.\n\nThe lighting is bright and direct, suggesting midday sun, casting sharp shadows from the trees and picnic table onto the sand. The overall color palette includes blues, greens, tans, and browns, with high contrast between sunlit areas and shaded regions.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1298.jpg": {
+      "file_path": "converted_images\\07\\IMG_1298.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482707952_0",
+          "text": "The image shows a wide expanse of dark blue water occupying the lower two-thirds of the frame. The surface is textured with small, consistent ripples and wavelets, reflecting subtle highlights from above. The water appears deep and undisturbed except for the natural movement of the surface.\n\nAlong the horizon, a continuous line of dense green forest stretches across the width of the image. The trees are predominantly coniferous, with dark green, pointed canopies. Interspersed among them are lighter green deciduous trees. The treeline is uneven, rising and falling slightly with the terrain behind it.\n\nNestled within the trees, near the center of the horizon, is a structure with a dark roof and light-colored walls, partially obscured by foliage. To its right, a small white rectangular object, possibly a dock or boathouse, is visible at the water\u2019s edge.\n\nAbove the treeline, the sky is a uniform, clear blue, devoid of clouds. The color transitions smoothly from a slightly lighter blue near the horizon to a deeper blue at the top of the frame. The lighting is bright and even, suggesting midday sun. No people, animals, or moving objects are visible in the scene.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1113.jpg": {
+      "file_path": "converted_images\\06\\IMG_1113.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482726493_0",
+          "text": "The image shows a view from the edge of a dock extending over a large body of water. The dock surface in the foreground is made of light gray, ribbed metal panels, with visible parallel grooves running lengthwise. A small, dark circular object, possibly a bolt or fixture, is embedded near the corner of the dock\u2019s edge. The water is a muted greenish-gray, with gentle ripples across its surface, reflecting the overcast sky above. In the distance, a continuous tree line stretches across the horizon, composed of dense, dark green foliage. The sky is uniformly covered with thick, soft gray clouds, with no visible breaks or sunlight. The overall lighting is diffuse and even, with no strong shadows. The water meets the tree line in a straight, distant horizon. No people, animals, or boats are visible in the scene.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\IMG_1398\\IMG_1398_0.00s.jpg": {
+      "file_path": "extracted_frames\\IMG_1398\\IMG_1398_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482741472_0",
+          "text": "The image shows a wide expanse of calm, greenish-blue water occupying the lower two-thirds of the frame. Gentle ripples cover the surface, reflecting the bright daylight. Along the far shore, a line of dense, leafy trees in varying shades of green stretches across the horizon. Interspersed among the trees are several structures: houses with light-colored siding and dark roofs, some partially obscured by foliage. Several covered boat docks extend from the shoreline into the water, each with a dark, sloped roof and open sides. A few small boats are moored beneath the docks. The land behind the trees slopes gently upward, revealing more houses nestled into the hillside. The sky above is a clear, uniform blue, with a few small, scattered white clouds near the treeline. The overall lighting is bright and even, suggesting midday sun.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1277.jpg": {
+      "file_path": "converted_images\\07\\IMG_1277.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482756905_0",
+          "text": "The image shows a view from the edge of a white, ribbed dock extending into a large body of water. The dock surface is textured with parallel vertical ridges and has a small, dark circular fixture near its corner. The water is a muted gray-green, rippling gently with small, irregular waves reflecting the overcast sky. In the distance, a continuous treeline runs along the far shore, composed of dense, dark green trees. Above the treeline, the sky is filled with thick, layered clouds in varying shades of gray and pale white, with subtle breaks allowing faint light to filter through near the horizon. The overall lighting is diffuse and even, with no direct sunlight visible. The water\u2019s surface appears slightly disturbed, suggesting a light breeze. No people, animals, or boats are visible in the scene.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0873.jpg": {
+      "file_path": "converted_images\\01\\IMG_0873.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482770513_0",
+          "text": "The image shows a coastal scene under a vast, pale blue sky with scattered, wispy white clouds near the horizon and a larger, brighter cloud formation in the upper right. The horizon line is distant, where the sky meets a calm, gray-blue ocean. Gentle waves ripple toward the shore, their crests catching glints of sunlight.\n\nIn the foreground, wet, dark gray sand stretches across the bottom of the frame, marked with shallow, parallel ripples left by receding water. Small, dark, irregularly shaped rocks and pebbles are scattered across the sand and in the shallow water. Some rocks are partially submerged, visible through the clear, shallow water that reflects the sky and ripples with small, concentric waves.\n\nA single bird, likely a gull, stands in the shallow water near the center of the frame, its white and gray plumage contrasting with the darker water. Further out, near the horizon, several small, dark figures are visible in the water, possibly people or distant birds, though their details are indistinct.\n\nThe overall lighting is bright and even, suggesting midday sun, with subtle highlights on the water\u2019s surface and the wet sand. The scene is tranquil, with no visible motion except for the gentle undulation of the water.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1317.jpg": {
+      "file_path": "converted_images\\07\\IMG_1317.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482787824_0",
+          "text": "The image captures a view from the stern of a moving boat across a wide expanse of water during twilight. In the lower-left corner, a black outboard motor is partially visible, bearing the white and red \u201cMercury\u201d logo. The motor churns the dark, rippling water, creating a frothy white wake that trails diagonally toward the center of the frame. The water surface is textured with small waves and reflects the fading light, appearing in shades of deep blue and gray, with streaks of pale gold where the sky\u2019s glow touches it.\n\nIn the distance, a low, tree-lined shoreline stretches across the horizon, silhouetted against the sky. The trees are dark and dense, forming a continuous band of black against the gradient above. The sky transitions smoothly from a warm, soft orange near the horizon to a pale yellow, then to a clear, cool blue at the top of the frame. The horizon line is straight and unbroken, separating the water from the sky. A few small, indistinct shapes\u2014possibly distant boats or buoys\u2014are visible on the water near the far shore. The overall lighting is soft and diffused, characteristic of the time just after sunset.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\05\\IMG_1055.jpg": {
+      "file_path": "converted_images\\05\\IMG_1055.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482805388_0",
+          "text": "The image shows a wide expanse of turquoise water occupying the lower two-thirds of the frame, its surface textured with small, gentle ripples catching the sunlight. The water extends to a distant horizon line that slopes slightly upward from left to right. Along this horizon, a faint silhouette of a city skyline is visible, composed of numerous rectangular and vertical structures of varying heights, appearing gray and muted against the sky. Above the horizon, the sky dominates the upper third of the image, a deep, clear blue with scattered cumulus clouds. These clouds are bright white with soft, rounded edges and subtle gray shading on their undersides, varying in size and density. Some clouds are isolated, while others form loose clusters. The overall lighting is bright and even, suggesting midday sun, with no visible shadows cast on the water\u2019s surface. The horizon line is slightly tilted, giving the impression the photo was taken from a moving or angled perspective.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0839.jpg": {
+      "file_path": "converted_images\\01\\IMG_0839.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482825255_0",
+          "text": "The image shows a beach scene under an overcast sky. The foreground is dominated by damp, grayish-brown sand, marked with scattered footprints and small indentations. Gentle waves with white foam edges roll onto the shore, creating a textured line where water meets sand. Two silhouetted figures stand in shallow water near the shore; one is slightly bent forward, the other upright with arms partially raised. Further out, several small dark shapes are visible on the water\u2019s surface, possibly distant swimmers or buoys. The ocean stretches to the horizon, its surface shimmering with scattered glints of sunlight reflecting off ripples. The sky above is pale blue-gray, streaked with thin, wispy cirrus clouds and faint contrails. On the far right, a dark, rocky outcrop juts into the water near the horizon. The overall lighting is diffuse, with no strong shadows, and the color palette is muted\u2014grays, blues, and soft whites dominate.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1176.JPG": {
+      "file_path": "2024\\06\\IMG_1176.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482844998_0",
+          "text": "The image shows a large expanse of light beige sand occupying most of the frame, with subtle undulations and scattered small dark debris\u2014possibly twigs or dried plant matter\u2014across its surface. The sand appears dry and fine-grained, with faint, irregular patterns suggesting wind or foot traffic. Along the left edge, a narrow strip of water runs parallel to the sand, its surface reflecting a pale blue-gray hue, indicating overcast or diffused lighting. A dark, vertical wooden post stands in the water near the shoreline, with several horizontal crossbars attached, resembling part of a dock or mooring structure. Further left, a small red buoy floats near the water\u2019s edge, tethered by a thin line. In the upper left corner, a portion of a wooden structure\u2014possibly a pier or shed\u2014is visible, with weathered gray planks and a small pile of dark stones or rocks at its base. The overall lighting is even and soft, with no harsh shadows, suggesting an overcast day or indirect sunlight. The composition is tilted, giving the impression that the photo was taken at an angle, with the water and sand running diagonally from the lower left to the upper right.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1299.jpg": {
+      "file_path": "converted_images\\07\\IMG_1299.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482862945_0",
+          "text": "A man and a woman are seated on a pontoon boat under a black fabric canopy supported by silver metal poles. The man, on the left, wears a red baseball cap with yellow lettering, a gray long-sleeve shirt, dark shorts, and gray athletic shoes. He is seated on a beige upholstered bench, facing slightly forward, with his hands resting on his knees. In front of him, mounted on the console, is a black Humminbird fish finder with a screen angled toward the viewer.\n\nTo his right, the woman sits on a matching beige bench, wearing a wide-brimmed light gray sun hat, dark sunglasses, an orange long-sleeve shirt with white text reading \u201cI came, I saw, I conquered 2021,\u201d and light-colored shorts. Her hands rest in her lap. Between them is a small, round, black tabletop mounted on a silver metal pole, with two cup holders visible on its surface.\n\nThe boat\u2019s flooring is a textured gray carpet. The console to the left features a molded white plastic structure with a recessed black storage compartment and a circular stainless steel cup holder. A black bag with gray accents rests on the floor near the woman\u2019s feet.\n\nBeyond the boat, the water is a deep blue with small ripples reflecting sunlight. In the distance, a tree-lined shore stretches across the horizon under a clear, pale blue sky. The sun casts distinct shadows inside the boat, indicating bright daylight.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_0178.jpg": {
+      "file_path": "converted_images\\07\\IMG_0178.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482882909_0",
+          "text": "A wooden dock extends diagonally from the lower left toward the center of the frame, its weathered gray planks showing signs of exposure to water and sun. At the end of the dock, a dark wooden bench with horizontal slats and metal supports sits facing the water. To the right of the bench, a curved metal handrail rises from the dock\u2019s edge, partially submerged. The water surrounding the dock is rippled, reflecting a muted sky, with small waves lapping gently against the structure.\n\nIn the foreground, on a sandy shore, rests a small plastic children\u2019s slide. The slide\u2019s frame is bright blue, with a curved orange slide surface. A yellow horizontal bar connects the two blue side supports near the base. The sand is light brown, scattered with small twigs and bits of organic debris.\n\nBeyond the dock, the lake stretches to a distant tree line. The trees are dense and uniformly green, forming a continuous horizon. Above them, the sky is pale blue with scattered white and gray clouds. A few small, indistinct white objects\u2014possibly boats\u2014are visible near the far shore, nestled among the trees.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1300.jpg": {
+      "file_path": "converted_images\\07\\IMG_1300.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482902113_0",
+          "text": "A man occupies the lower-left portion of the frame, captured from the chest up in a low-angle selfie. He wears a dark gray baseball cap with a small red and white logo on the front. His eyes are closed, and his face is angled slightly upward, with sunlight illuminating the right side of his face and casting the left side in shadow. He has fair skin with visible pores and slight stubble along his jawline. He is wearing a green crew-neck t-shirt with visible stitching along the collar and shoulder seams.\n\nBehind him, a wide expanse of deep blue water stretches to the horizon, its surface textured with small, gentle ripples catching the sunlight. The water meets a distant, low-lying treeline composed of dense, dark green coniferous trees. Above the treeline, the sky is a vast, uninterrupted gradient of clear blue, lighter near the horizon and deepening toward the top of the frame. The lighting is bright and direct, suggesting midday sun. The composition places the man in the foreground, with the expansive water and sky dominating the background.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1322.jpg": {
+      "file_path": "converted_images\\07\\IMG_1322.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482922546_0",
+          "text": "The image captures a scene on a pontoon boat during twilight. In the foreground, the back of a person wearing a dark brown hooded sweatshirt and light blue denim shorts is visible on the left. To their right, seated on the boat\u2019s bench, is another person wearing a gray baseball cap with a small square logo, a plaid shirt in shades of brown, gray, and black, and olive-green pants. This person is holding a black smartphone in their left hand and making a peace sign with both hands, facing the camera. Their expression is neutral to slightly smiling.\n\nThe boat\u2019s console is gray plastic, featuring a mounted GPS screen displaying a map with a red arrow, two analog gauges with white faces and black dials, and a black steering wheel being gripped by a hand on the far right. A dark blue water bottle with a black cap sits in a cup holder on the console. A thin black cable runs from the GPS down the side of the console.\n\nBehind the seated person, a blue cushioned seat is partially visible. The background shows a shoreline lined with tall evergreen and deciduous trees, their leaves dark green against the fading light. Beyond the trees, a calm body of water stretches to the horizon, reflecting the soft orange and pink hues of the sunset. The sky above the water is pale blue fading into warm tones near the horizon. The overall lighting is dim, suggesting late evening, with shadows beginning to settle across the boat and surrounding foliage.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1192.JPG": {
+      "file_path": "2024\\06\\IMG_1192.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482942589_0",
+          "text": "The image shows a large expanse of light beige sand occupying most of the frame, with a slightly uneven, textured surface marked by subtle ridges, depressions, and scattered small dark specks\u2014possibly bits of organic debris or pebbles. The sand appears dry and fine-grained, with variations in tone caused by shadows and sunlight. Along the left edge, a narrow strip of water is visible, reflecting a pale blue-gray hue, bordered by a dark, linear structure that appears to be a wooden or metal railing or walkway. This structure runs diagonally from the lower left toward the upper left, with vertical posts and horizontal rails. Near the top left corner, a small cluster of dark, irregularly shaped stones or rocks is visible, partially embedded in the sand. The lighting suggests a bright, sunny day, with shadows cast across the sand indicating the presence of nearby objects or foliage outside the frame. The overall composition is tilted, giving the impression that the photo was taken at an angle rather than straight-on.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1145.jpg": {
+      "file_path": "converted_images\\06\\IMG_1145.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482963636_0",
+          "text": "The image shows a body of water under a partly cloudy sky. The water, occupying the lower two-thirds of the frame, has a rippled surface with small waves reflecting light, appearing in shades of gray, blue, and green. In the middle ground, a white floating dock extends diagonally from the right toward the center. Attached to the dock is a white ladder leading up to a light blue plastic waterslide that curves downward toward the water. Further along the dock, a white boat with a canopy is moored. Behind the dock, a shoreline is visible, lined with dense green trees. A small sandy beach area is present on the far right, where a few people are seated or standing. A white gazebo-like structure with a peaked roof stands near the shore, partially obscured by trees. The sky above is bright blue with scattered cumulus clouds, some dense and white, others more diffuse and grayish. The overall lighting suggests a sunny day with shadows cast by the clouds. The image is tilted slightly, giving a diagonal orientation to the horizon line.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1230.jpg": {
+      "file_path": "converted_images\\06\\IMG_1230.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761482982993_0",
+          "text": "The image shows a view from a watercraft on a body of water under a partly cloudy sky. In the lower-left corner, the tip of a white paddle is visible, bearing a red logo with the word \u201cWERNER\u201d and a stylized design above it. The water is a murky green-gray, rippling with small waves and scattered with thin, stringy strands of aquatic vegetation floating on the surface. In the background, a tree-lined shore stretches across the frame. The trees are dense and leafy, varying in shades of green, with some appearing darker and others lighter, possibly due to sunlight or species variation. Behind the trees, portions of residential structures are visible \u2014 roofs and walls in muted tones of beige, gray, and brown. The sky above is a pale blue, filled with large, fluffy cumulus clouds that are white with gray undersides. The overall lighting suggests daytime, with diffuse sunlight filtering through the clouds.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1116.JPG": {
+      "file_path": "2024\\06\\IMG_1116.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483010559_0",
+          "text": "The image is oriented vertically, with the top of the frame showing the ground and the bottom showing the sky, suggesting it was rotated 90 degrees clockwise.\n\nIn the upper portion of the frame, a sandy beach stretches diagonally from the upper left toward the center. The sand is light tan, with scattered darker patches and shadows cast by trees. A dark wooden picnic table with attached benches sits on the sand, angled slightly toward the water. Behind it, a tree trunk rises, its branches and green leaves extending into the upper left corner, partially obscuring the sky.\n\nThe middle of the frame is dominated by a wide expanse of calm blue water, reflecting the sky. Along the far shore, a dense line of green trees forms a continuous treeline. Several small boats are moored near the shore, visible as white and dark shapes. A wooden dock extends into the water from the left side, with a closed blue umbrella and a lamppost visible near its edge.\n\nThe lower portion of the frame shows a bright blue sky with scattered, wispy white clouds. The branches of a dark green coniferous tree fill the lower left corner, its needles dense and shadowed. The sunlight illuminates parts of the sand and water, creating contrast with the shaded areas beneath the trees. The overall lighting suggests a clear, sunny day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1321.jpg": {
+      "file_path": "converted_images\\07\\IMG_1321.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483029315_0",
+          "text": "A man sits in the driver\u2019s seat of a boat at dusk, silhouetted against a glowing horizon. He wears a red baseball cap and a dark hooded jacket, his hands gripping the steering wheel. The boat\u2019s console is visible in the foreground, featuring a lit GPS screen displaying a map with red and yellow markers, alongside analog gauges with white faces and black needles. A black canopy overhead is supported by metal poles, casting deep shadows over the cockpit. To the left, the dark silhouette of tree branches extends into the frame. Beyond the boat, calm water reflects the fading light of the sunset \u2014 a gradient of orange near the horizon, blending into pale yellow, then soft blue above. The distant shoreline is a dark, low silhouette against the sky. The man\u2019s profile is visible in side view, his gaze directed forward toward the water. The boat\u2019s captain\u2019s chair is upholstered in dark material, and a small circular gauge or speaker is embedded in the console\u2019s lower left corner. The overall lighting is low, with the primary illumination coming from the sky and the GPS screen.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1292.jpg": {
+      "file_path": "converted_images\\07\\IMG_1292.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483065469_0",
+          "text": "The image shows a wide expanse of dark, rippling water occupying the lower two-thirds of the frame. The surface is textured with small, irregular waves and subtle crests, reflecting dim ambient light. The water appears deep blue to nearly black, with faint highlights catching along the wave peaks.\n\nAbove the waterline, a distant, low-lying landmass stretches horizontally across the horizon. It is covered in dark green vegetation and appears flat. Several thin, vertical structures\u2014possibly towers or masts\u2014are visible rising from the land, spaced irregularly and appearing small due to distance.\n\nThe sky dominates the upper third of the image. It is filled with layered clouds: lower, denser formations in shades of gray and muted blue, with lighter, wispy clouds above them. The cloud cover is uneven, allowing patches of pale blue sky to show through. Near the horizon on the left, a faint glow of pink and orange tinges the underside of the clouds, suggesting the presence of a setting or rising sun just beyond the frame.\n\nThe overall lighting is subdued, with no direct sunlight visible. The scene is rendered in cool tones, primarily blues, grays, and dark greens, with minimal contrast. The horizon line is straight and clearly defined, separating the water from the sky and distant land.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0858.jpg": {
+      "file_path": "converted_images\\01\\IMG_0858.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483100282_0",
+          "text": "A man occupies the left foreground of the image, captured from a low angle. He wears a red polo shirt with a visible collar and a single white button at the placket. A white earbud cord hangs down from his left ear. On his head is a baseball cap, primarily white with a red brim and red detailing on the front panel. His eyes are closed, and his face is angled slightly upward, with sunlight illuminating the right side of his face and casting shadows on the left. His skin appears fair with visible texture and some wrinkles around the eyes and mouth.\n\nBehind him, the ocean stretches to the horizon. The water is a mix of deep blue and green, with white foam from breaking waves rolling toward the shore. The waves are active, creating a textured surface of white crests and churning water. The sky above is a bright, clear blue, with thin, wispy white clouds scattered across the upper portion of the frame. The horizon line is straight and distinct, separating the sea from the sky. In the bottom right corner, a dark, textured surface, possibly a wooden railing or pier edge, is partially visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1217.jpg": {
+      "file_path": "converted_images\\06\\IMG_1217.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483129622_0",
+          "text": "The image shows a sandy shoreline sloping gently toward calm water. The sand is light beige, textured with small ripples and scattered with tiny dark fragments\u2014possibly twigs, leaves, or organic debris. Shadows from unseen overhead foliage dapple the sand in soft, irregular patches of gray and muted brown, suggesting sunlight filtering through trees just outside the frame.\n\nIn the upper left, a wooden dock extends into the water. It is constructed of weathered planks and supported by vertical posts. A metal ladder with rungs is attached to the dock\u2019s edge, descending toward the water. The water itself is a muted gray-blue, reflecting the overcast or shaded sky, with gentle ripples lapping at the shore. A thin line of darker, damp sand marks the water\u2019s edge.\n\nIn the upper right corner, a small pile of rounded stones rests near the base of a wooden ramp or walkway, which angles downward into the frame. The ramp appears to be made of dark, weathered wood planks. The overall scene is quiet, with no visible people or animals, and the lighting suggests either early morning or late afternoon under partial shade.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1112.jpg": {
+      "file_path": "converted_images\\06\\IMG_1112.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483159041_0",
+          "text": "A long, narrow dock extends diagonally from the lower left corner of the frame toward the center of the image, receding into the water. The dock surface is composed of light gray, ribbed metal panels with visible seams and fasteners. Black metal support posts are spaced along its edges, some partially submerged. At the far end of the dock, a small, rectangular platform with a metal railing and bench-like structure juts out over the water.\n\nThe water is calm, with gentle ripples across its surface, appearing in shades of grayish-brown, reflecting the overcast sky. Near the horizon, a small white motorboat with a single dark figure aboard is visible, moving left to right, leaving a faint wake.\n\nIn the background, a continuous treeline stretches across the horizon, composed of dense, dark green trees. The sky above is uniformly overcast, a flat, pale gray with subtle variations in tone, no visible sun or blue patches.\n\nTo the right of the dock, near the shore, a wooden post with a horizontal crossbar protrudes from the water, partially submerged. The shoreline in the lower right corner is sandy, light brown, with scattered dark debris and faint footprints or tire tracks visible in the wet sand. The overall lighting is diffuse and even, with no strong shadows.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0130.jpg": {
+      "file_path": "converted_images\\01\\IMG_0130.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483184596_0",
+          "text": "A high-angle view captures a coastal scene under a clear, pale blue sky. In the foreground, a kidney-shaped swimming pool with bright turquoise water occupies the lower left. Its curved edge is lined with a light beige coping, and a metal ladder is visible on the near side. The pool\u2019s surface reflects sunlight and casts a dark, sharply defined shadow of a palm frond across its left portion.\n\nAdjacent to the pool is a paved patio area made of interlocking beige and light brown pavers. Scattered across the patio are multiple lounge chairs \u2014 some dark brown or black, others light beige \u2014 arranged in small clusters around small, round, light-colored tables. A few people are visible: one person reclines in a lounge chair near the pool\u2019s edge, another sits at a table with a blue towel draped over the back of their chair, and a third person is seated nearby.\n\nA white metal railing with vertical bars encloses the patio, separating it from a sloping dune area. Beyond the railing, the dunes are covered in dry, brownish-green grasses and scattered with several tall, slender palm trees with dark green fronds. A narrow, sandy footpath winds through the dunes.\n\nBeyond the dunes lies a wide, flat expanse of white sand beach. A few small, dark figures of people are visible walking along the shoreline. Gentle, rolling waves with white foam crests approach the shore, transitioning from a pale green near the beach to a deeper, uniform blue-green further out. The ocean stretches to the horizon, meeting the sky in a straight, unbroken line.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1262.jpg": {
+      "file_path": "converted_images\\06\\IMG_1262.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483211765_0",
+          "text": "A long, narrow wooden dock extends diagonally from the lower left toward the center of the frame, receding into a wide expanse of grayish-brown water. The dock is constructed of light brown wooden planks, showing signs of weathering, with visible seams and fasteners. Along its surface, scattered dark shapes\u2014likely birds\u2014are perched at intervals. The dock is bordered by a white or light gray floating edge, possibly made of plastic or foam, which contrasts with the darker water.\n\nThe water itself is textured with small, choppy ripples, reflecting the overcast sky above. Near the bottom left, a dark, partially submerged object\u2014possibly a piece of debris or a floating log\u2014breaks the surface, creating a small disturbance in the water.\n\nIn the foreground, a concrete edge or pier runs horizontally across the bottom of the image. It is light gray, with visible seams between slabs and a slightly weathered, stained surface. A narrow, darker groove or channel runs along its top edge.\n\nThe horizon is marked by a distant, low-lying treeline, dark green and dense, stretching across the width of the image. Above, the sky is uniformly covered in thick, layered clouds, varying in shades of gray and white, with no visible sun or blue sky. The overall lighting is diffuse and muted.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0859.jpg": {
+      "file_path": "converted_images\\01\\IMG_0859.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483243847_0",
+          "text": "A man is centered in the foreground, facing the camera directly. He wears a red polo shirt with a collar and a single visible white button at the placket. Over his ears are white wired earbuds, the wires running down his chest. He wears a baseball cap with a gray brim and a red underside; the crown of the cap is white with a red logo or design on the front. His skin is fair with visible pores and slight redness on the cheeks and nose. His eyes are light-colored, and his expression is neutral, with lips closed and slightly pursed. Behind him, the ocean stretches to the horizon, with white foam from breaking waves visible on the right side of the frame. The water is a muted blue-gray. To the left, a sandy beach is visible, with a line of green palm trees and vegetation along the shore. The sky above is a clear, bright blue with thin, wispy white clouds scattered across it. The lighting is bright and even, suggesting midday sunlight.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0887.jpg": {
+      "file_path": "converted_images\\01\\IMG_0887.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483271761_0",
+          "text": "The foreground shows a stretch of damp, grayish-brown sand, textured with fine grains and scattered debris. Dark, tangled clumps of seaweed lie strewn across the surface, some appearing wet and glossy, others dry and brittle. Small, dark pebbles and fragments of shell are interspersed among the organic matter. A few thin, dried stalks of plant material protrude from the sand at various angles.\n\nBeyond the sand, the ocean extends toward the horizon. Gentle waves roll in, their crests breaking into white foam that spreads across the shore in a frothy, irregular line. The water near the shore is translucent, revealing the sandy bottom beneath, while farther out it deepens to a muted gray-blue, reflecting the sky above. The surface is rippled with small, parallel wavelets, catching glints of sunlight.\n\nAbove the water, the sky is a pale blue, partially covered by scattered, wispy clouds. Near the horizon, a band of denser, low-lying clouds stretches across the frame, tinged with soft white and gray. A single dark bird is visible in flight, silhouetted against the sky, positioned slightly above the center of the image, wings outstretched. The overall lighting is bright and even, suggesting daytime with partial cloud cover.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0875.jpg": {
+      "file_path": "converted_images\\01\\IMG_0875.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483306287_0",
+          "text": "A woman stands centered in the foreground on a wet, sandy beach. She wears a white long-sleeved shirt featuring a large circular NASA logo \u2014 blue with white lettering and a red swoosh \u2014 and smaller red text beneath it reading \u201cMELBOURNE BEACH, FL.\u201d She has light-colored hair pulled back, and wears dark sunglasses with white frames. Her hands hold a folded black garment, possibly a sweater or jacket, in front of her waist. She is also wearing dark blue jeans and teal-colored shoes, partially visible.\n\nBehind her, the beach slopes gently toward shallow, calm water. The sand is damp and textured with small ripples, scattered with dark pebbles, bits of seaweed, and shell fragments. The water is clear near shore, revealing submerged rocks and sand, and extends to gentle waves breaking further out. In the distance, a low, tree-covered coastline stretches across the horizon under a vast blue sky. A band of white, fluffy clouds hovers just above the distant land, with a few wispy clouds higher up. The lighting is bright and even, suggesting midday sun.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1138.jpg": {
+      "file_path": "converted_images\\06\\IMG_1138.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483341638_0",
+          "text": "The image shows a view from the corner of a white, ribbed dock extending into a body of water. The dock surface is textured with parallel vertical ridges and features a small, dark circular fixture near its edge. The water is dark gray and rippled, reflecting the sky above, with subtle variations in tone indicating movement and depth. In the distance, a tree-lined shore stretches horizontally across the frame, composed of dense, dark green foliage. Above the treeline, the sky is a mix of bright blue and voluminous white and gray clouds. The clouds are cumulus in form, with defined edges and shadowed undersides, suggesting depth and texture. The lighting appears natural and diffused, with no direct sunlight visible on the dock or water. The horizon line is slightly tilted, giving the image a casual, unsteady perspective.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1269.jpg": {
+      "file_path": "converted_images\\06\\IMG_1269.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483366065_0",
+          "text": "The image captures a daytime view of a football field from the bleachers under a clear blue sky with a few scattered white clouds. The field is covered in bright green artificial turf, marked with white yard lines and numbers including \u201c40,\u201d \u201c50,\u201d and \u201c30.\u201d A red track surrounds the field, with the word \u201cMIDDLETON\u201d painted in large white capital letters on the black surface of the track. Beyond the field, a line of dense green trees forms the horizon. A tall metal light pole stands near the far end zone.\n\nIn the foreground, a man walks along the top row of metal bleachers. He wears a white t-shirt, a neon yellow safety vest, dark gray shorts, black socks, and gray sneakers with white stripes. He has a black visor on his head and holds a clear plastic water bottle in his right hand. His shadow stretches across the bleachers and track. The bleachers are silver metal with yellow painted seat edges, each marked with a number in black: \u201c21,\u201d \u201c22,\u201d \u201c23,\u201d \u201c24,\u201d \u201c25,\u201d \u201c26\u201d are visible. A portion of another person\u2019s leg and knee, clad in dark shorts, appears in the bottom right corner, seated on the bleachers. In the distance, white bleachers face the field, and a small red-roofed structure sits near the sideline. A white vehicle is parked near the far bleachers. The scene is brightly lit by direct sunlight, casting sharp shadows.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0907.jpg": {
+      "file_path": "converted_images\\01\\IMG_0907.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483383282_0",
+          "text": "The image shows a wide expanse of light beige sand, textured with numerous footprints, shallow depressions, and scattered small debris. The sand appears dry and granular, with variations in tone from pale tan to grayish-beige, suggesting areas of shadow and sun exposure. A long, dark, sharply defined shadow stretches diagonally across the sand from the upper right toward the lower left, likely cast by a railing or structure outside the frame.\n\nIn the upper portion of the image, a low, weathered metal barrier runs horizontally. It is rusted along its edges, with patches of orange-brown corrosion visible against its darker base. Behind the barrier, a section of calm, dark blue water is visible, reflecting a muted sky. A white metal railing with vertical posts stands above the barrier, partially visible at the top edge of the frame. The posts are cylindrical and evenly spaced, with the railing extending out of view to the left and right.\n\nScattered across the sand are small, dark fragments \u2014 possibly dried leaves, twigs, or bits of seaweed \u2014 in shades of brown and black. Some areas of the sand show faint, grid-like impressions, possibly from a textured surface that was previously in contact with it. The overall lighting is bright and direct, casting crisp shadows and highlighting the granular texture of the sand.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_0176.jpg": {
+      "file_path": "converted_images\\06\\IMG_0176.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483402828_0",
+          "text": "A grassy shoreline slopes gently toward a wide, calm body of water under an overcast sky. The foreground consists of patchy green grass interspersed with bare earth, scattered dry leaves, and small weeds. A narrow dirt path runs horizontally across the middle of the frame, separating the grassy area from the water\u2019s edge. To the left, a young tree with a slender trunk and a full canopy of bright green leaves stands near the water. On the right, the overhanging branches of a larger tree frame the upper corner of the image, its leaves a darker green and more densely clustered. The water is a muted gray-green, reflecting the cloudy sky above, with subtle ripples across its surface. In the distance, a low, tree-lined shore stretches across the horizon, and several small, dark shapes\u2014possibly boats\u2014are visible on the water. The sky is filled with thick, soft clouds in varying shades of gray and white, with no direct sunlight visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1122.JPG": {
+      "file_path": "2024\\06\\IMG_1122.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483422095_0",
+          "text": "The image is oriented vertically, with the top of the frame showing the ground and the bottom showing the sky, suggesting it was rotated 90 degrees clockwise.\n\nIn the upper portion of the frame, a sandy beach stretches diagonally from the upper left toward the center. The sand is light tan, with darker patches and shadows cast by trees. A dark wooden picnic table with attached benches sits on the sand, angled slightly away from the viewer. To its right, a narrow concrete or paved walkway runs parallel to the shoreline, bordered by the sand on one side and a grassy or dirt area on the other.\n\nBeyond the walkway, the water of a lake or large river extends to the horizon. The water is calm, with a slight ripple, reflecting the blue sky. Several small boats are moored along the shore, including one with a white canopy or cover. A wooden dock extends into the water, and a small white structure, possibly a lifeguard stand or kiosk, is visible near the water\u2019s edge.\n\nThe lower portion of the frame is dominated by trees. On the left, a large tree with dense, dark green foliage fills much of the space. To its right, another tree with lighter green, feathery leaves extends upward, its branches reaching toward the sky. The sky is a clear, bright blue with a few scattered, wispy white clouds.\n\nA lamppost stands near the water\u2019s edge, its dark metal pole contrasting with the lighter sand and water. The overall lighting is bright and natural, suggesting a sunny day. Shadows from the trees fall across the sand and walkway, creating patterns of light and dark.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0860.jpg": {
+      "file_path": "converted_images\\01\\IMG_0860.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483442762_0",
+          "text": "The image presents a wide expanse of open water under a layered sky. The water occupies the lower two-thirds of the frame, its surface textured with small, consistent ripples that catch and reflect light. The color of the water transitions from a dark, deep teal in the foreground to a lighter, grayish-blue near the horizon. A faint, bright reflection of sunlight stretches diagonally across the left side of the water, creating a shimmering path of white and silver highlights.\n\nAbove the water, the sky fills the upper third of the image. It is dominated by horizontal bands of clouds, varying in density and tone. The clouds range from pale, almost translucent white to soft gray, with some darker, more defined streaks interspersed. Near the horizon, the sky lightens to a pale, muted yellow-gray, suggesting diffused sunlight. The horizon line is straight and distinct, separating the water from the sky with a clean, unbroken edge. A single, tiny dark speck, possibly a distant buoy or small vessel, is visible on the water near the center of the horizon. The overall lighting is subdued and even, with no harsh shadows or bright highlights beyond the reflected sunlight on the water.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1152.jpg": {
+      "file_path": "converted_images\\06\\IMG_1152.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483459084_0",
+          "text": "The image shows a sandy shoreline meeting calm water. The sand is light beige, textured with small ridges and depressions, likely shaped by wind or receding water. Scattered across the sand are tiny dark fragments\u2014possibly bits of organic debris or small stones. The water at the top left is a muted gray-blue, with gentle ripples lapping at the shore, leaving a thin, wet, darker line where it meets the sand. The upper right corner shows a patch of shadowed ground, possibly from overhanging foliage, with a few dry twigs or branches visible. The lighting suggests sunlight filtering through trees, casting dappled shadows across the sand\u2019s surface. No human-made objects or animals are visible. The overall scene is still and natural, with a quiet, undisturbed quality.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1307.jpg": {
+      "file_path": "converted_images\\07\\IMG_1307.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483477170_0",
+          "text": "A man with short, light-colored hair sits at the helm of a pontoon boat, facing forward and slightly to the left. He wears a long-sleeved gray shirt and dark pants. His right hand rests on the black steering wheel, while his left hand holds a small black rectangular object, possibly a phone or remote. He is seated in a high-backed, cream-colored upholstered captain\u2019s chair with visible stitching and a mesh pocket on the side.\n\nThe boat\u2019s dashboard is beige with black accents, featuring several round analog gauges with white faces and black dials, a central digital display screen, and various control knobs and switches. A black bimini top with silver metal support poles extends overhead, casting a shadow over the helm area. In the foreground, a black plastic console with a textured surface includes a circular stainless steel cup holder and a rectangular recessed compartment.\n\nTo the right of the captain\u2019s chair, a white fire extinguisher with a red label and black nozzle is mounted in a holder. The boat\u2019s flooring is a textured gray material. Beyond the boat, calm blue water stretches to a tree-lined shore under a clear, pale blue sky. The distant shoreline is dotted with green trees and a few visible houses, including one with a reddish-brown roof and another with a blue roof. The sunlight appears to be coming from the left, casting soft shadows and illuminating the scene evenly.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1121.JPG": {
+      "file_path": "2024\\06\\IMG_1121.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483490022_0",
+          "text": "The image is oriented vertically, with the top of the frame showing the sky and the bottom showing the ground, as if the camera were rotated 90 degrees clockwise.\n\nAt the top of the frame, a bright blue sky with scattered small white clouds stretches across the view. Below the sky, a wide expanse of calm, light blue water extends to the horizon, where a dark green treeline is visible on the far shore.\n\nAlong the near shore, a sandy beach occupies the right side of the frame. The sand is light tan, with darker patches and shadows cast by trees. A wooden picnic table with attached benches sits on the sand, its dark brown surface and legs contrasting with the lighter ground. A small, closed, dark blue umbrella stands near the water\u2019s edge, next to a wooden dock or pier extending into the water. Several small boats or watercraft are moored along the dock.\n\nOn the left side of the frame, the foliage of several trees fills the space. The leaves are various shades of green \u2014 some bright and sunlit, others darker in shadow. A tree trunk, light gray and textured, rises vertically near the center. The branches and leaves create dappled shadows on the sand below.\n\nA narrow concrete or paved walkway runs parallel to the water, separating the sand from the trees. A lamppost with a classic-style lantern head stands beside the path. The shadows of the trees fall across the sand and path, creating patterns of light and dark.\n\nThe overall lighting is bright and natural, suggesting a sunny day. The scene is still, with no visible people or movement.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0871.jpg": {
+      "file_path": "converted_images\\01\\IMG_0871.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483504007_0",
+          "text": "The image captures a wide, sunlit beach under a vast sky. The foreground is dominated by pale beige sand, textured with footprints, shallow depressions, and scattered patches of low, greenish-brown vegetation. A few small, dark objects, possibly debris or seaweed, are scattered across the sand.\n\nIn the middle ground, the beach stretches toward the water\u2019s edge. Two small, dark figures stand near the shoreline, appearing distant. To the left, near the water, two dark, rectangular objects, possibly trash bins or beach equipment, rest on the sand. The ocean is a band of blue-gray, with gentle waves breaking near the shore, catching glints of sunlight.\n\nThe horizon is marked by a line of dark, silhouetted trees and a low, rocky breakwater extending into the water on the right. Above, the sky is a gradient of blue, lighter near the horizon and deeper overhead. The sun, positioned in the upper left, shines brightly, partially veiled by thin, wispy white clouds that streak across the sky. The overall lighting is bright and natural, casting subtle shadows on the sand.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0841.jpg": {
+      "file_path": "converted_images\\01\\IMG_0841.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483514670_0",
+          "text": "The scene is set on a paved patio area overlooking a wide, sandy beach under an overcast sky. The ground is covered in interlocking pavers in shades of muted red, gray, and beige, arranged in a herringbone pattern. In the foreground, a sturdy picnic table made of textured, light-brown concrete sits centered, with attached benches on either side. The table\u2019s legs are thick and blocky, with a slightly rough, molded surface.\n\nFlanking the picnic table are two black metal grills mounted on short posts. Each grill has a rectangular basin with slotted sides and a flat top. Behind the table, a low concrete retaining wall separates the patio from the beach. The wall is weathered, with visible seams and minor discoloration.\n\nBeyond the wall, the beach stretches flat and wide, composed of fine, pale tan sand. The ocean meets the shore in a soft, indistinct line, its surface calm and gray, mirroring the sky above. The horizon is hazy, with faint silhouettes of distant objects\u2014possibly buoys or small boats\u2014dotting the water. On the far right, a dark, low-lying breakwater or jetty extends into the sea, and a few small, boxy concrete structures stand near the water\u2019s edge.\n\nThe sky is uniformly overcast, a blanket of soft, layered gray clouds with no visible sun or blue patches. The overall lighting is diffuse and even, casting no sharp shadows. The scene is devoid of people or animals, and the atmosphere is still and quiet.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\05\\IMG_1045.jpg": {
+      "file_path": "converted_images\\05\\IMG_1045.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483524850_0",
+          "text": "A large white sailing vessel named \u201cWINDY\u201d is moored at a stone pier under a bright blue sky scattered with fluffy white clouds. The ship features two tall wooden masts with black-rigged ladders ascending their sides. Numerous ropes and lines crisscross between the masts and the deck. A dark blue flag with white lettering hangs from one of the riggings. The vessel\u2019s hull is white with black circular portholes and a wooden railing along the upper deck. A life preserver with red and white markings is mounted on the railing.\n\nOn the deck, several people are visible: one man in a white shirt and dark shorts stands near the railing, another in a dark shirt and khaki shorts is stepping down from the gangway, and others are standing or seated in the background. A yellow caution tape is strung between black stanchions along the pier, separating the public from the ship\u2019s gangway. A blue fender and a yellow bollard are positioned near the ship\u2019s side.\n\nThe pier surface is paved with rectangular gray stone tiles arranged in a herringbone pattern. In the foreground, a wooden bench is partially visible, and a person wearing a gray hoodie and striped pants sits on it, their hands clasped over their lap. A black backpack with a green zipper pull rests beside them. The sunlight casts sharp, dark shadows of the masts, ropes, and stanchions across the pier. A wooden post with engraved illustrations stands near the gangway, and a red sign with white text is attached to the caution tape. The water beside the ship is calm and blue-green.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0899.jpg": {
+      "file_path": "converted_images\\01\\IMG_0899.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483535420_0",
+          "text": "The image shows the stern of a white boat moving across deep blue water under a clear, cloudless sky. The boat\u2019s surface is smooth and glossy, with visible seams and rivets along its structure. A silver metal railing runs along the edge, secured with clamps and bolts. Attached to the railing on the right is a white flagpole, from which an American flag hangs. The flag displays thirteen horizontal stripes alternating red and white, and a blue canton in the upper left corner bearing fifty white stars arranged in rows. The flag is slightly rippled, suggesting movement from wind or the boat\u2019s motion.\n\nTo the left, partially visible behind the railing, is the back of a person with dark hair tied up in a bun, wearing a dark top. The water behind the boat churns into white foam, indicating the vessel\u2019s forward movement. In the far distance, a hazy, low-lying landmass stretches across the horizon, its contours faint against the sky. The overall lighting is bright and even, suggesting midday sun.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1308.jpg": {
+      "file_path": "converted_images\\07\\IMG_1308.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483547715_0",
+          "text": "A man with short, light-colored hair sits in the driver\u2019s seat of a pontoon boat, his right hand resting on the black steering wheel. He wears a long-sleeved gray shirt and dark pants. The boat\u2019s console is beige with black accents, featuring two round analog gauges, a digital display screen mounted on a flexible arm, and various control switches. A black canopy overhead casts shadows across the console and the man\u2019s shoulder. The boat\u2019s seating is upholstered in light beige fabric, with a mesh pocket visible on the side of the passenger seat. In the foreground, a black plastic table with a textured surface holds a bright blue insulated water bottle with a black lid, resting in a circular stainless steel cup holder. Another cup holder is empty beside it. Beyond the boat, calm blue water stretches to a tree-lined shore under a clear, pale blue sky. A two-story house with beige siding and a dark roof is visible among the green trees on the far bank. The sunlight, coming from the right, illuminates the man\u2019s profile and casts long shadows across the boat\u2019s interior. A blue towel or garment is draped over the passenger seat behind the console.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\RPReplay_Final1608168342\\RPReplay_Final1608168342_54.87s.jpg": {
+      "file_path": "extracted_frames\\RPReplay_Final1608168342\\RPReplay_Final1608168342_54.87s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483563301_0",
+          "text": "The image displays a smartphone screen with a light gray, slightly blurred background. At the top left, a red pill-shaped status bar shows the time \u201c7:25\u201d in white text. At the top right, standard iOS status icons are visible: a cellular signal indicator with four bars, a Wi-Fi symbol, and a yellow battery icon indicating partial charge.\n\nCentered on the screen is the green \u201cFidelity Investments\u201d logo. The word \u201cFidelity\u201d is in bold, italicized, sans-serif font, with \u201cINVESTMENTS\u201d in smaller, uppercase letters beneath it. To the left of the text is a circular green emblem containing a stylized white starburst or sunburst pattern.\n\nBehind the logo, faintly visible through the blur, are several app icons arranged in a grid. One appears to be a lemon slice, another a water droplet, and below them, a graph icon with the word \u201cyahoo!\u201d partially visible. These icons are muted and out of focus.\n\nTo the right of the Fidelity logo, there is a black-outlined rectangular box with rounded corners, empty and centered vertically relative to the logo.\n\nAt the bottom of the screen, a thin black horizontal bar \u2014 characteristic of the iPhone home indicator \u2014 is centered against the light background. The overall image has a soft, translucent overlay, suggesting the screen is in a loading or transition state.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251016_002916",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\IMG_1409\\IMG_1409_0.00s.jpg": {
+      "file_path": "extracted_frames\\IMG_1409\\IMG_1409_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483575853_0",
+          "text": "A wide expanse of calm blue water stretches toward the horizon, meeting a clear, cloudless sky that fades from deep azure at the top to a lighter blue near the distant landmass. Along the water\u2019s edge, a rocky and pebbled shoreline is exposed, with patches of dark green and gray seaweed clinging to the stones. A large, weathered driftwood log lies diagonally across the foreground, its root end split into jagged, finger-like protrusions, bleached gray by sun and salt, with patches of reddish-brown bark still clinging to its length. The log rests against a low concrete retaining wall that borders a paved pathway on the right. The pathway is gray concrete, speckled with small stones, and bordered by sparse tufts of green grass and a few yellow wildflowers near the edge. In the distance, a dark, tree-covered landmass rises gently from the water, with faint, hazy mountain peaks visible beyond it. A few small white specks, possibly boats, are scattered across the water\u2019s surface. The scene is brightly lit by direct sunlight, casting sharp shadows from the driftwood onto the gravel and pavement.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0898.jpg": {
+      "file_path": "converted_images\\01\\IMG_0898.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483592931_0",
+          "text": "The image captures a view from the stern of a moving vessel, looking back over its wake. The water is a deep, dark blue, disturbed into a wide, V-shaped trail of white, frothy foam and churning turbulence directly behind the boat. This wake extends from the bottom edge of the frame toward the horizon, narrowing as it recedes. The foam is bright white and textured with bubbles and spray, contrasting sharply with the darker, undisturbed water on either side. In the distance, a low, hazy landmass stretches across the horizon, its features indistinct but showing variations in tone from light tan to muted green and gray, suggesting hills or coastal terrain. Above the horizon, the sky is a vast, unbroken expanse of clear, deep blue, gradually lightening to a paler blue near the horizon line. There are no visible clouds. The overall lighting is bright and even, suggesting midday sun. The composition is dominated by the strong diagonal lines of the wake leading the eye toward the distant shore.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\IMG_1429\\IMG_1429_0.00s.jpg": {
+      "file_path": "extracted_frames\\IMG_1429\\IMG_1429_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483606181_0",
+          "text": "A paved asphalt path curves gently to the left, occupying the lower-left portion of the frame. Its surface is dark gray and smooth, bordered on the right by a strip of grass that transitions from green to dry, yellowish-brown patches. Beyond the grass, a dense thicket of green shrubs and tall reeds lines the edge of a calm, dark waterway, partially visible on the right. The water reflects no distinct shapes but appears still and shadowed.\n\nAbove the shrubs, a sloping bank rises, covered in thick, leafy vegetation, including a dense stand of tall, dark green trees on the right. To the left, a row of tall, slender trees with conical canopies stands in a straight line, their foliage a deep, uniform green. The sky above is a vast expanse of clear, bright blue, with only a few thin, wispy white clouds streaking across the upper right corner. The sunlight is direct and strong, casting sharp shadows and highlighting the textures of the grass, leaves, and pavement. No people, animals, or man-made structures are visible beyond the path itself.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1319.jpg": {
+      "file_path": "converted_images\\07\\IMG_1319.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483618510_0",
+          "text": "The image captures a view from the side of a moving boat, looking out over a wide expanse of dark, rippling water. In the foreground, a curved wake of white, frothy foam trails along the left edge, created by the boat\u2019s motion. The water surface is textured with small, dark blue-gray waves, reflecting the fading light. In the distance, a low, continuous tree line stretches across the horizon, composed of dense, dark green foliage. Above the treeline, the sky transitions from a pale, muted lavender near the horizon to a clear, soft blue higher up, indicating either early morning or late evening. The overall lighting is subdued, with no direct sunlight visible, casting a cool, even tone across the scene. No people, structures, or other vessels are visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1310.jpg": {
+      "file_path": "converted_images\\07\\IMG_1310.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483632301_0",
+          "text": "The image captures a view from the rear of a moving boat, looking out over a body of water during twilight. The sky above transitions from a deep, clear blue at the top to a pale, warm yellow near the horizon. A faint, thin contrail is visible in the upper left portion of the sky.\n\nIn the foreground, the dark, rippling wake of the boat spreads outward in a V-shape, with white foam and churned water along the edges of the waves. The water\u2019s surface reflects the fading light, showing subtle highlights along the crests of the ripples.\n\nTo the right, a dense line of trees forms a dark silhouette against the horizon. The trees vary in height, with some taller, pointed conifers standing out. On the far left, a more distant, low-lying treeline is visible, also silhouetted. A small, dark object, possibly another boat, is faintly visible near the left horizon.\n\nThe top right corner of the frame is partially obscured by a dark, solid shape \u2014 likely the edge of the boat\u2019s canopy or roof \u2014 which casts a shadow over the upper right portion of the image. The overall lighting is dim, suggesting the sun has recently set or is just below the horizon.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0878.jpg": {
+      "file_path": "converted_images\\01\\IMG_0878.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483645564_0",
+          "text": "The image shows a beach scene under a partly cloudy sky. The upper portion of the frame is dominated by a pale blue sky streaked with thin, wispy white clouds, and a denser band of low, grayish-white clouds stretches across the horizon. Below the sky, the ocean extends to the horizon, its surface textured with small, rolling waves. The water near the shore is a muted gray-green, reflecting the sky, with white foam forming along the crests of the waves as they break.\n\nA line of dark, wet sand runs horizontally across the middle of the image, marking the tide line where the water meets the beach. The foam from the receding waves lingers along this edge, appearing as a frothy, irregular white border. Scattered across the damp sand in the foreground are small, dark fragments of seaweed, bits of driftwood, and shell fragments. Some pieces are clumped together; others are isolated. A single, small, orange-brown leaf lies near the center of the sandy area.\n\nThe sand itself is a uniform, fine-grained gray, slightly darker where wet, and lighter in patches where it is drier. The overall lighting is diffuse, suggesting an overcast or partially sunny day, with no harsh shadows visible. The horizon line is straight and clear, separating the water from the sky. In the far distance, on the right side of the horizon, a faint, dark landmass or headland is visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1316.jpg": {
+      "file_path": "converted_images\\07\\IMG_1316.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483661394_0",
+          "text": "The image captures a view from a moving boat at sunset. In the upper right corner, a dark, angular structure\u2014likely part of the boat\u2019s canopy or railing\u2014cuts diagonally into the frame, its underside shadowed and its edge sharply defined against the sky. The sky transitions smoothly from a pale, dusky blue at the top to a warm gradient of orange and yellow near the horizon. The sun, a small, bright orb, sits just above the distant treeline, casting a shimmering, elongated reflection across the water\u2019s surface.\n\nThe water occupies the lower two-thirds of the image, its surface textured with ripples and small waves, disturbed by the boat\u2019s movement. A visible wake trails from the lower left toward the center, marked by frothy, white-tipped crests and darker troughs. The water reflects the sky\u2019s colors\u2014cool blues and grays in the foreground, warming to golden tones near the horizon.\n\nAlong the horizon, a continuous dark silhouette of land stretches across the frame, densely covered with trees. The treeline is uneven, with varying heights and shapes, and appears almost black against the glowing sky. Two small, dark shapes\u2014possibly other boats\u2014are visible on the water near the horizon, one to the left and one near the center, both distant and indistinct.\n\nA faint, pale circular shape, possibly the moon, is visible in the upper left portion of the sky, just above the treeline. A thin, wispy cloud streaks horizontally near the right edge of the frame, catching the sunset\u2019s glow. The overall lighting is soft and diffused, with the brightest illumination concentrated around the sun and its reflection.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1119.JPG": {
+      "file_path": "2024\\06\\IMG_1119.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483675623_0",
+          "text": "The image is oriented vertically, with the top of the frame showing the ground and the bottom showing the sky, suggesting it was taken sideways.\n\nOn the right side of the frame, a wide expanse of light brown sand stretches diagonally from the top right toward the center. The sand is textured with footprints and small indentations, and dappled with shadows cast by overhead trees. A dark metal picnic table with attached benches sits on the sand, its legs and frame casting sharp, dark shadows.\n\nTo the left of the picnic table, a narrow concrete or paved walkway runs parallel to the shoreline, bordered by the sand on one side and a line of trees on the other. A closed, light blue patio umbrella stands near the walkway, its fabric gathered and resting on its pole. A tall, slender lamppost with a classic-style lantern head rises from the walkway.\n\nBeyond the walkway, a calm body of water extends to the horizon. The water is a muted blue-gray, reflecting the sky above. A wooden dock or pier juts into the water, with several small boats moored alongside it. One boat is white with a red stripe; another is dark-hulled. A small, white, triangular sail or flag is visible on one of the boats.\n\nThe far shore is lined with dense green trees, forming a continuous dark green band against the sky. Overhead, the sky is a clear, pale blue with a few scattered, wispy white clouds. The upper portion of the frame is dominated by the foliage of large, leafy trees. Their branches and leaves are a vibrant green, with sunlight filtering through, creating patterns of light and shadow. One thick tree trunk is visible near the center, its bark rough and gray-brown.\n\nThe overall lighting is bright and natural, suggesting a sunny day. Shadows are distinct and fall primarily from the upper left toward the lower right, consistent with the sideways orientation of the image.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1297.jpg": {
+      "file_path": "converted_images\\07\\IMG_1297.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483689779_0",
+          "text": "A person sits on a cushioned seat inside a pontoon boat, shaded by a dark gray fabric canopy supported by silver metal poles. The person wears a wide-brimmed white sun hat, dark sunglasses, a coral-colored long-sleeve shirt with white text and numbers on the chest, and light blue shorts. Their left hand rests under their chin, fingers curled, while their right arm rests along the side of the seat. A black wristwatch is visible on their left wrist.\n\nTo the left, another person is partially visible, wearing a maroon short-sleeve shirt and dark shorts, seated in a similar cushioned chair. Between the two individuals is a small black table with a circular cutout, mounted on a silver pole. Beneath the table, a black cylindrical object with a handle and cord is attached to the boat\u2019s floor.\n\nThe boat\u2019s interior features beige and gray upholstered seating with rounded contours. The floor is a light beige textured material. Beyond the canopy, the water stretches out, shimmering with sunlight, reflecting bright white highlights. The far shoreline is lined with dense green trees under a pale blue sky with a few small, scattered white clouds. The sun creates a lens flare in the upper left corner of the image, casting a purple and white glow across the canopy.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0901.jpg": {
+      "file_path": "converted_images\\01\\IMG_0901.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483703791_0",
+          "text": "The foreground shows a wet, sandy beach with scattered small rocks and pebbles embedded in the sand. The sand is a light brown, dampened by receding waves that leave behind thin, foamy white lines and shallow pools of water. A single white seagull is visible at the very bottom edge of the frame, its head and part of its body in view.\n\nBeyond the shore, the water is calm and stretches across the middle of the image, reflecting the sky in muted tones of blue and gray. Dozens of boats are anchored in the water \u2014 mostly white sailboats with tall masts, some with sails down, others with no sails visible. A few motorboats and smaller vessels are interspersed among them. Buoys, mostly white and round, dot the water near the boats.\n\nOn the right side of the image, a wooden pier extends into the water. At the end of the pier is a two-story structure with light blue siding and a dark roof. A red kayak or small boat is tied to the pier near the structure. In the far distance, a faint, hazy landmass is visible along the horizon.\n\nThe sky dominates the upper two-thirds of the image. It is a bright, clear blue with wispy, streaky cirrus clouds scattered across it. A long, thin contrail, white and slightly diffused, stretches horizontally across the upper sky. The lighting is bright and even, suggesting midday sun.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1221.jpg": {
+      "file_path": "converted_images\\06\\IMG_1221.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483715841_0",
+          "text": "The image shows a view from the front of a blue kayak floating on dark, rippling water. The bow of the kayak is visible in the lower left corner, featuring a bright neon green bungee cord crisscrossed in a diamond pattern and secured with black plastic toggles. The water surface is textured with small, overlapping waves, reflecting muted gray tones from the overcast sky above. To the right, a dense treeline of dark green trees runs along the shoreline, extending into the distance. The sky is filled with thick, layered clouds in shades of gray and white, with some areas slightly brighter where sunlight filters through. In the far left background, faint silhouettes of distant structures or towers are visible along the horizon. The overall lighting is diffuse, with no direct sunlight or sharp shadows.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1232.jpg": {
+      "file_path": "converted_images\\06\\IMG_1232.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483722788_0",
+          "text": "The image shows a wide expanse of water under a partly cloudy sky. The water is a muted green-gray, rippling with small, gentle waves that catch faint glints of light. In the lower right corner, a portion of a bright blue object\u2014possibly the edge of a kayak or paddleboard\u2014is visible, with a neon green bungee cord or strap attached to it. The horizon stretches across the middle of the frame, where a distant, low-lying landmass is faintly visible. To the right, closer to the viewer, a shoreline is lined with dense, dark green trees. The sky above is a pale, washed-out blue, scattered with soft, rounded white and gray clouds. The overall lighting is diffuse, suggesting an overcast or partially sunny day. No people, animals, or man-made structures beyond the blue object are visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0915.jpg": {
+      "file_path": "converted_images\\01\\IMG_0915.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483730062_0",
+          "text": "The image shows a wide expanse of beach under a clear, deep blue sky that fades to a lighter blue near the horizon. The sand in the foreground is textured with numerous footprints, depressions, and small mounds, appearing in shades of light brown and gray under direct sunlight. The beach stretches toward the waterline, where gentle waves break in thin white lines against the shore.\n\nIn the middle distance, near the water\u2019s edge, several small, dark silhouettes of people are visible. One figure appears seated on the sand, another is standing or walking, and a third is crouched or sitting nearby. A few small, dark shapes\u2014possibly birds\u2014are scattered along the wet sand near the water.\n\nThe ocean is calm, with a smooth surface reflecting the sky\u2019s blue, and a faint white line of surf marks the boundary between sea and shore. On the far right horizon, a long, low structure\u2014possibly a pier or breakwater\u2014extends into the water, with faint industrial elements like cranes visible at its far end. A small white sailboat is visible on the water, far out near the horizon.\n\nThe lighting is bright and direct, casting minimal shadows, suggesting midday or early afternoon. The overall scene is open, expansive, and sparsely populated.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1315.jpg": {
+      "file_path": "converted_images\\07\\IMG_1315.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483738390_0",
+          "text": "A person sits on the left side of a pontoon boat, facing right, looking out over the water. They wear a beige baseball cap, a dark gray sleeveless shirt, and a yellow garment visible beneath the shirt at the side. Their dark, curly hair extends from under the cap. The boat\u2019s interior features light beige, padded vinyl seats with stitched detailing. A black, curved console is in the foreground, with a circular, chrome-rimmed cup holder and a rectangular storage compartment beside it. Behind the console, a black panel with a small white label and a white fire extinguisher mounted to its side is visible. The boat\u2019s frame is made of silver aluminum tubing, forming a geometric support structure for a black fabric canopy overhead. Beyond the railing, calm water ripples gently, reflecting the pale blue sky of late afternoon or early evening. A distant shoreline is lined with dense green trees, and a small, gray-roofed structure is partially visible among them. A black bag rests on the floor near the right-side seat. The overall lighting is soft and warm, suggesting the sun is low on the horizon.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1347.jpg": {
+      "file_path": "converted_images\\07\\IMG_1347.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483750317_0",
+          "text": "The image captures an outdoor scene at dusk, under a sky filled with dense, textured clouds tinged with blue and gray. In the foreground, a woman stands in profile, facing right. Her brown hair is pulled back into a ponytail, with sunglasses resting atop her head. She wears a sleeveless, patterned brown top and a light gray skirt or shorts. A large, detailed black-and-gray floral tattoo covers her right shoulder and upper arm. She holds a clear plastic water bottle in her right hand, which also has a black wristband and a small tattoo near the wrist. A black strap, possibly from a bag, hangs from her left shoulder.\n\nBehind her, a crowd of people, including children and adults, gathers near a brightly colored carnival game booth. The booth is primarily blue with yellow and white striped awnings. A large yellow sign with a cartoon duck and the words \u201cPluck A Duck\u201d in bold black and white lettering is mounted above the game area. Below the sign, a blue and yellow striped counter holds numerous small yellow rubber ducks. Several children stand near the counter, some holding ducks. One girl in a white t-shirt and camouflage pants stands to the right, holding a duck. Another child in a navy blue shirt and light blue shorts stands in front of the booth, facing away from the camera.\n\nIn the background, stadium-style floodlights rise above the scene, and the silhouettes of trees and distant structures are visible. The ground is paved asphalt, and the overall lighting suggests late afternoon or early evening, with artificial lights beginning to illuminate the area. The atmosphere is casual and lively, typical of a fair or outdoor festival.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1120.JPG": {
+      "file_path": "2024\\06\\IMG_1120.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483767597_0",
+          "text": "The image is oriented vertically, with the top of the frame showing the ground and the bottom showing the sky, suggesting it was taken sideways.\n\nOn the right side of the frame, a wide expanse of light brown sand stretches diagonally from the top right toward the center. The sand is textured with small pebbles and footprints, and dappled with dark shadows cast by overhead trees. A dark wooden picnic table with attached benches sits on the sand, angled slightly away from the viewer. Behind it, a tree trunk rises, its bark rough and gray-brown, with branches extending upward and out of frame.\n\nTo the left of the picnic table, a narrow concrete or paved walkway runs parallel to the shoreline, bordered by the sand on one side and a grassy or vegetated area on the other. A closed, light blue patio umbrella stands near the walkway, its fabric folded and resting on its pole. A lamppost with a classic-style lantern head is visible beside the walkway, its metal pole dark against the sand.\n\nBeyond the walkway, a calm body of water extends to the horizon, its surface reflecting the sky in shades of blue and gray. Several small boats are moored near the shore, their hulls white or light-colored, with masts and rigging visible. A wooden dock or pier juts into the water, with railings and posts.\n\nThe left side of the frame is dominated by dense tree foliage. The leaves are a vibrant green, with sunlight filtering through, creating highlights and shadows. Some branches are bare or sparsely leafed, revealing the sky behind. The sky itself is a clear, pale blue with a few scattered, wispy white clouds.\n\nIn the distance, across the water, a dark green treeline marks the far shore, forming a horizontal band against the sky. The overall lighting is bright and natural, suggesting a sunny day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\IMG_1347\\IMG_1347_0.00s.jpg": {
+      "file_path": "extracted_frames\\IMG_1347\\IMG_1347_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483783143_0",
+          "text": "The image captures a scene outdoors during twilight, under a sky filled with soft, textured clouds tinged with blue and gray. In the foreground, a woman stands in profile, facing left. Her reddish-brown hair is pulled back into a ponytail, with sunglasses resting atop her head. She wears small hoop earrings and a sleeveless top with a marbled pattern of brown and black. A large, dark tattoo covers her right shoulder and upper arm. She holds a clear plastic water bottle in her right hand, which also wears a black wristband. A light gray fabric, possibly a shirt or towel, is draped over her left arm.\n\nBehind her, several people are visible, including children and adults. One boy wears a bright orange T-shirt and green shorts. Another child in a navy blue shirt and light blue shorts stands near a game booth. The booth is brightly colored, with a yellow and blue striped awning and a sign reading \u201cPluck A Duck\u201d in stylized lettering, accompanied by a green duck illustration. Below the awning, a blue panel displays yellow rubber ducks arranged in rows. A woman in a white top and camouflage pants stands near the booth, holding a blue object.\n\nIn the background, a tall stadium light pole rises against the evening sky. The ground is paved asphalt, and the overall lighting suggests late afternoon or early evening, with ambient light fading. The image is slightly blurred, suggesting motion or low-light capture.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\08\\IMG_1401.PNG": {
+      "file_path": "2024\\08\\IMG_1401.PNG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483794411_0",
+          "text": "The image is a screenshot of a mobile device displaying a flight tracking interface from Southwest Airlines, viewed through a browser connected to \u201cconnected.southwestwifi.com.\u201d The top status bar shows the time \u201c2:35,\u201d an airplane mode icon, Wi-Fi signal strength, and a battery level at 77%.\n\nBelow the status bar is a dark blue header with the \u201cSouthwest\u201d logo in white text with a red heart replacing the dot over the \u2018i\u2019. To the left of the logo is a white hamburger menu icon. Beneath this, a progress bar with a white airplane icon indicates \u201c0h 14m\u201d elapsed time, with a right-pointing arrow and a weather icon (sun partially behind cloud) to the right.\n\nBelow that, a dark navy bar contains a yellow button labeled \u201cChange View,\u201d followed by white text \u201cFlight Tracker,\u201d and on the far right, a \u201ctripbits.com\u201d logo with an orange location pin.\n\nThe main visual is a map of North America, centered on the United States, with a curved horizon suggesting a view from space. The background above the map is black with scattered white stars. The map shows landmasses in beige and green, with bodies of water in light blue. Yellow location pins mark cities including Denver, Dallas, Chicago (Midway), Atlanta, Miami, New York, and Orlando. A dark blue flight path traces a route from Chicago (Midway) to Miami, with a small red-and-white airplane icon indicating the current position near Chicago.\n\nTwo dark blue information boxes overlay the map. The upper box, labeled \u201cDelicious Cuisines,\u201d contains white text: \u201cMiami\u2019s diverse culinary scene satisfies every palate,\u201d with a blue location pin icon to the left. The lower box, labeled \u201cOrlando,\u201d reads \u201cLake Eola Park,\u201d with a yellow location pin icon to the left.\n\nAt the bottom of the map, a small gray bar reads \u201c\u00a9 FlightPath3D WebApp.\u201d Below that, the browser\u2019s address bar shows a lock icon and the URL \u201cconnected.southwestwifi.com,\u201d with a refresh icon to the right.\n\nAt the very bottom of the screen, a dark gray navigation bar contains four icons in light blue: a back arrow, a forward arrow, a share icon, and a bookmarks icon. A white horizontal line is centered at the bottom edge, indicating the iOS home indicator.\n\nThe overall color scheme is dark blue, black, beige, light blue, yellow, white, and red, with text primarily in white and icons in light blue or yellow.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "extracted_frames\\IMG_1397\\IMG_1397_0.00s.jpg": {
+      "file_path": "extracted_frames\\IMG_1397\\IMG_1397_0.00s.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483800574_0",
+          "text": "The image shows a wide expanse of calm, greenish-blue water occupying the lower two-thirds of the frame. Gentle ripples cover the surface, reflecting the bright daylight. Along the far shore, a dense line of lush, dark green trees stretches across the horizon. Nestled among the trees are several houses: one with a light-colored exterior and dark roof, another with a green roof, and others partially obscured by foliage. Several wooden docks extend from the shore into the water, each topped with a covered pavilion or canopy. The canopies vary in color\u2014some are dark gray or black, others green. Small boats are moored alongside some of the docks. The sky above is a clear, vibrant blue, with a few scattered, fluffy white clouds near the treeline. The overall lighting is bright and even, suggesting midday sun. The shoreline is a mix of grassy slopes and tree-covered banks, with no visible sandy beach.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1140.jpg": {
+      "file_path": "converted_images\\06\\IMG_1140.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483808256_0",
+          "text": "The image shows a view from the edge of a white, ribbed dock extending into a body of water. The dock surface is textured with parallel vertical ridges and features a small, dark circular fixture near its corner. The water is dark gray and rippled, reflecting the sky above with subtle distortions. In the distance, a low, dark treeline runs horizontally across the horizon, composed of dense, leafy trees. Above, the sky is a vivid blue, partially obscured by voluminous clouds. These clouds vary in tone \u2014 bright white where lit by sunlight, and darker gray in shadowed areas \u2014 with soft, rounded edges and layered formations. The lighting suggests daytime, with sunlight filtering through gaps in the clouds, creating contrast between illuminated and shaded regions. The overall composition is angled slightly downward, emphasizing the dock\u2019s edge and the expanse of water leading to the distant shore.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0854.jpg": {
+      "file_path": "converted_images\\01\\IMG_0854.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483817698_0",
+          "text": "The image captures a wide expanse of ocean under a pale blue sky with faint, wispy clouds near the horizon. The water dominates the frame, displaying a gradient of color: in the foreground, it is a deep, murky green with scattered patches of white foam and froth, suggesting recent wave activity. Toward the middle ground, a distinct, curling wave breaks diagonally from the upper left toward the center, its crest foaming white and churning the water beneath it into a turbulent, textured line. Beyond the breaking wave, the ocean surface smooths into a calmer, darker blue-green, stretching to the horizon. In the far upper left corner, a sliver of land is visible \u2014 a low, dark shoreline with indistinct shapes that may be vegetation or structures. The sunlight reflects off the water\u2019s surface in scattered, bright glints, particularly along the wave\u2019s crest and in the foam. The overall texture of the water is dynamic, with ripples, swirls, and frothy trails indicating movement and current.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1142.jpg": {
+      "file_path": "converted_images\\06\\IMG_1142.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483825994_0",
+          "text": "The image shows a body of shallow, rippling water with a greenish-yellow tint. The surface is textured with small, overlapping wavelets that catch and reflect light, creating shifting patterns of white and silver highlights. Beneath the surface, the water is translucent enough to reveal a sandy or silty bottom, with subtle variations in tone ranging from pale beige to muted green. In the upper right corner, a portion of a white floating dock is visible, supported by metal framework and anchored with black cylindrical floats. The dock extends diagonally into the frame, its clean lines contrasting with the organic movement of the water. Along the top edge of the image, a narrow strip of light brown shoreline is visible, suggesting a beach or bank. The overall lighting is diffuse, with no harsh shadows, indicating an overcast sky or indirect sunlight.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\08\\IMG_1397.jpg": {
+      "file_path": "converted_images\\08\\IMG_1397.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483831971_0",
+          "text": "The image shows a wide expanse of calm, greenish-blue water occupying the lower two-thirds of the frame. Gentle ripples cover the surface, reflecting subtle variations in light. Along the far shore, a line of dense, leafy trees in varying shades of green stretches across the horizon. Behind and among the trees, several residential structures are visible \u2014 houses with light-colored siding and dark or green roofs, some partially obscured by foliage. Several covered boat docks extend from the shoreline into the water, each with a dark, sloped roof and open sides. A few small boats are moored beneath the docks. The sky above is a clear, bright blue, with a few scattered, wispy white clouds near the treeline. The overall lighting is bright and even, suggesting a sunny day. The water\u2019s edge is not sharply defined, blending into grassy banks and tree roots along the shore.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0870.jpg": {
+      "file_path": "converted_images\\01\\IMG_0870.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483836554_0",
+          "text": "The image shows a wide, open beach under a vast sky. The foreground is dominated by light brown, textured sand, marked with numerous footprints, tire tracks, and scattered small patches of green vegetation. A few dark, rectangular objects, possibly trash bins or benches, are spaced out along the mid-ground near the water\u2019s edge. The ocean stretches across the horizon, its surface shimmering with silver reflections from the sun, which is visible in the upper right corner, partially obscured by thin, wispy white clouds. The sky above is a gradient of blue, lighter near the horizon and deeper overhead, streaked with scattered, feathery clouds. In the far distance, along the left side of the frame, a low, dark landmass or coastal bluff is visible, with faint outlines of structures or trees. Two small, dark human figures stand near the water on the right side of the image, appearing to walk along the shoreline. The overall lighting is bright and natural, suggesting midday or early afternoon.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1141.jpg": {
+      "file_path": "converted_images\\06\\IMG_1141.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483841128_0",
+          "text": "The image shows a view from the edge of a white, ribbed dock extending into a large body of water. The dock surface is textured with parallel ridges running diagonally from the lower left toward the center. A small, dark circular object, possibly a bolt or fixture, is visible near the top right corner of the dock\u2019s visible edge.\n\nThe water is calm but textured with small, gentle ripples reflecting the sky above. Its color is a mix of gray, blue, and green tones, with subtle variations caused by light and movement. The water stretches across the frame, meeting a distant shoreline.\n\nThe shoreline is lined with dense, dark green trees, forming a continuous band across the horizon. Behind the treeline, faint structures\u2014possibly houses or docks\u2014are barely visible, appearing as small, light-colored shapes nestled among the foliage.\n\nAbove, the sky is a vivid blue, partially covered by large, billowing cumulus clouds. The clouds are bright white on their sunlit tops and shaded gray on their undersides, creating depth and contrast. The cloud formations are irregular and voluminous, occupying the upper two-thirds of the image.\n\nThe overall lighting suggests a bright, sunny day, with clear shadows and highlights visible on the clouds and water surface. The perspective is angled slightly downward, emphasizing the dock\u2019s edge and the expanse of water beyond.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1123.JPG": {
+      "file_path": "2024\\06\\IMG_1123.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483847466_0",
+          "text": "The image is oriented vertically, with the top of the frame showing the ground and the bottom showing the sky, suggesting it was rotated 90 degrees clockwise.\n\nIn the upper portion of the frame, a sandy beach stretches diagonally from the upper left toward the center. The sand is light tan, with scattered darker patches and small debris. A wooden picnic table with attached benches sits on the sand, its dark brown surface contrasting with the lighter ground. A tree trunk, also dark brown, emerges from the sand near the table, with green, leafy branches extending upward and to the left, partially framing the scene.\n\nBeyond the beach, a wide expanse of calm blue water stretches across the middle of the frame. The water reflects the sky and has subtle ripples. Along the far shore, a dense line of green trees forms a dark, continuous treeline.\n\nIn the lower portion of the frame, the sky is a clear, bright blue with a few small, wispy white clouds. Several tall, dark green coniferous trees rise from the bottom edge, their branches reaching upward. A closed, light blue patio umbrella is visible near the water\u2019s edge, along with a lamppost and what appears to be a dock or pier extending into the water. A few small boats or buoys are faintly visible on the water\u2019s surface.\n\nShadows from the trees fall across the sand, creating dappled patterns of dark brown and gray. The overall lighting is bright and even, suggesting a sunny day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\05\\IMG_1056.jpg": {
+      "file_path": "converted_images\\05\\IMG_1056.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483853734_0",
+          "text": "The image shows a wide expanse of water under a clear sky. The water, occupying the lower two-thirds of the frame, is a deep turquoise with subtle ripples and small wavelets across its surface, reflecting sunlight in scattered highlights. The horizon line is slightly tilted, running diagonally from the lower left to the upper right. Along the horizon, on the far left, a faint silhouette of a distant shoreline is visible, with low, indistinct structures. On the far right, near the horizon, a small white vessel with a visible mast is present, appearing distant and tiny against the water. The sky above is a vibrant, clear blue, gradually lightening toward the horizon. Scattered across the sky are several fluffy, white cumulus clouds, varying in size and density. Some clouds are clustered near the center and upper left, while smaller, isolated puffs appear toward the upper right. The overall lighting is bright and even, suggesting midday sun. No land, people, or other objects are visible in the immediate foreground or midground.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\05\\IMG_1052.jpg": {
+      "file_path": "converted_images\\05\\IMG_1052.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483858763_0",
+          "text": "The image shows a wide expanse of open water under a bright blue sky. The water, occupying the lower two-thirds of the frame, is a deep turquoise with subtle ripples and small wavelets across its surface, reflecting the sunlight in scattered highlights. In the distance, near the horizon, a single sailboat with a white triangular sail is visible, centered slightly to the left. Further along the horizon, faint silhouettes of land and low-rise structures can be seen on the right side, appearing as a thin, dark line against the sky. The sky above is a clear, vibrant blue, populated with scattered cumulus clouds\u2014puffy, white, and well-defined\u2014concentrated more densely in the middle and upper portions of the frame. A few smaller, isolated clouds float higher and to the right. The overall lighting is bright and even, suggesting midday sun. No people, animals, or other vessels are visible in the immediate foreground or midground.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\05\\IMG_1043.jpg": {
+      "file_path": "converted_images\\05\\IMG_1043.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483863322_0",
+          "text": "A white-hulled sailing vessel is docked at a pier under a bright blue sky scattered with white cumulus clouds. The ship\u2019s name, \u201cWINDY,\u201d is displayed in large white capital letters on a maroon banner affixed to its stern. Below the banner, a vertical wooden panel features hand-drawn illustrations resembling a treasure map, including compass roses, ships, and landmasses in sepia tones.\n\nThe vessel\u2019s deck is visible, lined with metal railings. A man in a dark blue polo shirt and khaki shorts stands near the railing, facing left, with his hands resting on the rail. Behind him, another person in a white shirt and dark shorts leans against the railing, looking out toward the water. A white life preserver with black lettering reading \u201cS/V WINDY\u201d and \u201cChicago\u201d is mounted on the railing near the first man.\n\nThe ship\u2019s masts rise vertically, with wooden spars and black rigging lines extending in multiple directions. A furled white sail is wrapped around one of the lower spars. Several round, black portholes are visible along the side of the hull.\n\nOn the pier, a yellow caution tape stretches horizontally, attached to black stanchions. A small red rectangular sign attached to the tape reads \u201cDO NOT CROSS CHAINS\u201d in white uppercase letters. A bright orange bollard with the number \u201c30\u201d stenciled in black stands near the tape. A large blue buoy rests on the pier beside the bollard, secured with a metal chain.\n\nThe pier surface is paved with rectangular gray stone tiles arranged in a herringbone pattern, with darker gray grout lines. Shadows from the ship\u2019s rigging and the stanchions fall sharply across the pavement, indicating bright sunlight. In the background, calm blue water extends to the horizon, with a faint outline of distant land or structures visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0877.jpg": {
+      "file_path": "converted_images\\01\\IMG_0877.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483868285_0",
+          "text": "The image shows a beach scene under a pale blue sky with scattered, wispy white clouds near the horizon. The ocean stretches across the frame, its surface textured with small, rolling waves. The water near the shore is a mix of gray and muted blue, with white foam forming as waves break and recede. The foam lingers in thin, frothy lines along the wet sand.\n\nThe foreground is a stretch of damp, fine-grained sand, light gray in color, with darker patches where moisture has settled. Scattered across the sand are bits of seaweed\u2014dark green, brown, and black\u2014some clumped, others stretched out. Small, smooth stones and fragments of shells are interspersed among the debris. A few thin, dark twigs lie tangled in the seaweed. One small, bright orange object, possibly a piece of plastic or a shell fragment, stands out against the muted tones.\n\nIn the distance, the horizon line is broken by a faint landmass on the right, with a small, dark structure visible atop it. The sunlight reflects off the water\u2019s surface, creating shimmering highlights that contrast with the darker troughs between waves. The overall lighting is even and natural, suggesting a daytime scene with no direct overhead sun.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0857.jpg": {
+      "file_path": "converted_images\\01\\IMG_0857.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483872633_0",
+          "text": "The image shows a wide expanse of ocean under a partly cloudy sky. The water is a muted greenish-gray, with gentle ripples and small white foam patches scattered across the surface, particularly near the bottom right corner. Sunlight reflects off the water in scattered, shimmering highlights, creating a glittering effect along the mid-right portion of the frame. In the distance, near the horizon, a small dark object\u2014possibly a person or buoy\u2014is visible floating on the water. The horizon line is slightly tilted, running diagonally from the upper left to the upper right. The sky above is pale blue with streaks of thin, wispy white and gray clouds. In the bottom right corner, a dark, partially submerged object\u2014perhaps a pier piling or rock\u2014is visible, with a sliver of weathered wooden structure extending into the frame from the very edge. The overall lighting is diffuse, suggesting an overcast or late afternoon condition.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "2024\\06\\IMG_1206.JPG": {
+      "file_path": "2024\\06\\IMG_1206.JPG",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483877242_0",
+          "text": "The image shows a large expanse of light beige sand occupying most of the frame, with a slightly uneven, granular texture. Scattered across the sand are small dark specks and thin, dry plant fragments. A distinct shadow, likely cast by foliage, stretches diagonally across the sand from the upper left toward the lower right, creating a pattern of soft, irregular shapes. Along the left edge, a narrow strip of water is visible, appearing grayish-blue and reflecting light. Adjacent to the water, a dark, linear structure runs parallel to the shoreline \u2014 possibly a metal railing or fence \u2014 with vertical posts and horizontal bars. In the upper left corner, a small cluster of dark, rounded stones is partially visible near the edge of the sand. The overall lighting suggests daylight, with areas of direct sunlight and shadow creating contrast across the scene.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\07\\IMG_1294.jpg": {
+      "file_path": "converted_images\\07\\IMG_1294.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483883137_0",
+          "text": "The image captures a wide expanse of water under a vast, cloud-filled sky. In the upper left corner, dark green pine needles and branches hang into the frame, sharply silhouetted against the sky. The sky itself is layered: the upper portion is dominated by dense, billowing clouds in shades of gray and pale blue, streaked with wisps of white. Toward the horizon, the clouds thin and reveal a band of soft pink and orange light, suggesting the sun is just below the horizon line. The water below is dark, appearing deep blue to nearly black, with small, consistent ripples across its surface reflecting the muted tones of the sky. Along the distant horizon, a low, dark landmass is visible, dotted with faint vertical structures\u2014possibly towers or masts\u2014rising above the treeline. In the lower left foreground, a small rocky outcrop juts into the water, topped with sparse green vegetation. The overall lighting is dim and diffuse, characteristic of twilight, with no direct sunlight visible.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1223.jpg": {
+      "file_path": "converted_images\\06\\IMG_1223.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483888655_0",
+          "text": "The image shows a wide expanse of water under a partly cloudy sky. The water, occupying the lower two-thirds of the frame, is a muted gray-green with small, choppy ripples and subtle wavelets reflecting diffuse light. Near the bottom left corner, a small white vertical edge\u2014possibly the side of a boat\u2014is visible, partially cropped by the frame.\n\nAbove the waterline, a distant, low-lying landmass stretches horizontally across the middle of the image. It is covered in dense, dark green foliage, appearing as a continuous tree line with no visible structures or breaks.\n\nThe sky above is filled with voluminous cumulus clouds, varying in density and shade. The clouds are predominantly white and light gray, with some darker, shadowed undersides. Patches of pale blue sky peek through the cloud cover, especially toward the upper right. The lighting is soft and even, suggesting an overcast or partially sunny day, with no harsh shadows visible on the water or land.\n\nThe horizon line is slightly tilted, giving the image a subtle diagonal orientation from lower left to upper right. The overall color palette is subdued, dominated by grays, muted greens, and soft blues and whites.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\09\\IMG_1430.jpg": {
+      "file_path": "converted_images\\09\\IMG_1430.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483893461_0",
+          "text": "A narrow, calm stream meanders diagonally across the frame from lower left to upper right, its surface reflecting muted tones of sky and surrounding foliage. The water appears still, with scattered patches of floating vegetation or algae near the banks. Along the near bank, tall reeds and grasses grow densely, their blades varying in color from bright green to pale yellow and brown, suggesting a mix of sun exposure and seasonal change. The ground in the immediate foreground is a sloping expanse of mown or trampled grass, interspersed with patches of bare earth and low-lying weeds, displaying a mosaic of green, tan, and brown hues.\n\nAbove the stream, a steep, densely vegetated embankment rises, covered in a thick, uniform blanket of dark green ivy or similar climbing plant, creating a textured, almost solid wall of foliage. At the crest of this embankment, a line of mature trees stands against the sky. Their canopies are full and rounded, composed of deep green leaves, with some branches catching direct sunlight, creating highlights. The sky above is a clear, uninterrupted expanse of bright, vivid blue, with no visible clouds. The lighting is strong and direct, casting sharp shadows beneath the trees and highlighting the textures of the grasses and the ivy-covered slope.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\01\\IMG_0900.jpg": {
+      "file_path": "converted_images\\01\\IMG_0900.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483898664_0",
+          "text": "The image captures a view from the stern of a moving vessel, looking back over its wake. The wake consists of two parallel trails of white, frothy water, churned into foam and spray, extending diagonally from the lower corners toward the center of the frame. Between the trails, the water is darker, appearing deep blue to nearly black, with ripples and small waves reflecting sunlight. The surrounding sea is a vast expanse of dark blue, stretching to the horizon. Along the horizon, a distant landmass is visible \u2014 a low, hazy silhouette of hills or coastline, with faint, indistinct structures or vegetation along its edge. Above, the sky is a clear, uniform gradient of blue, deepening toward the top of the frame and lightening slightly near the horizon. No clouds are visible. The sunlight illuminates the scene from above, casting highlights on the foam and creating contrast between the bright wake and the darker water. The composition is dominated by the diagonal lines of the wake, leading the eye toward the distant shore.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\08\\IMG_1398.jpg": {
+      "file_path": "converted_images\\08\\IMG_1398.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483903800_0",
+          "text": "The image shows a wide expanse of calm, greenish-blue water occupying the lower two-thirds of the frame. Gentle ripples cover the surface, reflecting subtle variations in light. Along the far shore, a line of dense, leafy trees in varying shades of green stretches across the horizon. Behind and among the trees, several residential structures are visible \u2014 houses with light-colored siding, dark roofs, and attached garages. Some homes have sloped lawns leading down to the water\u2019s edge.\n\nMultiple boat docks extend from the shore into the water. Each dock features a covered canopy, mostly dark gray or black, supported by wooden posts. A few small boats are moored beneath the canopies. The shoreline is a mix of grassy areas, concrete driveways, and wooden walkways leading to the docks. In the background, the sky is a clear, uniform blue with a few small, scattered white clouds near the treeline. The lighting is bright and even, suggesting midday sun. No people or animals are visible in the scene.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\08\\IMG_1409.jpg": {
+      "file_path": "converted_images\\08\\IMG_1409.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483909294_0",
+          "text": "A clear, deep blue sky stretches across the upper portion of the image, unbroken by clouds. Below it, a wide expanse of calm, dark blue water extends toward a distant, hazy shoreline. The far shore is lined with low, dark green hills and faint, pale mountain peaks visible on the horizon.\n\nIn the foreground, a rocky and pebbled beach slopes gently toward the water. The shore is littered with gray and brown stones of varying sizes, some partially submerged in shallow water. A large, weathered piece of driftwood lies diagonally across the beach, its surface bleached and cracked, with a prominent, root-like base jutting upward. Smaller pieces of driftwood and debris are scattered nearby.\n\nTo the right, a concrete walkway runs parallel to the shore, its surface textured and slightly stained. A low concrete curb separates the walkway from the beach. Along the edge of the walkway, sparse patches of green grass and small yellow wildflowers grow in the cracks. In the far right, a wooden railing or structure is partially visible, suggesting a viewing platform or staircase. The sunlight casts sharp, defined shadows, indicating a bright, clear day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    },
+    "converted_images\\06\\IMG_1225.jpg": {
+      "file_path": "converted_images\\06\\IMG_1225.jpg",
+      "item_type": "image",
+      "descriptions": [
+        {
+          "id": "1761483914729_0",
+          "text": "The image shows a view from a watercraft on a body of water, likely a river or lake. In the foreground, the tip of a white paddle blade extends upward from the bottom edge of the frame. The blade bears a red logo with stylized lettering that reads \u201cWERNER\u201d and a circular emblem above it. The water is a murky greenish-brown, with gentle ripples and small wavelets reflecting patches of sky and surrounding foliage. The surface is textured with subtle undulations and scattered white highlights where light catches the water.\n\nBeyond the water, a tree-lined shore stretches across the middle and upper portions of the image. The trees are dense and leafy, displaying various shades of green\u2014from bright, sunlit lime to deeper forest tones. Some branches overhang the water, and a few appear broken or leaning. At the left edge of the shore, a concrete structure with a rectangular opening is visible, possibly a culvert or small access point. Behind the trees, partially obscured, is a white house with dark shutters and a gabled roof. The sky above is pale blue with scattered, wispy white clouds. The overall lighting suggests a bright, overcast or partly sunny day.",
+          "model": "qwen3-vl:235b-cloud",
+          "prompt_style": "narrative",
+          "created": "20251015_062330",
+          "custom_prompt": "",
+          "provider": "ollama",
+          "detection_data": []
+        }
+      ],
+      "batch_marked": false,
+      "parent_video": null,
+      "extracted_frames": [],
+      "display_name": ""
+    }
+  },
+  "chat_sessions": {},
+  "imported_workflow_dir": "\\\\qnap\\home\\idt\\descriptions",
+  "created": "2025-10-26T08:05:18.815062",
+  "modified": "2025-10-26T08:05:18.815062"
+}
