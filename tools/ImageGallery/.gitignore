@@ -1,0 +1,50 @@
+# Image Gallery .gitignore
+# Large binary files and deployment-specific content should not be in source control
+
+# Image files (large binaries)
+images/
+*/images/
+*/*/images/
+galleries/*/images/
+
+# JSON data files (deployment-specific)
+jsondata/*.json
+*/jsondata/*.json
+*/*/jsondata/*.json
+galleries/*/jsondata/*.json
+
+# Workflow output directories (very large, can be regenerated)
+descriptions/
+*/descriptions/
+*/*/descriptions/
+
+# Gallery data (deployment-specific)
+gallery-data/*.json
+*/gallery-data/*.json
+
+# Specific gallery deployments (keep only template)
+galleries/*
+!galleries/template/
+!galleries/README.md
+
+# CSV exports (can be regenerated)
+*.csv
+
+# Keep .gitkeep files (for empty directory structure)
+!.gitkeep
+
+# Keep all markdown documentation
+!*.md
+
+# Keep requirements
+!requirements.txt
+
+# Keep Python scripts
+!*.py
+
+# Keep root index.html (the template)
+!index.html
+
+# Keep batch files
+!*.bat
+!*.sh

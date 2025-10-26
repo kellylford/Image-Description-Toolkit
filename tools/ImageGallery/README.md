@@ -1,447 +1,468 @@
-# IDT Interactive Demo Gallery
+# Image Gallery - Organized Structure# IDT Interactive Demo Gallery
 
-An interactive web-based gallery that showcases the Image Description Toolkit's capabilities by allowing users to compare AI-generated image descriptions across different providers, models, and prompt styles.
 
-## Purpose
 
-This is a "one-time demo project to show the power of the IDT without having to install anything." Users can:
+**Last Updated:** October 25, 2025An interactive web-based gallery that showcases the Image Description Toolkit's capabilities by allowing users to compare AI-generated image descriptions across different providers, models, and prompt styles.
 
-- View a collection of 25 test images
-- Select different AI providers (Ollama, OpenAI, Claude)
-- Choose from various models (llava, granite, gpt-4o, claude, etc.)
-- Pick prompt styles (narrative, detailed, colorful, etc.)
-- See how different configurations describe the same images
 
-## Quick Start
 
-### 1. Collect Gallery Data
+This directory contains everything needed to create and deploy image galleries that showcase AI-generated descriptions from multiple providers, models, and prompts.---
 
-Run workflows for all provider/model/prompt combinations:
 
-```bash
-# Full data collection (27 workflows)
-generate_all_gallery_data.bat c:\idt\images
 
-# Or test first (6 workflows)
-generate_test_gallery_data.bat c:\idt\images
-```
+## 📁 Directory Structure## Quick Start
 
-See `GALLERY_DATA_CHECKLIST.md` for detailed progress tracking.
 
-### 2. Generate JSON Files
 
-```bash
-cd tools\ImageGallery
-python generate_descriptions.py --name 25imagetest
-```
+```### View Existing Gallery
 
-### 3. Test Locally
+ImageGallery/
 
-```bash
-test_gallery.bat
-```
+├── galleries/           Individual galleries (template + deployed)```bash
 
-### 4. Deploy to Web Server
+├── documentation/       All guides and reference docscd tools/ImageGallery
 
-Copy these files to your web server:
-- `index.html`
-- `descriptions/` folder (with all JSON files)
-- `*.jpg` files (25 images)
+├── content-creation/    Scripts and tools for creating galleriespython -m http.server 8082
 
-## Architecture
+├── archive_old/         Historical files (not needed for regular use)# Open browser to: http://localhost:8082
 
-### Files
+├── index.html           Root template file (reference version)```
 
-1. **index.html** - Single-page interactive gallery
-   - Responsive design (mobile and desktop)
-   - Three view modes: Single, Provider Comparison, Prompt Matrix
-   - Provider/Model/Prompt dropdowns with smart validation
-   - Image viewer with prev/next navigation (Alt+P/Alt+N)
-   - Model navigation buttons in Provider Comparison mode
-   - Description display panel with accessibility features
-   - Collapsible prompt text viewer
-   - WCAG 2.2 AA compliant interface
+└── requirements.txt     Python dependencies
 
-2. **generate_descriptions.py** - Data extraction script
-   - Scans IDT workflow directories
-   - Parses description files
-   - Generates JSON files for web consumption
-   - Normalizes Ollama model names (treats "model" and "model:latest" as same)
+```### Create Your Own Gallery
 
-3. **generate_all_gallery_data.bat** - Comprehensive data collection
-   - Runs 27 workflows (3 providers × 3-4 models × 3 prompts)
-   - Claude: Haiku 3.5, Opus 4, Sonnet 4.5
-   - OpenAI: GPT-4o-mini, GPT-4o
-   - Ollama: Qwen3-VL Cloud, Llava, Gemma3, Moondream
 
-4. **generate_test_gallery_data.bat** - Quick test (6 workflows)
-   - One model per provider, 2 prompts each
-   - Good for testing before full run
 
-5. **GALLERY_DATA_CHECKLIST.md** - Progress tracking
-   - Checklist for all 27 workflows
-   - Prerequisites and setup instructions
-   - Ollama model installation commands
+## 🚀 Quick Start**See [REPLICATION_GUIDE.md](REPLICATION_GUIDE.md) for detailed instructions.**
 
-6. **descriptions/** - Generated JSON data
-   - index.json - Configuration index
-   - {provider}_{model}_{prompt}.json - Individual description sets
 
-### Data Flow
 
-```
-Workflow Directories (c:\idt\Descriptions)
-    ↓
-generate_descriptions.py (scans & parses)
-    ↓
-JSON Files (descriptions/*.json)
-    ↓
-index.html (loads & displays)
-    ↓
-User's Browser
-```
+### For Creating a New GalleryQuick summary (30-45 minutes for 25 images):
 
-## Data Collection
+1. Create project directory and add 15-30 images
 
-## Data Collection
+1. **Read the documentation**:2. Run 4 IDT workflows (narrative, colorful, technical, detailed)
 
-### Automated Data Collection (Recommended)
+   ```bash3. Generate JSON files from workflows
 
-Use the batch files to automatically run all needed workflows:
+   cd documentation/4. Add accessibility alt text
 
-**Full Collection (27 workflows):**
-```bash
-generate_all_gallery_data.bat c:\idt\images
-```
+   cat TEMPLATE_CHECKLIST.md5. Configure and deploy
 
-This runs:
-- Claude: 3 models × 3 prompts = 9 workflows
-- OpenAI: 2 models × 3 prompts = 6 workflows
-- Ollama: 4 models × 3 prompts = 12 workflows
-
-**Test Collection (6 workflows):**
-```bash
-generate_test_gallery_data.bat c:\idt\images
-```
-
-Good for testing before committing to the full 27-workflow run.
-
-### Prerequisites
-
-Before running data collection:
-
-1. **Set up API keys:**
-   ```bash
-   # In bat/ directory
-   setup_claude_key.bat
-   setup_openai_key.bat
    ```
 
-2. **Install Ollama models:**
+---
+
+2. **Copy the template**:
+
+   ```bash## Documentation Map
+
+   cd galleries/
+
+   cp -r template/ my-new-gallery/| Document | Purpose | Who Should Read |
+
+   ```|----------|---------|-----------------|
+
+| **README.md** | Quick start, overview | Everyone (start here) |
+
+3. **Add images** to `my-new-gallery/images/`| **[REPLICATION_GUIDE.md](REPLICATION_GUIDE.md)** | Step-by-step gallery creation | Gallery creators |
+
+| **[ARCHITECTURE.md](ARCHITECTURE.md)** | Technical details, troubleshooting | Developers, advanced users |
+
+4. **Build the gallery**:| **[SETUP_GUIDE.md](SETUP_GUIDE.md)** | Deployment instructions | System administrators |
+
    ```bash
-   ollama pull qwen3-vl:235b-cloud
-   ollama pull llava:latest
-   ollama pull gemma3:latest
-   ollama pull moondream:latest
-   ```
 
-3. **Ensure Ollama is running**
+   cd ../content-creation/**Archived Documentation:**
 
-See `GALLERY_DATA_CHECKLIST.md` for detailed tracking of workflow completion.
+   python build_gallery.py ../galleries/my-new-gallery/- [archive/GALLERY_DATA_CHECKLIST.md](archive/GALLERY_DATA_CHECKLIST.md) - Workflow tracking checklist
 
-## Interface Features
+   ```- [archive/README_ALT_TEXT.md](archive/README_ALT_TEXT.md) - Alt text implementation details
 
-### View Modes
 
-1. **Single View**: Traditional image gallery with individual model/prompt selection
-2. **Provider Comparison**: Compare how different providers handle the same prompt style
-3. **Prompt Matrix**: See all prompt styles for a selected model across multiple images
 
-### Model Navigation (Provider Comparison)
+5. **Deploy** - Upload `my-new-gallery/` to your server---
 
-The Provider Comparison view includes model navigation buttons (‹ and ›) for each provider that has multiple models available:
 
-- **Navigation**: Click ‹ or › to cycle through available models for each provider
-- **State Persistence**: Model selections are remembered throughout the session
-- **Model Count Display**: Shows current model and total count (e.g., "2/4")
-- **Accessibility**: Buttons include proper ARIA labels for screen readers
-- **Smart Disable**: Navigation buttons are disabled when only one model is available
 
-Example: When comparing the "narrative" prompt across providers, you might see:
-- Claude: Sonnet 4.5 (1/3) with navigation to Haiku 3.5 and Opus 4
-- OpenAI: GPT-4o (1/2) with navigation to GPT-4o-mini  
-- Ollama: Llava (1/4) with navigation to Qwen3-VL, Gemma3, and Moondream
+### For Generating Descriptions## Gallery Features
 
-### Keyboard Shortcuts
 
-- **Alt+P**: Previous image
-- **Alt+N**: Next image
-- **Arrow Keys**: Navigate through dropdowns and buttons
-- **Enter/Space**: Activate buttons and selections
 
-### Manual Data Collection
+1. **Run IDT workflows** on your images### User Features
 
-If you prefer to run workflows individually:
+2. **Convert to gallery format**:- **Two View Modes:**
+
+   ```bash  - **Image Browser:** Browse images with descriptions
+
+   cd content-creation/  - **Description Explorer:** Search/filter by description text
+
+   python generate_descriptions.py ../galleries/my-gallery/images/  
+
+   python generate_alt_text.py ../galleries/my-gallery/- **Multi-Provider Comparison:**
+
+   ```  - Claude (Haiku, Opus, Sonnet)
+
+  - OpenAI (GPT-4o, GPT-4o-mini)
+
+## 📚 Key Documentation  - Ollama (Llava, Qwen, Gemma, etc.)
+
+  
+
+All documentation is in the `documentation/` directory:- **Multiple Prompt Styles:**
+
+  - Narrative (balanced, story-like)
+
+- **TEMPLATE_CHECKLIST.md** - Step-by-step gallery creation guide  - Colorful (artistic, vibrant)
+
+- **BUILD_GALLERY_README.md** - How to use build_gallery.py  - Technical (analytical, detailed)
+
+- **ARCHITECTURE.md** - Overall system design  - Detailed (comprehensive, thorough)
+
+- **ARIA_EVALUATION_OCT24.md** - Accessibility requirements  
+
+- **README.md** - Complete overview (start here!)- **Accessibility:**
+
+- **SETUP_GUIDE.md** - Initial setup instructions  - WCAG 2.2 AA compliant
+
+- **SOURCE_CONTROL.md** - What to commit to git  - Keyboard navigation (arrows, Tab, Enter)
+
+  - Screen reader support
+
+## 🛠️ Content Creation Tools  - Alt text on all images
+
+
+
+All tools are in the `content-creation/` directory:### Gallery Capabilities
+
+- Side-by-side comparison of different AI descriptions
+
+### Python Scripts- Filter by provider, model, or prompt style
+
+- **build_gallery.py** - Automatically updates image list in index.html- Responsive design (desktop and mobile)
+
+- **generate_descriptions.py** - Converts workflow outputs to JSON- Works offline (static files)
+
+- **generate_alt_text.py** - Adds accessibility alt text- No backend required
+
+- **check_data_status.py** - Verifies gallery data
+
+- **evaluate_alt_text_generation.py** - Tests alt text quality---
+
+- **export_analysis_data.py** - Exports analysis data
+
+## Architecture Overview
+
+### Batch Files (Windows)
+
+- **generate_all_gallery_data.bat** - Full workflow automation```
+
+- **generate_alt_text.bat** - Alt text generationGallery Directory Structure:
+
+- **test_gallery.bat** - Local testing├── index.html              # Web interface
+
+├── images/                 # Image files (JPG)
+
+## 🎨 Galleries├── gallery-data/           # JSON files for gallery (DEPLOY THIS)
+
+│   ├── index.json         # Configuration list
+
+The `galleries/` directory contains:│   └── *.json             # One per provider+model+prompt
+
+├── descriptions/           # Workflow outputs (KEEP LOCAL)
+
+- **template/** - Clean starting point for new galleries│   └── wf_*/              # Logs, temp files (~130MB)
+
+- **europe/** - Example deployed gallery (Europe travel photos)└── generate_*.py          # Data generation scripts
+
+- *(Your new galleries go here)*```
+
+
+
+## 🗄️ Archive**Data Flow:**
+
+```
+
+The `archive_old/` directory contains historical documentation and cleanup records. Not needed for regular use.Images → IDT Workflows → descriptions/wf_*/ → JSON Files → Gallery
+
+                         (~130MB, keep local)  (~150KB, deploy)
+
+## 🎯 Typical Workflow```
+
+
+
+```bash**Critical:** Only deploy `index.html`, `images/`, and `gallery-data/` to web server. The `descriptions/wf_*/` directories are development artifacts (logs, temp files) not needed by the gallery.
+
+# 1. Create from template
+
+cd galleries/**See [ARCHITECTURE.md](ARCHITECTURE.md) for complete technical details.**
+
+cp -r template/ my-gallery/
+
+---
+
+# 2. Add images
+
+cp /path/to/photos/* my-gallery/images/## Requirements
+
+
+
+# 3. Build gallery (automatic image list)### To View Gallery
+
+cd ../content-creation/- Modern web browser (Chrome, Firefox, Safari, Edge)
+
+python build_gallery.py ../galleries/my-gallery/- HTTP server (Python's `http.server` works great)
+
+- **Note:** Won't work with `file://` protocol due to CORS
+
+# 4. Optional: Generate descriptions
+
+python generate_descriptions.py ../galleries/my-gallery/images/### To Create Gallery
+
+python generate_alt_text.py ../galleries/my-gallery/- **IDT:** Image Description Toolkit (`idt.exe`)
+
+- **Python 3.x** with `requests` package
+
+# 5. Test locally- **API Keys:** Claude and/or OpenAI (depending on providers)
+
+cd ../galleries/my-gallery/- **Images:** 15-30 JPG files recommended
+
+python -m http.server 8000- **Time:** 30-45 minutes for complete gallery
+
+
+
+# 6. Deploy: Upload to server---
+
+```
+
+## Common Tasks
+
+## 📦 Dependencies
+
+### Add New Images
+
+Install Python dependencies:```bash
+
+```bash# 1. Copy images to images/ directory
+
+pip install -r requirements.txtcp /path/to/new/*.jpg images/
+
+```
+
+# 2. Re-run workflows
+
+## 🌐 Live Examplesc:/idt/idt.exe workflow images/ --provider claude --model MODEL --prompt-style STYLE ...
+
+
+
+- **Europe Gallery**: https://www.kellford.com/europegallery/# 3. Regenerate JSON
+
+- **Cottage Gallery**: https://www.kellford.com/idtdemo/python generate_descriptions.py --descriptions-dir descriptions/ --output-dir gallery-data/
+
+
+
+## 📖 Getting Started# 4. Regenerate alt text
+
+python generate_alt_text.py --jsondata-dir gallery-data/
+
+1. **New to this?** Start with `documentation/SETUP_GUIDE.md````
+
+2. **Creating a gallery?** Follow `documentation/TEMPLATE_CHECKLIST.md`
+
+3. **Need help?** Check `documentation/README.md` for complete overview### Add New Model Configuration
 
 ```bash
-idt workflow c:\idt\images --provider claude --model claude-3-5-haiku-20241022 --prompt-style narrative --name 25imagetest
-idt workflow c:\idt\images --provider openai --model gpt-4o-mini --prompt-style colorful --name 25imagetest
-# ... etc
+
+## ⚡ Key Features# 1. Run workflow with new model
+
+c:/idt/idt.exe workflow images/ --provider PROVIDER --model NEW_MODEL --prompt-style STYLE ...
+
+- ✅ **Automatic image list generation** - No manual editing
+
+- ✅ **WCAG 2.2 AA accessible** - Screen reader optimized# 2. Regenerate JSON (will include new config)
+
+- ✅ **Multiple AI providers** - Compare descriptions side-by-sidepython generate_descriptions.py --descriptions-dir descriptions/ --output-dir gallery-data/
+
+- ✅ **Easy deployment** - Static HTML, works anywhere
+
+- ✅ **Clean template system** - Start new galleries in minutes# Gallery automatically shows new configuration
+
 ```
 
-## Data Generation
+## 🔗 Related
 
-### 1. Generate Description Data
+### Export Analysis Data
 
-Run the Python script to extract descriptions from your workflow directories:
+This is part of the **Image Description Toolkit (IDT)** project.```bash
 
+# Extract workflow metrics (timing, tokens, costs)
+
+- Main project: `../../` (two levels up)python export_analysis_data.py \
+
+- IDT CLI tool: Use for generating descriptions  --descriptions-dir descriptions \
+
+- Viewer tool: For browsing workflow outputs  --output-dir analysis \
+
+  --pattern WORKFLOW_NAME
+
+---
+
+# Creates CSV with per-image data
+
+**Repository Size**: ~81MB (after cleanup from 4.3GB)  # Use for cost analysis, performance benchmarking
+
+**Last Major Cleanup**: October 25, 2025```
+
+
+### Remove Configuration
 ```bash
-cd tools/ImageGallery
-python generate_descriptions.py
+# 1. Delete JSON file
+rm descriptions/PROVIDER_MODEL_PROMPT.json
+
+# 2. Regenerate index
+python generate_descriptions.py --descriptions-dir descriptions/ --output-dir descriptions/
 ```
 
-**Options:**
-- `--input-dir PATH` or `--descriptions-dir PATH` - Path to Descriptions directory containing workflows (default: c:/idt/Descriptions)
-- `--output-dir PATH` - Output directory for JSON files (default: descriptions)
-- `--name PATTERN` or `--pattern PATTERN` - Workflow name pattern to match in directory names (default: 25imagetest)
+---
 
-**Example with custom input directory:**
-```bash
-# If your workflow data is in a different location
-python generate_descriptions.py \
-    --input-dir /path/to/your/Descriptions \
-    --output-dir web_data \
-    --name multipletest
-```
+## Gallery Examples
 
-**Example for generating from a specific Descriptions folder:**
-```bash
-# Generate from c:/mydata/Descriptions with default 25imagetest pattern
-python generate_descriptions.py --input-dir c:/mydata/Descriptions
+### Main Gallery (Production)
+- **Location:** `tools/ImageGallery/`
+- **Images:** Test/demo images (24 images)
+- **Configurations:** Multiple providers and models
+- **Data:** `data/jsondata/` directory
 
-# Or use a different workflow name pattern
-python generate_descriptions.py --input-dir c:/idt/Descriptions --name 10multipletest
-```
+### Content Prototype (Europe Trip)
+- **Location:** `tools/ImageGallery/contentprototype/`
+- **Images:** Europe vacation photos (25 images)
+- **Configurations:** Claude Haiku (4 prompt styles)
+- **Data:** `descriptions/` directory
+- **Purpose:** Proof of concept for Phase 2
 
-### 2. Prepare Images
-
-Copy your converted JPG images to the deployment directory:
-
-```bash
-# From your workflow's converted_images directory
-cp c:/idt/Descriptions/wf_25imagetest_*/converted_images/*.jpg ./
-```
-
-Or use the source images directory:
-```bash
-cp c:/idt/images/*.jpg ./
-```
-
-### 3. Update Image List (if needed)
-
-If you add more images, update the `images` array in index.html:
-
-```javascript
-images = [
-    'IMG_4276.jpg',
-    'IMG_4277.jpg',
-    // ... add more images here
-];
-```
-
-### 4. Deploy to Web Server
-
-Copy these files to your web server:
-- index.html
-- descriptions/ (entire directory)
-- *.jpg (all image files)
-
-**Example using FTP:**
-```bash
-# In FTP client
-cd /public_html/testimages
-put index.html
-mkdir descriptions
-cd descriptions
-mput descriptions/*.json
-cd ..
-mput *.jpg
-```
-
-**Example using network drive:**
-```powershell
-# In PowerShell
-Copy-Item -Path "index.html" -Destination "Z:\testimages\"
-Copy-Item -Path "descriptions" -Destination "Z:\testimages\" -Recurse
-Copy-Item -Path "*.jpg" -Destination "Z:\testimages\"
-```
-
-## Adding More Data
-
-The system is designed to scale easily:
-
-1. **Run more workflows** - Use IDT with different configurations
-   - Make sure workflow names include your pattern (e.g., "25imagetest")
-   - Use consistent image sets across workflows for comparison
-
-2. **Re-generate JSON** - Run the script again to pick up new workflows
-   ```bash
-   python generate_descriptions.py
-   ```
-
-3. **Upload updates** - Copy new JSON files to your server
-   ```bash
-   # Only updated files need to be re-uploaded
-   ftp> cd descriptions
-   ftp> mput *.json
-   ```
-
-The gallery will automatically detect and display new configurations!
-
-## Data Structure
-
-### Workflow Directory Naming
-```
-wf_WORKFLOWNAME_PROVIDER_MODEL_[VARIANT_]PROMPTSTYLE_TIMESTAMP/
-    descriptions/
-        image_descriptions.txt
-```
-
-Example:
-```
-wf_25imagetest_ollama_llava_7b_narrative_20251021_200409/
-wf_25imagetest_claude_claude-3-haiku-20240307_narrative_20251022_141523/
-wf_25imagetest_ollama_granite3.2-vision_latest_colorful_20251022_160315/
-```
-
-### Description File Format
-```
-File: converted_images\image.jpg
-Provider: ollama
-Model: llava:7b
-Prompt Style: narrative
-Description: [Multi-paragraph description text]
-Timestamp: 2025-10-21 20:05:26
---------------------------------------------------------------------------------
-```
-
-### Generated JSON Structure
-
-**index.json:**
-```json
-{
-  "configs": {
-    "providers": ["ollama", "claude", "openai"],
-    "models": {
-      "ollama": ["llava:7b", "granite3.2-vision"],
-      "claude": ["claude-3-haiku"]
-    },
-    "prompts": {
-      "ollama": {
-        "llava:7b": ["narrative", "detailed"],
-        "granite3.2-vision": ["colorful"]
-      }
-    }
-  }
-}
-```
-
-**ollama_llava_7b_narrative.json:**
-```json
-{
-  "provider": "ollama",
-  "model": "llava:7b",
-  "prompt_style": "narrative",
-  "images": {
-    "IMG_4276.jpg": {
-      "description": "The image shows...",
-      "provider": "ollama",
-      "model": "llava:7b",
-      "prompt_style": "narrative",
-      "timestamp": "2025-10-21 20:05:26"
-    }
-  }
-}
-```
-
-## Customization
-
-### Styling
-Edit the `<style>` section in index.html to customize:
-- Colors and gradients
-- Layout (single column vs. side-by-side)
-- Font sizes and spacing
-- Mobile breakpoints
-
-### Configuration
-Update the `CONFIG` object in index.html:
-```javascript
-const CONFIG = {
-    imagesBaseUrl: './',              // Image location
-    descriptionsBaseUrl: './descriptions/',  // JSON location
-    workflowPattern: '25imagetest'    // Workflow pattern
-};
-```
-
-### Workflow Pattern
-To include different workflows, change the pattern:
-```bash
-# Generate from all workflows
-python generate_descriptions.py --name ""
-
-# Generate from specific test set
-python generate_descriptions.py --name "multipletest"
-
-# Generate from model-specific runs
-python generate_descriptions.py --name "granite"
-```
+---
 
 ## Troubleshooting
 
-### No descriptions showing
-1. Check browser console for errors (F12)
-2. Verify descriptions/index.json exists and loads
-3. Check that JSON filenames match the pattern: `{provider}_{model}_{prompt}.json`
-4. Ensure descriptions directory is in the same location as index.html
+### Gallery won't load
+- ✓ Check you're using HTTP server, not `file://`
+- ✓ Verify `descriptions/*.json` files exist
+- ✓ Check browser console for errors
+- ✓ Confirm `CONFIG.descriptionsBaseUrl` matches actual directory
 
-### Images not loading
-1. Verify image files are in correct location
-2. Check image filenames match exactly (case-sensitive on some servers)
-3. Ensure images are JPG format (not HEIC)
+### Images don't display
+- ✓ Verify `images/*.jpg` files exist
+- ✓ Check `CONFIG.imagesBaseUrl` in `index.html`
+- ✓ Look for 404 errors in browser console
 
-### Missing configurations
-1. Re-run generate_descriptions.py to scan for new workflows
-2. Verify workflow directories match the naming pattern
-3. Check that description files exist in workflow directories
+### No descriptions appear
+- ✓ Check JSON files are not empty: `ls -lh descriptions/*.json`
+- ✓ Verify workflow completed successfully
+- ✓ Re-run: `python generate_descriptions.py`
 
-### Parsing errors
-1. Check workflow directory naming follows the expected format
-2. Verify description files have the expected structure
-3. Look for encoding issues in description files (should be UTF-8)
+### Alt text missing
+- ✓ Run: `python generate_alt_text.py --jsondata-dir descriptions/`
+- ✓ Check API key is set: `echo $ANTHROPIC_API_KEY`
+- ✓ Verify `grep "alt_text" descriptions/*.json` shows results
+
+**For detailed troubleshooting, see [ARCHITECTURE.md](ARCHITECTURE.md).**
+
+---
+
+## Scripts Reference
+
+### Data Generation
+- **`generate_descriptions.py`** - Convert IDT workflow outputs to JSON
+  ```bash
+  python generate_descriptions.py \
+    --descriptions-dir descriptions \
+    --output-dir descriptions \
+    --pattern WORKFLOW_NAME
+  ```
+
+- **`generate_alt_text.py`** - Add accessibility alt text
+  ```bash
+  python generate_alt_text.py --jsondata-dir descriptions/
+  ```
+
+- **`check_data_status.py`** - Verify gallery data integrity
+
+### Batch Workflows (Windows)
+- **`generate_all_gallery_data.bat`** - Run all 27 workflows
+- **`generate_test_gallery_data.bat`** - Run 6 test workflows
+- **`test_gallery.bat`** - Start local HTTP server
+- **`generate_alt_text.bat`** - Alt text generation wrapper
+
+---
+
+## Best Practices
+
+### For Gallery Creators
+1. **Start small:** Test with 10 images and 2 prompts first
+2. **Review quality:** Check first few descriptions before batch processing
+3. **Add alt text:** Generate after workflows complete
+4. **Test locally:** Use `python -m http.server` before deployment
+5. **Document:** Note which models/prompts work best for your use case
+
+### For Gallery Users
+1. **Use HTTP server:** Never open via `file://` protocol
+2. **Keyboard shortcuts:** Learn Alt+P/Alt+N for navigation
+3. **Compare prompts:** Try same image with different prompt styles
+4. **Accessibility:** Test with keyboard-only navigation
+
+### For Developers
+1. **Validate JSON:** Check format after generation
+2. **Handle errors:** Gallery degrades gracefully if files missing
+3. **Version control:** Track changes to `index.html` and scripts
+4. **Document changes:** Update ARCHITECTURE.md when modifying structure
+
+---
 
 ## Performance Notes
 
-- **Initial Load**: Loads only index.json (~few KB)
-- **Per Configuration**: Loads one JSON file when selection changes (~50-200KB depending on image count)
-- **Images**: Lazy loaded, one at a time as user navigates
-- **Caching**: Browser will cache JSON and images after first load
+### Recommended Gallery Sizes
 
-For best performance:
-- Keep JSON files under 500KB each
-- Optimize images (1200px width recommended)
-- Use a CDN for large deployments
+| Size | Images | Configs | Total Size | Load Time |
+|------|--------|---------|------------|-----------|
+| **Small** | 10-20 | 3-6 | 30-80 MB | <2 sec |
+| **Medium** | 20-50 | 6-12 | 80-200 MB | 2-5 sec |
+| **Large** | 50-100 | 12-27 | 200-500 MB | 5-10 sec |
 
-## Future Enhancements
+**Optimal:** 25-30 images with 6-9 configurations (~120 MB)
 
-Possible additions:
-- [ ] Side-by-side comparison mode (view 2+ configs at once)
-- [ ] Search/filter functionality
-- [ ] Export descriptions to text file
-- [ ] Direct links to specific image/config combinations
-- [ ] Image zoom/lightbox feature
-- [ ] Statistics display (word count, processing time)
-- [ ] Model performance comparison charts
+### If Gallery is Too Large
+1. Split into multiple galleries by theme/date
+2. Compress images (85% JPG quality, max 1920px width)
+3. Reduce number of configurations
+4. Use CDN for deployment
+
+---
+
+## Contributing
+
+This is part of the Image Description Toolkit project. Improvements welcome:
+
+1. **Gallery features:** Better UI, search, filters
+2. **Documentation:** Clarifications, examples, tutorials
+3. **Scripts:** Automation, error handling, validation
+4. **Accessibility:** Additional WCAG compliance improvements
+
+---
 
 ## License
 
-Part of the Image Description Toolkit project.
+Same as Image Description Toolkit - see [LICENSE](../../LICENSE)
+
+---
+
+## Support
+
+- **Main IDT Documentation:** [docs/](../../docs/)
+- **Issues:** GitHub Issues for bug reports
+- **Architecture Questions:** See [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Process Questions:** See [REPLICATION_GUIDE.md](REPLICATION_GUIDE.md)
+
+---
+
+**Last Updated:** October 25, 2025
