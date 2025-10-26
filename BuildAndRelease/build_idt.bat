@@ -44,7 +44,7 @@ if errorlevel 1 (
 )
 
 REM Check if spec file exists
-if not exist "final_working.spec" (
+if not exist "BuildAndRelease\final_working.spec" (
     echo ERROR: final_working.spec not found
     echo.
     echo Please ensure you are running this script from the project root directory.
@@ -61,7 +61,7 @@ echo.
 echo [2/4] Building executable with PyInstaller...
 echo     This may take 5-10 minutes...
 echo.
-"%PYTHON_EXE%" -m PyInstaller --clean final_working.spec
+"%PYTHON_EXE%" -m PyInstaller --clean buildandrelease\final_working.spec
 if errorlevel 1 (
     echo.
     echo ERROR: Build failed!
