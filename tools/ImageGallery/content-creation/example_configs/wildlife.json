@@ -1,0 +1,25 @@
+{
+  "gallery_name": "Wildlife and Nature",
+  "sources": {
+    "directories": [
+      "./descriptions"
+    ]
+  },
+  "content_rules": {
+    "required_keywords": [],
+    "preferred_keywords": ["animal", "bird", "wildlife", "deer", "bear", "fox", "rabbit", "squirrel", "butterfly", "insect", "nature", "wild"],
+    "excluded_keywords": ["indoor", "pet", "domestic", "urban"],
+    "min_keyword_matches": 1,
+    "case_sensitive": false
+  },
+  "filters": {
+    "min_description_length": 50,
+    "preferred_prompts": ["narrative", "colorful", "detailed"],
+    "preferred_models": []
+  },
+  "output": {
+    "max_images": 60,
+    "sort_by": "keyword_relevance",
+    "include_metadata": true
+  }
+}
