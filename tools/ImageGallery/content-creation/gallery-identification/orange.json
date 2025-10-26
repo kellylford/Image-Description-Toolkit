@@ -1,0 +1,37 @@
+{
+  "gallery_name": "orange",
+  "sources": {
+    "directories": [
+      "//qnap/home/idt/descriptions"
+    ],
+    "workflow_patterns": [
+      "*"
+    ]
+  },
+  "content_rules": {
+    "required_keywords": [
+      "orange",
+      "cloud",
+      "reflect",
+      "lake",
+      "watersunset"
+    ],
+    "preferred_keywords": [],
+    "excluded_keywords": [
+      "boat",
+      "people"
+    ],
+    "min_keyword_matches": 1,
+    "case_sensitive": false
+  },
+  "filters": {
+    "min_description_length": 0,
+    "preferred_prompts": [],
+    "preferred_models": []
+  },
+  "output": {
+    "max_images": 50,
+    "sort_by": "keyword_relevance",
+    "include_metadata": true
+  }
+}

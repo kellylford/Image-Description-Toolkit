@@ -39,8 +39,35 @@ from typing import Dict, List, Tuple, Optional, Set
 from collections import defaultdict
 
 # Import utilities from list_results for directory scanning
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "scripts"))
 from list_results import find_workflow_directories, count_descriptions, format_timestamp
+
+
+def safe_print(text):
+    """Print text safely on Windows console, replacing problematic Unicode characters."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        # Replace common emoji/Unicode characters with ASCII equivalents
+        replacements = {
+            '🔍': '[SEARCH]',
+            '📁': '[FOLDER]',
+            '⚠️': '[WARNING]',
+            '✅': '[SUCCESS]',
+            '❌': '[ERROR]',
+            '📊': '[STATS]',
+            '🏆': '[TOP]',
+            '🎯': '[TARGET]',
+            '📈': '[CHART]',
+            '🌟': '[STAR]',
+            '🚀': '[LAUNCH]',
+            '💾': '[SAVE]',
+            '🎉': '[CELEBRATE]'
+        }
+        safe_text = text
+        for emoji, replacement in replacements.items():
+            safe_text = safe_text.replace(emoji, replacement)
+        print(safe_text)
 
 
 class GalleryContentIdentifier:
@@ -323,23 +350,23 @@ class GalleryContentIdentifier:
         Returns:
             List of candidate image dictionaries with scores
         """
-        print(f"\n🔍 Identifying candidates for: {self.gallery_name}")
+        print(f"\nIdentifying candidates for: {self.gallery_name}")
         print(f"=" * 70)
         
         # Scan workflows
-        print("\n📁 Scanning workflow directories...")
+        print("\nScanning workflow directories...")
         workflows = self.scan_workflows()
         print(f"   Found {len(workflows)} workflow(s) matching criteria")
         
         if not workflows:
-            print("\n⚠️  No workflows found matching the specified criteria")
+            print("\nWARNING: No workflows found matching the specified criteria")
             return []
         
         # Process each workflow
         all_candidates = []
         processed_images = set()  # Track unique images across workflows
         
-        print("\n📝 Processing descriptions...")
+        print("\nProcessing descriptions...")
         for workflow_path, workflow_metadata in workflows:
             descriptions = self.extract_descriptions_from_workflow(workflow_path)
             
@@ -378,7 +405,7 @@ class GalleryContentIdentifier:
                     all_candidates.append(candidate)
                     processed_images.add(filename)
         
-        print(f"   ✅ Found {len(all_candidates)} matching descriptions from {len(processed_images)} unique images")
+        print(f"   SUCCESS: Found {len(all_candidates)} matching descriptions from {len(processed_images)} unique images")
         
         # Sort by score (or other criteria)
         if self.sort_by == 'keyword_relevance':
@@ -389,7 +416,7 @@ class GalleryContentIdentifier:
         # Limit to max_images
         if self.max_images > 0 and len(all_candidates) > self.max_images:
             all_candidates = all_candidates[:self.max_images]
-            print(f"   📊 Limited to top {self.max_images} candidates")
+            print(f"   STATS: Limited to top {self.max_images} candidates")
         
         self.candidates = all_candidates
         return all_candidates
@@ -397,10 +424,10 @@ class GalleryContentIdentifier:
     def print_summary(self):
         """Print summary of identified candidates."""
         if not self.candidates:
-            print("\n⚠️  No candidates identified")
-            return
+            print("\nWARNING: No candidates identified")
+            return []
         
-        print(f"\n📊 Summary")
+        print(f"\nSUMMARY")
         print(f"=" * 70)
         print(f"Gallery Name: {self.gallery_name}")
         print(f"Total Candidates: {len(self.candidates)}")
@@ -418,7 +445,7 @@ class GalleryContentIdentifier:
         print(f"  Preferred: {preferred_matches} total")
         
         # Top candidates preview
-        print(f"\n🏆 Top 5 Candidates:")
+        print(f"\nTOP 5 Candidates:")
         for i, candidate in enumerate(self.candidates[:5], 1):
             print(f"\n  {i}. {candidate['filename']} (Score: {candidate['score']:.1f})")
             required = candidate['match_details']['required_matches']
@@ -447,11 +474,11 @@ class GalleryContentIdentifier:
         try:
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
-            print(f"\n💾 Results saved to: {output_path}")
+            print(f"\nSAVED: Results saved to: {output_path}")
             print(f"   {len(self.candidates)} candidates written")
             return True
         except Exception as e:
-            print(f"\n❌ Error saving results: {e}")
+            print(f"\nERROR: Error saving results: {e}")
             return False
 
 
@@ -671,13 +698,13 @@ Examples:
     # Save results
     if candidates:
         identifier.save_results(args.output)
-        print(f"\n✅ Gallery content identification complete!")
-        print(f"\n💡 Next steps:")
+        print(f"\nSUCCESS: Gallery content identification complete!")
+        print(f"\nNEXT STEPS:")
         print(f"   1. Review candidates in {args.output}")
         print(f"   2. Copy selected images to gallery/images/")
         print(f"   3. Run build_gallery.py to finalize")
     else:
-        print(f"\n⚠️  No candidates found. Try:")
+        print(f"\nWARNING: No candidates found. Try:")
         print(f"   - Relaxing keyword requirements")
         print(f"   - Checking workflow directories exist")
         print(f"   - Verifying description files are present")

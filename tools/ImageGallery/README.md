@@ -138,7 +138,10 @@ All tools are in the `content-creation/` directory:
 
 ### Python Scripts
 
-- **identify_gallery_content.py** - NEW! Identify images for galleries by keywords and filters
+- **gallery-identification/** - NEW! Complete gallery content identification system
+  - **identify_gallery_content.py** - Main tool for selecting images by keywords and filters
+  - **example_configs/** - Ready-to-use gallery configurations
+  - **Complete documentation** and test suite included
 - **build_gallery.py** - Automatically updates image list in index.html
 - **generate_descriptions.py** - Converts workflow outputs to JSON
 - **generate_alt_text.py** - Adds accessibility alt text
@@ -229,11 +232,11 @@ python -m http.server 8000- **Time:** 30-45 minutes for complete gallery
 
 ## 🆕 Creating Themed Galleries (New!)
 
-The new `identify_gallery_content.py` tool helps you automatically select images for themed galleries:
+The new gallery content identification system helps you automatically select images for themed galleries:
 
 ### Quick Example
 ```bash
-cd content-creation
+cd content-creation/gallery-identification
 
 # Option 1: Use a config file
 python identify_gallery_content.py --config example_configs/sunset_water.json
@@ -247,7 +250,7 @@ python identify_gallery_content.py \
   --output water_candidates.json
 
 # Review results and copy selected images to gallery
-# See documentation/GALLERY_CONTENT_IDENTIFICATION.md for complete guide
+# See gallery-identification/README.md for complete guide
 ```
 
 ### Workflow Integration
@@ -257,7 +260,7 @@ python identify_gallery_content.py \
 4. **Copy selected images** to new gallery directory
 5. **Build and deploy** gallery as usual
 
-See [documentation/GALLERY_CONTENT_IDENTIFICATION.md](documentation/GALLERY_CONTENT_IDENTIFICATION.md) for detailed guide with examples.
+See [gallery-identification/README.md](content-creation/gallery-identification/README.md) for detailed guide with examples.
 
 ---
 
@@ -399,27 +402,19 @@ python generate_descriptions.py --descriptions-dir descriptions/ --output-dir de
 
 ### Data Generation
 
-- **`identify_gallery_content.py`** - Identify images for themed galleries
+- **`gallery-identification/`** - Complete gallery content identification system
   ```bash
   # Using configuration file
-  python identify_gallery_content.py --config sunset_water.json
-  
+  cd content-creation/gallery-identification
+  python identify_gallery_content.py --config example_configs/sunset_water.json
+
   # Using command-line parameters
   python identify_gallery_content.py \
     --required water,sun \
     --keywords sunset,reflection \
     --output candidates.json
   ```
-  See [GALLERY_CONTENT_IDENTIFICATION.md](documentation/GALLERY_CONTENT_IDENTIFICATION.md) for complete guide.
-
-- **`generate_descriptions.py`** - Convert IDT workflow outputs to JSON
-  ```bash
-  python identify_gallery_content.py \
-    --required water,sun \
-    --keywords sunset,reflection \
-    --output candidates.json
-  ```
-  See [GALLERY_CONTENT_IDENTIFICATION.md](documentation/GALLERY_CONTENT_IDENTIFICATION.md) for complete guide.
+  See [gallery-identification/README.md](content-creation/gallery-identification/README.md) for complete guide.
 
 - **`generate_descriptions.py`** - Convert IDT workflow outputs to JSON
   ```bash
