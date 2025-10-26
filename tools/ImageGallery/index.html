@@ -262,23 +262,6 @@
             color: #33e0ff;
         }
         
-        .prompt-text {
-            background: rgba(0, 0, 0, 0.3);
-            border-left: 3px solid #00d4ff;
-            padding: 15px;
-            margin-top: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            color: #aaa;
-            white-space: pre-wrap;
-            line-height: 1.6;
-            display: none;
-        }
-        
-        .prompt-text.visible {
-            display: block;
-        }
-        
         .controls {
             display: flex;
             gap: 15px;
@@ -629,6 +612,7 @@
             color: #aaa;
             line-height: 1.6;
             border-radius: 4px;
+            white-space: pre-wrap;
         }
         
         .card-footer {
@@ -993,8 +977,8 @@
     </div>
 
     <div class="controls">
-        <button id="prevBtn" onclick="previousImage()" aria-label="Previous image (Alt+P)">← Previous</button>
-        <button id="nextBtn" onclick="nextImage()" aria-label="Next image (Alt+N)">Next →</button>
+        <button id="prevBtn" onclick="previousImage()">← Previous</button>
+        <button id="nextBtn" onclick="nextImage()">Next →</button>
     </div>
 
     <div class="keyboard-hint">Use ← → arrow keys or Alt+P/Alt+N to navigate</div>
@@ -1213,7 +1197,7 @@
                     title: formatPromptName(prompt),
                     badge: `${provider} - ${model}`,
                     description: description || 'No description available',
-                    footer: `Prompt: ${prompt}`,
+                    footer: '', // Removed redundant "Prompt: " text
                     imageName: imageName,
                     promptKey: prompt
                 });
@@ -1283,7 +1267,7 @@
                     title: `${combo.provider} - ${combo.model}`,
                     badge: formatPromptName(prompt),
                     description: description || 'No description available',
-                    footer: `Provider: ${combo.provider}`
+                    footer: '' // Removed redundant "Provider: " text
                     // Removed promptKey so cards don't show individual prompt buttons
                 });
                 
@@ -1313,7 +1297,7 @@
             card.innerHTML = `
                 <div class="card-header">
                     <h3 class="card-title">${data.title}</h3>
-                    <span class="card-badge" aria-label="Model">${data.badge}</span>
+                    <span class="card-badge">${data.badge}</span>
                 </div>
                 <div class="card-description">${data.description}</div>
                 ${data.promptKey ? `
@@ -1321,12 +1305,12 @@
                         <button class="prompt-toggle-btn" onclick="togglePromptText('${promptId}')" aria-expanded="false">
                             Show Prompt Text
                         </button>
-                        <div class="prompt-text-container" id="${promptId}" style="display: none;" role="region" aria-live="polite" aria-label="Prompt text for ${data.promptKey}">
+                        <div class="prompt-text-container" id="${promptId}" style="display: none;" role="region">
                             <div class="prompt-text">${promptTextContent}</div>
                         </div>
                     </div>
                 ` : ''}
-                <div class="card-footer">${data.footer}</div>
+                ${data.footer ? `<div class="card-footer">${data.footer}</div>` : ''}
             `;
             
             return card;
@@ -1355,14 +1339,8 @@
         
         function getPromptText(promptKey) {
             // Return the full prompt text for the given prompt key
-            const prompts = {
-                'narrative': 'Describe this image in detail, focusing on the main subjects, their actions, and the setting. Use clear, descriptive language.',
-                'colorful': 'Describe this image with vivid, expressive language. Emphasize colors, textures, mood, and atmosphere.',
-                'technical': 'Provide a technical description of this image, including composition, lighting, perspective, and any notable photographic or artistic techniques.',
-                'detailed': 'Provide an extremely detailed description of this image, covering all visible elements, their relationships, colors, textures, spatial arrangement, and any notable features or patterns.'
-            };
-            
-            return prompts[promptKey] || 'Prompt text not available for this prompt type.';
+            // Use the comprehensive PROMPT_TEXTS object defined at the top of the file
+            return PROMPT_TEXTS[promptKey] || 'Prompt text not available for this prompt type.';
         }
         
         function getAvailablePrompts() {

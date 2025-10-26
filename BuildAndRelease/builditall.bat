@@ -36,6 +36,9 @@ echo.
 echo Make sure all virtual environments are set up before continuing.
 echo.
 
+REM Change to project root directory
+cd /d "%~dp0.."
+
 set BUILD_ERRORS=0
 
 REM ============================================================================
@@ -44,7 +47,7 @@ echo [1/4] Building IDT (main toolkit)...
 echo ========================================================================
 echo.
 
-call build_idt.bat
+call BuildAndRelease\build_idt.bat
 if errorlevel 1 (
     echo ERROR: IDT build failed!
     set /a BUILD_ERRORS+=1
