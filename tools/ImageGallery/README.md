@@ -398,9 +398,6 @@ python generate_descriptions.py --descriptions-dir descriptions/ --output-dir de
 ## Scripts Reference
 
 ### Data Generation
-- **`generate_descriptions.py`** - Convert IDT workflow outputs to JSON
-  ```bash
-### Data Generation
 
 - **`identify_gallery_content.py`** - Identify images for themed galleries
   ```bash
@@ -408,6 +405,15 @@ python generate_descriptions.py --descriptions-dir descriptions/ --output-dir de
   python identify_gallery_content.py --config sunset_water.json
   
   # Using command-line parameters
+  python identify_gallery_content.py \
+    --required water,sun \
+    --keywords sunset,reflection \
+    --output candidates.json
+  ```
+  See [GALLERY_CONTENT_IDENTIFICATION.md](documentation/GALLERY_CONTENT_IDENTIFICATION.md) for complete guide.
+
+- **`generate_descriptions.py`** - Convert IDT workflow outputs to JSON
+  ```bash
   python identify_gallery_content.py \
     --required water,sun \
     --keywords sunset,reflection \
