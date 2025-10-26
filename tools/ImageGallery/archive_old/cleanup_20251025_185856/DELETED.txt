@@ -1,0 +1,10 @@
+# Cleanup performed on Sat, Oct 25, 2025  6:58:56 PM
+
+Directories deleted:
+
+259M	contentprototype
+3.6G	cottage
+194M	europe/production
+83M	images
+11M	data
+9.1M	jsondata
