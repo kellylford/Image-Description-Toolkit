@@ -315,6 +315,45 @@ class IDTConfigureApp(QMainWindow):
                     "description": "Automatically sort images by file modification time before processing. Ensures chronological order for photo collections."
                 }
             },
+            "Metadata Settings": {
+                "metadata_enabled": {
+                    "file": "image_describer",
+                    "path": ["metadata", "enabled"],
+                    "type": "bool",
+                    "description": "Enable metadata extraction from images (GPS coordinates, dates, camera info). Adds location/date prefix to descriptions."
+                },
+                "include_location_prefix": {
+                    "file": "image_describer",
+                    "path": ["metadata", "include_location_prefix"],
+                    "type": "bool",
+                    "description": "Include location and date as prefix in descriptions (e.g., 'Austin, TX Mar 25, 2025: ...'). Requires metadata_enabled."
+                },
+                "geocoding_enabled": {
+                    "file": "image_describer",
+                    "path": ["metadata", "geocoding", "enabled"],
+                    "type": "bool",
+                    "description": "Enable reverse geocoding to convert GPS coordinates to city/state/country. Requires internet access and adds API delay. Results are cached."
+                },
+                "geocoding_user_agent": {
+                    "file": "image_describer",
+                    "path": ["metadata", "geocoding", "user_agent"],
+                    "type": "string",
+                    "description": "User agent string for geocoding API requests. Must follow OpenStreetMap Nominatim usage policy."
+                },
+                "geocoding_delay": {
+                    "file": "image_describer",
+                    "path": ["metadata", "geocoding", "delay_seconds"],
+                    "type": "float",
+                    "range": [0.5, 5.0],
+                    "description": "Delay in seconds between geocoding API requests. Minimum 1.0 second required by Nominatim usage policy."
+                },
+                "geocoding_cache_file": {
+                    "file": "image_describer",
+                    "path": ["metadata", "geocoding", "cache_file"],
+                    "type": "string",
+                    "description": "Path to geocoding cache file. Stores geocoded locations to minimize API calls."
+                }
+            },
             "Workflow Settings": {
                 "base_output_directory": {
                     "file": "workflow",
