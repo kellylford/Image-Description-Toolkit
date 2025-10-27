@@ -174,7 +174,7 @@ The show_metadata tool now offers the same friendly interactive experience as ID
 
 ---
 
-## Ìæâ Major Feature: End-to-End Metadata Integration (Afternoon Session)
+## ÔøΩÔøΩÔøΩ Major Feature: End-to-End Metadata Integration (Afternoon Session)
 
 ### Overview
 Completed comprehensive metadata extraction and geocoding integration across the entire IDT ecosystem. This is a **major feature release** adding rich location/temporal context to all image descriptions.
@@ -204,7 +204,7 @@ Completed comprehensive metadata extraction and geocoding integration across the
 
 #### ‚úÖ Phase 7: Viewer Display (Commit: cbdd5a1)
 - Added `metadata_label` widget to viewer.py
-- Parses and displays location/date prefix in **bold blue** with Ì≥ç icon
+- Parses and displays location/date prefix in **bold blue** with ÔøΩÔøΩÔøΩ icon
 - Separates prefix from description for cleaner layout
 
 #### ‚úÖ Phase 8: ImageDescriber GUI (Commit: c9e4aeb)
@@ -219,7 +219,7 @@ Completed comprehensive metadata extraction and geocoding integration across the
 
 #### ‚úÖ Phase 10: HTML Output (Commit: 1243d71)
 - Enhanced `descriptions_to_html.py` to parse location/date prefix
-- Displays prefix in **bold blue** with Ì≥ç icon in reports
+- Displays prefix in **bold blue** with ÔøΩÔøΩÔøΩ icon in reports
 - Consistent styling with viewer
 
 #### ‚úÖ Phase 11: Documentation (Commits: 1b77475, 94d44bb)
@@ -281,8 +281,8 @@ Location data ¬© OpenStreetMap contributors
 ```
 
 **Visual Enhancements:**
-- Viewer: Ì≥ç Blue bold prefix above description
-- HTML: Ì≥ç Blue bold prefix in reports  
+- Viewer: ÔøΩÔøΩÔøΩ Blue bold prefix above description
+- HTML: ÔøΩÔøΩÔøΩ Blue bold prefix in reports  
 - GUI: Organized property sections
 
 ### Usage Examples
@@ -339,7 +339,7 @@ idt guideme
 
 After build, verify:
 - [ ] Description files include location/date prefix
-- [ ] Viewer displays Ì≥ç metadata prominently
+- [ ] Viewer displays ÔøΩÔøΩÔøΩ metadata prominently
 - [ ] HTML reports show highlighted prefix
 - [ ] ImageDescriber shows Location & Date properties
 - [ ] IDTConfigure has Metadata Settings category
@@ -360,6 +360,63 @@ After build, verify:
 **Estimated Impact:** Major feature, significant user value, legal compliance
 
 ---
+
+## Evening Session: Conversion Progress & Status Log Enhancements
+
+### Overview
+Implemented real-time progress reporting for the HEIC ‚Üí JPG conversion step to match the image description step. Progress now appears in the command window and is mirrored to `logs/status.log` for easy monitoring.
+
+### What Changed
+- `scripts/ConvertImage.py`
+  - When invoked with a workflow `--log-dir`, initializes `logs/convert_images_progress.txt`
+  - Appends one line per successful conversion (fast, append-only)
+- `scripts/workflow.py`
+  - Detects total HEIC files and starts a lightweight monitor thread
+  - Reads `logs/convert_images_progress.txt` every ~2s to compute X/Y (Z%)
+  - Updates the command window and calls `_update_status_log()`
+  - Final line on completion: "‚úì Image conversion complete (Y HEIC ‚Üí JPG)"
+- `scripts/workflow_utils.py`
+  - Existing `WorkflowLogger.update_status()` used to write `logs/status.log`
+
+### Status Log Output Examples
+During convert:
+```
+‚ü≥ Image conversion in progress: 12/48 HEIC ‚Üí JPG (25%)
+```
+
+On completion:
+```
+‚úì Image conversion complete (48 HEIC ‚Üí JPG)
+```
+
+### Progress Files
+- Convert step: `logs/convert_images_progress.txt`
+- Describe step: `logs/image_describer_progress.txt`
+- Aggregated human-readable status: `logs/status.log`
+
+Notes:
+- Progress files are created when running via the workflow (which supplies `--log-dir`).
+- Direct use of the converter script without `--log-dir` will not create progress files.
+
+### Commit Information (Conversion Progress)
+- **Commit**: 03fe6bd
+- **Message**: "Conversion progress: show percentage/status in console and update logs/status via monitor; add convert_images_progress.txt writer/reader"
+- **Branch**: main
+- **Pushed**: Yes ‚úÖ
+- **Files Changed**: 2 files, 113 insertions(+), 2 deletions(-)
+
+### Testing Performed (Conversion Progress)
+- ‚úÖ Created a small HEIC test set and verified:
+  - `convert_images_progress.txt` line count increases per file
+  - Command window shows X/Y (Z%) during conversion
+  - `logs/status.log` mirrors in-progress and completion lines
+- ‚úÖ No syntax or lint errors detected in modified files
+
+### Additions to Testing Checklist
+- [ ] CMD shows convert progress: "‚ü≥ Image conversion in progress: X/Y HEIC ‚Üí JPG (Z%)"
+- [ ] `logs/convert_images_progress.txt` appended per converted file
+- [ ] `logs/status.log` shows convert in-progress and final completion lines
+- [ ] Behavior consistent when no HEIC files are present (graceful skip)
 
 ## Session Statistics
 

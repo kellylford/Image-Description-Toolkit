@@ -334,6 +334,25 @@ idt workflow C:\Photos --skip-existing --view-results
 idt workflow C:\Videos --steps video,describe --name "video_analysis"
 ```
 
+#### Progress & Status Log
+
+When running `idt workflow`, the orchestrator exposes step progress in the command window and writes a concise status log:
+
+- Convert step (HEIC → JPG):
+    - Console: "⟳ Image conversion in progress: X/Y HEIC → JPG (Z%)"
+    - Console (done): "✓ Image conversion complete (Y HEIC → JPG)"
+    - Progress file: `<workflow_dir>/logs/convert_images_progress.txt`
+
+- Describe step (image descriptions):
+    - Console: "⟳ Image description in progress: X/Y (Z%)"
+    - Console (done): "✓ Image description complete (Y descriptions)"
+    - Progress file: `<workflow_dir>/logs/image_describer_progress.txt`
+
+- Aggregated summary:
+    - `<workflow_dir>/logs/status.log` updated every ~2 seconds while steps run
+
+Note: Progress files are created when steps are launched by the workflow (which passes a log directory to child processes). Running converter/other tools directly without a `--log-dir` won’t emit progress files.
+
 ### GUI Application Launchers
 
 #### `viewer` / `view` - Results Viewer

@@ -921,6 +921,27 @@ The viewer automatically detects two modes:
 
 ---
 
+### 11.1 Command Window Progress and Status Log (Convert + Describe)
+
+When running workflows from the command line, IDT provides concise, screen-reader-friendly progress and a human-readable status log:
+
+- Convert step (HEIC → JPG):
+   - In-progress: "⟳ Image conversion in progress: X/Y HEIC → JPG (Z%)"
+   - Complete:    "✓ Image conversion complete (Y HEIC → JPG)"
+   - Progress file: `<workflow_dir>/logs/convert_images_progress.txt`
+
+- Describe step (image descriptions):
+   - In-progress: "⟳ Image description in progress: X/Y (Z%)"
+   - Complete:    "✓ Image description complete (Y descriptions)"
+   - Progress file: `<workflow_dir>/logs/image_describer_progress.txt`
+
+- Aggregated status:
+   - Human-readable summary at `<workflow_dir>/logs/status.log`
+   - Updated every ~2 seconds while steps are running
+
+Notes:
+- Progress files are created when running via the workflow (which passes a `--log-dir` to child processes). Running converters directly without `--log-dir` won’t create progress files.
+
 ## 12. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
