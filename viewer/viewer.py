@@ -891,6 +891,15 @@ class ImageDescriptionViewer(QWidget):
         self.image_label.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # Make it focusable with tab
         layout.addWidget(self.image_label)
 
+        # Location/Date metadata display (if present in description)
+        self.metadata_label = QLabel()
+        self.metadata_label.setAccessibleName("Image Metadata")
+        self.metadata_label.setAccessibleDescription("Location and date information extracted from the image")
+        self.metadata_label.setWordWrap(True)
+        self.metadata_label.setStyleSheet("QLabel { color: #0066CC; font-weight: bold; padding: 5px; }")
+        self.metadata_label.setVisible(False)  # Hidden by default, shown if metadata present
+        layout.addWidget(self.metadata_label)
+
         # Description display
         self.description_text = QTextEdit()
         self.description_text.setReadOnly(True)
@@ -1320,17 +1329,40 @@ class ImageDescriptionViewer(QWidget):
         if 0 <= row < len(self.descriptions):
             description = self.descriptions[row]
             
+            # Check if description starts with location/date prefix
+            # Format: "City, State Mon Day, Year: Description" or "Mon Day, Year: Description"
+            metadata_prefix = None
+            description_without_prefix = description
+            
+            # Regex to match the prefix pattern
+            import re
+            prefix_match = re.match(r'^([^:]+):\s+(.+)$', description, re.DOTALL)
+            if prefix_match:
+                potential_prefix = prefix_match.group(1).strip()
+                # Check if it looks like a location/date prefix (contains date pattern)
+                if re.search(r'\b\w{3}\s+\d{1,2},\s+\d{4}\b', potential_prefix):
+                    metadata_prefix = potential_prefix
+                    description_without_prefix = prefix_match.group(2).strip()
+            
+            # Display metadata prefix if present
+            if metadata_prefix:
+                self.metadata_label.setText(f"📍 {metadata_prefix}")
+                self.metadata_label.setVisible(True)
+                self.metadata_label.setAccessibleDescription(f"Image location and date: {metadata_prefix}")
+            else:
+                self.metadata_label.setVisible(False)
+            
             # Get image date and append to description
             if 0 <= row < len(self.image_files):
                 img_path = self.image_files[row]
                 if os.path.isfile(img_path):
                     image_date = get_image_date(img_path)
                     if image_date:
-                        description = f"{description}\n\n{image_date}"
+                        description_without_prefix = f"{description_without_prefix}\n\n{image_date}"
             
             # Process the text to ensure blank lines are properly handled for screen readers
             # Split into lines and process each blank line
-            lines = description.split('\n')
+            lines = description_without_prefix.split('\n')
             processed_lines = []
             
             for line in lines:
@@ -1363,12 +1395,15 @@ class ImageDescriptionViewer(QWidget):
                     self.description_text.setTextCursor(cursor)
             
             # Update accessible description for screen readers without stealing focus
-            self.description_text.setAccessibleDescription(f"Image description with {len(description)} characters: {description}")
+            # Include metadata prefix if present for screen reader context
+            full_description_for_sr = description  # Original with prefix
+            self.description_text.setAccessibleDescription(f"Image description with {len(full_description_for_sr)} characters: {full_description_for_sr}")
             
         else:
             if self.description_text.toPlainText():  # Only clear if there's content
                 self.description_text.clear()
                 self.description_text.setAccessibleDescription("No description selected.")
+            self.metadata_label.setVisible(False)
                 
         # Show image preview
         if 0 <= row < len(self.image_files):
