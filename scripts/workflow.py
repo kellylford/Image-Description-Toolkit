@@ -487,6 +487,18 @@ class WorkflowOrchestrator:
             
         if 'convert' in self.statistics['steps_completed']:
             status_lines.append(f"✓ Image conversion complete ({self.statistics['total_conversions']} HEIC → JPG)")
+        elif self.step_results.get('convert', {}).get('in_progress', False):
+            conv_result = self.step_results.get('convert', {})
+            if 'processed' in conv_result and 'total' in conv_result:
+                processed = conv_result['processed']
+                total = conv_result['total']
+                if total > 0:
+                    percentage = int((processed / total) * 100)
+                    status_lines.append(f"⟳ Image conversion in progress: {processed}/{total} HEIC → JPG ({percentage}%)")
+                else:
+                    status_lines.append(f"⟳ Image conversion in progress: {processed}/{total} HEIC → JPG")
+            else:
+                status_lines.append("⟳ Image conversion in progress...")
         elif 'convert' in self.statistics['steps_failed']:
             status_lines.append(f"✗ Image conversion failed")
             
@@ -675,15 +687,92 @@ class WorkflowOrchestrator:
             if not step_config.get("keep_metadata", True):
                 cmd.append("--no-metadata")
             
+            # Prepare progress monitoring
+            total_to_convert = len(heic_files)
+            self.step_results['convert'] = {
+                'in_progress': True,
+                'total': total_to_convert,
+                'processed': 0
+            }
+            self._update_status_log()
+
+            # Determine progress file location (based on --log-dir)
+            progress_file = None
+            for arg_i, arg in enumerate(cmd):
+                if arg == "--log-dir" and arg_i + 1 < len(cmd):
+                    progress_file = Path(cmd[arg_i + 1]) / "convert_images_progress.txt"
+                    self.logger.info(f"Conversion progress file: {progress_file}")
+                    break
+            if progress_file is None:
+                progress_file = self.config.base_output_dir / "logs" / "convert_images_progress.txt"
+                self.logger.info(f"Conversion progress file (fallback): {progress_file}")
+
+            # Start background monitor similar to describe step
+            import threading
+            import time
+
+            def monitor_conversion_progress():
+                last_count = 0
+                checks_without_file = 0
+                iteration = 0
+                self.logger.info("Conversion progress monitoring thread started")
+                while self.step_results.get('convert', {}).get('in_progress', False):
+                    iteration += 1
+                    try:
+                        if progress_file.exists():
+                            if checks_without_file > 0:
+                                self.logger.info(f"Conversion progress file appeared after {checks_without_file} checks: {progress_file}")
+                                checks_without_file = 0
+                            with open(progress_file, 'r', encoding='utf-8') as f:
+                                lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+                                current_count = len(lines)
+                            if iteration % 5 == 0:
+                                self.logger.debug(f"Conversion monitor check #{iteration}: {current_count}/{total_to_convert} converted")
+                            if current_count != last_count:
+                                self.step_results['convert']['processed'] = current_count
+                                self._update_status_log()
+                                if current_count - last_count >= 10 or (last_count == 0 and current_count > 0):
+                                    self.logger.info(f"Progress update: {current_count}/{total_to_convert} HEIC → JPG converted, status.log updated")
+                                last_count = current_count
+                        else:
+                            checks_without_file += 1
+                            if checks_without_file == 1:
+                                self.logger.info(f"Waiting for conversion progress file to be created: {progress_file}")
+                            elif checks_without_file % 10 == 0:
+                                self.logger.warning(f"Conversion progress file still not found after {checks_without_file} checks ({checks_without_file * 2}s)")
+                        time.sleep(2)
+                    except Exception as e:
+                        self.logger.warning(f"Conversion progress monitoring error: {e}")
+                        time.sleep(5)
+                self.logger.info(f"Conversion progress monitoring thread ending after {iteration} iterations")
+
+            monitor_thread = threading.Thread(target=monitor_conversion_progress, daemon=True)
+            monitor_thread.start()
+
             self.logger.info(f"Running: {' '.join(cmd)}")
-            # Stream output directly to terminal for real-time progress feedback
+            # Stream output directly to terminal for real-time progress feedback (conversion tool runs quiet)
             result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
             
+            # Mark conversion as no longer in progress and final update
+            if 'convert' in self.step_results:
+                self.step_results['convert']['in_progress'] = False
+                # Final read of progress file
+                try:
+                    if progress_file.exists():
+                        with open(progress_file, 'r', encoding='utf-8') as f:
+                            lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+                            self.step_results['convert']['processed'] = len(lines)
+                except Exception:
+                    pass
+                self._update_status_log()
+
             if result.returncode == 0:
                 self.logger.info("Image conversion completed successfully")
                 
                 # Count converted images
                 converted_images = self.discovery.find_files_by_type(output_dir, "images")
+                # Update statistics
+                self.statistics['total_conversions'] = len(converted_images)
                 
                 return {
                     "success": True,
