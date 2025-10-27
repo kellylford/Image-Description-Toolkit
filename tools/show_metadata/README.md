@@ -4,6 +4,7 @@ Extract and display EXIF metadata from images without running AI descriptions.
 
 ## Features
 
+- **Interactive Wizard**: Guided setup with `--guideme` flag (recommended for beginners)
 - **HEIC Support**: Reads iPhone HEIC photos (requires pillow-heif)
 - **GPS Extraction**: Extracts GPS coordinates and altitude from EXIF
 - **Reverse Geocoding**: Optional city/state/country lookup via OpenStreetMap Nominatim
@@ -17,6 +18,30 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+
+### Interactive Wizard (Recommended for Beginners)
+
+The easiest way to use the tool! The `--guideme` flag launches an interactive wizard that walks you through all options:
+
+```bash
+python show_metadata.py --guideme
+```
+
+The wizard will:
+1. ✅ Help you select the image directory
+2. ✅ Choose recursive scanning (subdirectories)
+3. ✅ Enable/disable meta suffix display
+4. ✅ Configure reverse geocoding (city/state/country lookup)
+5. ✅ Set up CSV export options
+6. ✅ Show you the command before running
+7. ✅ Save the command for future reference
+8. ✅ Run the extraction or just display the command
+
+**Perfect for:**
+- First-time users learning the tool
+- Complex setups with geocoding and CSV export
+- When you want to preview settings before running
+- Saving commands for reuse
 
 ### Basic Usage
 

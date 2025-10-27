@@ -735,5 +735,343 @@ This tool shows what metadata will be extracted and included in workflow outputs
     )
 
 
+def print_header(text):
+    """Print a section header"""
+    print(f"\n{'=' * 70}")
+    print(f"  {text}")
+    print(f"{'=' * 70}\n")
+
+
+def print_numbered_list(items, start=1):
+    """Print a numbered list of items (accessible for screen readers)"""
+    for idx, item in enumerate(items, start=start):
+        print(f"  {idx}. {item}")
+    print()
+
+
+def get_choice(prompt, options, default=None, allow_back=False, allow_exit=True):
+    """
+    Get user choice from numbered list (accessible for screen readers)
+    
+    Args:
+        prompt: Question to ask
+        options: List of option strings
+        default: Default option number (1-based) if user just presses Enter
+        allow_back: If True, allow 'b' to go back
+        allow_exit: If True, allow 'e' to exit
+    
+    Returns:
+        Selected option string, or 'BACK' if user pressed 'b', or 'EXIT' if user pressed 'e'
+    """
+    print(prompt)
+    print_numbered_list(options)
+    
+    # Build help text
+    help_parts = []
+    if allow_back:
+        help_parts.append("b=back")
+    if allow_exit:
+        help_parts.append("e=exit")
+    help_text = ", ".join(help_parts)
+    
+    while True:
+        if default:
+            if help_text:
+                user_input = input(f"Enter choice (1-{len(options)}, {help_text}, default={default}): ").strip().lower()
+            else:
+                user_input = input(f"Enter choice (1-{len(options)}, default={default}): ").strip().lower()
+            if not user_input:
+                return options[default - 1]
+        else:
+            if help_text:
+                user_input = input(f"Enter choice (1-{len(options)}, {help_text}): ").strip().lower()
+            else:
+                user_input = input(f"Enter choice (1-{len(options)}): ").strip().lower()
+        
+        # Check for special commands
+        if user_input == 'b' and allow_back:
+            return 'BACK'
+        if user_input == 'e' and allow_exit:
+            return 'EXIT'
+        
+        try:
+            choice = int(user_input)
+            if 1 <= choice <= len(options):
+                return options[choice - 1]
+            else:
+                print(f"Please enter a number between 1 and {len(options)}")
+        except ValueError:
+            valid_options = f"a number between 1 and {len(options)}"
+            if allow_back or allow_exit:
+                extras = []
+                if allow_back:
+                    extras.append("'b' for back")
+                if allow_exit:
+                    extras.append("'e' for exit")
+                valid_options += ", " + ", or ".join(extras)
+            print(f"Please enter {valid_options}")
+
+
+def get_input(prompt, default=None, allow_empty=False):
+    """Get user input with optional default"""
+    if default:
+        result = input(f"{prompt} (default: {default}): ").strip()
+        return result if result else default
+    else:
+        while True:
+            result = input(f"{prompt}: ").strip()
+            if result or allow_empty:
+                return result
+            print("This field is required. Please enter a value.")
+
+
+def get_yes_no(prompt, default_yes=True):
+    """Get yes/no answer from user"""
+    default_text = "Y/n" if default_yes else "y/N"
+    while True:
+        response = input(f"{prompt} [{default_text}]: ").strip().lower()
+        if not response:
+            return default_yes
+        if response in ['y', 'yes']:
+            return True
+        if response in ['n', 'no']:
+            return False
+        print("Please enter 'y' or 'n'")
+
+
+def guideme():
+    """Interactive guided workflow for show_metadata"""
+    print_header("Show Metadata - Interactive Wizard")
+    
+    print("Welcome! This wizard will help you set up metadata extraction.")
+    print("You can press Ctrl+C at any time to exit.")
+    print()
+    
+    # Step 1: Image Directory
+    print_header("Step 1: Image Directory")
+    print("Enter the path to the directory containing images to analyze.")
+    print("Examples:")
+    print("  - C:\\Photos\\Vacation")
+    print("  - //server/share/photos")
+    print("  - /mnt/photos")
+    print()
+    
+    img_dir = get_input("Image directory path")
+    if not Path(img_dir).exists():
+        print(f"\nWARNING: Directory does not exist: {img_dir}")
+        continue_anyway = get_yes_no("Continue anyway?", default_yes=False)
+        if not continue_anyway:
+            print("Exiting...")
+            return
+    
+    # Step 2: Recursive Scan
+    print_header("Step 2: Recursive Scanning")
+    print("Should subdirectories be included in the scan?")
+    print()
+    
+    recursive = get_yes_no("Scan subdirectories recursively?", default_yes=True)
+    
+    # Step 3: Meta Suffix Display
+    print_header("Step 3: Meta Suffix Display")
+    print("The meta suffix shows key metadata in a compact format.")
+    print("Example: [6/7/2023 2:35P, iPhone 14, 39.9047°N, 116.4074°E, 51m]")
+    print()
+    
+    show_meta_suffix = get_yes_no("Display meta suffix?", default_yes=True)
+    
+    # Step 4: Geocoding
+    print_header("Step 4: Reverse Geocoding")
+    print("Reverse geocoding converts GPS coordinates to city/state/country names.")
+    print("This requires an internet connection and may take time for large batches.")
+    print()
+    
+    use_geocoding = get_yes_no("Enable reverse geocoding?", default_yes=False)
+    
+    geocode_user_agent = None
+    geocode_delay = None
+    geocode_cache = None
+    
+    if use_geocoding:
+        # Step 4a: User Agent
+        print("\nOpenStreetMap Nominatim requires a custom User-Agent string.")
+        print("This identifies your application to their service.")
+        default_user_agent = 'Image-Description-Toolkit/ShowMetadata (https://github.com/kelly/Image-Description-Toolkit)'
+        print(f"\nDefault: {default_user_agent}")
+        print()
+        
+        custom_agent = get_yes_no("Use default User-Agent?", default_yes=True)
+        if custom_agent:
+            geocode_user_agent = default_user_agent
+        else:
+            geocode_user_agent = get_input("Enter custom User-Agent string")
+        
+        # Step 4b: Delay
+        print("\nNominatim recommends 1 second delay between requests.")
+        print("Lower delays may result in rate limiting or blocking.")
+        print()
+        
+        use_default_delay = get_yes_no("Use recommended 1 second delay?", default_yes=True)
+        if use_default_delay:
+            geocode_delay = 1.0
+        else:
+            while True:
+                delay_input = get_input("Enter delay in seconds (minimum 0.5)", "1.0")
+                try:
+                    geocode_delay = float(delay_input)
+                    if geocode_delay < 0.5:
+                        print("Delay must be at least 0.5 seconds")
+                        continue
+                    break
+                except ValueError:
+                    print("Please enter a valid number")
+        
+        # Step 4c: Cache
+        print("\nGeocoding results can be cached to avoid repeated API calls.")
+        print("This is especially useful when re-scanning the same locations.")
+        print()
+        
+        use_cache = get_yes_no("Enable geocoding cache?", default_yes=True)
+        if use_cache:
+            default_cache = str(Path(__file__).parent / "geocode_cache.json")
+            print(f"\nDefault cache location: {default_cache}")
+            print()
+            
+            use_default_cache = get_yes_no("Use default cache location?", default_yes=True)
+            if use_default_cache:
+                geocode_cache = default_cache
+            else:
+                geocode_cache = get_input("Enter cache file path")
+    
+    # Step 5: CSV Export
+    print_header("Step 5: CSV Export")
+    print("Export metadata to a CSV file for analysis in Excel or other tools.")
+    print()
+    
+    export_csv = get_yes_no("Export to CSV?", default_yes=False)
+    
+    csv_out = None
+    if export_csv:
+        # Generate default CSV name based on input directory
+        dir_name = Path(img_dir).name or "metadata"
+        default_csv = str(Path(__file__).parent / f"metadata_{dir_name}.csv")
+        print(f"\nDefault CSV location: {default_csv}")
+        print()
+        
+        use_default_csv = get_yes_no("Use default CSV location?", default_yes=True)
+        if use_default_csv:
+            csv_out = default_csv
+        else:
+            csv_out = get_input("Enter CSV file path")
+    
+    # Build command
+    print_header("Command Summary")
+    
+    cmd_parts = ["python", "show_metadata.py", img_dir]
+    
+    if recursive:
+        cmd_parts.append("--recursive")
+    
+    if not show_meta_suffix:
+        cmd_parts.append("--no-meta-suffix")
+    
+    if use_geocoding:
+        cmd_parts.append("--geocode")
+        if geocode_user_agent:
+            cmd_parts.extend(["--geocode-user-agent", geocode_user_agent])
+        if geocode_delay:
+            cmd_parts.extend(["--geocode-delay", str(geocode_delay)])
+        if geocode_cache:
+            cmd_parts.extend(["--geocode-cache", geocode_cache])
+    
+    if csv_out:
+        cmd_parts.extend(["--csv-out", csv_out])
+    
+    # Display the command
+    command_str = " ".join(f'"{part}"' if ' ' in part else part for part in cmd_parts)
+    print("The following command will be executed:\n")
+    print(f"  {command_str}\n")
+    
+    # Save command to file
+    command_file = Path(__file__).parent / ".show_metadata_last_command"
+    try:
+        with open(command_file, 'w', encoding='utf-8') as f:
+            f.write(f"# Show Metadata - Last Command\n")
+            f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write(command_str + "\n")
+        print(f"Command saved to: {command_file}")
+        print()
+    except Exception as e:
+        print(f"Note: Could not save command to file: {e}")
+        print()
+    
+    # Ask to run or exit
+    action = get_choice("What would you like to do?", 
+                       ["Run this command now", "Just show the command (don't run)", "Go back to modify settings"],
+                       allow_exit=True)
+    
+    if action == 'EXIT':
+        print("Exiting...")
+        return
+    
+    if action == "Go back to modify settings":
+        return guideme()
+    
+    if action == "Run this command now":
+        print_header("Running Metadata Extraction")
+        print(f"Executing: {command_str}\n")
+        
+        try:
+            # Build arguments
+            directory = Path(img_dir)
+            extractor = MetadataExtractor()
+
+            geocoder = None
+            if use_geocoding:
+                cache_path = Path(geocode_cache) if geocode_cache else None
+                geocoder = NominatimGeocoder(
+                    user_agent=geocode_user_agent,
+                    delay_seconds=geocode_delay,
+                    cache_path=cache_path
+                )
+                if not geocoder._requests_available:
+                    print("WARNING: requests not installed; install with 'pip install requests' to enable geocoding.")
+
+            csv_path = Path(csv_out) if csv_out else None
+
+            extractor.process_directory(
+                directory,
+                recursive=recursive,
+                show_meta_suffix=show_meta_suffix,
+                geocoder=geocoder,
+                csv_out=csv_path,
+            )
+                
+        except Exception as e:
+            print(f"\nError running metadata extraction: {e}")
+            print("\nYou can manually run the command shown above.")
+    
+    elif action == "Just show the command (don't run)":
+        print("\nCopy and paste this command to run it:\n")
+        print(f"  {command_str}\n")
+        
+        # Ask if they want to go back or exit
+        next_action = get_choice("What next?", ["Go back to modify settings", "Exit"], allow_exit=True)
+        if next_action == "Go back to modify settings":
+            return guideme()
+        print("Exiting...")
+        return
+
+
 if __name__ == '__main__':
-    main()
+    # Check if --guideme flag is present
+    if '--guideme' in sys.argv:
+        try:
+            guideme()
+        except KeyboardInterrupt:
+            print("\n\nCancelled by user. Exiting...")
+            sys.exit(0)
+        except Exception as e:
+            print(f"\nError: {e}")
+            sys.exit(1)
+    else:
+        main()
