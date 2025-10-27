@@ -46,6 +46,17 @@ try:
 except ImportError:
     openai = None
 
+# Import shared metadata extraction module
+try:
+    # Add scripts directory to path
+    scripts_dir = Path(__file__).parent.parent / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from metadata_extractor import MetadataExtractor, NominatimGeocoder
+except ImportError:
+    MetadataExtractor = None
+    NominatimGeocoder = None
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QLabel, QTextEdit, QSplitter,
@@ -9307,6 +9318,74 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
         file_path_obj = Path(file_path)
         
         try:
+            # Try to use shared metadata_extractor module first for richer metadata
+            if MetadataExtractor:
+                try:
+                    extractor = MetadataExtractor()
+                    metadata = extractor.extract_metadata(str(file_path_obj))
+                    
+                    if metadata:
+                        # Add enhanced metadata sections
+                        if metadata.get('datetime') or metadata.get('location'):
+                            location_info = {}
+                            
+                            if metadata.get('datetime'):
+                                location_info["Photo Date"] = metadata['datetime']
+                            
+                            if metadata.get('location'):
+                                loc = metadata['location']
+                                if loc.get('city') and loc.get('state'):
+                                    location_info["Location"] = f"{loc['city']}, {loc['state']}"
+                                    if loc.get('country'):
+                                        location_info["Country"] = loc['country']
+                                elif loc.get('city'):
+                                    location_info["City"] = loc['city']
+                                
+                                if loc.get('latitude') and loc.get('longitude'):
+                                    location_info["GPS Coordinates"] = f"{loc['latitude']:.6f}, {loc['longitude']:.6f}"
+                                
+                                if loc.get('altitude'):
+                                    location_info["Altitude"] = f"{loc['altitude']:.1f}m"
+                            
+                            if location_info:
+                                properties["Location & Date"] = location_info
+                        
+                        if metadata.get('camera'):
+                            cam = metadata['camera']
+                            camera_info = {}
+                            
+                            if cam.get('make') and cam.get('model'):
+                                camera_info["Camera"] = f"{cam['make']} {cam['model']}"
+                            elif cam.get('model'):
+                                camera_info["Camera"] = cam['model']
+                            
+                            if cam.get('lens_model'):
+                                camera_info["Lens"] = cam['lens_model']
+                            
+                            if camera_info:
+                                properties["Camera Information"] = camera_info
+                        
+                        if metadata.get('technical'):
+                            tech = metadata['technical']
+                            tech_info = {}
+                            
+                            if tech.get('iso'):
+                                tech_info["ISO"] = tech['iso']
+                            if tech.get('aperture'):
+                                tech_info["Aperture"] = tech['aperture']
+                            if tech.get('shutter_speed'):
+                                tech_info["Shutter Speed"] = tech['shutter_speed']
+                            if tech.get('focal_length'):
+                                tech_info["Focal Length"] = tech['focal_length']
+                            if tech.get('flash'):
+                                tech_info["Flash"] = tech['flash']
+                            
+                            if tech_info:
+                                properties["Photo Settings"] = tech_info
+                
+                except Exception as e:
+                    print(f"Warning: Could not use metadata_extractor: {e}")
+            
             # Basic file properties
             stat = file_path_obj.stat()
             file_size = stat.st_size
