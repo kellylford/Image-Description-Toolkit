@@ -88,3 +88,11 @@ tools/ImageGallery/images/*.jpg
 tools/ImageGallery/images/*.jpeg
 tools/ImageGallery/*.HEIC
 tools/ImageGallery/.venv/
+
+# ShowMetadata tool outputs and cache
+.cache/
+metadata_*.csv
+tools/metadata_*.csv
+tools/show_metadata/*.csv
+tools/show_metadata/geocode_cache.json
+tools/show_metadata/*.log

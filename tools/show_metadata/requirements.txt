@@ -1,0 +1,7 @@
+# Optional dependencies for tools in the tools/ folder
+# Install in a separate virtual environment if desired
+# pip install -r tools/requirements.txt
+
+Pillow>=10
+pillow-heif>=0.16
+requests>=2.31
