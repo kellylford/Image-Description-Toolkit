@@ -15,13 +15,9 @@ if "%~1"=="" (
     echo.
 ) else (
     set "STATUS_FILE=%~1\logs\status.log"
-    if not exist "%STATUS_FILE%" (
-        echo Error: Status log not found at %STATUS_FILE%
-        echo.
-        echo Usage: monitor_status.bat [workflow_directory]
-        echo Example: monitor_status.bat Descriptions\workflow_vacation_photos
-        exit /b 1
-    )
+    echo Checking for: %STATUS_FILE%
+    echo.
+    REM Don't check if file exists yet - it might be created during workflow
     echo Monitoring: %STATUS_FILE%
     echo.
     echo Press Ctrl+C to stop
