@@ -291,9 +291,24 @@ class ImageDescriber:
         try:
             config_path = Path(config_file)
             if not config_path.is_absolute():
-                # Look for config file in script directory
-                script_dir = Path(__file__).parent
-                config_path = script_dir / config_file
+                # In frozen mode (PyInstaller), look for config next to executable first
+                # This allows workflow.py to update the config file and have it used
+                if getattr(sys, 'frozen', False):
+                    # Frozen mode: Check next to executable first
+                    exe_dir = Path(sys.executable).parent
+                    scripts_dir = exe_dir / 'scripts'
+                    if (scripts_dir / config_file).exists():
+                        config_path = scripts_dir / config_file
+                    elif (exe_dir / config_file).exists():
+                        config_path = exe_dir / config_file
+                    else:
+                        # Fallback to bundled config in temp directory
+                        script_dir = Path(__file__).parent
+                        config_path = script_dir / config_file
+                else:
+                    # Normal mode: Look in script directory
+                    script_dir = Path(__file__).parent
+                    config_path = script_dir / config_file
             
             if not config_path.exists():
                 logger.warning(f"Config file not found: {config_path}")
@@ -819,26 +834,26 @@ class ImageDescriber:
             if base_directory:
                 try:
                     relative_path = image_path.relative_to(base_directory)
-                    entry = f"File: {relative_path}\n"
+                    entry = "File: " + str(relative_path) + "\n"
                 except ValueError:
                     # Fallback if relative path calculation fails
-                    entry = f"File: {image_path.name}\n"
+                    entry = "File: " + image_path.name + "\n"
             else:
-                entry = f"File: {image_path.name}\n"
+                entry = "File: " + image_path.name + "\n"
             
             if output_format.get('include_file_path', True):
-                entry += f"Path: {image_path}\n"
+                entry += "Path: " + str(image_path) + "\n"
             
             # Add metadata if enabled and available
             if output_format.get('include_metadata', True) and metadata:
                 metadata_str = self.format_metadata(metadata)
                 if metadata_str:
-                    entry += f"{metadata_str}\n"
+                    entry += metadata_str + "\n"
             
             if output_format.get('include_model_info', True):
-                entry += f"Provider: {self.provider_name}\n"
-                entry += f"Model: {self.model_name}\n"
-                entry += f"Prompt Style: {self.prompt_style}\n"
+                entry += "Provider: " + str(self.provider_name) + "\n"
+                entry += "Model: " + str(self.model_name) + "\n"
+                entry += "Prompt Style: " + str(self.prompt_style) + "\n"
             
             # Add location/date prefix to description if enabled and metadata available
             formatted_description = description
@@ -846,12 +861,13 @@ class ImageDescriber:
             if metadata_config.get('include_location_prefix', True) and metadata and self.metadata_extractor:
                 location_prefix = self.metadata_extractor.format_location_prefix(metadata)
                 if location_prefix:
-                    formatted_description = f"{location_prefix}: {description}"
+                    # Use string concatenation to avoid f-string format errors from curly braces in description
+                    formatted_description = location_prefix + ": " + description
             
-            entry += f"Description: {formatted_description}\n"
+            entry += "Description: " + formatted_description + "\n"
             
             if output_format.get('include_timestamp', True):
-                entry += f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                entry += "Timestamp: " + time.strftime('%Y-%m-%d %H:%M:%S') + "\n"
 
             # Append compact metadata suffix at end for downstream reuse
             try:
@@ -874,7 +890,7 @@ class ImageDescriber:
             with open(output_file, 'a', encoding='utf-8') as f:
                 f.write(entry)
             
-            logger.info(f"Successfully wrote description for {image_path.name} to {output_file.name}")
+            logger.info("Successfully wrote description for " + image_path.name + " to " + output_file.name)
             return True
             
         except Exception as e:
