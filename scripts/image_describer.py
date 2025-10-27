@@ -29,6 +29,15 @@ import gc
 import time
 from datetime import datetime
 
+# Import shared metadata extraction module
+try:
+    from metadata_extractor import MetadataExtractor, NominatimGeocoder
+    METADATA_SUPPORT = True
+except ImportError:
+    METADATA_SUPPORT = False
+    MetadataExtractor = None
+    NominatimGeocoder = None
+
 
 def set_console_title(title):
     """Set the Windows console title."""
@@ -48,6 +57,15 @@ except ImportError:
 
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
+
+# Try to enable HEIC support for better metadata extraction from iPhone photos
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    HEIC_SUPPORT = True
+except ImportError:
+    HEIC_SUPPORT = False
+    # Will warn user if HEIC files are encountered
 
 # Import ConvertImage utilities for image size optimization
 try:
@@ -172,6 +190,23 @@ class ImageDescriber:
         # Set supported formats from config
         self.supported_formats = set(self.config.get('processing_options', {}).get('supported_formats', 
                                                     ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']))
+        
+        # Initialize metadata extractor and geocoder (if enabled)
+        self.metadata_extractor = None
+        self.geocoder = None
+        if METADATA_SUPPORT:
+            self.metadata_extractor = MetadataExtractor()
+            
+            # Initialize geocoder if enabled in config
+            metadata_config = self.config.get('metadata', {})
+            geocoding_config = metadata_config.get('geocoding', {})
+            if geocoding_config.get('enabled', False):
+                user_agent = geocoding_config.get('user_agent', 'IDT/3.0 (+https://github.com/kellylford/Image-Description-Toolkit)')
+                delay = geocoding_config.get('delay_seconds', 1.0)
+                cache_file = geocoding_config.get('cache_file', 'geocode_cache.json')
+                cache_path = Path(cache_file) if cache_file else None
+                self.geocoder = NominatimGeocoder(user_agent=user_agent, delay_seconds=delay, cache_path=cache_path)
+                logger.info(f"Geocoding enabled with cache: {cache_path}")
         
         # Initialize the AI provider
         self.provider = self._initialize_provider()
@@ -805,7 +840,15 @@ class ImageDescriber:
                 entry += f"Model: {self.model_name}\n"
                 entry += f"Prompt Style: {self.prompt_style}\n"
             
-            entry += f"Description: {description}\n"
+            # Add location/date prefix to description if enabled and metadata available
+            formatted_description = description
+            metadata_config = self.config.get('metadata', {})
+            if metadata_config.get('include_location_prefix', True) and metadata and self.metadata_extractor:
+                location_prefix = self.metadata_extractor.format_location_prefix(metadata)
+                if location_prefix:
+                    formatted_description = f"{location_prefix}: {description}"
+            
+            entry += f"Description: {formatted_description}\n"
             
             if output_format.get('include_timestamp', True):
                 entry += f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -941,6 +984,14 @@ class ImageDescriber:
         
         logger.info(f"Found {len(image_files)} image files")
         logger.info("Sorted files chronologically by modification time (oldest first)")
+        
+        # Check for HEIC files and warn if no support
+        heic_files = [f for f in image_files if f.suffix.lower() in {'.heic', '.heif'}]
+        if heic_files and not HEIC_SUPPORT:
+            logger.warning(f"Found {len(heic_files)} HEIC/HEIF files, but pillow-heif is not installed")
+            logger.warning("HEIC files contain GPS location and camera metadata that cannot be extracted")
+            logger.warning("Install pillow-heif to enable full HEIC support: pip install pillow-heif")
+            logger.warning("Without HEIC support, only file modification time will be available for these files")
         
         # Limit files if specified
         if max_files and len(image_files) > max_files:
@@ -1210,7 +1261,7 @@ class ImageDescriber:
     
     def extract_metadata(self, image_path: Path) -> Dict[str, Any]:
         """
-        Extract EXIF metadata from an image file
+        Extract EXIF metadata from an image file using shared metadata module
         
         Args:
             image_path: Path to the image file
@@ -1226,51 +1277,30 @@ class ImageDescriber:
                 logger.debug(f"Metadata extraction disabled for {image_path.name}")
                 return metadata
             
-            with Image.open(image_path) as img:
-                # Use getexif() instead of _getexif() (modern method)
-                exif_data = img.getexif()
-                
-                if not exif_data:
-                    logger.debug(f"No EXIF data found in {image_path.name} (this is normal for screenshots, web images, etc.)")
-                    return metadata
-                
-                if exif_data:
-                    # Convert EXIF data to human-readable format
-                    exif_dict = {}
-                    for tag_id, value in exif_data.items():
-                        tag = TAGS.get(tag_id, tag_id)
-                        exif_dict[tag] = value
-                    
-                    metadata_sections = 0
-                    
-                    # Extract all available metadata
-                    datetime_info = self._extract_datetime(exif_dict)
-                    if datetime_info:
-                        metadata['datetime'] = datetime_info
-                        metadata_sections += 1
-                    
-                    location_info = self._extract_location(exif_dict)
-                    if location_info:
-                        metadata['location'] = location_info
-                        metadata_sections += 1
-                    
-                    camera_info = self._extract_camera_info(exif_dict)
-                    if camera_info:
-                        metadata['camera'] = camera_info
-                        metadata_sections += 1
-                    
-                    technical_info = self._extract_technical_info(exif_dict)
-                    if technical_info:
-                        metadata['technical'] = technical_info
-                        metadata_sections += 1
-                    
-                    if metadata_sections > 0:
-                        logger.debug(f"Extracted {metadata_sections} metadata sections from {image_path.name}")
-                    else:
-                        logger.debug(f"EXIF data present but no usable metadata extracted from {image_path.name}")
+            # Check if metadata extractor is available
+            if not self.metadata_extractor:
+                logger.debug(f"Metadata extractor not available (install metadata_extractor module)")
+                return metadata
+            
+            # Extract metadata using shared module
+            metadata = self.metadata_extractor.extract_metadata(image_path)
+            
+            # Enrich with geocoding if available and enabled
+            if self.geocoder and 'location' in metadata:
+                loc = metadata['location']
+                if 'latitude' in loc and 'longitude' in loc:
+                    logger.debug(f"Geocoding coordinates for {image_path.name}")
+                    metadata = self.geocoder.enrich_metadata(metadata)
+            
+            if metadata:
+                sections = len([k for k in metadata.keys() if k in ('datetime', 'location', 'camera', 'technical')])
+                if sections > 0:
+                    logger.debug(f"Extracted {sections} metadata sections from {image_path.name}")
+            else:
+                logger.debug(f"No metadata extracted from {image_path.name}")
                             
         except Exception as e:
-            logger.info(f"Could not extract metadata from {image_path.name}: {e} (image may not support EXIF)")
+            logger.info(f"Could not extract metadata from {image_path.name}: {e}")
         
         return metadata
 
@@ -1462,15 +1492,41 @@ class ImageDescriber:
         
         lines = []
         
-        # Format datetime
-        if 'datetime' in metadata:
-            lines.append(f"Photo Date: {metadata['datetime']}")
+        # Format datetime (handle both string and datetime object)
+        if 'datetime_str' in metadata:
+            lines.append(f"Photo Date: {metadata['datetime_str']}")
+        elif 'datetime' in metadata:
+            dt_val = metadata['datetime']
+            if isinstance(dt_val, str):
+                lines.append(f"Photo Date: {dt_val}")
+            elif isinstance(dt_val, datetime):
+                # Format using shared module if available
+                if self.metadata_extractor:
+                    formatted = self.metadata_extractor._format_mdy_ampm(dt_val)
+                    lines.append(f"Photo Date: {formatted}")
         
-        # Format location
+        # Format location with geocoded city/state if available
         if 'location' in metadata:
             location = metadata['location']
             location_parts = []
             
+            # Add city, state, country if available (from geocoding)
+            city = location.get('city') or location.get('town')
+            state = location.get('state')
+            country = location.get('country')
+            
+            readable_parts = []
+            if city:
+                readable_parts.append(city)
+            if state:
+                readable_parts.append(state)
+            if country:
+                readable_parts.append(country)
+            
+            if readable_parts:
+                location_parts.append("Location: " + ", ".join(readable_parts))
+            
+            # Add GPS coordinates
             if 'latitude' in location and 'longitude' in location:
                 location_parts.append(f"GPS: {location['latitude']:.6f}, {location['longitude']:.6f}")
             
@@ -1478,7 +1534,7 @@ class ImageDescriber:
                 location_parts.append(f"Altitude: {location['altitude']:.1f}m")
             
             if location_parts:
-                lines.append("Location: " + ", ".join(location_parts))
+                lines.append(", ".join(location_parts))
         
         # Format camera info
         if 'camera' in metadata:
@@ -1494,65 +1550,19 @@ class ImageDescriber:
             if camera_parts:
                 lines.append("Camera: " + ", ".join(camera_parts))
         
-        # Format technical info
-        if 'technical' in metadata:
-            technical = metadata['technical']
-            technical_parts = []
-            
-            for key, value in technical.items():
-                technical_parts.append(f"{key.replace('_', ' ').title()}: {value}")
-            
-            if technical_parts:
-                lines.append("Settings: " + ", ".join(technical_parts))
-        
         return "\n".join(lines)
 
     def _build_meta_suffix(self, image_path: Path, metadata: Dict[str, Any]) -> str:
-        """Build a compact, parseable one-line metadata suffix.
-        Example: Meta: date=3/25/2025 7:35P; location=Austin, TX; coords=30.267200,-97.743100
+        """Build a compact, parseable one-line metadata suffix using shared module.
+        Example: [3/25/2025 7:35P, iPhone 14, 30.2672°N, 97.7431°W, 150m]
         Only include fields that are available.
         """
-        parts = []
-        # Date from metadata or fallback to file mtime
-        date_str = None
-        try:
-            if metadata and metadata.get('datetime'):
-                date_str = metadata['datetime']
-            else:
-                mtime = datetime.fromtimestamp(image_path.stat().st_mtime)
-                date_str = self._format_mdy_ampm(mtime)
-        except Exception:
-            date_str = None
-        if date_str:
-            parts.append(f"date={date_str}")
-
-        # Human-readable location if present
-        loc_human = None
-        coords = None
-        loc = metadata.get('location') if metadata else None
-        if isinstance(loc, dict):
-            city = loc.get('city') or loc.get('town')
-            state = loc.get('state')
-            country = loc.get('country') or loc.get('countryname')
-            if city and state:
-                loc_human = f"{city}, {state}"
-            elif city and country:
-                loc_human = f"{city}, {country}"
-            elif state and country:
-                loc_human = f"{state}, {country}"
-
-            if 'latitude' in loc and 'longitude' in loc:
-                try:
-                    coords = f"{float(loc['latitude']):.6f},{float(loc['longitude']):.6f}"
-                except Exception:
-                    coords = None
-
-        if loc_human:
-            parts.append(f"location={loc_human}")
-        if coords:
-            parts.append(f"coords={coords}")
-
-        return ("Meta: " + "; ".join(parts)) if parts else ""
+        if self.metadata_extractor:
+            # Use shared module method
+            return self.metadata_extractor.build_meta_suffix(image_path, metadata)
+        
+        # Fallback to empty string if extractor not available
+        return ""
 
     # ...existing code...
 def get_default_prompt_style(config_file: str = "image_describer_config.json") -> str:

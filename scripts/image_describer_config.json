@@ -51,6 +51,16 @@
       "rationale": "File modification times are preserved when copying photos from devices like iPhones, making them reliable for chronological ordering. Video frames inherit their source video's modification time."
     }
   },
+  "metadata": {
+    "enabled": true,
+    "include_location_prefix": true,
+    "geocoding": {
+      "enabled": false,
+      "user_agent": "IDT/3.0 (+https://github.com/kellylford/Image-Description-Toolkit)",
+      "delay_seconds": 1.0,
+      "cache_file": "geocode_cache.json"
+    }
+  },
   "documentation": {
     "overview": "This configuration file controls all aspects of the image description process.",
     "model_settings": {
@@ -86,6 +96,16 @@
       "include_file_path": "Whether to include full file path in descriptions",
       "include_metadata": "Whether to include extracted EXIF metadata in descriptions",
       "separator": "Character used to separate entries in the output file"
+    },
+    "metadata": {
+      "enabled": "Whether to extract and include metadata (dates, GPS, camera info) in descriptions",
+      "include_location_prefix": "Whether to prefix descriptions with 'City, State Date: ' format (e.g., 'Madison, WI Sep 9, 2025: A beautiful sunset...')",
+      "geocoding": {
+        "enabled": "Whether to reverse geocode GPS coordinates to city/state/country names (requires internet connection and API calls)",
+        "user_agent": "Custom User-Agent string for Nominatim API requests (required by OpenStreetMap usage policy)",
+        "delay_seconds": "Minimum delay between geocoding API requests in seconds (1.0 recommended to respect rate limits)",
+        "cache_file": "Path to JSON file for caching geocoding results (relative to scripts directory or absolute path)"
+      }
     }
   },
   "default_provider": "ollama"
