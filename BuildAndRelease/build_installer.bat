@@ -14,9 +14,9 @@ REM Read version from VERSION file
 set VERSION=unknown
 if exist "VERSION" (
     set /p VERSION=<VERSION
-    REM Trim any whitespace/newlines
-    for /f "tokens=* delims= " %%a in ("%VERSION%") do set VERSION=%%a
 )
+REM Remove any trailing whitespace or newlines
+set VERSION=%VERSION: =%
 
 echo Using version: %VERSION%
 echo.

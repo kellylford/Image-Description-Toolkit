@@ -15,6 +15,10 @@ requests>=2.25.0        # HTTP requests for AI providers
 ollama>=0.3.0           # Ollama Python client
 psutil>=5.9.0           # System/hardware information for environment logging
 
+# HEIC/HEIF Support (Strongly recommended for iPhone/iOS photos)
+# Without this, HEIC files lose GPS location and camera metadata
+pillow-heif>=0.13.0     # HEIC/HEIF image format support (iPhone photos)
+
 # Cloud AI Provider SDKs (used by both scripts and GUI)
 openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
 anthropic>=0.18.0       # Anthropic Claude official SDK (retry logic, token tracking, streaming)
