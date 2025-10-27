@@ -809,6 +809,14 @@ class ImageDescriber:
             
             if output_format.get('include_timestamp', True):
                 entry += f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+
+            # Append compact metadata suffix at end for downstream reuse
+            try:
+                meta_suffix = self._build_meta_suffix(image_path, metadata or {})
+                if meta_suffix:
+                    entry += meta_suffix + "\n"
+            except Exception:
+                pass
             
             entry += separator_char * 80 + "\n\n"
             
@@ -1265,40 +1273,56 @@ class ImageDescriber:
             logger.info(f"Could not extract metadata from {image_path.name}: {e} (image may not support EXIF)")
         
         return metadata
+
+    def _format_mdy_ampm(self, dt: datetime) -> str:
+        """Format datetime as M/D/YYYY H:MMP (no leading zero on hour, A/P)."""
+        month = dt.month
+        day = dt.day
+        year = dt.year
+        hour24 = dt.hour
+        minute = dt.minute
+        suffix = 'A' if hour24 < 12 else 'P'
+        hour12 = hour24 % 12
+        if hour12 == 0:
+            hour12 = 12
+        return f"{month}/{day}/{year} {hour12}:{minute:02d}{suffix}"
     
     def _extract_datetime(self, exif_data: dict) -> Optional[str]:
-        """Extract date and time from EXIF data"""
+        """Extract date/time from EXIF using standard format.
+        Priority: DateTimeOriginal > DateTimeDigitized > DateTime.
+        """
         try:
-            # Try different datetime fields
-            datetime_fields = ['DateTime', 'DateTimeOriginal', 'DateTimeDigitized']
-            
+            datetime_fields = ['DateTimeOriginal', 'DateTimeDigitized', 'DateTime']
             for field in datetime_fields:
                 if field in exif_data:
                     dt_str = exif_data[field]
-                    if dt_str:
-                        # Parse and format the datetime
+                    if not dt_str:
+                        continue
+                    for fmt in ('%Y:%m:%d %H:%M:%S', '%Y-%m-%d %H:%M:%S'):
                         try:
-                            dt = datetime.strptime(dt_str, '%Y:%m:%d %H:%M:%S')
-                            return dt.strftime('%Y-%m-%d %H:%M:%S')
+                            dt = datetime.strptime(dt_str, fmt)
+                            return self._format_mdy_ampm(dt)
                         except ValueError:
-                            # Try alternative format
-                            try:
-                                dt = datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
-                                return dt.strftime('%Y-%m-%d %H:%M:%S')
-                            except ValueError:
-                                logger.debug(f"Could not parse datetime format: {dt_str}")
-                                continue
+                            continue
+                    logger.debug(f"Could not parse datetime format: {dt_str}")
         except Exception as e:
             logger.debug(f"Error extracting datetime: {e}")
-        
         return None
     
     def _extract_location(self, exif_data: dict) -> Optional[Dict[str, Any]]:
-        """Extract GPS location from EXIF data"""
+        """Extract GPS/location info including optional human-readable fields."""
         try:
             gps_info = exif_data.get('GPSInfo')
             if not gps_info:
-                return None
+                # Fallback: collect any textual location hints from EXIF
+                text_loc = {}
+                for key in ('City', 'State', 'Province', 'Country', 'CountryName', 'CountryCode'):
+                    if key in exif_data and exif_data[key]:
+                        k = key.lower()
+                        if k == 'province':
+                            k = 'state'
+                        text_loc[k] = exif_data[key]
+                return text_loc or None
             
             # Convert GPS info to readable format
             gps_dict = {}
@@ -1329,6 +1353,14 @@ class ImageDescriber:
                     altitude = -altitude
                 location['altitude'] = altitude
             
+            # Attach any human-readable tags if present
+            for key in ('City', 'State', 'Province', 'Country', 'CountryName', 'CountryCode'):
+                if key in exif_data and exif_data[key]:
+                    k = key.lower()
+                    if k == 'province':
+                        k = 'state'
+                    location[k] = exif_data[key]
+
             return location if location else None
             
         except Exception as e:
@@ -1474,6 +1506,53 @@ class ImageDescriber:
                 lines.append("Settings: " + ", ".join(technical_parts))
         
         return "\n".join(lines)
+
+    def _build_meta_suffix(self, image_path: Path, metadata: Dict[str, Any]) -> str:
+        """Build a compact, parseable one-line metadata suffix.
+        Example: Meta: date=3/25/2025 7:35P; location=Austin, TX; coords=30.267200,-97.743100
+        Only include fields that are available.
+        """
+        parts = []
+        # Date from metadata or fallback to file mtime
+        date_str = None
+        try:
+            if metadata and metadata.get('datetime'):
+                date_str = metadata['datetime']
+            else:
+                mtime = datetime.fromtimestamp(image_path.stat().st_mtime)
+                date_str = self._format_mdy_ampm(mtime)
+        except Exception:
+            date_str = None
+        if date_str:
+            parts.append(f"date={date_str}")
+
+        # Human-readable location if present
+        loc_human = None
+        coords = None
+        loc = metadata.get('location') if metadata else None
+        if isinstance(loc, dict):
+            city = loc.get('city') or loc.get('town')
+            state = loc.get('state')
+            country = loc.get('country') or loc.get('countryname')
+            if city and state:
+                loc_human = f"{city}, {state}"
+            elif city and country:
+                loc_human = f"{city}, {country}"
+            elif state and country:
+                loc_human = f"{state}, {country}"
+
+            if 'latitude' in loc and 'longitude' in loc:
+                try:
+                    coords = f"{float(loc['latitude']):.6f},{float(loc['longitude']):.6f}"
+                except Exception:
+                    coords = None
+
+        if loc_human:
+            parts.append(f"location={loc_human}")
+        if coords:
+            parts.append(f"coords={coords}")
+
+        return ("Meta: " + "; ".join(parts)) if parts else ""
 
     # ...existing code...
 def get_default_prompt_style(config_file: str = "image_describer_config.json") -> str:

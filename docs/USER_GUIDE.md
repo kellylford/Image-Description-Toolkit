@@ -1116,6 +1116,63 @@ idt help
 
 ---
 
+## Results and output files
+
+When you run image description workflows, IDT writes entries to a text file named `image_descriptions.txt` inside each workflow directory. Each entry typically contains:
+
+- File and full Path
+- Optional EXIF metadata block (Photo Date, Location, Camera, Settings)
+- Provider, Model, and Prompt Style
+- Description
+- Timestamp
+- Meta suffix (new)
+- Separator line
+
+### Meta suffix (new)
+
+At the end of each entry, IDT appends a compact, parseable one-line suffix that surfaces the most useful original capture data for downstream tools:
+
+- Format: `Meta: date=M/D/YYYY H:MMP; location=City, ST; coords=LAT,LON`
+- Example: `Meta: date=3/25/2025 7:35P; location=Austin, TX; coords=30.267200,-97.743100`
+- Only the fields available for a given image are included.
+- If EXIF has no date, file modified time is used as a fallback.
+- If GPS is missing but City/State/Country are present, `location=` is included without `coords=`.
+
+### Date/time format standard
+
+All dates shown in the new Meta suffix (and Photo Date when available) follow the project standard:
+
+- M/D/YYYY H:MMP (no leading zeros on month/day/hour, A/P suffix)
+- Examples: `3/25/2025 7:35P`, `10/16/2025 8:03A`
+
+This keeps dates consistent across the CLI, the GUI viewer, and analysis tools.
+
+### Backward compatibility
+
+- The existing multi-line metadata block remains unchanged and continues to appear near the top of each entry when metadata is enabled.
+- The new Meta suffix is additive and appears after the Timestamp line, before the separator.
+- No existing scripts need to change; new consumers can parse the Meta line for quick access to original date/location.
+
+### Example entry
+
+```
+File: IMG_1234.JPG
+Path: C:/Photos/IMG_1234.JPG
+Photo Date: 3/25/2025 7:35P
+Location: GPS: 30.267200, -97.743100, Altitude: 165.0m
+Camera: Apple iPhone 14 Pro, Lens: iPhone 14 Pro back triple camera 6.86mm f/1.78
+Settings: Iso: 100, Aperture: f/1.8, Shutter Speed: 1/120s, Focal Length: 7mm
+Provider: ollama
+Model: moondream
+Prompt Style: detailed
+Description: A person on a bridge at sunset...
+Timestamp: 2025-10-26 17:22:03
+Meta: date=3/25/2025 7:35P; location=Austin, TX; coords=30.267200,-97.743100
+--------------------------------------------------------------------------------
+```
+
+---
+
 ## Further Resources
 
 - **GitHub:** https://github.com/kellylford/Image-Description-Toolkit

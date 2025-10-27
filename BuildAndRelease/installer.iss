@@ -1,8 +1,10 @@
 ; Image Description Toolkit - Inno Setup Script
-; Version 3.0.1
+; Version dynamically read from VERSION file
 
 #define MyAppName "Image Description Toolkit"
-#define MyAppVersion "3.0.1"
+#define VersionFile FileOpen(SourcePath + "\..\VERSION")
+#define MyAppVersion Trim(FileRead(VersionFile))
+#expr FileClose(VersionFile)
 #define MyAppPublisher "Kelly Ford"
 #define MyAppURL "https://github.com/kellylford/Image-Description-Toolkit"
 #define MyAppExeName "idt.exe"
