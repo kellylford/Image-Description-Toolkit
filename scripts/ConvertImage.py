@@ -42,6 +42,9 @@ pillow_heif.register_heif_opener()
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# Progress file path (set when log_dir provided)
+progress_file_path = None
+
 # File size limits for AI providers (in bytes)
 CLAUDE_MAX_SIZE = 5 * 1024 * 1024  # 5MB (Claude's limit)
 OPENAI_MAX_SIZE = 20 * 1024 * 1024  # 20MB (OpenAI's limit)
@@ -50,7 +53,7 @@ TARGET_MAX_SIZE = 3.75 * 1024 * 1024  # 3.75MB (safe margin accounting for base6
 
 def setup_logging(log_dir: str = None, verbose: bool = False, quiet: bool = False) -> None:
     """Set up logging configuration."""
-    global logger
+    global logger, progress_file_path
     
     # Clear existing handlers
     logger.handlers.clear()
@@ -83,6 +86,16 @@ def setup_logging(log_dir: str = None, verbose: bool = False, quiet: bool = Fals
         logger.addHandler(file_handler)
         
         logger.info(f"Convert Image log file: {log_filename.absolute()}")
+
+        # Initialize progress file used by workflow monitor
+        try:
+            progress_file_path = log_dir / "convert_images_progress.txt"
+            # Truncate any existing progress file at start
+            with open(progress_file_path, 'w', encoding='utf-8') as pf:
+                pf.write("")
+            logger.debug(f"Progress file initialized: {progress_file_path}")
+        except Exception as e:
+            logger.warning(f"Could not initialize progress file in {log_dir}: {e}")
 
 
 def convert_heic_to_jpg(input_path, output_path=None, quality=95, keep_metadata=True, max_file_size=TARGET_MAX_SIZE):
@@ -266,6 +279,15 @@ def convert_directory(directory_path, output_directory=None, recursive=False, qu
         
         if convert_heic_to_jpg(heic_file, output_file, quality, keep_metadata):
             successful += 1
+            # Append a line to the progress file for each successful conversion
+            try:
+                if progress_file_path is not None:
+                    with open(progress_file_path, 'a', encoding='utf-8') as pf:
+                        pf.write(f"{output_file}\n")
+                else:
+                    logger.debug("Progress file not set; skipping progress append")
+            except Exception as e:
+                logger.debug(f"Failed to update progress file: {e}")
         else:
             failed += 1
     
