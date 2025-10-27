@@ -10,6 +10,17 @@ echo.
 REM Change to project root directory
 cd /d "%~dp0.."
 
+REM Read version from VERSION file
+set VERSION=unknown
+if exist "VERSION" (
+    set /p VERSION=<VERSION
+    REM Trim any whitespace/newlines
+    for /f "tokens=* delims= " %%a in ("%VERSION%") do set VERSION=%%a
+)
+
+echo Using version: %VERSION%
+echo.
+
 REM Check if Inno Setup is installed
 set "INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if not exist "%INNO_PATH%" (
@@ -23,27 +34,27 @@ if not exist "%INNO_PATH%" (
 )
 
 REM Check if required files exist
-if not exist "releases\ImageDescriptionToolkit_v3.0.1.zip" (
-    echo ERROR: ImageDescriptionToolkit_v3.0.1.zip not found in releases\
+if not exist "releases\ImageDescriptionToolkit_v%VERSION%.zip" (
+    echo ERROR: ImageDescriptionToolkit_v%VERSION%.zip not found in releases\
     echo Please run packageitall.bat first to create release packages.
     pause
     exit /b 1
 )
 
-if not exist "releases\viewer_v3.0.1.zip" (
-    echo ERROR: viewer_v3.0.1.zip not found in releases\
+if not exist "releases\viewer_v%VERSION%.zip" (
+    echo ERROR: viewer_v%VERSION%.zip not found in releases\
     pause
     exit /b 1
 )
 
-if not exist "releases\imagedescriber_v3.0.1.zip" (
-    echo ERROR: imagedescriber_v3.0.1.zip not found in releases\
+if not exist "releases\imagedescriber_v%VERSION%.zip" (
+    echo ERROR: imagedescriber_v%VERSION%.zip not found in releases\
     pause
     exit /b 1
 )
 
-if not exist "releases\prompt_editor_v3.0.1.zip" (
-    echo ERROR: prompt_editor_v3.0.1.zip not found in releases\
+if not exist "releases\prompt_editor_v%VERSION%.zip" (
+    echo ERROR: prompt_editor_v%VERSION%.zip not found in releases\
     pause
     exit /b 1
 )
@@ -59,7 +70,7 @@ if %ERRORLEVEL% EQU 0 (
     echo SUCCESS: Installer created successfully!
     echo ================================================
     echo.
-    echo Output: releases\ImageDescriptionToolkit_Setup_v3.0.1.exe
+    echo Output: releases\ImageDescriptionToolkit_Setup_v%VERSION%.exe
     echo.
 ) else (
     echo.

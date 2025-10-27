@@ -14,6 +14,7 @@ from typing import List
 import time
 import logging
 from datetime import datetime
+import sys
 
 class VideoFrameExtractor:
     def __init__(self, config_file: str = "video_frame_extractor_config.json", log_dir: str = None):
@@ -38,6 +39,22 @@ class VideoFrameExtractor:
             "end_time": None,
             "errors": []
         }
+
+    # --- Console title helpers (Windows-friendly) ---
+    @staticmethod
+    def set_console_title(title: str) -> None:
+        """Set the console window title on Windows; no-op elsewhere."""
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                ctypes.windll.kernel32.SetConsoleTitleW(title)
+            except Exception:
+                pass
+
+    def _build_window_title(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
+        """Build a descriptive window title similar to image_describer."""
+        base = f"IDT - Extracting Video Frames ({progress_percent}%, {current} of {total})"
+        return base + suffix
         
     def setup_logging(self, quiet: bool = False):
         """Set up logging to both console and file"""
@@ -573,14 +590,28 @@ class VideoFrameExtractor:
         # Process videos
         total_extracted = 0
         self.statistics['videos_processed'] = 0
-        
+        total_videos = len(video_files)
+
+        # Initial title
+        try:
+            self.set_console_title(self._build_window_title(0, 0, total_videos))
+        except Exception:
+            pass
+
         for i, video_path in enumerate(video_files, 1):
-            self.logger.info(f"[{i}/{len(video_files)}] Processing video: {os.path.basename(video_path)}")
+            self.logger.info(f"[{i}/{total_videos}] Processing video: {os.path.basename(video_path)}")
             extracted = self.process_video(video_path)
             total_extracted += len(extracted)
             self.statistics['videos_processed'] += 1
             
             self.logger.info(f"  Extracted {len(extracted)} frames from {os.path.basename(video_path)}")
+
+            # Update window title with progress after each video
+            try:
+                progress_percent = int((self.statistics['videos_processed'] / max(total_videos, 1)) * 100)
+                self.set_console_title(self._build_window_title(progress_percent, self.statistics['videos_processed'], total_videos))
+            except Exception:
+                pass
         
         # Summary
         elapsed_time = time.time() - start_time
@@ -624,6 +655,12 @@ class VideoFrameExtractor:
         
         # Log final comprehensive summary
         self.log_final_summary()
+
+        # Final title
+        try:
+            self.set_console_title(f"IDT - Video Extraction Complete ({self.statistics['videos_processed']}/{total_videos} videos)")
+        except Exception:
+            pass
 
 def main():
     parser = argparse.ArgumentParser(description="Extract frames from video files")
