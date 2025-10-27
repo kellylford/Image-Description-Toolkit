@@ -338,14 +338,14 @@ idt workflow C:\Videos --steps video,describe --name "video_analysis"
 
 When running `idt workflow`, the orchestrator exposes step progress in the command window and writes a concise status log:
 
-- Convert step (HEIC → JPG):
-    - Console: "⟳ Image conversion in progress: X/Y HEIC → JPG (Z%)"
-    - Console (done): "✓ Image conversion complete (Y HEIC → JPG)"
+- Convert step (HEIC to JPG):
+    - Console: "[ACTIVE] Image conversion in progress: X/Y HEIC to JPG (Z%)"
+    - Console (done): "[DONE] Image conversion complete (Y HEIC to JPG)"
     - Progress file: `<workflow_dir>/logs/convert_images_progress.txt`
 
 - Describe step (image descriptions):
-    - Console: "⟳ Image description in progress: X/Y (Z%)"
-    - Console (done): "✓ Image description complete (Y descriptions)"
+    - Console: "[ACTIVE] Image description in progress: X/Y (Z%)"
+    - Console (done): "[DONE] Image description complete (Y descriptions)"
     - Progress file: `<workflow_dir>/logs/image_describer_progress.txt`
 
 - Aggregated summary:

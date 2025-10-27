@@ -921,23 +921,28 @@ The viewer automatically detects two modes:
 
 ---
 
-### 11.1 Command Window Progress and Status Log (Convert + Describe)
+### 11.1 Command Window Progress and Status Log (Video + Convert + Describe)
 
 When running workflows from the command line, IDT provides concise, screen-reader-friendly progress and a human-readable status log:
 
-- Convert step (HEIC → JPG):
-   - In-progress: "⟳ Image conversion in progress: X/Y HEIC → JPG (Z%)"
-   - Complete:    "✓ Image conversion complete (Y HEIC → JPG)"
+- Video extraction (video → frames):
+   - In-progress: "[ACTIVE] Video extraction in progress: X/Y videos (Z%)"
+   - Complete:    "[DONE] Video extraction complete (Y videos)"
+   - Progress file: `<workflow_dir>/logs/video_extraction_progress.txt`
+
+- Convert step (HEIC to JPG):
+   - In-progress: "[ACTIVE] Image conversion in progress: X/Y HEIC to JPG (Z%)"
+   - Complete:    "[DONE] Image conversion complete (Y HEIC to JPG)"
    - Progress file: `<workflow_dir>/logs/convert_images_progress.txt`
 
 - Describe step (image descriptions):
-   - In-progress: "⟳ Image description in progress: X/Y (Z%)"
-   - Complete:    "✓ Image description complete (Y descriptions)"
+   - In-progress: "[ACTIVE] Image description in progress: X/Y (Z%)"
+   - Complete:    "[DONE] Image description complete (Y descriptions)"
    - Progress file: `<workflow_dir>/logs/image_describer_progress.txt`
 
 - Aggregated status:
    - Human-readable summary at `<workflow_dir>/logs/status.log`
-   - Updated every ~2 seconds while steps are running
+   - Updated every ~10 seconds while steps are running
 
 Notes:
 - Progress files are created when running via the workflow (which passes a `--log-dir` to child processes). Running converters directly without `--log-dir` won’t create progress files.
@@ -949,24 +954,24 @@ While a workflow is running, you can monitor the status log in a separate termin
 **From Windows Command Prompt (CMD):**
 
 ```cmd
-REM Watch status log with 2-second refresh
+REM Watch status log with 10-second refresh
 :loop
 cls
 type Descriptions\workflow_*\logs\status.log
-timeout /t 2 /nobreak > nul
+timeout /t 10 /nobreak > nul
 goto loop
 ```
 
 Or as a one-liner you can paste directly:
 
 ```cmd
-for /L %i in (1,0,2) do @(cls & type Descriptions\workflow_*\logs\status.log & timeout /t 2 /nobreak > nul)
+for /L %i in (1,0,2) do @(cls & type Descriptions\workflow_*\logs\status.log & timeout /t 10 /nobreak > nul)
 ```
 
 **Tips:**
 - Replace `workflow_*` with your specific workflow directory name if the wildcard doesn't work
 - Press Ctrl+C to stop monitoring
-- The status log updates every ~2 seconds during active processing
+- The status log updates every ~10 seconds during active processing
 
 ---
 

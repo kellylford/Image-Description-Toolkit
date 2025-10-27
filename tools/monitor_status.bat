@@ -39,5 +39,5 @@ echo ======================================
 echo Last updated: %date% %time%
 echo Press Ctrl+C to stop
 echo ======================================
-timeout /t 2 /nobreak > nul
+timeout /t 10 /nobreak > nul
 goto loop
