@@ -59,7 +59,7 @@ All scripts automatically change to the project root directory before executing,
    - Places all packages in `releases/` directory
 
 3. **Master Package** (`releaseitall.bat`)
-   - Creates `idt2.zip` containing all individual packages
+   - Creates `idt_v[VERSION].zip` containing all individual packages
    - Includes `install_idt.bat` for easy installation
    - Ready for GitHub release upload
 

@@ -4,7 +4,52 @@ This directory contains utility scripts for managing and analyzing the Image Des
 
 ## Available Tools
 
-### 1. analyze_workflow_naming.py
+### 1. show_metadata.py (NEW)
+
+**Purpose**: Extract and display EXIF metadata from images without running AI descriptions.
+
+**What it does**:
+- Shows what metadata will be extracted during workflows
+- Displays both the detailed EXIF block and the compact Meta suffix
+- Tests metadata extraction on your images before running full workflows
+- Identifies images with/without EXIF data
+
+**Usage**:
+```bash
+# Show metadata for all images in a directory
+python tools/show_metadata.py images/
+
+# Process subdirectories recursively
+python tools/show_metadata.py images/ --recursive
+
+# Hide the Meta suffix line (show only detailed metadata)
+python tools/show_metadata.py images/ --no-meta-suffix
+```
+
+**Output Example**:
+```
+[1/3] IMG_1234.JPG
+  File size: 2458.3 KB
+  File modified: 3/25/2025 7:35P
+
+  EXIF Metadata:
+  Photo Date: 3/25/2025 7:35P
+  Location: GPS: 30.267200, -97.743100, Altitude: 165.0m, Location: Austin, TX
+  Camera: Apple iPhone 14 Pro, Lens: iPhone 14 Pro back triple camera
+  Settings: Iso: 100, Aperture: f/1.8, Shutter Speed: 1/120s, Focal Length: 7mm
+
+  Meta: date=3/25/2025 7:35P; location=Austin, TX; coords=30.267200,-97.743100
+```
+
+**Use Cases**:
+- Test which images have EXIF metadata before running workflows
+- Verify date/time formatting matches project standards
+- Check GPS coordinates and location data availability
+- Preview what the Meta suffix will contain
+
+---
+
+### 2. analyze_workflow_naming.py
 
 **Purpose**: Analyze existing workflow directories and propose enhanced naming schemes with path identifiers.
 
@@ -32,7 +77,7 @@ python tools/analyze_workflow_naming.py C:\path\to\workflows
 
 ---
 
-### 2. rename_workflows_with_paths.py
+### 3. rename_workflows_with_paths.py
 
 **Purpose**: Rename existing workflow directories to include 2-component path identifiers.
 

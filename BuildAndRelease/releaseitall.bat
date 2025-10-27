@@ -17,7 +17,7 @@ REM   - releases/viewer_v[VERSION]_[ARCH].zip
 REM   - releases/prompt_editor_v[VERSION]_[ARCH].zip
 REM   - releases/imagedescriber_v[VERSION]_[ARCH].zip
 REM   - releases/idtconfigure_v[VERSION].zip
-REM   - releases/idt2.zip (master package containing all individual packages)
+REM   - releases/idt_v[VERSION].zip (master package containing all individual packages)
 REM ============================================================================
 
 echo.
@@ -33,13 +33,24 @@ echo   4. ImageDescriber
 echo   5. IDTConfigure
 echo.
 echo All distribution packages will be created in releases/ directory.
-echo A master package (idt2.zip) will also be created containing all packages.
+echo A master package (idt_v%VERSION%.zip) will also be created containing all packages.
 echo.
 echo Starting release process...
 echo.
 
 REM Change to project root directory
 cd /d "%~dp0.."
+
+REM Read version from VERSION file
+set VERSION=unknown
+if exist "VERSION" (
+    set /p VERSION=<VERSION
+)
+REM Remove any trailing whitespace or newlines
+set VERSION=%VERSION: =%
+
+echo Using version: %VERSION%
+echo.
 
 REM ============================================================================
 echo ========================================================================
@@ -88,28 +99,28 @@ if not exist releases\*.zip (
     exit /b 1
 )
 
-echo Creating master package idt2.zip with all distribution packages...
+echo Creating master package idt_v%VERSION%.zip with all distribution packages...
 echo.
 
-REM Delete existing idt2.zip if it exists
-if exist releases\idt2.zip (
-    echo Removing existing idt2.zip...
-    del releases\idt2.zip
+REM Delete existing master package if it exists
+if exist releases\idt_v%VERSION%.zip (
+    echo Removing existing idt_v%VERSION%.zip...
+    del releases\idt_v%VERSION%.zip
 )
 
-REM Create idt2.zip containing all individual distribution packages
+REM Create master package containing all individual distribution packages
 REM Use PowerShell for reliable ZIP creation on Windows
-powershell -NoProfile -Command "Compress-Archive -Path 'releases\*.zip', 'releases\install_idt.bat', 'releases\README.md' -DestinationPath 'releases\idt2.zip' -CompressionLevel Optimal -Force"
+powershell -NoProfile -Command "Compress-Archive -Path 'releases\*.zip', 'releases\install_idt.bat', 'releases\README.md' -DestinationPath 'releases\idt_v%VERSION%.zip' -CompressionLevel Optimal -Force"
 
 if errorlevel 1 (
     echo.
-    echo ERROR: Failed to create master package idt2.zip!
+    echo ERROR: Failed to create master package idt_v%VERSION%.zip!
     echo Individual packages are still available in releases\ directory.
     exit /b 1
 )
 
 echo.
-echo Master package created successfully: releases\idt2.zip
+echo Master package created successfully: releases\idt_v%VERSION%.zip
 echo.
 
 REM ============================================================================
@@ -122,10 +133,10 @@ echo All distribution packages have been created successfully.
 echo.
 echo Individual packages in releases\ directory:
 echo.
-dir /b releases\*.zip 2>nul | findstr /V "idt2.zip"
+dir /b releases\*.zip 2>nul | findstr /V "idt_v"
 echo.
 echo Master package (contains all individual packages above):
-echo   idt2.zip
+echo   idt_v%VERSION%.zip
 echo.
 echo ========================================================================
 echo NEXT STEPS
@@ -136,8 +147,8 @@ echo    - Extract each ZIP and test the executables
 echo    - Verify README files are correct
 echo.
 echo 2. Create GitHub Release:
-echo    - Tag version: v[VERSION]
-echo    - Upload idt2.zip (master package) OR individual ZIPs from releases\
+echo    - Tag version: v%VERSION%
+echo    - Upload idt_v%VERSION%.zip (master package) OR individual ZIPs from releases\
 echo    - Add release notes
 echo.
 echo 3. Update documentation:
