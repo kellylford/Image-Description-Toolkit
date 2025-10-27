@@ -105,6 +105,29 @@ def get_input(prompt, default=None, allow_empty=False):
             print("This field is required. Please enter a value.")
 
 
+def get_yes_no(prompt, default=True):
+    """
+    Get yes/no answer from user (accessible for screen readers)
+    
+    Args:
+        prompt: Question to ask
+        default: Default boolean value if user just presses Enter
+    
+    Returns:
+        Boolean True for yes, False for no
+    """
+    default_str = "Y/n" if default else "y/N"
+    while True:
+        response = input(f"{prompt} [{default_str}]: ").strip().lower()
+        if not response:
+            return default
+        if response in ['y', 'yes']:
+            return True
+        if response in ['n', 'no']:
+            return False
+        print("Please enter 'y' for yes or 'n' for no")
+
+
 def create_view_results_bat(output_dir: Path):
     """
     Create a view_results.bat file in the root directory for easy viewer access.
@@ -290,7 +313,7 @@ def guided_workflow():
         while i < len(sys.argv):
             arg = sys.argv[i]
             # Known workflow flags to pass through
-            if arg in ['--timeout', '--preserve-descriptions']:
+            if arg in ['--timeout', '--preserve-descriptions', '--metadata', '--no-metadata', '--geocode', '--geocode-cache']:
                 extra_workflow_args.append(arg)
                 # Check if next arg is the value for this flag
                 if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith('--'):
@@ -452,6 +475,45 @@ def guided_workflow():
     else:
         # Remove " (default)" suffix if present
         prompt_style = style_choice.replace(" (default)", "").strip()
+    
+    # Step for metadata configuration
+    metadata_step = "Step 6" if provider == 'ollama' else "Step 7"
+    print_header(f"{metadata_step}: Metadata Options")
+    
+    print("The workflow can extract metadata from your images (GPS coordinates, dates, camera info).")
+    print("This metadata can be:")
+    print("  • Added as a location/date prefix to descriptions (e.g., 'Austin, TX Mar 25, 2025: ...')")
+    print("  • Included in the description text file")
+    print("  • Used for workflow tracking and organization")
+    print()
+    
+    enable_metadata = get_yes_no("Enable metadata extraction?", default=True)
+    
+    enable_geocoding = False
+    geocode_cache_file = None
+    
+    if enable_metadata:
+        print()
+        print("Geocoding converts GPS coordinates into human-readable locations (city, state, country).")
+        print("This requires internet access and adds a small delay per unique location.")
+        print("Results are cached to minimize API calls on subsequent runs.")
+        print()
+        
+        enable_geocoding = get_yes_no("Enable geocoding to convert GPS to city/state/country?", default=False)
+        
+        if enable_geocoding:
+            print()
+            print("Geocoding results are cached to avoid redundant API calls.")
+            geocode_cache_file = get_input("Geocoding cache file location", default="geocode_cache.json")
+    
+    # Add metadata flags to extra_workflow_args
+    if not enable_metadata:
+        extra_workflow_args.append("--no-metadata")
+    
+    if enable_geocoding:
+        extra_workflow_args.append("--geocode")
+        if geocode_cache_file and geocode_cache_file != "geocode_cache.json":
+            extra_workflow_args.extend(["--geocode-cache", geocode_cache_file])
     
     # Build the command
     print_header("Command Summary")
