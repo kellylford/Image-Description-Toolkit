@@ -330,6 +330,11 @@ class NominatimGeocoder:
                     self.cache = json.load(f)
             except Exception:
                 self.cache = {}
+        
+        # Log attribution notice when geocoder is initialized
+        if self._requests_available:
+            print("Geocoding service: OpenStreetMap Nominatim")
+            print("Location data © OpenStreetMap contributors (https://www.openstreetmap.org/copyright)")
     
     def _save_cache(self):
         """Save cache to file if cache_path is set"""

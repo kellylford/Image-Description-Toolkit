@@ -319,14 +319,26 @@ class HTMLGenerator:
             html_parts.append(self._generate_toc())
         
         # Individual entries
+        has_geocoded_data = False
         for i, entry in enumerate(self.entries):
             html_parts.append(f'<div class="entry" id="entry-{i}">')
             html_parts.append(entry.to_html(include_details=self.include_details))
             html_parts.append('</div>')
             
+            # Check if this entry has geocoded location data
+            if entry.location and any(term in entry.location.lower() for term in ['gps:', 'city', 'state', 'country']):
+                has_geocoded_data = True
+            
             # Add separator between entries
             if i < len(self.entries) - 1:
                 html_parts.append('<hr class="entry-separator">')
+        
+        # Add attribution footer if geocoded data was used
+        if has_geocoded_data:
+            html_parts.append('<hr style="margin-top: 40px;">')
+            html_parts.append('<footer style="text-align: center; padding: 20px; color: #6c757d; font-size: 0.9em;">')
+            html_parts.append('<p>Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a></p>')
+            html_parts.append('</footer>')
         
         html_parts.append('</div>')
         html_parts.append('</body>')

@@ -861,6 +861,13 @@ class ImageDescriber:
             except Exception:
                 pass
             
+            # Add OpenStreetMap attribution if geocoding was used
+            if metadata and 'location' in metadata:
+                loc = metadata['location']
+                # Check if geocoded data (city/state/country) is present
+                if loc.get('city') or loc.get('state') or loc.get('country'):
+                    entry += "\nLocation data © OpenStreetMap contributors (https://www.openstreetmap.org/copyright)\n"
+            
             entry += separator_char * 80 + "\n\n"
             
             # Append to the file
