@@ -77,6 +77,18 @@ class VideoFrameExtractor:
         logs_dir.mkdir(parents=True, exist_ok=True)
         log_filename = logs_dir / f"frame_extractor_{timestamp}.log"
         
+        # Set up progress file for workflow monitoring (similar to convert/describe)
+        if self.log_dir:
+            self.progress_file = logs_dir / "video_extraction_progress.txt"
+            # Initialize empty progress file
+            try:
+                self.progress_file.write_text("", encoding='utf-8')
+                self.logger_ready = False  # Logger not ready yet, can't log
+            except Exception:
+                self.progress_file = None
+        else:
+            self.progress_file = None
+        
         # Create logger
         self.logger = logging.getLogger(f"frame_extractor_{timestamp}")
         self.logger.setLevel(logging.INFO)
@@ -108,6 +120,10 @@ class VideoFrameExtractor:
         self.logger.info(f"Log file: {log_filename.absolute()}")
         self.logger.info(f"Working directory: {os.getcwd()}")
         self.logger.info(f"Configuration loaded from: {os.path.abspath(self.config_file) if hasattr(self, 'config_file') else 'default'}")
+        
+        # Now we can log about progress file
+        if self.progress_file:
+            self.logger.info(f"Progress file: {self.progress_file.absolute()}")
         
     def load_config(self, config_file: str) -> dict:
         """Load configuration from JSON file"""
@@ -479,6 +495,14 @@ class VideoFrameExtractor:
             self.logger.info(f"Last frame: {os.path.basename(extracted_files[-1])}")
             self.statistics["total_frames_extracted"] += len(extracted_files)
             self.statistics["total_videos_processed"] += 1
+            
+            # Append to progress file for workflow monitoring (similar to convert/describe pattern)
+            if hasattr(self, 'progress_file') and self.progress_file:
+                try:
+                    with open(self.progress_file, 'a', encoding='utf-8') as pf:
+                        pf.write(f"{video_name}\n")
+                except Exception as e:
+                    self.logger.warning(f"Could not write to progress file: {e}")
         else:
             self.logger.warning(f"No frames extracted from {video_name}")
         

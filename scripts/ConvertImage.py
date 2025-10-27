@@ -45,6 +45,16 @@ logger = logging.getLogger(__name__)
 # Progress file path (set when log_dir provided)
 progress_file_path = None
 
+# --- Console title helpers (Windows-friendly) ---
+def set_console_title(title: str) -> None:
+    """Set the console window title on Windows; no-op elsewhere."""
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW(title)
+        except Exception:
+            pass
+
 # File size limits for AI providers (in bytes)
 CLAUDE_MAX_SIZE = 5 * 1024 * 1024  # 5MB (Claude's limit)
 OPENAI_MAX_SIZE = 20 * 1024 * 1024  # 20MB (OpenAI's limit)
@@ -267,6 +277,9 @@ def convert_directory(directory_path, output_directory=None, recursive=False, qu
     successful = 0
     failed = 0
     
+    # Set initial console title
+    set_console_title(f"IDT - Converting Images (0%, 0 of {len(heic_files)} files)")
+    
     for i, heic_file in enumerate(heic_files, 1):
         logger.info(f"Converting file {i}/{len(heic_files)}: {heic_file.name}")
         
@@ -290,6 +303,13 @@ def convert_directory(directory_path, output_directory=None, recursive=False, qu
                 logger.debug(f"Failed to update progress file: {e}")
         else:
             failed += 1
+        
+        # Update console title with progress
+        progress_percent = int((i / len(heic_files)) * 100)
+        set_console_title(f"IDT - Converting Images ({progress_percent}%, {i} of {len(heic_files)} files)")
+    
+    # Set final console title
+    set_console_title(f"IDT - Image Conversion Complete ({successful} of {len(heic_files)} files converted)")
     
     # Final statistics
     elapsed_time = time.time() - start_time

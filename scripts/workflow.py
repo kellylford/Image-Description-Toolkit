@@ -481,12 +481,24 @@ class WorkflowOrchestrator:
         
         # Add step-specific status
         if 'video' in self.statistics['steps_completed']:
-            status_lines.append(f"✓ Video extraction complete ({self.statistics['total_videos_processed']} videos)")
+            status_lines.append(f"[DONE] Video extraction complete ({self.statistics['total_videos_processed']} videos)")
+        elif self.step_results.get('video', {}).get('in_progress', False):
+            vid_result = self.step_results.get('video', {})
+            if 'processed' in vid_result and 'total' in vid_result:
+                processed = vid_result['processed']
+                total = vid_result['total']
+                if total > 0:
+                    percentage = int((processed / total) * 100)
+                    status_lines.append(f"[ACTIVE] Video extraction in progress: {processed}/{total} videos ({percentage}%)")
+                else:
+                    status_lines.append(f"[ACTIVE] Video extraction in progress: {processed}/{total} videos")
+            else:
+                status_lines.append("[ACTIVE] Video extraction in progress...")
         elif 'video' in self.statistics['steps_failed']:
-            status_lines.append(f"✗ Video extraction failed")
+            status_lines.append(f"[FAILED] Video extraction failed")
             
         if 'convert' in self.statistics['steps_completed']:
-            status_lines.append(f"✓ Image conversion complete ({self.statistics['total_conversions']} HEIC → JPG)")
+            status_lines.append(f"[DONE] Image conversion complete ({self.statistics['total_conversions']} HEIC to JPG)")
         elif self.step_results.get('convert', {}).get('in_progress', False):
             conv_result = self.step_results.get('convert', {})
             if 'processed' in conv_result and 'total' in conv_result:
@@ -494,16 +506,16 @@ class WorkflowOrchestrator:
                 total = conv_result['total']
                 if total > 0:
                     percentage = int((processed / total) * 100)
-                    status_lines.append(f"⟳ Image conversion in progress: {processed}/{total} HEIC → JPG ({percentage}%)")
+                    status_lines.append(f"[ACTIVE] Image conversion in progress: {processed}/{total} HEIC to JPG ({percentage}%)")
                 else:
-                    status_lines.append(f"⟳ Image conversion in progress: {processed}/{total} HEIC → JPG")
+                    status_lines.append(f"[ACTIVE] Image conversion in progress: {processed}/{total} HEIC to JPG")
             else:
-                status_lines.append("⟳ Image conversion in progress...")
+                status_lines.append("[ACTIVE] Image conversion in progress...")
         elif 'convert' in self.statistics['steps_failed']:
-            status_lines.append(f"✗ Image conversion failed")
+            status_lines.append(f"[FAILED] Image conversion failed")
             
         if 'describe' in self.statistics['steps_completed']:
-            status_lines.append(f"✓ Image description complete ({self.statistics['total_descriptions']} descriptions)")
+            status_lines.append(f"[DONE] Image description complete ({self.statistics['total_descriptions']} descriptions)")
         elif self.step_results.get('describe', {}).get('in_progress', False):
             # Check if we have progress data
             desc_result = self.step_results.get('describe', {})
@@ -512,7 +524,7 @@ class WorkflowOrchestrator:
                 total = desc_result['total']
                 if total > 0:
                     percentage = int((processed / total) * 100)
-                    status_lines.append(f"⟳ Image description in progress: {processed}/{total} images described ({percentage}%)")
+                    status_lines.append(f"[ACTIVE] Image description in progress: {processed}/{total} images described ({percentage}%)")
                     
                     # Add estimated time remaining if we have enough data
                     if processed > 0 and self.statistics.get('start_time'):
@@ -534,16 +546,16 @@ class WorkflowOrchestrator:
                         except Exception:
                             pass  # Don't break status updates on ETA calculation errors
                 else:
-                    status_lines.append(f"⟳ Image description in progress: {processed}/{total} images described")
+                    status_lines.append(f"[ACTIVE] Image description in progress: {processed}/{total} images described")
             else:
-                status_lines.append(f"⟳ Image description in progress...")
+                status_lines.append(f"[ACTIVE] Image description in progress...")
         elif 'describe' in self.statistics['steps_failed']:
-            status_lines.append(f"✗ Image description failed")
+            status_lines.append(f"[FAILED] Image description failed")
             
         if 'html' in self.statistics['steps_completed']:
-            status_lines.append(f"✓ HTML generation complete")
+            status_lines.append(f"[DONE] HTML generation complete")
         elif 'html' in self.statistics['steps_failed']:
-            status_lines.append(f"✗ HTML generation failed")
+            status_lines.append(f"[FAILED] HTML generation failed")
         
         # Add error count if any
         if self.statistics['errors_encountered'] > 0:
@@ -610,9 +622,83 @@ class WorkflowOrchestrator:
                     "--quiet"  # Suppress subprocess console output to avoid duplicates
                 ]
             
+            # Prepare progress monitoring
+            total_videos = len(video_files)
+            self.step_results['video'] = {
+                'in_progress': True,
+                'total': total_videos,
+                'processed': 0
+            }
+            self._update_status_log()
+
+            # Determine progress file location (based on --log-dir)
+            progress_file = None
+            for arg_i, arg in enumerate(cmd):
+                if arg == "--log-dir" and arg_i + 1 < len(cmd):
+                    progress_file = Path(cmd[arg_i + 1]) / "logs" / "video_extraction_progress.txt"
+                    self.logger.info(f"Video extraction progress file: {progress_file}")
+                    break
+            if progress_file is None:
+                progress_file = self.config.base_output_dir / "logs" / "video_extraction_progress.txt"
+                self.logger.info(f"Video extraction progress file (fallback): {progress_file}")
+
+            # Start background monitor similar to convert/describe steps
+            import threading
+            import time
+
+            def monitor_video_progress():
+                last_count = 0
+                checks_without_file = 0
+                iteration = 0
+                self.logger.info("Video extraction progress monitoring thread started")
+                while self.step_results.get('video', {}).get('in_progress', False):
+                    iteration += 1
+                    try:
+                        if progress_file.exists():
+                            if checks_without_file > 0:
+                                self.logger.info(f"Video extraction progress file appeared after {checks_without_file} checks: {progress_file}")
+                                checks_without_file = 0
+                            with open(progress_file, 'r', encoding='utf-8') as f:
+                                lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+                                current_count = len(lines)
+                            if iteration % 5 == 0:
+                                self.logger.debug(f"Video extraction monitor check #{iteration}: {current_count}/{total_videos} processed")
+                            if current_count != last_count:
+                                self.step_results['video']['processed'] = current_count
+                                self._update_status_log()
+                                if current_count - last_count >= 5 or (last_count == 0 and current_count > 0):
+                                    self.logger.info(f"Progress update: {current_count}/{total_videos} videos processed, status.log updated")
+                                last_count = current_count
+                        else:
+                            checks_without_file += 1
+                            if checks_without_file == 1:
+                                self.logger.info(f"Waiting for video extraction progress file to be created: {progress_file}")
+                            elif checks_without_file % 10 == 0:
+                                self.logger.warning(f"Video extraction progress file still not found after {checks_without_file} checks ({checks_without_file * 10}s)")
+                        time.sleep(10)
+                    except Exception as e:
+                        self.logger.warning(f"Video extraction progress monitoring error: {e}")
+                        time.sleep(10)
+                self.logger.info(f"Video extraction progress monitoring thread ending after {iteration} iterations")
+
+            monitor_thread = threading.Thread(target=monitor_video_progress, daemon=True)
+            monitor_thread.start()
+            
             self.logger.info(f"Running: {' '.join(cmd)}")
             # Stream output directly to terminal for real-time progress feedback
             result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            
+            # Stop monitoring
+            if 'video' in self.step_results:
+                self.step_results['video']['in_progress'] = False
+            
+            # Final progress update
+            if progress_file and progress_file.exists():
+                with open(progress_file, 'r', encoding='utf-8') as f:
+                    lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+                    final_count = len(lines)
+                if 'video' in self.step_results:
+                    self.step_results['video']['processed'] = final_count
             
             if result.returncode == 0:
                 self.logger.info("Video frame extraction completed successfully")
@@ -732,18 +818,18 @@ class WorkflowOrchestrator:
                                 self.step_results['convert']['processed'] = current_count
                                 self._update_status_log()
                                 if current_count - last_count >= 10 or (last_count == 0 and current_count > 0):
-                                    self.logger.info(f"Progress update: {current_count}/{total_to_convert} HEIC → JPG converted, status.log updated")
+                                    self.logger.info(f"Progress update: {current_count}/{total_to_convert} HEIC to JPG converted, status.log updated")
                                 last_count = current_count
                         else:
                             checks_without_file += 1
                             if checks_without_file == 1:
                                 self.logger.info(f"Waiting for conversion progress file to be created: {progress_file}")
                             elif checks_without_file % 10 == 0:
-                                self.logger.warning(f"Conversion progress file still not found after {checks_without_file} checks ({checks_without_file * 2}s)")
-                        time.sleep(2)
+                                self.logger.warning(f"Conversion progress file still not found after {checks_without_file} checks ({checks_without_file * 10}s)")
+                        time.sleep(10)
                     except Exception as e:
                         self.logger.warning(f"Conversion progress monitoring error: {e}")
-                        time.sleep(5)
+                        time.sleep(10)
                 self.logger.info(f"Conversion progress monitoring thread ending after {iteration} iterations")
 
             monitor_thread = threading.Thread(target=monitor_conversion_progress, daemon=True)
@@ -932,7 +1018,7 @@ class WorkflowOrchestrator:
         
         self.logger.info(f"Total unique images to describe: {unique_source_count}")
         if conversion_count > 0:
-            self.logger.info(f"Format conversions included: {conversion_count} (HEIC → JPG)")
+            self.logger.info(f"Format conversions included: {conversion_count} (HEIC to JPG)")
         
         try:
             # Get description settings
@@ -1171,10 +1257,10 @@ class WorkflowOrchestrator:
                             checks_without_file += 1
                             if checks_without_file == 1:
                                 self.logger.info(f"Waiting for progress file to be created: {progress_file}")
-                            elif checks_without_file % 10 == 0:  # Log every 20 seconds
-                                self.logger.warning(f"Progress file still not found after {checks_without_file} checks ({checks_without_file * 2}s)")
+                            elif checks_without_file % 10 == 0:  # Log every 100 seconds
+                                self.logger.warning(f"Progress file still not found after {checks_without_file} checks ({checks_without_file * 10}s)")
                         
-                        time.sleep(2)  # Check every 2 seconds
+                        time.sleep(10)  # Check every 10 seconds
                     except Exception as e:
                         self.logger.warning(f"Progress monitoring error: {e}")
                         import traceback
@@ -1246,7 +1332,7 @@ class WorkflowOrchestrator:
                 if total_processed != unique_source_count:
                     self.logger.warning(f"Description count mismatch: processed {total_processed} but expected {unique_source_count} unique images")
                 else:
-                    self.logger.info(f"✓ Validation: All {unique_source_count} unique images were described")
+                    self.logger.info(f"Validation: All {unique_source_count} unique images were described")
             else:
                 self.logger.error(f"Image description failed: {result.stderr}")
                 return {
@@ -1567,7 +1653,7 @@ class WorkflowOrchestrator:
         self.logger.info(f"Videos processed: {self.statistics['total_videos_processed']}")
         self.logger.info(f"Unique images processed: {self.statistics['total_images_processed']}")
         if self.statistics['total_conversions'] > 0:
-            self.logger.info(f"Format conversions (HEIC → JPG): {self.statistics['total_conversions']}")
+            self.logger.info(f"Format conversions (HEIC to JPG): {self.statistics['total_conversions']}")
         self.logger.info(f"Descriptions generated: {self.statistics['total_descriptions']}")
         
         # Step completion statistics
