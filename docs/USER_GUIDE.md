@@ -942,6 +942,35 @@ When running workflows from the command line, IDT provides concise, screen-reade
 Notes:
 - Progress files are created when running via the workflow (which passes a `--log-dir` to child processes). Running converters directly without `--log-dir` won’t create progress files.
 
+### Monitoring Status Log in Real-Time
+
+While a workflow is running, you can monitor the status log in a separate terminal window. This is useful for checking progress without switching to the main workflow window.
+
+**From Windows Command Prompt (CMD):**
+
+```cmd
+REM Watch status log with 2-second refresh
+:loop
+cls
+type Descriptions\workflow_*\logs\status.log
+timeout /t 2 /nobreak > nul
+goto loop
+```
+
+Or as a one-liner you can paste directly:
+
+```cmd
+for /L %i in (1,0,2) do @(cls & type Descriptions\workflow_*\logs\status.log & timeout /t 2 /nobreak > nul)
+```
+
+**Tips:**
+- Replace `workflow_*` with your specific workflow directory name if the wildcard doesn't work
+- Press Ctrl+C to stop monitoring
+- The status log updates every ~2 seconds during active processing
+
+---
+
+
 ## 12. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
