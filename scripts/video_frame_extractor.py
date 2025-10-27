@@ -130,9 +130,24 @@ class VideoFrameExtractor:
         try:
             config_path = Path(config_file)
             if not config_path.is_absolute():
-                # Look for config file in script directory first
-                script_dir = Path(__file__).parent
-                config_path = script_dir / config_file
+                # In frozen mode (PyInstaller), look for config next to executable first
+                # This allows workflow.py to update the config file and have it used
+                if getattr(sys, 'frozen', False):
+                    # Frozen mode: Check next to executable first
+                    exe_dir = Path(sys.executable).parent
+                    scripts_dir = exe_dir / 'scripts'
+                    if (scripts_dir / config_file).exists():
+                        config_path = scripts_dir / config_file
+                    elif (exe_dir / config_file).exists():
+                        config_path = exe_dir / config_file
+                    else:
+                        # Fallback to bundled config in temp directory
+                        script_dir = Path(__file__).parent
+                        config_path = script_dir / config_file
+                else:
+                    # Normal mode: Look in script directory
+                    script_dir = Path(__file__).parent
+                    config_path = script_dir / config_file
             
             if not config_path.exists():
                 self.logger.warning(f"Config file not found: {config_path}")

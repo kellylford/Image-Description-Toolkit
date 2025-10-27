@@ -487,7 +487,17 @@ def guided_workflow():
     print("  • Used for workflow tracking and organization")
     print()
     
-    enable_metadata = get_yes_no("Enable metadata extraction?", default=True)
+    metadata_choice = get_choice(
+        "Enable metadata extraction?",
+        ["Yes (recommended)", "No"],
+        default=1,
+        allow_back=True
+    )
+    
+    if metadata_choice == "back":
+        return None
+    
+    enable_metadata = (metadata_choice == "Yes (recommended)")
     
     enable_geocoding = False
     geocode_cache_file = None
@@ -499,7 +509,17 @@ def guided_workflow():
         print("Results are cached to minimize API calls on subsequent runs.")
         print()
         
-        enable_geocoding = get_yes_no("Enable geocoding to convert GPS to city/state/country?", default=False)
+        geocoding_choice = get_choice(
+            "Enable geocoding to convert GPS to city/state/country?",
+            ["Yes", "No (skip geocoding)"],
+            default=2,
+            allow_back=True
+        )
+        
+        if geocoding_choice == "back":
+            return None
+        
+        enable_geocoding = (geocoding_choice == "Yes")
         
         if enable_geocoding:
             print()

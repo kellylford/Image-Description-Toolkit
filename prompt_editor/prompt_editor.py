@@ -99,6 +99,18 @@ class PromptEditorMainWindow(QMainWindow):
         
     def find_config_file(self):
         """Find the image_describer_config.json file"""
+        # In frozen mode (PyInstaller), look next to executable first
+        if getattr(sys, 'frozen', False):
+            exe_dir = Path(sys.executable).parent
+            # Check in scripts subdirectory next to executable
+            exe_scripts = exe_dir / "scripts" / "image_describer_config.json"
+            if exe_scripts.exists():
+                return exe_scripts.resolve()
+            # Check directly next to executable
+            exe_config = exe_dir / "image_describer_config.json"
+            if exe_config.exists():
+                return exe_config.resolve()
+        
         # Look in scripts directory relative to current location
         possible_paths = [
             Path("scripts/image_describer_config.json"),

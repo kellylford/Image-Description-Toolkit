@@ -77,6 +77,9 @@ copy "scripts\workflow_config.json" "%STAGE_DIR%\scripts\" >nul
 copy "scripts\image_describer_config.json" "%STAGE_DIR%\scripts\" >nul
 copy "scripts\video_frame_extractor_config.json" "%STAGE_DIR%\scripts\" >nul
 
+REM Copy metadata_extractor module required by image_describer subprocess
+copy "scripts\metadata_extractor.py" "%STAGE_DIR%\scripts\" >nul
+
 echo     Done.
 echo.
 

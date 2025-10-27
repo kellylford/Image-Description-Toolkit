@@ -1141,6 +1141,10 @@ class WorkflowOrchestrator:
             # Add optional parameters
             if "config_file" in step_config:
                 cmd.extend(["--config", step_config["config_file"]])
+            else:
+                # Always pass the config file that we just updated with metadata settings
+                config_file_path = Path(__file__).parent / "image_describer_config.json"
+                cmd.extend(["--config", str(config_file_path)])
             
             # Use override model if provided (for resume), otherwise use config
             if self.override_model:
