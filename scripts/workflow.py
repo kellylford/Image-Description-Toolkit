@@ -2282,9 +2282,9 @@ Viewing Results:
         
         # Determine workflow name identifier
         if args.name:
-            # User provided a custom name - preserve case for metadata, lowercase for directory
+            # User provided a custom name - preserve case for display and directory
             workflow_name_display = sanitize_name(args.name, preserve_case=True)
-            workflow_name = sanitize_name(args.name, preserve_case=False)
+            workflow_name = workflow_name_display  # Use same case-preserved name
         else:
             # Auto-generate from input directory path (2 components)
             workflow_name_display = get_path_identifier_2_components(str(input_dir))

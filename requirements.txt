@@ -54,6 +54,7 @@ pillow-heif>=0.13.0     # HEIC/HEIF image format conversion
 tqdm>=4.60.0            # Progress bars (optional, nice-to-have)
 pytest>=6.0.0           # Unit testing framework
 pytest-mock>=3.6.0      # Test mocking utilities
+pytest-cov>=4.0.0       # Test coverage reporting
 pyinstaller>=6.0.0      # Executable bundling for distribution
 
 # ============================================================================
