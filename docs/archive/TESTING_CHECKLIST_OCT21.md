@@ -282,3 +282,50 @@ builditall.bat
 - [ ] **Correct documentation:** Help text shows proper idt commands, not Python scripts
 
 All major reliability and user experience issues from the original failure report should now be resolved! 🎉
+
+---
+
+## Show Metadata Guideme Feature - October 27, 2025
+
+### What was added:
+Interactive wizard mode for show_metadata tool (modeled after IDT guideme)
+
+**Files Modified:**
+- `tools/show_metadata/show_metadata.py` - Added guideme() function with 7-step wizard
+- `tools/show_metadata/README.md` - Added guideme documentation
+- `.gitignore` - Excludes .show_metadata_last_command file
+
+**Test Steps:**
+- [ ] Navigate to `tools/show_metadata/`
+- [ ] Run `python show_metadata.py --guideme`
+- [ ] Verify wizard displays welcome header
+- [ ] Complete all 7 steps:
+  - [ ] Step 1: Enter valid image directory path
+  - [ ] Step 2: Choose recursive scanning (Y/n)
+  - [ ] Step 3: Enable meta suffix display (Y/n)
+  - [ ] Step 4: Configure geocoding (y/N)
+    - [ ] If yes: Verify User-Agent prompt
+    - [ ] If yes: Verify delay configuration
+    - [ ] If yes: Verify cache path options
+  - [ ] Step 5: Enable CSV export (y/N)
+    - [ ] If yes: Verify default CSV path suggestion
+  - [ ] Step 6: Review command summary
+  - [ ] Step 7: Choose to run, show command, or go back
+- [ ] Verify `.show_metadata_last_command` file is created
+- [ ] Verify saved command is valid and runnable
+- [ ] Test "Go back to modify settings" option
+- [ ] Test Ctrl+C exit at various steps
+- [ ] Verify normal CLI mode still works: `python show_metadata.py --help`
+
+**Expected Results:**
+- ✅ Wizard launches with clear headers and prompts
+- ✅ All steps display with examples and defaults
+- ✅ Command is saved to file with timestamp
+- ✅ Users can preview before running
+- ✅ Screen reader friendly (numbered menus)
+- ✅ Back/exit navigation works
+- ✅ Normal CLI flags still functional
+
+**Commits:**
+- a2dba84: "Add interactive guideme wizard to show_metadata tool"
+- bc793bc: "Add guideme testing documentation and update session summary"

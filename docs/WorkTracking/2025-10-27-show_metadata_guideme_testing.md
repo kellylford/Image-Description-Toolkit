@@ -1,6 +1,6 @@
 # Show Metadata Guideme Testing
 
-## Test Run: January 27, 2025
+## Test Run: October 27, 2025
 
 ### Test Objective
 Verify that the new `--guideme` flag launches the interactive wizard and walks users through all configuration options.
