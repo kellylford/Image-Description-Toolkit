@@ -228,6 +228,8 @@ Common workflow options that work with guideme:
 1. **Model Selection** - Choose from available Ollama, OpenAI, or Claude models
 2. **Image Directory** - Select folder containing images/videos to process
 3. **Output Location** - Choose where to save results (default: Descriptions/)
+4. **Metadata Configuration** - ⭐ NEW: Enable metadata extraction and optional geocoding
+5. **Confirmation** - Review settings and launch workflow with viewer
 4. **Workflow Naming** - Optional custom name for organization
 5. **Launch Options** - Option to launch viewer for real-time monitoring
 
@@ -277,6 +279,21 @@ idt workflow <image_directory> [options]
 --timeout SECONDS                     # Ollama request timeout (default: 90, increase for slow hardware)
 ```
 
+**Metadata Options:** ⭐ NEW
+```bash
+--metadata                            # Enable metadata extraction (GPS, dates, camera - enabled by default)
+--no-metadata                         # Disable metadata extraction
+--geocode                             # Enable reverse geocoding to convert GPS to city/state (requires internet)
+--geocode-cache CACHE_FILE            # Geocoding cache file (default: geocode_cache.json)
+```
+
+**About Metadata:**
+- Extracts photo dates, GPS coordinates, camera info from EXIF data
+- Adds location/date prefix to descriptions (e.g., "Austin, TX Mar 25, 2025: ...")
+- Geocoding converts GPS coordinates to readable locations (city, state, country)
+- Geocoding results are cached to minimize API calls
+- Respects OpenStreetMap Nominatim usage policy (1 request/second)
+
 **Prompt Styles:**
 - `narrative` - Story-like descriptions with context
 - `detailed` - Comprehensive technical descriptions  
@@ -297,6 +314,12 @@ idt workflow C:\Photos --provider openai --model gpt-4o --name "vacation_photos"
 
 # Claude with custom output directory
 idt workflow C:\Photos --provider claude --model claude-opus-4 --output-dir C:\Results
+
+# Workflow with metadata and geocoding (adds location/date prefix to descriptions)
+idt workflow C:\Photos --metadata --geocode
+
+# Workflow without metadata
+idt workflow C:\Photos --no-metadata
 
 # Increase timeout for slower hardware or large models
 idt workflow C:\Photos --timeout 120
