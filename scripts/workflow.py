@@ -57,8 +57,16 @@ except ImportError:
 import re
 
 
-def sanitize_name(name: str) -> str:
-    """Convert model/prompt names to filesystem-safe strings"""
+def sanitize_name(name: str, preserve_case: bool = False) -> str:
+    """Convert model/prompt names to filesystem-safe strings
+    
+    Args:
+        name: The name to sanitize
+        preserve_case: If True, preserve the original case. If False, convert to lowercase.
+    
+    Returns:
+        Sanitized name safe for filesystem use
+    """
     if not name:
         return "unknown"
     # Remove special characters, replace with underscores
@@ -66,7 +74,9 @@ def sanitize_name(name: str) -> str:
     # Remove multiple consecutive underscores
     safe_name = re.sub(r'_+', '_', safe_name)
     # Remove leading/trailing underscores
-    return safe_name.strip('_').lower()
+    safe_name = safe_name.strip('_')
+    # Convert to lowercase unless case preservation is requested
+    return safe_name if preserve_case else safe_name.lower()
 
 
 def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
@@ -392,7 +402,8 @@ class WorkflowOrchestrator:
     def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, 
                  model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", 
                  api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None,
-                 timeout: int = 90):
+                 timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = False, 
+                 geocode_cache: str = "geocode_cache.json"):
         """
         Initialize the workflow orchestrator
         
@@ -406,6 +417,9 @@ class WorkflowOrchestrator:
             preserve_descriptions: If True, skip describe step if descriptions already exist
             workflow_name: Name of the workflow (for display purposes)
             timeout: Timeout in seconds for Ollama API requests (default: 90)
+            enable_metadata: Whether to extract metadata (GPS, dates, camera info)
+            enable_geocoding: Whether to reverse geocode GPS coordinates to city/state/country
+            geocode_cache: Path to geocoding cache file
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -421,6 +435,9 @@ class WorkflowOrchestrator:
         self.preserve_descriptions = preserve_descriptions
         self.workflow_name = workflow_name
         self.timeout = timeout
+        self.enable_metadata = enable_metadata
+        self.enable_geocoding = enable_geocoding
+        self.geocode_cache = geocode_cache
         
         # Available workflow steps
         self.available_steps = {
@@ -682,7 +699,54 @@ class WorkflowOrchestrator:
             self.logger.error(f"Error during image conversion: {e}")
             return {"success": False, "error": str(e)}
     
+    def _configure_metadata_settings(self, config_file: str = "image_describer_config.json") -> None:
+        """
+        Update image_describer_config.json with metadata settings from workflow args.
+        This allows workflow to control metadata extraction and geocoding dynamically.
+        
+        Args:
+            config_file: Path to image_describer config file
+        """
+        try:
+            config_path = Path(__file__).parent / config_file
+            if not config_path.exists():
+                self.logger.warning(f"Config file not found: {config_path}, skipping metadata configuration")
+                return
+            
+            # Load current config
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            # Update metadata settings
+            if 'metadata' not in config:
+                config['metadata'] = {}
+            
+            config['metadata']['enabled'] = self.enable_metadata
+            config['metadata']['include_location_prefix'] = self.enable_metadata
+            
+            if 'geocoding' not in config['metadata']:
+                config['metadata']['geocoding'] = {}
+            
+            config['metadata']['geocoding']['enabled'] = self.enable_geocoding
+            if self.geocode_cache:
+                config['metadata']['geocoding']['cache_file'] = self.geocode_cache
+            
+            # Update processing_options to enable metadata extraction
+            if 'processing_options' not in config:
+                config['processing_options'] = {}
+            config['processing_options']['extract_metadata'] = self.enable_metadata
+            
+            # Save updated config
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            
+            self.logger.info(f"Updated metadata config: enabled={self.enable_metadata}, geocoding={self.enable_geocoding}")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to update metadata configuration: {e}")
+    
     def describe_images(self, input_dir: Path, output_dir: Path) -> Dict[str, Any]:
+
         """
         Generate AI descriptions for images using image_describer.py
         
@@ -694,6 +758,9 @@ class WorkflowOrchestrator:
             Dictionary with step results
         """
         self.logger.info("Starting image description...")
+        
+        # Configure metadata settings before running image_describer
+        self._configure_metadata_settings()
         
         # Check if preserve_descriptions flag is set and descriptions already exist
         if self.preserve_descriptions:
@@ -930,6 +997,14 @@ class WorkflowOrchestrator:
             # Add workflow name if available (for window title identification)
             if self.workflow_name:
                 cmd.extend(["--workflow-name", self.workflow_name])
+            
+            # Add metadata configuration
+            # Note: The config file controls metadata by default; we update it dynamically before running
+            # This allows the workflow to control metadata settings
+            if not self.enable_metadata:
+                # If metadata explicitly disabled, we could pass a custom config
+                # For now, metadata is handled via the config file which defaults to enabled
+                pass
             
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
@@ -1834,7 +1909,7 @@ Viewing Results:
     
     parser.add_argument(
         "--name",
-        help="Custom workflow name identifier (e.g., 'vacation_photos'). If not provided, auto-generates from input directory path."
+        help="Custom workflow name identifier (e.g., 'VacationPhotos' or 'TestingExample'). Case is preserved in metadata/display. If not provided, auto-generates from input directory path."
     )
     
     parser.add_argument(
@@ -1859,6 +1934,31 @@ Viewing Results:
         "--batch",
         action="store_true",
         help="Non-interactive mode - skip prompts (useful for running multiple workflows sequentially)"
+    )
+    
+    parser.add_argument(
+        "--metadata",
+        action="store_true",
+        default=None,
+        help="Enable metadata extraction (GPS, dates, camera info). Enabled by default if not specified."
+    )
+    
+    parser.add_argument(
+        "--no-metadata",
+        action="store_true",
+        help="Disable metadata extraction"
+    )
+    
+    parser.add_argument(
+        "--geocode",
+        action="store_true",
+        help="Enable reverse geocoding to convert GPS coordinates to city/state/country (requires internet, adds API delay)"
+    )
+    
+    parser.add_argument(
+        "--geocode-cache",
+        default="geocode_cache.json",
+        help="Path to geocoding cache file (default: geocode_cache.json)"
     )
     
     parser.add_argument(
@@ -2007,11 +2107,13 @@ Viewing Results:
         
         # Determine workflow name identifier
         if args.name:
-            # User provided a custom name
-            workflow_name = sanitize_name(args.name)
+            # User provided a custom name - preserve case for metadata, lowercase for directory
+            workflow_name_display = sanitize_name(args.name, preserve_case=True)
+            workflow_name = sanitize_name(args.name, preserve_case=False)
         else:
             # Auto-generate from input directory path (2 components)
-            workflow_name = get_path_identifier_2_components(str(input_dir))
+            workflow_name_display = get_path_identifier_2_components(str(input_dir))
+            workflow_name = workflow_name_display  # Already lowercase from auto-generation
         
         # Create descriptive directory name (wf = workflow)
         # Format: wf_NAME_PROVIDER_MODEL_PROMPT_TIMESTAMP
@@ -2050,7 +2152,10 @@ Viewing Results:
             api_key_file=args.api_key_file,
             preserve_descriptions=args.preserve_descriptions,
             workflow_name=workflow_name,
-            timeout=args.timeout
+            timeout=args.timeout,
+            enable_metadata=not args.no_metadata,  # Default True unless --no-metadata specified
+            enable_geocoding=args.geocode,  # Default False unless --geocode specified
+            geocode_cache=args.geocode_cache
         )
         
         if args.dry_run:
@@ -2080,7 +2185,7 @@ Viewing Results:
         
         # Prepare workflow metadata
         metadata = {
-            "workflow_name": workflow_name,
+            "workflow_name": workflow_name_display,  # Use case-preserved name for display
             "input_directory": str(input_dir),
             "provider": provider_name,
             "model": model_name,
