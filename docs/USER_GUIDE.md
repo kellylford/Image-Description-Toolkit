@@ -21,12 +21,13 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
 6. [Understanding Workflow Runs & Naming](#6-understanding-workflow-runs--naming)
 7. [Prompt Customization](#7-prompt-customization)
 8. [Advanced CLI Usage & Commands](#8-advanced-cli-usage--commands)
-9. [Analysis Tools](#9-analysis-tools)
-10. [Results Viewer (Real-Time Monitoring)](#10-results-viewer-real-time-monitoring)
-11. [Cloud Provider Setup](#11-cloud-provider-setup)
-12. [Performance Tips](#12-performance-tips)
-13. [Batch Files Reference](#13-batch-files-reference)
-14. [Troubleshooting](#14-troubleshooting)
+9. [Metadata Extraction & Geocoding](#9-metadata-extraction--geocoding) ⭐ NEW
+10. [Analysis Tools](#10-analysis-tools)
+11. [Results Viewer (Real-Time Monitoring)](#11-results-viewer-real-time-monitoring)
+12. [Cloud Provider Setup](#12-cloud-provider-setup)
+13. [Performance Tips](#13-performance-tips)
+14. [Batch Files Reference](#14-batch-files-reference)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -555,7 +556,164 @@ idt workflow C:\Photos --view-results --name live_monitoring
 
 ---
 
-## 9. Analysis Tools
+## 9. Metadata Extraction & Geocoding ⭐ NEW
+
+IDT can automatically extract and include rich metadata from your images, adding context about **where and when** photos were taken.
+
+### What is Metadata?
+
+Metadata extraction pulls information from your image files including:
+- **📅 Photo Date & Time** - When the photo was actually taken
+- **📍 GPS Coordinates** - Where the photo was taken (latitude/longitude)
+- **📷 Camera Information** - Device make/model, lens details
+- **⚙️ Photo Settings** - ISO, aperture, shutter speed, focal length
+- **🗺️ Location Names** - City, state, country (via geocoding)
+
+### Description Format with Metadata
+
+When metadata is enabled, descriptions include a **location/date prefix**:
+
+```
+Austin, TX Mar 25, 2025: A beautiful sunset over the lake with vibrant orange and pink hues reflecting on the calm water.
+
+[3/25/2025 7:35P, iPhone 14, 30.2672°N, 97.7431°W]
+```
+
+**Format breakdown:**
+- **Prefix:** `"Austin, TX Mar 25, 2025:"` - Human-readable location and date
+- **Description:** The AI-generated image description
+- **Metadata suffix:** Technical details in brackets
+
+### Using Metadata in Workflows
+
+**Basic metadata (enabled by default):**
+```bash
+idt workflow C:\Photos
+# Includes dates, GPS coordinates, camera info
+```
+
+**Disable metadata:**
+```bash
+idt workflow C:\Photos --no-metadata
+# No metadata extraction or prefix
+```
+
+**Enable geocoding (convert GPS to city/state):**
+```bash
+idt workflow C:\Photos --geocode
+# Adds "Austin, TX" instead of just coordinates
+```
+
+**Custom geocoding cache:**
+```bash
+idt workflow C:\Photos --geocode --geocode-cache my_cache.json
+# Stores geocoded locations for faster subsequent runs
+```
+
+### Interactive Wizard with Metadata
+
+The `idt guideme` wizard includes metadata configuration:
+
+```bash
+idt guideme
+```
+
+You'll be prompted:
+1. **Enable metadata extraction?** [Y/n] - Extracts photo data
+2. **Enable geocoding?** [y/N] - Converts GPS to city/state (requires internet)
+3. **Geocoding cache location?** - Where to save geocoded results
+
+### How Geocoding Works
+
+**Geocoding** converts raw GPS coordinates (30.2672, -97.7431) into readable locations (Austin, TX).
+
+**Key points:**
+- Uses **OpenStreetMap Nominatim API** (free, open-source)
+- Requires **internet connection** during processing
+- Results are **cached** to minimize API calls
+- Respects **1-second delay** between requests (Nominatim policy)
+- Works offline after locations are cached
+
+**Example workflow:**
+```bash
+# First run: Downloads location data from OpenStreetMap
+idt workflow C:\VacationPhotos --geocode
+
+# Subsequent runs: Uses cached data (instant, no internet needed)
+idt workflow C:\VacationPhotos --geocode
+```
+
+### Viewing Metadata
+
+**Viewer Application:**
+- Location/date prefix shown in **blue, bold text** with 📍 icon
+- Full metadata visible in description text file
+
+**ImageDescriber GUI:**
+- Right-click image → **Properties**
+- Shows: Location & Date, Camera Information, Photo Settings
+
+**HTML Reports:**
+- Location/date prefix highlighted at top of each description
+- Full metadata in "Details" section (when using `--full` flag)
+
+### Configuration
+
+**Edit metadata settings in `image_describer_config.json`:**
+
+```json
+{
+  "metadata": {
+    "enabled": true,
+    "include_location_prefix": true,
+    "geocoding": {
+      "enabled": false,
+      "user_agent": "IDT/3.0 (+https://github.com/kellylford/Image-Description-Toolkit)",
+      "delay_seconds": 1.0,
+      "cache_file": "geocode_cache.json"
+    }
+  }
+}
+```
+
+**Or use IDTConfigure GUI:**
+1. Run `idtconfigure.exe`
+2. Settings Menu → **Metadata Settings**
+3. Adjust: metadata_enabled, geocoding_enabled, cache_file, etc.
+
+### Example Scenarios
+
+**Scenario 1: Travel Photos with Location Context**
+```bash
+idt workflow C:\Europe2025 --geocode --name europe_trip
+# Descriptions: "Paris, France Jun 15, 2025: The Eiffel Tower..."
+```
+
+**Scenario 2: Event Photography (Date Only)**
+```bash
+idt workflow C:\Wedding --metadata
+# Descriptions: "May 12, 2025: The bride and groom..."
+# (No GPS data in studio photos, shows date only)
+```
+
+**Scenario 3: Privacy-Conscious (No Metadata)**
+```bash
+idt workflow C:\PersonalPhotos --no-metadata
+# Clean descriptions without location/date information
+```
+
+**Scenario 4: Large Collection with Geocoding**
+```bash
+# Initial run builds geocoding cache
+idt workflow C:\10000Photos --geocode --geocode-cache worldwide_cache.json
+
+# Reuse cache for other collections
+idt workflow C:\MorePhotos --geocode --geocode-cache worldwide_cache.json
+```
+
+---
+
+## 10. Analysis Tools
 
 After running workflows, use these tools to analyze and export results:
 
@@ -659,7 +817,7 @@ analysis/results/
 
 ---
 
-## 10. Results Viewer (Real-Time Monitoring)
+## 11. Results Viewer (Real-Time Monitoring)
 
 The **Results Viewer** is a GUI application that lets you browse, search, and monitor your workflow results in real-time.
 
@@ -763,7 +921,7 @@ The viewer automatically detects two modes:
 
 ---
 
-## 11. Cloud Provider Setup
+## 12. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
 
@@ -815,7 +973,7 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 
 ---
 
-## 12. Performance Tips
+## 13. Performance Tips
 
 ### Adjusting Timeout Settings
 
@@ -853,7 +1011,7 @@ idt workflow C:\Photos --timeout 300
 
 ---
 
-## 13. Batch Files Reference
+## 14. Batch Files Reference
 
 The `bat/` folder contains pre-configured batch files for quick model testing.
 
@@ -929,7 +1087,7 @@ idt workflow C:\Photos --model llava:7b --name my_custom_name
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 ### Common Issues
 
