@@ -150,9 +150,29 @@ class DescriptionEntry:
         html_content.append('<h4>Description</h4>')
         
         if self.description:
-            # Convert line breaks to HTML and escape content
-            description_html = html.escape(self.description).replace('\n', '<br>\n')
-            html_content.append(f'<p>{description_html}</p>')
+            # Check if description has location/date prefix (format: "City, State Mon Day, Year: Description")
+            import re
+            prefix_match = re.match(r'^([^:]+):\s+(.+)$', self.description, re.DOTALL)
+            
+            if prefix_match:
+                potential_prefix = prefix_match.group(1).strip()
+                description_text = prefix_match.group(2).strip()
+                
+                # Check if it looks like a location/date prefix (contains date pattern)
+                if re.search(r'\b\w{3}\s+\d{1,2},\s+\d{4}\b', potential_prefix):
+                    # Format with highlighted prefix
+                    prefix_html = html.escape(potential_prefix)
+                    description_html = html.escape(description_text).replace('\n', '<br>\n')
+                    html_content.append(f'<p><strong style="color: #0066CC;">📍 {prefix_html}</strong></p>')
+                    html_content.append(f'<p>{description_html}</p>')
+                else:
+                    # No prefix detected, display normally
+                    description_html = html.escape(self.description).replace('\n', '<br>\n')
+                    html_content.append(f'<p>{description_html}</p>')
+            else:
+                # No colon separator, display normally
+                description_html = html.escape(self.description).replace('\n', '<br>\n')
+                html_content.append(f'<p>{description_html}</p>')
         else:
             html_content.append('<p><em>No description available</em></p>')
         
