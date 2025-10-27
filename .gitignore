@@ -96,3 +96,5 @@ tools/metadata_*.csv
 tools/show_metadata/*.csv
 tools/show_metadata/geocode_cache.json
 tools/show_metadata/*.log
+tools/show_metadata/.show_metadata_last_command
+
