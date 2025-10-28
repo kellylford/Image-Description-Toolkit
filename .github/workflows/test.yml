@@ -106,3 +106,75 @@ jobs:
           Write-Error "Executable seems too small, possible build issue"
           exit 1
         }
+
+  build-scripts-check:
+    name: Build Scripts Validation
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Validate batch file syntax
+      run: |
+        Write-Host "Validating build and release batch files..."
+        $errors = 0
+        
+        # List of critical batch files to check
+        $batchFiles = @(
+          "BuildAndRelease\builditall.bat",
+          "BuildAndRelease\packageitall.bat", 
+          "BuildAndRelease\releaseitall.bat",
+          "BuildAndRelease\build_idt.bat",
+          "tools\environmentsetup.bat"
+        )
+        
+        foreach ($file in $batchFiles) {
+          if (!(Test-Path $file)) {
+            Write-Warning "File not found: $file"
+            $errors++
+            continue
+          }
+          
+          Write-Host "Checking: $file"
+          
+          # Read file content
+          $content = Get-Content $file -Raw
+          
+          # Check for common syntax errors
+          # 1. Unclosed quotes
+          $quoteCount = ($content -split '"').Count - 1
+          if ($quoteCount % 2 -ne 0) {
+            Write-Error "  Possible unclosed quote in $file"
+            $errors++
+          }
+          
+          # 2. Unmatched parentheses
+          $openParen = ($content -split '\(').Count - 1
+          $closeParen = ($content -split '\)').Count - 1
+          if ($openParen -ne $closeParen) {
+            Write-Error "  Unmatched parentheses in $file (open: $openParen, close: $closeParen)"
+            $errors++
+          }
+          
+          # 3. Check for bare command calls (should use 'call' for batch files)
+          if ($content -match '\n\s*[a-z_]+\s*$' -and $file -match 'releaseitall') {
+            Write-Warning "  Possible bare command in $file - should use 'call' for .bat files"
+          }
+          
+          # 4. Check for trailing commands without proper exit
+          $lines = Get-Content $file
+          $lastLine = $lines[-1].Trim()
+          if ($lastLine -and $lastLine -notmatch '^(pause|exit|goto|rem|::|echo)') {
+            Write-Warning "  File $file ends with command: '$lastLine' - may cause issues"
+          }
+          
+          Write-Host "  ✓ $file passed basic checks"
+        }
+        
+        if ($errors -gt 0) {
+          Write-Error "Found $errors syntax errors in batch files"
+          exit 1
+        }
+        
+        Write-Host "All batch files passed validation"
