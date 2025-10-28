@@ -8,6 +8,10 @@ MAINTENANCE NOTES:
 - Test with test_executable.py after building
 - Keep excludes list updated to avoid conflicts
 - Use build_executable.sh for automated builds
+
+RECENT UPDATES:
+- October 2025: Added video metadata extraction modules (video_metadata_extractor.py, exif_embedder.py)
+- October 2025: Added piexif for EXIF embedding in extracted video frames
 """
 
 a = Analysis(
@@ -20,6 +24,8 @@ a = Analysis(
         ('../scripts/workflow_utils.py', 'scripts'), 
         ('../scripts/image_describer.py', 'scripts'),
         ('../scripts/metadata_extractor.py', 'scripts'),
+        ('../scripts/video_metadata_extractor.py', 'scripts'),
+        ('../scripts/exif_embedder.py', 'scripts'),
         ('../scripts/ConvertImage.py', 'scripts'),
         ('../scripts/descriptions_to_html.py', 'scripts'),
         ('../scripts/video_frame_extractor.py', 'scripts'),
@@ -41,6 +47,8 @@ a = Analysis(
         'scripts.workflow_utils',
         'scripts.image_describer', 
         'metadata_extractor',
+        'scripts.video_metadata_extractor',
+        'scripts.exif_embedder',
         'scripts.ConvertImage',
         'scripts.descriptions_to_html',
         'scripts.video_frame_extractor',
@@ -58,6 +66,8 @@ a = Analysis(
         'json', 'pathlib', 'subprocess', 'logging', 'datetime', 'argparse',
         # Image processing
         'PIL', 'PIL.Image', 'PIL.ImageOps', 'pillow_heif',
+        # EXIF handling for video frame metadata
+        'piexif', 'piexif.helper',
         # AI providers - CRITICAL for executable
         'requests', 'anthropic', 'openai',
         # Anthropic dependencies
