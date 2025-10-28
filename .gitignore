@@ -102,3 +102,4 @@ tools/show_metadata/.show_metadata_last_command
 .pytest_cache/
 *.log
 deployment_test_*.log
+
