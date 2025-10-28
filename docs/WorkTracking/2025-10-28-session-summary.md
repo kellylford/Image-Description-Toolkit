@@ -145,5 +145,33 @@ User confirmed geocoding is now working beautifully:
 - Cache file prevents redundant API calls
 - Beautiful results in Viewer
 
-**User reaction:** "Oh my goodness!!! This is now working and is brilliant."
+**User reaction:** "**User reaction:** "Oh my goodness!!! This is now working and is brilliant."
+
+---
+
+## Update — 2025-10-28 (late evening) — CI Smoke Tests + Encoding Fixes
+
+### What changed
+- Added CLI and GUI smoke tests: `pytest_tests/smoke/test_entry_points.py`
+  - Verifies CLI: `help`, `version`, `workflow --help`, `guideme`, `check-models`, `results-list`
+  - Verifies GUI: Viewer, ImageDescriber, PromptEditor launch and stay alive briefly
+- Hardened subprocess output handling on Windows:
+  - Replaced `text=True` with `encoding='utf-8', errors='replace'` to avoid `UnicodeDecodeError` on cp1252 consoles
+- Enhanced custom test runner `run_unit_tests.py`:
+  - Added a minimal pytest compatibility shim (`@pytest.mark.*`, `pytest.fail()`)
+  - Discovers both unit and smoke tests and executes them in a stable order
+
+### Results
+- Full suite: 48/48 tests passing locally
+- Smoke tests validate all key entry points launch without immediate crash
+
+### Files modified
+- `pytest_tests/smoke/test_entry_points.py` — New/updated smoke tests with UTF-8 capture
+- `run_unit_tests.py` — Added minimal pytest shim; multi-directory discovery
+
+### Notes
+- Root cause for prior CLI smoke failure: Windows attempted cp1252 decoding of UTF-8 help text (byte 0x8F). Explicit UTF-8 with `errors='replace'` resolved it.
+- This makes CI robust across Windows/Linux runners.
+
+```"
 

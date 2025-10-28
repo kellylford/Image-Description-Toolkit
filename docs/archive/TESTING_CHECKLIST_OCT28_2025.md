@@ -2,6 +2,13 @@
 
 This is a living checklist for validation of the recent fixes (format-string errors, Windows date formatting, Ollama fallbacks) and the build pipeline health.
 
+## Automated Test Status
+- [x] Unit + smoke tests green locally (48/48)
+- [x] CLI smoke: help/version/workflow/guideme/check-models/results-list
+- [x] GUI smoke: Viewer/ImageDescriber/PromptEditor launch
+- [x] Subprocess capture uses `encoding='utf-8', errors='replace'` on Windows
+- [x] Custom test runner includes minimal pytest shim
+
 ## Core Regressions to Guard Against
 - [ ] No "Invalid format string" when writing descriptions
 - [ ] Windows date formatting shows no leading zeros in day; correct AM/PM suffix

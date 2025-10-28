@@ -9,6 +9,24 @@ import importlib.util
 from pathlib import Path
 import traceback
 
+# Minimal pytest compatibility for tests that import it
+class MinimalPytest:
+    """Minimal pytest module substitute for tests that import pytest."""
+    class mark:
+        @staticmethod
+        def regression(func):
+            """Dummy decorator for @pytest.mark.regression"""
+            return func
+    
+    @staticmethod
+    def fail(msg):
+        """Replacement for pytest.fail() - just raise AssertionError"""
+        raise AssertionError(msg)
+
+# Inject minimal pytest into sys.modules if not already present
+if 'pytest' not in sys.modules:
+    sys.modules['pytest'] = MinimalPytest()
+
 # Add scripts directory to Python path for imports
 scripts_dir = Path(__file__).parent / "scripts"
 if str(scripts_dir) not in sys.path:
