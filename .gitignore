@@ -98,3 +98,7 @@ tools/show_metadata/geocode_cache.json
 tools/show_metadata/*.log
 tools/show_metadata/.show_metadata_last_command
 
+# Test artifacts and cache
+.pytest_cache/
+*.log
+deployment_test_*.log
