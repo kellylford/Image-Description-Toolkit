@@ -136,18 +136,6 @@ def convert_heic_to_jpg(input_path, output_path=None, quality=95, keep_metadata=
         
         # Open and convert the image
         with Image.open(input_path) as image:
-            # Capture EXIF from source before any conversions/resizes
-            exif_bytes = None
-            try:
-                exif = image.getexif()
-                if exif and len(exif) > 0:
-                    exif_bytes = exif.tobytes()
-            except Exception:
-                # Fall back to raw info blob if available
-                pass
-            if not exif_bytes and hasattr(image, 'info'):
-                exif_bytes = image.info.get('exif', b'') or None
-
             # Convert to RGB if necessary (HEIC can have different color modes)
             if image.mode != 'RGB':
                 image = image.convert('RGB')
@@ -169,9 +157,11 @@ def convert_heic_to_jpg(input_path, output_path=None, quality=95, keep_metadata=
                     'optimize': True
                 }
                 
-                # Preserve metadata if requested on every attempt
-                if keep_metadata and exif_bytes:
-                    save_kwargs['exif'] = exif_bytes
+                # Preserve metadata if requested (only on first attempt with high quality)
+                if keep_metadata and hasattr(current_image, 'info') and attempt == 0:
+                    exif_data = current_image.info.get('exif', b'')
+                    if exif_data:
+                        save_kwargs['exif'] = exif_data
                 
                 current_image.save(output_path, **save_kwargs)
                 
@@ -368,16 +358,6 @@ def optimize_image_size(image_path, max_file_size=TARGET_MAX_SIZE, quality=90):
         temp_path = image_path.with_suffix('.tmp.jpg')
         
         with Image.open(image_path) as image:
-            # Capture EXIF from original image prior to any modifications
-            exif_bytes = None
-            try:
-                exif = image.getexif()
-                if exif and len(exif) > 0:
-                    exif_bytes = exif.tobytes()
-            except Exception:
-                pass
-            if not exif_bytes and hasattr(image, 'info'):
-                exif_bytes = image.info.get('exif', b'') or None
             # Convert to RGB if needed
             if image.mode not in ('RGB', 'L'):
                 image = image.convert('RGB')
@@ -393,9 +373,6 @@ def optimize_image_size(image_path, max_file_size=TARGET_MAX_SIZE, quality=90):
                     'quality': current_quality,
                     'optimize': True
                 }
-                # Preserve metadata if available
-                if exif_bytes:
-                    save_kwargs['exif'] = exif_bytes
                 
                 current_image.save(temp_path, **save_kwargs)
                 file_size = temp_path.stat().st_size

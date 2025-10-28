@@ -16,10 +16,10 @@ Use this checklist to validate the current build end-to-end. Mark items with [x]
 ## 1) Build and Packaging
 - [x] Run build scripts (builditall.bat or release flow) without errors — Done, no issues
 - [x] idt.exe launches with `idt --help` — Done, no issues
-- [x] imagedescriber.exe launches — Launch is just fine
-- [x] viewer.exe launches — Launch is just fine
-- [x] prompt_editor.exe launches — Launch is just fine
-- [x] Final artifact structure correct (executables + scripts + docs) — Done, this is fine
+- [ ] imagedescriber.exe launches
+- [ ] viewer.exe launches
+- [ ] prompt_editor.exe launches
+- [ ] Final artifact structure correct (executables + scripts + docs)
 
 Notes:
 
@@ -29,7 +29,7 @@ Notes:
 - [ ] image_descriptions.txt contains entries for each input image
 - [ ] viewer prompt after completion works (y launches viewer)
 
-Notes: **CRITICAL BUG FOUND** - Metadata/geocoding not working in workflow. Descriptions missing geographic information (city/state/country), only showing original date. Root cause: workflow.py updates config file but doesn't pass --config parameter to ImageDescriber.py subprocess. FIX APPLIED to scripts/workflow.py line 1142-1147. REBUILD REQUIRED before continuing validation.
+Notes:
 
 ## 3) Conversion Step — Real-time Progress (NEW)
 - [ ] CMD shows: "⟳ Image conversion in progress: X/Y HEIC → JPG (Z%)"

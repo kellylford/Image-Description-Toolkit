@@ -84,9 +84,15 @@ def main():
     print("Running Unit Tests (Python 3.13 compatible runner)")
     print("=" * 70)
     
-    # Find all test files
-    test_dir = Path(__file__).parent / "pytest_tests" / "unit"
-    test_files = list(test_dir.glob("test_*.py"))
+    # Find all test files (unit and smoke tests)
+    test_dirs = [
+        Path(__file__).parent / "pytest_tests" / "unit",
+        Path(__file__).parent / "pytest_tests" / "smoke"
+    ]
+    test_files = []
+    for test_dir in test_dirs:
+        if test_dir.exists():
+            test_files.extend(test_dir.glob("test_*.py"))
     
     if not test_files:
         print(f"\n[FAIL] No test files found in {test_dir}")
