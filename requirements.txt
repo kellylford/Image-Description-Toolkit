@@ -12,6 +12,7 @@
 # ----------------------------------------------------------------------------
 Pillow>=10.0.0          # Image processing (all components)
 requests>=2.25.0        # HTTP requests for AI providers
+beautifulsoup4>=4.9.0   # HTML parsing for web image downloader
 ollama>=0.3.0           # Ollama Python client
 psutil>=5.9.0           # System/hardware information for environment logging
 
