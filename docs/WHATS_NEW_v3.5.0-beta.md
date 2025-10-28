@@ -8,25 +8,7 @@
 
 ## 🎯 Major New Features
 
-### 1. **Video Metadata Embedding** ⭐ NEW
-**Extracted video frames now preserve GPS, date, and camera metadata from source videos**
-
-- **video_metadata_extractor.py**: Extracts GPS coordinates, recording date/time, and camera info from video files using ffprobe
-- **exif_embedder.py**: Converts video metadata to standard EXIF format and embeds in extracted frame JPEGs
-- **Seamless Integration**: Works automatically with existing `--metadata` and `--geocode` flags
-- **Standards-Based**: Uses standard EXIF tags for maximum compatibility
-- **Graceful Degradation**: Works without ffprobe, just doesn't embed metadata
-- **Frame Timestamps**: Each frame gets accurate timestamp based on position in video
-
-**Requirements:**
-- `piexif>=1.1.3` (included in requirements.txt)
-- `ffprobe` (optional, part of ffmpeg)
-
-**Impact:** Video frames are now "first-class citizens" with full metadata support, enabling location/date prefixes in descriptions just like regular photos.
-
-**Documentation:** `docs/VIDEO_METADATA_EMBEDDING.md`
-
-### 2. **Metadata Extraction & Geocoding** 🌍
+### 1. **Metadata Extraction & Geocoding** 🌍
 **Complete metadata integration across the entire toolkit**
 
 #### Core Functionality
@@ -47,6 +29,24 @@
 - `docs/USER_GUIDE.md` - Section 9: Metadata Extraction & Geocoding
 - `docs/CLI_REFERENCE.md` - Metadata options
 - OpenStreetMap attribution for compliance
+
+### 2. **Video Metadata Embedding** ⭐ NEW
+**Extracted video frames now preserve GPS, date, and camera metadata from source videos**
+
+- **video_metadata_extractor.py**: Extracts GPS coordinates, recording date/time, and camera info from video files using ffprobe
+- **exif_embedder.py**: Converts video metadata to standard EXIF format and embeds in extracted frame JPEGs
+- **Seamless Integration**: Works automatically with existing `--metadata` and `--geocode` flags
+- **Standards-Based**: Uses standard EXIF tags for maximum compatibility
+- **Graceful Degradation**: Works without ffprobe, just doesn't embed metadata
+- **Frame Timestamps**: Each frame gets accurate timestamp based on position in video
+
+**Requirements:**
+- `piexif>=1.1.3` (included in requirements.txt)
+- `ffprobe` (optional, part of ffmpeg)
+
+**Impact:** Video frames are now "first-class citizens" with full metadata support, enabling location/date prefixes in descriptions just like regular photos.
+
+**Documentation:** `docs/VIDEO_METADATA_EMBEDDING.md`
 
 ### 3. **IDTConfigure Application** ⚙️
 **New GUI application for configuration management**
