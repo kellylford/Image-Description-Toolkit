@@ -1,0 +1,108 @@
+name: Automated Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run unit tests
+      run: |
+        python run_unit_tests.py
+        
+    - name: Check test results
+      if: failure()
+      run: |
+        echo "Tests failed! Check the output above for details."
+        exit 1
+
+  syntax-check:
+    name: Syntax & Import Check
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Check syntax of main scripts
+      run: |
+        python -m py_compile scripts/workflow.py
+        python -m py_compile scripts/image_describer.py
+        python -m py_compile scripts/metadata_extractor.py
+        python -m py_compile idt_cli.py
+        
+    - name: Test imports
+      run: |
+        cd scripts
+        python -c "import workflow_utils; print('workflow_utils OK')"
+        python -c "import image_describer; print('image_describer OK')"
+        python -c "import metadata_extractor; print('metadata_extractor OK')"
+
+  build-test:
+    name: PyInstaller Build Test
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Test CLI build
+      run: |
+        pyinstaller --clean --noconfirm idt_cli_build.spec
+        
+    - name: Verify build artifacts
+      run: |
+        if (!(Test-Path "dist/idt.exe")) {
+          Write-Error "idt.exe not found in dist/"
+          exit 1
+        }
+        Write-Host "Build successful: idt.exe created"
+        
+    - name: Check executable size
+      run: |
+        $size = (Get-Item dist/idt.exe).Length / 1MB
+        Write-Host "idt.exe size: $([math]::Round($size, 2)) MB"
+        if ($size -lt 10) {
+          Write-Error "Executable seems too small, possible build issue"
+          exit 1
+        }
