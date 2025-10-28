@@ -248,7 +248,19 @@ class ImageDescriber:
                     if ollama is not None and hasattr(ollama, 'list'):
                         models = ollama.list()
                         available_models = [model['name'] for model in models.get('models', [])]
-                        if self.model_name not in available_models:
+                        # Smart model name matching: handle :latest suffix
+                        model_found = self.model_name in available_models
+                        if not model_found and ':' not in self.model_name:
+                            # Try with :latest suffix
+                            if f"{self.model_name}:latest" in available_models:
+                                model_found = True
+                            # Or check if any available model starts with this base name
+                            else:
+                                base_matches = [m for m in available_models if m.startswith(f"{self.model_name}:")]
+                                if base_matches:
+                                    model_found = True
+                        
+                        if not model_found:
                             logger.warning(f"Model '{self.model_name}' not found in Ollama")
                             logger.info(f"Available models: {', '.join(available_models)}")
                             logger.info(f"Tip: Install with 'ollama pull {self.model_name}'")
@@ -258,8 +270,20 @@ class ImageDescriber:
                             import requests
                             tags = requests.get("http://127.0.0.1:11434/api/tags", timeout=3).json()
                             available_models = [m.get('name') for m in tags.get('models', []) if m.get('name')]
-                            if available_models and self.model_name not in available_models:
-                                logger.warning(f"Model '{self.model_name}' not in tags list from Ollama HTTP API")
+                            if available_models:
+                                # Smart model name matching: handle :latest suffix
+                                model_found = self.model_name in available_models
+                                if not model_found and ':' not in self.model_name:
+                                    # Try with :latest suffix or base name match
+                                    if f"{self.model_name}:latest" in available_models:
+                                        model_found = True
+                                    else:
+                                        base_matches = [m for m in available_models if m.startswith(f"{self.model_name}:")]
+                                        if base_matches:
+                                            model_found = True
+                                
+                                if not model_found:
+                                    logger.warning(f"Model '{self.model_name}' not in tags list from Ollama HTTP API")
                         except Exception:
                             # Silent: availability is checked later during actual call
                             pass
@@ -2007,13 +2031,27 @@ Configuration:
 
         # Check if the specified model is available (best effort)
         try:
-            if available_models and describer.model_name not in available_models:
-                logger.error(f"Model '{describer.model_name}' is not available")
-                logger.error(f"Available models: {', '.join(available_models)}")
-                logger.info(f"You can install the model with: ollama pull {describer.model_name}")
-                sys.exit(1)
-            else:
-                logger.info(f"Using provider: {describer.provider_name}, model: {describer.model_name}")
+            if available_models:
+                # Smart model name matching: handle :latest suffix
+                model_found = describer.model_name in available_models
+                if not model_found:
+                    # Try with :latest suffix
+                    if f"{describer.model_name}:latest" in available_models:
+                        model_found = True
+                    # Or check if model_name has a tag and base name matches
+                    elif ':' not in describer.model_name:
+                        # Check if any available model starts with this base name
+                        base_matches = [m for m in available_models if m.startswith(f"{describer.model_name}:")]
+                        if base_matches:
+                            model_found = True
+                
+                if not model_found:
+                    logger.error(f"Model '{describer.model_name}' is not available")
+                    logger.error(f"Available models: {', '.join(available_models)}")
+                    logger.info(f"You can install the model with: ollama pull {describer.model_name}")
+                    sys.exit(1)
+            
+            logger.info(f"Using provider: {describer.provider_name}, model: {describer.model_name}")
         except Exception as e:
             logger.warning(f"Could not check available models: {e}")
     
