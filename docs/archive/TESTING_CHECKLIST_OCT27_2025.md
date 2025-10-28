@@ -4,22 +4,22 @@ Use this checklist to validate the current build end-to-end. Mark items with [x]
 
 - Build ID: 
 - Commit(s): 03fe6bd + latest on main
-- Tester: 
-- Date: 
+- Tester: Kelly
+- Date: 10/27/2025
 
 ## 0) Pre-flight
-- [ ] Clean working tree (no uncommitted changes)
-- [ ] Pull latest main
-- [ ] Dependencies present (Ollama or cloud keys available as needed)
-- [ ] Test images ready (include a few HEICs, JPGs, and a short MP4 if testing video)
+- [x] Clean working tree (no uncommitted changes) — Done without issues
+- [x] Pull latest main — Done without issues
+- [x] Dependencies present (Ollama or cloud keys available as needed) — Done without issues
+- [x] Test images ready (include a few HEICs, JPGs, and a short MP4 if testing video) — Done, have more than enough test content
 
 ## 1) Build and Packaging
-- [ ] Run build scripts (builditall.bat or release flow) without errors
-- [ ] idt.exe launches with `idt --help`
-- [ ] imagedescriber.exe launches
-- [ ] viewer.exe launches
-- [ ] prompt_editor.exe launches
-- [ ] Final artifact structure correct (executables + scripts + docs)
+- [x] Run build scripts (builditall.bat or release flow) without errors — Done, no issues
+- [x] idt.exe launches with `idt --help` — Done, no issues
+- [x] imagedescriber.exe launches — Launch is just fine
+- [x] viewer.exe launches — Launch is just fine
+- [x] prompt_editor.exe launches — Launch is just fine
+- [x] Final artifact structure correct (executables + scripts + docs) — Done, this is fine
 
 Notes:
 
@@ -29,7 +29,7 @@ Notes:
 - [ ] image_descriptions.txt contains entries for each input image
 - [ ] viewer prompt after completion works (y launches viewer)
 
-Notes:
+Notes: **CRITICAL BUG FOUND** - Metadata/geocoding not working in workflow. Descriptions missing geographic information (city/state/country), only showing original date. Root cause: workflow.py updates config file but doesn't pass --config parameter to ImageDescriber.py subprocess. FIX APPLIED to scripts/workflow.py line 1142-1147. REBUILD REQUIRED before continuing validation.
 
 ## 3) Conversion Step — Real-time Progress (NEW)
 - [ ] CMD shows: "⟳ Image conversion in progress: X/Y HEIC → JPG (Z%)"

@@ -23,6 +23,8 @@ Follow these guidelines for all coding work on this project.
 
 7. **Reposatory Hygiene:** Keep the repository clean and organized. Remove unused files, fix broken links, and ensure that documentation is up to date.
 
+8. **Agent Identification:** Always identify yourself at the start of each response using the format `<Claude Sonnet 3.5>` (or your actual model name). This helps users track which AI agent they're working with across sessions.
+
 ## Project-Specific Guidelines
 
 ### Testing Checklist
