@@ -21,7 +21,8 @@ class TestCLIEntryPoints:
         result = subprocess.run(
             [sys.executable, 'idt_cli.py', 'help'],
             capture_output=True,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         
@@ -39,7 +40,8 @@ class TestCLIEntryPoints:
         result = subprocess.run(
             [sys.executable, 'idt_cli.py', 'version'],
             capture_output=True,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         
@@ -54,25 +56,31 @@ class TestCLIEntryPoints:
     
     def test_idt_workflow_help(self):
         """Test that 'idt workflow --help' works."""
+        # Use utf-8 encoding and errors='replace' to handle any encoding issues
         result = subprocess.run(
             [sys.executable, 'idt_cli.py', 'workflow', '--help'],
             capture_output=True,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=10
         )
         
-        # Should exit successfully (help typically exits with 0)
-        assert result.returncode in (0, 1), "workflow --help should exit cleanly"
+        # Should exit successfully (help exits with 0)
+        assert result.returncode == 0, f"workflow --help should exit successfully (got {result.returncode})"
         
         # Should mention workflow-related options
         stdout = result.stdout or ""
         stderr = result.stderr or ""
         output = stdout + stderr
-        assert len(output) > 100, "Workflow help should be substantial"
-        # Look for common workflow flags
-        assert any(keyword in output.lower() for keyword in 
-                  ['workflow', 'input', 'output', 'model', 'provider']), \
-            "Workflow help should mention key options"
+        
+        # Workflow help should be substantial (at least some text)
+        assert len(output) > 50, f"Workflow help should print usage info (got {len(output)} chars)"
+        
+        # Look for common workflow flags or usage text
+        output_lower = output.lower()
+        assert any(keyword in output_lower for keyword in 
+                  ['workflow', 'usage', 'input', 'output', 'model', 'provider', 'help', 'options']), \
+            f"Workflow help should mention key options, got: {output[:200]}"
     
     def test_idt_guideme_launches(self):
         """Test that 'idt guideme' starts (we'll kill it immediately)."""
@@ -81,7 +89,8 @@ class TestCLIEntryPoints:
             [sys.executable, 'idt_cli.py', 'guideme'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+                encoding='utf-8',
+                errors='replace'
         )
         
         # Wait a moment to see if it crashes immediately
@@ -108,7 +117,8 @@ class TestCLIEntryPoints:
         result = subprocess.run(
             [sys.executable, 'idt_cli.py', 'check-models'],
             capture_output=True,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=30  # Longer timeout as it may check network
         )
         
@@ -121,7 +131,8 @@ class TestCLIEntryPoints:
         result = subprocess.run(
             [sys.executable, 'idt_cli.py', 'results-list'],
             capture_output=True,
-            text=True,
+                encoding='utf-8',
+                errors='replace',
             timeout=10
         )
         

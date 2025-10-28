@@ -6,12 +6,14 @@ Automated continuous integration (CI) and build testing is now fully implemented
 
 ## What Runs Automatically
 
-- **Unit Tests**: 39/39 passing (as of this commit)
+- **Unit + Smoke Tests**: 48/48 passing (as of this update)
   - Metadata extraction and format string safety
   - GPS/EXIF parsing, date formatting, and camera info
   - Workflow config race condition and frozen mode path resolution
   - Name sanitization and directory naming (case preservation, punctuation removal)
   - Status log content (ASCII-only, no Unicode)
+  - CLI smoke tests for idt help/version/workflow/check-models/guideme/results-list
+  - GUI smoke tests for Viewer, ImageDescriber, PromptEditor launch
 - **Syntax/Import Checks**: All main scripts checked for syntax errors and import failures
 - **Build Verification**: PyInstaller build runs on Windows runner; verifies idt.exe is created and of expected size
 
@@ -19,6 +21,8 @@ Automated continuous integration (CI) and build testing is now fully implemented
 
 - **GitHub Actions**: `.github/workflows/test.yml` runs on every push/PR
 - **Custom Test Runner**: `run_unit_tests.py` bypasses pytest buffer issues on Python 3.13
+  - Now includes a minimal `pytest` compatibility shim (supports `@pytest.mark.*` and `pytest.fail()`)
+  - Handles Windows encoding reliably by using `encoding='utf-8', errors='replace'` when capturing subprocess output
 - **No External API Calls**: Tests do not call Ollama, Claude, OpenAI, or geocoding APIs
 - **Cost**: $0 for public repos; ~6–9 minutes of runner time per push
 
@@ -45,4 +49,4 @@ Automated continuous integration (CI) and build testing is now fully implemented
 
 ---
 
-*This summary documents the state of CI/CD as of October 28, 2025. All changes are committed and live in the main branch.*
+*This summary documents the state of CI/CD as of October 28, 2025. All changes are committed and live in the main branch. Update: Smoke tests added and all tests are green (48/48).* 
