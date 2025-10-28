@@ -15,6 +15,8 @@ addopts = """
     --strict-markers
     --tb=short
     --cov-config=pyproject.toml
+    -p no:terminal
+    -p no:cacheprovider
 """
 
 # Markers for categorizing tests

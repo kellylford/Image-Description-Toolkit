@@ -6,16 +6,11 @@ preventing race conditions in frozen mode where config updates happen immediatel
 before ImageDescriber initialization.
 """
 
-import pytest
 import json
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import sys
-
-# Import the workflow module
-from scripts.workflow import Workflow
 
 
 class TestConfigFileOperations:
@@ -47,7 +42,7 @@ class TestConfigFileOperations:
         assert 'Path(sys.executable).parent' in source, \
             "Frozen mode should use sys.executable for path resolution"
     
-    @pytest.mark.regression
+    
     def test_config_write_completes_before_read(self):
         """Test that config writes complete before subsequent reads."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -76,7 +71,7 @@ class TestConfigFileOperations:
 class TestGeocodingConfiguration:
     """Test that geocoding configuration is properly set."""
     
-    @pytest.mark.regression
+    
     def test_geocoding_enabled_flag_propagates(self):
         """Test that --geocode flag properly enables geocoding in config."""
         # This test validates the fix for the race condition where config
@@ -133,7 +128,6 @@ class TestFrozenModePathResolution:
         assert "Path(__file__).parent" in source, \
             "Development mode should use __file__ for paths"
     
-    @pytest.mark.regression
     def test_frozen_mode_path_fix_present(self):
         """Regression test: verify frozen mode path bug is fixed."""
         workflow_path = Path(__file__).parent.parent.parent / "scripts" / "workflow.py"
@@ -165,4 +159,6 @@ class TestFrozenModePathResolution:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    # Run tests directly without pytest
+    import unittest
+    unittest.main()
