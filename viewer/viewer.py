@@ -903,6 +903,7 @@ class ImageDescriptionViewer(QWidget):
         # Description display
         self.description_text = QTextEdit()
         self.description_text.setReadOnly(True)
+        self.description_text.setAcceptRichText(False)  # CRITICAL: Disable HTML rendering
         self.description_text.setAccessibleName("Description Text")
         self.description_text.setAccessibleDescription("Displays the full image description. Use arrow keys to navigate through the text.")
         # Enable text selection and copy with Ctrl+C
