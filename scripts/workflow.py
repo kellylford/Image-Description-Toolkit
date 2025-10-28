@@ -883,7 +883,15 @@ class WorkflowOrchestrator:
             config_file: Path to image_describer config file
         """
         try:
-            config_path = Path(__file__).parent / config_file
+            # In frozen mode, resolve config path relative to the executable's directory
+            if getattr(sys, 'frozen', False):
+                # Frozen: use the directory containing the executable
+                base_dir = Path(sys.executable).parent
+                config_path = base_dir / "scripts" / config_file
+            else:
+                # Development: use the script's directory
+                config_path = Path(__file__).parent / config_file
+            
             if not config_path.exists():
                 self.logger.warning(f"Config file not found: {config_path}, skipping metadata configuration")
                 return
@@ -914,6 +922,12 @@ class WorkflowOrchestrator:
             # Save updated config
             with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
+                f.flush()  # Ensure buffer is written
+                os.fsync(f.fileno())  # Force OS to write to disk
+            
+            # Small delay to ensure file system has fully committed the write
+            import time
+            time.sleep(0.1)
             
             self.logger.info(f"Updated metadata config: enabled={self.enable_metadata}, geocoding={self.enable_geocoding}")
             

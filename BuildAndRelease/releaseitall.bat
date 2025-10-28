@@ -157,3 +157,5 @@ echo    - Update version references
 echo.
 echo Release directory: %CD%\releases
 echo.
+cd buildandrelease
+build_installer

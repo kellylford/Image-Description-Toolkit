@@ -55,8 +55,9 @@ class MetadataExtractor:
         return f"{month}/{day}/{year} {hour12}:{minute:02d}{suffix}"
     
     def _format_short_date(self, dt: datetime) -> str:
-        """Format datetime as 'Mon Day, Year' (e.g., 'Sep 9, 2025')."""
-        return dt.strftime("%b %-d, %Y").replace(" 0", " ")  # Remove leading zero from day
+        """Format datetime as 'Mon Day, Year' (e.g., 'Sep 9, 2025'). Cross-platform (Windows-safe)."""
+        # Use %d (with leading zero) and strip the zero for 01-09 days to avoid %-d incompatibility on Windows
+        return dt.strftime("%b %d, %Y").replace(" 0", " ")
     
     def _extract_datetime(self, exif_data: dict) -> Optional[datetime]:
         """Extract date/time from EXIF as datetime object.
@@ -241,9 +242,9 @@ class MetadataExtractor:
             country = loc.get('country') or loc.get('countryname')
             
             if city and state:
-                parts.append(f"{city}, {state}")
+                parts.append(str(city) + ", " + str(state))
             elif city and country:
-                parts.append(f"{city}, {country}")
+                parts.append(str(city) + ", " + str(country))
             elif state:
                 parts.append(state)
         
@@ -276,7 +277,7 @@ class MetadataExtractor:
                 if model.lower().startswith(make.lower()):
                     parts.append(model)
                 else:
-                    parts.append(f"{make} {model}")
+                    parts.append(str(make) + " " + str(model))
             elif 'model' in camera:
                 parts.append(camera['model'])
         

@@ -186,6 +186,8 @@ class ImageDescriber:
         self.api_key = api_key
         self.workflow_name = workflow_name  # Workflow name for window title
         self.timeout = timeout  # Timeout for Ollama requests
+        # Notice flags (avoid repeating log spam)
+        self._geocode_notice_logged = False
         
         # Set supported formats from config
         self.supported_formats = set(self.config.get('processing_options', {}).get('supported_formats', 
@@ -241,14 +243,26 @@ class ImageDescriber:
             if self.provider_name == "ollama":
                 logger.info("Initializing Ollama provider...")
                 provider = OllamaProvider()
-                # Verify model is available
+                # Verify model is available (guard if python client missing)
                 try:
-                    models = ollama.list()
-                    available_models = [model['name'] for model in models.get('models', [])]
-                    if self.model_name not in available_models:
-                        logger.warning(f"Model '{self.model_name}' not found in Ollama")
-                        logger.info(f"Available models: {', '.join(available_models)}")
-                        logger.info(f"Tip: Install with 'ollama pull {self.model_name}'")
+                    if ollama is not None and hasattr(ollama, 'list'):
+                        models = ollama.list()
+                        available_models = [model['name'] for model in models.get('models', [])]
+                        if self.model_name not in available_models:
+                            logger.warning(f"Model '{self.model_name}' not found in Ollama")
+                            logger.info(f"Available models: {', '.join(available_models)}")
+                            logger.info(f"Tip: Install with 'ollama pull {self.model_name}'")
+                    else:
+                        # Try lightweight HTTP probe as a best-effort check
+                        try:
+                            import requests
+                            tags = requests.get("http://127.0.0.1:11434/api/tags", timeout=3).json()
+                            available_models = [m.get('name') for m in tags.get('models', []) if m.get('name')]
+                            if available_models and self.model_name not in available_models:
+                                logger.warning(f"Model '{self.model_name}' not in tags list from Ollama HTTP API")
+                        except Exception:
+                            # Silent: availability is checked later during actual call
+                            pass
                 except Exception as e:
                     logger.warning(f"Could not verify Ollama models: {e}")
                 return provider
@@ -564,7 +578,7 @@ class ImageDescriber:
             prompt = self.get_prompt()
             logger.debug(f"Using prompt: {repr(prompt)}")
             
-            # For Ollama provider, use legacy direct API call for backward compatibility
+            # For Ollama provider, use direct API call with fallback to HTTP if python client missing
             if self.provider_name == "ollama":
                 # Encode image to base64
                 image_base64 = self.encode_image_to_base64(image_path)
@@ -584,69 +598,93 @@ class ImageDescriber:
                 for attempt in range(max_retries + 1):  # +1 for initial attempt
                     try:
                         # Call Ollama API with configured settings and timeout
-                        import signal
-                        
-                        def timeout_handler(signum, frame):
-                            raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
-                        
-                        # Set up timeout for Windows/Unix compatibility
-                        try:
-                            # For Windows, we'll use a different approach since signal.alarm doesn't work
-                            import threading
-                            import time
+                        # Prefer python client when available; fallback to HTTP API
+                        use_python_client = (ollama is not None and hasattr(ollama, 'chat'))
+                        if use_python_client:
+                            import signal
                             
-                            response = None
-                            exception_caught = None
-                            
-                            def make_request():
-                                nonlocal response, exception_caught
-                                try:
-                                    response = ollama.chat(
-                                        model=self.model_name,
-                                        messages=[
-                                            {
-                                                'role': 'user',
-                                                'content': prompt,
-                                                'images': [image_base64]
-                                            }
-                                        ],
-                                        options=model_settings
-                                    )
-                                except Exception as e:
-                                    exception_caught = e
-                            
-                            # Start request in background thread
-                            request_thread = threading.Thread(target=make_request)
-                            request_thread.daemon = True
-                            request_thread.start()
-                            
-                            # Wait for completion or timeout
-                            request_thread.join(timeout=self.timeout)
-                            
-                            if request_thread.is_alive():
-                                # Request is still running - timeout occurred
-                                logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after {self.timeout} seconds")
+                            def timeout_handler(signum, frame):
                                 raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
                             
-                            if exception_caught:
-                                raise exception_caught
+                            # Set up timeout for Windows/Unix compatibility
+                            try:
+                                # For Windows, we'll use a different approach since signal.alarm doesn't work
+                                import threading
+                                import time
                                 
-                            if response is None:
-                                raise RuntimeError("Request completed but no response received")
+                                response = None
+                                exception_caught = None
                                 
-                        except ImportError:
-                            # Fallback to direct call if threading unavailable
-                            response = ollama.chat(
-                                model=self.model_name,
-                                messages=[
-                                    {
-                                        'role': 'user',
-                                        'content': prompt,
-                                        'images': [image_base64]
-                                    }
-                                ],
-                                options=model_settings
+                                def make_request():
+                                    nonlocal response, exception_caught
+                                    try:
+                                        response = ollama.chat(
+                                            model=self.model_name,
+                                            messages=[
+                                                {
+                                                    'role': 'user',
+                                                    'content': prompt,
+                                                    'images': [image_base64]
+                                                }
+                                            ],
+                                            options=model_settings
+                                        )
+                                    except Exception as e:
+                                        exception_caught = e
+                                
+                                # Start request in background thread
+                                request_thread = threading.Thread(target=make_request)
+                                request_thread.daemon = True
+                                request_thread.start()
+                                
+                                # Wait for completion or timeout
+                                request_thread.join(timeout=self.timeout)
+                                
+                                if request_thread.is_alive():
+                                    # Request is still running - timeout occurred
+                                    logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after {self.timeout} seconds")
+                                    raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
+                                
+                                if exception_caught:
+                                    raise exception_caught
+                                    
+                                if response is None:
+                                    raise RuntimeError("Request completed but no response received")
+                                    
+                            except ImportError:
+                                # Fallback to direct call if threading unavailable
+                                response = ollama.chat(
+                                    model=self.model_name,
+                                    messages=[
+                                        {
+                                            'role': 'user',
+                                            'content': prompt,
+                                            'images': [image_base64]
+                                        }
+                                    ],
+                                    options=model_settings
+                                )
+                        else:
+                            # HTTP fallback to Ollama API
+                            import requests
+                            http_response = requests.post(
+                                "http://127.0.0.1:11434/api/chat",
+                                json={
+                                    'model': self.model_name,
+                                    'messages': [
+                                        {
+                                            'role': 'user',
+                                            'content': prompt,
+                                            'images': [image_base64]
+                                        }
+                                    ],
+                                    'options': model_settings,
+                                    'stream': False
+                                },
+                                timeout=self.timeout
                             )
+                            http_response.raise_for_status()
+                            response = http_response.json()
                         
                         # If we get here, the call succeeded
                         if attempt > 0:
@@ -702,7 +740,15 @@ class ImageDescriber:
                     elif 'content' in response['message']:
                         logger.debug(f"Message content dict: {repr(response['message']['content'])}")
                 
-                description = response['message']['content'].strip()
+                # Normalize response for both python client and HTTP JSON
+                message = response['message'] if isinstance(response, dict) else response.get('message')
+                if hasattr(message, 'content'):
+                    description = message.content.strip()
+                elif isinstance(message, dict) and 'content' in message:
+                    description = str(message['content']).strip()
+                else:
+                    # Fallback: try to stringify whole response
+                    description = str(response).strip()
                 logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
                 logger.debug(f"Description content: {repr(description)}")
                 logger.debug(f"Description length: {len(description)}")
@@ -859,6 +905,16 @@ class ImageDescriber:
             formatted_description = description
             metadata_config = self.config.get('metadata', {})
             if metadata_config.get('include_location_prefix', True) and metadata and self.metadata_extractor:
+                # Hint the user if GPS exists but geocoding is disabled
+                try:
+                    loc_hint = metadata.get('location', {}) if isinstance(metadata, dict) else {}
+                except Exception:
+                    loc_hint = {}
+                if (not self._geocode_notice_logged and self.geocoder is None and isinstance(loc_hint, dict)
+                        and (('latitude' in loc_hint and 'longitude' in loc_hint) or ('lat' in loc_hint and 'lon' in loc_hint))
+                        and not (loc_hint.get('city') or loc_hint.get('state') or loc_hint.get('country'))):
+                    logger.info("GPS detected but reverse geocoding is disabled. Use --geocode (or enable metadata.geocoding.enabled) to include city/state names.")
+                    self._geocode_notice_logged = True
                 location_prefix = self.metadata_extractor.format_location_prefix(metadata)
                 if location_prefix:
                     # Use string concatenation to avoid f-string format errors from curly braces in description
@@ -1459,29 +1515,30 @@ class ImageDescriber:
                 f_number = exif_data['FNumber']
                 if isinstance(f_number, tuple) and len(f_number) == 2:
                     f_value = f_number[0] / f_number[1]
-                    technical_info['aperture'] = f"f/{f_value:.1f}"
+                    technical_info['aperture'] = "f/" + "{:.1f}".format(f_value)
                 else:
-                    technical_info['aperture'] = f"f/{f_number}"
+                    technical_info['aperture'] = "f/" + str(f_number)
             
             # Shutter speed
             if 'ExposureTime' in exif_data:
                 exposure_time = exif_data['ExposureTime']
                 if isinstance(exposure_time, tuple) and len(exposure_time) == 2:
                     if exposure_time[0] == 1:
-                        technical_info['shutter_speed'] = f"1/{exposure_time[1]}s"
+                        technical_info['shutter_speed'] = "1/" + str(exposure_time[1]) + "s"
                     else:
-                        technical_info['shutter_speed'] = f"{exposure_time[0]/exposure_time[1]}s"
+                        exp_val = exposure_time[0]/exposure_time[1]
+                        technical_info['shutter_speed'] = str(exp_val) + "s"
                 else:
-                    technical_info['shutter_speed'] = f"{exposure_time}s"
+                    technical_info['shutter_speed'] = str(exposure_time) + "s"
             
             # Focal length
             if 'FocalLength' in exif_data:
                 focal_length = exif_data['FocalLength']
                 if isinstance(focal_length, tuple) and len(focal_length) == 2:
                     fl_value = focal_length[0] / focal_length[1]
-                    technical_info['focal_length'] = f"{fl_value:.0f}mm"
+                    technical_info['focal_length'] = "{:.0f}".format(fl_value) + "mm"
                 else:
-                    technical_info['focal_length'] = f"{focal_length}mm"
+                    technical_info['focal_length'] = str(focal_length) + "mm"
             
             return technical_info if technical_info else None
             
@@ -1517,16 +1574,16 @@ class ImageDescriber:
         
         # Format datetime (handle both string and datetime object)
         if 'datetime_str' in metadata:
-            lines.append(f"Photo Date: {metadata['datetime_str']}")
+            lines.append("Photo Date: " + str(metadata['datetime_str']))
         elif 'datetime' in metadata:
             dt_val = metadata['datetime']
             if isinstance(dt_val, str):
-                lines.append(f"Photo Date: {dt_val}")
+                lines.append("Photo Date: " + str(dt_val))
             elif isinstance(dt_val, datetime):
                 # Format using shared module if available
                 if self.metadata_extractor:
                     formatted = self.metadata_extractor._format_mdy_ampm(dt_val)
-                    lines.append(f"Photo Date: {formatted}")
+                    lines.append("Photo Date: " + str(formatted))
         
         # Format location with geocoded city/state if available
         if 'location' in metadata:
@@ -1551,10 +1608,13 @@ class ImageDescriber:
             
             # Add GPS coordinates
             if 'latitude' in location and 'longitude' in location:
-                location_parts.append(f"GPS: {location['latitude']:.6f}, {location['longitude']:.6f}")
+                lat_str = "{:.6f}".format(location['latitude'])
+                lon_str = "{:.6f}".format(location['longitude'])
+                location_parts.append("GPS: " + lat_str + ", " + lon_str)
             
             if 'altitude' in location:
-                location_parts.append(f"Altitude: {location['altitude']:.1f}m")
+                alt_str = "{:.1f}".format(location['altitude'])
+                location_parts.append("Altitude: " + alt_str + "m")
             
             if location_parts:
                 lines.append(", ".join(location_parts))
@@ -1565,10 +1625,10 @@ class ImageDescriber:
             camera_parts = []
             
             if 'make' in camera and 'model' in camera:
-                camera_parts.append(f"{camera['make']} {camera['model']}")
+                camera_parts.append(str(camera['make']) + " " + str(camera['model']))
             
             if 'lens' in camera:
-                camera_parts.append(f"Lens: {camera['lens']}")
+                camera_parts.append("Lens: " + str(camera['lens']))
             
             if camera_parts:
                 lines.append("Camera: " + ", ".join(camera_parts))
@@ -1919,19 +1979,35 @@ Configuration:
     
     # Check provider availability (only for Ollama to maintain backward compatibility)
     if args.provider == "ollama":
+        available_models = []
+        ollama_ok = False
+        # Try python client first
+        if ollama is not None and hasattr(ollama, 'list'):
+            try:
+                models = ollama.list()
+                available_models = [model['name'] for model in models.get('models', [])]
+                ollama_ok = True
+                logger.info("Ollama is available (python client)")
+            except Exception as e:
+                logger.warning(f"Ollama python client check failed: {e}")
+        # Fallback to HTTP API
+        if not ollama_ok:
+            try:
+                import requests
+                tags = requests.get("http://127.0.0.1:11434/api/tags", timeout=3)
+                tags.raise_for_status()
+                data = tags.json()
+                available_models = [m.get('name') for m in data.get('models', []) if m.get('name')]
+                ollama_ok = True
+                logger.info("Ollama is available (HTTP)")
+            except Exception as e:
+                logger.error(f"Ollama is not available or not running: {e}")
+                logger.error("Please make sure Ollama is installed and running")
+                sys.exit(1)
+
+        # Check if the specified model is available (best effort)
         try:
-            ollama.list()
-            logger.info("Ollama is available")
-        except Exception as e:
-            logger.error(f"Ollama is not available or not running: {e}")
-            logger.error("Please make sure Ollama is installed and running")
-            sys.exit(1)
-        
-        # Check if the specified model is available
-        try:
-            models = ollama.list()
-            available_models = [model['name'] for model in models.get('models', [])]
-            if describer.model_name not in available_models:
+            if available_models and describer.model_name not in available_models:
                 logger.error(f"Model '{describer.model_name}' is not available")
                 logger.error(f"Available models: {', '.join(available_models)}")
                 logger.info(f"You can install the model with: ollama pull {describer.model_name}")
