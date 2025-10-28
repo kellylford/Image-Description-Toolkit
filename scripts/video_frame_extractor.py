@@ -2,6 +2,7 @@
 """
 Video Frame Extractor
 Extracts frames from video files based on configurable options including scene change detection.
+Embeds source video metadata (GPS, date, camera) into extracted frames.
 """
 
 import cv2
@@ -10,11 +11,19 @@ import json
 import argparse
 import numpy as np
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Dict, Any
 import time
 import logging
 from datetime import datetime
 import sys
+
+# Import video metadata extraction (optional - degrades gracefully if not available)
+try:
+    from video_metadata_extractor import VideoMetadataExtractor
+    from exif_embedder import ExifEmbedder
+    VIDEO_METADATA_AVAILABLE = True
+except ImportError:
+    VIDEO_METADATA_AVAILABLE = False
 
 class VideoFrameExtractor:
     def __init__(self, config_file: str = "video_frame_extractor_config.json", log_dir: str = None):
@@ -26,6 +35,19 @@ class VideoFrameExtractor:
         self.logger.info("VideoFrameExtractor initialized successfully")
         self.logger.info(f"Supported video formats: {', '.join(sorted(self.supported_formats))}")
         self.logger.info(f"Extraction mode: {self.config.get('extraction_mode', 'unknown')}")
+        
+        # Initialize metadata tools if available
+        if VIDEO_METADATA_AVAILABLE:
+            self.video_metadata_extractor = VideoMetadataExtractor()
+            self.exif_embedder = ExifEmbedder()
+            if self.video_metadata_extractor.ffprobe_available:
+                self.logger.info("Video metadata extraction enabled (ffprobe available)")
+            else:
+                self.logger.info("Video metadata extraction disabled (ffprobe not found)")
+        else:
+            self.video_metadata_extractor = None
+            self.exif_embedder = None
+            self.logger.info("Video metadata extraction disabled (modules not available)")
         
         # Initialize processing statistics
         self.statistics = {
@@ -130,24 +152,9 @@ class VideoFrameExtractor:
         try:
             config_path = Path(config_file)
             if not config_path.is_absolute():
-                # In frozen mode (PyInstaller), look for config next to executable first
-                # This allows workflow.py to update the config file and have it used
-                if getattr(sys, 'frozen', False):
-                    # Frozen mode: Check next to executable first
-                    exe_dir = Path(sys.executable).parent
-                    scripts_dir = exe_dir / 'scripts'
-                    if (scripts_dir / config_file).exists():
-                        config_path = scripts_dir / config_file
-                    elif (exe_dir / config_file).exists():
-                        config_path = exe_dir / config_file
-                    else:
-                        # Fallback to bundled config in temp directory
-                        script_dir = Path(__file__).parent
-                        config_path = script_dir / config_file
-                else:
-                    # Normal mode: Look in script directory
-                    script_dir = Path(__file__).parent
-                    config_path = script_dir / config_file
+                # Look for config file in script directory first
+                script_dir = Path(__file__).parent
+                config_path = script_dir / config_file
             
             if not config_path.exists():
                 self.logger.warning(f"Config file not found: {config_path}")
@@ -248,6 +255,18 @@ class VideoFrameExtractor:
         # Extract video name for frame naming
         video_name = Path(video_path).stem
         
+        # Extract video metadata once (if available)
+        video_metadata = None
+        if self.video_metadata_extractor and self.video_metadata_extractor.ffprobe_available:
+            try:
+                video_metadata = self.video_metadata_extractor.extract_metadata(Path(video_path))
+                if video_metadata:
+                    self.logger.info(f"Extracted metadata from video: GPS={('gps' in video_metadata)}, Date={('datetime' in video_metadata)}, Camera={('camera' in video_metadata)}")
+                else:
+                    self.logger.debug("No metadata found in video")
+            except Exception as e:
+                self.logger.debug(f"Could not extract video metadata: {e}")
+        
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             error_msg = f"Could not open video {video_path}"
@@ -298,6 +317,17 @@ class VideoFrameExtractor:
             
             success = cv2.imwrite(output_path, frame, [cv2.IMWRITE_JPEG_QUALITY, self.config["image_quality"]])
             if success:
+                # Embed video metadata into frame (if available)
+                if video_metadata and self.exif_embedder:
+                    try:
+                        self.exif_embedder.embed_metadata(
+                            Path(output_path),
+                            video_metadata,
+                            frame_time=timestamp
+                        )
+                    except Exception as e:
+                        self.logger.debug(f"Could not embed metadata in frame: {e}")
+                
                 extracted_files.append(output_path)
                 frame_count += 1
                 
@@ -328,6 +358,18 @@ class VideoFrameExtractor:
         
         # Extract video name for frame naming
         video_name = Path(video_path).stem
+        
+        # Extract video metadata once (if available)
+        video_metadata = None
+        if self.video_metadata_extractor and self.video_metadata_extractor.ffprobe_available:
+            try:
+                video_metadata = self.video_metadata_extractor.extract_metadata(Path(video_path))
+                if video_metadata:
+                    self.logger.info(f"Extracted metadata from video: GPS={('gps' in video_metadata)}, Date={('datetime' in video_metadata)}, Camera={('camera' in video_metadata)}")
+                else:
+                    self.logger.debug("No metadata found in video")
+            except Exception as e:
+                self.logger.debug(f"Could not extract video metadata: {e}")
         
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
@@ -388,6 +430,17 @@ class VideoFrameExtractor:
                     
                     success = cv2.imwrite(output_path, save_frame, [cv2.IMWRITE_JPEG_QUALITY, self.config["image_quality"]])
                     if success:
+                        # Embed video metadata into frame (if available)
+                        if video_metadata and self.exif_embedder:
+                            try:
+                                self.exif_embedder.embed_metadata(
+                                    Path(output_path),
+                                    video_metadata,
+                                    frame_time=timestamp
+                                )
+                            except Exception as e:
+                                self.logger.debug(f"Could not embed metadata in frame: {e}")
+                        
                         extracted_files.append(output_path)
                         self.statistics['frames_saved'] += 1
                         frame_count += 1
