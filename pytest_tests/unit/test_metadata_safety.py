@@ -27,16 +27,16 @@ class TestFormatStringSafety:
         }
         
         extractor = MetadataExtractor()
+        # Use public extraction API and ensure values are preserved literally
+        camera = extractor._extract_camera_info(mock_exif)
+        assert camera is not None, "Camera info should be extracted"
+        assert camera.get('make') == 'Camera{0}Brand'
+        assert camera.get('model') == 'Model{1}Name'
         
-        # Should not raise KeyError or ValueError
-        try:
-            camera_info = extractor._format_camera_info(mock_exif)
-            # If we get here, no exception was raised - good!
-            assert '{0}' in camera_info or '{1}' in camera_info or \
-                   'Camera' in camera_info, \
-                "Should preserve original text safely"
-        except (KeyError, ValueError) as e:
-            pytest.fail(f"Format string in camera info should not cause errors: {e}")
+        # Ensure downstream formatting (meta suffix) does not crash
+        meta = {'datetime_str': '1/1/2025 1:00P', 'camera': camera}
+        suffix = extractor.build_meta_suffix(Path('x.jpg'), meta)
+        assert isinstance(suffix, str)
     
     @pytest.mark.regression  
     def test_location_prefix_with_format_chars_safe(self):
@@ -106,8 +106,18 @@ class TestMetadataExtraction:
         }
         
         extractor = MetadataExtractor()
-        lat, lon = extractor._extract_gps_coordinates(mock_exif)
-        
+        exif_dict = {
+            'GPSInfo': {
+                'GPSLatitude': mock_exif['GPSLatitude'],
+                'GPSLatitudeRef': mock_exif['GPSLatitudeRef'],
+                'GPSLongitude': mock_exif['GPSLongitude'],
+                'GPSLongitudeRef': mock_exif['GPSLongitudeRef'],
+            }
+        }
+        loc = extractor._extract_location(exif_dict)
+        assert loc is not None and 'latitude' in loc and 'longitude' in loc
+        lat = loc['latitude']
+        lon = loc['longitude']
         # Should be approximately 28.1006, -80.5681
         assert 28.0 < lat < 28.2, f"Latitude {lat} should be ~28.1"
         assert -80.6 < lon < -80.5, f"Longitude {lon} should be ~-80.57"
@@ -140,4 +150,6 @@ class TestMetadataExtraction:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    # Allow running this test file directly
+    import unittest
+    unittest.main()

@@ -154,13 +154,24 @@ class MetadataExtractor:
         return None
     
     def _convert_gps_coordinate(self, coord_tuple) -> float:
-        """Convert GPS coordinate from tuple format to decimal degrees"""
+        """Convert GPS coordinate from EXIF tuple format to decimal degrees.
+        Supports values provided as floats or as (numerator, denominator) rationals.
+        """
+        def _val(x):
+            try:
+                # EXIF often stores rationals as (num, den)
+                if isinstance(x, (tuple, list)) and len(x) == 2:
+                    num, den = x
+                    return float(num) / float(den) if float(den) != 0 else 0.0
+                return float(x)
+            except Exception:
+                return 0.0
         try:
-            degrees = float(coord_tuple[0])
-            minutes = float(coord_tuple[1])
-            seconds = float(coord_tuple[2])
+            degrees = _val(coord_tuple[0])
+            minutes = _val(coord_tuple[1])
+            seconds = _val(coord_tuple[2])
             return degrees + (minutes / 60.0) + (seconds / 3600.0)
-        except:
+        except Exception:
             return 0.0
     
     def extract_metadata(self, image_path: Path) -> Dict[str, Any]:

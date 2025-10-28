@@ -161,12 +161,15 @@ class TestCasePreservationIntegration:
     complete workflow context, not just isolated functions.
     """
     
-    def test_args_name_to_directory_name(self, mock_args):
+    def test_args_name_to_directory_name(self):
         """Test the full path from args.name to directory name."""
         from scripts.workflow import sanitize_name
         
         # Simulate user providing --name MyRunHasUpperCase
-        args = mock_args(name="MyRunHasUpperCase")
+        class Args:
+            def __init__(self, name):
+                self.name = name
+        args = Args(name="MyRunHasUpperCase")
         
         # This is what the workflow code does
         if args.name:
@@ -176,7 +179,7 @@ class TestCasePreservationIntegration:
         assert workflow_name == "MyRunHasUpperCase", \
             "workflow_name should equal workflow_name_display for case preservation"
     
-    def test_different_case_styles(self, mock_args):
+    def test_different_case_styles(self):
         """Test that various case styles are preserved correctly."""
         test_cases = [
             "AllUpperCase",
@@ -201,5 +204,6 @@ class TestCasePreservationIntegration:
 
 
 if __name__ == "__main__":
-    # Allow running this test file directly
-    pytest.main([__file__, "-v"])
+    # Allow running this test file directly without pytest
+    import unittest
+    unittest.main()
