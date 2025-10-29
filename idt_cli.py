@@ -516,13 +516,28 @@ def main():
             return result.returncode
     
     elif command == 'version' or command == '--version' or command == '-v':
-        # Show version
-        version_file = get_resource_path('VERSION')
-        if version_file.exists():
-            print(f"Image Description Toolkit v{version_file.read_text().strip()}")
-        else:
-            print("Image Description Toolkit (version unknown)")
-        return 0
+        # Show version (with build number and git info)
+        try:
+            # Ensure scripts path is available for imports
+            scripts_path = get_resource_path('scripts')
+            if str(scripts_path) not in sys.path:
+                sys.path.insert(0, str(scripts_path))
+            from versioning import get_full_version, get_git_info, is_frozen
+            full = get_full_version()
+            sha, dirty = get_git_info()
+            mode = 'Frozen' if is_frozen() else 'Dev'
+            print(f"Image Description Toolkit {full}")
+            print(f"Commit: {sha or 'unknown'}{' (dirty)' if dirty else ''}")
+            print(f"Mode: {mode}")
+            return 0
+        except Exception:
+            # Fallback to plain VERSION file if anything goes wrong
+            version_file = get_resource_path('VERSION')
+            if version_file.exists():
+                print(f"Image Description Toolkit v{version_file.read_text().strip()}")
+            else:
+                print("Image Description Toolkit (version unknown)")
+            return 0
 
     elif command == 'descriptions-to-html':
         # Generate HTML from descriptions (descriptions_to_html.py)
