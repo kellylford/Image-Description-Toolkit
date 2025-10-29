@@ -323,7 +323,8 @@ class VideoFrameExtractor:
                         self.exif_embedder.embed_metadata(
                             Path(output_path),
                             video_metadata,
-                            frame_time=timestamp
+                            frame_time=timestamp,
+                            source_video_path=Path(video_path)
                         )
                     except Exception as e:
                         self.logger.debug(f"Could not embed metadata in frame: {e}")
@@ -436,7 +437,8 @@ class VideoFrameExtractor:
                                 self.exif_embedder.embed_metadata(
                                     Path(output_path),
                                     video_metadata,
-                                    frame_time=timestamp
+                                    frame_time=timestamp,
+                                    source_video_path=Path(video_path)
                                 )
                             except Exception as e:
                                 self.logger.debug(f"Could not embed metadata in frame: {e}")

@@ -28,6 +28,13 @@ except ImportError:
     # Fallback if resource manager not available
     def get_resource_path(relative_path):
         return Path(__file__).parent.parent / relative_path
+
+try:
+    from scripts.metadata_extractor import MetadataExtractor
+except ImportError:
+    # Fallback if metadata extractor not available
+    MetadataExtractor = None
+
 import re
 import os
 from pathlib import Path
@@ -121,6 +128,92 @@ def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
     except Exception as e:
         # Return epoch time if any error occurs (will sort to beginning)
         return datetime.fromtimestamp(0)
+
+
+def get_image_location_for_display(image_name: str, base_dir: Path) -> str:
+    """
+    Extract human-readable location (city, state, country) from image EXIF data.
+    
+    Only returns location if it already exists in the EXIF data - does not perform
+    reverse geocoding. Returns an empty string if no location data is available.
+    
+    Args:
+        image_name: The filename to search for
+        base_dir: Base directory containing workflow folders
+        
+    Returns:
+        Formatted location string (e.g., "Seattle, WA, USA") or empty string
+    """
+    if MetadataExtractor is None:
+        return ""
+    
+    try:
+        # Search for the image file in workflow directories (same logic as get_image_date_for_sorting)
+        image_path = None
+        for workflow_dir in base_dir.glob("wf_*"):
+            # Check common subdirectories where images might be
+            for subdir in ['converted_images', 'extracted_frames', '']:
+                if subdir:
+                    search_dir = workflow_dir / subdir
+                else:
+                    search_dir = workflow_dir
+                    
+                if search_dir.exists():
+                    # Look for the exact filename
+                    potential_path = search_dir / image_name
+                    if potential_path.exists():
+                        image_path = potential_path
+                        break
+                    
+                    # Also check subdirectories (for video frames)
+                    for img_file in search_dir.rglob(image_name):
+                        if img_file.is_file():
+                            image_path = img_file
+                            break
+                            
+                if image_path:
+                    break
+            if image_path:
+                break
+        
+        if not image_path or not image_path.exists():
+            return ""
+        
+        # Extract metadata using MetadataExtractor
+        extractor = MetadataExtractor()
+        if not extractor.is_supported_image(image_path):
+            return ""
+        
+        metadata = extractor.extract_metadata(image_path)
+        location_data = metadata.get('location')
+        
+        if not location_data:
+            return ""
+        
+        # Format location as "City, State, Country" (skipping missing parts)
+        # Do NOT include latitude/longitude - only human-readable text
+        parts = []
+        
+        # Add city if available
+        if 'city' in location_data and location_data['city']:
+            parts.append(location_data['city'])
+        
+        # Add state if available (could be 'state' or 'province')
+        if 'state' in location_data and location_data['state']:
+            parts.append(location_data['state'])
+        
+        # Add country if available (prefer 'country' over 'countrycode')
+        if 'country' in location_data and location_data['country']:
+            parts.append(location_data['country'])
+        elif 'countrycode' in location_data and location_data['countrycode']:
+            parts.append(location_data['countrycode'])
+        
+        # Join parts with comma-space separator
+        return ', '.join(parts) if parts else ""
+        
+    except Exception as e:
+        # Silently fail and return empty string if any error occurs
+        return ""
 
 
 def parse_description_file(file_path: Path) -> OrderedDict:
@@ -586,14 +679,22 @@ Default: date'''
         quotechar = '"'
     
     with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
-        # Create header row: Image Name, Prompt, Workflow, Model1, Model2, Model3, ...
-        headers = ['Image Name', 'Prompt', 'Workflow'] + unique_models
+        # Create header row: Image Name, Location, Prompt, Workflow, Model1, Model2, Model3, ...
+        headers = ['Image Name', 'Location', 'Prompt', 'Workflow'] + unique_models
         writer = csv.writer(csvfile, delimiter=delimiter, quoting=quoting, quotechar=quotechar)
         writer.writerow(headers)
         
+        # Create location cache to avoid re-reading same images
+        location_cache = {}
+        
         # Write data rows for each image+prompt+workflow combination
         for image_name, prompt_style, workflow_name in sorted_combinations:
-            row = [image_name, prompt_style, workflow_name if workflow_name else '(legacy)']
+            # Get location from cache or extract it
+            if image_name not in location_cache:
+                location_cache[image_name] = get_image_location_for_display(image_name, base_dir)
+            location = location_cache[image_name]
+            
+            row = [image_name, location, prompt_style, workflow_name if workflow_name else '(legacy)']
             
             # Add description from each model for this image+prompt+workflow combination
             for model_label in unique_models:
@@ -612,6 +713,11 @@ Default: date'''
     print(f"Format: {args.format.upper()} ({'comma-delimited with quotes' if args.format == 'csv' else 'tab-delimited' if args.format == 'tsv' else '@-delimited'})")
     print(f"Sort order: {'Date (oldest to newest)' if args.sort == 'date' else 'Alphabetical by filename'}")
     print(f"Total rows: {len(sorted_combinations) + 1} (including header)")
+    
+    # Report how many images have location data
+    images_with_location = sum(1 for loc in location_cache.values() if loc)
+    if images_with_location > 0:
+        print(f"Location data found for {images_with_location} of {len(location_cache)} images")
     
     if args.format == 'csv':
         print("\n[OK] This CSV file will open directly in Excel with proper column separation!")

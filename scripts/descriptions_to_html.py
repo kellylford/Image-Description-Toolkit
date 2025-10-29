@@ -163,7 +163,7 @@ class DescriptionEntry:
                     # Format with highlighted prefix
                     prefix_html = html.escape(potential_prefix)
                     description_html = html.escape(description_text).replace('\n', '<br>\n')
-                    html_content.append(f'<p><strong style="color: #0066CC;">📍 {prefix_html}</strong></p>')
+                    html_content.append(f'<p><strong style="color: #0066CC;">{prefix_html}</strong></p>')
                     html_content.append(f'<p>{description_html}</p>')
                 else:
                     # No prefix detected, display normally
