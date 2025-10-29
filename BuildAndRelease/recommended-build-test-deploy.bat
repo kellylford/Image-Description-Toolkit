@@ -19,43 +19,38 @@ REM Store original directory
 set "ORIGINAL_DIR=%CD%"
 cd /d "%~dp0.."
 
-echo [Step 1/3] Running unit tests...
+echo [Step 1/2] Running comprehensive test suite...
 echo.
-python run_unit_tests.py
+python tools\run_all_tests.py
 if errorlevel 1 (
     echo.
-    echo ERROR: Unit tests failed!
-    echo Build aborted.
+    echo ERROR: Tests failed!
+    echo Build aborted - please fix failing tests before building.
     cd /d "%ORIGINAL_DIR%"
+    pause
     exit /b 1
 )
 
 echo.
-echo [Step 2/3] Running smoke tests...
+echo [Step 2/2] Building all executables...
 echo.
-python run_unit_tests.py pytest_tests\smoke
-if errorlevel 1 (
-    echo.
-    echo ERROR: Smoke tests failed!
-    echo Build aborted.
-    cd /d "%ORIGINAL_DIR%"
-    exit /b 1
-)
-
-echo.
-echo [Step 3/3] Building executable...
-echo.
-call BuildAndRelease\build.bat
+call BuildAndRelease\builditall.bat
 if errorlevel 1 (
     echo.
     echo ERROR: Build failed!
     cd /d "%ORIGINAL_DIR%"
+    pause
     exit /b 1
 )
 
 echo.
 echo ========================================
 echo SUCCESS: All tests passed and build completed
+echo ========================================
+echo   - All 5 executables built successfully
+echo   - Unit tests: PASSED
+echo   - Syntax checks: PASSED
+echo   - Build scripts: VALIDATED
 echo ========================================
 echo.
 
