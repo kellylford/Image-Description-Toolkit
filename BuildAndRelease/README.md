@@ -134,3 +134,54 @@ All build outputs go to the project root directories:
 - All scripts can be run from anywhere in the project
 - Windows batch files use `cd /d "%~dp0.."` to find project root
 - PyInstaller spec file uses `../` paths for all sources
+
+## Versioning and Build Numbers
+
+This project uses a simple, consistent build version format and logs it at the start of every workflow log:
+
+- Format: `"<base> bldNNN"` (for example: `"3.5beta bld012"`)
+- Base version comes from the top‑level `VERSION` file
+- Build number source (in order of precedence):
+   1. Environment variable `IDT_BUILD_NUMBER`
+   2. GitHub Actions `GITHUB_RUN_NUMBER` (CI)
+   3. Local counter in `build/BUILD_TRACKER.json` (per base version)
+
+Implementation details:
+
+- Module: `scripts/versioning.py`
+   - `get_full_version()` returns the composed string (e.g., `"3.5beta bld007"`)
+   - `log_build_banner(logger)` writes a standardized banner (Version, Commit, Mode, UTC time)
+- Workflow: `scripts/workflow.py` logs the banner right after the logger is created
+- CLI: `idt version` prints the full version, commit, and mode
+
+Environment overrides (optional):
+
+- `IDT_BUILD_BASE` — override base version (otherwise read from `VERSION`)
+- `IDT_BUILD_NUMBER` — force a specific build number (useful for custom pipelines)
+
+Local vs CI behavior:
+
+- CI builds default to using `GITHUB_RUN_NUMBER` for the build number (no repo writes)
+- Local builds increment a per‑base counter in `build/BUILD_TRACKER.json`
+- Changing the base version in `VERSION` naturally resets the local counter for that base
+
+Viewing the version:
+
+```bash
+idt version
+```
+
+Log banner example (at the top of workflow logs):
+
+```
+Image Description Toolkit
+Version: 3.5beta bld012
+Commit: abc1234
+Mode: Dev
+Start: 2025-10-29T01:23:45Z
+```
+
+Notes:
+
+- No changes to your existing `releaseitall.bat` / `build_installer.bat` flow are required
+- The version banner appears automatically in logs and the CLI version output
