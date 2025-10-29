@@ -26,6 +26,11 @@ echo ========================================================================
 echo BUILD ALL APPLICATIONS
 echo ========================================================================
 echo.
+REM Show composed build version and commit before starting
+echo --- Build Version Banner (pre-build) ---
+python idt_cli.py version
+echo ----------------------------------------
+echo.
 echo This will build all five applications:
 echo   1. IDT (main toolkit)
 echo   2. Viewer
@@ -163,6 +168,14 @@ if "%BUILD_ERRORS%"=="0" (
     echo SUCCESS: All applications built successfully
 ) else (
     echo ERRORS: %BUILD_ERRORS% build failures encountered
+)
+
+REM Show version from built CLI if available
+if exist "dist\idt.exe" (
+    echo.
+    echo --- Built Executable Version ---
+    dist\idt.exe version
+    echo --------------------------------
 )
 
 echo.

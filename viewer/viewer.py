@@ -68,6 +68,15 @@ except ImportError as e:
     format_timestamp = None
     parse_directory_name = None
 
+# Versioning banner (development and frozen)
+try:
+    # versioning.py lives in scripts_dir
+    from versioning import log_build_banner, get_full_version, is_frozen
+except Exception:
+    log_build_banner = None
+    get_full_version = None
+    is_frozen = None
+
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QLabel, QPushButton, 
     QFileDialog, QMessageBox, QAbstractItemView, QTextEdit, QDialog, QComboBox, QDialogButtonBox, 
@@ -1585,6 +1594,13 @@ Keyboard shortcuts:
     filtered_args = [arg for arg in sys.argv if not arg.startswith('-platform')]
     args = parser.parse_args(filtered_args[1:])  # Skip program name
     
+    # Log standardized build banner at startup (stdout if no logger)
+    if log_build_banner:
+        try:
+            log_build_banner()
+        except Exception:
+            pass
+
     # Create Qt application
     app = QApplication(sys.argv)
     viewer = ImageDescriptionViewer()

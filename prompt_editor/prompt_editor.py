@@ -61,6 +61,14 @@ except ImportError as e:
     AI_PROVIDERS_AVAILABLE = False
     print(f"Warning: AI providers not available: {e}")
 
+# Versioning support (for standardized banner and app version)
+try:
+    # We already inserted repo root to sys.path below; import from scripts package
+    from scripts.versioning import log_build_banner, get_full_version
+except Exception:
+    log_build_banner = None
+    get_full_version = None
+
 
 class PromptEditorMainWindow(QMainWindow):
     """Main window for the prompt editor application"""
@@ -1079,9 +1087,23 @@ class PromptEditorMainWindow(QMainWindow):
 
 def main():
     """Main application entry point"""
+    # Log standardized build banner at startup to stdout (if available)
+    if log_build_banner:
+        try:
+            log_build_banner()
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     app.setApplicationName("Prompt Editor")
-    app.setApplicationVersion("1.0")
+    # Use composed version string if available
+    try:
+        if get_full_version:
+            app.setApplicationVersion(get_full_version())
+        else:
+            app.setApplicationVersion("1.0")
+    except Exception:
+        app.setApplicationVersion("1.0")
     
     # Set application properties for accessibility
     app.setOrganizationName("Image Description Toolkit")
