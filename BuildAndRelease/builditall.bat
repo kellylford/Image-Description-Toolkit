@@ -31,6 +31,19 @@ echo --- Build Version Banner (pre-build) ---
 python idt_cli.py version
 echo ----------------------------------------
 echo.
+
+REM Pre-build validation: Check spec file completeness
+echo.
+echo [Pre-Build Check] Verifying PyInstaller spec file...
+python BuildAndRelease\check_spec_completeness.py
+if errorlevel 1 (
+    echo.
+    echo ERROR: Spec file is incomplete! Fix the issues above before building.
+    echo.
+    pause
+    exit /b 1
+)
+echo.
 echo This will build all five applications:
 echo   1. IDT (main toolkit)
 echo   2. Viewer
@@ -178,6 +191,27 @@ if exist "dist\idt.exe" (
     echo --------------------------------
 )
 
+REM Post-build validation: Test the built executable
+if exist "dist\idt.exe" (
+    echo.
+    echo [Post-Build Check] Validating built executable...
+    python BuildAndRelease\validate_build.py
+    if errorlevel 1 (
+        echo.
+        echo WARNING: Build validation found issues!
+        echo The executable may not work correctly in production.
+        echo Review the errors above and rebuild after fixing.
+        echo.
+        set /a BUILD_ERRORS+=1
+    )
+)
+
 echo.
 
-exit /b 0
+if "%BUILD_ERRORS%"=="0" (
+    exit /b 0
+) else (
+    echo.
+    echo Build completed with %BUILD_ERRORS% error(s).
+    exit /b 1
+)
