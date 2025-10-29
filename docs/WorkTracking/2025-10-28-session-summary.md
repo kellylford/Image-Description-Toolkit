@@ -173,5 +173,132 @@ User confirmed geocoding is now working beautifully:
 - Root cause for prior CLI smoke failure: Windows attempted cp1252 decoding of UTF-8 help text (byte 0x8F). Explicit UTF-8 with `errors='replace'` resolved it.
 - This makes CI robust across Windows/Linux runners.
 
+---
+
+## Update — 2025-10-28 (late evening) — Viewer Simplification + Source File Tracking
+
+### Major Changes
+
+#### 1. Viewer Simplification - Removed HTML Parsing Mode (~80 lines removed)
+**Problem**: Viewer had dual code paths (HTML parsing vs text file parsing). HTML parser was buggy, fragile, and less robust.
+
+**Root Cause of "Strong Strong" Bug**: 
+- HTML generator creates TWO `<p>` tags when date prefix exists:
+  1. First `<p>`: Date prefix wrapped in `<strong>` tag
+  2. Second `<p>`: Actual description text
+- Old HTML regex only captured first `<p>`, so viewer only showed date with `<strong>` tags
+- Screen readers announced "strong strong" instead of clean text
+
+**Solution**: Removed HTML parsing entirely, always use text file parser.
+
+**Files Modified**:
+- `viewer/viewer.py`
+  - ❌ Deleted: `load_html_descriptions()` function (70+ lines)
+  - ❌ Deleted: `toggle_live_mode()` function
+  - ❌ Deleted: Live Mode checkbox from UI
+  - ❌ Deleted: `self.live_mode` variable and all references
+  - ✅ Simplified: `load_descriptions()` always uses text parser
+  - ✅ Simplified: `update_title()`, `on_file_changed()`, `refresh_live_content()`
+  - ✅ Changed: Refresh button always visible (not hidden/shown)
+
+**Technical Rationale**:
+- Text file parser is more robust (line-by-line vs regex)
+- Works during workflow execution (incremental) AND after completion (full file)
+- No HTML tag stripping needed (better for accessibility)
+- Same data in both formats, but text parsing is simpler
+- One code path = easier maintenance, fewer bugs
+
+**Result**: 
+- ✅ Fixed "strong strong" screen reader issue
+- ✅ Removed ~80 lines of complex HTML parsing code
+- ✅ Single, reliable code path
+- ✅ Same user experience, more maintainable
+
+#### 2. Source File Tracking for Video Frames
+**User Need**: When reviewing a cool frame at 20 seconds, users need to know which video file to go back to for more context or per-second extraction.
+
+**Implementation**: End-to-end source file tracking through EXIF metadata.
+
+**Files Modified**:
+
+**a) EXIF Embedder** (`scripts/exif_embedder.py`)
+- Added `source_video_path` parameter to `embed_metadata()`
+- Embeds format: `"Extracted from video: /path/to/video.mp4 at 12.34s"`
+- Stores in both `ImageDescription` and `UserComment` EXIF fields for redundancy
+
+**b) Video Frame Extractor** (`scripts/video_frame_extractor.py`)
+- Updated `extract_frames_time_interval()` to pass `source_video_path=Path(video_path)`
+- Updated `extract_frames_scene_change()` to pass `source_video_path=Path(video_path)`
+- Every extracted frame now has source video path embedded in EXIF
+
+**c) Metadata Extractor** (`scripts/metadata_extractor.py`)
+- Added `_extract_source_file()` method
+- Reads EXIF `ImageDescription` and `UserComment` fields
+- Parses format and returns: `{'path': '...', 'type': 'video', 'timestamp': '12.34s'}`
+- Integrated into `extract_metadata()` function
+
+**d) Image Describer** (`scripts/image_describer.py`)
+- Updated `write_description_to_file()` to include source file info
+- Adds `Source:` field after `Path:` field in description file
+- Format: `Source: /path/to/video.mp4 at 12.34s`
+- Only appears when source info available in metadata
+
+**e) Viewer** (`viewer/viewer.py`)
+- Updated `_parse_entry()` to recognize `Source:` field
+- Stores in `entry['metadata']['source']`
+- Added to field exclusion list (won't appear in description text)
+- Parsed correctly (not yet displayed in UI, but available for future enhancement)
+
+**Example Description Entry**:
+```
+File: vacation_45.23s.jpg
+Path: /workflow/images/vacation_45.23s.jpg
+Source: /videos/family_vacation.mp4 at 45.23s
+Photo Date: 7/15/2024 3:45P
+Camera: Canon EOS R5
+Provider: ollama
+Model: llava
+Prompt Style: narrative
+Description: A stunning sunset over the ocean...
+```
+
+**Technical Decisions**:
+- **Why EXIF?** Standard, universal, persistent (stays with image if moved), human-readable
+- **Why ImageDescription?** Standard EXIF field meant for this purpose
+- **Why parse in viewer?** Ensures field doesn't get mistaken for description text; ready for future UI display
+
+**Testing Status**: ⏳ Awaiting user build and test
+1. Extract frames: `idt videoextract /videos/test.mp4`
+2. Describe frames: `idt describe /workflow/images`
+3. Verify `Source:` field in description file
+4. Open in viewer to confirm parsing
+
+### Syntax Validation
+All modified files compiled successfully:
+```bash
+python -m py_compile scripts/exif_embedder.py scripts/video_frame_extractor.py \
+  scripts/metadata_extractor.py scripts/image_describer.py viewer/viewer.py
+```
+✅ Exit code: 0
+
+### User-Facing Benefits
+
+**Viewer Simplification**:
+- 🛡️ Fixed accessibility bug (screen reader "strong strong" issue)
+- 🚀 More reliable description display
+- 🧹 Cleaner, simpler codebase (easier to maintain)
+- 📊 Always shows accurate progress and stats
+- ✨ No visible change to user experience
+
+**Source File Tracking**:
+- 🎬 Know which video every frame came from
+- ⏱️ Know exact timestamp of extraction (e.g., "at 45.23s")
+- 🔍 Easy to find original content for deeper review
+- 🎯 Perfect for spotting cool moments and drilling in per-second
+- 📝 Automatically embedded in EXIF and description files
+
+### Next Session Reminder
+**Ask Kelly**: How did the build go? Is source file tracking working for video frames?
+
 ```"
 

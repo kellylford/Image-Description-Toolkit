@@ -914,6 +914,15 @@ class ImageDescriber:
             if output_format.get('include_file_path', True):
                 entry += "Path: " + str(image_path) + "\n"
             
+            # Add source file info if available (video frames, converted images)
+            if metadata and 'source_file' in metadata:
+                source = metadata['source_file']
+                if source.get('type') == 'video':
+                    source_line = "Source: " + str(source.get('path', 'Unknown'))
+                    if 'timestamp' in source:
+                        source_line += " at " + str(source['timestamp'])
+                    entry += source_line + "\n"
+            
             # Add metadata if enabled and available
             if output_format.get('include_metadata', True) and metadata:
                 metadata_str = self.format_metadata(metadata)

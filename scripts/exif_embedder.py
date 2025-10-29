@@ -20,7 +20,8 @@ class ExifEmbedder:
     def embed_metadata(self, 
                       image_path: Path, 
                       metadata: Dict[str, Any],
-                      frame_time: Optional[float] = None) -> bool:
+                      frame_time: Optional[float] = None,
+                      source_video_path: Optional[Path] = None) -> bool:
         """
         Embed video metadata into a JPEG image as EXIF data.
         
@@ -31,6 +32,7 @@ class ExifEmbedder:
                 - datetime: datetime object
                 - camera: {make, model}
             frame_time: Optional time offset in seconds from video start
+            source_video_path: Optional path to source video file
         
         Returns:
             True if successful, False otherwise
@@ -73,11 +75,24 @@ class ExifEmbedder:
                 if 'model' in camera:
                     exif_dict['0th'][piexif.ImageIFD.Model] = camera['model']
             
-            # Add comment indicating source
-            exif_dict['0th'][piexif.ImageIFD.ImageDescription] = b'Extracted from video'
-            exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
-                'Frame extracted with metadata from source video'
-            )
+            # Add source video path and extraction info
+            if source_video_path:
+                # Store source video path in ImageDescription
+                source_info = f'Extracted from video: {source_video_path}'
+                if frame_time is not None:
+                    source_info += f' at {frame_time:.2f}s'
+                exif_dict['0th'][piexif.ImageIFD.ImageDescription] = source_info.encode('utf-8')
+                
+                # Also store in UserComment for redundancy
+                exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
+                    source_info
+                )
+            else:
+                # Fallback if no source path provided
+                exif_dict['0th'][piexif.ImageIFD.ImageDescription] = b'Extracted from video'
+                exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
+                    'Frame extracted with metadata from source video'
+                )
             
             # Convert to bytes and save
             exif_bytes = piexif.dump(exif_dict)

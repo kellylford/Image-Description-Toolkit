@@ -149,6 +149,14 @@ class DescriptionFileParser:
                 entry['relative_path'] = line[6:].strip()
             elif line.startswith('Path: '):
                 entry['file_path'] = line[6:].strip()
+            elif line.startswith('Source: '):
+                entry['metadata']['source'] = line[8:].strip()
+            elif line.startswith('Photo Date: '):
+                entry['metadata']['photo_date'] = line[12:].strip()
+            elif line.startswith('Camera: '):
+                entry['metadata']['camera'] = line[8:].strip()
+            elif line.startswith('Provider: '):
+                entry['metadata']['provider'] = line[10:].strip()
             elif line.startswith('Model: '):
                 entry['model'] = line[7:].strip()
             elif line.startswith('Prompt Style: '):
@@ -158,7 +166,10 @@ class DescriptionFileParser:
                 description_lines.append(line[13:].strip())
             elif line.startswith('Timestamp: '):
                 entry['metadata']['timestamp'] = line[11:].strip()
-            elif description_started and not line.startswith(('Timestamp:', 'File:', 'Path:', 'Model:', 'Prompt Style:')):
+            elif line.startswith('[') and line.endswith(']'):
+                # Skip summary lines like "[12/31/2001 8:00A, CAMERA]"
+                continue
+            elif description_started and not line.startswith(('Timestamp:', 'File:', 'Path:', 'Source:', 'Model:', 'Prompt Style:', 'Photo Date:', 'Camera:', 'Provider:')):
                 description_lines.append(line)
         
         if description_lines:
@@ -816,8 +827,7 @@ class ImageDescriptionViewer(QWidget):
         self.descriptions_updated = []  # Track which descriptions have been updated
         self.redescribing_rows = set()  # Track which rows are currently being redescribed
         
-        # Live monitoring components
-        self.live_mode = False
+        # Monitoring components (always active)
         self.description_parser = DescriptionFileParser()
         self.workflow_monitor = None
         self.file_watcher = QFileSystemWatcher()
@@ -846,19 +856,12 @@ class ImageDescriptionViewer(QWidget):
         self.dir_label.setAccessibleDescription("Shows the currently loaded workflow output directory.")
         dir_layout.addWidget(self.dir_label)
         
-        # Live mode checkbox
-        self.live_mode_checkbox = QCheckBox("Live Mode")
-        self.live_mode_checkbox.setAccessibleName("Live Mode Toggle")
-        self.live_mode_checkbox.setAccessibleDescription("Enable live monitoring of workflow progress. Updates descriptions in real-time as they are generated.")
-        self.live_mode_checkbox.stateChanged.connect(self.toggle_live_mode)
-        dir_layout.addWidget(self.live_mode_checkbox)
-        
-        # Refresh button (for live mode)
+        # Refresh button (for manual updates)
         self.refresh_btn = QPushButton("Refresh")
         self.refresh_btn.setAccessibleName("Refresh Button")
-        self.refresh_btn.setAccessibleDescription("Manually refresh the live content to check for new descriptions. Will preserve your current position.")
+        self.refresh_btn.setAccessibleDescription("Manually refresh the content to check for new or updated descriptions. Will preserve your current position.")
         self.refresh_btn.clicked.connect(self.manual_refresh)
-        self.refresh_btn.setVisible(False)
+        dir_layout.addWidget(self.refresh_btn)
         dir_layout.addWidget(self.refresh_btn)
         
         self.browse_results_btn = QPushButton("Browse Results")
@@ -950,22 +953,6 @@ class ImageDescriptionViewer(QWidget):
         self.status_bar.showMessage("Ready")
         layout.addWidget(self.status_bar)
 
-    def toggle_live_mode(self, checked):
-        """Toggle between live mode and HTML mode"""
-        self.live_mode = checked
-        self.refresh_btn.setVisible(checked)
-        
-        if checked:
-            self.status_bar.showMessage("Live mode enabled - monitoring for updates")
-            if self.current_dir:
-                self.start_live_monitoring()
-        else:
-            self.status_bar.showMessage("Live mode disabled - using final HTML output")
-            self.stop_live_monitoring()
-            # Reload from HTML if available
-            if self.current_dir:
-                self.load_descriptions(self.current_dir)
-    
     def start_live_monitoring(self):
         """Start monitoring the descriptions file for changes"""
         if not self.current_dir:
@@ -992,8 +979,7 @@ class ImageDescriptionViewer(QWidget):
             # Load initial content
             self.refresh_live_content()
         else:
-            self.status_bar.showMessage("Descriptions file not found - live mode unavailable")
-            self.live_mode_checkbox.setChecked(False)
+            self.status_bar.showMessage("Descriptions file not found")
     
     def stop_live_monitoring(self):
         """Stop monitoring for live updates"""
@@ -1023,13 +1009,8 @@ class ImageDescriptionViewer(QWidget):
         
         # Always show count if we have descriptions loaded
         if len(self.descriptions) > 0:
-            total = len(self.descriptions)
-            current = total  # For non-live mode, all descriptions are loaded
-            
-            # In live mode, use the progress info if available
-            if self.live_mode and self.progress_info.get("total", 0) > 0:
-                current = self.progress_info.get("current", 0)
-                total = self.progress_info.get("total", 0)
+            total = self.progress_info.get("total", 0) if self.progress_info.get("total", 0) > 0 else len(self.descriptions)
+            current = self.progress_info.get("current", 0) if self.progress_info.get("total", 0) > 0 else len(self.descriptions)
             
             # Calculate percentage (no decimal points)
             percentage = int((current / total * 100)) if total > 0 else 0
@@ -1037,8 +1018,8 @@ class ImageDescriptionViewer(QWidget):
             # Format: "XX%, X of Y images described"
             status_text = f"{percentage}%, {current} of {total} images described"
             
-            # Add (Live) indicator if in active live mode
-            if self.live_mode and self.progress_info.get("active", False):
+            # Add (Live) indicator if workflow is still active
+            if self.progress_info.get("active", False):
                 title = f"{base_title} - {status_text} (Live)"
             else:
                 title = f"{base_title} - {status_text}"
@@ -1068,7 +1049,7 @@ class ImageDescriptionViewer(QWidget):
     
     def on_file_changed(self, path):
         """Handle file system changes with focus preservation"""
-        if self.live_mode and not self.updating_content:
+        if not self.updating_content:
             # Only update if user isn't actively interacting
             focused_widget = QApplication.focusWidget()
             if focused_widget in [self.list_widget, self.description_text]:
@@ -1080,7 +1061,7 @@ class ImageDescriptionViewer(QWidget):
     
     def refresh_live_content(self):
         """Refresh content from live descriptions file with focus preservation"""
-        if not self.live_mode or not self.current_dir:
+        if not self.current_dir:
             return
         
         # Check if user is actively interacting - if so, defer update
@@ -1216,7 +1197,7 @@ class ImageDescriptionViewer(QWidget):
             self.load_descriptions(dir_path)
 
     def load_descriptions(self, dir_path):
-        """Load descriptions from either HTML or live file based on mode"""
+        """Load descriptions from text file (always uses live file parser)"""
         self.current_dir = dir_path
         self.dir_label.setText(f"Loaded: {dir_path}")
         
@@ -1226,78 +1207,14 @@ class ImageDescriptionViewer(QWidget):
         # Stop any existing monitoring
         self.stop_live_monitoring()
         
-        # Check if live mode should be auto-enabled
+        # Always use the text file parser (simpler and more reliable than HTML parsing)
         descriptions_file = Path(dir_path) / "descriptions" / "image_descriptions.txt"
-        html_file = Path(dir_path) / "html_reports" / "image_descriptions.html"
         
-        # Auto-enable live mode if descriptions file exists but HTML doesn't
-        if descriptions_file.exists() and not html_file.exists():
-            self.live_mode_checkbox.setChecked(True)
-            self.live_mode = True
-        
-        if self.live_mode:
+        if descriptions_file.exists():
             self.start_live_monitoring()
         else:
-            self.load_html_descriptions(dir_path)
+            QMessageBox.warning(self, "Error", "Descriptions file not found. Please select a valid workflow output directory.")
     
-    def load_html_descriptions(self, dir_path):
-        """Load descriptions from HTML file (original behavior)"""
-        html_path = os.path.join(dir_path, "html_reports", "image_descriptions.html")
-        self.image_files = []
-        self.descriptions = []
-        self.descriptions_updated = []  # Reset updated tracking
-        self.redescribing_rows = set()  # Reset redescribing tracking
-        self.list_widget.clear()
-        
-        if os.path.isfile(html_path):
-            try:
-                with open(html_path, "r", encoding="utf-8") as f:
-                    html = f.read()
-                import re
-                entry_pattern = re.compile(r'<div class="entry" id="entry-\d+">.*?<h2>(.*?)</h2>.*?<h4>Description</h4>.*?<p>(.*?)</p>', re.DOTALL)
-                entries = entry_pattern.findall(html)
-                from PyQt6.QtWidgets import QListWidgetItem
-                for img_path, desc in entries:
-                    img_path = img_path.replace('\\', os.sep).replace('/', os.sep)
-                    desc = re.sub(r'<br\s*/?>', '\n', desc)
-                    desc = re.sub(r'&[a-zA-Z0-9#]+;', lambda m: {
-                        '&quot;': '"', '&#x27;': "'", '&amp;': '&', '&lt;': '<', '&gt;': '>'
-                    }.get(m.group(0), m.group(0)), desc)
-                    self.image_files.append(os.path.join(dir_path, img_path))
-                    self.descriptions.append(desc.strip())
-                    self.descriptions_updated.append(False)  # Track that this is original description
-                    truncated = desc[:100] + ("..." if len(desc) > 100 else "")
-                    item = QListWidgetItem(truncated)
-                    from PyQt6.QtCore import Qt
-                    item.setData(Qt.ItemDataRole.AccessibleTextRole, desc.strip())
-                    self.list_widget.addItem(item)
-                if self.descriptions:
-                    self.list_widget.setCurrentRow(0)
-                    # Set focus to the list so users can immediately start navigating
-                    # But only if no other widget currently has focus
-                    if not QApplication.focusWidget():
-                        self.list_widget.setFocus()
-                    # Update title with description count
-                    self.update_title()
-                else:
-                    QMessageBox.information(self, "No Descriptions", "No image descriptions found in HTML report.")
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to parse HTML report: {e}")
-        else:
-            # Try live mode if HTML not available
-            descriptions_file = Path(dir_path) / "descriptions" / "image_descriptions.txt"
-            if descriptions_file.exists():
-                reply = QMessageBox.question(self, "HTML Not Found", 
-                                           "HTML report not found, but live descriptions file is available. Switch to live mode?",
-                                           QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                if reply == QMessageBox.StandardButton.Yes:
-                    self.live_mode_checkbox.setChecked(True)
-                    self.live_mode = True
-                    self.start_live_monitoring()
-                    return
-            
-            QMessageBox.warning(self, "Error", "HTML report not found. Please select a valid workflow output directory.")
-
     def manual_refresh(self):
         """Manually refresh content, preserving focus and position"""
         focused_widget = QApplication.focusWidget()
@@ -1347,7 +1264,7 @@ class ImageDescriptionViewer(QWidget):
             
             # Display metadata prefix if present
             if metadata_prefix:
-                self.metadata_label.setText(f"📍 {metadata_prefix}")
+                self.metadata_label.setText(metadata_prefix)
                 self.metadata_label.setVisible(True)
                 self.metadata_label.setAccessibleDescription(f"Image location and date: {metadata_prefix}")
             else:

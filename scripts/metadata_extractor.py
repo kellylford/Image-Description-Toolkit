@@ -153,6 +153,47 @@ class MetadataExtractor:
             pass
         return None
     
+    def _extract_source_file(self, exif_data: dict) -> Optional[Dict[str, str]]:
+        """Extract source file information from EXIF data (for video frames or converted images)"""
+        try:
+            source_info = {}
+            
+            # Check ImageDescription for video source
+            if 'ImageDescription' in exif_data:
+                desc = exif_data['ImageDescription']
+                if isinstance(desc, bytes):
+                    desc = desc.decode('utf-8', errors='ignore')
+                
+                # Parse "Extracted from video: /path/to/video.mp4 at 12.34s"
+                if desc and 'Extracted from video:' in desc:
+                    parts = desc.replace('Extracted from video:', '').strip().split(' at ')
+                    if parts:
+                        source_info['path'] = parts[0].strip()
+                        source_info['type'] = 'video'
+                        if len(parts) > 1:
+                            source_info['timestamp'] = parts[1].strip()
+            
+            # Check UserComment as fallback
+            if not source_info and 'UserComment' in exif_data:
+                try:
+                    from PIL.ExifTags import TAGS
+                    import piexif
+                    comment = piexif.helper.UserComment.load(exif_data['UserComment'])
+                    if comment and 'Extracted from video:' in comment:
+                        parts = comment.replace('Extracted from video:', '').strip().split(' at ')
+                        if parts:
+                            source_info['path'] = parts[0].strip()
+                            source_info['type'] = 'video'
+                            if len(parts) > 1:
+                                source_info['timestamp'] = parts[1].strip()
+                except Exception:
+                    pass
+            
+            return source_info if source_info else None
+        except Exception:
+            pass
+        return None
+    
     def _convert_gps_coordinate(self, coord_tuple) -> float:
         """Convert GPS coordinate from EXIF tuple format to decimal degrees.
         Supports values provided as floats or as (numerator, denominator) rationals.
@@ -218,6 +259,11 @@ class MetadataExtractor:
                 camera_info = self._extract_camera_info(exif_dict)
                 if camera_info:
                     metadata['camera'] = camera_info
+                
+                # Extract source file info (for video frames or converted images)
+                source_info = self._extract_source_file(exif_dict)
+                if source_info:
+                    metadata['source_file'] = source_info
         except Exception as e:
             # Silently fail - metadata is optional
             pass
