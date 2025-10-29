@@ -55,6 +55,11 @@ try:
 except ImportError:
     load_json_config = None
 import re
+try:
+    # Versioning utilities for logging banner
+    from versioning import log_build_banner
+except Exception:
+    log_build_banner = None
 
 
 def sanitize_name(name: str, preserve_case: bool = True) -> str:
@@ -422,6 +427,13 @@ class WorkflowOrchestrator:
         if base_output_dir:
             self.config.set_base_output_dir(base_output_dir)
         self.logger = WorkflowLogger("workflow_orchestrator", base_output_dir=self.config.base_output_dir)
+        # Log standardized build banner at the start of any log we create
+        try:
+            if log_build_banner is not None:
+                # WorkflowLogger wraps a real logger in .logger
+                log_build_banner(self.logger.logger)
+        except Exception:
+            pass
         self.discovery = FileDiscovery(self.config)
         
         # Store override settings for resume functionality
