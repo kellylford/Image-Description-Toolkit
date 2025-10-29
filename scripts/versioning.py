@@ -192,13 +192,16 @@ def log_build_banner(logger=None, stream=None) -> None:
         f"Start: {ts} UTC",
     ]
 
-    msg = "\n".join(lines)
     if logger is not None:
         try:
-            logger.info(msg)
+            # Log each line separately so they all appear in the log file
+            for line in lines:
+                logger.info(line)
         except Exception:
             pass
     else:
+        # For stdout/stream, join with newlines
+        msg = "\n".join(lines)
         out = stream or sys.stdout
         try:
             out.write(msg + "\n")

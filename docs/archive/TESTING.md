@@ -1,500 +1,335 @@
-# Image Description Toolkit - Testing Guide
+# Testing Guide for Image Description Toolkit
 
 ## Overview
 
-This document describes the testing strategy and guidelines for the Image Description Toolkit (IDT).
+IDT has a comprehensive testing system using pytest with unit, integration, and smoke tests. Tests are organized to run quickly in CI/CD and catch regressions before deployment.
 
-## Test Directory Structure
+## Test Structure
 
 ```
-tests/
-├── conftest.py              # Shared pytest fixtures and configuration  
-├── __init__.py              # Package marker
-├── unit/                    # Fast, isolated unit tests
-│   ├── test_sanitization.py   # Name sanitization and case preservation
-│   └── test_status_log.py     # ASCII-only status output
-├── integration/             # Multi-component integration tests
-│   └── (coming soon)
-└── fixtures/                # Test data and mock responses
-```
-
-## Quick Start
-
-### Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-This installs pytest, pytest-cov, and pytest-mock.
-
-### Run Tests
-
-```bash
-# From project root
-pytest
-
-# With verbose output
-pytest -v
-
-# With coverage
-pytest --cov=scripts --cov-report=html
-```
-
-### View Coverage Report
-
-```bash
-# Generate HTML coverage report
-pytest --cov=scripts --cov-report=html
-
-# Open in browser
-# Windows:
-start htmlcov/index.html
-
-# Linux/Mac:
-open htmlcov/index.html
+pytest_tests/
+├── conftest.py              # Shared fixtures and configuration
+├── unit/                    # Fast tests, no dependencies
+│   ├── test_metadata_safety.py
+│   ├── test_workflow_config.py
+│   ├── test_sanitization.py
+│   └── test_status_log.py
+├── integration/            # Slow tests, real operations
+│   ├── test_exif_preservation.py
+│   └── test_workflow_integration.py
+└── smoke/                  # Entry point validation
+    └── test_entry_points.py
 ```
 
 ## Test Categories
 
-### Unit Tests (`tests/unit/`)
+### Unit Tests (Fast)
+**Purpose**: Test individual functions and logic without dependencies  
+**Run time**: < 1 second per test  
+**Dependencies**: None (uses mocks)
 
-Fast, isolated tests for individual functions:
+**Current coverage**:
+- Format string injection safety (@pytest.mark.regression)
+- Config file I/O and race conditions
+- Input sanitization functions
+- Status logging utilities
 
-- **test_sanitization.py** - Name sanitization (`sanitize_name()`)
-  - Tests case preservation with `preserve_case=True`
-  - Tests lowercasing with `preserve_case=False`
-  - Tests special character handling
-  - Tests workflow directory naming
-  - **Regression prevention**: Ensures `--name MyRunHasUpperCase` isn't lowercased
+**When to run**: Every commit, before pushing code
 
-- **test_status_log.py** - Status log output formatting
-  - Tests ASCII-only symbols (`[ACTIVE]`, `[DONE]`, `[FAILED]`)
-  - Tests absence of Unicode symbols (⟳, ✓, ✗, →)
-  - Tests screen reader compatibility
-  - **Regression prevention**: Ensures no Unicode garbage in status logs
+### Integration Tests (Slow)
+**Purpose**: Test full workflows with real file operations  
+**Run time**: 1-10 seconds per test  
+**Dependencies**: Test images, temporary directories, PIL/piexif
 
-### Integration Tests (`tests/integration/`)
+**Current coverage**:
+- EXIF preservation through image optimization pipeline
+- GPS coordinate accuracy after conversion
+- End-to-end workflow execution (convert → describe → parse)
+- Video frame source tracking
 
-Tests that verify multiple components working together (coming soon):
+**When to run**: Before releases, after significant changes
 
-- Workflow execution end-to-end
-- CLI command parsing and execution
-- File conversion pipelines
-- Metadata extraction and geocoding
+### Smoke Tests (Quick Validation)
+**Purpose**: Verify applications launch without crashing  
+**Run time**: < 5 seconds total  
+**Dependencies**: Built executables (frozen mode)
 
-### End-to-End Tests
+**Current coverage**:
+- CLI entry points (idt.exe)
+- GUI launches (viewer, imagedescriber, etc.)
 
-Full pipeline tests on real/realistic data (coming soon):
+**When to run**: After building executables
 
-- Complete workflow with video, HEIC, and JPG files
-- HTML gallery generation
-- Analysis tools (CombineDescriptions, stats)
+## Running Tests
 
-## Running Specific Tests
-
-### By File
-
+### All Tests
 ```bash
-pytest tests/unit/test_sanitization.py -v
-pytest tests/unit/test_status_log.py -v
+pytest pytest_tests -v
 ```
 
-### By Class
-
+### By Category
 ```bash
-pytest tests/unit/test_sanitization.py::TestSanitizeName -v
-pytest tests/unit/test_status_log.py::TestStatusLogASCIISymbols -v
+# Unit tests only (fast)
+pytest pytest_tests/unit -v
+
+# Integration tests only (slow)
+pytest pytest_tests/integration -v
+
+# Smoke tests only
+pytest pytest_tests/smoke -v
 ```
 
-### By Method
-
+### By Marker
 ```bash
-pytest tests/unit/test_sanitization.py::TestSanitizeName::test_sanitize_name_preserves_case_when_requested -v
+# Only regression tests (for known bugs)
+pytest pytest_tests -m regression -v
+
+# Skip slow tests
+pytest pytest_tests -m "not slow" -v
 ```
 
-### By Keyword
-
+### With Coverage
 ```bash
-# Run all tests with "case" in the name
-pytest -k case -v
+# Coverage report in terminal
+pytest pytest_tests --cov=scripts --cov-report=term-missing
 
-# Run all tests with "ascii" in the name
-pytest -k ascii -v
+# HTML coverage report
+pytest pytest_tests --cov=scripts --cov-report=html
+# Opens in browser: htmlcov/index.html
 ```
 
-## Writing Tests
+### Specific Test File
+```bash
+pytest pytest_tests/integration/test_exif_preservation.py -v
+```
 
-### Test Structure
+### Specific Test Function
+```bash
+pytest pytest_tests/integration/test_exif_preservation.py::test_exif_preserved_through_quality_reduction -v
+```
 
+## Test Markers
+
+Defined in `pyproject.toml`:
+
+- `@pytest.mark.unit` - Unit tests (fast, no dependencies)
+- `@pytest.mark.integration` - Integration tests (slow, real operations)
+- `@pytest.mark.slow` - Tests taking >1 second
+- `@pytest.mark.regression` - Tests for specific bug fixes (should never fail)
+
+**Usage**:
 ```python
-import pytest
-from scripts.your_module import your_function
-
-class TestYourFeature:
-    """Test your feature description."""
-    
-    def test_basic_functionality(self):
-        """Test that basic case works correctly."""
-        result = your_function("input")
-        assert result == "expected", "Descriptive error message"
-    
-    def test_edge_case(self):
-        """Test that edge case is handled properly."""
-        result = your_function("")
-        assert isinstance(result, str), "Should return string even for empty input"
+@pytest.mark.regression
+@pytest.mark.unit
+def test_format_string_safety():
+    """Test that format strings don't cause KeyError with user data."""
+    # Test implementation
 ```
 
-### Using Fixtures
+## Shared Fixtures
 
-Fixtures from `conftest.py` are available to all tests:
+Available to all tests via `pytest_tests/conftest.py`:
 
+- `project_root_path` - Path to project root directory
+- `scripts_path` - Path to scripts/ directory
+- `test_fixtures_path` - Path to test fixtures
+- `temp_workflow_dir` - Temporary workflow directory structure
+- `mock_args` - Mock command-line arguments object
+
+**Usage**:
 ```python
-def test_with_temp_directory(temp_workflow_dir):
-    """Test that uses temporary workflow directory."""
+def test_something(temp_workflow_dir):
+    """Test using temporary workflow directory."""
     assert temp_workflow_dir.exists()
-    logs_dir = temp_workflow_dir / "logs"
-    assert logs_dir.exists()
+    # Test implementation
 ```
 
-### Custom Fixtures
+## Writing New Tests
 
-Add reusable fixtures to `conftest.py`:
-
+### Unit Test Template
 ```python
-@pytest.fixture
-def sample_image():
-    """Return path to a sample test image."""
-    return Path(__file__).parent / "fixtures" / "sample.jpg"
+"""Test module description."""
+
+import pytest
+
+@pytest.mark.unit
+def test_function_name():
+    """Test description explaining what is tested."""
+    # Arrange
+    input_data = "test data"
+    
+    # Act
+    result = function_to_test(input_data)
+    
+    # Assert
+    assert result == expected_value
 ```
 
-## Best Practices
-
-### 1. Name Tests Descriptively
-
-❌ Bad:
+### Integration Test Template
 ```python
-def test_name():
-    ...
+"""Integration test module description."""
+
+import pytest
+from pathlib import Path
+
+@pytest.mark.integration
+def test_workflow_step(tmp_path):
+    """Test description explaining workflow step."""
+    # Arrange - Create test files
+    test_image = tmp_path / "test.jpg"
+    # ... create test image with EXIF
+    
+    # Act - Run workflow step
+    result = workflow_function(test_image)
+    
+    # Assert - Verify results
+    assert result.exists()
+    # ... verify EXIF, content, etc.
 ```
 
-✅ Good:
+### Regression Test Template
 ```python
-def test_sanitize_name_preserves_case_when_preserve_case_true():
-    ...
+"""Regression test for bug #123."""
+
+import pytest
+
+@pytest.mark.regression
+@pytest.mark.unit
+def test_bug_123_format_string():
+    """
+    Regression test for format string bug.
+    
+    Bug: User EXIF data with {} characters caused KeyError.
+    Fix: Use % formatting instead of .format()
+    """
+    # Test implementation ensuring bug doesn't reoccur
 ```
 
-### 2. Test One Thing Per Test
+## Test Data
 
-❌ Bad:
+### Creating Test Images
 ```python
-def test_everything(self):
-    # Tests 10 different things
-    assert sanitize_name("A") == "A"
-    assert sanitize_name("B") == "B"
-    # ... 8 more assertions
+from PIL import Image
+import piexif
+
+def create_test_image_with_exif(output_path, width=1000, height=800):
+    """Create a test JPEG with EXIF metadata."""
+    # Create image
+    img = Image.new('RGB', (width, height), color='blue')
+    
+    # Create EXIF data
+    exif_dict = {
+        "0th": {
+            piexif.ImageIFD.Make: "Test Camera",
+            piexif.ImageIFD.Model: "Test Model",
+        },
+        "Exif": {
+            piexif.ExifIFD.DateTimeOriginal: "2025:10:29 12:00:00",
+        },
+        "GPS": {
+            piexif.GPSIFD.GPSLatitude: ((42, 1), (21, 1), (36, 1)),
+            piexif.GPSIFD.GPSLatitudeRef: 'N',
+        }
+    }
+    
+    exif_bytes = piexif.dump(exif_dict)
+    img.save(output_path, "JPEG", exif=exif_bytes)
 ```
 
-✅ Good:
-```python
-def test_preserves_uppercase_letters(self):
-    result = sanitize_name("ABC", preserve_case=True)
-    assert result == "ABC"
+### Test Image Sizes
+- **Small**: < 1MB (no optimization needed)
+- **Medium**: 1-3MB (quality reduction needed)
+- **Large**: > 5MB (aggressive resize needed)
 
-def test_converts_to_lowercase_when_requested(self):
-    result = sanitize_name("ABC", preserve_case=False)
-    assert result == "abc"
+## CI/CD Integration
+
+### GitHub Actions (Planned)
+See `docs/WorkTracking/ISSUE-automated-testing-cicd.md` for full roadmap.
+
+**Phase 2** (GitHub cloud runners):
+- Syntax checking (pyflakes, flake8)
+- Import validation
+- Unit tests
+- Build verification
+
+**Phase 3** (Self-hosted runner):
+- Integration tests with real images
+- Full workflow validation
+- Ollama model inference tests
+- Executable smoke tests
+
+### Pre-Commit Checklist
+Before committing code:
+1. Run unit tests: `pytest pytest_tests/unit -v`
+2. Run affected integration tests
+3. Check syntax: `python -m py_compile scripts/your_file.py`
+4. Run regression tests: `pytest -m regression -v`
+
+### Pre-Release Checklist
+Before creating a release:
+1. Run full test suite: `pytest pytest_tests -v`
+2. Run with coverage: `pytest pytest_tests --cov=scripts`
+3. Build all executables: `BuildAndRelease\builditall.bat`
+4. Run smoke tests on built executables
+5. Manually test critical workflows
+
+## Troubleshooting Tests
+
+### ImportError: No module named 'scripts'
+**Solution**: Run from project root, not from `pytest_tests/` directory.
+```bash
+# Wrong
+cd pytest_tests && pytest .
+
+# Right
+pytest pytest_tests
 ```
 
-### 3. Include Helpful Assertion Messages
+### PIL/Pillow Import Warnings
+**Expected**: Integration tests use PIL for EXIF manipulation.  
+**Action**: Ignore import warnings during test execution.
 
-❌ Bad:
-```python
-assert result == expected
-```
+### Test Fails Only in CI
+**Check**:
+- Path resolution (frozen vs dev mode)
+- Environment variables
+- Temporary directory permissions
+- Dependencies installed correctly
 
-✅ Good:
-```python
-assert result == expected, \
-    f"sanitize_name should preserve case, got '{result}' instead of '{expected}'"
-```
-
-### 4. Test Behavior, Not Implementation
-
-❌ Bad:
-```python
-def test_uses_regex_to_remove_special_chars(self):
-    # Tests how it's implemented
-    ...
-```
-
-✅ Good:
-```python
-def test_removes_special_characters_from_name(self):
-    # Tests what it does
-    result = sanitize_name("Run!@#$Name")
-    assert result == "RunName"
-```
-
-### 5. Cover Edge Cases
-
-Test the happy path AND edge cases:
-
-```python
-def test_handles_empty_string(self):
-    result = sanitize_name("")
-    assert isinstance(result, str)
-
-def test_handles_only_special_characters(self):
-    result = sanitize_name("!@#$%")
-    assert isinstance(result, str)
-
-def test_handles_very_long_names(self):
-    long_name = "A" * 1000
-    result = sanitize_name(long_name)
-    assert isinstance(result, str)
-```
-
-## Regression Testing
-
-**Every time you fix a bug, write a test for it.**
-
-### Process:
-
-1. **Write a test that reproduces the bug**
-   ```python
-   def test_name_case_preserved_in_directory(self):
-       """Regression test for bug where --name was lowercased."""
-       result = sanitize_name("MyRunHasUpperCase", preserve_case=True)
-       assert result == "MyRunHasUpperCase"  # This would fail with the bug
-   ```
-
-2. **Verify the test fails** (confirms it catches the bug)
-   ```bash
-   pytest tests/unit/test_sanitization.py::test_name_case_preserved_in_directory -v
-   # Should FAIL initially
-   ```
-
-3. **Fix the bug** in the code
-
-4. **Verify the test passes**
-   ```bash
-   pytest tests/unit/test_sanitization.py::test_name_case_preserved_in_directory -v
-   # Should PASS now
-   ```
-
-5. **Commit both the fix and the test**
-   ```bash
-   git add scripts/workflow.py tests/unit/test_sanitization.py
-   git commit -m "Fix: preserve case in --name parameter with test"
-   ```
-
-### Current Regression Tests
-
-- ✅ **Case preservation bug** (Oct 27, 2025)
-  - Test: `test_sanitization.py::TestWorkflowNameHandling`
-  - Bug: `--name MyRunHasUpperCase` was lowercased in directory name
-  - Fix: Use `preserve_case=True` for both display and directory
-
-- ✅ **Unicode symbols bug** (Oct 27, 2025)
-  - Test: `test_status_log.py::TestStatusLogASCIISymbols`
-  - Bug: Unicode symbols (⟳, ✓, ✗, →) rendered as garbage for screen readers
-  - Fix: Replace with ASCII equivalents (`[ACTIVE]`, `[DONE]`, `[FAILED]`, "to")
-
-## Test-Driven Development (TDD)
-
-For new features, write tests FIRST:
-
-### TDD Workflow:
-
-1. **Write the test** (it will fail - feature doesn't exist yet)
-   ```python
-   def test_new_feature_works(self):
-       result = new_feature("input")
-       assert result == "expected output"
-   ```
-
-2. **Run the test** (confirm it fails)
-   ```bash
-   pytest tests/unit/test_new_feature.py -v
-   # FAIL: NameError: name 'new_feature' is not defined
-   ```
-
-3. **Write minimal code to make it pass**
-   ```python
-   def new_feature(input):
-       return "expected output"  # Simplest implementation
-   ```
-
-4. **Run the test** (confirm it passes)
-   ```bash
-   pytest tests/unit/test_new_feature.py -v
-   # PASS
-   ```
-
-5. **Refactor** (improve code without breaking tests)
-
-6. **Repeat** for more complex cases
+### Tests Pass But Bug Exists
+**Common causes**:
+- Test data doesn't match real-world data
+- Test uses mocks that don't reflect actual behavior
+- Test coverage gap (add integration test)
+- Race condition not reproduced in test
 
 ## Coverage Goals
 
-### Targets:
+- **Unit Tests**: 60%+ coverage of core functions
+- **Integration Tests**: Critical workflows fully tested
+- **Regression Tests**: Every fixed bug has a test
 
-- **Minimum**: 60% overall coverage
-- **Goal**: 80% coverage
-- **Critical modules**: 90%+ coverage
-  - `workflow.py`
-  - `ConvertImage.py`
-  - `video_frame_extractor.py`
-  - `idt_cli.py`
-  - `idt_runner.py`
+**Current priority**: Image processing pipeline (conversion, EXIF, optimization)
 
-### Check Coverage:
+## Known Testing Gaps
 
-```bash
-# Generate report
-pytest --cov=scripts --cov-report=term-missing
+As of 2025-10-29:
 
-# See which lines aren't covered
-pytest --cov=scripts --cov-report=html
-# Open htmlcov/index.html
-```
+- ✅ Format string safety (covered)
+- ✅ Config file race conditions (covered)
+- ✅ EXIF preservation (NEW - added today)
+- ⏳ Geocoding API integration (planned)
+- ⏳ AI model inference (needs self-hosted runner)
+- ⏳ GUI automation (PyQt6 testing)
+- ⏳ Performance benchmarks (timing, memory)
 
-### Don't Aim for 100%:
+## References
 
-- Some code is hard to test (GUI event loops, main entry points)
-- Some code isn't worth testing (trivial getters/setters)
-- Focus on **critical business logic** and **regression prevention**
-
-## Continuous Integration
-
-Tests run automatically via GitHub Actions on every push.
-
-### Workflow File: `.github/workflows/tests.yml`
-
-```yaml
-name: Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: pytest --cov=scripts --cov-report=html
-      - uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: htmlcov/
-```
-
-### CI Requirements:
-
-- All tests must pass before merging PRs
-- Coverage should not decrease significantly
-- New features should include tests
-
-## Mocking External Dependencies
-
-Use `pytest-mock` for external dependencies:
-
-### Example: Mocking API Calls
-
-```python
-def test_geocoding_with_mock_api(mocker):
-    """Test geocoding without hitting real API."""
-    # Mock the requests.get function
-    mock_response = mocker.Mock()
-    mock_response.json.return_value = {"lat": 40.7128, "lon": -74.0060}
-    mock_response.status_code = 200
-    
-    mocker.patch('requests.get', return_value=mock_response)
-    
-    # Now test geocoding function
-    result = geocode_location("New York")
-    assert result["lat"] == 40.7128
-```
-
-### Example: Mocking File I/O
-
-```python
-def test_file_processing(mocker, tmp_path):
-    """Test file processing with temporary files."""
-    test_file = tmp_path / "test.txt"
-    test_file.write_text("test content")
-    
-    result = process_file(test_file)
-    assert result == "processed: test content"
-```
-
-## Debugging Failed Tests
-
-### Run with More Detail:
-
-```bash
-# Show print statements
-pytest -s
-
-# Show local variables on failure
-pytest -l
-
-# Stop on first failure
-pytest -x
-
-# Enter debugger on failure
-pytest --pdb
-```
-
-### Common Issues:
-
-1. **Import errors**: Run from project root, not `tests/` directory
-2. **File not found**: Use `tmp_path` fixture or `test_fixtures_path`
-3. **Tests pass locally but fail in CI**: Check for hardcoded paths, platform differences
-
-## Performance
-
-### Keep Tests Fast:
-
-- Unit tests should complete in milliseconds
-- Use mocks instead of real APIs/files
-- Use `tmp_path` for temporary files
-- Avoid sleep() in tests
-
-### Slow Tests:
-
-Mark slow tests so they can be skipped:
-
-```python
-@pytest.mark.slow
-def test_long_running_operation():
-    ...
-```
-
-Run fast tests only:
-```bash
-pytest -m "not slow"
-```
-
-## Resources
-
-- **pytest documentation**: https://docs.pytest.org/
-- **pytest-cov**: https://pytest-cov.readthedocs.io/
-- **pytest-mock**: https://pytest-mock.readthedocs.io/
-- **Test example**: `tools/ImageGallery/.../test_identify_gallery_content.py`
-
-## Questions?
-
-- Check test examples in `tests/unit/`
-- Review `conftest.py` for available fixtures
-- See `.github/ISSUE_AUTOMATED_TEST_SYSTEM.md` for overall testing strategy
+- **pytest docs**: https://docs.pytest.org/
+- **Coverage.py**: https://coverage.readthedocs.io/
+- **CI/CD Roadmap**: `docs/WorkTracking/ISSUE-automated-testing-cicd.md`
+- **Test configuration**: `pyproject.toml`
 
 ---
 
-**Created**: October 27, 2025  
-**Framework**: pytest 6.0+  
-**Coverage**: pytest-cov  
-**Mocking**: pytest-mock  
-**CI**: GitHub Actions
+**Questions?** See CI/CD roadmap issue or ask in session summaries.

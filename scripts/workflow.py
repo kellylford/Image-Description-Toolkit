@@ -404,7 +404,7 @@ class WorkflowOrchestrator:
     def __init__(self, config_file: str = "workflow_config.json", base_output_dir: Optional[Path] = None, 
                  model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", 
                  api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None,
-                 timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = False, 
+                 timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = True, 
                  geocode_cache: str = "geocode_cache.json"):
         """
         Initialize the workflow orchestrator
@@ -2152,9 +2152,9 @@ Viewing Results:
     )
     
     parser.add_argument(
-        "--geocode",
+        "--no-geocode",
         action="store_true",
-        help="Enable reverse geocoding to convert GPS coordinates to city/state/country (requires internet, adds API delay)"
+        help="Disable reverse geocoding (geocoding is enabled by default to convert GPS coordinates to city/state/country)"
     )
     
     parser.add_argument(
@@ -2356,7 +2356,7 @@ Viewing Results:
             workflow_name=workflow_name,
             timeout=args.timeout,
             enable_metadata=not args.no_metadata,  # Default True unless --no-metadata specified
-            enable_geocoding=args.geocode,  # Default False unless --geocode specified
+            enable_geocoding=not args.no_geocode,  # Default True unless --no-geocode specified
             geocode_cache=args.geocode_cache
         )
         

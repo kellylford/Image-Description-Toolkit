@@ -82,3 +82,85 @@ def test_get_full_version_with_env():
             os.environ.pop('IDT_BUILD_NUMBER', None)
         else:
             os.environ['IDT_BUILD_NUMBER'] = old_num
+
+
+def test_log_build_banner_with_logger():
+    """Verify banner logs each line separately when given a logger"""
+    import logging
+    from io import StringIO
+    
+    # Create a mock logger that captures output
+    stream = StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    
+    logger = logging.getLogger('test_banner_logger')
+    logger.handlers = []  # Clear any existing handlers
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    
+    # Set env to get predictable output
+    old_base = os.environ.get('IDT_BUILD_BASE')
+    old_num = os.environ.get('IDT_BUILD_NUMBER')
+    try:
+        os.environ['IDT_BUILD_BASE'] = '3.5test'
+        os.environ['IDT_BUILD_NUMBER'] = '99'
+        
+        # Call banner with logger
+        v.log_build_banner(logger=logger)
+        
+        # Check output contains all expected lines
+        output = stream.getvalue()
+        assert 'Image Description Toolkit' in output, "Missing toolkit name"
+        assert 'Version: 3.5test bld099' in output, "Missing or incorrect version"
+        assert 'Commit:' in output, "Missing commit line"
+        assert 'Mode:' in output, "Missing mode line"
+        assert 'Start:' in output, "Missing start timestamp"
+        
+        # Verify multiple lines were logged (not just one multi-line string)
+        lines = [line for line in output.split('\n') if line.strip()]
+        assert len(lines) >= 5, f"Expected at least 5 log lines, got {len(lines)}"
+        
+    finally:
+        if old_base is None:
+            os.environ.pop('IDT_BUILD_BASE', None)
+        else:
+            os.environ['IDT_BUILD_BASE'] = old_base
+        if old_num is None:
+            os.environ.pop('IDT_BUILD_NUMBER', None)
+        else:
+            os.environ['IDT_BUILD_NUMBER'] = old_num
+
+
+def test_log_build_banner_to_stdout():
+    """Verify banner prints correctly to stdout"""
+    from io import StringIO
+    
+    stream = StringIO()
+    
+    old_base = os.environ.get('IDT_BUILD_BASE')
+    old_num = os.environ.get('IDT_BUILD_NUMBER')
+    try:
+        os.environ['IDT_BUILD_BASE'] = '2.0test'
+        os.environ['IDT_BUILD_NUMBER'] = '5'
+        
+        # Call banner with stream
+        v.log_build_banner(stream=stream)
+        
+        output = stream.getvalue()
+        assert 'Image Description Toolkit' in output
+        assert 'Version: 2.0test bld005' in output
+        assert 'Commit:' in output
+        assert 'Mode:' in output
+        assert 'Start:' in output
+        
+    finally:
+        if old_base is None:
+            os.environ.pop('IDT_BUILD_BASE', None)
+        else:
+            os.environ['IDT_BUILD_BASE'] = old_base
+        if old_num is None:
+            os.environ.pop('IDT_BUILD_NUMBER', None)
+        else:
+            os.environ['IDT_BUILD_NUMBER'] = old_num
