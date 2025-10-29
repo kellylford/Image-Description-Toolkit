@@ -21,6 +21,12 @@ set VERSION=%VERSION: =%
 echo Using version: %VERSION%
 echo.
 
+REM Print composed build version and commit info for installer logs
+echo --- Build Version Banner ---
+python idt_cli.py version
+echo ----------------------------
+echo.
+
 REM Check if Inno Setup is installed
 set "INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if not exist "%INNO_PATH%" (

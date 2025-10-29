@@ -57,6 +57,14 @@ except ImportError:
     MetadataExtractor = None
     NominatimGeocoder = None
 
+# Versioning utilities (standardized banner at startup)
+try:
+    # scripts_dir is already on sys.path above
+    from versioning import log_build_banner, get_full_version
+except Exception:
+    log_build_banner = None
+    get_full_version = None
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QLabel, QTextEdit, QSplitter,
@@ -10296,11 +10304,25 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
 
 def main():
     """Main application entry point"""
+    # Log banner early to stdout if available (no logger here)
+    if log_build_banner:
+        try:
+            log_build_banner()
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     
     # Set application properties
     app.setApplicationName("ImageDescriber")
-    app.setApplicationVersion("1.0.0")
+    # Set application version using composed full version if available
+    try:
+        if get_full_version:
+            app.setApplicationVersion(get_full_version())
+        else:
+            app.setApplicationVersion("1.0.0")
+    except Exception:
+        app.setApplicationVersion("1.0.0")
     app.setOrganizationName("Image Description Toolkit")
     
     # Create and show main window

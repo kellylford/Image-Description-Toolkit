@@ -52,6 +52,12 @@ set VERSION=%VERSION: =%
 echo Using version: %VERSION%
 echo.
 
+REM Print composed build version (base + build number) and commit info
+echo --- Build Version Banner (pre-build) ---
+python idt_cli.py version
+echo ----------------------------------------
+echo.
+
 REM ============================================================================
 echo ========================================================================
 echo PHASE 1: BUILD ALL APPLICATIONS
@@ -66,6 +72,15 @@ if errorlevel 1 (
     echo.
     echo Release process aborted.
     exit /b 1
+)
+
+REM After build, print version from built CLI as a sanity check
+if exist "dist\idt.exe" (
+    echo.
+    echo --- Built Executable Version ---
+    dist\idt.exe version
+    echo --------------------------------
+    echo.
 )
 
 REM ============================================================================

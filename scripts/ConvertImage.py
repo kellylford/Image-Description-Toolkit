@@ -144,6 +144,13 @@ def convert_heic_to_jpg(input_path, output_path=None, quality=95, keep_metadata=
             original_width, original_height = image.size
             logger.debug(f"Original image size: {original_width}x{original_height}")
             
+            # Preserve EXIF metadata once at the beginning (will be included in all save attempts)
+            exif_data = None
+            if keep_metadata and hasattr(image, 'info'):
+                exif_data = image.info.get('exif', b'')
+                if exif_data:
+                    logger.debug(f"Preserved EXIF metadata from {input_path.name} ({len(exif_data)} bytes)")
+            
             # Try saving with progressive quality reduction if needed
             current_quality = quality
             current_image = image
@@ -157,11 +164,9 @@ def convert_heic_to_jpg(input_path, output_path=None, quality=95, keep_metadata=
                     'optimize': True
                 }
                 
-                # Preserve metadata if requested (only on first attempt with high quality)
-                if keep_metadata and hasattr(current_image, 'info') and attempt == 0:
-                    exif_data = current_image.info.get('exif', b'')
-                    if exif_data:
-                        save_kwargs['exif'] = exif_data
+                # Include EXIF data in every save attempt
+                if exif_data:
+                    save_kwargs['exif'] = exif_data
                 
                 current_image.save(output_path, **save_kwargs)
                 

@@ -60,7 +60,7 @@
     "enabled": true,
     "include_location_prefix": true,
     "geocoding": {
-      "enabled": false,
+      "enabled": true,
       "user_agent": "IDT/3.0 (+https://github.com/kellylford/Image-Description-Toolkit)",
       "delay_seconds": 1.0,
       "cache_file": "geocode_cache.json"
