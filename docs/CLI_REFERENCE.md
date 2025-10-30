@@ -275,8 +275,15 @@ idt workflow <image_directory> [options]
 --skip-existing                       # Skip images that already have descriptions
 --dry-run                            # Show what would be processed without doing it
 --original-cwd PATH                   # Set working directory context
---steps STEPS                         # Workflow steps: video,convert,describe,html
+--steps STEPS                         # Workflow steps: download,video,convert,describe,html
 --timeout SECONDS                     # Ollama request timeout (default: 90, increase for slow hardware)
+```
+
+**Web Download Options:** ⭐ NEW
+```bash
+--url URL                             # Download images from URL (enables web download step)
+--min-size SIZE                       # Minimum image size filter (e.g. "100KB", "1MB")
+--max-images COUNT                    # Maximum number of images to download
 ```
 
 **Metadata Options:** ⭐ NEW
@@ -330,6 +337,11 @@ idt workflow C:\Photos --dry-run
 # Skip existing descriptions, launch viewer
 idt workflow C:\Photos --skip-existing --view-results
 
+# Web download workflows (requires --url, no input directory needed)
+idt workflow --url "https://example.com/gallery" --steps download,describe,html
+idt workflow --url "https://site.com/photos" --max-images 10 --min-size "100KB"
+idt workflow --url "https://portfolio.com" --steps download,describe --provider openai
+
 # Custom workflow with specific steps
 idt workflow C:\Videos --steps video,describe --name "video_analysis"
 ```
@@ -337,6 +349,10 @@ idt workflow C:\Videos --steps video,describe --name "video_analysis"
 #### Progress & Status Log
 
 When running `idt workflow`, the orchestrator exposes step progress in the command window and writes a concise status log:
+
+- Download step (web image download):
+    - Console: "[ACTIVE] Downloading images from URL..."
+    - Console (done): "[DONE] Image download complete (Y images)"
 
 - Convert step (HEIC to JPG):
     - Console: "[ACTIVE] Image conversion in progress: X/Y HEIC to JPG (Z%)"
