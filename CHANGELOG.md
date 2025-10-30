@@ -5,6 +5,60 @@ All notable changes to the Image Description Toolkit will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 3.5.0-beta
+
+### 🌐 New Features
+
+**Web Image Download**
+- **Download images from websites**: Process images directly from URLs without manual downloading
+- **Simplified interface**: Just use `idt workflow example.com` to download and describe images from any website
+- **Smart URL detection**: Automatically recognizes URLs and configures the correct workflow steps
+- **BeautifulSoup4 HTML parsing**: Extracts images from `<img>` tags, `<picture>` elements, and direct links
+- **Duplicate detection**: MD5 content hashing prevents downloading the same image multiple times
+- **Progress tracking**: Real-time progress updates with formatted console output
+- **Filtering options**: `--max-images` to limit download count
+- **Safe filenames**: Automatically sanitizes filenames for cross-platform compatibility
+- **Image validation**: Verifies downloaded files are valid images using PIL/Pillow
+- **Rate limiting**: Respectful 0.5s delays between downloads to avoid overwhelming servers
+
+### 📚 Documentation
+
+**New Web Download Guide**
+- **[WEB_DOWNLOAD_GUIDE.md](docs/WEB_DOWNLOAD_GUIDE.md)** - Complete guide to downloading images from websites
+- Usage examples with various workflow configurations
+- Technical details on supported formats and validation
+- Troubleshooting section for common issues
+- Limitations and legal considerations
+
+**Enhanced User Guide**
+- Added web download examples and use cases
+- Simplified workflow syntax examples: `idt workflow mywebsite.com`
+- Auto-detection behavior documentation
+
+**Updated CLI Reference**
+- Complete `--url` parameter documentation
+- Web download workflow examples
+- Integration with existing workflow steps
+
+### 🔧 Bug Fixes
+
+**Resume Mode**
+- Fixed `UnboundLocalError` for `workflow_name_display` variable in `--resume` mode
+- Corrected initialization in both code paths (metadata file and directory name fallback)
+- Enhanced error handling for resume workflows
+
+### 🛠️ Technical Details
+
+**Dependencies**
+- Added `beautifulsoup4>=4.9.0` for HTML parsing
+- Updated PyInstaller spec with BeautifulSoup4 support (`collect_all`, hidden imports)
+- Maintained backward compatibility with existing requirements
+
+**Build System**
+- Updated `final_working.spec` with BeautifulSoup4 data collection
+- Tested with both Python development mode and PyInstaller frozen executable
+- Verified resource path resolution in both modes
+
 ## [3.0.1] - 2025-10-21
 
 ### 🚀 Performance Improvements
