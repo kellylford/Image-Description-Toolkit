@@ -26,6 +26,9 @@ piexif>=1.1.3           # Write EXIF metadata to extracted video frames
 openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
 anthropic>=0.18.0       # Anthropic Claude official SDK (retry logic, token tracking, streaming)
 
+# Web Image Download Support (scripts/web_image_downloader.py)
+beautifulsoup4>=4.9.0   # HTML parsing for web image extraction
+
 # ----------------------------------------------------------------------------
 # GUI APPLICATIONS (imagedescriber, viewer, prompt_editor)
 # ----------------------------------------------------------------------------

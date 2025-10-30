@@ -405,7 +405,8 @@ class WorkflowOrchestrator:
                  model: Optional[str] = None, prompt_style: Optional[str] = None, provider: str = "ollama", 
                  api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None,
                  timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = True, 
-                 geocode_cache: str = "geocode_cache.json"):
+                 geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
+                 max_images: int = None):
         """
         Initialize the workflow orchestrator
         
@@ -422,6 +423,9 @@ class WorkflowOrchestrator:
             enable_metadata: Whether to extract metadata (GPS, dates, camera info)
             enable_geocoding: Whether to reverse geocode GPS coordinates to city/state/country
             geocode_cache: Path to geocoding cache file
+            url: URL to download images from (enables web download step)
+            min_size: Minimum image size filter (e.g. "100KB", "1MB")
+            max_images: Maximum number of images to download
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -447,9 +451,13 @@ class WorkflowOrchestrator:
         self.enable_metadata = enable_metadata
         self.enable_geocoding = enable_geocoding
         self.geocode_cache = geocode_cache
+        self.url = url
+        self.min_size = min_size
+        self.max_images = max_images
         
         # Available workflow steps
         self.available_steps = {
+            "download": "download_images",
             "video": "extract_video_frames",
             "convert": "convert_images", 
             "describe": "describe_images",
@@ -466,6 +474,7 @@ class WorkflowOrchestrator:
             'total_files_processed': 0,
             'total_videos_processed': 0,
             'total_images_processed': 0,
+            'total_downloads': 0,
             'total_conversions': 0,
             'total_descriptions': 0,
             'errors_encountered': 0,
@@ -489,6 +498,11 @@ class WorkflowOrchestrator:
             status_lines.append(f"Workflow Progress: {len(self.statistics['steps_completed'])}/{total_steps} steps completed")
         
         # Add step-specific status
+        if 'download' in self.statistics['steps_completed']:
+            status_lines.append(f"[DONE] Image download complete ({self.statistics['total_downloads']} images)")
+        elif 'download' in self.statistics['steps_failed']:
+            status_lines.append(f"[FAILED] Image download failed")
+            
         if 'video' in self.statistics['steps_completed']:
             status_lines.append(f"[DONE] Video extraction complete ({self.statistics['total_videos_processed']} videos)")
         elif self.step_results.get('video', {}).get('in_progress', False):
@@ -578,6 +592,76 @@ class WorkflowOrchestrator:
         
         # Update the status log
         self.logger.update_status(status_lines)
+        
+    def download_images(self, input_dir: Path, output_dir: Path) -> Dict[str, Any]:
+        """
+        Download images from a URL using web_image_downloader.py
+        
+        Args:
+            input_dir: Input directory (not used for download step, but required for interface consistency)
+            output_dir: Output directory for downloaded images
+            
+        Returns:
+            Dict containing download results and statistics
+        """
+        from scripts.web_image_downloader import WebImageDownloader
+        
+        if not self.url:
+            raise ValueError("URL is required for download step")
+            
+        print(f"\n{'='*80}")
+        print("DOWNLOADING IMAGES")
+        print(f"{'='*80}")
+        print(f"URL: {self.url}")
+        print(f"Output directory: {output_dir}")
+        
+        # Parse min_size parameter if provided
+        min_width, min_height = 0, 0
+        if self.min_size:
+            # Parse formats like "100KB" -> ignore for now, focus on dimensions
+            # For now, we'll ignore min_size and use default 0x0
+            pass
+        
+        try:
+            # Create downloader with proper parameters
+            downloader = WebImageDownloader(
+                url=self.url,
+                output_dir=output_dir,
+                min_width=min_width,
+                min_height=min_height,
+                max_images=self.max_images,
+                verbose=True
+            )
+            
+            # Download images
+            downloaded_count, skipped_count = downloader.download()
+            
+            print(f"\nDownload completed successfully!")
+            print(f"Downloaded {downloaded_count} images")
+            if skipped_count > 0:
+                print(f"Skipped {skipped_count} images (duplicates/too small)")
+            
+            return {
+                'success': True,
+                'downloaded_count': downloaded_count,
+                'skipped_count': skipped_count,
+                'count': downloaded_count,
+                'processed': downloaded_count,
+                'output_dir': str(output_dir)
+            }
+            
+        except Exception as e:
+            error_msg = f"Download failed: {str(e)}"
+            print(f"\nERROR: {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'downloaded_count': 0,
+                'skipped_count': 0,
+                'count': 0,
+                'processed': 0,
+                'output_dir': str(output_dir)
+            }
         
     def extract_video_frames(self, input_dir: Path, output_dir: Path) -> Dict[str, Any]:
         """
@@ -1555,7 +1639,7 @@ class WorkflowOrchestrator:
             
             step_method = getattr(self, self.available_steps[step])
             step_output_dir = self.config.get_step_output_dir(
-                {"video": "video_extraction", "convert": "image_conversion", 
+                {"download": "image_download", "video": "video_extraction", "convert": "image_conversion", 
                  "describe": "image_description", "html": "html_generation"}[step]
             )
             
@@ -1631,7 +1715,11 @@ class WorkflowOrchestrator:
         """Update workflow statistics based on step results"""
         if step_result.get("success"):
             processed = step_result.get("processed", 0)
-            if step == "video":
+            if step == "download":
+                count = step_result.get("count", 0)
+                self.statistics['total_downloads'] += count
+                self.statistics['total_files_processed'] += count
+            elif step == "video":
                 self.statistics['total_videos_processed'] += processed
             elif step == "convert":
                 self.statistics['total_conversions'] += processed
@@ -1677,6 +1765,8 @@ class WorkflowOrchestrator:
         
         # File processing statistics
         self.logger.info(f"Total files processed: {self.statistics['total_files_processed']}")
+        if self.statistics['total_downloads'] > 0:
+            self.logger.info(f"Images downloaded: {self.statistics['total_downloads']}")
         self.logger.info(f"Videos processed: {self.statistics['total_videos_processed']}")
         self.logger.info(f"Unique images processed: {self.statistics['total_images_processed']}")
         if self.statistics['total_conversions'] > 0:
@@ -2163,6 +2253,23 @@ Viewing Results:
         help="Path to geocoding cache file (default: geocode_cache.json)"
     )
     
+    # Web image download arguments
+    parser.add_argument(
+        "--url",
+        help="URL to download images from (enables web download step)"
+    )
+    
+    parser.add_argument(
+        "--min-size",
+        help="Minimum image size filter (e.g. '100KB', '1MB')"
+    )
+    
+    parser.add_argument(
+        "--max-images",
+        type=int,
+        help="Maximum number of images to download"
+    )
+    
     parser.add_argument(
         "--original-cwd",
         help=argparse.SUPPRESS  # Hidden argument for wrapper communication
@@ -2279,9 +2386,9 @@ Viewing Results:
         print(f"Remaining steps: {', '.join(steps)}")
         
     else:
-        # Normal mode - validate input directory is provided
-        if not args.input_dir:
-            print("Error: input_dir is required when not using --resume")
+        # Normal mode - validate input directory is provided (unless downloading from URL)
+        if not args.input_dir and not args.url:
+            print("Error: input_dir is required when not using --resume or --url")
             parser.print_help()
             sys.exit(1)
         
@@ -2289,14 +2396,17 @@ Viewing Results:
         original_cwd = args.original_cwd if args.original_cwd else os.getcwd()
         
         # Validate input directory (resolve relative to original working directory)
-        input_dir = Path(args.input_dir)
-        if not input_dir.is_absolute():
-            input_dir = (Path(original_cwd) / input_dir).resolve()
-        
-        if not input_dir.exists():
-            # Can't use logger yet since orchestrator isn't created
-            print(f"Error: Input directory does not exist: {input_dir}")
-            sys.exit(1)
+        if args.input_dir:
+            input_dir = Path(args.input_dir)
+            if not input_dir.is_absolute():
+                input_dir = (Path(original_cwd) / input_dir).resolve()
+                
+            if not input_dir.exists():
+                print(f"ERROR: Input directory does not exist: {input_dir}")
+                sys.exit(1)
+        else:
+            # For URL downloads, create a dummy input directory
+            input_dir = Path(original_cwd)  # Use current working directory as base
         
         # Set output directory (resolve relative to original working directory)
         # Create timestamped workflow output directory with provider, model, and prompt info
@@ -2335,7 +2445,7 @@ Viewing Results:
         steps = [step.strip() for step in args.steps.split(",")]
     
     # Validate steps
-    valid_steps = ["video", "convert", "describe", "html"]
+    valid_steps = ["download", "video", "convert", "describe", "html"]
     invalid_steps = [step for step in steps if step not in valid_steps]
     if invalid_steps:
         # Can't use logger yet since orchestrator isn't created
@@ -2357,7 +2467,10 @@ Viewing Results:
             timeout=args.timeout,
             enable_metadata=not args.no_metadata,  # Default True unless --no-metadata specified
             enable_geocoding=not args.no_geocode,  # Default True unless --no-geocode specified
-            geocode_cache=args.geocode_cache
+            geocode_cache=args.geocode_cache,
+            url=args.url,
+            min_size=args.min_size,
+            max_images=args.max_images
         )
         
         if args.dry_run:

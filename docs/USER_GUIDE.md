@@ -21,13 +21,14 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
 6. [Understanding Workflow Runs & Naming](#6-understanding-workflow-runs--naming)
 7. [Prompt Customization](#7-prompt-customization)
 8. [Advanced CLI Usage & Commands](#8-advanced-cli-usage--commands)
-9. [Metadata Extraction & Geocoding](#9-metadata-extraction--geocoding) ⭐ NEW
-10. [Analysis Tools](#10-analysis-tools)
-11. [Results Viewer (Real-Time Monitoring)](#11-results-viewer-real-time-monitoring)
-12. [Cloud Provider Setup](#12-cloud-provider-setup)
-13. [Performance Tips](#13-performance-tips)
-14. [Batch Files Reference](#14-batch-files-reference)
-15. [Troubleshooting](#15-troubleshooting)
+9. [Web Image Downloads](#9-web-image-downloads) ⭐ NEW
+10. [Metadata Extraction & Geocoding](#10-metadata-extraction--geocoding) ⭐ NEW
+11. [Analysis Tools](#11-analysis-tools)
+12. [Results Viewer (Real-Time Monitoring)](#12-results-viewer-real-time-monitoring)
+13. [Cloud Provider Setup](#13-cloud-provider-setup)
+14. [Performance Tips](#14-performance-tips)
+15. [Batch Files Reference](#15-batch-files-reference)
+16. [Troubleshooting](#16-troubleshooting)
 
 ---
 
@@ -552,11 +553,58 @@ idt workflow C:\More_Photos --batch --name batch2
 
 # Launch viewer automatically to watch progress
 idt workflow C:\Photos --view-results --name live_monitoring
+
+# Web download workflows ⭐ NEW
+idt workflow --url "https://example.com/gallery" --steps download,describe,html
+idt workflow --url "https://portfolio.com" --max-images 20 --provider openai
+idt workflow --url "https://site.com/photos" --steps download,describe --name web_gallery
 ```
 
 ---
 
-## 9. Metadata Extraction & Geocoding ⭐ NEW
+## 9. Web Image Downloads ⭐ NEW
+
+IDT can now download images directly from web pages, making it easy to process online galleries, portfolios, or any webpage containing images.
+
+### Basic Usage
+
+Instead of providing a local directory, use the `--url` parameter:
+
+```bash
+# Download images from a webpage and describe them
+idt workflow --url "https://example.com/gallery" --steps download,describe,html
+
+# Limit the number of downloads
+idt workflow --url "https://portfolio.com" --max-images 20
+
+# Use with cloud AI providers
+idt workflow --url "https://site.com/photos" --provider openai --model gpt-4o
+```
+
+### How It Works
+
+1. **Download Step**: IDT fetches the webpage, parses the HTML, and downloads all images found
+2. **Duplicate Detection**: Images are checked for duplicates using content hashing
+3. **Integration**: Downloaded images are then processed by subsequent workflow steps
+
+### Command Options
+
+- `--url URL` - Download images from this web page (replaces the input directory)
+- `--max-images N` - Limit the total number of images downloaded
+- `--min-size SIZE` - *(Reserved for future use)* Filter images by minimum file size
+
+### Use Cases
+
+- **Portfolio Analysis**: Download and describe images from artist portfolios
+- **Product Catalogs**: Process e-commerce product images with AI descriptions
+- **Gallery Documentation**: Create comprehensive descriptions of online art galleries
+- **Research**: Analyze collections of images from academic or research websites
+
+**Note**: Always respect website terms of service and robots.txt when downloading images.
+
+---
+
+## 10. Metadata Extraction & Geocoding ⭐ NEW
 
 IDT can automatically extract and include rich metadata from your images, adding context about **where and when** photos were taken.
 
@@ -713,7 +761,7 @@ idt workflow C:\MorePhotos --geocode --geocode-cache worldwide_cache.json
 
 ---
 
-## 10. Analysis Tools
+## 11. Analysis Tools
 
 After running workflows, use these tools to analyze and export results:
 
@@ -817,7 +865,7 @@ analysis/results/
 
 ---
 
-## 11. Results Viewer (Real-Time Monitoring)
+## 12. Results Viewer (Real-Time Monitoring)
 
 The **Results Viewer** is a GUI application that lets you browse, search, and monitor your workflow results in real-time.
 
@@ -976,7 +1024,7 @@ for /L %i in (1,0,2) do @(cls & type Descriptions\workflow_*\logs\status.log & t
 ---
 
 
-## 12. Cloud Provider Setup
+## 13. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
 
@@ -1028,7 +1076,7 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 
 ---
 
-## 13. Performance Tips
+## 14. Performance Tips
 
 ### Adjusting Timeout Settings
 
@@ -1066,7 +1114,7 @@ idt workflow C:\Photos --timeout 300
 
 ---
 
-## 14. Batch Files Reference
+## 15. Batch Files Reference
 
 The `bat/` folder contains pre-configured batch files for quick model testing.
 
@@ -1142,7 +1190,7 @@ idt workflow C:\Photos --model llava:7b --name my_custom_name
 
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 ### Common Issues
 
