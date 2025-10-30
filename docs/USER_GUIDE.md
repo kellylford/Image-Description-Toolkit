@@ -326,9 +326,34 @@ This wizard will:
 
 **💡 Pro Tip:** If you're using large vision models (like Qwen) that take longer to process each image, add `--timeout <seconds>` with an appropriate value (e.g., 180, 300, or higher) to avoid timeouts.
 
-### Option 2: Direct Command (Quick & Simple)
+### Option 2: Simplified Direct Commands ⭐ NEW
 
-Once you're familiar with the tool:
+**Super simple syntax for common tasks:**
+
+```bash
+# Describe images in a local folder
+idt workflow photos
+idt workflow C:\MyImages
+
+# Download and describe images from a website  
+idt workflow example.com
+idt workflow mywebsite.com
+idt workflow https://portfolio.com
+
+# With live progress updates
+idt workflow gallery.com --progress-status
+idt workflow photos --progress-status --view-results
+```
+
+**🌟 What's Smart About This:**
+- **Auto-detection**: Recognizes websites vs local directories  
+- **Smart steps**: Uses `download,describe,html` for websites, full pipeline for local files
+- **No complex options**: Just specify what you want to process
+- **Protocol auto-add**: `example.com` becomes `https://example.com` automatically
+
+### Option 3: Advanced Direct Commands
+
+For power users who want full control:
 
 1. Put some images in a directory (e.g., `C:\Photos\`)
 2. Open a terminal in the IDT folder
@@ -566,39 +591,54 @@ idt workflow --url "https://site.com/photos" --steps download,describe --name we
 
 IDT can now download images directly from web pages, making it easy to process online galleries, portfolios, or any webpage containing images.
 
-### Basic Usage
+### Simplified Usage ⭐ UPDATED
 
-Instead of providing a local directory, use the `--url` parameter:
+**Just specify the website directly** - IDT automatically detects URLs and sets up the right workflow:
 
 ```bash
-# Download images from a webpage and describe them
-idt workflow --url "https://example.com/gallery" --steps download,describe,html
+# Simple website downloads  
+idt workflow example.com
+idt workflow mywebsite.com
+idt workflow https://portfolio.com
 
-# Limit the number of downloads
-idt workflow --url "https://portfolio.com" --max-images 20
+# With options
+idt workflow gallery.com --max-images 20 --progress-status
+idt workflow --download https://site.com/photos --provider openai --model gpt-4o
+```
 
-# Use with cloud AI providers
-idt workflow --url "https://site.com/photos" --provider openai --model gpt-4o
+### Advanced Usage
+
+For explicit control, use the `--download` flag:
+
+```bash
+# Explicit download syntax
+idt workflow --download "https://example.com/gallery"
+
+# With custom workflow name
+idt workflow artgallery.com --name "gallery_analysis" --view-results
 ```
 
 ### How It Works
 
-1. **Download Step**: IDT fetches the webpage, parses the HTML, and downloads all images found
-2. **Duplicate Detection**: Images are checked for duplicates using content hashing
-3. **Integration**: Downloaded images are then processed by subsequent workflow steps
+1. **🌐 URL Detection**: IDT automatically recognizes websites vs local directories
+2. **🔄 Smart Steps**: Automatically uses `download,describe,html` steps for websites  
+3. **📥 Download Step**: Fetches the webpage, parses HTML, downloads all images found
+4. **🔍 Duplicate Detection**: Images are checked for duplicates using content hashing
+5. **🤖 AI Processing**: Downloaded images are described by your chosen AI model
 
 ### Command Options
 
-- `--url URL` - Download images from this web page (replaces the input directory)
+- `--download URL` - Explicitly download images from this web page
 - `--max-images N` - Limit the total number of images downloaded
 - `--min-size SIZE` - *(Reserved for future use)* Filter images by minimum file size
+- `--progress-status` - Show live download and processing progress
 
 ### Use Cases
 
-- **Portfolio Analysis**: Download and describe images from artist portfolios
-- **Product Catalogs**: Process e-commerce product images with AI descriptions
-- **Gallery Documentation**: Create comprehensive descriptions of online art galleries
-- **Research**: Analyze collections of images from academic or research websites
+- **Portfolio Analysis**: `idt workflow artistsite.com --progress-status`
+- **Product Catalogs**: `idt workflow shop.com --max-images 50 --provider openai`
+- **Gallery Documentation**: `idt workflow gallery.com --name "art_analysis"`
+- **Research**: `idt workflow research-site.edu --view-results`
 
 **Note**: Always respect website terms of service and robots.txt when downloading images.
 

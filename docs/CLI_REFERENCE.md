@@ -62,7 +62,7 @@ idt <command> [options]
 ```bash
 # Interactive & Workflow Commands
 idt guideme               # Interactive workflow wizard ⭐ RECOMMENDED
-idt workflow              # Direct workflow execution
+idt workflow <source>     # Direct workflow execution (local dirs or websites) ⭐ SIMPLIFIED
 idt viewer                # Launch results viewer GUI
 idt imagedescriber        # Launch batch processing GUI  
 idt prompteditor          # Launch prompt editor GUI
@@ -87,6 +87,30 @@ idt descriptions-to-html  # Generate HTML reports
 idt help                  # Show help information
 idt image_describer       # Legacy: same as 'imagedescriber'
 ```
+
+### ⚡ Quick Start - Simplified Interface
+
+**Just want to describe images? Use the simplified syntax:**
+
+```bash
+# Describe images in a local folder
+idt workflow photos
+
+# Download and describe images from a website  
+idt workflow example.com
+
+# With live progress updates
+idt workflow mywebsite.com --progress-status
+
+# Explicit download syntax
+idt workflow --download https://gallery.com
+```
+
+**🌟 Key Benefits:**
+- **Intelligent mode detection** - automatically chooses the right workflow steps
+- **No complex arguments required** - just specify what you want to process  
+- **URL auto-detection** - recognizes websites vs local directories
+- **Live progress tracking** - see real-time status with `--progress-status`
 
 ---
 
@@ -253,11 +277,19 @@ idt guideme --timeout 300
 #### `workflow` - Direct Workflow Execution
 
 ```bash
-idt workflow <image_directory> [options]
+# Simplified interface - intelligent mode detection
+idt workflow <input_source> [options]
 ```
 
-**Required:**
-- `<image_directory>` - Path to folder containing images/videos
+**Input Sources:**
+- `<local_directory>` - Path to folder containing images/videos (e.g., `C:\Photos`)
+- `<website_url>` - URL to download images from (e.g., `example.com`, `https://site.com`)
+- `--download <url>` - Explicit web download mode
+
+**🌟 Intelligent Step Detection:**
+- **Local directories** → `video,convert,describe,html` steps (full processing)
+- **Website URLs** → `download,describe,html` steps (web download mode)
+- Manual override available with `--steps` option
 
 **Core Options:**
 ```bash
@@ -275,7 +307,7 @@ idt workflow <image_directory> [options]
 --skip-existing                       # Skip images that already have descriptions
 --dry-run                            # Show what would be processed without doing it
 --original-cwd PATH                   # Set working directory context
---steps STEPS                         # Workflow steps: download,video,convert,describe,html
+--steps STEPS                         # Manual step override: download,video,convert,describe,html
 --timeout SECONDS                     # Ollama request timeout (default: 90, increase for slow hardware)
 --verbose                            # Enable verbose logging (DEBUG level)
 --progress-status                    # Enable live progress status updates in console (INFO level + status blocks)
@@ -283,12 +315,12 @@ idt workflow <image_directory> [options]
 
 **Web Download Options:** ⭐ NEW
 ```bash
---url URL                             # Download images from URL (enables web download step)
+--download URL                        # Explicitly download images from URL
 --min-size SIZE                       # Minimum image size filter (e.g. "100KB", "1MB")
 --max-images COUNT                    # Maximum number of images to download
 ```
 
-**Metadata Options:** ⭐ NEW
+**Metadata Options:**
 ```bash
 --metadata                            # Enable metadata extraction (GPS, dates, camera - enabled by default)
 --no-metadata                         # Disable metadata extraction
@@ -314,9 +346,29 @@ idt workflow <image_directory> [options]
 - `simple` - Basic, accessible descriptions
 
 **Examples:**
+
+**🌐 Web Download (New Simple Syntax):**
 ```bash
-# Basic Ollama workflow
-idt workflow C:\Photos --model llava --prompt-style narrative
+# Simple website download
+idt workflow example.com
+
+# With options
+idt workflow mywebsite.com --max-images 20 --progress-status
+
+# Explicit download syntax
+idt workflow --download https://example.com --model llava
+
+# With full URL
+idt workflow https://www.theideaplace.net --prompt-style detailed
+```
+
+**📁 Local Directory Processing:**
+```bash
+# Basic local workflow  
+idt workflow C:\Photos
+
+# With options
+idt workflow photos --model llava --prompt-style narrative
 
 # OpenAI with custom name and viewer launch
 idt workflow C:\Photos --provider openai --model gpt-4o --name "vacation_photos" --view-results
@@ -339,13 +391,21 @@ idt workflow C:\Photos --dry-run
 # Skip existing descriptions, launch viewer
 idt workflow C:\Photos --skip-existing --view-results
 
-# Web download workflows (requires --url, no input directory needed)
-idt workflow --url "https://example.com/gallery" --steps download,describe,html
-idt workflow --url "https://site.com/photos" --max-images 10 --min-size "100KB"
-idt workflow --url "https://portfolio.com" --steps download,describe --provider openai
-
 # Custom workflow with specific steps
 idt workflow C:\Videos --steps video,describe --name "video_analysis"
+```
+
+**🚀 Power User Examples:**
+```bash
+# Cloud provider workflows with progress tracking
+idt workflow example.com --provider openai --model gpt-4o --progress-status
+idt workflow portfolio.com --provider claude --max-images 50 --view-results
+
+# Advanced web download with custom settings
+idt workflow --download https://gallery.com --min-size 500KB --name "gallery_analysis" --timeout 180
+
+# Multi-step local processing with real-time monitoring
+idt workflow media_folder --steps video,convert,describe,html --progress-status --view-results
 ```
 
 #### Progress & Status Log

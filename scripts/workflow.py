@@ -11,13 +11,20 @@ The workflow maintains compatibility with all existing scripts while providing
 a streamlined interface for end-to-end processing.
 
 Usage:
-    python workflow.py input_directory [options]
+    python workflow.py <input_source> [options]
     
 Examples:
-    python workflow.py media_folder
-    python workflow.py media_folder --output-dir results --steps video,convert,describe,html
-    python workflow.py photos --steps describe,html --model llava:7b
-    python workflow.py photos --timeout 120  # Increase timeout for slower hardware or large models
+    # Describe images in a local directory
+    python workflow.py photos
+    python workflow.py /path/to/media --model llava:7b
+    
+    # Download and describe images from a website
+    python workflow.py example.com
+    python workflow.py https://mywebsite.com --max-images 20
+    python workflow.py --download https://example.com
+    
+    # Advanced options
+    python workflow.py photos --steps describe,html --timeout 120
 """
 
 import sys
@@ -26,6 +33,7 @@ import argparse
 import subprocess
 import shutil
 import shlex
+from urllib.parse import urlparse
 
 # Set UTF-8 encoding for console output on Windows
 if sys.platform.startswith('win'):
@@ -484,6 +492,24 @@ class WorkflowOrchestrator:
             'steps_failed': []
         }
         
+    def _download_progress_callback(self, processed: int, total: int, status: str = ""):
+        """Callback for download progress updates"""
+        if 'download' in self.step_results:
+            self.step_results['download'].update({
+                'processed': processed,
+                'total': total,
+                'current_status': status
+            })
+            self._update_status_log()
+            
+            # Also log to console if progress_status is enabled
+            if self.progress_status:
+                if total > 0:
+                    percentage = int((processed / total) * 100)
+                    self.logger.info(f"[ACTIVE] Image download in progress: {processed}/{total} ({percentage}%) - {status}")
+                else:
+                    self.logger.info(f"[ACTIVE] Image download in progress: {processed} - {status}")
+
     def _update_status_log(self) -> None:
         """Update the simple status.log file with current progress"""
         status_lines = []
@@ -502,6 +528,20 @@ class WorkflowOrchestrator:
         # Add step-specific status
         if 'download' in self.statistics['steps_completed']:
             status_lines.append(f"[DONE] Image download complete ({self.statistics['total_downloads']} images)")
+        elif self.step_results.get('download', {}).get('in_progress', False):
+            download_result = self.step_results.get('download', {})
+            if 'processed' in download_result and 'total' in download_result:
+                processed = download_result['processed']
+                total = download_result['total']
+                if total > 0:
+                    percentage = int((processed / total) * 100)
+                    status = download_result.get('current_status', '')
+                    status_lines.append(f"[ACTIVE] Image download in progress: {processed}/{total} ({percentage}%) - {status}")
+                else:
+                    status = download_result.get('current_status', '')
+                    status_lines.append(f"[ACTIVE] Image download in progress: {processed} - {status}")
+            else:
+                status_lines.append("[ACTIVE] Image download in progress...")
         elif 'download' in self.statistics['steps_failed']:
             status_lines.append(f"[FAILED] Image download failed")
             
@@ -634,6 +674,15 @@ class WorkflowOrchestrator:
             pass
         
         try:
+            # Initialize progress tracking
+            self.step_results['download'] = {
+                'in_progress': True,
+                'processed': 0,
+                'total': 0,
+                'current_status': 'Initializing download...'
+            }
+            self._update_status_log()
+            
             # Create downloader with proper parameters
             downloader = WebImageDownloader(
                 url=self.url,
@@ -641,11 +690,21 @@ class WorkflowOrchestrator:
                 min_width=min_width,
                 min_height=min_height,
                 max_images=self.max_images,
-                verbose=True
+                verbose=True,
+                progress_callback=self._download_progress_callback if self.progress_status else None
             )
             
             # Download images
             downloaded_count, skipped_count = downloader.download()
+            
+            # Mark download as complete
+            self.step_results['download'] = {
+                'in_progress': False,
+                'processed': downloaded_count,
+                'total': downloaded_count + skipped_count,
+                'current_status': f'Download complete: {downloaded_count} images'
+            }
+            self._update_status_log()
             
             print(f"\nDownload completed successfully!")
             print(f"Downloaded {downloaded_count} images")
@@ -1663,8 +1722,8 @@ class WorkflowOrchestrator:
                         desc_file = self.step_results["describe"]["description_file"]
                     step_result = step_method(current_input_dir, step_output_dir, desc_file)
                 elif step == "describe":
-                    # Description step should look at multiple potential image sources
-                    step_result = step_method(input_dir, step_output_dir)
+                    # Description step should look at current input directory (after download/convert)
+                    step_result = step_method(current_input_dir, step_output_dir)
                 elif step == "convert":
                     # Convert step should always work on original input directory
                     step_result = step_method(input_dir, step_output_dir)
@@ -1686,8 +1745,8 @@ class WorkflowOrchestrator:
                     self._update_status_log()
                     
                     # Update input directory for next step if this step produced outputs
-                    if step in ["video", "convert"] and step_result.get("output_dir"):
-                        current_input_dir = step_result["output_dir"]
+                    if step in ["download", "video", "convert"] and step_result.get("output_dir"):
+                        current_input_dir = Path(step_result["output_dir"])
                 else:
                     self.statistics['steps_failed'].append(step)
                     workflow_results["steps_failed"].append(step)
@@ -2148,9 +2207,14 @@ Viewing Results:
     )
     
     parser.add_argument(
-        "input_dir",
-        nargs='?',  # Make input_dir optional when using --resume
-        help="Input directory containing media files to process"
+        "input_source",
+        nargs='?',  # Make input_source optional when using --resume
+        help="Input directory containing media files, or URL to download images from (e.g., https://example.com)"
+    )
+    
+    parser.add_argument(
+        "--download", "-d",
+        help="Explicitly download images from this URL (alternative to providing URL as input_source)"
     )
     
     parser.add_argument(
@@ -2403,27 +2467,55 @@ Viewing Results:
         print(f"Remaining steps: {', '.join(steps)}")
         
     else:
-        # Normal mode - validate input directory is provided (unless downloading from URL)
-        if not args.input_dir and not args.url:
-            print("Error: input_dir is required when not using --resume or --url")
-            parser.print_help()
+        # Normal mode - determine input source and mode
+        url = None
+        input_dir = None
+        
+        # Check for URL input (either as input_source or --download flag)
+        if args.download:
+            url = args.download
+            input_dir = Path.cwd()  # Use current directory as base for URL downloads
+        elif args.input_source and (args.input_source.startswith('http://') or 
+                                  args.input_source.startswith('https://') or 
+                                  '.' in args.input_source and not Path(args.input_source).exists()):
+            # Input looks like a URL - treat as web download
+            url = args.input_source
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url  # Add https:// if not specified
+            input_dir = Path.cwd()
+        elif args.input_source:
+            # Input is a directory path
+            input_dir = Path(args.input_source)
+        else:
+            print("Error: Please provide either:")
+            print("  - A directory path: python workflow.py /path/to/images")
+            print("  - A website URL: python workflow.py example.com")
+            print("  - Or use --download: python workflow.py --download https://example.com")
             sys.exit(1)
         
         # Handle original working directory if called from wrapper
         original_cwd = args.original_cwd if args.original_cwd else os.getcwd()
         
-        # Validate input directory (resolve relative to original working directory)
-        if args.input_dir:
-            input_dir = Path(args.input_dir)
+        # Validate input directory if it's a local path
+        if not url and input_dir:
             if not input_dir.is_absolute():
                 input_dir = (Path(original_cwd) / input_dir).resolve()
                 
             if not input_dir.exists():
                 print(f"ERROR: Input directory does not exist: {input_dir}")
                 sys.exit(1)
+        
+        # Auto-detect appropriate workflow steps based on input type
+        if url:
+            # For web download: download,describe,html
+            if not args.steps or args.steps == "video,convert,describe,html":
+                steps = ["download", "describe", "html"]
+                print(f"🌐 Web download mode detected - using steps: {','.join(steps)}")
+            else:
+                steps = args.steps.split(',')
         else:
-            # For URL downloads, create a dummy input directory
-            input_dir = Path(original_cwd)  # Use current working directory as base
+            # For local files: keep default or user-specified steps
+            steps = args.steps.split(',') if args.steps else ["video", "convert", "describe", "html"]
         
         # Set output directory (resolve relative to original working directory)
         # Create timestamped workflow output directory with provider, model, and prompt info
@@ -2439,6 +2531,13 @@ Viewing Results:
             # User provided a custom name - preserve case for display and directory
             workflow_name_display = sanitize_name(args.name, preserve_case=True)
             workflow_name = workflow_name_display  # Use same case-preserved name
+        elif url:
+            # Auto-generate from URL domain
+            from urllib.parse import urlparse
+            parsed_url = urlparse(url)
+            domain = parsed_url.netloc or parsed_url.path
+            workflow_name_display = sanitize_name(domain.replace('www.', ''), preserve_case=True)
+            workflow_name = workflow_name_display
         else:
             # Auto-generate from input directory path (2 components)
             workflow_name_display = get_path_identifier_2_components(str(input_dir))
@@ -2455,11 +2554,17 @@ Viewing Results:
                 base_dir = (Path(original_cwd) / base_dir).resolve()
             output_dir = (base_dir / wf_dirname).resolve()
         else:
-            # No output directory specified - create wf_ directory in current directory
-            output_dir = (Path(original_cwd) / wf_dirname).resolve()
+            # No output directory specified - use default from config (usually "Descriptions/")
+            default_base = Path(original_cwd) / "Descriptions"
+            output_dir = (default_base / wf_dirname).resolve()
         
-        # Parse workflow steps
-        steps = [step.strip() for step in args.steps.split(",")]
+        # Parse workflow steps (steps was already processed in auto-detection above)
+        if isinstance(steps, list):
+            # Already processed as list from auto-detection
+            pass  
+        else:
+            # Convert string to list
+            steps = [step.strip() for step in steps.split(",")]
     
     # Validate steps
     valid_steps = ["download", "video", "convert", "describe", "html"]
@@ -2485,7 +2590,7 @@ Viewing Results:
             enable_metadata=not args.no_metadata,  # Default True unless --no-metadata specified
             enable_geocoding=not args.no_geocode,  # Default True unless --no-geocode specified
             geocode_cache=args.geocode_cache,
-            url=args.url,
+            url=url,  # Use detected URL from argument processing
             min_size=args.min_size,
             max_images=args.max_images,
             progress_status=args.progress_status

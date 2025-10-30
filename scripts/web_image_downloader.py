@@ -24,12 +24,24 @@ from typing import List, Set, Optional, Tuple
 import logging
 import time
 import hashlib
+from io import BytesIO
 
 try:
     from bs4 import BeautifulSoup
-except ImportError:
-    print("ERROR: BeautifulSoup4 not installed")
+except ImportError as e:
+    print(f"ERROR: BeautifulSoup4 import failed: {e}")
     print("Install with: pip install beautifulsoup4")
+    # Check if we're in a frozen executable
+    import sys
+    if getattr(sys, 'frozen', False):
+        print("Running in frozen mode - checking available modules...")
+        import os
+        meipass = getattr(sys, '_MEIPASS', '')
+        if meipass:
+            bs4_path = os.path.join(meipass, 'bs4')
+            print(f"bs4 path exists: {os.path.exists(bs4_path)}")
+            if os.path.exists(bs4_path):
+                print(f"bs4 directory contents: {os.listdir(bs4_path)[:10]}")
     sys.exit(1)
 
 try:
@@ -48,7 +60,8 @@ class WebImageDownloader:
                  max_images: Optional[int] = None,
                  user_agent: str = None,
                  timeout: int = 30,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 progress_callback: Optional[callable] = None):
         """
         Initialize the web image downloader
         
@@ -61,6 +74,7 @@ class WebImageDownloader:
             user_agent: Custom user agent string
             timeout: Request timeout in seconds
             verbose: Enable verbose logging
+            progress_callback: Optional callback function for progress updates
         """
         self.url = url
         self.output_dir = Path(output_dir)
@@ -69,6 +83,7 @@ class WebImageDownloader:
         self.max_images = max_images
         self.timeout = timeout
         self.verbose = verbose
+        self.progress_callback = progress_callback
         
         # Setup logging
         log_level = logging.DEBUG if verbose else logging.INFO
@@ -150,7 +165,7 @@ class WebImageDownloader:
             
             # Validate it's actually an image
             try:
-                img = Image.open(requests.compat.BytesIO(image_data))
+                img = Image.open(BytesIO(image_data))
                 width, height = img.size
                 
                 # Check size requirements
@@ -294,6 +309,13 @@ class WebImageDownloader:
                     self.logger.info(f"Reached maximum image limit ({self.max_images})")
                     break
                 
+                # Update progress callback if provided
+                if self.progress_callback:
+                    try:
+                        self.progress_callback(i-1, total_found, f"Downloading image {i}/{total_found}: {img_url[:50]}...")
+                    except Exception as e:
+                        self.logger.debug(f"Progress callback error: {e}")
+                
                 # Download the image
                 result = self._download_image(img_url, i)
                 
@@ -301,6 +323,14 @@ class WebImageDownloader:
                     successful += 1
                 else:
                     failed += 1
+                
+                # Update progress callback after download
+                if self.progress_callback:
+                    try:
+                        status = f"Downloaded {successful}, skipped {failed}"
+                        self.progress_callback(i, total_found, status)
+                    except Exception as e:
+                        self.logger.debug(f"Progress callback error: {e}")
                 
                 # Small delay to be respectful to the server
                 if i < total_found:
