@@ -2363,6 +2363,9 @@ Viewing Results:
         # Resume mode - validate resume directory and extract workflow state
         resume_dir = Path(args.resume)
         
+        # Initialize variables that may not be set in resume mode
+        url = None  # Resume mode doesn't use URL downloads
+        
         if not resume_dir.is_absolute():
             # Use original working directory if provided, otherwise current directory
             base_dir = Path(args.original_cwd) if args.original_cwd else Path(os.getcwd())
@@ -2411,6 +2414,7 @@ Viewing Results:
             dir_parts = resume_dir.name.split('_')
             if len(dir_parts) >= 5 and dir_parts[0] == 'wf':
                 workflow_name = dir_parts[1]
+                workflow_name_display = workflow_name  # Preserve case from directory name
                 provider_name = dir_parts[2]
                 model_name = dir_parts[3]
                 prompt_style = dir_parts[4]
@@ -2418,6 +2422,7 @@ Viewing Results:
             else:
                 # Ultimate fallback
                 workflow_name = "resumed"
+                workflow_name_display = "resumed"
                 provider_name = "ollama"
                 model_name = "unknown"
                 prompt_style = "narrative"
