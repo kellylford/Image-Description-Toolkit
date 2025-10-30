@@ -117,5 +117,256 @@ python scripts/workflow.py --url "https://site.com" --max-images 10 --min-size "
 - **Modified**: `requirements.txt` (+1 dependency)
 - **Modified**: `scripts/workflow.py` (+100+ lines for integration)
 
-## Status: Complete and Ready for Use
-The web image download feature is now fully integrated and ready for the 3.5 beta release. All testing completed successfully with no breaking changes to existing functionality.
+## Critical Bug Fixes (Post-Integration)
+
+### Resume Mode UnboundLocalError (FIXED)
+**Problem**: After integration, testing revealed that `--resume` flag caused `UnboundLocalError: local variable 'workflow_name_display' referenced before assignment`
+
+**Root Cause**: Resume mode had TWO independent code paths:
+1. **Primary path**: Load from `workflow_metadata.json` (if exists) - line 2404
+2. **Fallback path**: Extract from directory name - line 2412
+
+Both paths failed to initialize `workflow_name_display` before use.
+
+**Solution Applied**: 
+- **First fix**: Added `workflow_name_display = workflow_name` in fallback path (commit fc28a52)
+- **Second fix**: Discovered and fixed primary path as well (commit not yet committed)
+- Applied fix to BOTH main (3.6.0-beta) and 3.5beta branches
+- Built and tested executables in both branches
+- Verified with user's actual workflow directory containing metadata file
+
+**Testing Results**:
+- ✅ Main branch (3.6.0-beta): Resume working with both code paths
+- ✅ 3.5beta branch: Resume working with both code paths  
+- ✅ Both executables built and deployed to c:\idt
+- ✅ No UnboundLocalError in either version
+
+### Output Directory Bug (FIXED)
+**Problem**: Web download was creating directories in root instead of Descriptions/
+**Solution**: Fixed default output directory to "Descriptions/" in workflow.py
+
+### BytesIO Import Error (FIXED)
+**Problem**: `from requests.compat import BytesIO` was deprecated
+**Solution**: Changed to `from io import BytesIO`
+
+## Documentation Enhancements (COMPLETED)
+
+### New Comprehensive CHANGELOG Entry
+- Added **[Unreleased] 3.6.0-beta** section to CHANGELOG.md
+- Documented all web download features
+- Documented resume bug fixes  
+- Included technical details on dependencies and build system
+- Added limitations and considerations
+
+### Verified Documentation Coverage
+✅ **WEB_DOWNLOAD_GUIDE.md** (221 lines) - Complete usage guide
+✅ **USER_GUIDE.md** - Enhanced with web download examples and simplified syntax
+✅ **CLI_REFERENCE.md** - Updated with URL parameter documentation
+✅ **CHANGELOG.md** - Comprehensive unreleased section for 3.6.0-beta
+✅ **requirements.txt** - All files include beautifulsoup4 with explanatory comments
+✅ **PyInstaller specs** - BeautifulSoup4 support documented and configured
+
+### Documentation Features Verified
+- Complete usage examples with various workflow configurations
+- Technical details on HTML parsing, validation, and duplicate detection
+- Troubleshooting section for common issues
+- Limitations clearly documented (JavaScript, authentication, robots.txt)
+- Legal considerations and best practices
+- Dependency information and installation instructions
+
+## Progress Tracking Implementation
+
+### Real-Time Download Progress
+**Feature**: Added progress callback system to workflow orchestrator
+**Implementation**: 
+- `_download_progress_callback()` method in WorkflowOrchestrator
+- Real-time console updates showing download progress
+- Formatted progress blocks with percentages
+- Integration with existing workflow statistics
+
+**Example Output**:
+```
+╔═══════════════════════════════════════════════╗
+║ DOWNLOAD PROGRESS: 15/50 images (30%)        ║
+╚═══════════════════════════════════════════════╝
+```
+
+## Simplified Interface Enhancement
+
+### Auto-Detection of URLs
+**Feature**: Workflow automatically detects URLs vs local directories
+**Implementation**: Added `_is_url()` helper method with regex pattern matching
+**Usage Pattern**:
+```bash
+# Old way (explicit)
+idt workflow --url https://example.com --steps download,describe,html
+
+# New way (simplified)
+idt workflow example.com
+```
+
+**Behavior**:
+- Detects URLs by pattern (http://, https://, www., domain.tld)
+- Automatically sets `--steps download,describe,html` for URLs
+- Uses full pipeline for local directories
+- Documented in USER_GUIDE.md and CLI_REFERENCE.md
+
+## Build Status
+
+### Main Branch (3.6.0-beta)
+- ✅ Built successfully: 75.8 MB executable
+- ✅ Includes BeautifulSoup4 and web download feature
+- ✅ Resume bug fixes applied (both code paths)
+- ✅ Deployed to c:\idt\idt.exe
+- ✅ Tested with real workflows
+
+### 3.5beta Branch (3.5.0-beta)
+- ✅ Built successfully: 75.6 MB executable  
+- ✅ No web download feature (stable release candidate)
+- ✅ Resume bug fixes applied (both code paths)
+- ✅ Deployed to c:\idt\idt.exe (testing)
+- ✅ Production-ready
+
+### PyInstaller Configuration
+**Main Branch**: Updated `final_working.spec` with:
+```python
+bs4_datas, bs4_binaries, bs4_hiddenimports = collect_all('beautifulsoup4')
+datas += bs4_datas
+binaries += bs4_binaries  
+hiddenimports += bs4_hiddenimports
+```
+
+**3.5beta Branch**: Clean spec without BeautifulSoup4 dependencies
+
+## Branch Strategy Discussion
+
+### Current State (8 commits ahead in main)
+**Main branch** (3.6.0-beta): +2,253 insertions, +817 test lines
+- Complete web download feature (443-line web_image_downloader.py)
+- Enhanced documentation (+220 lines WEB_DOWNLOAD_GUIDE.md)
+- All bug fixes applied
+- BeautifulSoup4 dependency
+
+**3.5beta branch** (3.5.0-beta): Stable, tested
+- No web download feature
+- All bug fixes applied
+- Production-ready
+
+### Options Discussed
+1. **Conservative**: Release 3.5-beta as 3.5.0 final, keep main as 3.6.0-beta
+   - Stable, well-tested release today
+   - Web download gets more testing time
+   - Two separate releases
+
+2. **Aggressive**: Merge main into 3.5-beta, release as 3.5.0 with web download
+   - All features in one release
+   - Slightly higher risk
+   - More complex testing matrix
+
+### Decision Status
+**Outcome**: Continue testing, make call after validation
+- User acknowledged assessment and documentation completion
+- Web download needs more real-world testing
+- Documentation ready for either approach
+- Both branches stable and working
+
+## Testing Results Summary
+
+### Web Download Testing
+✅ **NASA.gov**: Successfully extracted and downloaded images
+✅ **httpbin.org**: HTML parsing working correctly
+✅ **Duplicate Detection**: MD5 hashing prevents re-downloads
+✅ **Progress Display**: Real-time updates working
+✅ **File Validation**: PIL/Pillow validation working
+✅ **Safe Filenames**: Cross-platform sanitization working
+
+### Resume Mode Testing  
+✅ **Metadata Path**: Primary code path (line 2404) working
+✅ **Directory Path**: Fallback code path (line 2412) working
+✅ **Main Branch**: No errors with real workflow directories
+✅ **Beta Branch**: No errors with real workflow directories
+
+### Integration Testing
+✅ **Full Pipeline**: download → describe → html working
+✅ **Partial Pipeline**: download → describe working
+✅ **Statistics**: Download counts properly tracked
+✅ **Error Handling**: Graceful failure for network/parsing errors
+✅ **PyInstaller**: Both frozen executables working correctly
+
+## User-Friendly Summary
+
+### What's New in 3.6.0-beta
+**Web Download Feature**: IDT can now download images directly from websites! Just type `idt workflow example.com` and it automatically downloads images and generates AI descriptions. No more manual downloading required.
+
+**Simplified Interface**: The toolkit now auto-detects URLs vs local directories and sets up the right workflow steps automatically.
+
+**Progress Tracking**: Real-time progress updates show download status as images are being retrieved from websites.
+
+### What's Fixed
+**Resume Mode**: The `--resume` flag now works correctly when continuing interrupted workflows. Previously crashed with UnboundLocalError - fixed in both main (3.6.0) and stable (3.5.0) versions.
+
+**Output Directories**: Fixed issue where web downloads were creating directories in the wrong location.
+
+### Documentation
+**Complete guides available**:
+- WEB_DOWNLOAD_GUIDE.md - Full usage guide with examples
+- USER_GUIDE.md - Enhanced with simplified syntax examples  
+- CLI_REFERENCE.md - Complete parameter documentation
+- CHANGELOG.md - Unreleased section documenting all changes
+
+### What's Next
+Continuing to test the web download feature with various website structures before making final release decision. All documentation is complete and ready.
+
+## Files Changed This Session
+
+### New Files
+- `scripts/web_image_downloader.py` (443 lines) - Web download implementation
+- `docs/WEB_DOWNLOAD_GUIDE.md` (221 lines) - User documentation
+- `pytest_tests/unit/test_web_image_downloader.py` - Unit tests
+
+### Modified Files (Main Branch)
+- `scripts/workflow.py` - Web download integration, resume fixes, progress callbacks
+- `requirements.txt` - Added beautifulsoup4>=4.9.0
+- `BuildAndRelease/final_working.spec` - BeautifulSoup4 PyInstaller config
+- `docs/USER_GUIDE.md` - Web download examples and simplified syntax
+- `docs/CLI_REFERENCE.md` - URL parameter documentation
+- `CHANGELOG.md` - Added [Unreleased] 3.6.0-beta section
+
+### Modified Files (3.5beta Branch)
+- `scripts/workflow.py` - Resume bug fixes only (no web download)
+
+## Branch Strategy Decision - EXECUTED
+
+### Final Decision: Web Download Ready for Beta
+**Outcome**: Decided to promote web download feature to beta status
+- Web download feature is sufficiently tested and documented
+- Ready for broader beta testing
+- Both main and 3.5beta will have identical code with web download
+
+### Branch Reorganization (Completed)
+**Steps Executed**:
+1. ✅ Deleted old 3.5beta branch (remote and local) - no longer needed
+2. ✅ Changed VERSION file on main from "3.6.0-beta" to "3.5.0-beta"
+3. ✅ Updated CHANGELOG.md to reflect 3.5.0-beta
+4. ✅ Committed version change to main (commit 96f3faf)
+5. ✅ Created new 3.5beta branch from current main
+6. ✅ Pushed both main and new 3.5beta to remote
+
+**Result**:
+- Both `main` and `3.5beta` branches are now identical
+- Both at version 3.5.0-beta
+- Both include complete web download feature
+- Both include all bug fixes
+- Ready for beta testing across both branches
+
+**Commit History**:
+```
+96f3faf - Version: Change to 3.5.0-beta (web download feature ready for beta testing)
+fc28a52 - Fix: Also initialize workflow_name_display in existing_metadata path
+fdb9d80 - Fix: Initialize workflow_name_display and url variables in resume mode
+2be829f - Add web download feature with progress status integration
+5c4c800 - Update PyInstaller spec file with collect_submodules for bs4
+```
+
+## Status: Feature Complete, Documentation Complete, Testing Ongoing
+The web image download feature is fully implemented and comprehensively documented. Resume mode bugs have been fixed in both branches. Both branches have been built and deployed for testing. Awaiting final testing results before release decision.
