@@ -78,7 +78,59 @@
 - Integrated into build/release pipeline
 - Included in installer
 
-### 5. **Interactive Image Gallery** 🖼️
+### 6. **Web Image Download** 🌐 NEW
+**Download and describe images directly from websites**
+
+#### Core Functionality
+- **BeautifulSoup4 HTML parsing**: Extracts images from web pages automatically
+- **Simplified interface**: Just type `idt workflow example.com` to download and describe
+- **Smart URL detection**: Automatically recognizes URLs and configures correct workflow steps
+- **Multiple image sources**: Finds images in `<img>` tags, `<picture>` elements, and direct links
+- **Duplicate detection**: MD5 content hashing prevents downloading the same image multiple times
+- **Image validation**: Verifies downloaded files are valid images using PIL/Pillow
+- **Safe filenames**: Automatically sanitizes filenames for cross-platform compatibility
+- **Rate limiting**: Respectful 0.5s delays between downloads to avoid overwhelming servers
+- **Progress tracking**: Real-time console updates showing download progress
+
+#### Command-Line Usage
+```bash
+# Simplified syntax - auto-detects URLs
+idt workflow example.com
+
+# Explicit syntax with options
+idt workflow --url https://example.com/gallery --max-images 50
+
+# Full workflow integration
+idt workflow --url https://portfolio.com --steps download,describe,html \
+  --provider openai --model gpt-4o-mini
+```
+
+#### Features
+- `--url URL`: Specify the web page to download images from
+- `--max-images N`: Limit the number of images to download
+- `--steps download,describe,html`: Download step integrates with existing workflow
+- Auto-detection: URLs are recognized automatically (http://, https://, www., domain.tld patterns)
+- Progress display: Formatted console blocks showing download percentage and count
+
+#### Supported Formats
+- `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.tiff`, `.tif`
+
+#### Limitations
+- JavaScript-rendered images may not be detected (static HTML parsing only)
+- Authentication/login-required pages not supported
+- Some websites may block or throttle automated requests
+- Users responsible for complying with website terms of service and copyright laws
+
+#### Dependencies
+- `beautifulsoup4>=4.9.0` (included in requirements.txt)
+- `requests>=2.25.0` (already required)
+- `Pillow>=10.0.0` (already required)
+
+**Documentation:** `docs/WEB_DOWNLOAD_GUIDE.md` - Complete 221-line guide with examples, troubleshooting, and technical details
+
+**Files:** `scripts/web_image_downloader.py` (443 lines), `pytest_tests/unit/test_web_image_downloader.py`
+
+### 7. **Interactive Image Gallery** 🖼️
 **Advanced HTML gallery for comparing AI model outputs**
 
 - Side-by-side model comparison
@@ -92,7 +144,7 @@
 
 **Location:** `tools/ImageGallery/`
 
-### 6. **Automated Testing Infrastructure** 🧪
+### 8. **Automated Testing Infrastructure** 🧪
 **Professional testing setup with pytest**
 
 - pytest configuration
@@ -148,16 +200,18 @@
 
 #### New Documentation
 - `docs/VIDEO_METADATA_EMBEDDING.md`: Complete video metadata guide
+- `docs/WEB_DOWNLOAD_GUIDE.md`: Complete web download guide (221 lines)
 - `docs/TESTING.md`: Testing infrastructure and procedures
 - `BuildAndRelease/README.md`: Build process documentation
 - Gallery identification system docs
 - Workflow performance analysis (Oct 21, 2025)
 
 #### Updated Documentation
-- USER_GUIDE.md: Metadata section, monitoring examples
-- CLI_REFERENCE.md: Metadata flags, updated options
+- USER_GUIDE.md: Metadata section, monitoring examples, web download simplified syntax
+- CLI_REFERENCE.md: Metadata flags, URL parameters, web download options
+- CHANGELOG.md: Unreleased section for 3.5.0-beta with complete feature list
 - Testing checklists: OCT27_2025, guideme testing
-- Session summaries: 2025-10-26, 2025-10-27
+- Session summaries: 2025-10-26, 2025-10-27, 2025-10-30
 
 #### Archived Documentation
 - Moved outdated docs to archive
@@ -242,6 +296,11 @@
    - Model name extraction uses actual names from descriptions
    - Cache-busting for reliable updates
    - Screen reader accessibility improvements
+
+12. **Resume Mode Workflow Name Display**
+   - Fixed `UnboundLocalError` when using `--resume` flag
+   - Corrected initialization in both code paths (metadata file and directory name fallback)
+   - Now properly displays workflow name when resuming interrupted workflows
 
 ### Other Fixes
 
@@ -349,6 +408,25 @@
 
 ## 💡 Usage Examples
 
+### Web Image Download
+```bash
+# Simplified syntax - just specify the URL
+idt workflow example.com
+
+# Download images from a gallery
+idt workflow https://artist-portfolio.com/gallery
+
+# Limit the number of images
+idt workflow --url https://example.com/photos --max-images 20
+
+# Full workflow with specific AI provider
+idt workflow --url https://example.com/gallery \
+  --max-images 50 \
+  --provider openai \
+  --model gpt-4o-mini \
+  --steps download,describe,html
+```
+
 ### Video Metadata Embedding
 ```bash
 # Extract frames from phone video (with GPS)
@@ -414,13 +492,14 @@ python tools/show_metadata/show_metadata.py --guideme
 - Enhanced HEIC metadata extraction
 - Performance optimizations for large datasets
 - Additional AI providers integration
-- Web image download from URLs (partially implemented)
+- JavaScript-rendered image support for web downloads
 
 ### Feedback Welcome
 This is a **beta release** - we're actively seeking feedback on:
 - Build versioning and validation system
 - Video metadata embedding workflow
 - Geocoding accuracy and performance (now enabled by default)
+- **Web image download feature** - compatibility, performance, use cases
 - UI/UX improvements
 - Documentation clarity
 - Bug reports
@@ -431,15 +510,17 @@ This is a **beta release** - we're actively seeking feedback on:
 
 ### New Documentation
 - `docs/VIDEO_METADATA_EMBEDDING.md` - Video metadata complete guide
+- `docs/WEB_DOWNLOAD_GUIDE.md` - Web image download complete guide
 - `docs/TESTING.md` - Testing infrastructure
 - `BuildAndRelease/README.md` - Build documentation including versioning system
 - `tools/show_metadata/README.md` - Metadata tool guide
 - `tools/ImageGallery/README.md` - Gallery documentation
-- Session summaries: 2025-10-26, 2025-10-27, 2025-10-29
+- Session summaries: 2025-10-26, 2025-10-27, 2025-10-29, 2025-10-30
 
 ### Updated Documentation
-- `docs/USER_GUIDE.md` - Added metadata section
-- `docs/CLI_REFERENCE.md` - Updated with new flags (--no-geocode, --no-metadata)
+- `docs/USER_GUIDE.md` - Added metadata section and web download examples
+- `docs/CLI_REFERENCE.md` - Updated with new flags (--no-geocode, --no-metadata, --url, --max-images)
+- `docs/CHANGELOG.md` - Unreleased section for 3.5.0-beta
 - `README.md` - Updated feature list
 - Testing checklists: OCT27_2025, guideme testing
 
@@ -468,6 +549,7 @@ Special thanks to:
 #### New Dependencies
 ```bash
 pip install piexif>=1.1.3
+pip install beautifulsoup4>=4.9.0
 ```
 
 #### Optional: Install ffprobe for video metadata
