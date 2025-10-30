@@ -12,6 +12,7 @@ MAINTENANCE NOTES:
 RECENT UPDATES:
 - October 2025: Added video metadata extraction modules (video_metadata_extractor.py, exif_embedder.py)
 - October 2025: Added piexif for EXIF embedding in extracted video frames
+- October 2025: Added web image download support (web_image_downloader.py, beautifulsoup4)
 """
 
 a = Analysis(
@@ -30,6 +31,7 @@ a = Analysis(
         ('../scripts/ConvertImage.py', 'scripts'),
         ('../scripts/descriptions_to_html.py', 'scripts'),
         ('../scripts/video_frame_extractor.py', 'scripts'),
+        ('../scripts/web_image_downloader.py', 'scripts'),
         ('../scripts/config_loader.py', 'scripts'),
         ('../scripts/resource_manager.py', 'scripts'),
         ('../scripts/guided_workflow.py', 'scripts'),
@@ -57,6 +59,7 @@ a = Analysis(
         'scripts.ConvertImage',
         'scripts.descriptions_to_html',
         'scripts.video_frame_extractor',
+        'scripts.web_image_downloader',
         'scripts.config_loader',
         'scripts.list_prompts',
         'scripts.list_results',
@@ -73,6 +76,9 @@ a = Analysis(
         'PIL', 'PIL.Image', 'PIL.ImageOps', 'pillow_heif',
         # EXIF handling for video frame metadata
         'piexif', 'piexif.helper',
+        # Web image download support
+        'bs4', 'beautifulsoup4', 'urllib3', 'urllib.parse', 'urllib.request',
+        'hashlib', 'requests.adapters', 'requests.packages',
         # AI providers - CRITICAL for executable
         'requests', 'anthropic', 'openai',
         # Anthropic dependencies
