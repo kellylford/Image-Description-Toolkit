@@ -2404,6 +2404,7 @@ Viewing Results:
         if existing_metadata:
             # Use existing metadata
             workflow_name = existing_metadata.get("workflow_name", "resumed")
+            workflow_name_display = workflow_name  # Preserve case from metadata
             provider_name = existing_metadata.get("provider", "ollama")
             model_name = existing_metadata.get("model", "unknown")
             prompt_style = existing_metadata.get("prompt_style", "narrative")
