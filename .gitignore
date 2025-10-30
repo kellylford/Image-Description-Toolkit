@@ -59,6 +59,9 @@ build/
 dist/
 *.egg-info/
 
+# Local development build counter (preserve across git pulls)
+build/BUILD_TRACKER.json
+
 # Executable distribution
 releases/
 *.spec.bak
