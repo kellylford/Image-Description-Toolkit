@@ -210,7 +210,9 @@ echo.
 
 if "%BUILD_ERRORS%"=="0" (
     exit /b 0
-) else (
+)
+
+if not "%BUILD_ERRORS%"=="0" (
     echo.
     echo Build completed with %BUILD_ERRORS% error(s).
     exit /b 1

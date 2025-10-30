@@ -406,7 +406,7 @@ class WorkflowOrchestrator:
                  api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None,
                  timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = True, 
                  geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
-                 max_images: int = None):
+                 max_images: int = None, progress_status: bool = False):
         """
         Initialize the workflow orchestrator
         
@@ -426,6 +426,7 @@ class WorkflowOrchestrator:
             url: URL to download images from (enables web download step)
             min_size: Minimum image size filter (e.g. "100KB", "1MB")
             max_images: Maximum number of images to download
+            progress_status: Enable live progress status updates to console
         """
         self.config = WorkflowConfig(config_file)
         if base_output_dir:
@@ -454,6 +455,7 @@ class WorkflowOrchestrator:
         self.url = url
         self.min_size = min_size
         self.max_images = max_images
+        self.progress_status = progress_status
         
         # Available workflow steps
         self.available_steps = {
@@ -592,6 +594,15 @@ class WorkflowOrchestrator:
         
         # Update the status log
         self.logger.update_status(status_lines)
+        
+        # If progress-status mode is enabled, also print to console
+        if self.progress_status:
+            print("\n" + "="*60)
+            print("WORKFLOW PROGRESS STATUS")
+            print("="*60)
+            for line in status_lines:
+                print(line)
+            print("="*60)
         
     def download_images(self, input_dir: Path, output_dir: Path) -> Dict[str, Any]:
         """
@@ -2211,6 +2222,12 @@ Viewing Results:
     )
     
     parser.add_argument(
+        "--progress-status",
+        action="store_true",
+        help="Enable live progress status updates in console (shows all INFO messages and status.log updates)"
+    )
+    
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be done without executing"
@@ -2470,7 +2487,8 @@ Viewing Results:
             geocode_cache=args.geocode_cache,
             url=args.url,
             min_size=args.min_size,
-            max_images=args.max_images
+            max_images=args.max_images,
+            progress_status=args.progress_status
         )
         
         if args.dry_run:
@@ -2497,6 +2515,12 @@ Viewing Results:
         # Set logging level
         if args.verbose:
             orchestrator.logger.logger.setLevel(logging.DEBUG)
+        elif args.progress_status:
+            orchestrator.logger.logger.setLevel(logging.INFO)
+            # Also set console handler to INFO level to show progress messages
+            for handler in orchestrator.logger.logger.handlers:
+                if hasattr(handler, 'stream') and handler.stream.name == '<stdout>':
+                    handler.setLevel(logging.INFO)
         
         # Prepare workflow metadata
         metadata = {
@@ -2533,6 +2557,8 @@ Viewing Results:
                 original_cmd.extend(["--config", args.config])
             if args.verbose:
                 original_cmd.append("--verbose")
+            if args.progress_status:
+                original_cmd.append("--progress-status")
             
             orchestrator.logger.info(f"Original command: {' '.join(original_cmd)}")
         else:

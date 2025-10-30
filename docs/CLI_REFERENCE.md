@@ -277,6 +277,8 @@ idt workflow <image_directory> [options]
 --original-cwd PATH                   # Set working directory context
 --steps STEPS                         # Workflow steps: download,video,convert,describe,html
 --timeout SECONDS                     # Ollama request timeout (default: 90, increase for slow hardware)
+--verbose                            # Enable verbose logging (DEBUG level)
+--progress-status                    # Enable live progress status updates in console (INFO level + status blocks)
 ```
 
 **Web Download Options:** ⭐ NEW
@@ -965,6 +967,12 @@ idt viewer
 # Named workflow with custom output and viewer
 idt workflow C:\Photos --provider claude --model claude-opus-4 \
     --name "professional_photos" --output-dir C:\Results --view-results
+
+# Live progress updates during processing
+idt workflow C:\Photos --progress-status --provider claude --model claude-opus-4
+
+# Combine progress tracking with web downloads
+idt workflow --url "https://example.com/gallery" --progress-status --max-images 20
 
 # Batch analysis
 idt stats

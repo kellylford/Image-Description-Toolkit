@@ -22,6 +22,8 @@ def run_command(cmd, description):
             cmd, 
             capture_output=True, 
             text=True,
+            encoding='utf-8',
+            errors='replace',  # Replace invalid characters instead of crashing
             timeout=10
         )
         return result.returncode == 0, result.stdout, result.stderr
@@ -53,7 +55,8 @@ def test_version_command():
         return False
     
     # Check for expected version components
-    required = ['Version:', 'Commit:', 'Mode:']
+    # Output format: "Image Description Toolkit X.Y.Z\nCommit: ...\nMode: ..."
+    required = ['Image Description Toolkit', 'Commit:', 'Mode:']
     missing = [r for r in required if r not in stdout]
     
     if missing:
