@@ -15,10 +15,14 @@ RECENT UPDATES:
 - October 2025: Added web image download support (web_image_downloader.py, beautifulsoup4)
 """
 
+# Web download dependencies - use PyInstaller's collect_all for BeautifulSoup4
+from PyInstaller.utils.hooks import collect_all
+bs4_datas, bs4_binaries, bs4_hiddenimports = collect_all('bs4')
+
 a = Analysis(
     ['../idt_cli.py'],
     pathex=['..', '../scripts'],
-    binaries=[],
+    binaries=bs4_binaries,
     datas=[
         # Include ALL scripts files individually
         ('../scripts/workflow.py', 'scripts'),
@@ -43,7 +47,7 @@ a = Analysis(
         ('../models', 'models'),
         ('../analysis', 'analysis'),
         ('../VERSION', '.'),
-    ],
+    ] + bs4_datas,
     hiddenimports=[
         # EXPLICITLY include every module we need
         'scripts',
@@ -76,8 +80,8 @@ a = Analysis(
         'PIL', 'PIL.Image', 'PIL.ImageOps', 'pillow_heif',
         # EXIF handling for video frame metadata
         'piexif', 'piexif.helper',
-        # Web image download support
-        'bs4', 'urllib3', 'urllib.parse', 'urllib.request',
+        # Web image download support - using PyInstaller's collect_all
+        'html.parser', 'urllib3', 'urllib.parse', 'urllib.request',
         'hashlib', 'requests.adapters', 'requests.packages',
         # AI providers - CRITICAL for executable
         'requests', 'anthropic', 'openai',
@@ -101,8 +105,7 @@ a = Analysis(
         'openai._exceptions',
         'openai.types',
         'openai.resources',
-    ],
-    collect_submodules=['bs4'],
+    ] + bs4_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
