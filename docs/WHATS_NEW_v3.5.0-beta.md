@@ -8,17 +8,38 @@
 
 ## 🎯 Major New Features
 
-### 1. **Metadata Extraction & Geocoding** 🌍
+### 1. **Build Versioning & Validation System** 🏗️ NEW
+**Professional build numbering and automated validation**
+
+#### Versioning System
+- **Build-numbered versions**: `3.5.0-beta bld001`, `3.5.0-beta bld002`, etc.
+- **Multiple sources**: Environment variables, GitHub Actions CI, or local tracker
+- **Workflow logs**: Standardized banner with version, commit, mode, and UTC timestamp
+- **CLI version command**: Shows full version + commit + frozen/dev mode
+- **Unit tested**: Comprehensive tests for all versioning components
+
+#### Build Validation
+- **Pre-build check**: `check_spec_completeness.py` verifies all scripts are in PyInstaller spec
+- **Post-build validation**: `validate_build.py` smoke tests the frozen executable
+  - Tests version command, help, workflow imports, and core commands
+  - Catches frozen build issues before deployment
+- **Integration tests**: Tests specifically for frozen executable functionality
+- **Automated in builditall.bat**: Validation runs automatically during every build
+
+**Files:** `scripts/versioning.py`, `BuildAndRelease/validate_build.py`, `BuildAndRelease/check_spec_completeness.py`, `pytest_tests/integration/test_frozen_executable.py`
+
+### 2. **Metadata Extraction & Geocoding** 🌍
 **Complete metadata integration across the entire toolkit**
 
 #### Core Functionality
 - Extract GPS coordinates, dates, camera info from images (including HEIC/HEIF)
-- Optional reverse geocoding via OpenStreetMap Nominatim
+- **Reverse geocoding via OpenStreetMap Nominatim** (enabled by default)
 - Location and date prefixes added to descriptions
 - Geocoding cache to minimize API calls
+- **Default behavior**: Metadata and geocoding are ON unless explicitly disabled
 
 #### Integration Points
-- **CLI**: `--metadata`, `--no-metadata`, `--geocode`, `--geocode-cache` flags
+- **CLI**: `--no-metadata`, `--no-geocode` flags (both default to ON)
 - **ImageDescriber GUI**: Enhanced metadata display panel
 - **Viewer**: Metadata display in image viewer
 - **IDTConfigure**: Metadata settings category
@@ -30,7 +51,7 @@
 - `docs/CLI_REFERENCE.md` - Metadata options
 - OpenStreetMap attribution for compliance
 
-### 2. **Video Metadata Embedding** ⭐ NEW
+### 3. **Video Metadata Embedding** ⭐
 **Extracted video frames now preserve GPS, date, and camera metadata from source videos**
 
 - **video_metadata_extractor.py**: Extracts GPS coordinates, recording date/time, and camera info from video files using ffprobe
@@ -48,7 +69,7 @@
 
 **Documentation:** `docs/VIDEO_METADATA_EMBEDDING.md`
 
-### 3. **IDTConfigure Application** ⚙️
+### 4. **IDTConfigure Application** ⚙️
 **New GUI application for configuration management**
 
 - Centralized configuration editor
@@ -57,7 +78,7 @@
 - Integrated into build/release pipeline
 - Included in installer
 
-### 4. **Interactive Image Gallery** 🖼️
+### 5. **Interactive Image Gallery** 🖼️
 **Advanced HTML gallery for comparing AI model outputs**
 
 - Side-by-side model comparison
@@ -71,14 +92,17 @@
 
 **Location:** `tools/ImageGallery/`
 
-### 5. **Automated Testing Infrastructure** 🧪
+### 6. **Automated Testing Infrastructure** 🧪
 **Professional testing setup with pytest**
 
 - pytest configuration
-- Automated test runner
+- Automated test runner (Python 3.13+ compatible)
 - GitHub Actions CI/CD integration
-- 39/39 unit tests passing
+- **55 unit tests passing** (increased from 39)
+- **48 smoke tests** for CLI/GUI entry points
+- Integration tests for frozen executable
 - Test coverage reporting
+- Comprehensive local test suite with clear pass/fail reporting
 
 ---
 
@@ -168,32 +192,50 @@
 
 ### Critical Fixes
 
-1. **Format String Vulnerabilities**
+1. **Build Validation System Issues**
+   - Fixed Unicode encoding errors in validate_build.py (UTF-8 with error replacement)
+   - Fixed CMD batch file IF/ELSE parsing error causing `. was unexpected` errors
+   - Split IF/ELSE into separate IF statements for CMD compatibility
+
+2. **Geocoding Now Enabled by Default**
+   - Changed `enable_geocoding` default from False to True
+   - Changed CLI flag from `--geocode` to `--no-geocode` (inverse logic)
+   - Matches user expectations: geocoding ON unless explicitly disabled
+
+3. **EXIF Metadata Loss During Image Optimization**
+   - Fixed EXIF data preservation during image conversion/optimization
+   - GPS and other metadata now correctly preserved through image processing
+
+4. **Workflow Export Enhancements**
+   - Added location and source tracking to workflow exports
+   - Better metadata integration in CSV/Excel exports
+
+5. **Format String Vulnerabilities**
    - Fixed format string errors in multiple components
    - Metadata config loading corrected
    - Frozen mode path handling fixed
 
-2. **HTML Rendering in Viewer**
+6. **HTML Rendering in Viewer**
    - CRITICAL: Disabled HTML rendering in description pane (security)
    - Prevents XSS vulnerabilities
 
-3. **Geocoding Race Condition**
+7. **Geocoding Race Condition**
    - Fixed race condition in geocoding logic
    - Format string vulnerabilities addressed
 
-4. **EXIF GPS Conversion**
+8. **EXIF GPS Conversion**
    - Fixed GPS conversion to handle rational tuples (num/den)
    - Proper handling of EXIF coordinate format
 
-5. **Stats Analysis for Resumed Workflows**
+9. **Stats Analysis for Resumed Workflows**
    - Fixed to count actual descriptions, not total images
    - Accurate statistics for interrupted/resumed workflows
 
-6. **Status.log Monitoring**
-   - Fixed to prioritize --log-dir over --output-dir
-   - Correct log file location resolution
+10. **Status.log Monitoring**
+    - Fixed to prioritize --log-dir over --output-dir
+    - Correct log file location resolution
 
-7. **Image Gallery Issues**
+11. **Image Gallery Issues**
    - Fixed prompt text display in Same Prompt mode
    - Fixed description explorer display
    - Fixed JSON loading (index.json vs individual files)
@@ -217,12 +259,14 @@
 ## 🏗️ Infrastructure Changes
 
 ### Build System
-- PyInstaller spec file updated for new modules (video metadata, exif embedder)
+- **Versioning**: Build-numbered versions with tracking (scripts/versioning.py)
+- **Validation**: Pre-build spec checks and post-build smoke tests
+- PyInstaller spec file updated for new modules (video metadata, exif embedder, versioning)
 - All 5 apps now have dedicated build/package scripts
 - Virtual environment setup automated
-- `builditall.bat`: Builds all applications
+- `builditall.bat`: Builds all applications with validation
 - `packageitall.bat`: Packages all applications
-- `releaseitall.bat`: Complete release pipeline (fixed syntax error)
+- `releaseitall.bat`: Complete release pipeline (fixed IF/ELSE syntax)
 - `build_installer.bat`: Windows installer creation
 
 ### Requirements
@@ -233,9 +277,10 @@
 
 ### Testing
 - pytest framework integrated
-- Custom test runner for 39 unit tests
+- Custom test runner for 55 unit tests + 48 smoke tests
 - GitHub Actions CI/CD
 - Automated testing documentation
+- Integration tests for frozen executables
 
 ---
 
@@ -279,15 +324,18 @@
 ## 📊 Validation & Testing Status
 
 ### ✅ Completed Testing
-- [x] Unit tests: 39/39 passing
-- [x] Build system: All 5 apps building successfully
+- [x] Unit tests: 55/55 passing
+- [x] Smoke tests: 48/48 CLI/GUI entry points passing
+- [x] Integration tests: Frozen executable tests passing
+- [x] Build system: All 5 apps building successfully with validation
 - [x] Metadata extraction: Working with JPEG, PNG, HEIC
-- [x] Geocoding: OpenStreetMap integration working
+- [x] Geocoding: OpenStreetMap integration working, enabled by default
+- [x] Versioning: Build numbers and banners appearing in logs and CLI
 - [x] Image Gallery: All features functional
+- [x] EXIF preservation: Metadata preserved through image optimization
 
 ### 🔄 Pending Validation
 - [ ] Video metadata embedding: Test with real videos containing GPS
-- [ ] Frozen executable (idt.exe): Test all new features in exe mode
 - [ ] Geocoding cache: Validate cache persistence and performance
 - [ ] Installer: Test Windows installer with all 5 apps
 - [ ] Documentation: Verify all examples and screenshots current
@@ -312,11 +360,30 @@ idt workflow --input-dir extracted_frames --metadata --geocode
 
 ### Metadata & Geocoding
 ```bash
-# Process images with metadata and geocoding
-idt workflow --input-dir photos --metadata --geocode
+# Process images with metadata and geocoding (both enabled by default)
+idt workflow --input-dir photos
+
+# Disable metadata
+idt workflow --input-dir photos --no-metadata
+
+# Disable just geocoding (keep metadata)
+idt workflow --input-dir photos --no-geocode
 
 # Use custom geocode cache
-idt workflow --input-dir photos --metadata --geocode-cache my_cache.json
+idt workflow --input-dir photos --geocode-cache my_cache.json
+```
+
+### Build Version Information
+```bash
+# Check build version
+idt version
+# Output: Image Description Toolkit 3.5.0-beta bld001
+#         Commit: abc1234
+#         Mode: Frozen
+
+# Workflow logs now start with version banner automatically
+idt workflow --input-dir photos
+# Log shows: Build version, commit, mode, and timestamp
 ```
 
 ### Monitoring Workflow
@@ -347,11 +414,13 @@ python tools/show_metadata/show_metadata.py --guideme
 - Enhanced HEIC metadata extraction
 - Performance optimizations for large datasets
 - Additional AI providers integration
+- Web image download from URLs (partially implemented)
 
 ### Feedback Welcome
 This is a **beta release** - we're actively seeking feedback on:
+- Build versioning and validation system
 - Video metadata embedding workflow
-- Geocoding accuracy and performance
+- Geocoding accuracy and performance (now enabled by default)
 - UI/UX improvements
 - Documentation clarity
 - Bug reports
@@ -363,18 +432,22 @@ This is a **beta release** - we're actively seeking feedback on:
 ### New Documentation
 - `docs/VIDEO_METADATA_EMBEDDING.md` - Video metadata complete guide
 - `docs/TESTING.md` - Testing infrastructure
-- `BuildAndRelease/README.md` - Build documentation
+- `BuildAndRelease/README.md` - Build documentation including versioning system
 - `tools/show_metadata/README.md` - Metadata tool guide
 - `tools/ImageGallery/README.md` - Gallery documentation
+- Session summaries: 2025-10-26, 2025-10-27, 2025-10-29
 
 ### Updated Documentation
 - `docs/USER_GUIDE.md` - Added metadata section
-- `docs/CLI_REFERENCE.md` - Updated with new flags
+- `docs/CLI_REFERENCE.md` - Updated with new flags (--no-geocode, --no-metadata)
 - `README.md` - Updated feature list
+- Testing checklists: OCT27_2025, guideme testing
 
 ### Testing Documentation
 - `docs/archive/TESTING_CHECKLIST_OCT27_2025.md`
 - `docs/archive/guideme_testing.md`
+- `pytest_tests/integration/test_frozen_executable.py` - Frozen build validation
+- `pytest_tests/unit/test_versioning.py` - Versioning system tests
 
 ---
 
@@ -410,7 +483,12 @@ sudo apt-get install ffmpeg
 ```
 
 #### No Breaking Changes
-All existing workflows continue to work. New features are opt-in via flags or automatic (video metadata).
+All existing workflows continue to work. New features are opt-in via flags or automatic.
+
+**Key behavior changes:**
+- Metadata extraction is now ON by default (use `--no-metadata` to disable)
+- Geocoding is now ON by default (use `--no-geocode` to disable)
+- Version command now shows build number and commit info
 
 #### Configuration Changes
 - New metadata settings in IDTConfigure
@@ -428,12 +506,18 @@ All existing workflows continue to work. New features are opt-in via flags or au
 ---
 
 **Next Steps for Release:**
-1. Complete pending validation tests
-2. Update CHANGELOG.md with final release notes
-3. Create GitHub release v3.5.0-beta
-4. Upload distribution packages
-5. Announce new features
+1. ✅ Complete build validation system
+2. ✅ Add versioning with build numbers
+3. ✅ Enable geocoding by default
+4. ✅ Fix EXIF metadata preservation
+5. Complete pending validation tests (video metadata, large workflows)
+6. Update CHANGELOG.md with final release notes
+7. Create GitHub release v3.5.0-beta
+8. Upload distribution packages
+9. External user beta testing
+10. Announce new features
 
 ---
 
-*This document will be updated as testing progresses toward the stable v3.5.0 release.*
+*Last Updated: October 29, 2025*  
+*Document Status: Ready for external beta testing*

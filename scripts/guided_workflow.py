@@ -313,7 +313,7 @@ def guided_workflow():
         while i < len(sys.argv):
             arg = sys.argv[i]
             # Known workflow flags to pass through
-            if arg in ['--timeout', '--preserve-descriptions', '--metadata', '--no-metadata', '--geocode', '--geocode-cache']:
+            if arg in ['--timeout', '--preserve-descriptions', '--metadata', '--no-metadata', '--no-geocode', '--geocode-cache']:
                 extra_workflow_args.append(arg)
                 # Check if next arg is the value for this flag
                 if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith('--'):
@@ -530,10 +530,13 @@ def guided_workflow():
     if not enable_metadata:
         extra_workflow_args.append("--no-metadata")
     
-    if enable_geocoding:
-        extra_workflow_args.append("--geocode")
-        if geocode_cache_file and geocode_cache_file != "geocode_cache.json":
-            extra_workflow_args.extend(["--geocode-cache", geocode_cache_file])
+    # Geocoding is now enabled by default in workflow.py, so we only need to pass --no-geocode if disabled
+    if enable_metadata and not enable_geocoding:
+        extra_workflow_args.append("--no-geocode")
+    
+    # Only add custom geocode cache location if specified and different from default
+    if enable_geocoding and geocode_cache_file and geocode_cache_file.strip() and geocode_cache_file != "geocode_cache.json":
+        extra_workflow_args.extend(["--geocode-cache", geocode_cache_file])
     
     # Build the command
     print_header("Command Summary")
