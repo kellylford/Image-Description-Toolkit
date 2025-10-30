@@ -77,7 +77,7 @@ a = Analysis(
         # EXIF handling for video frame metadata
         'piexif', 'piexif.helper',
         # Web image download support
-        'bs4', 'beautifulsoup4', 'urllib3', 'urllib.parse', 'urllib.request',
+        'bs4', 'urllib3', 'urllib.parse', 'urllib.request',
         'hashlib', 'requests.adapters', 'requests.packages',
         # AI providers - CRITICAL for executable
         'requests', 'anthropic', 'openai',
@@ -102,6 +102,7 @@ a = Analysis(
         'openai.types',
         'openai.resources',
     ],
+    collect_submodules=['bs4'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
