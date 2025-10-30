@@ -28,6 +28,7 @@ requests>=2.25.0       # HTTP requests
 ollama>=0.3.0          # Ollama Python client
 openai>=1.0.0          # OpenAI API
 anthropic>=0.18.0      # Anthropic Claude API
+beautifulsoup4>=4.9.0  # Web scraping for download functionality
 
 # ----------------------------------------------------------------------------
 # REQUIRED - Utilities

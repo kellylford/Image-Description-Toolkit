@@ -19,6 +19,7 @@ PyQt6>=6.4.0           # Qt6 GUI framework for the viewer interface
 Pillow>=10.0.0         # Image processing
 requests>=2.25.0       # HTTP requests
 ollama>=0.3.0          # Ollama Python client for redescribe feature
+beautifulsoup4>=4.9.0  # Web scraping for download functionality
 
 # ----------------------------------------------------------------------------
 # REQUIRED - Build Tool
