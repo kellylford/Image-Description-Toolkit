@@ -36,11 +36,11 @@ All IDT commands support the `--config` (or `-c`) option to specify a custom con
 # Use custom workflow config
 idt workflow photos --config my_workflow_config.json
 
-# Use custom image describer config (for standalone image description)
-python scripts/image_describer.py photos --config my_prompts_config.json
+# Use custom image describer config (workflow will use it)
+idt workflow photos --config my_prompts_config.json
 
-# Use custom video extractor config
-python scripts/video_frame_extractor.py video.mp4 --config my_extraction_config.json
+# Use custom video extractor config (via workflow)
+idt workflow videos --config my_extraction_config.json
 ```
 
 ### Environment Variables
@@ -564,21 +564,21 @@ idt workflow photos --prompt-style product_photo
 # Image describer GUI will also use your custom prompts
 idt imagedescriber
 
-# Standalone image describer uses your prompts
-python scripts/image_describer.py photos
+# Viewer will show descriptions generated with your prompts
+idt viewer
 ```
 
 #### Step 4: Test Your Custom Prompts
 
 ```bash
-# Test with a single image first
-python scripts/image_describer.py test_image.jpg --config my_custom_prompts.json --prompt-style my_style
-
-# Run a small batch
-idt workflow test_photos --config my_custom_prompts.json --max-files 5
+# Run a small test batch first
+idt workflow test_photos --config my_custom_prompts.json --prompt-style my_style --max-files 5
 
 # View results
 idt viewer
+
+# If satisfied, run full batch
+idt workflow all_photos --config my_custom_prompts.json
 ```
 
 #### Step 5: Maintain Multiple Prompt Profiles
