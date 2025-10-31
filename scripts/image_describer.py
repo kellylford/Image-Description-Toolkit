@@ -1916,8 +1916,7 @@ Configuration:
         "--prompt-style",
         type=str,
         default=default_style,
-        choices=available_styles,
-        help=f"Style of prompt to use. Available: {', '.join(available_styles)} (default: {default_style})"
+        help=f"Style of prompt to use (from config file). Default: {default_style}"
     )
     parser.add_argument(
         "--timeout",
@@ -1947,6 +1946,27 @@ Configuration:
     )
     
     args = parser.parse_args()
+    
+    # If custom config specified, reload to get available prompt styles for validation
+    if args.config:
+        try:
+            from config_loader import load_json_config
+            cfg_dict, cfg_path, cfg_source = load_json_config('image_describer_config.json', explicit=args.config)
+            if cfg_dict:
+                variations = cfg_dict.get('prompt_variations', {})
+                config_available_styles = list(variations.keys()) if variations else get_available_prompt_styles()
+                
+                # Validate prompt style against config-specific styles
+                if args.prompt_style:
+                    lower_map = {k.lower(): k for k in config_available_styles}
+                    if args.prompt_style.lower() not in lower_map:
+                        logger.error(f"Invalid prompt style '{args.prompt_style}' for config {cfg_path}")
+                        logger.error(f"Available styles in {cfg_path}: {', '.join(config_available_styles)}")
+                        print(f"ERROR: Invalid prompt style '{args.prompt_style}'")
+                        print(f"Available styles in {cfg_path}: {', '.join(config_available_styles)}")
+                        sys.exit(1)
+        except Exception as e:
+            logger.warning(f"Could not validate prompt style with custom config: {e}")
     
     # Set up logging with log directory, verbosity, and quiet mode
     setup_logging(log_dir=args.log_dir, verbose=args.verbose, quiet=args.quiet)
