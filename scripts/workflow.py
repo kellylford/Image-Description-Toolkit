@@ -2249,14 +2249,8 @@ Viewing Results:
     )
     
     parser.add_argument(
-        "--config", "-c",
-        help="Path to custom image_describer_config.json file for prompts and settings"
-    )
-    
-    parser.add_argument(
-        "--config", "-c",
-        default="workflow_config.json",
-        help="Workflow configuration file (default: workflow_config.json)"
+        "--config",
+        help="Path to custom image_describer_config.json file for custom prompts and AI settings"
     )
     
     parser.add_argument(
@@ -2631,10 +2625,11 @@ Viewing Results:
             sys.exit(0)
         
         # Override configuration if specified
-        if args.model:
+        # Only update workflow config if it has the workflow structure
+        if args.model and "workflow" in orchestrator.config.config:
             orchestrator.config.config["workflow"]["steps"]["image_description"]["model"] = args.model
         
-        if args.prompt_style:
+        if args.prompt_style and "workflow" in orchestrator.config.config:
             orchestrator.config.config["workflow"]["steps"]["image_description"]["prompt_style"] = args.prompt_style
         
         # Set logging level
@@ -2735,7 +2730,9 @@ Viewing Results:
         print("\nWorkflow interrupted by user")
         sys.exit(130)
     except Exception as e:
+        import traceback
         print(f"Error: {e}")
+        traceback.print_exc()
         sys.exit(1)
 
 
