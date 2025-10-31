@@ -53,8 +53,18 @@ if not exist "BuildAndRelease\final_working.spec" (
 )
 
 echo [1/4] Cleaning previous builds...
+REM Preserve BUILD_TRACKER.json before cleaning
+if exist "build\BUILD_TRACKER.json" (
+    copy /Y "build\BUILD_TRACKER.json" "BUILD_TRACKER.json.tmp" >nul 2>&1
+)
 if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
+REM Restore BUILD_TRACKER.json after cleaning
+if exist "BUILD_TRACKER.json.tmp" (
+    mkdir "build" 2>nul
+    copy /Y "BUILD_TRACKER.json.tmp" "build\BUILD_TRACKER.json" >nul 2>&1
+    del "BUILD_TRACKER.json.tmp" >nul 2>&1
+)
 echo     Done.
 echo.
 
