@@ -2165,6 +2165,31 @@ def launch_viewer(output_dir, logger: logging.Logger) -> None:
         print(f"ERROR: Failed to launch viewer: {e}")
 
 
+def normalize_model_name(model: str, provider: str) -> str:
+    """
+    Normalize model name by stripping provider prefix if present.
+    
+    Users might specify: ollama:llama3.2-vision:11b
+    But Ollama API expects: llama3.2-vision:11b
+    
+    Args:
+        model: Model name that may include provider prefix
+        provider: Provider name (ollama, openai, claude)
+    
+    Returns:
+        Model name with provider prefix stripped if it matches the provider
+    """
+    if not model:
+        return model
+    
+    # Strip provider prefix if present (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
+    prefix = f"{provider}:"
+    if model.startswith(prefix):
+        return model[len(prefix):]
+    
+    return model
+
+
 def main():
     """Main function for command-line usage"""
     parser = argparse.ArgumentParser(
@@ -2250,7 +2275,8 @@ Viewing Results:
     
     parser.add_argument(
         "--config",
-        help="Path to custom image_describer_config.json file for custom prompts and AI settings"
+        default="workflow_config.json",
+        help="Path to custom workflow config file (default: workflow_config.json)"
     )
     
     parser.add_argument(
@@ -2589,12 +2615,16 @@ Viewing Results:
         print(f"Valid steps: {', '.join(valid_steps)}")
         sys.exit(1)
     
+    # Normalize model name - strip provider prefix if present
+    # (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
+    normalized_model = normalize_model_name(args.model, args.provider) if args.model else None
+    
     # Create orchestrator first to get access to logging
     try:
         orchestrator = WorkflowOrchestrator(
             args.config, 
             base_output_dir=output_dir, 
-            model=args.model, 
+            model=normalized_model, 
             prompt_style=args.prompt_style, 
             provider=args.provider, 
             api_key_file=args.api_key_file,
@@ -2626,8 +2656,8 @@ Viewing Results:
         
         # Override configuration if specified
         # Only update workflow config if it has the workflow structure
-        if args.model and "workflow" in orchestrator.config.config:
-            orchestrator.config.config["workflow"]["steps"]["image_description"]["model"] = args.model
+        if normalized_model and "workflow" in orchestrator.config.config:
+            orchestrator.config.config["workflow"]["steps"]["image_description"]["model"] = normalized_model
         
         if args.prompt_style and "workflow" in orchestrator.config.config:
             orchestrator.config.config["workflow"]["steps"]["image_description"]["prompt_style"] = args.prompt_style
