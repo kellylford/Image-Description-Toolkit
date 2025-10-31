@@ -26,6 +26,10 @@ echo ========================================================================
 echo BUILD ALL APPLICATIONS
 echo ========================================================================
 echo.
+
+REM Change to project root directory
+cd /d "%~dp0.."
+
 REM Show composed build version and commit before starting
 echo --- Build Version Banner (pre-build) ---
 python idt_cli.py version
@@ -53,9 +57,6 @@ echo   5. IDTConfigure
 echo.
 echo Make sure all virtual environments are set up before continuing.
 echo.
-
-REM Change to project root directory
-cd /d "%~dp0.."
 
 set BUILD_ERRORS=0
 
