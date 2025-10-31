@@ -2518,6 +2518,16 @@ Viewing Results:
             # Old workflow_state used single "config" - map to image_describer_config for backward compatibility
             args.config_image_describer = workflow_state["config"]
         
+        # Restore custom config paths from metadata (new format)
+        workflow_metadata = load_workflow_metadata(resume_dir)
+        if workflow_metadata:
+            if workflow_metadata.get("config_workflow"):
+                args.config_workflow = workflow_metadata["config_workflow"]
+            if workflow_metadata.get("config_image_describer"):
+                args.config_image_describer = workflow_metadata["config_image_describer"]
+            if workflow_metadata.get("config_video"):
+                args.config_video = workflow_metadata["config_video"]
+        
         # Filter steps to only include those not yet completed
         remaining_steps = []
         for step in steps:
@@ -2738,7 +2748,11 @@ Viewing Results:
             "prompt_style": prompt_style,
             "timestamp": timestamp,
             "steps": steps,
-            "user_provided_name": bool(args.name)
+            "user_provided_name": bool(args.name),
+            # Save custom config paths for resume (only if non-default)
+            "config_workflow": args.config_workflow if args.config_workflow != "workflow_config.json" else None,
+            "config_image_describer": args.config_image_describer,
+            "config_video": args.config_video
         }
         
         # Launch viewer if requested (before workflow starts for real-time monitoring)
