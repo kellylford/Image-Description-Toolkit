@@ -2619,10 +2619,13 @@ Viewing Results:
     # (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
     normalized_model = normalize_model_name(args.model, args.provider) if args.model else None
     
+    # IMPORTANT: --config is for image_describer_config.json, NOT workflow_config.json
+    # Workflow always uses default workflow_config.json
+    # The args.config gets passed to image_describer subprocess instead
     # Create orchestrator first to get access to logging
     try:
         orchestrator = WorkflowOrchestrator(
-            args.config, 
+            "workflow_config.json",  # Always use default workflow config 
             base_output_dir=output_dir, 
             model=normalized_model, 
             prompt_style=args.prompt_style, 
