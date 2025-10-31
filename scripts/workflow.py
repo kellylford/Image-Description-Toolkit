@@ -2515,7 +2515,8 @@ Viewing Results:
             args.provider = workflow_state["provider"]
             provider_name = workflow_state["provider"]
         if workflow_state["config"]:
-            args.config = workflow_state["config"]
+            # Old workflow_state used single "config" - map to image_describer_config for backward compatibility
+            args.config_image_describer = workflow_state["config"]
         
         # Filter steps to only include those not yet completed
         remaining_steps = []
@@ -2604,8 +2605,8 @@ Viewing Results:
         
         # Get provider, model and prompt info for directory naming
         provider_name = args.provider if args.provider else "ollama"
-        model_name = get_effective_model(args, args.config)
-        prompt_style = get_effective_prompt_style(args, args.config)
+        model_name = get_effective_model(args, args.config_image_describer)
+        prompt_style = get_effective_prompt_style(args, args.config_image_describer)
         
         # Determine workflow name identifier
         if args.name:
@@ -2759,8 +2760,13 @@ Viewing Results:
                 original_cmd.extend(["--model", args.model])
             if args.prompt_style:
                 original_cmd.extend(["--prompt-style", args.prompt_style])
-            if args.config != "workflow_config.json":
-                original_cmd.extend(["--config", args.config])
+            # Log config arguments (use new explicit names)
+            if args.config_image_describer and args.config_image_describer != "image_describer_config.json":
+                original_cmd.extend(["--config-image-describer", args.config_image_describer])
+            if args.config_workflow and args.config_workflow != "workflow_config.json":
+                original_cmd.extend(["--config-workflow", args.config_workflow])
+            if args.config_video and args.config_video != "video_frame_extractor_config.json":
+                original_cmd.extend(["--config-video", args.config_video])
             if args.verbose:
                 original_cmd.append("--verbose")
             if args.progress_status:
