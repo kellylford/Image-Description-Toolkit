@@ -535,6 +535,25 @@ class WorkflowOrchestrator:
             status_lines.append(f"Workflow Progress: {len(self.statistics['steps_completed'])}/{total_steps} steps completed")
         
         # Add step-specific status
+        # Preparation (copy images to temp directory) status
+        if self.step_results.get('prepare', {}).get('in_progress', False):
+            prep = self.step_results.get('prepare', {})
+            if 'processed' in prep and 'total' in prep:
+                processed = prep['processed']
+                total = prep['total']
+                if total > 0:
+                    percentage = int((processed / total) * 100)
+                    status_lines.append(f"[ACTIVE] Preparing images for description: {processed}/{total} ({percentage}%)")
+                else:
+                    status_lines.append(f"[ACTIVE] Preparing images for description: {processed}/{total}")
+            else:
+                status_lines.append("[ACTIVE] Preparing images for description...")
+        elif 'prepare' in self.step_results and not self.step_results.get('prepare', {}).get('in_progress', True):
+            # Only show a DONE line if we have totals to report
+            prep = self.step_results.get('prepare', {})
+            if 'total' in prep:
+                status_lines.append(f"[DONE] Image preparation complete ({prep.get('total', 0)} files prepared)")
+
         if 'download' in self.statistics['steps_completed']:
             status_lines.append(f"[DONE] Image download complete ({self.statistics['total_downloads']} images)")
         elif self.step_results.get('download', {}).get('in_progress', False):
@@ -1224,9 +1243,18 @@ class WorkflowOrchestrator:
             # Preserve full directory structure in temp dir to prevent collisions
             combined_image_list = []
             total_copy_failures = 0
+
+            # Initialize preparation (copy) progress so the user sees activity before describe starts
+            self.step_results['prepare'] = {
+                'in_progress': True,
+                'processed': 0,
+                'total': len(all_image_files)
+            }
+            self.logger.info(f"Preparing {len(all_image_files)} images for description (copying to temp workspace)...")
+            self._update_status_log()
             
             # Copy all unique images to temporary directory
-            for image_file in all_image_files:
+            for idx, image_file in enumerate(all_image_files, start=1):
                 try:
                     # Determine which source directory this file came from
                     source_dir = None
@@ -1260,6 +1288,18 @@ class WorkflowOrchestrator:
                     shutil.copy2(image_file, temp_image_path)
                     combined_image_list.append((temp_image_path, image_file))  # (temp_path, original_path)
                     self.logger.debug(f"Copied {image_file} to {temp_image_path}")
+
+                    # Update preparation progress counters and status periodically
+                    if 'prepare' in self.step_results:
+                        self.step_results['prepare']['processed'] += 1
+                        # Update every 25 files or on last item
+                        if (idx % 25 == 0) or (self.step_results['prepare']['processed'] == self.step_results['prepare']['total']):
+                            self._update_status_log()
+                            if self.progress_status:
+                                proc = self.step_results['prepare']['processed']
+                                tot = self.step_results['prepare']['total']
+                                pct = int((proc / tot) * 100) if tot > 0 else 0
+                                self.logger.info(f"[ACTIVE] Preparing images for description: {proc}/{tot} ({pct}%)")
                     
                 except Exception as e:
                     self.logger.warning(f"Failed to copy {image_file}: {e}")
@@ -1272,6 +1312,13 @@ class WorkflowOrchestrator:
                 self.logger.warning(f"Copy Summary: Failed to copy {total_copy_failures} images")
                 self.logger.warning(f"Copy Summary: Success rate: {(len(combined_image_list) / len(all_image_files) * 100):.1f}%")
             
+            # Mark preparation as complete in status tracking
+            if 'prepare' in self.step_results:
+                self.step_results['prepare']['in_progress'] = False
+                # Ensure final status update after completion
+                self._update_status_log()
+                self.logger.info(f"Image preparation complete: {len(combined_image_list)}/{len(all_image_files)} files ready")
+
             if not combined_image_list:
                 self.logger.info("No images were successfully prepared for processing")
                 return {"success": True, "processed": 0, "output_dir": output_dir}
