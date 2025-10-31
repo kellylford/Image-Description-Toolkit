@@ -2230,8 +2230,10 @@ Examples:
   idt workflow photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file claude.txt
   idt workflow media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
   
-  # Configuration
-  idt workflow mixed_media --output-dir analysis --config my_workflow.json
+  # Custom Configuration Files
+  idt workflow photos --config-image-describer scripts/my_prompts.json --prompt-style artistic
+  idt workflow photos --config-id scripts/my_prompts.json  # Short form
+  idt workflow photos --config scripts/my_prompts.json     # Deprecated but still works
   
 Resume Examples:
   idt workflow --resume workflow_output_20250919_153443
@@ -2691,13 +2693,21 @@ Viewing Results:
             orchestrator.logger.info(f"Input directory: {input_dir}")
             orchestrator.logger.info(f"Output directory: {output_dir}")
             orchestrator.logger.info(f"Workflow steps: {', '.join(steps)}")
-            orchestrator.logger.info(f"Configuration: {args.config}")
+            orchestrator.logger.info(f"Workflow config: {workflow_config}")
+            if image_describer_config:
+                orchestrator.logger.info(f"Image describer config: {image_describer_config}")
+            if video_config:
+                orchestrator.logger.info(f"Video config: {video_config}")
             # Also print to console for immediate feedback
             print("Dry run mode - showing what would be executed:")
             print(f"Input directory: {input_dir}")
             print(f"Output directory: {output_dir}")
             print(f"Workflow steps: {', '.join(steps)}")
-            print(f"Configuration: {args.config}")
+            print(f"Workflow config: {workflow_config}")
+            if image_describer_config:
+                print(f"Image describer config: {image_describer_config}")
+            if video_config:
+                print(f"Video config: {video_config}")
             sys.exit(0)
         
         # Override configuration if specified

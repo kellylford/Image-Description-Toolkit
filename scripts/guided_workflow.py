@@ -598,9 +598,9 @@ def guided_workflow(custom_config_path=None):
     if prompt_style:
         cmd_parts.extend(["--prompt-style", prompt_style])
     
-    # Add custom config if provided
+    # Add custom config if provided - use explicit image describer config
     if config_path_for_workflow:
-        cmd_parts.extend(["--config", config_path_for_workflow])
+        cmd_parts.extend(["--config-image-describer", config_path_for_workflow])
     
     # Add any extra workflow arguments passed to guideme
     if extra_workflow_args:
@@ -665,9 +665,9 @@ def guided_workflow(custom_config_path=None):
         if prompt_style:
             cmd_parts.extend(["--prompt-style", prompt_style])
         
-        # Add custom config if provided
+        # Add custom config if provided - use explicit image describer config
         if config_path_for_workflow:
-            cmd_parts.extend(["--config", config_path_for_workflow])
+            cmd_parts.extend(["--config-image-describer", config_path_for_workflow])
         
         # Add any extra workflow arguments
         if extra_workflow_args:
@@ -698,9 +698,9 @@ def guided_workflow(custom_config_path=None):
                 workflow_args.extend(["--name", workflow_name])
             if prompt_style:
                 workflow_args.extend(["--prompt-style", prompt_style])
-            # Add custom config if provided
+            # Add custom config if provided - use explicit image describer config
             if config_path_for_workflow:
-                workflow_args.extend(["--config", config_path_for_workflow])
+                workflow_args.extend(["--config-image-describer", config_path_for_workflow])
             # Add any extra workflow arguments (e.g., --timeout)
             if extra_workflow_args:
                 workflow_args.extend(extra_workflow_args)
