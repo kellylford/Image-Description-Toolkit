@@ -157,15 +157,15 @@ Examples:
   idt prompt-list --config scripts/my_prompts.json
   idt prompt-list --config scripts/my_prompts.json --verbose
 
-  # Also works with
-  idt prompt-list -v
+  # Also works with short form
+  idt prompt-list -c scripts/my_prompts.json -v
         """
     )
     
     parser.add_argument(
         "--config", "-c",
         type=str,
-        help="Path to custom image_describer_config.json file"
+        help="Path to custom image_describer_config.json file (contains prompt variations)"
     )
     
     parser.add_argument(
