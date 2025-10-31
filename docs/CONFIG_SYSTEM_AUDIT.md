@@ -1,7 +1,51 @@
 # Configuration System Comprehensive Audit
 **Date:** October 31, 2025  
 **Branch:** 3.5beta  
-**Related Issue:** #62
+**Related Issue:** #62  
+**Status:** ✅ ALL BUGS FIXED - 5 bugs found and fixed
+
+## Critical Bug Summary
+
+Found and fixed **5 critical bugs** in configuration system:
+
+1. **guided_workflow.py** - Completely ignored `--config` flag (commit be2f1e8)
+2. **workflow.py** - Didn't pass `--config` to image_describer (commit ab07750)
+3. **list_prompts.py** - No `--config` support (commit ef7721a)
+4. **guided_workflow.py** - Wrong parameters to load_json_config (commit aacf4ce) ⚠️ **CRITICAL**
+5. **list_prompts.py** - Wrong parameters to load_json_config (commit 9c02340) ⚠️ **CRITICAL**
+
+## Bugs #4 and #5: The Subtle load_json_config() Bug
+
+### The Problem:
+When user runs `idt guideme --config scripts\kelly.json`:
+- ✅ Code converts to absolute: `c:\idt\scripts\kelly.json`
+- ✅ Verifies file exists
+- ✅ Shows "Using custom configuration" message
+- ❌ **Then passes full path as filename parameter!**
+
+**Wrong:**
+```python
+config, path, source = load_json_config('c:\idt\scripts\kelly.json')
+```
+
+This tells load_json_config to SEARCH for a file NAMED `c:\idt\scripts\kelly.json`, which obviously fails!
+
+**Correct:**
+```python
+config, path, source = load_json_config('kelly.json', explicit='c:\idt\scripts\kelly.json')
+```
+
+This properly tells config_loader: "The filename is kelly.json, but use this explicit path."
+
+### Comprehensive Audit of ALL load_json_config() Calls:
+
+- ✅ **image_describer.py** line 1691 - CORRECT (uses explicit parameter properly)
+- ✅ **workflow.py** line 151 - CORRECT (uses explicit parameter properly)
+- ❌ **guided_workflow.py** line 282 - WRONG → FIXED (commit aacf4ce)
+- ❌ **list_prompts.py** line 35 - WRONG → FIXED (commit 9c02340)
+- ✅ **test files** - correct (test-specific usage)
+
+**Result:** All config loading now uses load_json_config() correctly!
 
 ## Summary
 Audited ALL IDT commands and scripts for `--config` flag support.
