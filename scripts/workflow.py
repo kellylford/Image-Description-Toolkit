@@ -2250,6 +2250,11 @@ Viewing Results:
     
     parser.add_argument(
         "--config", "-c",
+        help="Path to custom image_describer_config.json file for prompts and settings"
+    )
+    
+    parser.add_argument(
+        "--config", "-c",
         default="workflow_config.json",
         help="Workflow configuration file (default: workflow_config.json)"
     )
