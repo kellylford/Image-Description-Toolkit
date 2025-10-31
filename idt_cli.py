@@ -907,12 +907,20 @@ COMMANDS:
     version               Show version information
     help                  Show this help message
 
+GLOBAL OPTIONS:
+    --config, -c <file>   Use custom configuration file (default: workflow_config.json)
+                          Config files: workflow_config.json, image_describer_config.json,
+                          video_frame_extractor_config.json
+
 EXAMPLES:
     # Interactive guided workflow (recommended for beginners)
     {base_call} guideme
 
     # Run workflow with Ollama
     {base_call} workflow --provider ollama --model llava
+
+    # Run workflow with custom config file
+    {base_call} workflow photos --config my_workflow.json
 
     # Launch viewer (empty)
     {base_call} viewer
