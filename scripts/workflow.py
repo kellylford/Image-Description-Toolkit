@@ -414,10 +414,15 @@ class WorkflowOrchestrator:
                  api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None,
                  timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = True, 
                  geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
-                 max_images: int = None, progress_status: bool = False):
+                 max_images: int = None, progress_status: bool = False,
+                 image_describer_config: Optional[str] = None, video_config: Optional[str] = None):
         """
         Initialize the workflow orchestrator
         
+        Args:
+            config_file: Path to workflow orchestration configuration file
+            image_describer_config: Path to image describer config (prompts, AI, metadata)
+            video_config: Path to video extraction config
         Args:
             config_file: Path to workflow configuration file
             base_output_dir: Base output directory for the workflow
@@ -437,7 +442,10 @@ class WorkflowOrchestrator:
             progress_status: Enable live progress status updates to console
         """
         self.config = WorkflowConfig(config_file)
-        self.config_file = config_file  # Store for passing to subprocesses
+        self.config_file = config_file  # Workflow orchestration config
+        self.image_describer_config = image_describer_config  # Image describer config (optional)
+        self.video_config = video_config  # Video extraction config (optional)
+        
         if base_output_dir:
             self.config.set_base_output_dir(base_output_dir)
         self.logger = WorkflowLogger("workflow_orchestrator", base_output_dir=self.config.base_output_dir)
@@ -758,7 +766,13 @@ class WorkflowOrchestrator:
         
         # Update frame extractor config to use our output directory
         step_config = self.config.get_step_config("video_extraction")
-        config_file = step_config.get("config_file", "video_frame_extractor_config.json")
+        
+        # Use explicit video_config if provided, otherwise use step config or default
+        if self.video_config:
+            config_file = self.video_config
+            self.logger.info(f"Using custom video extraction config: {self.video_config}")
+        else:
+            config_file = step_config.get("config_file", "video_frame_extractor_config.json")
         
         # Temporarily modify the frame extractor config
         self._update_frame_extractor_config(config_file, output_dir)
@@ -1317,17 +1331,16 @@ class WorkflowOrchestrator:
                 self.logger.info(f"Using API key file: {self.api_key_file}")
             
             # Add optional parameters
-            # Priority: user's --config flag > step_config > default
+            # Use explicit image_describer_config if provided
             config_to_use = None
-            if self.config_file and self.config_file != "workflow_config.json":
-                # User specified a custom config file - assume it's image_describer_config.json
-                # (workflow.py uses workflow_config.json, image_describer uses image_describer_config.json)
-                config_to_use = self.config_file
-                self.logger.info(f"Passing user's custom config to image_describer: {self.config_file}")
+            if self.image_describer_config:
+                # User specified explicit image describer config
+                config_to_use = self.image_describer_config
+                self.logger.info(f"Using custom image describer config: {self.image_describer_config}")
             elif "config_file" in step_config:
                 config_to_use = step_config["config_file"]
             else:
-                # Always pass the config file that we just updated with metadata settings
+                # Use default image_describer_config.json
                 config_to_use = str(Path(__file__).parent / "image_describer_config.json")
             
             cmd.extend(["--config", config_to_use])
@@ -2273,10 +2286,28 @@ Viewing Results:
         help="Comma-separated list of workflow steps (default: video,convert,describe,html)"
     )
     
+    # Configuration file arguments (explicit types)
+    parser.add_argument(
+        "--config-workflow", "--config-wf",
+        default="workflow_config.json",
+        help="Path to workflow orchestration config file (default: workflow_config.json)"
+    )
+    
+    parser.add_argument(
+        "--config-image-describer", "--config-id",
+        help="Path to image describer config file (prompts, AI settings, metadata)"
+    )
+    
+    parser.add_argument(
+        "--config-video",
+        help="Path to video frame extraction config file"
+    )
+    
+    # Deprecated: Keep for backward compatibility
     parser.add_argument(
         "--config",
-        default="workflow_config.json",
-        help="Path to custom workflow config file (default: workflow_config.json)"
+        dest="_deprecated_config",
+        help="[DEPRECATED] Use --config-image-describer instead. This alias will be removed in v4.0."
     )
     
     parser.add_argument(
@@ -2391,6 +2422,14 @@ Viewing Results:
     )
     
     args = parser.parse_args()
+    
+    # Handle deprecated --config argument
+    if hasattr(args, '_deprecated_config') and args._deprecated_config:
+        print("WARNING: --config is deprecated and will be removed in v4.0.")
+        print("         Use --config-image-describer (or --config-id) instead.")
+        print(f"         Treating '{args._deprecated_config}' as image describer config.")
+        if not args.config_image_describer:
+            args.config_image_describer = args._deprecated_config
     
     # Handle resume mode
     if args.resume:
@@ -2619,13 +2658,15 @@ Viewing Results:
     # (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
     normalized_model = normalize_model_name(args.model, args.provider) if args.model else None
     
-    # IMPORTANT: --config is for image_describer_config.json, NOT workflow_config.json
-    # Workflow always uses default workflow_config.json
-    # The args.config gets passed to image_describer subprocess instead
+    # Determine which config files to use
+    workflow_config = args.config_workflow if args.config_workflow else "workflow_config.json"
+    image_describer_config = args.config_image_describer  # Can be None (will use defaults)
+    video_config = args.config_video  # Can be None (will use defaults)
+    
     # Create orchestrator first to get access to logging
     try:
         orchestrator = WorkflowOrchestrator(
-            "workflow_config.json",  # Always use default workflow config 
+            workflow_config,  # Explicit workflow config 
             base_output_dir=output_dir, 
             model=normalized_model, 
             prompt_style=args.prompt_style, 
@@ -2640,7 +2681,9 @@ Viewing Results:
             url=url,  # Use detected URL from argument processing
             min_size=args.min_size,
             max_images=args.max_images,
-            progress_status=args.progress_status
+            progress_status=args.progress_status,
+            image_describer_config=image_describer_config,  # NEW: explicit image describer config
+            video_config=video_config  # NEW: explicit video config
         )
         
         if args.dry_run:
