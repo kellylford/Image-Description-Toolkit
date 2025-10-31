@@ -27,6 +27,23 @@ Follow these guidelines for all coding work on this project.
 
 8. **Finished includes tested now and forever:** Ensure that all code is thoroughly tested before considering it finished. This includes unit tests, integration tests, and any other relevant testing methodologies completed along with the change.
 
+9. **Test Before Claiming Complete:** Before stating that code is fixed or a feature is implemented:
+   - Actually BUILD the executable if changes affect compiled code
+   - RUN the code with realistic test scenarios (not just theoretical analysis)
+   - VERIFY the fix works end-to-end, not just that syntax is correct
+   - Do NOT ask the user to test - YOU test first, then report results
+   - If you cannot test (missing environment/data), explicitly state what you CAN'T verify
+   
+   **Example from config system debugging:** Agent made 7 fixes across multiple files but kept saying "it should work now" without testing. Each fix broke something new because related code wasn't checked. The correct approach: After each fix, rebuild idt.exe, run with test data, verify the actual error is gone, check for NEW errors, repeat until genuinely working.
+
+10. **Comprehensive Impact Analysis:** When making changes:
+    - Search for ALL usages of the function/variable/pattern being changed
+    - Check for duplicate implementations that need the same fix
+    - Look for related code that depends on the changed behavior
+    - Verify argument parsers don't have conflicting flags (e.g., two `-c` arguments)
+    - Check if frozen executable vs dev mode have different code paths
+    - Assume there ARE related bugs you haven't found yet - actively hunt for them
+
 
 
 ## Architecture Overview
