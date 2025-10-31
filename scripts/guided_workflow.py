@@ -277,7 +277,9 @@ def get_available_prompt_styles(custom_config_path=None):
         if custom_config_path:
             # Use custom config if provided
             print(f"  Loading prompts from custom config: {custom_config_path}")
-            config, path, source = load_json_config(custom_config_path)
+            # Pass as explicit parameter, extract just filename for search
+            config_filename = Path(custom_config_path).name
+            config, path, source = load_json_config(config_filename, explicit=custom_config_path)
             if config:
                 print(f"  ✓ Loaded config from: {path} (source: {source})")
                 prompt_variations = config.get('prompt_variations', {})
