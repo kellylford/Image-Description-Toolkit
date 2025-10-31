@@ -31,8 +31,11 @@ def load_prompt_styles(config_file=None):
         from config_loader import load_json_config
         
         # Use custom config if provided, otherwise use default
-        config_name = config_file if config_file else 'image_describer_config.json'
-        config, config_path, source = load_json_config(config_name)
+        # Pass as explicit parameter if custom path provided
+        if config_file:
+            config, config_path, source = load_json_config('image_describer_config.json', explicit=config_file)
+        else:
+            config, config_path, source = load_json_config('image_describer_config.json')
         
         if not config:
             print("Error: Could not find image_describer_config.json", file=sys.stderr)
