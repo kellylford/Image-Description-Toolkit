@@ -437,6 +437,7 @@ class WorkflowOrchestrator:
             progress_status: Enable live progress status updates to console
         """
         self.config = WorkflowConfig(config_file)
+        self.config_file = config_file  # Store for passing to subprocesses
         if base_output_dir:
             self.config.set_base_output_dir(base_output_dir)
         self.logger = WorkflowLogger("workflow_orchestrator", base_output_dir=self.config.base_output_dir)
@@ -1316,12 +1317,20 @@ class WorkflowOrchestrator:
                 self.logger.info(f"Using API key file: {self.api_key_file}")
             
             # Add optional parameters
-            if "config_file" in step_config:
-                cmd.extend(["--config", step_config["config_file"]])
+            # Priority: user's --config flag > step_config > default
+            config_to_use = None
+            if self.config_file and self.config_file != "workflow_config.json":
+                # User specified a custom config file - assume it's image_describer_config.json
+                # (workflow.py uses workflow_config.json, image_describer uses image_describer_config.json)
+                config_to_use = self.config_file
+                self.logger.info(f"Passing user's custom config to image_describer: {self.config_file}")
+            elif "config_file" in step_config:
+                config_to_use = step_config["config_file"]
             else:
                 # Always pass the config file that we just updated with metadata settings
-                config_file_path = Path(__file__).parent / "image_describer_config.json"
-                cmd.extend(["--config", str(config_file_path)])
+                config_to_use = str(Path(__file__).parent / "image_describer_config.json")
+            
+            cmd.extend(["--config", config_to_use])
             
             # Use override model if provided (for resume), otherwise use config
             if self.override_model:
