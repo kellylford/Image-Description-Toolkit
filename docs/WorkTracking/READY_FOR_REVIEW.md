@@ -29,10 +29,11 @@ Built executable and tested 5 scenarios - **ALL PASS**:
 4. --config (deprecated, shows warning) - PASS
 5. prompt-list with custom config - PASS
 
-### ✅ Complete Documentation
+### ✅ Complete Documentation ✅
 - Testing results: `docs/worktracking/2025-10-31-explicit-config-testing.md`
 - Session summary: `docs/worktracking/2025-10-31-session-summary.md`
 - Original proposal: `docs/WorkTracking/ISSUE-explicit-config-arguments.md`
+- **CLI Reference updated**: `docs/CLI_REFERENCE.md` (all new arguments documented with examples)
 
 ---
 
