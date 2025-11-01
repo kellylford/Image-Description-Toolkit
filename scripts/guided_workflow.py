@@ -8,11 +8,15 @@ import os
 from pathlib import Path
 import subprocess
 import json
+import argparse
 
 # Add scripts directory to path
 SCRIPT_DIR = Path(__file__).parent.absolute()
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+
+# Import config loader
+from config_loader import load_json_config
 
 
 def print_header(text):
@@ -259,27 +263,43 @@ def check_ollama_models():
         return []
 
 
-def get_available_prompt_styles():
-    """Get available prompt styles from image_describer_config.json (real-time)"""
+def get_available_prompt_styles(custom_config_path=None):
+    """
+    Get available prompt styles from image_describer_config.json (real-time)
+    
+    Args:
+        custom_config_path: Optional path to custom config file
+    
+    Returns:
+        Tuple of (prompt_styles_list, default_style)
+    """
     try:
-        config_paths = [
-            'scripts/image_describer_config.json',
-            'image_describer_config.json'
-        ]
+        if custom_config_path:
+            # Use custom config if provided
+            print(f"  Loading prompts from custom config: {custom_config_path}")
+            # Pass as explicit parameter, extract just filename for search
+            config_filename = Path(custom_config_path).name
+            config, path, source = load_json_config(config_filename, explicit=custom_config_path)
+            if config:
+                print(f"  ✓ Loaded config from: {path} (source: {source})")
+                prompt_variations = config.get('prompt_variations', {})
+                default_style = config.get('default_prompt_style', 'narrative')
+                print(f"  ✓ Found {len(prompt_variations)} prompt styles")
+                return list(prompt_variations.keys()), default_style
+            else:
+                print(f"  ✗ Failed to load custom config, falling back to default")
         
-        for config_path in config_paths:
-            if Path(config_path).exists():
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    prompt_variations = config.get('prompt_variations', {})
-                    default_style = config.get('default_prompt_style', 'narrative')
-                    
-                    # Return both the styles and the default
-                    return list(prompt_variations.keys()), default_style
+        # Fall back to default config loading
+        config, path, source = load_json_config('image_describer_config.json')
+        if config:
+            prompt_variations = config.get('prompt_variations', {})
+            default_style = config.get('default_prompt_style', 'narrative')
+            return list(prompt_variations.keys()), default_style
         
-        # Fallback if config not found
+        # Final fallback if config not found
         return ['narrative', 'detailed', 'concise', 'artistic', 'technical'], 'narrative'
-    except Exception:
+    except Exception as e:
+        print(f"  ✗ Error loading prompts: {e}")
         return ['narrative', 'detailed', 'concise', 'artistic', 'technical'], 'narrative'
 
 
@@ -302,16 +322,39 @@ def validate_directory(path):
     return True, "Valid"
 
 
-def guided_workflow():
-    """Interactive guided workflow builder"""
+def guided_workflow(custom_config_path=None):
+    """
+    Interactive guided workflow builder
+    
+    Args:
+        custom_config_path: Optional path to custom image_describer_config.json
+    """
     # Parse any extra workflow arguments passed through (e.g., --timeout 300)
     # These will be appended to the final workflow command
     extra_workflow_args = []
+    config_path_for_workflow = custom_config_path  # Store to pass to workflow
+    
     if len(sys.argv) > 1:
         # Filter out any arguments that are meant for the workflow
         i = 1
         while i < len(sys.argv):
             arg = sys.argv[i]
+            # Handle config flags (all forms)
+            if arg in ['--config-image-describer', '--config-id', '--config', '-c']:
+                if i + 1 < len(sys.argv):
+                    i += 1
+                    config_path_for_workflow = sys.argv[i]
+                    # Convert to absolute path for reliability
+                    config_path_abs = Path(config_path_for_workflow).resolve()
+                    if config_path_abs.exists():
+                        config_path_for_workflow = str(config_path_abs)
+                        print(f"\n✓ Using custom configuration: {config_path_for_workflow}")
+                    else:
+                        print(f"\n✗ Warning: Config file not found: {config_path_abs}")
+                        print(f"   Will attempt to use default configuration instead.")
+                        config_path_for_workflow = None
+                i += 1
+                continue
             # Known workflow flags to pass through
             if arg in ['--timeout', '--preserve-descriptions', '--metadata', '--no-metadata', '--no-geocode', '--geocode-cache']:
                 extra_workflow_args.append(arg)
@@ -447,8 +490,8 @@ def guided_workflow():
     style_step = "Step 5" if provider == 'ollama' else "Step 6"
     print_header(f"{style_step}: Prompt Style (Optional)")
     
-    # Get available prompt styles from config
-    available_styles, default_style = get_available_prompt_styles()
+    # Get available prompt styles from config (using custom config if provided)
+    available_styles, default_style = get_available_prompt_styles(config_path_for_workflow)
     
     print(f"Select a prompt style, or press Enter to use the default ({default_style}).")
     
@@ -555,6 +598,10 @@ def guided_workflow():
     if prompt_style:
         cmd_parts.extend(["--prompt-style", prompt_style])
     
+    # Add custom config if provided - use explicit image describer config
+    if config_path_for_workflow:
+        cmd_parts.extend(["--config-image-describer", config_path_for_workflow])
+    
     # Add any extra workflow arguments passed to guideme
     if extra_workflow_args:
         cmd_parts.extend(extra_workflow_args)
@@ -618,6 +665,10 @@ def guided_workflow():
         if prompt_style:
             cmd_parts.extend(["--prompt-style", prompt_style])
         
+        # Add custom config if provided - use explicit image describer config
+        if config_path_for_workflow:
+            cmd_parts.extend(["--config-image-describer", config_path_for_workflow])
+        
         # Add any extra workflow arguments
         if extra_workflow_args:
             cmd_parts.extend(extra_workflow_args)
@@ -647,6 +698,9 @@ def guided_workflow():
                 workflow_args.extend(["--name", workflow_name])
             if prompt_style:
                 workflow_args.extend(["--prompt-style", prompt_style])
+            # Add custom config if provided - use explicit image describer config
+            if config_path_for_workflow:
+                workflow_args.extend(["--config-image-describer", config_path_for_workflow])
             # Add any extra workflow arguments (e.g., --timeout)
             if extra_workflow_args:
                 workflow_args.extend(extra_workflow_args)
@@ -678,8 +732,19 @@ def guided_workflow():
 
 def main():
     """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description="Interactive workflow wizard",
+        add_help=False  # Suppress help since this is wizard-based
+    )
+    parser.add_argument(
+        "--config-image-describer", "--config-id", "--config", "-c",
+        dest="config",
+        help="Path to custom image_describer_config.json file (prompts, AI settings, metadata)"
+    )
+    
     try:
-        guided_workflow()
+        args, unknown = parser.parse_known_args()
+        guided_workflow(custom_config_path=args.config)
     except KeyboardInterrupt:
         print("\n\nCancelled by user. Exiting...")
         sys.exit(0)

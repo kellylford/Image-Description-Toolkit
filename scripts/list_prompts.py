@@ -12,55 +12,45 @@ from pathlib import Path
 import argparse
 
 
-def find_config_file():
-    """
-    Find the image_describer_config.json file.
-    Checks multiple possible locations.
-    
-    Returns:
-        Path to config file or None if not found
-    """
-    # Possible config file locations
-    possible_paths = [
-        Path("image_describer_config.json"),  # Current directory
-        Path("scripts/image_describer_config.json"),  # scripts subdirectory
-        Path(__file__).parent / "image_describer_config.json",  # Same dir as this script
-        Path(__file__).parent.parent / "scripts" / "image_describer_config.json",  # Up one level
-    ]
-    
-    for config_path in possible_paths:
-        if config_path.exists():
-            return config_path
-    
-    return None
-
-
-def load_prompt_styles():
+def load_prompt_styles(config_file=None):
     """
     Load prompt styles from the configuration file.
+    
+    Args:
+        config_file: Optional path to custom config file
     
     Returns:
         tuple: (default_style, prompt_variations dict, config_path)
     """
-    config_path = find_config_file()
-    
-    if not config_path:
-        print("Error: Could not find image_describer_config.json", file=sys.stderr)
-        print("\nSearched in:", file=sys.stderr)
-        print("  - Current directory", file=sys.stderr)
-        print("  - scripts/ subdirectory", file=sys.stderr)
-        print("  - Script's parent directory", file=sys.stderr)
-        return None, None, None
+    # Use config_loader for proper resolution
+    script_dir = Path(__file__).parent
+    if str(script_dir) not in sys.path:
+        sys.path.insert(0, str(script_dir))
     
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
+        from config_loader import load_json_config
+        
+        # Use custom config if provided, otherwise use default
+        # Pass as explicit parameter if custom path provided
+        if config_file:
+            config, config_path, source = load_json_config('image_describer_config.json', explicit=config_file)
+        else:
+            config, config_path, source = load_json_config('image_describer_config.json')
+        
+        if not config:
+            print("Error: Could not find image_describer_config.json", file=sys.stderr)
+            print("\nSearched using config_loader resolution order", file=sys.stderr)
+            return None, None, None
         
         default_style = config.get("default_prompt_style", "narrative")
         prompt_variations = config.get("prompt_variations", {})
         
         return default_style, prompt_variations, config_path
         
+    except ImportError:
+        # Fallback if config_loader not available (shouldn't happen)
+        print("Error: config_loader module not found", file=sys.stderr)
+        return None, None, None
     except json.JSONDecodeError as e:
         print(f"Error: Failed to parse JSON config file: {e}", file=sys.stderr)
         return None, None, None
@@ -69,9 +59,9 @@ def load_prompt_styles():
         return None, None, None
 
 
-def list_prompts_simple():
+def list_prompts_simple(config_file=None):
     """List prompt style names only (simple format)."""
-    default_style, prompt_variations, config_path = load_prompt_styles()
+    default_style, prompt_variations, config_path = load_prompt_styles(config_file)
     
     if prompt_variations is None:
         return 1
@@ -102,9 +92,9 @@ def list_prompts_simple():
     return 0
 
 
-def list_prompts_verbose():
+def list_prompts_verbose(config_file=None):
     """List prompt style names and their full text (verbose format)."""
-    default_style, prompt_variations, config_path = load_prompt_styles()
+    default_style, prompt_variations, config_path = load_prompt_styles(config_file)
     
     if prompt_variations is None:
         return 1
@@ -163,9 +153,21 @@ Examples:
   python list_prompts.py --verbose
   idt prompt-list --verbose
 
-  # Also works with
-  idt prompt-list -v
+  # Use custom config file
+  idt prompt-list --config-image-describer scripts/my_prompts.json
+  idt prompt-list --config-id scripts/my_prompts.json --verbose
+
+  # Short forms also work
+  idt prompt-list --config scripts/my_prompts.json -v
+  idt prompt-list -c scripts/my_prompts.json -v
         """
+    )
+    
+    parser.add_argument(
+        "--config-image-describer", "--config-id", "--config", "-c",
+        type=str,
+        dest="config",
+        help="Path to custom image_describer_config.json file (contains prompt variations)"
     )
     
     parser.add_argument(
@@ -177,9 +179,9 @@ Examples:
     args = parser.parse_args()
     
     if args.verbose:
-        return list_prompts_verbose()
+        return list_prompts_verbose(args.config)
     else:
-        return list_prompts_simple()
+        return list_prompts_simple(args.config)
 
 
 if __name__ == "__main__":
