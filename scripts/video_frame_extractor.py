@@ -759,7 +759,9 @@ class VideoFrameExtractor:
 def main():
     parser = argparse.ArgumentParser(description="Extract frames from video files")
     parser.add_argument("input", nargs='?', help="Input video file or directory")
-    parser.add_argument("-c", "--config", default="video_frame_extractor_config.json",
+    parser.add_argument("--config-video", "--config", "-c", 
+                       default="video_frame_extractor_config.json",
+                       dest="config",
                        help="Path to config file (default: video_frame_extractor_config.json)")
     parser.add_argument("--log-dir", help="Directory for log files (default: auto-detect workflow directory)")
     parser.add_argument("--output-dir", help="Output directory for extracted frames (overrides config)")

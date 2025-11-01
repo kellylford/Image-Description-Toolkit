@@ -908,9 +908,10 @@ COMMANDS:
     help                  Show this help message
 
 GLOBAL OPTIONS:
-    --config, -c <file>   Use custom configuration file (default: workflow_config.json)
-                          Config files: workflow_config.json, image_describer_config.json,
-                          video_frame_extractor_config.json
+    --config-workflow, --config-wf <file>     Workflow orchestration config (default: workflow_config.json)
+    --config-image-describer, --config-id <file>  Image describer config (prompts, AI, metadata)
+    --config-video <file>                     Video extraction config
+    --config <file>                           [DEPRECATED] Use --config-image-describer instead
 
 EXAMPLES:
     # Interactive guided workflow (recommended for beginners)
@@ -919,8 +920,11 @@ EXAMPLES:
     # Run workflow with Ollama
     {base_call} workflow --provider ollama --model llava
 
-    # Run workflow with custom config file
-    {base_call} workflow photos --config my_workflow.json
+    # Run workflow with custom prompts and metadata settings
+    {base_call} workflow photos --config-id my_prompts.json --prompt-style detailed
+
+    # Run workflow with multiple custom configs (advanced)
+    {base_call} workflow photos --config-wf production.json --config-id artistic.json
 
     # Launch viewer (empty)
     {base_call} viewer

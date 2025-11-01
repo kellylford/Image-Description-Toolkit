@@ -302,7 +302,12 @@ idt workflow <input_source> [options]
 
 **Advanced Options:**
 ```bash
---config CONFIG_FILE                  # Use custom config file
+--config-workflow FILE                # Workflow orchestration config (default: workflow_config.json)
+--config-wf FILE                      # Short form of --config-workflow
+--config-image-describer FILE         # Image describer config: prompts, AI, metadata
+--config-id FILE                      # Short form of --config-image-describer
+--config-video FILE                   # Video extraction config
+--config FILE                         # [DEPRECATED] Alias for --config-image-describer (shows warning)
 --view-results                        # Launch viewer after completion
 --skip-existing                       # Skip images that already have descriptions
 --dry-run                            # Show what would be processed without doing it
@@ -360,6 +365,70 @@ idt workflow --download https://example.com --model llava
 
 # With full URL
 idt workflow https://www.theideaplace.net --prompt-style detailed
+```
+
+**⚙️ Configuration Files:**
+
+IDT uses three separate configuration files for different purposes:
+
+1. **`workflow_config.json`** - Workflow orchestration settings
+   - Directory structure, file patterns, step configuration
+   - Use `--config-workflow` or `--config-wf` to customize
+   - Rarely needs customization
+
+2. **`image_describer_config.json`** - AI and description settings (most commonly customized)
+   - Custom prompt templates and variations
+   - AI model parameters (temperature, max tokens, etc.)
+   - Metadata extraction and geocoding settings
+   - Use `--config-image-describer` or `--config-id` to customize
+
+3. **`video_frame_extractor_config.json`** - Video extraction settings
+   - FPS settings, quality, filters
+   - Use `--config-video` to customize
+   - Rarely needs customization
+
+**Configuration Priority Order:**
+
+When determining which settings to use (model, prompt style, etc.), IDT follows this priority:
+
+1. **Command-line arguments** (highest priority)
+   - `--model`, `--prompt-style`, `--provider` explicitly on command line
+   
+2. **Custom image describer config** (if `--config-id` provided)
+   - `default_model`, `default_prompt_style`, `default_provider` from your custom config
+   - ⭐ **This is respected!** Your custom config's defaults are used automatically
+   
+3. **Workflow config step settings** (`workflow_config.json`)
+   - Settings in the `image_description` step config
+   - Usually set to `null` (empty) to allow flexibility
+   
+4. **Default image describer config** (fallback)
+   - System defaults from `scripts/image_describer_config.json`
+
+**Example:**
+```bash
+# Your custom config has: "default_model": "gemma3", "default_prompt_style": "narrative"
+idt workflow photos --config-id myconfig.json
+# Result: Uses gemma3 and narrative automatically from myconfig.json
+
+# Override model on command line (highest priority)
+idt workflow photos --config-id myconfig.json --model llava
+# Result: Uses llava (command-line) and narrative (from myconfig.json)
+```
+
+**Example with custom configs:**
+```bash
+# Use custom prompts and AI settings (most common)
+idt workflow photos --config-id scripts/kelly.json --prompt-style orientation
+
+# Short form
+idt workflow photos --config-id my_prompts.json
+
+# Multiple custom configs (advanced)
+idt workflow media --config-wf production.json --config-id artistic.json --config-video high-quality.json
+
+# Deprecated syntax (still works but shows warning)
+idt workflow photos --config my_prompts.json  # WARNING: use --config-id instead
 ```
 
 **📁 Local Directory Processing:**
@@ -804,7 +873,7 @@ idt prompt-list [options]
 **Options:**
 ```bash
 --verbose                 # Show full prompt text
---config CONFIG_FILE      # Use specific config file
+--config CONFIG_FILE      # Path to image_describer_config.json file (contains prompt variations)
 ```
 
 **Examples:**
@@ -815,7 +884,7 @@ idt prompt-list
 # Show full prompt text for all styles
 idt prompt-list --verbose
 
-# List prompts from custom config
+# List prompts from custom image describer config
 idt prompt-list --config scripts/custom_config.json
 ```
 

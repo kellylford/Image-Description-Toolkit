@@ -57,7 +57,7 @@ from workflow_utils import (
     get_path_identifier_2_components, save_workflow_metadata, load_workflow_metadata,
     create_workflow_helper_files
 )
-from image_describer import get_default_prompt_style
+from image_describer import get_default_prompt_style, get_default_model
 try:
     from config_loader import load_json_config
 except ImportError:
@@ -90,10 +90,26 @@ def sanitize_name(name: str, preserve_case: bool = True) -> str:
 
 
 def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
-    """Determine which model will actually be used"""
+    """Determine which model will actually be used for directory naming
+    
+    Priority:
+    1. Command-line --model argument
+    2. Custom image describer config default model (if --config-id provided)
+    3. workflow_config.json step config
+    4. Default image_describer_config.json
+    """
     # Command line argument takes precedence
     if hasattr(args, 'model') and args.model:
         return sanitize_name(args.model)
+    
+    # Check custom image describer config if provided
+    if hasattr(args, 'config_image_describer') and args.config_image_describer:
+        try:
+            custom_model = get_default_model(args.config_image_describer)
+            if custom_model:
+                return sanitize_name(custom_model)
+        except Exception:
+            pass
     
     # Check workflow config file
     try:
@@ -104,7 +120,7 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
     except Exception:
         pass
     
-    # Fall back to image_describer_config.json default
+    # Fall back to default image_describer_config.json
     try:
         import json
         # Try different possible paths for the config file
@@ -117,7 +133,13 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
             try:
                 with open(config_path, 'r') as f:
                     img_config = json.load(f)
-                    return sanitize_name(img_config.get("model_settings", {}).get("model", "unknown"))
+                    default_model = img_config.get("default_model")
+                    if default_model:
+                        return sanitize_name(default_model)
+                    # Fallback to old structure
+                    model = img_config.get("model_settings", {}).get("model")
+                    if model:
+                        return sanitize_name(model)
             except FileNotFoundError:
                 continue
                 
@@ -175,10 +197,26 @@ def validate_prompt_style(style: str, config_file: str = "image_describer_config
 
 
 def get_effective_prompt_style(args, config_file: str = "workflow_config.json") -> str:
-    """Determine which prompt style will actually be used"""
+    """Determine which prompt style will actually be used for directory naming
+    
+    Priority:
+    1. Command-line --prompt-style argument
+    2. Custom image describer config default prompt style (if --config-id provided)
+    3. workflow_config.json step config
+    4. Default image_describer_config.json
+    """
     # Command line argument takes precedence
     if hasattr(args, 'prompt_style') and args.prompt_style:
         return validate_prompt_style(args.prompt_style)
+    
+    # Check custom image describer config if provided
+    if hasattr(args, 'config_image_describer') and args.config_image_describer:
+        try:
+            custom_style = get_default_prompt_style(args.config_image_describer)
+            if custom_style:
+                return validate_prompt_style(custom_style)
+        except Exception:
+            pass
     
     # Check workflow config file
     try:
@@ -189,7 +227,7 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
     except Exception:
         pass
     
-    # Fall back to image_describer_config.json default
+    # Fall back to default image_describer_config.json
     try:
         # Try different possible paths for the config file
         config_paths = [
@@ -414,10 +452,15 @@ class WorkflowOrchestrator:
                  api_key_file: str = None, preserve_descriptions: bool = False, workflow_name: str = None,
                  timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = True, 
                  geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
-                 max_images: int = None, progress_status: bool = False):
+                 max_images: int = None, progress_status: bool = False,
+                 image_describer_config: Optional[str] = None, video_config: Optional[str] = None):
         """
         Initialize the workflow orchestrator
         
+        Args:
+            config_file: Path to workflow orchestration configuration file
+            image_describer_config: Path to image describer config (prompts, AI, metadata)
+            video_config: Path to video extraction config
         Args:
             config_file: Path to workflow configuration file
             base_output_dir: Base output directory for the workflow
@@ -437,7 +480,10 @@ class WorkflowOrchestrator:
             progress_status: Enable live progress status updates to console
         """
         self.config = WorkflowConfig(config_file)
-        self.config_file = config_file  # Store for passing to subprocesses
+        self.config_file = config_file  # Workflow orchestration config
+        self.image_describer_config = image_describer_config  # Image describer config (optional)
+        self.video_config = video_config  # Video extraction config (optional)
+        
         if base_output_dir:
             self.config.set_base_output_dir(base_output_dir)
         self.logger = WorkflowLogger("workflow_orchestrator", base_output_dir=self.config.base_output_dir)
@@ -527,6 +573,25 @@ class WorkflowOrchestrator:
             status_lines.append(f"Workflow Progress: {len(self.statistics['steps_completed'])}/{total_steps} steps completed")
         
         # Add step-specific status
+        # Preparation (copy images to temp directory) status
+        if self.step_results.get('prepare', {}).get('in_progress', False):
+            prep = self.step_results.get('prepare', {})
+            if 'processed' in prep and 'total' in prep:
+                processed = prep['processed']
+                total = prep['total']
+                if total > 0:
+                    percentage = int((processed / total) * 100)
+                    status_lines.append(f"[ACTIVE] Preparing images for description: {processed}/{total} ({percentage}%)")
+                else:
+                    status_lines.append(f"[ACTIVE] Preparing images for description: {processed}/{total}")
+            else:
+                status_lines.append("[ACTIVE] Preparing images for description...")
+        elif 'prepare' in self.step_results and not self.step_results.get('prepare', {}).get('in_progress', True):
+            # Only show a DONE line if we have totals to report
+            prep = self.step_results.get('prepare', {})
+            if 'total' in prep:
+                status_lines.append(f"[DONE] Image preparation complete ({prep.get('total', 0)} files prepared)")
+
         if 'download' in self.statistics['steps_completed']:
             status_lines.append(f"[DONE] Image download complete ({self.statistics['total_downloads']} images)")
         elif self.step_results.get('download', {}).get('in_progress', False):
@@ -758,7 +823,13 @@ class WorkflowOrchestrator:
         
         # Update frame extractor config to use our output directory
         step_config = self.config.get_step_config("video_extraction")
-        config_file = step_config.get("config_file", "video_frame_extractor_config.json")
+        
+        # Use explicit video_config if provided, otherwise use step config or default
+        if self.video_config:
+            config_file = self.video_config
+            self.logger.info(f"Using custom video extraction config: {self.video_config}")
+        else:
+            config_file = step_config.get("config_file", "video_frame_extractor_config.json")
         
         # Temporarily modify the frame extractor config
         self._update_frame_extractor_config(config_file, output_dir)
@@ -1210,9 +1281,18 @@ class WorkflowOrchestrator:
             # Preserve full directory structure in temp dir to prevent collisions
             combined_image_list = []
             total_copy_failures = 0
+
+            # Initialize preparation (copy) progress so the user sees activity before describe starts
+            self.step_results['prepare'] = {
+                'in_progress': True,
+                'processed': 0,
+                'total': len(all_image_files)
+            }
+            self.logger.info(f"Preparing {len(all_image_files)} images for description (copying to temp workspace)...")
+            self._update_status_log()
             
             # Copy all unique images to temporary directory
-            for image_file in all_image_files:
+            for idx, image_file in enumerate(all_image_files, start=1):
                 try:
                     # Determine which source directory this file came from
                     source_dir = None
@@ -1246,6 +1326,18 @@ class WorkflowOrchestrator:
                     shutil.copy2(image_file, temp_image_path)
                     combined_image_list.append((temp_image_path, image_file))  # (temp_path, original_path)
                     self.logger.debug(f"Copied {image_file} to {temp_image_path}")
+
+                    # Update preparation progress counters and status periodically
+                    if 'prepare' in self.step_results:
+                        self.step_results['prepare']['processed'] += 1
+                        # Update every 25 files or on last item
+                        if (idx % 25 == 0) or (self.step_results['prepare']['processed'] == self.step_results['prepare']['total']):
+                            self._update_status_log()
+                            if self.progress_status:
+                                proc = self.step_results['prepare']['processed']
+                                tot = self.step_results['prepare']['total']
+                                pct = int((proc / tot) * 100) if tot > 0 else 0
+                                self.logger.info(f"[ACTIVE] Preparing images for description: {proc}/{tot} ({pct}%)")
                     
                 except Exception as e:
                     self.logger.warning(f"Failed to copy {image_file}: {e}")
@@ -1258,6 +1350,13 @@ class WorkflowOrchestrator:
                 self.logger.warning(f"Copy Summary: Failed to copy {total_copy_failures} images")
                 self.logger.warning(f"Copy Summary: Success rate: {(len(combined_image_list) / len(all_image_files) * 100):.1f}%")
             
+            # Mark preparation as complete in status tracking
+            if 'prepare' in self.step_results:
+                self.step_results['prepare']['in_progress'] = False
+                # Ensure final status update after completion
+                self._update_status_log()
+                self.logger.info(f"Image preparation complete: {len(combined_image_list)}/{len(all_image_files)} files ready")
+
             if not combined_image_list:
                 self.logger.info("No images were successfully prepared for processing")
                 return {"success": True, "processed": 0, "output_dir": output_dir}
@@ -1317,42 +1416,76 @@ class WorkflowOrchestrator:
                 self.logger.info(f"Using API key file: {self.api_key_file}")
             
             # Add optional parameters
-            # Priority: user's --config flag > step_config > default
+            # Use explicit image_describer_config if provided
             config_to_use = None
-            if self.config_file and self.config_file != "workflow_config.json":
-                # User specified a custom config file - assume it's image_describer_config.json
-                # (workflow.py uses workflow_config.json, image_describer uses image_describer_config.json)
-                config_to_use = self.config_file
-                self.logger.info(f"Passing user's custom config to image_describer: {self.config_file}")
+            if self.image_describer_config:
+                # User specified explicit image describer config
+                config_to_use = self.image_describer_config
+                self.logger.info(f"Using custom image describer config: {self.image_describer_config}")
             elif "config_file" in step_config:
                 config_to_use = step_config["config_file"]
             else:
-                # Always pass the config file that we just updated with metadata settings
+                # Use default image_describer_config.json
                 config_to_use = str(Path(__file__).parent / "image_describer_config.json")
             
             cmd.extend(["--config", config_to_use])
             
-            # Use override model if provided (for resume), otherwise use config
-            if self.override_model:
-                cmd.extend(["--model", self.override_model])
-                self.logger.info(f"Using override model for resume: {self.override_model}")
-            elif "model" in step_config and step_config["model"]:
-                cmd.extend(["--model", step_config["model"]])
+            # Model selection priority:
+            # 1. Command-line --model argument (highest priority - explicit user choice)
+            # 2. Custom image describer config default model (if --config-id provided)
+            # 3. workflow_config.json step config model (fallback)
+            # 4. Let image_describer.py use its own defaults (no --model passed)
+            model_to_use = None
+            model_source = None
             
-            # Handle prompt style - use override if provided (for resume), otherwise use config
+            if self.override_model:
+                # Priority 1: Command-line argument
+                model_to_use = self.override_model
+                model_source = "command-line argument"
+            elif self.image_describer_config:
+                # Priority 2: Custom image describer config default model
+                custom_model = get_default_model(self.image_describer_config)
+                if custom_model:
+                    model_to_use = custom_model
+                    model_source = f"custom config '{self.image_describer_config}'"
+            
+            if not model_to_use and "model" in step_config and step_config["model"]:
+                # Priority 3: workflow_config.json step config
+                model_to_use = step_config["model"]
+                model_source = "workflow_config.json"
+            
+            if model_to_use:
+                cmd.extend(["--model", model_to_use])
+                self.logger.info(f"Using model '{model_to_use}' from {model_source}")
+            
+            # Prompt style selection priority (same pattern as model):
+            # 1. Command-line --prompt-style argument (highest priority - explicit user choice)
+            # 2. Custom image describer config default prompt style (if --config-id provided)
+            # 3. workflow_config.json step config prompt style (fallback)
+            # 4. Let image_describer.py use its own defaults (no --prompt-style passed)
+            prompt_style_to_use = None
+            prompt_source = None
+            
             if self.override_prompt_style:
-                validated_style = validate_prompt_style(self.override_prompt_style)
+                # Priority 1: Command-line argument
+                prompt_style_to_use = self.override_prompt_style
+                prompt_source = "command-line argument"
+            elif self.image_describer_config:
+                # Priority 2: Custom image describer config default prompt style
+                custom_style = get_default_prompt_style(self.image_describer_config)
+                if custom_style:
+                    prompt_style_to_use = custom_style
+                    prompt_source = f"custom config '{self.image_describer_config}'"
+            
+            if not prompt_style_to_use and "prompt_style" in step_config and step_config["prompt_style"]:
+                # Priority 3: workflow_config.json step config
+                prompt_style_to_use = step_config["prompt_style"]
+                prompt_source = "workflow_config.json"
+            
+            if prompt_style_to_use:
+                validated_style = validate_prompt_style(prompt_style_to_use)
                 cmd.extend(["--prompt-style", validated_style])
-                self.logger.info(f"Using override prompt style for resume: {self.override_prompt_style}")
-            elif "prompt_style" in step_config and step_config["prompt_style"]:
-                validated_style = validate_prompt_style(step_config["prompt_style"])
-                cmd.extend(["--prompt-style", validated_style])
-            else:
-                # Get default prompt style from image describer config
-                config_file = step_config.get("config_file", "image_describer_config.json")
-                default_style = get_default_prompt_style(config_file)
-                validated_style = validate_prompt_style(default_style)
-                cmd.extend(["--prompt-style", validated_style])
+                self.logger.info(f"Using prompt style '{validated_style}' from {prompt_source}")
             
             # Add timeout parameter for Ollama requests
             if self.timeout != 90:  # Only add if non-default
@@ -2217,8 +2350,10 @@ Examples:
   idt workflow photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file claude.txt
   idt workflow media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
   
-  # Configuration
-  idt workflow mixed_media --output-dir analysis --config my_workflow.json
+  # Custom Configuration Files
+  idt workflow photos --config-image-describer scripts/my_prompts.json --prompt-style artistic
+  idt workflow photos --config-id scripts/my_prompts.json  # Short form
+  idt workflow photos --config scripts/my_prompts.json     # Deprecated but still works
   
 Resume Examples:
   idt workflow --resume workflow_output_20250919_153443
@@ -2273,10 +2408,28 @@ Viewing Results:
         help="Comma-separated list of workflow steps (default: video,convert,describe,html)"
     )
     
+    # Configuration file arguments (explicit types)
+    parser.add_argument(
+        "--config-workflow", "--config-wf",
+        default="workflow_config.json",
+        help="Path to workflow orchestration config file (default: workflow_config.json)"
+    )
+    
+    parser.add_argument(
+        "--config-image-describer", "--config-id",
+        help="Path to image describer config file (prompts, AI settings, metadata)"
+    )
+    
+    parser.add_argument(
+        "--config-video",
+        help="Path to video frame extraction config file"
+    )
+    
+    # Deprecated: Keep for backward compatibility
     parser.add_argument(
         "--config",
-        default="workflow_config.json",
-        help="Path to custom workflow config file (default: workflow_config.json)"
+        dest="_deprecated_config",
+        help="[DEPRECATED] Use --config-image-describer instead. This alias will be removed in v4.0."
     )
     
     parser.add_argument(
@@ -2392,6 +2545,14 @@ Viewing Results:
     
     args = parser.parse_args()
     
+    # Handle deprecated --config argument
+    if hasattr(args, '_deprecated_config') and args._deprecated_config:
+        print("WARNING: --config is deprecated and will be removed in v4.0.")
+        print("         Use --config-image-describer (or --config-id) instead.")
+        print(f"         Treating '{args._deprecated_config}' as image describer config.")
+        if not args.config_image_describer:
+            args.config_image_describer = args._deprecated_config
+    
     # Handle resume mode
     if args.resume:
         # Resume mode - validate resume directory and extract workflow state
@@ -2474,7 +2635,18 @@ Viewing Results:
             args.provider = workflow_state["provider"]
             provider_name = workflow_state["provider"]
         if workflow_state["config"]:
-            args.config = workflow_state["config"]
+            # Old workflow_state used single "config" - map to image_describer_config for backward compatibility
+            args.config_image_describer = workflow_state["config"]
+        
+        # Restore custom config paths from metadata (new format)
+        workflow_metadata = load_workflow_metadata(resume_dir)
+        if workflow_metadata:
+            if workflow_metadata.get("config_workflow"):
+                args.config_workflow = workflow_metadata["config_workflow"]
+            if workflow_metadata.get("config_image_describer"):
+                args.config_image_describer = workflow_metadata["config_image_describer"]
+            if workflow_metadata.get("config_video"):
+                args.config_video = workflow_metadata["config_video"]
         
         # Filter steps to only include those not yet completed
         remaining_steps = []
@@ -2563,8 +2735,8 @@ Viewing Results:
         
         # Get provider, model and prompt info for directory naming
         provider_name = args.provider if args.provider else "ollama"
-        model_name = get_effective_model(args, args.config)
-        prompt_style = get_effective_prompt_style(args, args.config)
+        model_name = get_effective_model(args, args.config_workflow)
+        prompt_style = get_effective_prompt_style(args, args.config_workflow)
         
         # Determine workflow name identifier
         if args.name:
@@ -2619,13 +2791,15 @@ Viewing Results:
     # (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
     normalized_model = normalize_model_name(args.model, args.provider) if args.model else None
     
-    # IMPORTANT: --config is for image_describer_config.json, NOT workflow_config.json
-    # Workflow always uses default workflow_config.json
-    # The args.config gets passed to image_describer subprocess instead
+    # Determine which config files to use
+    workflow_config = args.config_workflow if args.config_workflow else "workflow_config.json"
+    image_describer_config = args.config_image_describer  # Can be None (will use defaults)
+    video_config = args.config_video  # Can be None (will use defaults)
+    
     # Create orchestrator first to get access to logging
     try:
         orchestrator = WorkflowOrchestrator(
-            "workflow_config.json",  # Always use default workflow config 
+            workflow_config,  # Explicit workflow config 
             base_output_dir=output_dir, 
             model=normalized_model, 
             prompt_style=args.prompt_style, 
@@ -2640,7 +2814,9 @@ Viewing Results:
             url=url,  # Use detected URL from argument processing
             min_size=args.min_size,
             max_images=args.max_images,
-            progress_status=args.progress_status
+            progress_status=args.progress_status,
+            image_describer_config=image_describer_config,  # NEW: explicit image describer config
+            video_config=video_config  # NEW: explicit video config
         )
         
         if args.dry_run:
@@ -2648,13 +2824,21 @@ Viewing Results:
             orchestrator.logger.info(f"Input directory: {input_dir}")
             orchestrator.logger.info(f"Output directory: {output_dir}")
             orchestrator.logger.info(f"Workflow steps: {', '.join(steps)}")
-            orchestrator.logger.info(f"Configuration: {args.config}")
+            orchestrator.logger.info(f"Workflow config: {workflow_config}")
+            if image_describer_config:
+                orchestrator.logger.info(f"Image describer config: {image_describer_config}")
+            if video_config:
+                orchestrator.logger.info(f"Video config: {video_config}")
             # Also print to console for immediate feedback
             print("Dry run mode - showing what would be executed:")
             print(f"Input directory: {input_dir}")
             print(f"Output directory: {output_dir}")
             print(f"Workflow steps: {', '.join(steps)}")
-            print(f"Configuration: {args.config}")
+            print(f"Workflow config: {workflow_config}")
+            if image_describer_config:
+                print(f"Image describer config: {image_describer_config}")
+            if video_config:
+                print(f"Video config: {video_config}")
             sys.exit(0)
         
         # Override configuration if specified
@@ -2684,7 +2868,11 @@ Viewing Results:
             "prompt_style": prompt_style,
             "timestamp": timestamp,
             "steps": steps,
-            "user_provided_name": bool(args.name)
+            "user_provided_name": bool(args.name),
+            # Save custom config paths for resume (only if non-default)
+            "config_workflow": args.config_workflow if args.config_workflow != "workflow_config.json" else None,
+            "config_image_describer": args.config_image_describer,
+            "config_video": args.config_video
         }
         
         # Launch viewer if requested (before workflow starts for real-time monitoring)
@@ -2706,8 +2894,13 @@ Viewing Results:
                 original_cmd.extend(["--model", args.model])
             if args.prompt_style:
                 original_cmd.extend(["--prompt-style", args.prompt_style])
-            if args.config != "workflow_config.json":
-                original_cmd.extend(["--config", args.config])
+            # Log config arguments (use new explicit names)
+            if args.config_image_describer and args.config_image_describer != "image_describer_config.json":
+                original_cmd.extend(["--config-image-describer", args.config_image_describer])
+            if args.config_workflow and args.config_workflow != "workflow_config.json":
+                original_cmd.extend(["--config-workflow", args.config_workflow])
+            if args.config_video and args.config_video != "video_frame_extractor_config.json":
+                original_cmd.extend(["--config-video", args.config_video])
             if args.verbose:
                 original_cmd.append("--verbose")
             if args.progress_status:
