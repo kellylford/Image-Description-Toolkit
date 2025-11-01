@@ -1,10 +1,10 @@
 # Session Summary: October 31, 2025
 
-## Status: In Progress — GUI prompt override and workflow UX improvements validated
+## Status: In Progress — Build/install cycle completed, investigating config argument behavior
 
 Branch: feature/explicit-config-arguments
 
-This session focused on two goals: making the hidden “prepare” copy phase visible in the workflow, and adding a session-scoped prompt configuration override to the ImageDescriber GUI. We also fixed a regression crash introduced during the GUI wiring.
+This session focused on three main areas: workflow UX improvements (making the hidden "prepare" copy phase visible), adding session-scoped prompt configuration override to the ImageDescriber GUI, and fixing packaging/installer issues. After a full rebuild and install cycle, investigating `--config-id` argument behavior.
 
 ---
 
