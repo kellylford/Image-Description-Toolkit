@@ -57,7 +57,7 @@ from workflow_utils import (
     get_path_identifier_2_components, save_workflow_metadata, load_workflow_metadata,
     create_workflow_helper_files
 )
-from image_describer import get_default_prompt_style
+from image_describer import get_default_prompt_style, get_default_model
 try:
     from config_loader import load_json_config
 except ImportError:
@@ -90,10 +90,26 @@ def sanitize_name(name: str, preserve_case: bool = True) -> str:
 
 
 def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
-    """Determine which model will actually be used"""
+    """Determine which model will actually be used for directory naming
+    
+    Priority:
+    1. Command-line --model argument
+    2. Custom image describer config default model (if --config-id provided)
+    3. workflow_config.json step config
+    4. Default image_describer_config.json
+    """
     # Command line argument takes precedence
     if hasattr(args, 'model') and args.model:
         return sanitize_name(args.model)
+    
+    # Check custom image describer config if provided
+    if hasattr(args, 'config_image_describer') and args.config_image_describer:
+        try:
+            custom_model = get_default_model(args.config_image_describer)
+            if custom_model:
+                return sanitize_name(custom_model)
+        except Exception:
+            pass
     
     # Check workflow config file
     try:
@@ -104,7 +120,7 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
     except Exception:
         pass
     
-    # Fall back to image_describer_config.json default
+    # Fall back to default image_describer_config.json
     try:
         import json
         # Try different possible paths for the config file
@@ -117,7 +133,13 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
             try:
                 with open(config_path, 'r') as f:
                     img_config = json.load(f)
-                    return sanitize_name(img_config.get("model_settings", {}).get("model", "unknown"))
+                    default_model = img_config.get("default_model")
+                    if default_model:
+                        return sanitize_name(default_model)
+                    # Fallback to old structure
+                    model = img_config.get("model_settings", {}).get("model")
+                    if model:
+                        return sanitize_name(model)
             except FileNotFoundError:
                 continue
                 
@@ -175,10 +197,26 @@ def validate_prompt_style(style: str, config_file: str = "image_describer_config
 
 
 def get_effective_prompt_style(args, config_file: str = "workflow_config.json") -> str:
-    """Determine which prompt style will actually be used"""
+    """Determine which prompt style will actually be used for directory naming
+    
+    Priority:
+    1. Command-line --prompt-style argument
+    2. Custom image describer config default prompt style (if --config-id provided)
+    3. workflow_config.json step config
+    4. Default image_describer_config.json
+    """
     # Command line argument takes precedence
     if hasattr(args, 'prompt_style') and args.prompt_style:
         return validate_prompt_style(args.prompt_style)
+    
+    # Check custom image describer config if provided
+    if hasattr(args, 'config_image_describer') and args.config_image_describer:
+        try:
+            custom_style = get_default_prompt_style(args.config_image_describer)
+            if custom_style:
+                return validate_prompt_style(custom_style)
+        except Exception:
+            pass
     
     # Check workflow config file
     try:
@@ -189,7 +227,7 @@ def get_effective_prompt_style(args, config_file: str = "workflow_config.json") 
     except Exception:
         pass
     
-    # Fall back to image_describer_config.json default
+    # Fall back to default image_describer_config.json
     try:
         # Try different possible paths for the config file
         config_paths = [
@@ -1392,27 +1430,62 @@ class WorkflowOrchestrator:
             
             cmd.extend(["--config", config_to_use])
             
-            # Use override model if provided (for resume), otherwise use config
-            if self.override_model:
-                cmd.extend(["--model", self.override_model])
-                self.logger.info(f"Using override model for resume: {self.override_model}")
-            elif "model" in step_config and step_config["model"]:
-                cmd.extend(["--model", step_config["model"]])
+            # Model selection priority:
+            # 1. Command-line --model argument (highest priority - explicit user choice)
+            # 2. Custom image describer config default model (if --config-id provided)
+            # 3. workflow_config.json step config model (fallback)
+            # 4. Let image_describer.py use its own defaults (no --model passed)
+            model_to_use = None
+            model_source = None
             
-            # Handle prompt style - use override if provided (for resume), otherwise use config
+            if self.override_model:
+                # Priority 1: Command-line argument
+                model_to_use = self.override_model
+                model_source = "command-line argument"
+            elif self.image_describer_config:
+                # Priority 2: Custom image describer config default model
+                custom_model = get_default_model(self.image_describer_config)
+                if custom_model:
+                    model_to_use = custom_model
+                    model_source = f"custom config '{self.image_describer_config}'"
+            
+            if not model_to_use and "model" in step_config and step_config["model"]:
+                # Priority 3: workflow_config.json step config
+                model_to_use = step_config["model"]
+                model_source = "workflow_config.json"
+            
+            if model_to_use:
+                cmd.extend(["--model", model_to_use])
+                self.logger.info(f"Using model '{model_to_use}' from {model_source}")
+            
+            # Prompt style selection priority (same pattern as model):
+            # 1. Command-line --prompt-style argument (highest priority - explicit user choice)
+            # 2. Custom image describer config default prompt style (if --config-id provided)
+            # 3. workflow_config.json step config prompt style (fallback)
+            # 4. Let image_describer.py use its own defaults (no --prompt-style passed)
+            prompt_style_to_use = None
+            prompt_source = None
+            
             if self.override_prompt_style:
-                validated_style = validate_prompt_style(self.override_prompt_style)
+                # Priority 1: Command-line argument
+                prompt_style_to_use = self.override_prompt_style
+                prompt_source = "command-line argument"
+            elif self.image_describer_config:
+                # Priority 2: Custom image describer config default prompt style
+                custom_style = get_default_prompt_style(self.image_describer_config)
+                if custom_style:
+                    prompt_style_to_use = custom_style
+                    prompt_source = f"custom config '{self.image_describer_config}'"
+            
+            if not prompt_style_to_use and "prompt_style" in step_config and step_config["prompt_style"]:
+                # Priority 3: workflow_config.json step config
+                prompt_style_to_use = step_config["prompt_style"]
+                prompt_source = "workflow_config.json"
+            
+            if prompt_style_to_use:
+                validated_style = validate_prompt_style(prompt_style_to_use)
                 cmd.extend(["--prompt-style", validated_style])
-                self.logger.info(f"Using override prompt style for resume: {self.override_prompt_style}")
-            elif "prompt_style" in step_config and step_config["prompt_style"]:
-                validated_style = validate_prompt_style(step_config["prompt_style"])
-                cmd.extend(["--prompt-style", validated_style])
-            else:
-                # Get default prompt style from image describer config
-                config_file = step_config.get("config_file", "image_describer_config.json")
-                default_style = get_default_prompt_style(config_file)
-                validated_style = validate_prompt_style(default_style)
-                cmd.extend(["--prompt-style", validated_style])
+                self.logger.info(f"Using prompt style '{validated_style}' from {prompt_source}")
             
             # Add timeout parameter for Ollama requests
             if self.timeout != 90:  # Only add if non-default

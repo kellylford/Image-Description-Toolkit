@@ -387,6 +387,35 @@ IDT uses three separate configuration files for different purposes:
    - Use `--config-video` to customize
    - Rarely needs customization
 
+**Configuration Priority Order:**
+
+When determining which settings to use (model, prompt style, etc.), IDT follows this priority:
+
+1. **Command-line arguments** (highest priority)
+   - `--model`, `--prompt-style`, `--provider` explicitly on command line
+   
+2. **Custom image describer config** (if `--config-id` provided)
+   - `default_model`, `default_prompt_style`, `default_provider` from your custom config
+   - ⭐ **This is respected!** Your custom config's defaults are used automatically
+   
+3. **Workflow config step settings** (`workflow_config.json`)
+   - Settings in the `image_description` step config
+   - Usually set to `null` (empty) to allow flexibility
+   
+4. **Default image describer config** (fallback)
+   - System defaults from `scripts/image_describer_config.json`
+
+**Example:**
+```bash
+# Your custom config has: "default_model": "gemma3", "default_prompt_style": "narrative"
+idt workflow photos --config-id myconfig.json
+# Result: Uses gemma3 and narrative automatically from myconfig.json
+
+# Override model on command line (highest priority)
+idt workflow photos --config-id myconfig.json --model llava
+# Result: Uses llava (command-line) and narrative (from myconfig.json)
+```
+
 **Example with custom configs:**
 ```bash
 # Use custom prompts and AI settings (most common)
