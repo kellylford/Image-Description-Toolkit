@@ -2662,8 +2662,8 @@ Viewing Results:
         
         # Get provider, model and prompt info for directory naming
         provider_name = args.provider if args.provider else "ollama"
-        model_name = get_effective_model(args, args.config_image_describer)
-        prompt_style = get_effective_prompt_style(args, args.config_image_describer)
+        model_name = get_effective_model(args, args.config_workflow)
+        prompt_style = get_effective_prompt_style(args, args.config_workflow)
         
         # Determine workflow name identifier
         if args.name:

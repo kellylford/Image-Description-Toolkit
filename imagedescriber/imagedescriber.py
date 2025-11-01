@@ -638,7 +638,7 @@ class ProcessingWorker(QThread):
     processing_complete = pyqtSignal(str, str, str, str, str, str)  # file_path, description, provider, model, prompt_style, custom_prompt
     processing_failed = pyqtSignal(str, str)  # file_path, error
     
-    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = "", yolo_settings: dict = None, detection_settings: dict = None):
+    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = "", yolo_settings: dict = None, detection_settings: dict = None, prompt_config_path: str | None = None):
         super().__init__()
         self.file_path = file_path
         self.provider = provider
@@ -647,6 +647,11 @@ class ProcessingWorker(QThread):
         self.custom_prompt = custom_prompt
         # Support both old yolo_settings and new detection_settings parameters for backward compatibility
         self.detection_settings = detection_settings or yolo_settings or {}
+        # Optional override for prompt configuration
+        try:
+            self._prompt_config_path = Path(prompt_config_path) if prompt_config_path else None
+        except Exception:
+            self._prompt_config_path = None
         
     def run(self):
         try:
@@ -682,8 +687,21 @@ class ProcessingWorker(QThread):
             self.processing_failed.emit(self.file_path, str(e))
     
     def load_prompt_config(self) -> dict:
-        """Load prompt configuration from the scripts directory"""
+        """Load prompt configuration, honoring GUI-selected override when provided.
+
+        Resolution order:
+        1) Explicit path provided by GUI via prompt_config_path
+        2) External scripts/image_describer_config.json next to exe (frozen)
+        3) Bundled scripts/image_describer_config.json inside _MEIPASS (frozen)
+        4) Repository scripts/image_describer_config.json (dev)
+        """
         try:
+            # Use explicit override if available
+            if self._prompt_config_path and self._prompt_config_path.exists():
+                with open(self._prompt_config_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                    return self._normalize_prompt_config(cfg)
+
             # Try to find the config file - check external first, then bundled
             config_path = None
             
@@ -703,14 +721,7 @@ class ProcessingWorker(QThread):
             if config_path and config_path.exists():
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    # Convert the config format to what we expect
-                    if "prompt_variations" in config:
-                        # Convert prompt_variations to our expected format
-                        prompts = {}
-                        for key, value in config["prompt_variations"].items():
-                            prompts[key] = {"text": value}
-                        config["prompts"] = prompts
-                    return config
+                    return self._normalize_prompt_config(config)
         except Exception as e:
             print(f"Failed to load config: {e}")
         
@@ -722,6 +733,24 @@ class ProcessingWorker(QThread):
                 "creative": {"text": "Describe this image in a creative, engaging way."}
             }
         }
+
+    def _normalize_prompt_config(self, config: dict) -> dict:
+        """Normalize config so that this worker exposes a 'prompts' mapping.
+
+        Accepts either toolkit-style 'prompt_variations' or already-converted 'prompts'.
+        """
+        try:
+            if "prompt_variations" in config:
+                prompts = {}
+                for key, value in config["prompt_variations"].items():
+                    if isinstance(value, dict):
+                        prompts[key] = {"text": value.get("text", "Describe this image.")}
+                    else:
+                        prompts[key] = {"text": value}
+                config = {**config, "prompts": prompts}
+        except Exception:
+            pass
+        return config
     
     def process_with_ai(self, image_path: str, prompt: str) -> str:
         """Process image with selected AI provider"""
@@ -1923,11 +1952,16 @@ class WorkspaceDirectoryManager(QDialog):
 
 class ProcessingDialog(QDialog):
     """Dialog for selecting processing options"""
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, prompt_config_path: str | None = None):
         super().__init__(parent)
         self.setWindowTitle("Processing Options")
         self.setModal(True)
         self.resize(400, 350)
+        # Optional override path for prompt configuration
+        try:
+            self._prompt_config_path = Path(prompt_config_path) if prompt_config_path else None
+        except Exception:
+            self._prompt_config_path = None
         
         layout = QVBoxLayout(self)
         
@@ -2408,8 +2442,13 @@ class ProcessingDialog(QDialog):
                 self.prompt_combo.addItem(prompt)
     
     def load_config(self):
-        """Load configuration from scripts directory"""
+        """Load configuration, honoring GUI-selected prompt config when provided"""
         try:
+            # Prefer explicit GUI-selected file if available
+            if getattr(self, '_prompt_config_path', None) and self._prompt_config_path and self._prompt_config_path.exists():
+                with open(self._prompt_config_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+
             # Try to find the config file - check external first, then bundled
             config_path = None
             
@@ -4220,6 +4259,8 @@ class ImageDescriberGUI(QMainWindow):
         self.workspace = ImageWorkspace(new_workspace=True)  # Start as saved to avoid false "unsaved changes"
         self.current_workspace_file = None
         self._skip_verification = True  # Skip verification by default
+        # Optional prompt config override selected via File > Load Prompt Config...
+        self.prompt_config_path: Optional[Path] = None
         
         # Processing state
         self.processing_workers: List[ProcessingWorker] = []
@@ -4722,6 +4763,15 @@ class ImageDescriberGUI(QMainWindow):
         import_workflow_action.triggered.connect(self.import_workflow)
         file_menu.addAction(import_workflow_action)
         
+        # Load Prompt Config (prompts only)
+        load_prompt_cfg_action = QAction("Load Prompt Config...", self)
+        load_prompt_cfg_action.setToolTip("Load a custom image_describer_config.json to override prompt styles")
+        load_prompt_cfg_action.setStatusTip("Load a custom prompt configuration file for this session")
+        # QAction doesn't support setAccessibleName/Description; use What's This and StatusTip instead
+        load_prompt_cfg_action.setWhatsThis("Load a custom prompt configuration JSON file for ImageDescriber prompts.")
+        load_prompt_cfg_action.triggered.connect(self.on_load_prompt_config)
+        file_menu.addAction(load_prompt_cfg_action)
+
         file_menu.addSeparator()
         
         exit_action = QAction("Exit", self)
@@ -5226,7 +5276,7 @@ class ImageDescriberGUI(QMainWindow):
             self.processing_items.add(file_path)
             self.update_window_title()
             
-            worker = ProcessingWorker(file_path, provider_name, model_name, default_prompt_style, custom_prompt)
+            worker = ProcessingWorker(file_path, provider_name, model_name, default_prompt_style, custom_prompt, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None))
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -6967,14 +7017,14 @@ class ImageDescriberGUI(QMainWindow):
     def process_image(self, file_path: str):
         """Process a single image"""
         # Show processing dialog first
-        dialog = ProcessingDialog(self)
+        dialog = ProcessingDialog(self, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None))
         if dialog.exec() == QDialog.DialogCode.Accepted:
             provider, model, prompt_style, custom_prompt, detection_settings = dialog.get_selections()
             
             # Start processing (skip old verification logic for now)
             self.processing_items.add(file_path)  # Mark as processing
             self.update_window_title()  # Update title to show processing status
-            worker = ProcessingWorker(file_path, provider, model, prompt_style, custom_prompt, detection_settings=detection_settings)
+            worker = ProcessingWorker(file_path, provider, model, prompt_style, custom_prompt, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None), detection_settings=detection_settings)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -7127,7 +7177,7 @@ class ImageDescriberGUI(QMainWindow):
             )
             
             return reply == QMessageBox.StandardButton.Yes
-            
+
         except Exception as e:
             print(f"Model verification error: {str(e)}")
             # If verification fails, ask user if they want to proceed
@@ -7137,6 +7187,38 @@ class ImageDescriberGUI(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             return reply == QMessageBox.StandardButton.Yes
+            
+    def on_load_prompt_config(self):
+        """Open a file dialog to select a prompt configuration JSON and set it for this session.
+
+        This only affects prompt styles. It does not change providers or models.
+        """
+        try:
+            start_dir = str(self.prompt_config_path.parent) if self.prompt_config_path else str(Path.home())
+        except Exception:
+            start_dir = str(Path.home())
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Prompt Config",
+            start_dir,
+            "JSON Files (*.json);;All Files (*)"
+        )
+        if not file_path:
+            return
+        # Validate JSON contains prompt entries
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            prompt_data = cfg.get("prompt_variations", cfg.get("prompts", {}))
+            if not isinstance(prompt_data, dict) or len(prompt_data) == 0:
+                QMessageBox.warning(self, "Invalid Config", "Selected file does not contain prompt styles.")
+                return
+            # Accept and set for session
+            self.prompt_config_path = Path(file_path)
+            self.status_bar.showMessage(f"Loaded prompt config: {self.prompt_config_path.name}", 5000)
+        except Exception as e:
+            QMessageBox.critical(self, "Load Failed", f"Failed to load config file:\n{e}")
+            return
     
     def toggle_batch_mark(self):
         """Toggle batch marking for selected image"""
@@ -7170,7 +7252,7 @@ class ImageDescriberGUI(QMainWindow):
             return
         
         # Show processing dialog first
-        dialog = ProcessingDialog(self)
+        dialog = ProcessingDialog(self, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None))
         if dialog.exec() == QDialog.DialogCode.Accepted:
             provider, model, prompt_style, custom_prompt, detection_settings = dialog.get_selections()
             
@@ -7189,7 +7271,7 @@ class ImageDescriberGUI(QMainWindow):
             # Add to processing items to show "p" indicator
             self.processing_items.add(item.file_path)
                 
-            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt, detection_settings=detection_settings)
+            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None), detection_settings=detection_settings)
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_batch_item_complete)
             worker.processing_failed.connect(self.on_batch_item_failed)
@@ -8098,7 +8180,7 @@ Please answer the follow-up question about this image, taking into account the c
             self.processing_items.add(file_path)
             self.update_window_title()
             
-            worker = ProcessingWorker(file_path, selected_provider, selected_model, "follow-up", custom_prompt)
+            worker = ProcessingWorker(file_path, selected_provider, selected_model, "follow-up", custom_prompt, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None))
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self.on_processing_complete)
             worker.processing_failed.connect(self.on_processing_failed)
@@ -8364,7 +8446,7 @@ Please answer the follow-up question about this image, taking into account the c
             return
         
         # Show processing dialog for AI model/prompt selection
-        dialog = ProcessingDialog(self)
+        dialog = ProcessingDialog(self, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None))
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         
@@ -8499,7 +8581,8 @@ Please answer the follow-up question about this image, taking into account the c
             self._current_process_all_provider,
             self._current_process_all_model, 
             self._current_process_all_prompt, 
-            self._current_process_all_custom
+            self._current_process_all_custom,
+            prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None)
         )
         
         # Connect signals for live updates
@@ -8647,7 +8730,7 @@ Please answer the follow-up question about this image, taking into account the c
         
         # Process images one by one to show live updates
         for item in all_images:
-            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(item.file_path, provider, model, prompt_style, custom_prompt, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None))
             worker.progress_updated.connect(self.on_processing_progress)
             worker.processing_complete.connect(self._on_live_processing_complete)
             worker.processing_failed.connect(self._on_live_processing_failed)
@@ -9114,7 +9197,7 @@ You can check Ollama logs for more details."""
         # Process each frame
         for i, frame_path in enumerate(frame_paths):
             self.processing_items.add(frame_path)  # Mark as processing
-            worker = ProcessingWorker(frame_path, provider, model, prompt_style, custom_prompt)
+            worker = ProcessingWorker(frame_path, provider, model, prompt_style, custom_prompt, prompt_config_path=(str(self.prompt_config_path) if self.prompt_config_path else None))
             
             # Enhanced progress callback to show frame progress
             def make_progress_callback(frame_index, total):

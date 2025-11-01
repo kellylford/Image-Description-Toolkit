@@ -32,13 +32,15 @@ class ProcessingWorker(QThread):
     processing_complete = pyqtSignal(str, str, str, str, str, str, object)  # file_path, description, provider, model, prompt_style, custom_prompt, token_usage
     processing_failed = pyqtSignal(str, str)  # file_path, error
     
-    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = ""):
+    def __init__(self, file_path: str, provider: str, model: str, prompt_style: str, custom_prompt: str = "", prompt_config_path: Optional[str] = None):
         super().__init__()
         self.file_path = file_path
         self.provider = provider
         self.model = model
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
+        # Optional override path for prompt configuration chosen via GUI menu
+        self._prompt_config_path = Path(prompt_config_path) if prompt_config_path else None
         
     def run(self):
         try:
@@ -74,9 +76,21 @@ class ProcessingWorker(QThread):
             self.processing_failed.emit(self.file_path, str(e))
     
     def load_prompt_config(self) -> dict:
-        """Load prompt configuration from the scripts directory"""
+        """Load prompt configuration with GUI override support.
+
+        Resolution order:
+        1) Explicit path provided by GUI via prompt_config_path
+        2) Bundled scripts/image_describer_config.json (frozen)
+        3) Repository scripts/image_describer_config.json (dev)
+        """
         try:
-            # Try to find the config file
+            # Prefer explicit GUI-selected config
+            if self._prompt_config_path and self._prompt_config_path.exists():
+                with open(self._prompt_config_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                    return self._normalize_prompt_config(cfg)
+
+            # Try to find the config file (frozen vs dev)
             if getattr(sys, 'frozen', False):
                 config_path = Path(sys._MEIPASS) / "scripts" / "image_describer_config.json"
             else:
@@ -85,14 +99,7 @@ class ProcessingWorker(QThread):
             if config_path.exists():
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    # Convert the config format to what we expect
-                    if "prompt_variations" in config:
-                        # Convert prompt_variations to our expected format
-                        prompts = {}
-                        for key, value in config["prompt_variations"].items():
-                            prompts[key] = {"text": value}
-                        config["prompts"] = prompts
-                    return config
+                    return self._normalize_prompt_config(config)
         except Exception as e:
             print(f"Failed to load config: {e}")
         
@@ -104,6 +111,21 @@ class ProcessingWorker(QThread):
                 "creative": {"text": "Describe this image in a creative, engaging way."}
             }
         }
+
+    def _normalize_prompt_config(self, config: dict) -> dict:
+        """Normalize config so we always expose a 'prompts' mapping.
+
+        Accepts toolkit-style 'prompt_variations' or already-converted 'prompts'.
+        """
+        try:
+            if "prompt_variations" in config:
+                prompts = {}
+                for key, value in config["prompt_variations"].items():
+                    prompts[key] = {"text": value if not isinstance(value, dict) else value.get("text", "Describe this image.")}
+                config = {**config, "prompts": prompts}
+        except Exception:
+            pass
+        return config
     
     def process_with_ai(self, image_path: str, prompt: str) -> str:
         """Process image with selected AI provider"""
