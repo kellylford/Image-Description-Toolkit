@@ -196,6 +196,25 @@ idt workflow --url https://portfolio.com --steps download,describe,html \
 - Automated dependency installation
 - Validation and status reporting
 
+### Custom Configuration Priority System
+
+#### Configuration File Priority
+- **New 4-level priority order**: CLI arguments → Custom config defaults → Workflow config → System defaults
+- **Custom config defaults respected**: `default_model`, `default_prompt_style`, and `default_provider` in custom config files now properly take priority
+- **Consistent behavior**: ImageDescriber GUI, CLI tools, and workflow commands all use the same priority logic
+- **Better control**: Users can now create custom config files with default settings that override system defaults but can still be overridden by command-line arguments
+
+#### What Changed
+- `--config-image-describer` now properly applies `default_model`, `default_prompt_style`, and `default_provider` from custom config files
+- ImageDescriber GUI respects all config defaults when loading prompt config files
+- Workflow directory naming uses custom config defaults (e.g., `wf_..._gemma3latest_Orientation` instead of `wf_..._moondreamlatest_narrative`)
+- Fixed: Custom configs were previously ignored, system defaults were always used
+
+#### Files Modified
+- `scripts/workflow.py`: Updated `get_effective_model()` and `get_effective_prompt_style()` to check custom configs
+- `scripts/image_describer.py`: Added `get_default_model()` function, updated `ImageDescriber.__init__` to read config defaults
+- `imagedescriber/imagedescriber.py`: Updated `on_load_prompt_config()` to apply all config defaults to GUI controls
+
 ### Documentation
 
 #### New Documentation
@@ -208,7 +227,7 @@ idt workflow --url https://portfolio.com --steps download,describe,html \
 
 #### Updated Documentation
 - USER_GUIDE.md: Metadata section, monitoring examples, web download simplified syntax
-- CLI_REFERENCE.md: Metadata flags, URL parameters, web download options
+- CLI_REFERENCE.md: **New "Configuration Priority Order" section**, metadata flags, URL parameters, web download options
 - CHANGELOG.md: Unreleased section for 3.5.0-beta with complete feature list
 - Testing checklists: OCT27_2025, guideme testing
 - Session summaries: 2025-10-26, 2025-10-27, 2025-10-30
@@ -571,8 +590,11 @@ All existing workflows continue to work. New features are opt-in via flags or au
 - Metadata extraction is now ON by default (use `--no-metadata` to disable)
 - Geocoding is now ON by default (use `--no-geocode` to disable)
 - Version command now shows build number and commit info
+- **Custom config files now properly respected**: `--config-image-describer` defaults override system defaults
 
 #### Configuration Changes
+- **New 4-level priority system**: CLI args > Custom config defaults > Workflow config > System defaults
+- Custom config `default_model`, `default_prompt_style`, and `default_provider` now properly applied
 - New metadata settings in IDTConfigure
 - Geocoding cache location configurable
 - No migration of existing configs required
