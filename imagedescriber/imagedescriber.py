@@ -7191,7 +7191,7 @@ class ImageDescriberGUI(QMainWindow):
     def on_load_prompt_config(self):
         """Open a file dialog to select a prompt configuration JSON and set it for this session.
 
-        This only affects prompt styles. It does not change providers or models.
+        Loads prompt styles AND default settings (model, provider, prompt_style) from config.
         """
         try:
             start_dir = str(self.prompt_config_path.parent) if self.prompt_config_path else str(Path.home())
@@ -7213,9 +7213,59 @@ class ImageDescriberGUI(QMainWindow):
             if not isinstance(prompt_data, dict) or len(prompt_data) == 0:
                 QMessageBox.warning(self, "Invalid Config", "Selected file does not contain prompt styles.")
                 return
+            
             # Accept and set for session
             self.prompt_config_path = Path(file_path)
-            self.status_bar.showMessage(f"Loaded prompt config: {self.prompt_config_path.name}", 5000)
+            
+            # Apply default settings from config if present
+            config_updated = False
+            
+            # Apply default_provider if present
+            if "default_provider" in cfg:
+                default_provider = cfg["default_provider"]
+                # Try to select it in the provider combo if it exists
+                if hasattr(self, 'provider_combo'):
+                    for i in range(self.provider_combo.count()):
+                        if self.provider_combo.itemText(i).lower() == default_provider.lower():
+                            self.provider_combo.setCurrentIndex(i)
+                            config_updated = True
+                            break
+            
+            # Apply default_model if present  
+            if "default_model" in cfg:
+                default_model = cfg["default_model"]
+                # Refresh models for current provider first
+                if hasattr(self, 'provider_combo'):
+                    current_provider = self.provider_combo.currentText()
+                    # This will repopulate model dropdown
+                    self.on_provider_changed(current_provider)
+                
+                # Try to select the default model
+                if hasattr(self, 'model_combo'):
+                    for i in range(self.model_combo.count()):
+                        model_text = self.model_combo.itemText(i)
+                        # Handle both "model:tag" and "model" formats
+                        if model_text == default_model or model_text.startswith(default_model + ":"):
+                            self.model_combo.setCurrentIndex(i)
+                            config_updated = True
+                            break
+            
+            # Apply default_prompt_style if present
+            if "default_prompt_style" in cfg:
+                default_style = cfg["default_prompt_style"]
+                # Try to select it in the prompt combo if it exists
+                if hasattr(self, 'prompt_combo'):
+                    for i in range(self.prompt_combo.count()):
+                        if self.prompt_combo.itemText(i).lower() == default_style.lower():
+                            self.prompt_combo.setCurrentIndex(i)
+                            config_updated = True
+                            break
+            
+            status_msg = f"Loaded prompt config: {self.prompt_config_path.name}"
+            if config_updated:
+                status_msg += " (defaults applied)"
+            self.status_bar.showMessage(status_msg, 5000)
+            
         except Exception as e:
             QMessageBox.critical(self, "Load Failed", f"Failed to load config file:\n{e}")
             return

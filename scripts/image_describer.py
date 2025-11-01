@@ -170,19 +170,43 @@ class ImageDescriber:
         # Load configuration first
         self.config = self.load_config(config_file)
         
-        # Set model name - use parameter if provided, otherwise use config, otherwise default
+        # Set model name with priority:
+        # 1. Parameter (command-line argument)
+        # 2. Config default_model (preferred)
+        # 3. Config model_settings.model (legacy)
+        # 4. Fallback to 'moondream'
         if model_name is not None:
             self.model_name = model_name
         else:
-            self.model_name = self.config.get('model_settings', {}).get('model', 'moondream')
+            # Try default_model first (new field)
+            self.model_name = self.config.get('default_model')
+            if not self.model_name:
+                # Fallback to legacy model_settings.model
+                self.model_name = self.config.get('model_settings', {}).get('model')
+            if not self.model_name:
+                # Final fallback
+                self.model_name = 'moondream'
+        
+        # Set prompt style - parameter has already been resolved by argparse
+        # (argparse loads config default if not specified on command line)
+        self.prompt_style = prompt_style if prompt_style else 'detailed'
+        
+        # Set provider with priority:
+        # 1. Parameter (command-line argument)  
+        # 2. Config default_provider
+        # 3. Fallback to 'ollama'
+        if provider != "ollama":
+            self.provider_name = provider.lower()
+        else:
+            # Check config for default provider
+            config_default_provider = self.config.get('default_provider', 'ollama')
+            self.provider_name = config_default_provider.lower()
         
         self.max_image_size = max_image_size
         self.enable_compression = enable_compression
         self.batch_delay = batch_delay
-        self.prompt_style = prompt_style
         self.output_dir = output_dir  # Custom output directory
         self.log_dir = log_dir  # Directory for logs and progress tracking
-        self.provider_name = provider.lower()
         self.api_key = api_key
         self.workflow_name = workflow_name  # Workflow name for window title
         self.timeout = timeout  # Timeout for Ollama requests
@@ -1728,6 +1752,61 @@ def get_default_prompt_style(config_file: str = "image_describer_config.json") -
     except Exception:
         pass
     return 'detailed'
+
+
+def get_default_model(config_file: str = "image_describer_config.json") -> str:
+    """Get default model from image describer config using config_loader.
+    
+    Args:
+        config_file: Path to configuration file
+        
+    Returns:
+        Default model name, or None if not specified in config
+    """
+    # Try config_loader first (proper resolution with search paths)
+    try:
+        from config_loader import load_json_config
+        cfg, path, source = load_json_config(
+            'image_describer_config.json', 
+            explicit=config_file if config_file != 'image_describer_config.json' else None,
+            env_var_file='IDT_IMAGE_DESCRIBER_CONFIG'
+        )
+        if cfg:
+            default_model = cfg.get('default_model')
+            if default_model:
+                try:
+                    logger.debug(f"Resolved default model '{default_model}' from {path} (source={source})")
+                except Exception:
+                    pass
+                return default_model
+            # Try old structure as fallback
+            old_model = cfg.get('model_settings', {}).get('model')
+            if old_model:
+                return old_model
+    except Exception:
+        pass
+    
+    # Fallback: Direct file loading (for absolute paths)
+    try:
+        config_path = Path(config_file)
+        if not config_path.is_absolute():
+            config_path = Path(__file__).parent / config_file
+        
+        if config_path.exists():
+            with open(config_path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            default_model = cfg.get('default_model')
+            if default_model:
+                return default_model
+            # Try old structure
+            old_model = cfg.get('model_settings', {}).get('model')
+            if old_model:
+                return old_model
+    except Exception:
+        pass
+    
+    return None
+    return None
 
 
 def get_available_prompt_styles(config_file: str = "image_describer_config.json") -> list:
