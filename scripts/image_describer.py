@@ -1897,9 +1897,13 @@ Configuration:
         help="Maximum number of files to process (for testing)"
     )
     parser.add_argument(
+        "--config-image-describer",
+        "--config-id",
         "--config",
+        "-c",
         type=str,
         default="image_describer_config.json",
+        dest="config",
         help="Path to JSON configuration file (default: image_describer_config.json)"
     )
     parser.add_argument(

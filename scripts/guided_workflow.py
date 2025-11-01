@@ -339,8 +339,8 @@ def guided_workflow(custom_config_path=None):
         i = 1
         while i < len(sys.argv):
             arg = sys.argv[i]
-            # Handle --config flag
-            if arg in ['--config', '-c']:
+            # Handle config flags (all forms)
+            if arg in ['--config-image-describer', '--config-id', '--config', '-c']:
                 if i + 1 < len(sys.argv):
                     i += 1
                     config_path_for_workflow = sys.argv[i]
@@ -732,8 +732,19 @@ def guided_workflow(custom_config_path=None):
 
 def main():
     """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description="Interactive workflow wizard",
+        add_help=False  # Suppress help since this is wizard-based
+    )
+    parser.add_argument(
+        "--config-image-describer", "--config-id", "--config", "-c",
+        dest="config",
+        help="Path to custom image_describer_config.json file (prompts, AI settings, metadata)"
+    )
+    
     try:
-        guided_workflow()
+        args, unknown = parser.parse_known_args()
+        guided_workflow(custom_config_path=args.config)
     except KeyboardInterrupt:
         print("\n\nCancelled by user. Exiting...")
         sys.exit(0)
