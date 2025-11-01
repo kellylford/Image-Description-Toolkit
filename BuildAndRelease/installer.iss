@@ -57,11 +57,15 @@ Source: "..\releases\imagedescriber_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Fla
 ; Prompt Editor
 Source: "..\releases\prompt_editor_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
+; IDTConfigure
+Source: "..\releases\idtconfigure_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+
 [Icons]
 Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber\imagedescriber.exe"; WorkingDir: "{app}\ImageDescriber"
 Name: "{group}\Viewer"; Filename: "{app}\Viewer\viewer.exe"; WorkingDir: "{app}\Viewer"
 Name: "{group}\Prompt Editor"; Filename: "{app}\PromptEditor\prompteditor.exe"; WorkingDir: "{app}\PromptEditor"
+Name: "{group}\Configure"; Filename: "{app}\IDTConfigure\idtconfigure.exe"; WorkingDir: "{app}\IDTConfigure"
 Name: "{group}\Documentation"; Filename: "{app}\docs"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
@@ -130,6 +134,9 @@ begin
     
     // Extract Prompt Editor
     Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\prompt_editor_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\PromptEditor') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    // Extract IDTConfigure
+    Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\idtconfigure_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\IDTConfigure') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     
     // Set IDT_CONFIG_DIR environment variable to point to scripts directory
     RegWriteStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'IDT_CONFIG_DIR', ExpandConstant('{app}\scripts'));

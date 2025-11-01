@@ -11,7 +11,13 @@ IDT now supports downloading images directly from web pages, making it easy to d
 Download images from a URL and describe them:
 
 ```bash
-idt workflow --url https://example.com/gallery --steps download,describe,html
+idt workflow https://example.com/gallery
+```
+
+Or with explicit steps:
+
+```bash
+idt workflow https://example.com/gallery --steps download,describe,html
 ```
 
 ### With Options
@@ -19,20 +25,17 @@ idt workflow --url https://example.com/gallery --steps download,describe,html
 Filter images by size and limit the number of downloads:
 
 ```bash
-idt workflow --url https://example.com/photos \
-  --max-images 50 \
-  --steps download,describe,html
+idt workflow https://example.com/photos --max-images 50
 ```
 
 ### Full Example with AI Provider
 
 ```bash
-idt workflow --url https://example.com/gallery \
+idt workflow https://example.com/gallery \
   --max-images 100 \
   --provider openai \
   --model gpt-4o-mini \
   --api-key-file openai.txt \
-  --steps download,describe,html \
   --output-dir my_web_gallery
 ```
 
@@ -40,7 +43,8 @@ idt workflow --url https://example.com/gallery \
 
 ### New Arguments for Web Download
 
-- `--url URL`: URL of the web page to download images from (alternative to input_dir)
+- URL (positional): URL of the web page to download images from (can be passed directly as first argument)
+- `--url URL`: Alternative way to specify URL (equivalent to positional argument)
 - `--min-size SIZE`: Minimum image size filter (e.g., "100KB", "1MB") - *Currently not implemented, reserved for future use*
 - `--max-images N`: Maximum number of images to download
   - Limits the total number of images to prevent downloading too many
@@ -65,13 +69,13 @@ The `download` step integrates seamlessly with existing workflow steps:
 
 ```bash
 # Download and describe only
-idt workflow --url https://example.com/gallery --steps download,describe
+idt workflow https://example.com/gallery --steps download,describe
 
-# Download, describe, and generate HTML report
-idt workflow --url https://example.com/gallery --steps download,describe,html
+# Download, describe, and generate HTML report (default behavior)
+idt workflow https://example.com/gallery
 
 # Can be combined with other steps (though not typically useful)
-idt workflow --url https://example.com/gallery --steps download,convert,describe,html
+idt workflow https://example.com/gallery --steps download,convert,describe,html
 ```
 
 ## Features
@@ -145,10 +149,9 @@ To be respectful to web servers, the downloader:
 ### Art Portfolio Website
 
 ```bash
-idt workflow --url https://artist-portfolio.example.com \
+idt workflow https://artist-portfolio.example.com \
   --min-size 500x500 \
   --max-images 30 \
-  --steps download,describe,html \
   --name "ArtistPortfolio" \
   --output-dir art_descriptions
 ```
@@ -156,7 +159,7 @@ idt workflow --url https://artist-portfolio.example.com \
 ### Product Gallery
 
 ```bash
-idt workflow --url https://store.example.com/products \
+idt workflow https://store.example.com/products \
   --min-size 300x300 \
   --steps download,describe \
   --provider openai \
@@ -167,8 +170,7 @@ idt workflow --url https://store.example.com/products \
 ### News Article with Images
 
 ```bash
-idt workflow --url https://news.example.com/article/12345 \
-  --steps download,describe,html \
+idt workflow https://news.example.com/article/12345 \
   --output-dir news_article_images
 ```
 

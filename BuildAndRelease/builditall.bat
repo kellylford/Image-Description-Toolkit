@@ -26,6 +26,10 @@ echo ========================================================================
 echo BUILD ALL APPLICATIONS
 echo ========================================================================
 echo.
+
+REM Change to project root directory
+cd /d "%~dp0.."
+
 REM Show composed build version and commit before starting
 echo --- Build Version Banner (pre-build) ---
 python idt_cli.py version
@@ -54,14 +58,11 @@ echo.
 echo Make sure all virtual environments are set up before continuing.
 echo.
 
-REM Change to project root directory
-cd /d "%~dp0.."
-
 set BUILD_ERRORS=0
 
 REM ============================================================================
 echo.
-echo [1/4] Building IDT (main toolkit)...
+echo [1/5] Building IDT (main toolkit)...
 echo ========================================================================
 echo.
 
@@ -75,7 +76,7 @@ if errorlevel 1 (
 
 REM ============================================================================
 echo.
-echo [2/4] Building Viewer...
+echo [2/5] Building Viewer...
 echo ========================================================================
 echo.
 
@@ -99,7 +100,7 @@ cd ..
 
 REM ============================================================================
 echo.
-echo [3/4] Building Prompt Editor...
+echo [3/5] Building Prompt Editor...
 echo ========================================================================
 echo.
 
@@ -123,7 +124,7 @@ cd ..
 
 REM ============================================================================
 echo.
-echo [4/4] Building ImageDescriber...
+echo [4/5] Building ImageDescriber...
 echo ========================================================================
 echo.
 
