@@ -22,7 +22,8 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
-    "regression: marks tests as regression tests for specific bugs"
+    "regression: marks tests as regression tests for specific bugs",
+    "e2e: marks tests as end-to-end tests requiring frozen executable",
 ]
 
 [tool.coverage.run]
