@@ -817,7 +817,7 @@ class WorkflowOrchestrator:
         
         if not video_files:
             self.logger.info("No video files found to process")
-            return {"success": True, "processed": 0, "output_dir": output_dir}
+            return {"success": True, "processed": 0}
         
         self.logger.info(f"Found {len(video_files)} video files")
         
@@ -973,7 +973,7 @@ class WorkflowOrchestrator:
         
         if not heic_files:
             self.logger.info("No HEIC files found to convert")
-            return {"success": True, "processed": 0, "output_dir": output_dir}
+            return {"success": True, "processed": 0}
         
         self.logger.info(f"Found {len(heic_files)} HEIC files")
         
