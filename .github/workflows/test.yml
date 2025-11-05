@@ -203,11 +203,18 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
     
-    - name: Build all executables
+    - name: Build and package all applications
       shell: cmd
       run: |
         cd BuildAndRelease
-        call builditall.bat
+        call releaseitall.bat
+    
+    - name: Build Windows installer
+      shell: cmd
+      run: |
+        cd BuildAndRelease
+        call build_installer.bat
+      continue-on-error: true
     
     - name: Validate build
       run: |
@@ -235,6 +242,7 @@ jobs:
         path: |
           build/*.exe
           releases/*.zip
+          releases/*.exe
         retention-days: 30
         if-no-files-found: warn
     
@@ -244,5 +252,12 @@ jobs:
         echo "" >> $env:GITHUB_STEP_SUMMARY
         echo "**Commit:** ${{ github.sha }}" >> $env:GITHUB_STEP_SUMMARY
         echo "**Branch:** main" >> $env:GITHUB_STEP_SUMMARY
-        echo "**Build artifacts are available for download for 30 days**" >> $env:GITHUB_STEP_SUMMARY
+        echo "" >> $env:GITHUB_STEP_SUMMARY
+        echo "**Artifacts created:**" >> $env:GITHUB_STEP_SUMMARY
+        echo "- All application executables" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Individual application ZIP packages" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Master ZIP package (contains all packages)" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Windows installer (if build succeeded)" >> $env:GITHUB_STEP_SUMMARY
+        echo "" >> $env:GITHUB_STEP_SUMMARY
+        echo "**Artifacts are available for download for 30 days**" >> $env:GITHUB_STEP_SUMMARY
 
