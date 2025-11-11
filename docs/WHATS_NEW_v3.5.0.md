@@ -1,8 +1,8 @@
-# What's New in v3.5.0-beta
+# What's New in v3.5.0
 
-**Release Date:** TBD (In Development)  
+**Release Date:** November 11, 2025  
 **Previous Version:** v3.0.1  
-**Status:** Beta - Testing and Validation Phase
+**Status:** Stable Release
 
 ---
 
@@ -514,10 +514,10 @@ python tools/show_metadata/show_metadata.py --guideme
 - JavaScript-rendered image support for web downloads
 
 ### Feedback Welcome
-This is a **beta release** - we're actively seeking feedback on:
+We welcome your feedback on:
 - Build versioning and validation system
 - Video metadata embedding workflow
-- Geocoding accuracy and performance (now enabled by default)
+- Geocoding accuracy and performance
 - **Web image download feature** - compatibility, performance, use cases
 - UI/UX improvements
 - Documentation clarity
@@ -563,7 +563,7 @@ Special thanks to:
 
 ## 📋 Migration Notes
 
-### From v3.0.1 to v3.5.0-beta
+### From v3.0.1 to v3.5.0
 
 #### New Dependencies
 ```bash
@@ -609,19 +609,12 @@ All existing workflows continue to work. New features are opt-in via flags or au
 
 ---
 
-**Next Steps for Release:**
-1. ✅ Complete build validation system
-2. ✅ Add versioning with build numbers
-3. ✅ Enable geocoding by default
-4. ✅ Fix EXIF metadata preservation
-5. Complete pending validation tests (video metadata, large workflows)
-6. Update CHANGELOG.md with final release notes
-7. Create GitHub release v3.5.0-beta
-8. Upload distribution packages
-9. External user beta testing
-10. Announce new features
+**Release Information:**
+- **Version**: 3.5.0
+- **Release Date**: November 11, 2025
+- **Status**: Stable Release
 
 ---
 
-*Last Updated: October 29, 2025*  
-*Document Status: Ready for external beta testing*
+*Last Updated: November 11, 2025*  
+*Document Status: Release Documentation*
