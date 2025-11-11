@@ -1,6 +1,6 @@
 # Configuring and Controlling IDT Through Config Files
 
-**Version:** 3.5.0-beta  
+**Version:** 3.5.0  
 **Last Updated:** November 1, 2025
 
 This guide explains how to configure and customize the Image Description Toolkit (IDT) using configuration files with the frozen/built version (`idt.exe`). It covers all three configuration file types, their settings, and how to use custom configurations across all IDT tools.
@@ -199,7 +199,7 @@ Result: Workflows created in `d:\projects\descriptions\wf_<name>_<timestamp>\`
 #### `enable_metadata_extraction` and `enable_geocoding`
 Control whether EXIF metadata and GPS geocoding are enabled by default.
 
-**Note:** As of v3.5.0-beta, both default to `true`. Use `--no-metadata` and `--no-geocode` CLI flags to disable.
+**Note:** As of v3.5.0, both default to `true`. Use `--no-metadata` and `--no-geocode` CLI flags to disable.
 
 #### `max_workers`
 Number of parallel processes for image description. Higher = faster but more CPU/memory.
@@ -277,7 +277,7 @@ Controls AI model selection, prompts, description styles, and image processing b
 ### Key Settings Explained
 
 #### `default_model`, `default_provider`, `default_prompt_style`
-**NEW in v3.5.0-beta:** These defaults are now properly respected!
+**NEW in v3.5.0:** These defaults are now properly respected!
 
 These set the default values that will be used unless overridden by CLI arguments.
 
@@ -408,7 +408,7 @@ Frames per second to extract. Controls density of frame extraction.
 - `0.1` - One frame every 10 seconds (sparse sampling)
 
 #### `extract_metadata` and `embed_gps`
-**NEW in v3.5.0-beta:** Video metadata embedding!
+**NEW in v3.5.0:** Video metadata embedding!
 
 When `true`, IDT extracts GPS coordinates, recording date/time, and camera info from video files and embeds them into extracted frame EXIF data.
 
@@ -786,9 +786,9 @@ idt workflow photos/ --config-image-describer custom.json
 
 **Problem:** Workflow directory name doesn't reflect custom config model.
 
-**Cause:** This was a bug in versions before v3.5.0-beta.
+**Cause:** This was a bug in versions before v3.5.0.
 
-**Solution:** Update to v3.5.0-beta or later. The workflow directory naming now properly uses custom config defaults.
+**Solution:** Update to v3.5.0 or later. The workflow directory naming now properly uses custom config defaults.
 
 **Before (broken):**
 ```
@@ -896,7 +896,7 @@ This prevents confusion about relative path context.
 - **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - Complete command-line reference with all `--config-*` options
 - **[USER_GUIDE.md](USER_GUIDE.md)** - General IDT usage guide
 - **[PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md)** - How to write effective prompts for the `prompts` section
-- **[WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md)** - Latest features including config priority fixes
+- **[WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md)** - Latest features including config priority fixes
 
 ---
 
@@ -915,6 +915,6 @@ This prevents confusion about relative path context.
 **Need Help?**
 - Check the [CLI_REFERENCE.md](CLI_REFERENCE.md) for command-line syntax
 - See [USER_GUIDE.md](USER_GUIDE.md) for general usage
-- Review [WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md) for latest features
+- Review [WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md) for latest features
 
-*Last updated: November 1, 2025 for IDT v3.5.0-beta*
+*Last updated: November 11, 2025 for IDT v3.5.0*

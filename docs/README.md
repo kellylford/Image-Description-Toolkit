@@ -7,7 +7,7 @@ Welcome to the IDT documentation! This page helps you find the right documentati
 ### Getting Started
 - **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user guide from installation to advanced usage
 - **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - Comprehensive command-line reference with all options and examples
-- **[WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md)** - Latest features and changes in v3.5.0-beta
+- **[WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md)** - Latest features and changes in v3.5.0
 
 ### Configuration & Customization
 - **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Complete guide to config files and customization
@@ -20,7 +20,7 @@ Welcome to the IDT documentation! This page helps you find the right documentati
 docs/
 ├── USER_GUIDE.md              # 📖 Start here! Complete getting started guide
 ├── CLI_REFERENCE.md           # 🔧 Complete command reference
-├── WHATS_NEW_v3.5.0-beta.md   # 🆕 Latest features and updates
+├── WHATS_NEW_v3.5.0.md       # 🆕 Latest features and updates
 ├── CONFIGURATION_GUIDE.md     # ⚙️  Config files and customization
 ├── PROMPT_WRITING_GUIDE.md    # ✍️  How to write effective prompts
 ├── WEB_DOWNLOAD_GUIDE.md      # 🌐 Download images from websites
@@ -41,8 +41,8 @@ docs/
 **Configure IDT for my needs**
 → [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) - Config files and customization
 
-**See what's new in v3.5.0-beta**
-→ [WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md) - Latest features and changes
+**See what's new in v3.5.0**
+→ [WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md) - Latest features and changes
 
 **Download images from websites**
 → [WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md) - Web download guide
@@ -74,7 +74,7 @@ Individual components have their own README files:
 
 ### **New Users**
 1. [USER_GUIDE.md](USER_GUIDE.md) - Installation and first workflow
-2. [WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md) - See the latest features
+2. [WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md) - See the latest features
 3. [PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md) - Creating effective prompts
 4. [CLI_REFERENCE.md](CLI_REFERENCE.md) - Command reference when needed
 
@@ -94,7 +94,7 @@ Individual components have their own README files:
 2. [CLI_REFERENCE.md](CLI_REFERENCE.md) - Keyboard-friendly command reference
 3. The entire toolkit is WCAG 2.2 AA compliant
 
-## 🔍 What's New in v3.5.0-beta
+## 🔍 What's New in v3.5.0
 
 See **[WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md)** for complete details!
 
