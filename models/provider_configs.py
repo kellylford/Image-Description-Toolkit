@@ -49,13 +49,13 @@ PROVIDER_CAPABILITIES: Dict[str, Dict[str, Any]] = {
         "description": "Claude 4.x series from Anthropic with advanced reasoning"
     },
     "ONNX": {
-        "supports_prompts": False,
+        "supports_prompts": True,
         "supports_custom_prompts": False,
-        "prompt_styles": [],
+        "prompt_styles": ["simple", "narrative", "detailed", "technical"],
         "requires_api_key": False,
         "is_cloud": False,
         "supports_options": True,
-        "description": "Local ONNX models (BLIP, etc.)"
+        "description": "Local Florence-2 vision models with NPU acceleration support"
     },
     "HuggingFace": {
         "supports_prompts": False,
