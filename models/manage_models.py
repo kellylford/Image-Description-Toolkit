@@ -230,6 +230,28 @@ MODEL_METADATA = {
         "cost": "$",
         "tags": ["vision", "cloud", "fast"]
     },
+    
+    # ONNX Models (Florence-2)
+    "microsoft/Florence-2-base": {
+        "provider": "onnx",
+        "description": "Florence-2 Base - Fast local vision model with NPU support",
+        "size": "~230MB",
+        "install_command": "pip install 'transformers>=4.45.0' torch torchvision pillow",
+        "recommended": True,
+        "min_ram": "4GB",
+        "cost": "Free",
+        "tags": ["vision", "local", "npu", "fast", "recommended"]
+    },
+    "microsoft/Florence-2-large": {
+        "provider": "onnx",
+        "description": "Florence-2 Large - Higher quality local vision model with NPU support",
+        "size": "~700MB",
+        "install_command": "pip install 'transformers>=4.45.0' torch torchvision pillow",
+        "recommended": True,
+        "min_ram": "8GB",
+        "cost": "Free",
+        "tags": ["vision", "local", "npu", "accurate", "recommended"]
+    },
 }
 
 

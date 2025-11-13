@@ -466,7 +466,7 @@ class WorkflowOrchestrator:
             base_output_dir: Base output directory for the workflow
             model: Override model name
             prompt_style: Override prompt style
-            provider: AI provider to use (ollama, openai, claude)
+            provider: AI provider to use (ollama, openai, claude, onnx)
             api_key_file: Path to API key file for cloud providers
             preserve_descriptions: If True, skip describe step if descriptions already exist
             workflow_name: Name of the workflow (for display purposes)
@@ -2307,7 +2307,7 @@ def normalize_model_name(model: str, provider: str) -> str:
     
     Args:
         model: Model name that may include provider prefix
-        provider: Provider name (ollama, openai, claude)
+        provider: Provider name (ollama, openai, claude, onnx)
     
     Returns:
         Model name with provider prefix stripped if it matches the provider
@@ -2439,7 +2439,7 @@ Viewing Results:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "claude"],
+        choices=["ollama", "openai", "claude", "onnx"],
         default="ollama",
         help="AI provider to use for image description (default: ollama)"
     )

@@ -376,7 +376,7 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude"]
+    providers = ["ollama", "openai", "claude", "onnx"]
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
     if provider == 'EXIT':

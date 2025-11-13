@@ -82,7 +82,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from imagedescriber.ai_providers import (
     OllamaProvider,
     OpenAIProvider,
-    ClaudeProvider
+    ClaudeProvider,
+    ONNXProvider
 )
 
 
@@ -333,8 +334,15 @@ class ImageDescriber:
                 print(f"INFO: Claude provider - API key set: {bool(provider.api_key)}, Client: {bool(provider.client)}, Available: {provider.is_available()}")
                 return provider
                 
+            elif self.provider_name == "onnx":
+                logger.info("Initializing ONNX provider...")
+                provider = ONNXProvider()
+                if not provider.is_available():
+                    raise ValueError("ONNX provider requires Florence-2 dependencies. Install with: pip install 'transformers>=4.45.0' torch torchvision einops timm")
+                return provider
+                
             else:
-                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude")
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, onnx")
                 
         except Exception as e:
             logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
@@ -1929,7 +1937,7 @@ Configuration:
         "--provider",
         type=str,
         default="ollama",
-        choices=["ollama", "openai", "claude"],
+        choices=["ollama", "openai", "claude", "onnx"],
         help="AI provider to use (default: ollama)"
     )
     parser.add_argument(
