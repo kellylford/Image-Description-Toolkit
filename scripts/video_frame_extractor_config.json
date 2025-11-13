@@ -3,7 +3,7 @@
     "time_interval_seconds": 5.0,
     "scene_change_threshold": 30.0,
     "min_scene_duration_seconds": 1.0,
-    "output_directory": "C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\Descriptions\\wf_baselineollamamodels_ollama_moondream_latest_colorful_20251017_005059\\extracted_frames",
+    "output_directory": "C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\Descriptions\\wf_2025_10_onnx_microsoftFlorence-2-base_colorful_20251113_104524\\extracted_frames",
     "preserve_directory_structure": false,
     "image_quality": 95,
     "resize_width": null,
