@@ -460,8 +460,44 @@ def guided_workflow(custom_config_path=None):
         # Extract just the model name (before the space/parenthesis)
         model = model_choice.split()[0]
     
+    elif provider == 'onnx':
+        # Check if ONNX provider is available
+        try:
+            sys.path.insert(0, str(Path(__file__).parent.parent))
+            from imagedescriber.ai_providers import ONNXProvider
+            onnx_provider = ONNXProvider()
+            
+            if not onnx_provider.is_available():
+                print("\n⚠️  Florence-2 dependencies not installed.")
+                print("Install with: pip install transformers torch torchvision einops timm")
+                print("\nReturning to provider selection...\n")
+                return guided_workflow()
+            
+            available_models = onnx_provider.get_available_models()
+            
+            onnx_models = [
+                "microsoft/Florence-2-base (230MB, faster, recommended)",
+                "microsoft/Florence-2-large (700MB, slower, better quality)"
+            ]
+            print("Available ONNX models (Florence-2):")
+            model_choice = get_choice("Select a model", onnx_models, default=1, allow_back=True)
+            if model_choice == 'EXIT':
+                print("Exiting...")
+                return
+            if model_choice == 'BACK':
+                # Go back to provider selection - restart function
+                return guided_workflow()
+            # Extract just the model name (before the space/parenthesis)
+            model = model_choice.split()[0]
+            
+        except ImportError as e:
+            print(f"\n⚠️  Error loading ONNX provider: {e}")
+            print("Make sure dependencies are installed: pip install transformers torch torchvision einops timm")
+            print("\nReturning to provider selection...\n")
+            return guided_workflow()
+    
     # Step 3/4: Image Directory (step number depends on whether API key was needed)
-    dir_step = "Step 3" if provider == 'ollama' else "Step 4"
+    dir_step = "Step 3" if provider in ['ollama', 'onnx'] else "Step 4"
     print_header(f"{dir_step}: Image Directory")
     
     while True:
@@ -480,14 +516,14 @@ def guided_workflow(custom_config_path=None):
                 return guided_workflow()
     
     # Step 4/5: Workflow Name (Optional)
-    name_step = "Step 4" if provider == 'ollama' else "Step 5"
+    name_step = "Step 4" if provider in ['ollama', 'onnx'] else "Step 5"
     print_header(f"{name_step}: Workflow Name (Optional)")
     print("You can provide a custom name for this workflow run.")
     print("If you skip this, a name will be auto-generated from the input directory.")
     workflow_name = get_input("Enter workflow name", allow_empty=True)
     
     # Step 5/6: Prompt Style (Optional)
-    style_step = "Step 5" if provider == 'ollama' else "Step 6"
+    style_step = "Step 5" if provider in ['ollama', 'onnx'] else "Step 6"
     print_header(f"{style_step}: Prompt Style (Optional)")
     
     # Get available prompt styles from config (using custom config if provided)
