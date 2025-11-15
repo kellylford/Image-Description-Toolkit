@@ -40,6 +40,7 @@ pywin32>=306; sys_platform == "win32"       # Windows system integration
 # ----------------------------------------------------------------------------
 # Florence-2 provides lightweight local image description without requiring Ollama
 # Note: NPU acceleration not available on ARM64 Windows (CPU-only on Copilot+ Snapdragon)
+# WARNING: Adds ~500MB to installation and increases startup time
 transformers>=4.45.0    # HuggingFace transformers (Florence-2 support, Python 3.13 compatible)
 torch>=2.0.0            # PyTorch backend for Florence-2
 torchvision>=0.15.0     # Vision utilities for PyTorch
