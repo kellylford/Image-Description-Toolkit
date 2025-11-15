@@ -444,6 +444,252 @@ def log_environment_info(log_dir: Path, workflow_name: str = "workflow") -> Dict
     return env_info
 
 
+# ============================================================================
+# REDESCRIBE WORKFLOW FUNCTIONS
+# ============================================================================
+
+def validate_redescribe_args(args, source_dir: Path) -> Dict[str, Any]:
+    """
+    Validate arguments for redescribe operation
+    
+    Args:
+        args: Parsed command-line arguments
+        source_dir: Path to source workflow directory
+        
+    Returns:
+        Source workflow metadata
+        
+    Raises:
+        ValueError: If validation fails
+    """
+    # Check for incompatible arguments
+    if args.input_source:
+        raise ValueError("Cannot specify input_source with --redescribe. The source workflow provides the images.")
+    
+    if args.resume:
+        raise ValueError("Cannot use --resume with --redescribe. Use one or the other.")
+    
+    if args.download:
+        raise ValueError("Cannot use --download with --redescribe. Use --redescribe to reuse existing images.")
+    
+    # Validate source workflow exists
+    if not source_dir.exists():
+        raise ValueError(f"Source workflow not found: {source_dir}")
+    
+    if not source_dir.is_dir():
+        raise ValueError(f"Source workflow is not a directory: {source_dir}")
+    
+    # Load source metadata
+    source_metadata = load_workflow_metadata(source_dir)
+    if not source_metadata:
+        raise ValueError(
+            f"Invalid workflow directory (no metadata found): {source_dir}\n"
+            f"Hint: Use 'idt list' to see available workflows"
+        )
+    
+    # Check for required directories - at least one must exist
+    converted_images = source_dir / "converted_images"
+    extracted_frames = source_dir / "extracted_frames"
+    
+    has_images = converted_images.exists() and any(converted_images.iterdir())
+    has_frames = extracted_frames.exists() and any(extracted_frames.iterdir())
+    
+    if not has_images and not has_frames:
+        raise ValueError(
+            f"Source workflow has no processed images:\n"
+            f"  Missing or empty: converted_images/\n"
+            f"  Missing or empty: extracted_frames/\n"
+            f"Run the source workflow to completion before redescribing."
+        )
+    
+    # Require at least one changed parameter
+    source_provider = source_metadata.get("provider", "")
+    source_model = source_metadata.get("model", "")
+    source_prompt = source_metadata.get("prompt_style", "")
+    
+    same_provider = args.provider == source_provider
+    same_model = (args.model or get_default_model(args.provider)) == source_model
+    same_prompt = (args.prompt_style or "narrative") == source_prompt
+    same_config = not args.config_image_describer  # No custom config specified
+    
+    if same_provider and same_model and same_prompt and same_config:
+        raise ValueError(
+            f"Redescribe requires at least one change in AI settings.\n"
+            f"Source workflow: {source_provider} / {source_model} / {source_prompt}\n"
+            f"Your settings: {args.provider} / {args.model or get_default_model(args.provider)} / {args.prompt_style or 'narrative'}\n"
+            f"Hint: Specify --provider, --model, --prompt-style, or --config-image-describer"
+        )
+    
+    return source_metadata
+
+
+def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[str]:
+    """
+    Analyze source workflow to determine which steps can be reused
+    
+    Args:
+        source_dir: Path to source workflow directory
+        source_metadata: Source workflow metadata
+        
+    Returns:
+        List of step names that can be reused (e.g., ['video', 'convert'])
+    """
+    reusable = []
+    
+    # Check for extracted video frames
+    extracted_frames = source_dir / "extracted_frames"
+    if extracted_frames.exists():
+        frame_files = list(extracted_frames.glob("*.jpg")) + list(extracted_frames.glob("*.png"))
+        if frame_files:
+            reusable.append("video")
+            print(f"  ✓ Found {len(frame_files)} extracted video frames")
+    
+    # Check for converted images  
+    converted_images = source_dir / "converted_images"
+    if converted_images.exists():
+        image_files = (list(converted_images.glob("*.jpg")) + 
+                      list(converted_images.glob("*.jpeg")) +
+                      list(converted_images.glob("*.png")))
+        if image_files:
+            reusable.append("convert")
+            print(f"  ✓ Found {len(image_files)} converted images")
+    
+    return reusable
+
+
+def can_create_hardlinks(source_parent: Path, dest_parent: Path) -> bool:
+    """Check if hardlinks can be created between two directories"""
+    try:
+        # Hardlinks require same filesystem
+        source_stat = os.stat(str(source_parent))
+        dest_stat = os.stat(str(dest_parent))
+        
+        # On Windows, check if on same drive
+        if sys.platform.startswith('win'):
+            return str(source_parent.resolve())[0].upper() == str(dest_parent.resolve())[0].upper()
+        else:
+            # On Unix, check if same device
+            return source_stat.st_dev == dest_stat.st_dev
+    except Exception:
+        return False
+
+
+def can_create_symlinks() -> bool:
+    """Check if symlinks can be created on this system"""
+    if sys.platform.startswith('win'):
+        # Windows requires admin privileges or Developer Mode for symlinks
+        try:
+            test_dir = Path.cwd() / ".symlink_test_dir"
+            test_link = Path.cwd() / ".symlink_test_link"
+            
+            test_dir.mkdir(exist_ok=True)
+            try:
+                test_link.symlink_to(test_dir, target_is_directory=True)
+                test_link.unlink()
+                test_dir.rmdir()
+                return True
+            except (OSError, NotImplementedError):
+                if test_dir.exists():
+                    test_dir.rmdir()
+                return False
+        except Exception:
+            return False
+    else:
+        # Unix systems support symlinks by default
+        return True
+
+
+def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
+    """
+    Reuse images from source workflow in destination workflow
+    
+    Args:
+        source_dir: Source workflow directory
+        dest_dir: Destination workflow directory  
+        method: "auto", "link", "copy", or "force-copy"
+    
+    Returns:
+        Method used: "hardlink", "symlink", or "copy"
+    """
+    # Determine which directory has the images
+    source_converted = source_dir / "converted_images"
+    source_extracted = source_dir / "extracted_frames"
+    
+    # Prefer converted_images, fall back to extracted_frames
+    if source_converted.exists() and any(source_converted.iterdir()):
+        source_images = source_converted
+        dest_images = dest_dir / "converted_images"
+    elif source_extracted.exists() and any(source_extracted.iterdir()):
+        source_images = source_extracted
+        dest_images = dest_dir / "converted_images"  # Still use converted_images for consistency
+    else:
+        raise ValueError("No images found in source workflow")
+    
+    # Determine method
+    if method == "force-copy" or method == "copy":
+        use_method = "copy"
+    elif method == "link":
+        # User requested linking - try hardlink first, then symlink
+        if can_create_hardlinks(source_images.parent, dest_images.parent):
+            use_method = "hardlink"
+        elif can_create_symlinks():
+            use_method = "symlink"
+        else:
+            print("  ⚠ Linking not available on this system, falling back to copy")
+            use_method = "copy"
+    else:  # auto
+        # Auto-detect best method
+        if can_create_hardlinks(source_images.parent, dest_images.parent):
+            use_method = "hardlink"
+        elif can_create_symlinks():
+            use_method = "symlink"
+        else:
+            use_method = "copy"
+    
+    print(f"  → Reusing images via {use_method}")
+    
+    dest_images.mkdir(parents=True, exist_ok=True)
+    
+    if use_method == "hardlink":
+        # Create hardlinks (same filesystem, no space duplication)
+        count = 0
+        for img in source_images.iterdir():
+            if img.is_file():
+                try:
+                    os.link(str(img), str(dest_images / img.name))
+                    count += 1
+                except Exception as e:
+                    # If hardlink fails, fall back to copy
+                    print(f"  ⚠ Hardlink failed for {img.name}, copying instead: {e}")
+                    shutil.copy2(str(img), str(dest_images / img.name))
+                    count += 1
+        print(f"  ✓ Created {count} hardlinks (0 MB disk space used)")
+        return "hardlink"
+    
+    elif use_method == "symlink":
+        # Create symlink to entire directory
+        # Remove the empty directory we just created
+        dest_images.rmdir()
+        dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
+        image_count = len(list(source_images.iterdir()))
+        print(f"  ✓ Created directory symlink to {image_count} images (0 MB disk space used)")
+        return "symlink"
+    
+    else:  # copy
+        # Copy files
+        count = 0
+        total_size = 0
+        for img in source_images.iterdir():
+            if img.is_file():
+                shutil.copy2(str(img), str(dest_images / img.name))
+                count += 1
+                total_size += img.stat().st_size
+        
+        size_mb = total_size / (1024 * 1024)
+        print(f"  ✓ Copied {count} images ({size_mb:.1f} MB disk space used)")
+        return "copy"
+
+
 class WorkflowOrchestrator:
     """Main workflow orchestrator class"""
     
@@ -2363,6 +2609,23 @@ Resume Examples:
   idt workflow --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file openai.txt
   idt workflow --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file claude.txt
   # See docs/WORKFLOW_RESUME_API_KEY.md for details
+
+Redescribe Examples (reuse images with different AI settings):
+  # Compare different models on same images (skips video/convert steps)
+  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\
+    --provider openai --model gpt-4o
+  
+  # Try different prompt styles
+  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\
+    --prompt-style technical
+  
+  # Test local ONNX model vs cloud
+  idt workflow --redescribe wf_photos_openai_gpt-4o_narrative_20251115_100000 \\
+    --provider onnx --model microsoft/Florence-2-base
+  
+  # Use symlinks to save disk space (faster, 0 MB used)
+  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\
+    --provider claude --model claude-sonnet-4-5 --link-images
   
 Viewing Results:
   # Launch viewer automatically at workflow start (recommended for long batches):
@@ -2392,9 +2655,26 @@ Viewing Results:
     )
     
     parser.add_argument(
+        "--redescribe",
+        help="Re-describe images from an existing workflow with different AI settings, skipping video/image conversion"
+    )
+    
+    parser.add_argument(
         "--preserve-descriptions",
         action="store_true",
         help="When resuming, preserve existing descriptions and skip describe step if substantial progress exists"
+    )
+    
+    parser.add_argument(
+        "--link-images",
+        action="store_true",
+        help="When redescribing, use symlinks/hardlinks instead of copying images (faster, no space duplication)"
+    )
+    
+    parser.add_argument(
+        "--force-copy",
+        action="store_true",
+        help="When redescribing, always copy images even if linking is available"
     )
     
     parser.add_argument(
@@ -2677,6 +2957,142 @@ Viewing Results:
         print(f"Original input: {input_dir}")
         print(f"Completed steps: {', '.join(workflow_state['completed_steps'])}")
         print(f"Remaining steps: {', '.join(steps)}")
+        
+    elif args.redescribe:
+        # Redescribe mode - reuse images from existing workflow with new AI settings
+        source_dir = Path(args.redescribe)
+        
+        if not source_dir.is_absolute():
+            # Use original working directory if provided, otherwise current directory
+            base_dir = Path(args.original_cwd) if args.original_cwd else Path(os.getcwd())
+            source_dir = (base_dir / source_dir).resolve()
+        
+        print("=" * 80)
+        print("REDESCRIBE WORKFLOW")
+        print("=" * 80)
+        print()
+        
+        try:
+            # Validate arguments and get source metadata
+            source_metadata = validate_redescribe_args(args, source_dir)
+            
+            print(f"Source Workflow: {source_dir.name}")
+            print(f"  Original Provider: {source_metadata.get('provider', 'unknown')}")
+            print(f"  Original Model: {source_metadata.get('model', 'unknown')}")
+            print(f"  Original Prompt: {source_metadata.get('prompt_style', 'unknown')}")
+            print()
+            
+            # Determine new AI settings
+            new_provider = args.provider
+            new_model = args.model or get_default_model(new_provider)
+            new_prompt = args.prompt_style or source_metadata.get("prompt_style", "narrative")
+            
+            print(f"New AI Configuration:")
+            print(f"  Provider: {new_provider}")
+            print(f"  Model: {new_model}")
+            print(f"  Prompt Style: {new_prompt}")
+            print()
+            
+            # Determine what can be reused
+            print("Analyzing source workflow...")
+            reusable_steps = determine_reusable_steps(source_dir, source_metadata)
+            
+            if not reusable_steps:
+                print("ERROR: No reusable content found in source workflow")
+                sys.exit(1)
+            
+            # Create new workflow directory
+            workflow_name = source_metadata.get("workflow_name", "redescribe")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Sanitize components for directory name
+            provider_sanitized = sanitize_name(new_provider)
+            model_sanitized = sanitize_name(new_model)
+            prompt_sanitized = sanitize_name(new_prompt)
+            
+            dir_name = f"wf_{workflow_name}_{provider_sanitized}_{model_sanitized}_{prompt_sanitized}_{timestamp}"
+            
+            # Determine output location
+            if args.output_dir:
+                output_base = Path(args.output_dir)
+            else:
+                # Use same parent directory as source workflow
+                output_base = source_dir.parent
+            
+            output_dir = output_base / dir_name
+            
+            try:
+                output_dir.mkdir(parents=True, exist_ok=False)
+            except FileExistsError:
+                print(f"ERROR: Output directory already exists: {output_dir}")
+                sys.exit(1)
+            
+            print()
+            print(f"New Workflow Directory: {output_dir.name}")
+            print()
+            
+            # Reuse images
+            print("Reusing processed images...")
+            link_method = "link" if args.link_images else "force-copy" if args.force_copy else "auto"
+            reuse_method = reuse_images(source_dir, output_dir, method=link_method)
+            print()
+            
+            # Build redescribe metadata
+            redescribe_metadata = {
+                "is_redescribe": True,
+                "source_workflow": str(source_dir.resolve()),
+                "source_workflow_name": source_dir.name,
+                "reused_steps": reusable_steps,
+                "images_linked": reuse_method in ["hardlink", "symlink"],
+                "link_method": reuse_method,
+                "source_metadata": {
+                    "original_provider": source_metadata.get("provider"),
+                    "original_model": source_metadata.get("model"),
+                    "original_prompt": source_metadata.get("prompt_style"),
+                    "original_timestamp": source_metadata.get("timestamp")
+                },
+                "redescribe_timestamp": datetime.now().isoformat()
+            }
+            
+            # Build full workflow metadata
+            metadata = {
+                "workflow_name": workflow_name,
+                "provider": new_provider,
+                "model": new_model,
+                "prompt_style": new_prompt,
+                "timestamp": timestamp,
+                "redescribe_operation": redescribe_metadata,
+                "steps_executed": ["describe", "html"],
+                "config_workflow": args.config_workflow,
+                "config_image_describer": args.config_image_describer
+            }
+            
+            # Save metadata
+            save_workflow_metadata(output_dir, metadata)
+            
+            # Set up for workflow execution
+            input_dir = output_dir / "converted_images"
+            steps = ["describe", "html"]  # Only run these steps
+            
+            # Store workflow info for later use
+            workflow_name_display = workflow_name
+            provider_name = new_provider
+            model_name = new_model
+            prompt_style = new_prompt
+            url = None  # No URL downloads in redescribe mode
+            
+            print("Running workflow steps...")
+            print(f"  Steps: {', '.join(steps)}")
+            print()
+            
+        except ValueError as e:
+            print(f"ERROR: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"ERROR: Unexpected error during redescribe setup: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
         
     else:
         # Normal mode - determine input source and mode
