@@ -609,15 +609,14 @@ def can_create_symlinks() -> bool:
         return True
 
 
-def reuse_images(source_dir: Path, dest_dir: Path, source_metadata: Dict, method: str = "auto") -> str:
+def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     """
     Reuse images from source workflow in destination workflow
-    Preserves the original directory structure (extracted_frames, converted_images, input_images, etc.)
+    Preserves the original directory structure (extracted_frames, converted_images, input_images)
     
     Args:
         source_dir: Source workflow directory
         dest_dir: Destination workflow directory
-        source_metadata: Source workflow metadata (for original input_directory)
         method: "auto", "link", "copy", or "force-copy"
     
     Returns:
@@ -3087,7 +3086,7 @@ Viewing Results:
             # Reuse images
             print("Reusing processed images...")
             link_method = "link" if args.link_images else "force-copy" if args.force_copy else "auto"
-            reuse_method = reuse_images(source_dir, output_dir, source_metadata, method=link_method)
+            reuse_method = reuse_images(source_dir, output_dir, method=link_method)
             print()
             
             # Build redescribe metadata
