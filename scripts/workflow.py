@@ -3265,7 +3265,7 @@ Viewing Results:
         
         # Get provider, model and prompt info for directory naming
         provider_name = args.provider if args.provider else "ollama"
-        model_name = get_effective_model(args, args.config_workflow)
+        model_name_sanitized = get_effective_model(args, args.config_workflow)  # For directory name
         prompt_style = get_effective_prompt_style(args, args.config_workflow)
         
         # Determine workflow name identifier
@@ -3287,7 +3287,7 @@ Viewing Results:
         
         # Create descriptive directory name (wf = workflow)
         # Format: wf_NAME_PROVIDER_MODEL_PROMPT_TIMESTAMP
-        wf_dirname = f"wf_{workflow_name}_{provider_name}_{model_name}_{prompt_style}_{timestamp}"
+        wf_dirname = f"wf_{workflow_name}_{provider_name}_{model_name_sanitized}_{prompt_style}_{timestamp}"
         
         if args.output_dir:
             # User specified output directory - create wf_ directory inside it
@@ -3320,6 +3320,41 @@ Viewing Results:
     # Normalize model name - strip provider prefix if present
     # (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
     normalized_model = normalize_model_name(args.model, args.provider) if args.model else None
+    
+    # Get the actual model name for metadata (original, not sanitized)
+    # This is what the AI provider needs to use
+    if normalized_model:
+        model_name_original = normalized_model
+    elif hasattr(args, 'config_image_describer') and args.config_image_describer:
+        # Try to get from custom config
+        try:
+            model_name_original = get_default_model(args.config_image_describer)
+        except Exception:
+            model_name_original = None
+    else:
+        # Try workflow config or default config
+        model_name_original = None
+        try:
+            config = WorkflowConfig(args.config_workflow if args.config_workflow else "workflow_config.json")
+            model_name_original = config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("model")
+        except Exception:
+            pass
+        
+        if not model_name_original:
+            try:
+                import json
+                config_paths = ["image_describer_config.json", "scripts/image_describer_config.json"]
+                for config_path in config_paths:
+                    try:
+                        with open(config_path, 'r') as f:
+                            img_config = json.load(f)
+                            model_name_original = img_config.get("default_model")
+                            if model_name_original:
+                                break
+                    except FileNotFoundError:
+                        continue
+            except Exception:
+                pass
     
     # Determine which config files to use
     workflow_config = args.config_workflow if args.config_workflow else "workflow_config.json"
@@ -3394,7 +3429,7 @@ Viewing Results:
             "workflow_name": workflow_name_display,  # Use case-preserved name for display
             "input_directory": str(input_dir),
             "provider": provider_name,
-            "model": model_name,
+            "model": model_name_original or model_name_sanitized,  # Original model name for AI provider (e.g., "microsoft/Florence-2-base")
             "prompt_style": prompt_style,
             "timestamp": timestamp,
             "steps": steps,
