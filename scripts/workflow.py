@@ -536,10 +536,10 @@ def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[st
     """
     reusable = []
     
-    # Check for extracted video frames
+    # Check for extracted video frames (may be in subdirectories by video name)
     extracted_frames = source_dir / "extracted_frames"
     if extracted_frames.exists():
-        frame_files = list(extracted_frames.glob("*.jpg")) + list(extracted_frames.glob("*.png"))
+        frame_files = list(extracted_frames.rglob("*.jpg")) + list(extracted_frames.rglob("*.png"))
         if frame_files:
             reusable.append("video")
             print(f"  ✓ Found {len(frame_files)} extracted video frames")
@@ -674,13 +674,18 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     for dir_name, source_images in image_dirs_to_copy:
         dest_images = dest_dir / dir_name
         
-        # Get all files in the directory
-        files_to_process = [f for f in source_images.iterdir() if f.is_file()]
+        # Get all files in the directory (recursively for subdirectories)
+        # extracted_frames may have subdirectories by video name
+        if dir_name == "extracted_frames":
+            files_to_process = list(source_images.rglob("*"))
+        else:
+            files_to_process = [f for f in source_images.iterdir() if f.is_file()]
         
         if use_method == "symlink":
-            # Create symlink to entire directory
+            # Create symlink to entire directory (preserves all subdirectories)
             dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
-            image_count = len(files_to_process)
+            # Count actual image files for reporting
+            image_count = len([f for f in files_to_process if f.is_file()])
             total_count += image_count
             print(f"  ✓ Symlinked {dir_name}/ ({image_count} images)")
             
@@ -688,34 +693,46 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
             # Create destination directory
             dest_images.mkdir(parents=True, exist_ok=True)
             
-            # Copy or hardlink each file
-            for img in files_to_process:
-                if not img.is_file():
+            # Copy or hardlink each file, preserving subdirectory structure
+            for item in files_to_process:
+                if not item.is_file():
                     continue
-                    
-                dest_file = dest_images / img.name
+                
+                # Calculate relative path from source directory to maintain structure
+                rel_path = item.relative_to(source_images)
+                dest_file = dest_images / rel_path
+                
+                # Create parent directories if needed (for extracted_frames subdirs)
+                dest_file.parent.mkdir(parents=True, exist_ok=True)
                 
                 if use_method == "hardlink":
                     try:
-                        os.link(str(img), str(dest_file))
+                        os.link(str(item), str(dest_file))
                         total_count += 1
                     except Exception as e:
                         # If hardlink fails, fall back to copy
-                        print(f"  ⚠ Hardlink failed for {img.name}, copying instead: {e}")
-                        shutil.copy2(str(img), str(dest_file))
+                        print(f"  ⚠ Hardlink failed for {item.name}, copying instead: {e}")
+                        shutil.copy2(str(item), str(dest_file))
                         total_count += 1
-                        total_size += img.stat().st_size
+                        total_size += item.stat().st_size
                 else:  # copy
-                    shutil.copy2(str(img), str(dest_file))
+                    shutil.copy2(str(item), str(dest_file))
                     total_count += 1
-                    total_size += img.stat().st_size
+                    total_size += item.stat().st_size
             
             if use_method == "hardlink":
-                dir_count = len([f for f in dest_images.iterdir() if f.is_file()])
+                if dir_name == "extracted_frames":
+                    dir_count = len([f for f in dest_images.rglob("*") if f.is_file()])
+                else:
+                    dir_count = len([f for f in dest_images.iterdir() if f.is_file()])
                 print(f"  ✓ Hardlinked {dir_name}/ ({dir_count} images)")
             else:
-                dir_count = len([f for f in dest_images.iterdir() if f.is_file()])
+                if dir_name == "extracted_frames":
+                    dir_count = len([f for f in dest_images.rglob("*") if f.is_file()])
+                else:
+                    dir_count = len([f for f in dest_images.iterdir() if f.is_file()])
                 print(f"  ✓ Copied {dir_name}/ ({dir_count} images)")
+
     
     # Print summary
     if use_method == "symlink":
@@ -3385,7 +3402,12 @@ Viewing Results:
         
         # Log original command for resume functionality
         if not args.resume:  # Only log original command for new workflows
-            original_cmd = ["python", "workflow.py", str(input_dir)]
+            # For redescribe, log the --redescribe argument; for normal workflows, log input_dir
+            if args.redescribe:
+                original_cmd = ["python", "workflow.py", "--redescribe", str(args.redescribe)]
+            else:
+                original_cmd = ["python", "workflow.py", str(input_dir)]
+            
             if args.output_dir:
                 original_cmd.extend(["--output-dir", args.output_dir])
             if args.steps != "video,convert,describe,html":
