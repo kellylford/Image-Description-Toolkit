@@ -3388,6 +3388,8 @@ Viewing Results:
                 original_cmd.extend(["--output-dir", args.output_dir])
             if args.steps != "video,convert,describe,html":
                 original_cmd.extend(["--steps", args.steps])
+            if args.provider and args.provider != "ollama":
+                original_cmd.extend(["--provider", args.provider])
             if args.model:
                 original_cmd.extend(["--model", args.model])
             if args.prompt_style:
