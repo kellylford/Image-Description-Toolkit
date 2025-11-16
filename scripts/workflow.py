@@ -1622,12 +1622,14 @@ class WorkflowOrchestrator:
                 try:
                     # Determine which source directory this file came from
                     source_dir = None
-                    if image_file.is_relative_to(input_dir):
-                        source_dir = input_dir
-                    elif has_conversions and image_file.is_relative_to(converted_dir):
+                    if image_file.is_relative_to(input_images_dir):
+                        source_dir = input_images_dir
+                    elif image_file.is_relative_to(converted_dir):
                         source_dir = converted_dir
-                    elif frames_dir.exists() and image_file.is_relative_to(frames_dir):
+                    elif image_file.is_relative_to(frames_dir):
                         source_dir = frames_dir
+                    elif image_file.is_relative_to(input_dir):
+                        source_dir = input_dir
                     else:
                         # Fallback to using parent directory
                         source_dir = image_file.parent
