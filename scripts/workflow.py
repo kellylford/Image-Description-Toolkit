@@ -554,6 +554,26 @@ def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[st
             reusable.append("convert")
             print(f"  ✓ Found {len(image_files)} converted images")
     
+    # Check for regular images from original input directory
+    # These are images that needed no conversion (already JPG/PNG)
+    original_input = source_metadata.get("input_directory")
+    if original_input:
+        original_input_path = Path(original_input)
+        if original_input_path.exists():
+            # Find regular images (not HEIC)
+            supported_formats = [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"]
+            input_images = []
+            for fmt in supported_formats:
+                input_images.extend(original_input_path.glob(f"*{fmt}"))
+                input_images.extend(original_input_path.glob(f"*{fmt.upper()}"))
+            
+            # Filter out any that are in subdirectories (those would be from extraction/conversion)
+            direct_images = [img for img in input_images if img.parent == original_input_path]
+            
+            if direct_images:
+                reusable.append("input")
+                print(f"  ✓ Found {len(direct_images)} direct input images (no conversion needed)")
+    
     return reusable
 
 
@@ -599,14 +619,15 @@ def can_create_symlinks() -> bool:
         return True
 
 
-def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
+def reuse_images(source_dir: Path, dest_dir: Path, source_metadata: Dict, method: str = "auto") -> str:
     """
     Reuse images from source workflow in destination workflow
-    Preserves the original directory structure (extracted_frames, converted_images, etc.)
+    Preserves the original directory structure (extracted_frames, converted_images, input_images, etc.)
     
     Args:
         source_dir: Source workflow directory
-        dest_dir: Destination workflow directory  
+        dest_dir: Destination workflow directory
+        source_metadata: Source workflow metadata (for original input_directory)
         method: "auto", "link", "copy", or "force-copy"
     
     Returns:
@@ -624,6 +645,25 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     source_converted = source_dir / "converted_images"
     if source_converted.exists() and any(source_converted.iterdir()):
         image_dirs_to_copy.append(("converted_images", source_converted))
+    
+    # Check for direct input images from original input directory
+    # These are images that needed no conversion (already JPG/PNG)
+    original_input = source_metadata.get("input_directory")
+    if original_input:
+        original_input_path = Path(original_input)
+        if original_input_path.exists():
+            # Find regular images (not HEIC) that were processed directly
+            supported_formats = [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"]
+            input_images = []
+            for fmt in supported_formats:
+                input_images.extend(original_input_path.glob(f"*{fmt}"))
+                input_images.extend(original_input_path.glob(f"*{fmt.upper()}"))
+            
+            # Filter to only direct children (not subdirectories)
+            direct_images = [img for img in input_images if img.parent == original_input_path]
+            
+            if direct_images:
+                image_dirs_to_copy.append(("input_images", original_input_path))
     
     if not image_dirs_to_copy:
         raise ValueError("No images found in source workflow")
@@ -659,19 +699,43 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     for dir_name, source_images in image_dirs_to_copy:
         dest_images = dest_dir / dir_name
         
+        # Get files to process (for input_images, only direct children)
+        if dir_name == "input_images":
+            # Only get direct image files, skip subdirectories
+            supported_formats = [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"]
+            files_to_process = []
+            for item in source_images.iterdir():
+                if item.is_file() and item.suffix.lower() in supported_formats:
+                    files_to_process.append(item)
+        else:
+            # Get all files in the directory
+            files_to_process = [f for f in source_images.iterdir() if f.is_file()]
+        
         if use_method == "symlink":
-            # Create symlink to entire directory
-            dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
-            image_count = len([f for f in source_images.iterdir() if f.is_file()])
-            total_count += image_count
-            print(f"  ✓ Symlinked {dir_name}/ ({image_count} images)")
+            if dir_name == "input_images":
+                # Can't symlink entire directory (may have other files/folders)
+                # Create directory and symlink each image file
+                dest_images.mkdir(parents=True, exist_ok=True)
+                for img in files_to_process:
+                    try:
+                        (dest_images / img.name).symlink_to(img.resolve())
+                        total_count += 1
+                    except Exception as e:
+                        print(f"  ⚠ Symlink failed for {img.name}: {e}")
+                print(f"  ✓ Symlinked {dir_name}/ ({len(files_to_process)} images)")
+            else:
+                # Create symlink to entire directory
+                dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
+                image_count = len(files_to_process)
+                total_count += image_count
+                print(f"  ✓ Symlinked {dir_name}/ ({image_count} images)")
             
         else:
             # Create destination directory
             dest_images.mkdir(parents=True, exist_ok=True)
             
             # Copy or hardlink each file
-            for img in source_images.iterdir():
+            for img in files_to_process:
                 if not img.is_file():
                     continue
                     
@@ -3055,7 +3119,7 @@ Viewing Results:
             # Reuse images
             print("Reusing processed images...")
             link_method = "link" if args.link_images else "force-copy" if args.force_copy else "auto"
-            reuse_method = reuse_images(source_dir, output_dir, method=link_method)
+            reuse_method = reuse_images(source_dir, output_dir, source_metadata, method=link_method)
             print()
             
             # Build redescribe metadata
@@ -3066,6 +3130,7 @@ Viewing Results:
                 "reused_steps": reusable_steps,
                 "images_linked": reuse_method in ["hardlink", "symlink"],
                 "link_method": reuse_method,
+                "original_input_directory": source_metadata.get("input_directory"),
                 "source_metadata": {
                     "original_provider": source_metadata.get("provider"),
                     "original_model": source_metadata.get("model"),
@@ -3092,7 +3157,9 @@ Viewing Results:
             save_workflow_metadata(output_dir, metadata)
             
             # Set up for workflow execution
-            input_dir = output_dir / "converted_images"
+            # The orchestrator will scan all image directories in output_dir
+            # (extracted_frames, converted_images, input_images)
+            input_dir = output_dir
             steps = ["describe", "html"]  # Only run these steps
             
             # Store workflow info for later use
