@@ -98,6 +98,43 @@ idt workflow --from <source_workflow_dir> [options]  # Alternate flag
 
 ### Workflow Directory Structure
 
+**Source Workflow** (what we're reading from):
+```
+wf_2025-11-15_143022_gpt4o_narrative/
+├── workflow_metadata.json          # Contains input_directory path
+├── extracted_frames/               # Video frames (if video step ran)
+│   └── *.jpg
+├── converted_images/               # HEIC→JPG conversions (if convert step ran)
+│   └── *.jpg
+└── descriptions/
+    ├── image_descriptions.txt
+    └── image_descriptions.html
+
+Note: Direct input images (JPG/PNG that needed no conversion) are NOT stored
+in the workflow directory. They remain in the original input_directory specified
+in workflow_metadata.json.
+```
+
+**Redescribed Workflow** (what we're creating):
+```
+wf_2025-11-16_092045_claude-sonnet45_narrative/
+├── workflow_metadata.json          # New metadata with redescribe_operation field
+├── extracted_frames/               # Hardlinked/copied from source
+│   └── *.jpg
+├── converted_images/               # Hardlinked/copied from source
+│   └── *.jpg
+├── input_images/                   # NEW: Direct input images from original_input_directory
+│   └── *.jpg                       # Hardlinked/copied from source metadata's input_directory
+└── descriptions/
+    ├── image_descriptions.txt      # Freshly generated with new AI settings
+    └── image_descriptions.html     # Freshly generated HTML report
+```
+
+**Key Implementation Detail**: The `input_images/` directory is only created during redescribe
+operations. It contains images that were in the original input directory but needed no
+conversion (already JPG/PNG format). The workflow orchestrator scans all three directories
+when executing the describe step.
+
 ```
 wf_vacation_openai_gpt-4o_narrative_20251115_120000/
 ├── workflow_metadata.json        # Indicates redescribe operation
@@ -198,6 +235,33 @@ def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[st
     if converted_images.exists() and any(converted_images.iterdir()):
         reusable.append("convert")
         image_count = len(list(converted_images.glob('*.jpg'))) + \
+                      len(list(converted_images.glob('*.png')))
+        logging.info(f"Found {image_count} converted images")
+    
+    # Check for direct input images (images that needed no conversion)
+    # IMPLEMENTATION NOTE (Nov 16, 2024): This was added after initial release
+    # to handle JPG/PNG files that were processed directly from input directory
+    original_input = source_metadata.get("input_directory")
+    if original_input:
+        original_input_path = Path(original_input)
+        if original_input_path.exists():
+            supported_formats = [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"]
+            input_images = []
+            for fmt in supported_formats:
+                input_images.extend(original_input_path.glob(f"*{fmt}"))
+                input_images.extend(original_input_path.glob(f"*{fmt.upper()}"))
+            
+            # Only count direct children (not subdirectories)
+            direct_images = [img for img in input_images if img.parent == original_input_path]
+            
+            if direct_images:
+                reusable.append("input")
+                logging.info(f"Found {len(direct_images)} direct input images")
+    
+    return reusable
+```
+
+**IMPORTANT**: Direct input images (images already in JPG/PNG format) are not stored in the workflow directory structure during the original workflow. They remain in the original input directory. The redescribe feature accesses them via the `input_directory` field in the source workflow's metadata.
                      len(list(converted_images.glob('*.png')))
         logging.info(f"Found {image_count} converted images")
     
@@ -309,6 +373,7 @@ def run_redescribe_workflow(source_dir: Path, source_metadata: Dict, args):
         "reused_steps": reusable_steps,
         "images_linked": link_method in ["hardlink", "symlink"],
         "link_method": link_method,
+        "original_input_directory": source_metadata.get("input_directory"),  # NEW: For direct input images
         "source_metadata": {
             "original_provider": source_metadata.get("provider"),
             "original_model": source_metadata.get("model"),
