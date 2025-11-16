@@ -256,50 +256,60 @@ def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[st
 def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     """
     Reuse images from source workflow in destination workflow
+    Preserves directory structure (extracted_frames, converted_images, input_images)
     
     Args:
         source_dir: Source workflow directory
         dest_dir: Destination workflow directory  
-        method: "auto", "link", "copy"
+        method: "auto", "link", "copy", or "force-copy"
     
     Returns:
         Method used: "hardlink", "symlink", or "copy"
     """
     
-    source_images = source_dir / "converted_images"
-    dest_images = dest_dir / "converted_images"
+    # Collect all image directories from source workflow
+    image_dirs_to_copy = []
+    
+    if (source_dir / "extracted_frames").exists():
+        image_dirs_to_copy.append(("extracted_frames", source_dir / "extracted_frames"))
+    
+    if (source_dir / "converted_images").exists():
+        image_dirs_to_copy.append(("converted_images", source_dir / "converted_images"))
+    
+    if (source_dir / "input_images").exists():
+        image_dirs_to_copy.append(("input_images", source_dir / "input_images"))
     
     # Determine method
     if method == "auto":
-        # Check if linking is supported on this filesystem
-        if can_create_hardlinks(source_images.parent, dest_images.parent):
-            method = "hardlink"
+        if can_create_hardlinks(source_dir, dest_dir):
+            use_method = "hardlink"
         elif can_create_symlinks():
-            method = "symlink"
+            use_method = "symlink"
         else:
-            method = "copy"
+            use_method = "copy"
+    elif method == "force-copy":
+        use_method = "copy"
+    else:
+        use_method = method
     
-    logging.info(f"Reusing images via {method}")
+    # Process each directory, preserving structure
+    for dir_name, source_images in image_dirs_to_copy:
+        dest_images = dest_dir / dir_name
+        
+        if use_method == "symlink":
+            # Symlink entire directory
+            dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
+        else:
+            # Create directory and hardlink/copy each file
+            dest_images.mkdir(parents=True, exist_ok=True)
+            for img in source_images.iterdir():
+                if img.is_file():
+                    if use_method == "hardlink":
+                        os.link(str(img), str(dest_images / img.name))
+                    else:
+                        shutil.copy2(str(img), str(dest_images / img.name))
     
-    if method == "hardlink":
-        # Create hardlinks (same filesystem, no space duplication)
-        dest_images.mkdir(parents=True, exist_ok=True)
-        for img in source_images.glob("*"):
-            if img.is_file():
-                os.link(str(img), str(dest_images / img.name))
-        return "hardlink"
-    
-    elif method == "symlink":
-        # Create symlink to entire directory (fast, but some tools may not follow)
-        if dest_images.exists():
-            dest_images.rmdir()
-        dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
-        return "symlink"
-    
-    else:  # copy
-        # Fall back to copying (slower, uses disk space)
-        shutil.copytree(source_images, dest_images, dirs_exist_ok=True)
-        return "copy"
+    return use_method
 ```
 
 #### 4. Create New Workflow Directory
