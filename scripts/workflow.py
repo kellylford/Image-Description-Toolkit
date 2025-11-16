@@ -1506,58 +1506,86 @@ class WorkflowOrchestrator:
         # Track unique source images to avoid double-counting HEIC + converted JPG
         converted_dir = self.config.get_step_output_dir("image_conversion")
         frames_dir = self.config.get_step_output_dir("video_extraction")
+        input_images_dir = self.config.base_output_dir / "input_images"
         
-        # Find HEIC files in input directory that will/were converted
-        heic_files_in_input = self.discovery.find_files_by_type(input_dir, "heic")
-        has_conversions = converted_dir.exists() and any(converted_dir.iterdir())
-        
-        # Find regular (non-HEIC) images in input directory
-        all_input_images = self.discovery.find_files_by_type(input_dir, "images")
-        regular_input_images = [img for img in all_input_images if img not in heic_files_in_input]
+        # Check if we're in a workflow directory (redescribe mode)
+        # In this case, input_dir == base_output_dir and we should scan the workflow subdirectories
+        is_workflow_dir = (input_dir == self.config.base_output_dir or 
+                          (converted_dir.exists() or frames_dir.exists() or input_images_dir.exists()))
         
         # Build the list of images to process
         all_image_files = []
         unique_source_count = 0  # Track unique source images
         conversion_count = 0  # Track format conversions
         
-        # Copy regular (non-HEIC) images to workflow input_images/ directory
-        # This makes workflows self-contained and consistent with extracted_frames/converted_images
-        input_images_dir = self.config.base_output_dir / "input_images"
-        if regular_input_images:
-            input_images_dir.mkdir(parents=True, exist_ok=True)
-            self.logger.info(f"Copying {len(regular_input_images)} regular image(s) to workflow directory...")
-            for img in regular_input_images:
-                dest = input_images_dir / img.name
-                shutil.copy2(str(img), str(dest))
-                all_image_files.append(dest)
-            unique_source_count += len(regular_input_images)
-            self.logger.info(f"Copied {len(regular_input_images)} images to: {input_images_dir}")
-        elif input_images_dir.exists() and any(input_images_dir.iterdir()):
-            # If input_images already exists (e.g., from redescribe), use those
-            existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
-            all_image_files.extend(existing_images)
-            unique_source_count += len(existing_images)
-            self.logger.info(f"Found {len(existing_images)} existing image(s) in: {input_images_dir}")
+        if is_workflow_dir:
+            # We're processing a workflow directory (redescribe mode)
+            # Scan the three possible image directories directly
+            self.logger.info("Scanning workflow directory for images...")
+            
+            # Check input_images directory
+            if input_images_dir.exists() and any(input_images_dir.iterdir()):
+                existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
+                all_image_files.extend(existing_images)
+                unique_source_count += len(existing_images)
+                self.logger.info(f"Found {len(existing_images)} image(s) in: {input_images_dir}")
+            
+            # Check converted_images directory
+            if converted_dir.exists() and any(converted_dir.iterdir()):
+                converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+                all_image_files.extend(converted_images)
+                unique_source_count += len(converted_images)
+                conversion_count = len(converted_images)
+                self.logger.info(f"Found {len(converted_images)} converted image(s) in: {converted_dir}")
+            
+            # Check extracted_frames directory
+            if frames_dir.exists() and any(frames_dir.iterdir()):
+                frame_images = self.discovery.find_files_by_type(frames_dir, "images")
+                all_image_files.extend(frame_images)
+                unique_source_count += len(frame_images)
+                self.logger.info(f"Found {len(frame_images)} extracted frame(s) in: {frames_dir}")
         
-        # Add converted images OR HEIC files (not both)
-        if has_conversions:
-            converted_images = self.discovery.find_files_by_type(converted_dir, "images")
-            all_image_files.extend(converted_images)
-            unique_source_count += len(converted_images)
-            conversion_count = len(converted_images)
-            self.logger.info(f"Including {len(converted_images)} converted image(s) from: {converted_dir}")
-        elif heic_files_in_input:
-            # If conversion hasn't run yet, include HEIC files directly
-            all_image_files.extend(heic_files_in_input)
-            unique_source_count += len(heic_files_in_input)
-            self.logger.info(f"Found {len(heic_files_in_input)} HEIC image(s) in input directory (not yet converted)")
-        
-        # Add extracted frames from videos
-        if frames_dir.exists() and any(frames_dir.iterdir()):
-            frame_images = self.discovery.find_files_by_type(frames_dir, "images")
-            all_image_files.extend(frame_images)
-            unique_source_count += len(frame_images)
-            self.logger.info(f"Including {len(frame_images)} extracted frame(s) from: {frames_dir}")
+        else:
+            # Normal mode: process original input directory
+            # Find HEIC files in input directory that will/were converted
+            heic_files_in_input = self.discovery.find_files_by_type(input_dir, "heic")
+            has_conversions = converted_dir.exists() and any(converted_dir.iterdir())
+            
+            # Find regular (non-HEIC) images in input directory
+            all_input_images = self.discovery.find_files_by_type(input_dir, "images")
+            regular_input_images = [img for img in all_input_images if img not in heic_files_in_input]
+            
+            # Copy regular (non-HEIC) images to workflow input_images/ directory
+            # This makes workflows self-contained and consistent with extracted_frames/converted_images
+            if regular_input_images:
+                input_images_dir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"Copying {len(regular_input_images)} regular image(s) to workflow directory...")
+                for img in regular_input_images:
+                    dest = input_images_dir / img.name
+                    shutil.copy2(str(img), str(dest))
+                    all_image_files.append(dest)
+                unique_source_count += len(regular_input_images)
+                self.logger.info(f"Copied {len(regular_input_images)} images to: {input_images_dir}")
+            
+            # Add converted images OR HEIC files (not both)
+            if has_conversions:
+                converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+                all_image_files.extend(converted_images)
+                unique_source_count += len(converted_images)
+                conversion_count = len(converted_images)
+                self.logger.info(f"Including {len(converted_images)} converted image(s) from: {converted_dir}")
+            elif heic_files_in_input:
+                # If conversion hasn't run yet, include HEIC files directly
+                all_image_files.extend(heic_files_in_input)
+                unique_source_count += len(heic_files_in_input)
+                self.logger.info(f"Found {len(heic_files_in_input)} HEIC image(s) in input directory (not yet converted)")
+            
+            # Add extracted frames from videos
+            if frames_dir.exists() and any(frames_dir.iterdir()):
+                frame_images = self.discovery.find_files_by_type(frames_dir, "images")
+                all_image_files.extend(frame_images)
+                unique_source_count += len(frame_images)
+                self.logger.info(f"Including {len(frame_images)} extracted frame(s) from: {frames_dir}")
         
         if not all_image_files:
             self.logger.info("No image files found to describe")
