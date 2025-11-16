@@ -611,26 +611,33 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     Returns:
         Method used: "hardlink", "symlink", or "copy"
     """
-    # Determine which directory has the images
-    source_converted = source_dir / "converted_images"
-    source_extracted = source_dir / "extracted_frames"
+    # Collect all available image sources (in priority order)
+    source_dirs = []
     
-    # Prefer converted_images, fall back to extracted_frames
+    # 1. Converted images (highest priority - already processed)
+    source_converted = source_dir / "converted_images"
     if source_converted.exists() and any(source_converted.iterdir()):
-        source_images = source_converted
-        dest_images = dest_dir / "converted_images"
-    elif source_extracted.exists() and any(source_extracted.iterdir()):
-        source_images = source_extracted
-        dest_images = dest_dir / "converted_images"  # Still use converted_images for consistency
-    else:
+        source_dirs.append(source_converted)
+    
+    # 2. Extracted video frames (if no converted images)
+    source_extracted = source_dir / "extracted_frames"
+    if source_extracted.exists() and any(source_extracted.iterdir()):
+        source_dirs.append(source_extracted)
+    
+    if not source_dirs:
         raise ValueError("No images found in source workflow")
     
-    # Determine method
+    # Destination directory for all images
+    dest_images = dest_dir / "converted_images"
+    dest_images.mkdir(parents=True, exist_ok=True)
+    
+    # Determine method (check using first source directory as reference)
+    first_source = source_dirs[0]
     if method == "force-copy" or method == "copy":
         use_method = "copy"
     elif method == "link":
         # User requested linking - try hardlink first, then symlink
-        if can_create_hardlinks(source_images.parent, dest_images.parent):
+        if can_create_hardlinks(first_source.parent, dest_images.parent):
             use_method = "hardlink"
         elif can_create_symlinks():
             use_method = "symlink"
@@ -639,7 +646,7 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
             use_method = "copy"
     else:  # auto
         # Auto-detect best method
-        if can_create_hardlinks(source_images.parent, dest_images.parent):
+        if can_create_hardlinks(first_source.parent, dest_images.parent):
             use_method = "hardlink"
         elif can_create_symlinks():
             use_method = "symlink"
@@ -648,45 +655,51 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     
     print(f"  → Reusing images via {use_method}")
     
-    dest_images.mkdir(parents=True, exist_ok=True)
-    
-    if use_method == "hardlink":
-        # Create hardlinks (same filesystem, no space duplication)
-        count = 0
-        for img in source_images.iterdir():
-            if img.is_file():
-                try:
-                    os.link(str(img), str(dest_images / img.name))
-                    count += 1
-                except Exception as e:
-                    # If hardlink fails, fall back to copy
-                    print(f"  ⚠ Hardlink failed for {img.name}, copying instead: {e}")
-                    shutil.copy2(str(img), str(dest_images / img.name))
-                    count += 1
-        print(f"  ✓ Created {count} hardlinks (0 MB disk space used)")
-        return "hardlink"
-    
-    elif use_method == "symlink":
-        # Create symlink to entire directory
+    # For symlinks with single source, create directory symlink
+    if use_method == "symlink" and len(source_dirs) == 1:
         # Remove the empty directory we just created
         dest_images.rmdir()
-        dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
-        image_count = len(list(source_images.iterdir()))
+        dest_images.symlink_to(first_source.resolve(), target_is_directory=True)
+        image_count = len([f for f in first_source.iterdir() if f.is_file()])
         print(f"  ✓ Created directory symlink to {image_count} images (0 MB disk space used)")
         return "symlink"
     
-    else:  # copy
-        # Copy files
-        count = 0
-        total_size = 0
+    # For hardlinks or copy, or multiple sources, process files
+    total_count = 0
+    total_size = 0
+    
+    for source_images in source_dirs:
         for img in source_images.iterdir():
-            if img.is_file():
-                shutil.copy2(str(img), str(dest_images / img.name))
-                count += 1
+            if not img.is_file():
+                continue
+                
+            dest_file = dest_images / img.name
+            
+            # Skip if already exists (from previous source)
+            if dest_file.exists():
+                continue
+            
+            if use_method == "hardlink":
+                try:
+                    os.link(str(img), str(dest_file))
+                    total_count += 1
+                except Exception as e:
+                    # If hardlink fails, fall back to copy
+                    print(f"  ⚠ Hardlink failed for {img.name}, copying instead: {e}")
+                    shutil.copy2(str(img), str(dest_file))
+                    total_count += 1
+                    total_size += img.stat().st_size
+            else:  # copy or symlink with multiple sources
+                shutil.copy2(str(img), str(dest_file))
+                total_count += 1
                 total_size += img.stat().st_size
-        
+    
+    if use_method == "hardlink":
+        print(f"  ✓ Created {total_count} hardlinks (0 MB disk space used)")
+        return "hardlink"
+    else:
         size_mb = total_size / (1024 * 1024)
-        print(f"  ✓ Copied {count} images ({size_mb:.1f} MB disk space used)")
+        print(f"  ✓ Copied {total_count} images ({size_mb:.1f} MB disk space used)")
         return "copy"
 
 
