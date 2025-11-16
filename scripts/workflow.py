@@ -3003,16 +3003,29 @@ Viewing Results:
                 prompt_style = "narrative"
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Override with state from logs
+        # Override with state from logs if available, otherwise keep metadata values
         if workflow_state["model"]:
             args.model = workflow_state["model"]
             model_name = workflow_state["model"]
+        elif not args.model:
+            # Use metadata value if no command-line override
+            args.model = model_name
+            
         if workflow_state["prompt_style"]:
             args.prompt_style = workflow_state["prompt_style"]
             prompt_style = workflow_state["prompt_style"]
+        elif not args.prompt_style:
+            # Use metadata value if no command-line override
+            args.prompt_style = prompt_style
+            
         if workflow_state["provider"]:
             args.provider = workflow_state["provider"]
             provider_name = workflow_state["provider"]
+        else:
+            # CRITICAL: Use metadata provider if log parsing failed
+            # Without this, args.provider defaults to "ollama" from argument parser
+            args.provider = provider_name
+            
         if workflow_state["config"]:
             # Old workflow_state used single "config" - map to image_describer_config for backward compatibility
             args.config_image_describer = workflow_state["config"]
