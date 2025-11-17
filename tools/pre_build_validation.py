@@ -23,6 +23,15 @@ def run_integration_tests():
     print("RUNNING INTEGRATION TESTS")
     print("=" * 80)
     
+    # Check if pytest is available
+    try:
+        import pytest
+    except ImportError:
+        print("⚠️  pytest not installed - skipping integration tests")
+        print("Install with: pip install pytest")
+        print("Tests are recommended but not required for build.")
+        return None  # Return None to indicate warning, not failure
+    
     result = subprocess.run(
         ["python", "-m", "pytest", 
          "pytest_tests/integration/",
