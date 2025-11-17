@@ -1525,10 +1525,10 @@ class WorkflowOrchestrator:
         frames_dir = self.config.get_step_output_dir("video_extraction")
         input_images_dir = self.config.base_output_dir / "input_images"
         
-        # Check if we're in a workflow directory (redescribe mode)
-        # In this case, input_dir == base_output_dir and we should scan the workflow subdirectories
-        is_workflow_dir = (input_dir == self.config.base_output_dir or 
-                          (converted_dir.exists() or frames_dir.exists() or input_images_dir.exists()))
+        # Check if we're in a workflow directory (redescribe/resume mode)
+        # In this case, input_dir == base_output_dir (user pointed at workflow dir, not source)
+        # We should scan the workflow subdirectories instead of the input directory
+        is_workflow_dir = (input_dir == self.config.base_output_dir)
         
         # Build the list of images to process
         all_image_files = []
