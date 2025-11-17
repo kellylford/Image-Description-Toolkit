@@ -239,10 +239,13 @@ class FileDiscovery:
         search_pattern = "**/*" if recursive else "*"
         
         for pattern in patterns:
-            if recursive:
-                files.extend(directory.rglob(f"*{pattern}"))
-            else:
-                files.extend(directory.glob(f"*{pattern}"))
+            # Search for both lowercase and uppercase extensions
+            # Windows filesystems can be case-sensitive in some contexts (e.g., WSL, network shares)
+            for ext_variant in [pattern, pattern.upper()]:
+                if recursive:
+                    files.extend(directory.rglob(f"*{ext_variant}"))
+                else:
+                    files.extend(directory.glob(f"*{ext_variant}"))
         
         # Sort and remove duplicates
         return sorted(list(set(files)))
