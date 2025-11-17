@@ -907,19 +907,26 @@ class ONNXProvider(AIProvider):
             raise RuntimeError(f"Failed to load Florence-2 model: {str(e)}")
     
     def _get_task_for_prompt(self, prompt: str) -> str:
-        """Convert prompt style to Florence-2 task type"""
-        # Extract prompt style from the prompt text if it contains keywords
+        """Convert prompt style to Florence-2 task type
+        
+        Florence-2 only supports 3 task types regardless of custom prompts:
+        - simple/brief → <CAPTION>
+        - technical → <DETAILED_CAPTION>  
+        - narrative/detailed → <MORE_DETAILED_CAPTION>
+        """
+        # Extract prompt style from the prompt text by keyword matching
         prompt_lower = prompt.lower()
         
-        # Check for explicit task types first
-        if "simple" in prompt_lower or "brief" in prompt_lower:
-            return self.TASK_CAPTION
-        elif "detailed" in prompt_lower or "comprehensive" in prompt_lower:
-            return self.TASK_MORE_DETAILED
-        elif "technical" in prompt_lower:
+        # Check for explicit task keywords in the prompt
+        # Order matters: check specific keywords before general ones
+        if "technical" in prompt_lower:
             return self.TASK_DETAILED
+        elif "simple" in prompt_lower or "brief" in prompt_lower or "concise" in prompt_lower:
+            return self.TASK_CAPTION
+        elif "detailed" in prompt_lower or "comprehensive" in prompt_lower or "narrative" in prompt_lower:
+            return self.TASK_MORE_DETAILED
         
-        # Default to detailed/narrative description
+        # Default to most detailed description
         return self.TASK_MORE_DETAILED
     
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
