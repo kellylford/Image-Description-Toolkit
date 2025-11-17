@@ -1530,6 +1530,23 @@ class WorkflowOrchestrator:
         # We should scan the workflow subdirectories instead of the input directory
         is_workflow_dir = (input_dir == self.config.base_output_dir)
         
+        # CRITICAL ASSERTION: Prevent regression of bug where normal workflows skip files
+        # Bug history: is_workflow_dir was checking .exists() on converted_dir/frames_dir
+        # This caused normal workflows to incorrectly trigger workflow mode after those steps ran
+        if is_workflow_dir:
+            # Double-check this is actually a workflow directory
+            # It should have at least one of the workflow subdirectories OR be explicitly redescribe
+            has_workflow_structure = (
+                (converted_dir.exists() and any(converted_dir.iterdir())) or
+                (frames_dir.exists() and any(frames_dir.iterdir())) or
+                (input_images_dir.exists() and any(input_images_dir.iterdir()))
+            )
+            if not has_workflow_structure:
+                self.logger.warning(
+                    f"is_workflow_dir=True but no workflow structure found in {input_dir}. "
+                    f"This may indicate a logic error - proceeding with caution."
+                )
+        
         # Build the list of images to process
         all_image_files = []
         unique_source_count = 0  # Track unique source images

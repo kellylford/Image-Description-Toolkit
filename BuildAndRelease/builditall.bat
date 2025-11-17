@@ -27,8 +27,54 @@ echo BUILD ALL APPLICATIONS
 echo ========================================================================
 echo.
 
-REM Change to project root directory
+REM ============================================================================
+REM CLEAN BUILD CACHE
+REM ============================================================================
+REM Change to project root directory FIRST
 cd /d "%~dp0.."
+
+echo Cleaning PyInstaller cache to ensure fresh build...
+python -c "import shutil; from pathlib import Path; cache_dir = Path.home() / 'AppData' / 'Local' / 'pyinstaller'; shutil.rmtree(cache_dir, ignore_errors=True); print(f'Cleaned: {cache_dir}')"
+
+echo Cleaning build and dist directories...
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
+echo Build cache cleaned successfully.
+echo.
+
+REM ============================================================================
+REM PRE-BUILD VALIDATION
+REM ============================================================================
+echo Running pre-build validation checks...
+echo This catches integration bugs before building (saves time later)
+echo.
+
+python tools\pre_build_validation.py
+if errorlevel 1 (
+    echo.
+    echo ========================================================================
+    echo BUILD ABORTED - VALIDATION FAILED
+    echo ========================================================================
+    echo Fix the issues above before building.
+    echo These bugs would only appear at runtime, wasting user testing time.
+    echo.
+    pause
+    exit /b 1
+)
+
+if errorlevel 2 (
+    echo.
+    echo ========================================================================
+    echo WARNINGS DETECTED - Review before release
+    echo ========================================================================
+    echo Build will continue, but consider fixing warnings.
+    echo.
+    timeout /t 5
+)
+
+echo.
+echo Validation passed - proceeding with build...
+echo.
 
 REM Show composed build version and commit before starting
 echo --- Build Version Banner (pre-build) ---

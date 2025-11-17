@@ -1,0 +1,64 @@
+
+========================================================================
+Building Image Description Toolkit Executable
+========================================================================
+
+Using virtual environment Python: .venv
+
+[1/4] Cleaning previous builds...
+    Done.
+
+[2/4] Building executable with PyInstaller...
+    This may take 5-10 minutes...
+
+172 INFO: PyInstaller: 6.16.0, contrib hooks: 2025.9
+172 INFO: Python: 3.13.9
+197 INFO: Platform: Windows-11-10.0.26220-SP0
+198 INFO: Python environment: C:\Users\kelly\GitHub\Image-Description-Toolkit\.venv
+201 INFO: Removing temporary files and cleaning cache in C:\Users\kelly\AppData\Local\pyinstaller
+1200 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\\python313.zip',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\\DLLs',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\\Lib',
+ 'C:\\Program '
+ 'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0',
+ 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv',
+ 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\win32',
+ 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\Pythonwin',
+ 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\setuptools\\_vendor',
+ 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit',
+ 'C:\\Users\\kelly\\GitHub',
+ 'C:\\Users\\kelly\\GitHub\\scripts']
+1653 INFO: Appending 'datas' from .spec
+1655 INFO: checking Analysis
+1655 INFO: Building Analysis because Analysis-00.toc is non existent
+1655 INFO: Looking for Python shared library...
+1655 INFO: Using Python shared library: C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\python313.dll
+1655 INFO: Running Analysis Analysis-00.toc
+1655 INFO: Target bytecode optimization level: 0
+1655 INFO: Initializing module dependency graph...
+1656 INFO: Initializing module graph hook caches...
+1667 INFO: Analyzing modules for base_library.zip ...
+3213 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4903 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5785 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+6151 INFO: Caching module dependency graph...
+6184 INFO: Analyzing C:\Users\kelly\GitHub\Image-Description-Toolkit\idt_cli.py
+6229 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+6266 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+6296 INFO: Analyzing hidden import 'scripts'
+6297 INFO: Analyzing hidden import 'scripts.workflow'
+6504 INFO: Processing standard module hook 'hook-psutil.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6575 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6749 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+6750 INFO: SetuptoolsInfo: initializing cached setuptools info...
+10132 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10211 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+Aborted by user request.
+Terminate batch job (Y/N)? Terminate batch job (Y/N)? 
