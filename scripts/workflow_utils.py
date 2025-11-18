@@ -241,6 +241,7 @@ class FileDiscovery:
         for pattern in patterns:
             # Search for both lowercase and uppercase extensions
             # Windows filesystems can be case-sensitive in some contexts (e.g., WSL, network shares)
+            # DEBUG: This will prove if new code is being used (BUILD ID: 2025-11-17-2110)
             for ext_variant in [pattern, pattern.upper()]:
                 if recursive:
                     files.extend(directory.rglob(f"*{ext_variant}"))

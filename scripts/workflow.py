@@ -1528,7 +1528,11 @@ class WorkflowOrchestrator:
         # Check if we're in a workflow directory (redescribe/resume mode)
         # In this case, input_dir == base_output_dir (user pointed at workflow dir, not source)
         # We should scan the workflow subdirectories instead of the input directory
-        is_workflow_dir = (input_dir == self.config.base_output_dir)
+        # Resolve both paths to absolute for comparison
+        resolved_input = Path(input_dir).resolve()
+        resolved_base = Path(self.config.base_output_dir).resolve()
+        is_workflow_dir = (resolved_input == resolved_base)
+        self.logger.debug(f"Workflow mode check: input_dir={resolved_input}, base_output_dir={resolved_base}, is_workflow_dir={is_workflow_dir}")
         
         # CRITICAL ASSERTION: Prevent regression of bug where normal workflows skip files
         # Bug history: is_workflow_dir was checking .exists() on converted_dir/frames_dir
@@ -1586,8 +1590,16 @@ class WorkflowOrchestrator:
             has_conversions = converted_dir.exists() and any(converted_dir.iterdir())
             
             # Find regular (non-HEIC) images in input directory
-            all_input_images = self.discovery.find_files_by_type(input_dir, "images")
-            regular_input_images = [img for img in all_input_images if img not in heic_files_in_input]
+            # CRITICAL: Don't scan workflow subdirectories (converted_images, extracted_frames, input_images)
+            # This prevents duplication when input_dir mistakenly points to a workflow subdirectory
+            workflow_subdirs = {converted_dir, frames_dir, input_images_dir}
+            if input_dir in workflow_subdirs or any(input_dir.is_relative_to(d) for d in workflow_subdirs if d.exists()):
+                self.logger.warning(f"Input directory {input_dir} is a workflow subdirectory - skipping regular image scan to prevent duplication")
+                all_input_images = []
+                regular_input_images = []
+            else:
+                all_input_images = self.discovery.find_files_by_type(input_dir, "images")
+                regular_input_images = [img for img in all_input_images if img not in heic_files_in_input]
             
             # Copy regular (non-HEIC) images to workflow input_images/ directory
             # This makes workflows self-contained and consistent with extracted_frames/converted_images
@@ -2226,8 +2238,9 @@ class WorkflowOrchestrator:
                         desc_file = self.step_results["describe"]["description_file"]
                     step_result = step_method(current_input_dir, step_output_dir, desc_file)
                 elif step == "describe":
-                    # Description step should look at current input directory (after download/convert)
-                    step_result = step_method(current_input_dir, step_output_dir)
+                    # Description step needs ORIGINAL input_dir to detect workflow mode correctly
+                    # and find regular images that haven't been processed yet
+                    step_result = step_method(input_dir, step_output_dir)
                 elif step == "convert":
                     # Convert step should always work on original input directory
                     step_result = step_method(input_dir, step_output_dir)
@@ -2249,7 +2262,9 @@ class WorkflowOrchestrator:
                     self._update_status_log()
                     
                     # Update input directory for next step if this step produced outputs
-                    if step in ["download", "video", "convert"] and step_result.get("output_dir"):
+                    # NOTE: Don't update for 'convert' step - describe needs original input_dir
+                    # to properly detect workflow mode and avoid scanning converted_images as source
+                    if step in ["download", "video"] and step_result.get("output_dir"):
                         current_input_dir = Path(step_result["output_dir"])
                 else:
                     self.statistics['steps_failed'].append(step)
