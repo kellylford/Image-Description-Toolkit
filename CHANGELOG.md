@@ -1,3 +1,116 @@
+## [4.0.0] - 2025-11-18
+
+### Ì∫Ä Major Features
+
+**ONNX Provider with Florence-2 Models**
+- **CPU-only AI vision models**: Microsoft Florence-2-base and Florence-2-large models
+- **No GPU required**: Production-ready ONNX Runtime execution on any CPU
+- **Three prompt styles**: Simple (8 words), Technical (40+ words), Narrative (70+ words)
+- **Comprehensive documentation**: See [ONNX_PROVIDER_GUIDE.md](docs/ONNX_PROVIDER_GUIDE.md)
+- **Performance benchmarking**: 8.63s to 145.16s per image depending on model/prompt
+- **Production tested**: Validated on 1000+ image workflows
+
+**Redescribe Feature - Workflow Reuse**
+- **Re-describe with different AI**: Test multiple models/prompts on identical images
+- **Efficient image reuse**: Hardlinks, symlinks, or copy - reuses extracted frames and converted images
+- **Model comparison**: Compare Ollama, OpenAI, Claude, and ONNX outputs side-by-side
+- **Workflow metadata**: Tracks original settings and changes for traceability
+- **Design documentation**: [redescribe-feature-design.md](docs/WorkTracking/redescribe-feature-design.md)
+- **Example**: `idt workflow --redescribe wf_photos_ollama_llava --provider onnx --model Florence-2-base`
+
+### Ì∞õ Critical Bug Fixes
+
+**File Discovery**
+- **Fixed uppercase extension handling**: Now correctly finds .PNG, .HEIC, .MOV files (not just lowercase)
+- **Impact**: Workflows were missing images with uppercase extensions
+- **Root cause**: Windows filesystems can be case-sensitive in some contexts (WSL, network shares)
+
+**Workflow Duplication Prevention**
+- **Fixed massive duplication bug**: Workflows were creating 2817 descriptions instead of 1793 (1.6x duplication)
+- **Root cause**: Describe step was scanning converted_images/ as a source directory
+- **Solution**: Added safety check to skip workflow subdirectories, corrected input directory handling
+
+**Path Resolution**
+- **Fixed redescribe WinError 32**: Resolved path comparison failure with relative vs absolute paths
+- **Impact**: Redescribe mode failed with "file in use" error
+- **Solution**: Use Path().resolve() for absolute path comparison before workflow mode detection
+
+### Ìª†Ô∏è Build & Quality Improvements
+
+**Build System**
+- **PyInstaller cache cleaning**: All build scripts now clean cache to prevent stale code issues
+- **Pre-build validation**: New tools/pre_build_validation.py validates code before building
+- **Build reliability**: Significantly reduced "works in dev but not in executable" issues
+
+**Testing**
+- **Integration tests**: New test_workflow_file_types.py validates video/image/HEIC handling
+- **Unit tests**: New test_workflow_redescribe.py (348 lines) for redescribe feature
+- **Total new test coverage**: 529 lines across 3 new test files
+
+**Code Quality**
+- **Pre-commit hook**: tools/pre-commit-hook.sh for validation before commits
+- **UTF-8 enforcement**: Consistent encoding across all build and validation scripts
+- **Better error messages**: Enhanced logging throughout workflow orchestration
+
+### Ì≥ö Documentation
+
+**New Documentation**
+- **ONNX Provider Guide**: 213-line comprehensive guide with examples and benchmarks
+- **Redescribe Design Doc**: 626-line design document with implementation details
+- **Florence-2 Analysis**: Performance and quality comparison across 6 model configurations
+- **DirectML Experiments**: GPU acceleration research and findings
+
+### Ì¥ß Other Improvements
+
+**Workflow Enhancements**
+- **Preserve frame subdirectories**: Video frame extraction maintains original structure
+- **Enhanced metadata**: Save original (unsanitized) model names in workflow metadata
+- **Resume improvements**: Better provider detection when resuming interrupted workflows
+- **Guided workflow**: Enhanced Florence-2 model support in interactive mode
+
+**Configuration**
+- **Better config loading**: More robust path resolution for PyInstaller executables
+- **Command logging**: --provider logged in original command for accurate resume
+
+### Ì≥¶ Dependencies
+
+**New Dependencies**
+- `optimum[onnxruntime]>=1.23.3` - ONNX model optimization
+- `onnxruntime>=1.20.1` - ONNX Runtime for model execution
+- `transformers>=4.47.1` - Hugging Face transformers for Florence-2
+- `torch>=2.5.1` - PyTorch backend for model loading
+- Plus 8 additional supporting packages
+
+**Note**: Total installation size increases by ~2-3 GB with PyTorch and ONNX Runtime
+
+### ‚ö†Ô∏è Breaking Changes
+
+None - all changes are backward compatible
+
+### ÌæØ Performance
+
+**Florence-2 Benchmarks** (per image, 5 test images):
+- Florence-2-base + Simple: 8.63s (fastest)
+- Florence-2-base + Technical: 26.09s (balanced)
+- Florence-2-base + Narrative: 73.59s
+- Florence-2-large + Simple: 23.81s
+- Florence-2-large + Technical: 56.44s
+- Florence-2-large + Narrative: 145.16s (highest quality)
+- Moondream + Narrative: 17.29s (best quality-per-second)
+
+**Key Finding**: Prompt complexity has 6-8x more impact on speed than model size (2-3x)
+
+### Ìπè Testing Credits
+
+Extensive testing and bug discovery by Kelly Ford across:
+- 6 Florence-2 model configurations
+- Case-insensitive file handling validation
+- Large-scale duplication detection (1793 image workflow)
+- Redescribe feature validation
+- Cross-model quality comparison
+
+---
+
 # Changelog
 
 All notable changes to the Image Description Toolkit will be documented in this file.
