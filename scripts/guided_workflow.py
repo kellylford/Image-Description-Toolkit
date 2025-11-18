@@ -376,7 +376,7 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude"]
+    providers = ["ollama", "openai", "claude", "onnx"]
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
     if provider == 'EXIT':
@@ -460,8 +460,44 @@ def guided_workflow(custom_config_path=None):
         # Extract just the model name (before the space/parenthesis)
         model = model_choice.split()[0]
     
+    elif provider == 'onnx':
+        # Check if ONNX provider is available
+        try:
+            sys.path.insert(0, str(Path(__file__).parent.parent))
+            from imagedescriber.ai_providers import ONNXProvider
+            onnx_provider = ONNXProvider()
+            
+            if not onnx_provider.is_available():
+                print("\n⚠️  Florence-2 dependencies not installed.")
+                print("Install with: pip install transformers torch torchvision einops timm")
+                print("\nReturning to provider selection...\n")
+                return guided_workflow()
+            
+            available_models = onnx_provider.get_available_models()
+            
+            onnx_models = [
+                "microsoft/Florence-2-base (230MB, faster, recommended)",
+                "microsoft/Florence-2-large (700MB, slower, better quality)"
+            ]
+            print("Available ONNX models (Florence-2):")
+            model_choice = get_choice("Select a model", onnx_models, default=1, allow_back=True)
+            if model_choice == 'EXIT':
+                print("Exiting...")
+                return
+            if model_choice == 'BACK':
+                # Go back to provider selection - restart function
+                return guided_workflow()
+            # Extract just the model name (before the space/parenthesis)
+            model = model_choice.split()[0]
+            
+        except ImportError as e:
+            print(f"\n⚠️  Error loading ONNX provider: {e}")
+            print("Make sure dependencies are installed: pip install transformers torch torchvision einops timm")
+            print("\nReturning to provider selection...\n")
+            return guided_workflow()
+    
     # Step 3/4: Image Directory (step number depends on whether API key was needed)
-    dir_step = "Step 3" if provider == 'ollama' else "Step 4"
+    dir_step = "Step 3" if provider in ['ollama', 'onnx'] else "Step 4"
     print_header(f"{dir_step}: Image Directory")
     
     while True:
@@ -480,44 +516,77 @@ def guided_workflow(custom_config_path=None):
                 return guided_workflow()
     
     # Step 4/5: Workflow Name (Optional)
-    name_step = "Step 4" if provider == 'ollama' else "Step 5"
+    name_step = "Step 4" if provider in ['ollama', 'onnx'] else "Step 5"
     print_header(f"{name_step}: Workflow Name (Optional)")
     print("You can provide a custom name for this workflow run.")
     print("If you skip this, a name will be auto-generated from the input directory.")
     workflow_name = get_input("Enter workflow name", allow_empty=True)
     
     # Step 5/6: Prompt Style (Optional)
-    style_step = "Step 5" if provider == 'ollama' else "Step 6"
+    style_step = "Step 5" if provider in ['ollama', 'onnx'] else "Step 6"
     print_header(f"{style_step}: Prompt Style (Optional)")
     
-    # Get available prompt styles from config (using custom config if provided)
-    available_styles, default_style = get_available_prompt_styles(config_path_for_workflow)
+    # Check if using Florence-2 model (ONNX provider)
+    is_florence = provider == 'onnx' and model and 'florence' in model.lower()
     
-    print(f"Select a prompt style, or press Enter to use the default ({default_style}).")
-    
-    # Build options with descriptions
-    style_options = []
-    for style in available_styles:
-        if style == default_style:
-            style_options.append(f"{style} (default)")
+    if is_florence:
+        # Florence-2 has specific task types, not custom prompts
+        print("Florence-2 models use specific task types for description detail level:")
+        print("  • simple    - Brief caption (<CAPTION>)")
+        print("  • technical - Detailed caption (<DETAILED_CAPTION>)")  
+        print("  • narrative - Most detailed caption (<MORE_DETAILED_CAPTION>, default)")
+        print()
+        
+        florence_styles = [
+            "narrative (most detailed, default)",
+            "technical (detailed)",
+            "simple (brief)",
+            "Skip (use default: narrative)"
+        ]
+        
+        style_choice = get_choice("Select Florence-2 task type", florence_styles, allow_back=True)
+        
+        if style_choice == 'EXIT':
+            print("Exiting...")
+            return
+        if style_choice == 'BACK':
+            return guided_workflow()
+        
+        # Extract just the style name
+        if style_choice.startswith("Skip"):
+            prompt_style = None
         else:
-            style_options.append(style)
-    style_options.append("Skip (use default)")
-    
-    style_choice = get_choice("Select prompt style", style_options, allow_back=True)
-    
-    if style_choice == 'EXIT':
-        print("Exiting...")
-        return
-    if style_choice == 'BACK':
-        return guided_workflow()
-    
-    # Extract just the style name
-    if style_choice.startswith("Skip"):
-        prompt_style = None
+            prompt_style = style_choice.split()[0]  # Get first word (simple/technical/narrative)
     else:
-        # Remove " (default)" suffix if present
-        prompt_style = style_choice.replace(" (default)", "").strip()
+        # Regular prompt styles for other providers
+        # Get available prompt styles from config (using custom config if provided)
+        available_styles, default_style = get_available_prompt_styles(config_path_for_workflow)
+        
+        print(f"Select a prompt style, or press Enter to use the default ({default_style}).")
+        
+        # Build options with descriptions
+        style_options = []
+        for style in available_styles:
+            if style == default_style:
+                style_options.append(f"{style} (default)")
+            else:
+                style_options.append(style)
+        style_options.append("Skip (use default)")
+        
+        style_choice = get_choice("Select prompt style", style_options, allow_back=True)
+        
+        if style_choice == 'EXIT':
+            print("Exiting...")
+            return
+        if style_choice == 'BACK':
+            return guided_workflow()
+        
+        # Extract just the style name
+        if style_choice.startswith("Skip"):
+            prompt_style = None
+        else:
+            # Remove " (default)" suffix if present
+            prompt_style = style_choice.replace(" (default)", "").strip()
     
     # Step for metadata configuration
     metadata_step = "Step 6" if provider == 'ollama' else "Step 7"
@@ -583,6 +652,17 @@ def guided_workflow(custom_config_path=None):
     
     # Build the command
     print_header("Command Summary")
+    
+    # Show Florence-2 specific info if applicable
+    if is_florence and prompt_style:
+        task_map = {
+            "simple": "<CAPTION>",
+            "technical": "<DETAILED_CAPTION>",
+            "narrative": "<MORE_DETAILED_CAPTION>"
+        }
+        task_type = task_map.get(prompt_style, "<MORE_DETAILED_CAPTION>")
+        print(f"Florence-2 will use task type: {task_type}")
+        print()
     
     cmd_parts = ["idt", "workflow", img_dir]
     cmd_parts.extend(["--provider", provider])

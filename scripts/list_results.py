@@ -102,10 +102,10 @@ def parse_directory_name(dir_name: str) -> dict:
         
         # Second to last is model (may be multiple parts)
         if len(before_timestamp) >= 2:
-            # Find where provider ends (ollama, openai, claude)
+            # Find where provider ends (ollama, openai, claude, onnx)
             provider_idx = -1
             for i, part in enumerate(before_timestamp):
-                if part.lower() in ['ollama', 'openai', 'claude']:
+                if part.lower() in ['ollama', 'openai', 'claude', 'onnx']:
                     provider_idx = i
                     metadata['provider'] = part
                     break

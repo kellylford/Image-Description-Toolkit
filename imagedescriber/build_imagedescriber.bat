@@ -4,6 +4,11 @@ echo Building ImageDescriber GUI Application
 echo ========================================================================
 echo.
 
+REM Clean PyInstaller cache for fresh build
+echo Cleaning PyInstaller cache...
+python -c "import shutil; from pathlib import Path; cache_dir = Path.home() / 'AppData' / 'Local' / 'pyinstaller'; shutil.rmtree(cache_dir, ignore_errors=True); print(f'Cleaned: {cache_dir}')"
+echo.
+
 REM Check if PyInstaller is installed
 python -c "import PyInstaller" 2>nul
 if errorlevel 1 (

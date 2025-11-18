@@ -53,6 +53,9 @@ if not exist "BuildAndRelease\final_working.spec" (
 )
 
 echo [1/4] Cleaning previous builds...
+echo     Cleaning PyInstaller cache...
+"%PYTHON_EXE%" -c "import shutil; from pathlib import Path; cache_dir = Path.home() / 'AppData' / 'Local' / 'pyinstaller'; shutil.rmtree(cache_dir, ignore_errors=True); print(f'    Cleaned: {cache_dir}')"
+echo     Cleaning build and dist directories...
 REM Preserve BUILD_TRACKER.json before cleaning
 if exist "build\BUILD_TRACKER.json" (
     copy /Y "build\BUILD_TRACKER.json" "BUILD_TRACKER.json.tmp" >nul 2>&1
