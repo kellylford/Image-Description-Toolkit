@@ -24,7 +24,7 @@ def run_command(cmd, description):
             text=True,
             encoding='utf-8',
             errors='replace',  # Replace invalid characters instead of crashing
-            timeout=10
+            timeout=60  # Increased for torch/transformers import (can take 30-40s first time)
         )
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.TimeoutExpired:

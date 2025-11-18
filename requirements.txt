@@ -36,6 +36,18 @@ PyQt6>=6.4.0                                # GUI framework
 pywin32>=306; sys_platform == "win32"       # Windows system integration
 
 # ----------------------------------------------------------------------------
+# ONNX/FLORENCE-2 SUPPORT (Local vision models)
+# ----------------------------------------------------------------------------
+# Florence-2 provides lightweight local image description without requiring Ollama
+# Note: NPU acceleration not available on ARM64 Windows (CPU-only on Copilot+ Snapdragon)
+# WARNING: Adds ~500MB to installation and increases startup time
+transformers>=4.45.0    # HuggingFace transformers (Florence-2 support, Python 3.13 compatible)
+torch>=2.0.0            # PyTorch backend for Florence-2
+torchvision>=0.15.0     # Vision utilities for PyTorch
+einops>=0.8.0           # Tensor operations (required by Florence-2)
+timm>=1.0.0             # PyTorch Image Models (required by Florence-2)
+
+# ----------------------------------------------------------------------------
 # VIDEO PROCESSING (scripts/video_frame_extractor.py only)
 # ----------------------------------------------------------------------------
 opencv-python>=4.8.0    # Video frame extraction

@@ -444,6 +444,308 @@ def log_environment_info(log_dir: Path, workflow_name: str = "workflow") -> Dict
     return env_info
 
 
+# ============================================================================
+# REDESCRIBE WORKFLOW FUNCTIONS
+# ============================================================================
+
+def validate_redescribe_args(args, source_dir: Path) -> Dict[str, Any]:
+    """
+    Validate arguments for redescribe operation
+    
+    Args:
+        args: Parsed command-line arguments
+        source_dir: Path to source workflow directory
+        
+    Returns:
+        Source workflow metadata
+        
+    Raises:
+        ValueError: If validation fails
+    """
+    # Check for incompatible arguments
+    if args.input_source:
+        raise ValueError("Cannot specify input_source with --redescribe. The source workflow provides the images.")
+    
+    if args.resume:
+        raise ValueError("Cannot use --resume with --redescribe. Use one or the other.")
+    
+    if args.download:
+        raise ValueError("Cannot use --download with --redescribe. Use --redescribe to reuse existing images.")
+    
+    # Validate source workflow exists
+    if not source_dir.exists():
+        raise ValueError(f"Source workflow not found: {source_dir}")
+    
+    if not source_dir.is_dir():
+        raise ValueError(f"Source workflow is not a directory: {source_dir}")
+    
+    # Load source metadata
+    source_metadata = load_workflow_metadata(source_dir)
+    if not source_metadata:
+        raise ValueError(
+            f"Invalid workflow directory (no metadata found): {source_dir}\n"
+            f"Hint: Use 'idt list' to see available workflows"
+        )
+    
+    # Check for required directories - at least one must exist
+    converted_images = source_dir / "converted_images"
+    extracted_frames = source_dir / "extracted_frames"
+    
+    has_images = converted_images.exists() and any(converted_images.iterdir())
+    has_frames = extracted_frames.exists() and any(extracted_frames.iterdir())
+    
+    if not has_images and not has_frames:
+        raise ValueError(
+            f"Source workflow has no processed images:\n"
+            f"  Missing or empty: converted_images/\n"
+            f"  Missing or empty: extracted_frames/\n"
+            f"Run the source workflow to completion before redescribing."
+        )
+    
+    # Require at least one changed parameter
+    source_provider = source_metadata.get("provider", "")
+    source_model = source_metadata.get("model", "")
+    source_prompt = source_metadata.get("prompt_style", "")
+    
+    same_provider = args.provider == source_provider
+    same_model = (args.model or get_default_model(args.provider)) == source_model
+    same_prompt = (args.prompt_style or "narrative") == source_prompt
+    same_config = not args.config_image_describer  # No custom config specified
+    
+    if same_provider and same_model and same_prompt and same_config:
+        raise ValueError(
+            f"Redescribe requires at least one change in AI settings.\n"
+            f"Source workflow: {source_provider} / {source_model} / {source_prompt}\n"
+            f"Your settings: {args.provider} / {args.model or get_default_model(args.provider)} / {args.prompt_style or 'narrative'}\n"
+            f"Hint: Specify --provider, --model, --prompt-style, or --config-image-describer"
+        )
+    
+    return source_metadata
+
+
+def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[str]:
+    """
+    Analyze source workflow to determine which steps can be reused
+    
+    Args:
+        source_dir: Path to source workflow directory
+        source_metadata: Source workflow metadata
+        
+    Returns:
+        List of step names that can be reused (e.g., ['video', 'convert'])
+    """
+    reusable = []
+    
+    # Check for extracted video frames (may be in subdirectories by video name)
+    extracted_frames = source_dir / "extracted_frames"
+    if extracted_frames.exists():
+        frame_files = list(extracted_frames.rglob("*.jpg")) + list(extracted_frames.rglob("*.png"))
+        if frame_files:
+            reusable.append("video")
+            print(f"  ✓ Found {len(frame_files)} extracted video frames")
+    
+    # Check for converted images  
+    converted_images = source_dir / "converted_images"
+    if converted_images.exists():
+        image_files = (list(converted_images.glob("*.jpg")) + 
+                      list(converted_images.glob("*.jpeg")) +
+                      list(converted_images.glob("*.png")))
+        if image_files:
+            reusable.append("convert")
+            print(f"  ✓ Found {len(image_files)} converted images")
+    
+    # Check for input images (regular images copied to workflow)
+    input_images = source_dir / "input_images"
+    if input_images.exists():
+        image_files = (list(input_images.glob("*.jpg")) + 
+                      list(input_images.glob("*.jpeg")) +
+                      list(input_images.glob("*.png")))
+        if image_files:
+            reusable.append("input")
+            print(f"  ✓ Found {len(image_files)} input images")
+    
+    return reusable
+
+
+def can_create_hardlinks(source_parent: Path, dest_parent: Path) -> bool:
+    """Check if hardlinks can be created between two directories"""
+    try:
+        # Hardlinks require same filesystem
+        source_stat = os.stat(str(source_parent))
+        dest_stat = os.stat(str(dest_parent))
+        
+        # On Windows, check if on same drive
+        if sys.platform.startswith('win'):
+            return str(source_parent.resolve())[0].upper() == str(dest_parent.resolve())[0].upper()
+        else:
+            # On Unix, check if same device
+            return source_stat.st_dev == dest_stat.st_dev
+    except Exception:
+        return False
+
+
+def can_create_symlinks() -> bool:
+    """Check if symlinks can be created on this system"""
+    if sys.platform.startswith('win'):
+        # Windows requires admin privileges or Developer Mode for symlinks
+        try:
+            test_dir = Path.cwd() / ".symlink_test_dir"
+            test_link = Path.cwd() / ".symlink_test_link"
+            
+            test_dir.mkdir(exist_ok=True)
+            try:
+                test_link.symlink_to(test_dir, target_is_directory=True)
+                test_link.unlink()
+                test_dir.rmdir()
+                return True
+            except (OSError, NotImplementedError):
+                if test_dir.exists():
+                    test_dir.rmdir()
+                return False
+        except Exception:
+            return False
+    else:
+        # Unix systems support symlinks by default
+        return True
+
+
+def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
+    """
+    Reuse images from source workflow in destination workflow
+    Preserves the original directory structure (extracted_frames, converted_images, input_images)
+    
+    Args:
+        source_dir: Source workflow directory
+        dest_dir: Destination workflow directory
+        method: "auto", "link", "copy", or "force-copy"
+    
+    Returns:
+        Method used: "hardlink", "symlink", or "copy"
+    """
+    # Find all image directories in source workflow
+    image_dirs_to_copy = []
+    
+    # Check for extracted video frames
+    source_extracted = source_dir / "extracted_frames"
+    if source_extracted.exists() and any(source_extracted.iterdir()):
+        image_dirs_to_copy.append(("extracted_frames", source_extracted))
+    
+    # Check for converted images  
+    source_converted = source_dir / "converted_images"
+    if source_converted.exists() and any(source_converted.iterdir()):
+        image_dirs_to_copy.append(("converted_images", source_converted))
+    
+    # Check for input images (regular images copied to workflow)
+    source_input = source_dir / "input_images"
+    if source_input.exists() and any(source_input.iterdir()):
+        image_dirs_to_copy.append(("input_images", source_input))
+    
+    if not image_dirs_to_copy:
+        raise ValueError("No images found in source workflow")
+    
+    # Determine method (check using first directory as reference)
+    first_dir_name, first_source = image_dirs_to_copy[0]
+    if method == "force-copy" or method == "copy":
+        use_method = "copy"
+    elif method == "link":
+        # User requested linking - try hardlink first, then symlink
+        if can_create_hardlinks(first_source.parent, dest_dir):
+            use_method = "hardlink"
+        elif can_create_symlinks():
+            use_method = "symlink"
+        else:
+            print("  ⚠ Linking not available on this system, falling back to copy")
+            use_method = "copy"
+    else:  # auto
+        # Auto-detect best method
+        if can_create_hardlinks(first_source.parent, dest_dir):
+            use_method = "hardlink"
+        elif can_create_symlinks():
+            use_method = "symlink"
+        else:
+            use_method = "copy"
+    
+    print(f"  → Reusing images via {use_method}")
+    
+    total_count = 0
+    total_size = 0
+    
+    # Process each directory, preserving structure
+    for dir_name, source_images in image_dirs_to_copy:
+        dest_images = dest_dir / dir_name
+        
+        # Get all files in the directory (recursively for subdirectories)
+        # extracted_frames may have subdirectories by video name
+        if dir_name == "extracted_frames":
+            files_to_process = list(source_images.rglob("*"))
+        else:
+            files_to_process = [f for f in source_images.iterdir() if f.is_file()]
+        
+        if use_method == "symlink":
+            # Create symlink to entire directory (preserves all subdirectories)
+            dest_images.symlink_to(source_images.resolve(), target_is_directory=True)
+            # Count actual image files for reporting
+            image_count = len([f for f in files_to_process if f.is_file()])
+            total_count += image_count
+            print(f"  ✓ Symlinked {dir_name}/ ({image_count} images)")
+            
+        else:
+            # Create destination directory
+            dest_images.mkdir(parents=True, exist_ok=True)
+            
+            # Copy or hardlink each file, preserving subdirectory structure
+            for item in files_to_process:
+                if not item.is_file():
+                    continue
+                
+                # Calculate relative path from source directory to maintain structure
+                rel_path = item.relative_to(source_images)
+                dest_file = dest_images / rel_path
+                
+                # Create parent directories if needed (for extracted_frames subdirs)
+                dest_file.parent.mkdir(parents=True, exist_ok=True)
+                
+                if use_method == "hardlink":
+                    try:
+                        os.link(str(item), str(dest_file))
+                        total_count += 1
+                    except Exception as e:
+                        # If hardlink fails, fall back to copy
+                        print(f"  ⚠ Hardlink failed for {item.name}, copying instead: {e}")
+                        shutil.copy2(str(item), str(dest_file))
+                        total_count += 1
+                        total_size += item.stat().st_size
+                else:  # copy
+                    shutil.copy2(str(item), str(dest_file))
+                    total_count += 1
+                    total_size += item.stat().st_size
+            
+            if use_method == "hardlink":
+                if dir_name == "extracted_frames":
+                    dir_count = len([f for f in dest_images.rglob("*") if f.is_file()])
+                else:
+                    dir_count = len([f for f in dest_images.iterdir() if f.is_file()])
+                print(f"  ✓ Hardlinked {dir_name}/ ({dir_count} images)")
+            else:
+                if dir_name == "extracted_frames":
+                    dir_count = len([f for f in dest_images.rglob("*") if f.is_file()])
+                else:
+                    dir_count = len([f for f in dest_images.iterdir() if f.is_file()])
+                print(f"  ✓ Copied {dir_name}/ ({dir_count} images)")
+
+    
+    # Print summary
+    if use_method == "symlink":
+        print(f"  ✓ Total: {total_count} images symlinked (0 MB disk space used)")
+    elif use_method == "hardlink":
+        print(f"  ✓ Total: {total_count} images hardlinked (0 MB disk space used)")
+    else:
+        size_mb = total_size / (1024 * 1024)
+        print(f"  ✓ Total: {total_count} images copied ({size_mb:.1f} MB disk space used)")
+    
+    return use_method
+
+
 class WorkflowOrchestrator:
     """Main workflow orchestrator class"""
     
@@ -466,7 +768,7 @@ class WorkflowOrchestrator:
             base_output_dir: Base output directory for the workflow
             model: Override model name
             prompt_style: Override prompt style
-            provider: AI provider to use (ollama, openai, claude)
+            provider: AI provider to use (ollama, openai, claude, onnx)
             api_key_file: Path to API key file for cloud providers
             preserve_descriptions: If True, skip describe step if descriptions already exist
             workflow_name: Name of the workflow (for display purposes)
@@ -1221,45 +1523,115 @@ class WorkflowOrchestrator:
         # Track unique source images to avoid double-counting HEIC + converted JPG
         converted_dir = self.config.get_step_output_dir("image_conversion")
         frames_dir = self.config.get_step_output_dir("video_extraction")
+        input_images_dir = self.config.base_output_dir / "input_images"
         
-        # Find HEIC files in input directory that will/were converted
-        heic_files_in_input = self.discovery.find_files_by_type(input_dir, "heic")
-        has_conversions = converted_dir.exists() and any(converted_dir.iterdir())
+        # Check if we're in a workflow directory (redescribe/resume mode)
+        # In this case, input_dir == base_output_dir (user pointed at workflow dir, not source)
+        # We should scan the workflow subdirectories instead of the input directory
+        # Resolve both paths to absolute for comparison
+        resolved_input = Path(input_dir).resolve()
+        resolved_base = Path(self.config.base_output_dir).resolve()
+        is_workflow_dir = (resolved_input == resolved_base)
+        self.logger.debug(f"Workflow mode check: input_dir={resolved_input}, base_output_dir={resolved_base}, is_workflow_dir={is_workflow_dir}")
         
-        # Find regular (non-HEIC) images in input directory
-        all_input_images = self.discovery.find_files_by_type(input_dir, "images")
-        regular_input_images = [img for img in all_input_images if img not in heic_files_in_input]
+        # CRITICAL ASSERTION: Prevent regression of bug where normal workflows skip files
+        # Bug history: is_workflow_dir was checking .exists() on converted_dir/frames_dir
+        # This caused normal workflows to incorrectly trigger workflow mode after those steps ran
+        if is_workflow_dir:
+            # Double-check this is actually a workflow directory
+            # It should have at least one of the workflow subdirectories OR be explicitly redescribe
+            has_workflow_structure = (
+                (converted_dir.exists() and any(converted_dir.iterdir())) or
+                (frames_dir.exists() and any(frames_dir.iterdir())) or
+                (input_images_dir.exists() and any(input_images_dir.iterdir()))
+            )
+            if not has_workflow_structure:
+                self.logger.warning(
+                    f"is_workflow_dir=True but no workflow structure found in {input_dir}. "
+                    f"This may indicate a logic error - proceeding with caution."
+                )
         
         # Build the list of images to process
         all_image_files = []
         unique_source_count = 0  # Track unique source images
         conversion_count = 0  # Track format conversions
         
-        # Add regular (non-HEIC) images from input directory
-        all_image_files.extend(regular_input_images)
-        unique_source_count += len(regular_input_images)
-        if regular_input_images:
-            self.logger.info(f"Found {len(regular_input_images)} regular image(s) in input directory")
+        if is_workflow_dir:
+            # We're processing a workflow directory (redescribe mode)
+            # Scan the three possible image directories directly
+            self.logger.info("Scanning workflow directory for images...")
+            
+            # Check input_images directory
+            if input_images_dir.exists() and any(input_images_dir.iterdir()):
+                existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
+                all_image_files.extend(existing_images)
+                unique_source_count += len(existing_images)
+                self.logger.info(f"Found {len(existing_images)} image(s) in: {input_images_dir}")
+            
+            # Check converted_images directory
+            if converted_dir.exists() and any(converted_dir.iterdir()):
+                converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+                all_image_files.extend(converted_images)
+                unique_source_count += len(converted_images)
+                conversion_count = len(converted_images)
+                self.logger.info(f"Found {len(converted_images)} converted image(s) in: {converted_dir}")
+            
+            # Check extracted_frames directory
+            if frames_dir.exists() and any(frames_dir.iterdir()):
+                frame_images = self.discovery.find_files_by_type(frames_dir, "images")
+                all_image_files.extend(frame_images)
+                unique_source_count += len(frame_images)
+                self.logger.info(f"Found {len(frame_images)} extracted frame(s) in: {frames_dir}")
         
-        # Add converted images OR HEIC files (not both)
-        if has_conversions:
-            converted_images = self.discovery.find_files_by_type(converted_dir, "images")
-            all_image_files.extend(converted_images)
-            unique_source_count += len(converted_images)
-            conversion_count = len(converted_images)
-            self.logger.info(f"Including {len(converted_images)} converted image(s) from: {converted_dir}")
-        elif heic_files_in_input:
-            # If conversion hasn't run yet, include HEIC files directly
-            all_image_files.extend(heic_files_in_input)
-            unique_source_count += len(heic_files_in_input)
-            self.logger.info(f"Found {len(heic_files_in_input)} HEIC image(s) in input directory (not yet converted)")
-        
-        # Add extracted frames from videos
-        if frames_dir.exists() and any(frames_dir.iterdir()):
-            frame_images = self.discovery.find_files_by_type(frames_dir, "images")
-            all_image_files.extend(frame_images)
-            unique_source_count += len(frame_images)
-            self.logger.info(f"Including {len(frame_images)} extracted frame(s) from: {frames_dir}")
+        else:
+            # Normal mode: process original input directory
+            # Find HEIC files in input directory that will/were converted
+            heic_files_in_input = self.discovery.find_files_by_type(input_dir, "heic")
+            has_conversions = converted_dir.exists() and any(converted_dir.iterdir())
+            
+            # Find regular (non-HEIC) images in input directory
+            # CRITICAL: Don't scan workflow subdirectories (converted_images, extracted_frames, input_images)
+            # This prevents duplication when input_dir mistakenly points to a workflow subdirectory
+            workflow_subdirs = {converted_dir, frames_dir, input_images_dir}
+            if input_dir in workflow_subdirs or any(input_dir.is_relative_to(d) for d in workflow_subdirs if d.exists()):
+                self.logger.warning(f"Input directory {input_dir} is a workflow subdirectory - skipping regular image scan to prevent duplication")
+                all_input_images = []
+                regular_input_images = []
+            else:
+                all_input_images = self.discovery.find_files_by_type(input_dir, "images")
+                regular_input_images = [img for img in all_input_images if img not in heic_files_in_input]
+            
+            # Copy regular (non-HEIC) images to workflow input_images/ directory
+            # This makes workflows self-contained and consistent with extracted_frames/converted_images
+            if regular_input_images:
+                input_images_dir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"Copying {len(regular_input_images)} regular image(s) to workflow directory...")
+                for img in regular_input_images:
+                    dest = input_images_dir / img.name
+                    shutil.copy2(str(img), str(dest))
+                    all_image_files.append(dest)
+                unique_source_count += len(regular_input_images)
+                self.logger.info(f"Copied {len(regular_input_images)} images to: {input_images_dir}")
+            
+            # Add converted images OR HEIC files (not both)
+            if has_conversions:
+                converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+                all_image_files.extend(converted_images)
+                unique_source_count += len(converted_images)
+                conversion_count = len(converted_images)
+                self.logger.info(f"Including {len(converted_images)} converted image(s) from: {converted_dir}")
+            elif heic_files_in_input:
+                # If conversion hasn't run yet, include HEIC files directly
+                all_image_files.extend(heic_files_in_input)
+                unique_source_count += len(heic_files_in_input)
+                self.logger.info(f"Found {len(heic_files_in_input)} HEIC image(s) in input directory (not yet converted)")
+            
+            # Add extracted frames from videos
+            if frames_dir.exists() and any(frames_dir.iterdir()):
+                frame_images = self.discovery.find_files_by_type(frames_dir, "images")
+                all_image_files.extend(frame_images)
+                unique_source_count += len(frame_images)
+                self.logger.info(f"Including {len(frame_images)} extracted frame(s) from: {frames_dir}")
         
         if not all_image_files:
             self.logger.info("No image files found to describe")
@@ -1296,12 +1668,14 @@ class WorkflowOrchestrator:
                 try:
                     # Determine which source directory this file came from
                     source_dir = None
-                    if image_file.is_relative_to(input_dir):
-                        source_dir = input_dir
-                    elif has_conversions and image_file.is_relative_to(converted_dir):
+                    if image_file.is_relative_to(input_images_dir):
+                        source_dir = input_images_dir
+                    elif image_file.is_relative_to(converted_dir):
                         source_dir = converted_dir
-                    elif frames_dir.exists() and image_file.is_relative_to(frames_dir):
+                    elif image_file.is_relative_to(frames_dir):
                         source_dir = frames_dir
+                    elif image_file.is_relative_to(input_dir):
+                        source_dir = input_dir
                     else:
                         # Fallback to using parent directory
                         source_dir = image_file.parent
@@ -1864,8 +2238,9 @@ class WorkflowOrchestrator:
                         desc_file = self.step_results["describe"]["description_file"]
                     step_result = step_method(current_input_dir, step_output_dir, desc_file)
                 elif step == "describe":
-                    # Description step should look at current input directory (after download/convert)
-                    step_result = step_method(current_input_dir, step_output_dir)
+                    # Description step needs ORIGINAL input_dir to detect workflow mode correctly
+                    # and find regular images that haven't been processed yet
+                    step_result = step_method(input_dir, step_output_dir)
                 elif step == "convert":
                     # Convert step should always work on original input directory
                     step_result = step_method(input_dir, step_output_dir)
@@ -1887,7 +2262,9 @@ class WorkflowOrchestrator:
                     self._update_status_log()
                     
                     # Update input directory for next step if this step produced outputs
-                    if step in ["download", "video", "convert"] and step_result.get("output_dir"):
+                    # NOTE: Don't update for 'convert' step - describe needs original input_dir
+                    # to properly detect workflow mode and avoid scanning converted_images as source
+                    if step in ["download", "video"] and step_result.get("output_dir"):
                         current_input_dir = Path(step_result["output_dir"])
                 else:
                     self.statistics['steps_failed'].append(step)
@@ -2307,7 +2684,7 @@ def normalize_model_name(model: str, provider: str) -> str:
     
     Args:
         model: Model name that may include provider prefix
-        provider: Provider name (ollama, openai, claude)
+        provider: Provider name (ollama, openai, claude, onnx)
     
     Returns:
         Model name with provider prefix stripped if it matches the provider
@@ -2363,6 +2740,23 @@ Resume Examples:
   idt workflow --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file openai.txt
   idt workflow --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file claude.txt
   # See docs/WORKFLOW_RESUME_API_KEY.md for details
+
+Redescribe Examples (reuse images with different AI settings):
+  # Compare different models on same images (skips video/convert steps)
+  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\
+    --provider openai --model gpt-4o
+  
+  # Try different prompt styles
+  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\
+    --prompt-style technical
+  
+  # Test local ONNX model vs cloud
+  idt workflow --redescribe wf_photos_openai_gpt-4o_narrative_20251115_100000 \\
+    --provider onnx --model microsoft/Florence-2-base
+  
+  # Use symlinks to save disk space (faster, 0 MB used)
+  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\
+    --provider claude --model claude-sonnet-4-5 --link-images
   
 Viewing Results:
   # Launch viewer automatically at workflow start (recommended for long batches):
@@ -2392,9 +2786,26 @@ Viewing Results:
     )
     
     parser.add_argument(
+        "--redescribe",
+        help="Re-describe images from an existing workflow with different AI settings, skipping video/image conversion"
+    )
+    
+    parser.add_argument(
         "--preserve-descriptions",
         action="store_true",
         help="When resuming, preserve existing descriptions and skip describe step if substantial progress exists"
+    )
+    
+    parser.add_argument(
+        "--link-images",
+        action="store_true",
+        help="When redescribing, use symlinks/hardlinks instead of copying images (faster, no space duplication)"
+    )
+    
+    parser.add_argument(
+        "--force-copy",
+        action="store_true",
+        help="When redescribing, always copy images even if linking is available"
     )
     
     parser.add_argument(
@@ -2439,7 +2850,7 @@ Viewing Results:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "claude"],
+        choices=["ollama", "openai", "claude", "onnx"],
         default="ollama",
         help="AI provider to use for image description (default: ollama)"
     )
@@ -2624,16 +3035,29 @@ Viewing Results:
                 prompt_style = "narrative"
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Override with state from logs
+        # Override with state from logs if available, otherwise keep metadata values
         if workflow_state["model"]:
             args.model = workflow_state["model"]
             model_name = workflow_state["model"]
+        elif not args.model:
+            # Use metadata value if no command-line override
+            args.model = model_name
+            
         if workflow_state["prompt_style"]:
             args.prompt_style = workflow_state["prompt_style"]
             prompt_style = workflow_state["prompt_style"]
+        elif not args.prompt_style:
+            # Use metadata value if no command-line override
+            args.prompt_style = prompt_style
+            
         if workflow_state["provider"]:
             args.provider = workflow_state["provider"]
             provider_name = workflow_state["provider"]
+        else:
+            # CRITICAL: Use metadata provider if log parsing failed
+            # Without this, args.provider defaults to "ollama" from argument parser
+            args.provider = provider_name
+            
         if workflow_state["config"]:
             # Old workflow_state used single "config" - map to image_describer_config for backward compatibility
             args.config_image_describer = workflow_state["config"]
@@ -2677,6 +3101,144 @@ Viewing Results:
         print(f"Original input: {input_dir}")
         print(f"Completed steps: {', '.join(workflow_state['completed_steps'])}")
         print(f"Remaining steps: {', '.join(steps)}")
+        
+    elif args.redescribe:
+        # Redescribe mode - reuse images from existing workflow with new AI settings
+        source_dir = Path(args.redescribe)
+        
+        if not source_dir.is_absolute():
+            # Use original working directory if provided, otherwise current directory
+            base_dir = Path(args.original_cwd) if args.original_cwd else Path(os.getcwd())
+            source_dir = (base_dir / source_dir).resolve()
+        
+        print("=" * 80)
+        print("REDESCRIBE WORKFLOW")
+        print("=" * 80)
+        print()
+        
+        try:
+            # Validate arguments and get source metadata
+            source_metadata = validate_redescribe_args(args, source_dir)
+            
+            print(f"Source Workflow: {source_dir.name}")
+            print(f"  Original Provider: {source_metadata.get('provider', 'unknown')}")
+            print(f"  Original Model: {source_metadata.get('model', 'unknown')}")
+            print(f"  Original Prompt: {source_metadata.get('prompt_style', 'unknown')}")
+            print()
+            
+            # Determine new AI settings
+            new_provider = args.provider
+            new_model = args.model or get_default_model(new_provider)
+            new_prompt = args.prompt_style or source_metadata.get("prompt_style", "narrative")
+            
+            print(f"New AI Configuration:")
+            print(f"  Provider: {new_provider}")
+            print(f"  Model: {new_model}")
+            print(f"  Prompt Style: {new_prompt}")
+            print()
+            
+            # Determine what can be reused
+            print("Analyzing source workflow...")
+            reusable_steps = determine_reusable_steps(source_dir, source_metadata)
+            
+            if not reusable_steps:
+                print("ERROR: No reusable content found in source workflow")
+                sys.exit(1)
+            
+            # Create new workflow directory
+            workflow_name = source_metadata.get("workflow_name", "redescribe")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Sanitize components for directory name
+            provider_sanitized = sanitize_name(new_provider)
+            model_sanitized = sanitize_name(new_model)
+            prompt_sanitized = sanitize_name(new_prompt)
+            
+            dir_name = f"wf_{workflow_name}_{provider_sanitized}_{model_sanitized}_{prompt_sanitized}_{timestamp}"
+            
+            # Determine output location
+            if args.output_dir:
+                output_base = Path(args.output_dir)
+            else:
+                # Use same parent directory as source workflow
+                output_base = source_dir.parent
+            
+            output_dir = output_base / dir_name
+            
+            try:
+                output_dir.mkdir(parents=True, exist_ok=False)
+            except FileExistsError:
+                print(f"ERROR: Output directory already exists: {output_dir}")
+                sys.exit(1)
+            
+            print()
+            print(f"New Workflow Directory: {output_dir.name}")
+            print()
+            
+            # Reuse images
+            print("Reusing processed images...")
+            link_method = "link" if args.link_images else "force-copy" if args.force_copy else "auto"
+            reuse_method = reuse_images(source_dir, output_dir, method=link_method)
+            print()
+            
+            # Build redescribe metadata
+            redescribe_metadata = {
+                "is_redescribe": True,
+                "source_workflow": str(source_dir.resolve()),
+                "source_workflow_name": source_dir.name,
+                "reused_steps": reusable_steps,
+                "images_linked": reuse_method in ["hardlink", "symlink"],
+                "link_method": reuse_method,
+                "source_metadata": {
+                    "original_provider": source_metadata.get("provider"),
+                    "original_model": source_metadata.get("model"),
+                    "original_prompt": source_metadata.get("prompt_style"),
+                    "original_timestamp": source_metadata.get("timestamp")
+                },
+                "redescribe_timestamp": datetime.now().isoformat()
+            }
+            
+            # Build full workflow metadata
+            metadata = {
+                "workflow_name": workflow_name,
+                "provider": new_provider,
+                "model": new_model,
+                "prompt_style": new_prompt,
+                "timestamp": timestamp,
+                "redescribe_operation": redescribe_metadata,
+                "steps_executed": ["describe", "html"],
+                "config_workflow": args.config_workflow,
+                "config_image_describer": args.config_image_describer
+            }
+            
+            # Save metadata
+            save_workflow_metadata(output_dir, metadata)
+            
+            # Set up for workflow execution
+            # The orchestrator will scan all image directories in output_dir
+            # (extracted_frames, converted_images, input_images)
+            input_dir = output_dir
+            steps = ["describe", "html"]  # Only run these steps
+            
+            # Store workflow info for later use
+            workflow_name_display = workflow_name
+            provider_name = new_provider
+            model_name = new_model
+            prompt_style = new_prompt
+            url = None  # No URL downloads in redescribe mode
+            
+            print("Running workflow steps...")
+            print(f"  Steps: {', '.join(steps)}")
+            print()
+            
+        except ValueError as e:
+            print(f"ERROR: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"ERROR: Unexpected error during redescribe setup: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
         
     else:
         # Normal mode - determine input source and mode
@@ -2735,7 +3297,7 @@ Viewing Results:
         
         # Get provider, model and prompt info for directory naming
         provider_name = args.provider if args.provider else "ollama"
-        model_name = get_effective_model(args, args.config_workflow)
+        model_name_sanitized = get_effective_model(args, args.config_workflow)  # For directory name
         prompt_style = get_effective_prompt_style(args, args.config_workflow)
         
         # Determine workflow name identifier
@@ -2757,7 +3319,7 @@ Viewing Results:
         
         # Create descriptive directory name (wf = workflow)
         # Format: wf_NAME_PROVIDER_MODEL_PROMPT_TIMESTAMP
-        wf_dirname = f"wf_{workflow_name}_{provider_name}_{model_name}_{prompt_style}_{timestamp}"
+        wf_dirname = f"wf_{workflow_name}_{provider_name}_{model_name_sanitized}_{prompt_style}_{timestamp}"
         
         if args.output_dir:
             # User specified output directory - create wf_ directory inside it
@@ -2790,6 +3352,41 @@ Viewing Results:
     # Normalize model name - strip provider prefix if present
     # (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
     normalized_model = normalize_model_name(args.model, args.provider) if args.model else None
+    
+    # Get the actual model name for metadata (original, not sanitized)
+    # This is what the AI provider needs to use
+    if normalized_model:
+        model_name_original = normalized_model
+    elif hasattr(args, 'config_image_describer') and args.config_image_describer:
+        # Try to get from custom config
+        try:
+            model_name_original = get_default_model(args.config_image_describer)
+        except Exception:
+            model_name_original = None
+    else:
+        # Try workflow config or default config
+        model_name_original = None
+        try:
+            config = WorkflowConfig(args.config_workflow if args.config_workflow else "workflow_config.json")
+            model_name_original = config.config.get("workflow", {}).get("steps", {}).get("image_description", {}).get("model")
+        except Exception:
+            pass
+        
+        if not model_name_original:
+            try:
+                import json
+                config_paths = ["image_describer_config.json", "scripts/image_describer_config.json"]
+                for config_path in config_paths:
+                    try:
+                        with open(config_path, 'r') as f:
+                            img_config = json.load(f)
+                            model_name_original = img_config.get("default_model")
+                            if model_name_original:
+                                break
+                    except FileNotFoundError:
+                        continue
+            except Exception:
+                pass
     
     # Determine which config files to use
     workflow_config = args.config_workflow if args.config_workflow else "workflow_config.json"
@@ -2864,7 +3461,7 @@ Viewing Results:
             "workflow_name": workflow_name_display,  # Use case-preserved name for display
             "input_directory": str(input_dir),
             "provider": provider_name,
-            "model": model_name,
+            "model": model_name_original or model_name_sanitized,  # Original model name for AI provider (e.g., "microsoft/Florence-2-base")
             "prompt_style": prompt_style,
             "timestamp": timestamp,
             "steps": steps,
@@ -2885,11 +3482,18 @@ Viewing Results:
         
         # Log original command for resume functionality
         if not args.resume:  # Only log original command for new workflows
-            original_cmd = ["python", "workflow.py", str(input_dir)]
+            # For redescribe, log the --redescribe argument; for normal workflows, log input_dir
+            if args.redescribe:
+                original_cmd = ["python", "workflow.py", "--redescribe", str(args.redescribe)]
+            else:
+                original_cmd = ["python", "workflow.py", str(input_dir)]
+            
             if args.output_dir:
                 original_cmd.extend(["--output-dir", args.output_dir])
             if args.steps != "video,convert,describe,html":
                 original_cmd.extend(["--steps", args.steps])
+            if args.provider and args.provider != "ollama":
+                original_cmd.extend(["--provider", args.provider])
             if args.model:
                 original_cmd.extend(["--model", args.model])
             if args.prompt_style:

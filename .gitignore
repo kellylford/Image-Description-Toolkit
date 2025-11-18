@@ -113,3 +113,16 @@ imagedescriber/imagedescriber_releases/staging/
 prompt_editor/prompt_editor_releases/staging/
 # Note: dist/ and build/ already covered by general patterns above
 
+
+# Cache files (user-specific data, should not be committed)
+geocode_cache.json
+scripts/geocode_cache.json
+tools/geocode_cache.json
+
+# Build output logs
+BuildAndRelease/build_output.txt
+build_log.txt
+
+# Experimental test scripts (should be in pytest_tests/ or documented separately)
+test_onnx*.py
+test_directml*.py
