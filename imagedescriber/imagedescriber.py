@@ -2326,12 +2326,14 @@ class ProcessingDialog(QDialog):
         
         self.model_combo.setEnabled(True)
         
-        # Use the global provider instances (with caching) directly instead of get_available_providers()
+        # Use the global provider instances (with caching) directly
         all_providers = {
             'ollama': _ollama_provider,
             'ollama_cloud': _ollama_cloud_provider,
             'openai': _openai_provider,
-            'claude': _claude_provider
+            'claude': _claude_provider,
+            'onnx': _onnx_provider,
+            'huggingface': _huggingface_provider
         }
         
         if provider_key not in all_providers:
@@ -2356,7 +2358,9 @@ class ProcessingDialog(QDialog):
             elif provider_key == "claude":
                 print("Warning: Claude models not available. Check API key in claude.txt file or ANTHROPIC_API_KEY environment variable")
             elif provider_key == "onnx":
-                print("Warning: No ONNX models found. Run download_onnx_models.bat to download models.")
+                print("Warning: ONNX (Florence-2) not available. Install dependencies: pip install 'transformers>=4.45.0' torch torchvision einops timm")
+            elif provider_key == "huggingface":
+                print("Warning: HuggingFace models not available. Install dependencies: pip install 'transformers>=4.45.0' torch torchvision pillow")
             elif provider_key == "copilot":
                 print("Warning: Copilot+ PC hardware not detected or Windows AI APIs not available.")
             elif provider_key == "object_detection":
