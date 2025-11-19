@@ -58,13 +58,13 @@ PROVIDER_CAPABILITIES: Dict[str, Dict[str, Any]] = {
         "description": "Local Florence-2 vision models with NPU acceleration support"
     },
     "HuggingFace": {
-        "supports_prompts": False,
-        "supports_custom_prompts": False,
-        "prompt_styles": [],
+        "supports_prompts": True,
+        "supports_custom_prompts": True,
+        "prompt_styles": ["detailed", "technical", "creative", "accessibility"],
         "requires_api_key": False,
         "is_cloud": False,
         "supports_options": True,
-        "description": "HuggingFace transformers models"
+        "description": "General HuggingFace vision-language models (Qwen2-VL, LLaVA-OneVision, etc.)"
     },
     "Object Detection": {
         "supports_prompts": False,

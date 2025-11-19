@@ -834,6 +834,247 @@ import platform
 import subprocess
 
 
+class HuggingFaceProvider(AIProvider):
+    """HuggingFace provider for general vision-language models
+    
+    Supports models like Qwen2-VL, LLaVA-OneVision, and other HuggingFace
+    vision-language models. Unlike the ONNX provider which is hardcoded for
+    Florence-2, this provider works with any compatible HF model.
+    """
+    
+    def __init__(self):
+        self.model = None
+        self.processor = None
+        self.device = None
+        self.model_name = None
+        self._model_family = None
+        
+    def get_provider_name(self) -> str:
+        return "HuggingFace"
+    
+    def is_available(self) -> bool:
+        """Check if HuggingFace transformers dependencies are available"""
+        return HAS_TRANSFORMERS
+    
+    def get_available_models(self) -> List[str]:
+        """Get list of popular HuggingFace vision-language models
+        
+        This is not exhaustive - users can use any HF model ID.
+        """
+        if not HAS_TRANSFORMERS:
+            return []
+        
+        return [
+            # Qwen2-VL family
+            "Qwen/Qwen2-VL-2B-Instruct",
+            "Qwen/Qwen2-VL-7B-Instruct",
+            
+            # LLaVA-OneVision family  
+            "lmms-lab/llava-onevision-qwen2-0.5b-ov",
+            "lmms-lab/llava-onevision-qwen2-7b-ov",
+            
+            # Other popular models can be added
+        ]
+    
+    def _detect_model_family(self, model_id: str) -> str:
+        """Detect the model family from the model ID
+        
+        Returns: 'qwen2-vl', 'llava', or 'unknown'
+        """
+        model_lower = model_id.lower()
+        
+        if 'qwen2-vl' in model_lower or 'qwen/qwen2-vl' in model_lower:
+            return 'qwen2-vl'
+        elif 'llava' in model_lower:
+            return 'llava'
+        else:
+            return 'unknown'
+    
+    def _load_model(self, model: str):
+        """Load HuggingFace vision-language model"""
+        if self.model is not None and self.model_name == model:
+            return  # Already loaded
+        
+        if not HAS_TRANSFORMERS:
+            raise ImportError(
+                "HuggingFace provider requires transformers>=4.45.0, torch, and Pillow.\n"
+                "Install with: pip install 'transformers>=4.45.0' torch torchvision pillow"
+            )
+        
+        try:
+            # Detect model family
+            self._model_family = self._detect_model_family(model)
+            
+            # Determine device (GPU/CPU)
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            else:
+                self.device = "cpu"
+            
+            print(f"Loading {model} ({self._model_family}) on {self.device}...")
+            
+            # Load processor - try AutoProcessor first, fall back to AutoTokenizer
+            try:
+                self.processor = AutoProcessor.from_pretrained(model, trust_remote_code=True)
+            except Exception:
+                # Some models may only have tokenizer
+                from transformers import AutoTokenizer
+                self.processor = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
+            
+            # Load model
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model,
+                trust_remote_code=True,
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+            ).to(self.device)
+            
+            self.model_name = model
+            print(f"Model loaded successfully on {self.device}")
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to load HuggingFace model {model}: {str(e)}")
+    
+    def _prepare_inputs_qwen2vl(self, image_path: str, prompt: str):
+        """Prepare inputs for Qwen2-VL models"""
+        from PIL import Image as PILImage
+        
+        # Load image
+        image = PILImage.open(image_path).convert('RGB')
+        
+        # Qwen2-VL uses a chat format with image tokens
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+        
+        # Apply chat template
+        text = self.processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        
+        # Process inputs
+        inputs = self.processor(
+            text=[text],
+            images=[image],
+            return_tensors="pt"
+        )
+        
+        return inputs
+    
+    def _prepare_inputs_llava(self, image_path: str, prompt: str):
+        """Prepare inputs for LLaVA models"""
+        from PIL import Image as PILImage
+        
+        # Load image
+        image = PILImage.open(image_path).convert('RGB')
+        
+        # LLaVA typically uses a simple format
+        conversation = [
+            {
+                "role": "user",
+                "content": f"<image>\n{prompt}"
+            }
+        ]
+        
+        # Apply chat template
+        text = self.processor.apply_chat_template(
+            conversation, add_generation_prompt=True
+        )
+        
+        # Process inputs
+        inputs = self.processor(
+            text=text,
+            images=image,
+            return_tensors="pt"
+        )
+        
+        return inputs
+    
+    def _prepare_inputs_generic(self, image_path: str, prompt: str):
+        """Prepare inputs for generic vision-language models"""
+        from PIL import Image as PILImage
+        
+        # Load image
+        image = PILImage.open(image_path).convert('RGB')
+        
+        # Try generic processor call
+        inputs = self.processor(
+            text=prompt,
+            images=image,
+            return_tensors="pt"
+        )
+        
+        return inputs
+    
+    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
+        """Generate description for an image using HuggingFace model"""
+        try:
+            # Load model if needed
+            self._load_model(model)
+            
+            # Prepare inputs based on model family
+            if self._model_family == 'qwen2-vl':
+                inputs = self._prepare_inputs_qwen2vl(image_path, prompt)
+            elif self._model_family == 'llava':
+                inputs = self._prepare_inputs_llava(image_path, prompt)
+            else:
+                inputs = self._prepare_inputs_generic(image_path, prompt)
+            
+            # Move inputs to device
+            device_inputs = {}
+            for k, v in inputs.items():
+                if v is not None and hasattr(v, 'to'):
+                    device_inputs[k] = v.to(self.device)
+                else:
+                    device_inputs[k] = v
+            
+            # Generate description
+            generated_ids = self.model.generate(
+                **device_inputs,
+                max_new_tokens=512,
+                do_sample=False,
+                temperature=0.0
+            )
+            
+            # Decode output
+            generated_text = self.processor.batch_decode(
+                generated_ids,
+                skip_special_tokens=True
+            )[0]
+            
+            # For chat models, extract just the assistant's response
+            # (remove the input prompt)
+            if "assistant" in generated_text.lower():
+                # Try to extract assistant's response
+                parts = generated_text.split("assistant")
+                if len(parts) > 1:
+                    description = parts[-1].strip()
+                    # Clean up common artifacts
+                    description = description.lstrip(':').lstrip('\n').strip()
+                else:
+                    description = generated_text.strip()
+            else:
+                description = generated_text.strip()
+            
+            if not description:
+                return "⚠️ HuggingFace model generated no description for this image."
+            
+            return description
+            
+        except ImportError as e:
+            return f"⚠️ HuggingFace dependencies not installed: {str(e)}"
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return f"⚠️ Error generating description with HuggingFace: {str(e)}"
+
+
+
 class ONNXProvider(AIProvider):
     """ONNX provider for local Florence-2 vision models with NPU acceleration"""
     
@@ -1001,6 +1242,7 @@ _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
+_huggingface_provider = HuggingFaceProvider()
 _onnx_provider = ONNXProvider()
 
 
@@ -1033,5 +1275,6 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'ollama_cloud': _ollama_cloud_provider,
         'openai': _openai_provider,
         'claude': _claude_provider,
+        'huggingface': _huggingface_provider,
         'onnx': _onnx_provider
     }
