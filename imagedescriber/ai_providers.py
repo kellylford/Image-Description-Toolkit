@@ -818,7 +818,7 @@ except ImportError:
 
 # Try to import transformers for Florence-2 (optional dependency)
 try:
-    from transformers import AutoProcessor, AutoModelForCausalLM
+    from transformers import AutoProcessor, AutoModel
     from PIL import Image as PILImage
     import torch
     HAS_TRANSFORMERS = True
@@ -921,8 +921,10 @@ class HuggingFaceProvider(AIProvider):
                 from transformers import AutoTokenizer
                 self.processor = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
             
-            # Load model
-            self.model = AutoModelForCausalLM.from_pretrained(
+            # Load model - Qwen2-VL and similar vision models need AutoModel, not AutoModelForCausalLM
+            # Using trust_remote_code=True allows the model to use its own custom class
+            from transformers import AutoModel
+            self.model = AutoModel.from_pretrained(
                 model,
                 trust_remote_code=True,
                 torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
@@ -1135,6 +1137,8 @@ class ONNXProvider(AIProvider):
             # Load model and processor
             print(f"Loading {model} on {self.device}...")
             self.processor = AutoProcessor.from_pretrained(model, trust_remote_code=True)
+            # Florence-2 uses AutoModelForCausalLM
+            from transformers import AutoModelForCausalLM
             self.model = AutoModelForCausalLM.from_pretrained(
                 model, 
                 trust_remote_code=True,
