@@ -83,7 +83,8 @@ from imagedescriber.ai_providers import (
     OllamaProvider,
     OpenAIProvider,
     ClaudeProvider,
-    ONNXProvider
+    ONNXProvider,
+    HuggingFaceProvider
 )
 
 
@@ -341,8 +342,15 @@ class ImageDescriber:
                     raise ValueError("ONNX provider requires Florence-2 dependencies. Install with: pip install 'transformers>=4.45.0' torch torchvision einops timm")
                 return provider
                 
+            elif self.provider_name == "huggingface":
+                logger.info("Initializing HuggingFace provider...")
+                provider = HuggingFaceProvider()
+                if not provider.is_available():
+                    raise ValueError("HuggingFace provider requires dependencies. Install with: pip install 'transformers>=4.45.0' torch torchvision pillow")
+                return provider
+                
             else:
-                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, onnx")
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, onnx, huggingface")
                 
         except Exception as e:
             logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
