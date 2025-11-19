@@ -883,10 +883,11 @@ class HuggingFaceProvider(AIProvider):
         """
         model_lower = model_id.lower()
         
-        if 'qwen2-vl' in model_lower or 'qwen/qwen2-vl' in model_lower:
-            return 'qwen2-vl'
-        elif 'llava' in model_lower:
+        # Check for llava FIRST - some LLaVA models contain "qwen2" in name
+        if 'llava' in model_lower:
             return 'llava'
+        elif 'qwen2-vl' in model_lower or 'qwen/qwen2-vl' in model_lower:
+            return 'qwen2-vl'
         else:
             return 'unknown'
     
@@ -921,9 +922,7 @@ class HuggingFaceProvider(AIProvider):
                 from transformers import AutoTokenizer
                 self.processor = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
             
-            # Load model - use the appropriate AutoModel class based on model family
-            # Qwen2-VL and similar vision models work with AutoModel + trust_remote_code
-            # which automatically resolves to the correct class (e.g., Qwen2VLForConditionalGeneration)
+            # Load model - use the appropriate class based on model family
             if self._model_family == 'qwen2-vl':
                 # Qwen2-VL requires the specific class for generation
                 from transformers import Qwen2VLForConditionalGeneration
@@ -932,14 +931,39 @@ class HuggingFaceProvider(AIProvider):
                     trust_remote_code=True,
                     torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
                 ).to(self.device)
+            elif self._model_family == 'llava':
+                # LLaVA models work with AutoModelForVision2Seq or AutoModelForCausalLM
+                try:
+                    from transformers import AutoModelForVision2Seq
+                    self.model = AutoModelForVision2Seq.from_pretrained(
+                        model,
+                        trust_remote_code=True,
+                        torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                    ).to(self.device)
+                except Exception:
+                    # Fallback to AutoModelForCausalLM for some LLaVA variants
+                    from transformers import AutoModelForCausalLM
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model,
+                        trust_remote_code=True,
+                        torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                    ).to(self.device)
             else:
-                # For other models, use AutoModel which will resolve to correct class
-                from transformers import AutoModel
-                self.model = AutoModel.from_pretrained(
-                    model,
-                    trust_remote_code=True,
-                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                ).to(self.device)
+                # For other models, try AutoModelForVision2Seq first, then AutoModel
+                try:
+                    from transformers import AutoModelForVision2Seq
+                    self.model = AutoModelForVision2Seq.from_pretrained(
+                        model,
+                        trust_remote_code=True,
+                        torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                    ).to(self.device)
+                except Exception:
+                    from transformers import AutoModel
+                    self.model = AutoModel.from_pretrained(
+                        model,
+                        trust_remote_code=True,
+                        torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                    ).to(self.device)
             
             self.model_name = model
             print(f"Model loaded successfully on {self.device}")
@@ -982,13 +1006,14 @@ class HuggingFaceProvider(AIProvider):
     def _prepare_inputs_llava(self, image_path: str, prompt: str):
         """Prepare inputs for LLaVA models"""
         from PIL import Image as PILImage
+        import torch
         
         # Load image
         image = PILImage.open(image_path).convert('RGB')
         
-        # Try to use chat template if available
+        # LLaVA-OneVision processors can be fragile - try multiple approaches
         try:
-            # LLaVA typically uses a simple format
+            # Approach 1: Try chat template with conversation format
             conversation = [
                 {
                     "role": "user",
@@ -996,26 +1021,50 @@ class HuggingFaceProvider(AIProvider):
                 }
             ]
             
-            # Apply chat template (some LLaVA models support this)
             text = self.processor.apply_chat_template(
                 conversation, add_generation_prompt=True
             )
             
-            # Process inputs
             inputs = self.processor(
                 text=text,
                 images=image,
                 return_tensors="pt"
             )
-        except (AttributeError, ValueError):
-            # Fallback: processor doesn't have chat template
-            # Use simple text concatenation
-            text = f"<image>\n{prompt}"
-            inputs = self.processor(
-                text=text,
-                images=image,
-                return_tensors="pt"
-            )
+        except (AttributeError, ValueError, TypeError) as e:
+            # Approach 2: Simple text + image processing
+            try:
+                text = f"<image>\n{prompt}"
+                inputs = self.processor(
+                    text=text,
+                    images=image,
+                    return_tensors="pt"
+                )
+            except (TypeError, AttributeError) as e2:
+                # Approach 3: Process text and image separately
+                # Some LLaVA processors need separate handling
+                try:
+                    inputs = self.processor(
+                        images=image,
+                        return_tensors="pt"
+                    )
+                    # Add text as input_ids if processor has tokenizer
+                    if hasattr(self.processor, 'tokenizer'):
+                        text_inputs = self.processor.tokenizer(
+                            prompt,
+                            return_tensors="pt",
+                            padding=True
+                        )
+                        inputs['input_ids'] = text_inputs['input_ids']
+                        inputs['attention_mask'] = text_inputs['attention_mask']
+                except Exception as e3:
+                    # Last resort: minimal inputs
+                    # Just process the image and let model handle text internally
+                    from transformers import AutoImageProcessor
+                    img_processor = AutoImageProcessor.from_pretrained(
+                        self.model_name,
+                        trust_remote_code=True
+                    )
+                    inputs = img_processor(images=image, return_tensors="pt")
         
         return inputs
     
