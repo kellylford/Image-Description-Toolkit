@@ -986,25 +986,36 @@ class HuggingFaceProvider(AIProvider):
         # Load image
         image = PILImage.open(image_path).convert('RGB')
         
-        # LLaVA typically uses a simple format
-        conversation = [
-            {
-                "role": "user",
-                "content": f"<image>\n{prompt}"
-            }
-        ]
-        
-        # Apply chat template
-        text = self.processor.apply_chat_template(
-            conversation, add_generation_prompt=True
-        )
-        
-        # Process inputs
-        inputs = self.processor(
-            text=text,
-            images=image,
-            return_tensors="pt"
-        )
+        # Try to use chat template if available
+        try:
+            # LLaVA typically uses a simple format
+            conversation = [
+                {
+                    "role": "user",
+                    "content": f"<image>\n{prompt}"
+                }
+            ]
+            
+            # Apply chat template (some LLaVA models support this)
+            text = self.processor.apply_chat_template(
+                conversation, add_generation_prompt=True
+            )
+            
+            # Process inputs
+            inputs = self.processor(
+                text=text,
+                images=image,
+                return_tensors="pt"
+            )
+        except (AttributeError, ValueError):
+            # Fallback: processor doesn't have chat template
+            # Use simple text concatenation
+            text = f"<image>\n{prompt}"
+            inputs = self.processor(
+                text=text,
+                images=image,
+                return_tensors="pt"
+            )
         
         return inputs
     
