@@ -273,26 +273,6 @@ MODEL_METADATA = {
         "cost": "Free",
         "tags": ["vision", "local", "multimodal", "accurate"]
     },
-    "lmms-lab/llava-onevision-qwen2-0.5b-ov": {
-        "provider": "huggingface",
-        "description": "LLaVA-OneVision 0.5B - Ultra-fast compact vision-language model",
-        "size": "~1GB",
-        "install_command": "pip install 'transformers>=4.45.0' torch torchvision pillow",
-        "recommended": False,
-        "min_ram": "4GB",
-        "cost": "Free",
-        "tags": ["vision", "local", "multimodal", "fast"]
-    },
-    "lmms-lab/llava-onevision-qwen2-7b-ov": {
-        "provider": "huggingface",
-        "description": "LLaVA-OneVision 7B - Advanced vision-language model",
-        "size": "~15GB",
-        "install_command": "pip install 'transformers>=4.45.0' torch torchvision pillow",
-        "recommended": False,
-        "min_ram": "16GB",
-        "cost": "Free",
-        "tags": ["vision", "local", "multimodal", "accurate"]
-    },
 }
 
 

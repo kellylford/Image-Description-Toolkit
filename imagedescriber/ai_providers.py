@@ -865,15 +865,12 @@ class HuggingFaceProvider(AIProvider):
             return []
         
         return [
-            # Qwen2-VL family
+            # Qwen2-VL family (tested and working)
             "Qwen/Qwen2-VL-2B-Instruct",
             "Qwen/Qwen2-VL-7B-Instruct",
             
-            # LLaVA-OneVision family  
-            "lmms-lab/llava-onevision-qwen2-0.5b-ov",
-            "lmms-lab/llava-onevision-qwen2-7b-ov",
-            
-            # Other popular models can be added
+            # Other HuggingFace vision models can be added here
+            # Note: LLaVA-OneVision models are incompatible with current transformers version
         ]
     
     def _detect_model_family(self, model_id: str) -> str:

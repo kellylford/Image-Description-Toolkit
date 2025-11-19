@@ -511,9 +511,7 @@ def guided_workflow(custom_config_path=None):
             
             hf_models = [
                 "Qwen/Qwen2-VL-2B-Instruct (4GB, recommended)",
-                "Qwen/Qwen2-VL-7B-Instruct (15GB, high quality)",
-                "lmms-lab/llava-onevision-qwen2-0.5b-ov (1GB, fast)",
-                "lmms-lab/llava-onevision-qwen2-7b-ov (15GB, alternative)"
+                "Qwen/Qwen2-VL-7B-Instruct (15GB, high quality)"
             ]
             print("Available HuggingFace models:")
             print("Note: Models will be downloaded on first use (1-15GB depending on model)")
