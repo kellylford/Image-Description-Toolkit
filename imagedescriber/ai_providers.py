@@ -921,14 +921,25 @@ class HuggingFaceProvider(AIProvider):
                 from transformers import AutoTokenizer
                 self.processor = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
             
-            # Load model - Qwen2-VL and similar vision models need AutoModel, not AutoModelForCausalLM
-            # Using trust_remote_code=True allows the model to use its own custom class
-            from transformers import AutoModel
-            self.model = AutoModel.from_pretrained(
-                model,
-                trust_remote_code=True,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-            ).to(self.device)
+            # Load model - use the appropriate AutoModel class based on model family
+            # Qwen2-VL and similar vision models work with AutoModel + trust_remote_code
+            # which automatically resolves to the correct class (e.g., Qwen2VLForConditionalGeneration)
+            if self._model_family == 'qwen2-vl':
+                # Qwen2-VL requires the specific class for generation
+                from transformers import Qwen2VLForConditionalGeneration
+                self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+                    model,
+                    trust_remote_code=True,
+                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                ).to(self.device)
+            else:
+                # For other models, use AutoModel which will resolve to correct class
+                from transformers import AutoModel
+                self.model = AutoModel.from_pretrained(
+                    model,
+                    trust_remote_code=True,
+                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                ).to(self.device)
             
             self.model_name = model
             print(f"Model loaded successfully on {self.device}")
