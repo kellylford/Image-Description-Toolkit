@@ -2,6 +2,7 @@
 imagedescriber/onnx_models/
 *.pt
 yolov8*.pt
+temp_vit_onnx/  # NPU test model (2.5GB ONNX export)
 
 # Temporary and development files
 ChatHistory.txt
