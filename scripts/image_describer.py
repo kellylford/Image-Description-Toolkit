@@ -1937,7 +1937,7 @@ Configuration:
         "--provider",
         type=str,
         default="ollama",
-        choices=["ollama", "openai", "claude", "onnx"],
+        choices=["ollama", "openai", "claude", "onnx", "huggingface"],
         help="AI provider to use (default: ollama)"
     )
     parser.add_argument(
