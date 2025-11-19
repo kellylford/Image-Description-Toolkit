@@ -376,7 +376,7 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude", "onnx"]
+    providers = ["ollama", "openai", "claude", "onnx", "huggingface"]
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
     if provider == 'EXIT':
@@ -496,8 +496,45 @@ def guided_workflow(custom_config_path=None):
             print("\nReturning to provider selection...\n")
             return guided_workflow()
     
+    elif provider == 'huggingface':
+        # Check if HuggingFace provider is available
+        try:
+            sys.path.insert(0, str(Path(__file__).parent.parent))
+            from imagedescriber.ai_providers import HuggingFaceProvider
+            hf_provider = HuggingFaceProvider()
+            
+            if not hf_provider.is_available():
+                print("\n⚠️  HuggingFace dependencies not installed.")
+                print("Install with: pip install transformers torch torchvision pillow")
+                print("\nReturning to provider selection...\n")
+                return guided_workflow()
+            
+            hf_models = [
+                "Qwen/Qwen2-VL-2B-Instruct (4GB, recommended)",
+                "Qwen/Qwen2-VL-7B-Instruct (15GB, high quality)",
+                "lmms-lab/llava-onevision-qwen2-0.5b-ov (1GB, fast)",
+                "lmms-lab/llava-onevision-qwen2-7b-ov (15GB, alternative)"
+            ]
+            print("Available HuggingFace models:")
+            print("Note: Models will be downloaded on first use (1-15GB depending on model)")
+            model_choice = get_choice("Select a model", hf_models, default=1, allow_back=True)
+            if model_choice == 'EXIT':
+                print("Exiting...")
+                return
+            if model_choice == 'BACK':
+                # Go back to provider selection - restart function
+                return guided_workflow()
+            # Extract just the model name (before the space/parenthesis)
+            model = model_choice.split()[0]
+            
+        except ImportError as e:
+            print(f"\n⚠️  Error loading HuggingFace provider: {e}")
+            print("Make sure dependencies are installed: pip install transformers torch torchvision pillow")
+            print("\nReturning to provider selection...\n")
+            return guided_workflow()
+    
     # Step 3/4: Image Directory (step number depends on whether API key was needed)
-    dir_step = "Step 3" if provider in ['ollama', 'onnx'] else "Step 4"
+    dir_step = "Step 3" if provider in ['ollama', 'onnx', 'huggingface'] else "Step 4"
     print_header(f"{dir_step}: Image Directory")
     
     while True:
