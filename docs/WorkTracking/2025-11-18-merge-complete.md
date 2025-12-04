@@ -61,7 +61,7 @@ Successfully merged the `onnx` branch into `main` with full cleanup and document
   - Simple: 8 words, 8.63s per image (base model)
   - Technical: 40+ words, 26.09s per image (base model)
   - Narrative: 70+ words, 73.59s per image (base model)
-- **Documentation**: [docs/ONNX_PROVIDER_GUIDE.md](../ONNX_PROVIDER_GUIDE.md)
+- **Documentation**: [docs/HUGGINGFACE_PROVIDER_GUIDE.md](../HUGGINGFACE_PROVIDER_GUIDE.md)
 
 **Example Usage**:
 ```bash
@@ -431,7 +431,7 @@ Before considering this merge complete, verify:
 ## References
 
 **Documentation**:
-- [ONNX Provider Guide](../ONNX_PROVIDER_GUIDE.md)
+- [HuggingFace Provider Guide](../HUGGINGFACE_PROVIDER_GUIDE.md)
 - [Redescribe Feature Design](redescribe-feature-design.md)
 - [Florence-2 Performance Analysis](2025-11-18-florence-analysis.md)
 - [Branch Merge Evaluation](2025-11-18-branch-merge-evaluation.md)
