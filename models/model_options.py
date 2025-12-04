@@ -34,7 +34,7 @@ GENERIC_OPTIONS: Dict[str, Dict[str, Any]] = {
         "range": [10, 300],
         "default": 60,
         "description": "Request timeout in seconds",
-        "applies_to": ["Ollama", "Ollama Cloud", "OpenAI", "HuggingFace", "ONNX", "Copilot+ PC"]
+        "applies_to": ["Ollama", "Ollama Cloud", "OpenAI", "HuggingFace", "Copilot+ PC"]
     }
 }
 
@@ -76,7 +76,7 @@ PROVIDER_SPECIFIC_OPTIONS: Dict[str, Dict[str, Dict[str, Any]]] = {
             "description": "Image detail level (affects cost and quality)"
         }
     },
-    "ONNX": {
+    "HuggingFace": {
         "use_gpu": {
             "type": "bool",
             "default": True,

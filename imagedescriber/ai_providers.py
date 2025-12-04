@@ -834,8 +834,8 @@ import platform
 import subprocess
 
 
-class ONNXProvider(AIProvider):
-    """ONNX provider for local Florence-2 vision models with NPU acceleration"""
+class HuggingFaceProvider(AIProvider):
+    """HuggingFace provider for local Florence-2 vision models with NPU acceleration"""
     
     # Florence-2 task types for different levels of detail
     TASK_CAPTION = "<CAPTION>"
@@ -861,7 +861,7 @@ class ONNXProvider(AIProvider):
         ]
     
     def get_provider_name(self) -> str:
-        return "ONNX"
+        return "HuggingFace"
     
     def is_available(self) -> bool:
         """Check if Florence-2 dependencies are available"""
@@ -1001,7 +1001,7 @@ _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
-_onnx_provider = ONNXProvider()
+_huggingface_provider = HuggingFaceProvider()
 
 
 def get_available_providers() -> Dict[str, AIProvider]:
@@ -1021,7 +1021,7 @@ def get_available_providers() -> Dict[str, AIProvider]:
         providers['claude'] = _claude_provider
     
     if _onnx_provider.is_available():
-        providers['onnx'] = _onnx_provider
+        providers['huggingface'] = _huggingface_provider
     
     return providers
 
@@ -1033,5 +1033,5 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'ollama_cloud': _ollama_cloud_provider,
         'openai': _openai_provider,
         'claude': _claude_provider,
-        'onnx': _onnx_provider
+        'huggingface': _huggingface_provider
     }

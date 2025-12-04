@@ -48,7 +48,7 @@ PROVIDER_CAPABILITIES: Dict[str, Dict[str, Any]] = {
         "supports_options": True,
         "description": "Claude 4.x series from Anthropic with advanced reasoning"
     },
-    "ONNX": {
+    "HuggingFace": {
         "supports_prompts": True,
         "supports_custom_prompts": False,
         "prompt_styles": ["simple", "narrative", "detailed", "technical"],
@@ -56,15 +56,6 @@ PROVIDER_CAPABILITIES: Dict[str, Dict[str, Any]] = {
         "is_cloud": False,
         "supports_options": True,
         "description": "Local Florence-2 vision models with NPU acceleration support"
-    },
-    "HuggingFace": {
-        "supports_prompts": False,
-        "supports_custom_prompts": False,
-        "prompt_styles": [],
-        "requires_api_key": False,
-        "is_cloud": False,
-        "supports_options": True,
-        "description": "HuggingFace transformers models"
     },
     "Object Detection": {
         "supports_prompts": False,
