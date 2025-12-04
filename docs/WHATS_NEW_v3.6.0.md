@@ -157,12 +157,6 @@ Image Description Toolkit v3.6.0 includes all necessary dependencies in `require
 
 ---
 
-## 🐛 Bug Fixes
-
-None - this is a feature addition release.
-
----
-
 ---
 
 **Previous Release**: [What's New in v3.5.0](WHATS_NEW_v3.5.0.md)
