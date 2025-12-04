@@ -61,15 +61,6 @@ Includes all five applications:
 - **prompteditor.exe** - Prompt template editor
 - **idtconfigure.exe** - Configuration manager
 
-### Manual Installation (Alternative)
-
-Download individual ZIP packages from the [releases page](https://github.com/kellylford/Image-Description-Toolkit/releases/tag/v3.6.0):
-- `ImageDescriptionToolkit_v3.6.0.zip` - Main CLI toolkit
-- `viewer_v3.6.0.zip` - Viewer application
-- `imagedescriber_v3.6.0.zip` - ImageDescriber GUI
-- `prompt_editor_v3.6.0.zip` - Prompt Editor
-- `idtconfigure_v3.6.0.zip` - Configuration tool
-
 ---
 
 ## 🔧 Requirements
