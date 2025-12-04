@@ -1,10 +1,35 @@
+## [3.6.0] - 2025-12-04
+
+### 🎯 Major Features
+
+**HuggingFace Provider with Florence-2 Models**
+- **Local AI vision models**: Microsoft Florence-2-base and Florence-2-large models
+- **Self-contained**: No need to install Ollama or external AI servers
+- **Zero cost**: No API keys, no cloud costs
+- **Privacy-focused**: All processing happens locally on your hardware
+- **Three prompt styles**: Simple, Technical, and Narrative descriptions
+- **Comprehensive documentation**: See [HUGGINGFACE_PROVIDER_GUIDE.md](docs/HUGGINGFACE_PROVIDER_GUIDE.md)
+
+**Redescribe Feature - Workflow Reuse**
+- **Re-describe with different AI**: Test multiple models/prompts on identical images
+- **Efficient image reuse**: Hardlinks, symlinks, or copy - reuses extracted frames and converted images
+- **Model comparison**: Compare Ollama, OpenAI, Claude, and HuggingFace outputs side-by-side
+- **Workflow metadata**: Tracks original settings and changes for traceability
+- **Design documentation**: [redescribe-feature-design.md](docs/WorkTracking/redescribe-feature-design.md)
+- **Example**: `idt workflow --redescribe wf_photos_ollama_llava --provider huggingface --model microsoft/Florence-2-base`
+
+---
+
 ## [4.0.0] - 2025-11-18
 
-### ��� Major Features
+### ⚠️ Note
+This version introduced Florence-2 support under the "ONNX" provider name, which was renamed to "HuggingFace" in v3.6.0 for accuracy.
 
-**ONNX Provider with Florence-2 Models**
+### 🎯 Major Features
+
+**HuggingFace Provider with Florence-2 Models** (originally named "ONNX" in this version)
 - **CPU-only AI vision models**: Microsoft Florence-2-base and Florence-2-large models
-- **No GPU required**: Production-ready ONNX Runtime execution on any CPU
+- **No GPU required**: Production-ready transformers library execution on any CPU
 - **Three prompt styles**: Simple (8 words), Technical (40+ words), Narrative (70+ words)
 - **Comprehensive documentation**: See [HUGGINGFACE_PROVIDER_GUIDE.md](docs/HUGGINGFACE_PROVIDER_GUIDE.md)
 - **Performance benchmarking**: 8.63s to 145.16s per image depending on model/prompt
@@ -13,10 +38,10 @@
 **Redescribe Feature - Workflow Reuse**
 - **Re-describe with different AI**: Test multiple models/prompts on identical images
 - **Efficient image reuse**: Hardlinks, symlinks, or copy - reuses extracted frames and converted images
-- **Model comparison**: Compare Ollama, OpenAI, Claude, and ONNX outputs side-by-side
+- **Model comparison**: Compare Ollama, OpenAI, Claude, and HuggingFace outputs side-by-side
 - **Workflow metadata**: Tracks original settings and changes for traceability
 - **Design documentation**: [redescribe-feature-design.md](docs/WorkTracking/redescribe-feature-design.md)
-- **Example**: `idt workflow --redescribe wf_photos_ollama_llava --provider onnx --model Florence-2-base`
+- **Example**: `idt workflow --redescribe wf_photos_ollama_llava --provider huggingface --model microsoft/Florence-2-base`
 
 ### ��� Critical Bug Fixes
 
