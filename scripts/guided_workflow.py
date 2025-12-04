@@ -460,27 +460,27 @@ def guided_workflow(custom_config_path=None):
         # Extract just the model name (before the space/parenthesis)
         model = model_choice.split()[0]
     
-    elif provider == 'onnx':
-        # Check if ONNX provider is available
+    elif provider == 'huggingface':
+        # Check if HuggingFace provider is available
         try:
             sys.path.insert(0, str(Path(__file__).parent.parent))
-            from imagedescriber.ai_providers import ONNXProvider
-            onnx_provider = ONNXProvider()
+            from imagedescriber.ai_providers import HuggingFaceProvider
+            hf_provider = HuggingFaceProvider()
             
-            if not onnx_provider.is_available():
+            if not hf_provider.is_available():
                 print("\n⚠️  Florence-2 dependencies not installed.")
                 print("Install with: pip install transformers torch torchvision einops timm")
                 print("\nReturning to provider selection...\n")
                 return guided_workflow()
             
-            available_models = onnx_provider.get_available_models()
+            available_models = hf_provider.get_available_models()
             
-            onnx_models = [
+            hf_models = [
                 "microsoft/Florence-2-base (230MB, faster, recommended)",
                 "microsoft/Florence-2-large (700MB, slower, better quality)"
             ]
-            print("Available ONNX models (Florence-2):")
-            model_choice = get_choice("Select a model", onnx_models, default=1, allow_back=True)
+            print("Available HuggingFace models (Florence-2):")
+            model_choice = get_choice("Select a model", hf_models, default=1, allow_back=True)
             if model_choice == 'EXIT':
                 print("Exiting...")
                 return
@@ -491,7 +491,7 @@ def guided_workflow(custom_config_path=None):
             model = model_choice.split()[0]
             
         except ImportError as e:
-            print(f"\n⚠️  Error loading ONNX provider: {e}")
+            print(f"\n⚠️  Error loading HuggingFace provider: {e}")
             print("Make sure dependencies are installed: pip install transformers torch torchvision einops timm")
             print("\nReturning to provider selection...\n")
             return guided_workflow()
