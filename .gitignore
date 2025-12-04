@@ -54,6 +54,14 @@ logs/
 *.bak
 *.backup
 
+# Test output files in root
+test_output.txt
+help_output.txt
+test_config.json
+
+# Accidental pip install outputs
+=*.*.*
+
 # Build artifacts
 build/
 dist/

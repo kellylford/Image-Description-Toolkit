@@ -1,5 +1,0 @@
-Dry run mode - showing what would be executed:
-Input directory: C:\Users\kelly\GitHub\Image-Description-Toolkit\test_data
-Output directory: C:\Users\kelly\GitHub\Image-Description-Toolkit\Descriptions\wf_image-description-toolkit_test_data_ollama_llava7b_narrative_20251031_112600
-Workflow steps: describe
-Workflow config: workflow_config.json
