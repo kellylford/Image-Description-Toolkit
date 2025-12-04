@@ -400,9 +400,8 @@ def guided_workflow(custom_config_path=None):
             if cont == 'BACK' or cont == "No, go back to setup":
                 return guided_workflow()
     
-    # Step 2/3: Select Model (step number depends on whether API key was needed)
-    model_step = "Step 2" if provider == 'ollama' else "Step 3"
-    print_header(f"{model_step}: Select Model")
+    # Step 3: Select Model
+    print_header("Step 3: Select Model")
     
     if provider == 'ollama':
         print("Checking for installed Ollama models...")
@@ -496,9 +495,8 @@ def guided_workflow(custom_config_path=None):
             print("\nReturning to provider selection...\n")
             return guided_workflow()
     
-    # Step 3/4: Image Directory (step number depends on whether API key was needed)
-    dir_step = "Step 3" if provider in ['ollama', 'huggingface'] else "Step 4"
-    print_header(f"{dir_step}: Image Directory")
+    # Step 4: Image Directory
+    print_header("Step 4: Image Directory")
     
     while True:
         img_dir = get_input("Enter path to directory containing images")
@@ -515,16 +513,14 @@ def guided_workflow(custom_config_path=None):
             if retry == 'BACK' or retry == "No, go back to model selection":
                 return guided_workflow()
     
-    # Step 4/5: Workflow Name (Optional)
-    name_step = "Step 4" if provider in ['ollama', 'huggingface'] else "Step 5"
-    print_header(f"{name_step}: Workflow Name (Optional)")
+    # Step 5: Workflow Name (Optional)
+    print_header("Step 5: Workflow Name (Optional)")
     print("You can provide a custom name for this workflow run.")
     print("If you skip this, a name will be auto-generated from the input directory.")
     workflow_name = get_input("Enter workflow name", allow_empty=True)
     
-    # Step 5/6: Prompt Style (Optional)
-    style_step = "Step 5" if provider in ['ollama', 'huggingface'] else "Step 6"
-    print_header(f"{style_step}: Prompt Style (Optional)")
+    # Step 6: Prompt Style (Optional)
+    print_header("Step 6: Prompt Style (Optional)")
     
     # Check if using Florence-2 model (ONNX provider)
     is_florence = provider == 'huggingface' and model and 'florence' in model.lower()
