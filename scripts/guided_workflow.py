@@ -399,6 +399,11 @@ def guided_workflow(custom_config_path=None):
                 return
             if cont == 'BACK' or cont == "No, go back to setup":
                 return guided_workflow()
+    else:
+        # Skip API key setup for local providers
+        print_header("Step 2: API Key Setup")
+        print(f"✓ Skipping - {provider} runs locally without API key")
+        print()
     
     # Step 3: Select Model
     print_header("Step 3: Select Model")
