@@ -1868,9 +1868,9 @@ def main():
         print("             Models: florence-2")
         print("             Requires: Copilot+ PC with NPU, DirectML")
         print()
-        print("huggingface  - HuggingFace Inference API")
-        print("             Models: Various vision models on HF")
-        print("             Requires: API key (--api-key-file or HUGGINGFACE_API_KEY)")
+        print("huggingface  - Local HuggingFace Florence-2 models")
+        print("             Models: microsoft/Florence-2-base, microsoft/Florence-2-large")
+        print("             Requires: No API key (runs locally)")
         print()
         print("=" * 60)
         sys.exit(0)
@@ -2084,13 +2084,11 @@ Configuration:
             sys.exit(1)
     
     # Check for API key in environment variables if not provided via file
-    if not api_key and args.provider in ["openai", "huggingface", "claude"]:
+    if not api_key and args.provider in ["openai", "claude"]:
         if args.provider == "openai":
             env_var = "OPENAI_API_KEY"
         elif args.provider == "claude":
             env_var = "ANTHROPIC_API_KEY"
-        else:
-            env_var = "HUGGINGFACE_API_KEY"
         
         api_key = os.environ.get(env_var)
         if api_key:
