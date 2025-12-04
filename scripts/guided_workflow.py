@@ -376,7 +376,7 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude", "onnx"]
+    providers = ["ollama", "openai", "claude", "huggingface"]
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
     if provider == 'EXIT':
@@ -497,7 +497,7 @@ def guided_workflow(custom_config_path=None):
             return guided_workflow()
     
     # Step 3/4: Image Directory (step number depends on whether API key was needed)
-    dir_step = "Step 3" if provider in ['ollama', 'onnx'] else "Step 4"
+    dir_step = "Step 3" if provider in ['ollama', 'huggingface'] else "Step 4"
     print_header(f"{dir_step}: Image Directory")
     
     while True:
@@ -516,18 +516,18 @@ def guided_workflow(custom_config_path=None):
                 return guided_workflow()
     
     # Step 4/5: Workflow Name (Optional)
-    name_step = "Step 4" if provider in ['ollama', 'onnx'] else "Step 5"
+    name_step = "Step 4" if provider in ['ollama', 'huggingface'] else "Step 5"
     print_header(f"{name_step}: Workflow Name (Optional)")
     print("You can provide a custom name for this workflow run.")
     print("If you skip this, a name will be auto-generated from the input directory.")
     workflow_name = get_input("Enter workflow name", allow_empty=True)
     
     # Step 5/6: Prompt Style (Optional)
-    style_step = "Step 5" if provider in ['ollama', 'onnx'] else "Step 6"
+    style_step = "Step 5" if provider in ['ollama', 'huggingface'] else "Step 6"
     print_header(f"{style_step}: Prompt Style (Optional)")
     
     # Check if using Florence-2 model (ONNX provider)
-    is_florence = provider == 'onnx' and model and 'florence' in model.lower()
+    is_florence = provider == 'huggingface' and model and 'florence' in model.lower()
     
     if is_florence:
         # Florence-2 has specific task types, not custom prompts

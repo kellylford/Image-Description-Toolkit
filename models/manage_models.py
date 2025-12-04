@@ -231,9 +231,9 @@ MODEL_METADATA = {
         "tags": ["vision", "cloud", "fast"]
     },
     
-    # ONNX Models (Florence-2)
+    # HuggingFace Models (Florence-2)
     "microsoft/Florence-2-base": {
-        "provider": "onnx",
+        "provider": "huggingface",
         "description": "Florence-2 Base - Fast local vision model with NPU support",
         "size": "~230MB",
         "install_command": "pip install 'transformers>=4.45.0' torch torchvision pillow",
@@ -243,7 +243,7 @@ MODEL_METADATA = {
         "tags": ["vision", "local", "npu", "fast", "recommended"]
     },
     "microsoft/Florence-2-large": {
-        "provider": "onnx",
+        "provider": "huggingface",
         "description": "Florence-2 Large - Higher quality local vision model with NPU support",
         "size": "~700MB",
         "install_command": "pip install 'transformers>=4.45.0' torch torchvision pillow",

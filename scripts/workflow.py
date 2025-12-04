@@ -2850,7 +2850,7 @@ Viewing Results:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "claude", "onnx"],
+        choices=["ollama", "openai", "claude", "huggingface"],
         default="ollama",
         help="AI provider to use for image description (default: ollama)"
     )

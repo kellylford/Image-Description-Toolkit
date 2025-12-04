@@ -224,7 +224,7 @@ def print_status_line(provider_name: str, available: bool, models: List[str], me
                 print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add OpenAI API key to 'openai.txt' or OPENAI_API_KEY env var")
         elif "transformers" in message.lower():
             print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install transformers torch")
-        elif "onnx" in message.lower():
+        elif "huggingface" in message.lower() or "onnx" in message.lower():
             print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install onnxruntime")
             print(f"    Download models: run models/download_onnx_models.bat")
 
