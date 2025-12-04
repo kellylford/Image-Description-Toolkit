@@ -1,8 +1,8 @@
-# ONNX Provider Guide - Florence-2 Local Vision Models
+# HuggingFace Provider Guide - Florence-2 Local Vision Models
 
 ## Overview
 
-The ONNX provider enables local AI-powered image descriptions using Microsoft's Florence-2 vision models. Run entirely on your hardware with zero API costs and no internet connection required (after initial model download).
+The HuggingFace provider enables local AI-powered image descriptions using Microsoft's Florence-2 vision models. Run entirely on your hardware with zero API costs and no internet connection required (after initial model download).
 
 ## Features
 
@@ -11,40 +11,13 @@ The ONNX provider enables local AI-powered image descriptions using Microsoft's 
 - **Python 3.13 Compatible**: Works with latest Python
 - **Three Detail Levels**: Simple, detailed, and narrative descriptions
 - **Two Model Sizes**: Base (230MB, faster) and Large (700MB, better quality)
-- **NPU Ready**: Foundation for Copilot+ PC NPU acceleration (Phase 2)
-
-## Installation
-
-### 1. Install Dependencies
-
-```bash
-pip install 'transformers>=4.45.0' torch torchvision einops timm pillow
-```
-
-**Dependencies Explained**:
-- `transformers>=4.45.0` - HuggingFace library with Python 3.13 support
-- `torch` - PyTorch backend (~111MB download)
-- `torchvision` - Vision utilities for PyTorch
-- `einops` - Tensor operations (required by Florence-2)
-- `timm` - PyTorch Image Models library (required by Florence-2)
-- `pillow` - Image loading (already in IDT requirements)
-
-**Total Download Size**: ~120MB (packages) + 230-700MB (model on first use)
-
-### 2. Verify Installation
-
-```bash
-python test_onnx_provider.py
-```
-
-This will test the ONNX provider with Florence-2 base model.
 
 ## Usage
 
 ### GUI (ImageDescriber)
 
 1. Open ImageDescriber application
-2. Select **Provider**: `ONNX`
+2. Select **Provider**: `HuggingFace`
 3. Select **Model**: `microsoft/Florence-2-base` or `microsoft/Florence-2-large`
 4. Select **Prompt Style**: 
    - `simple` - Brief captions
@@ -55,22 +28,22 @@ This will test the ONNX provider with Florence-2 base model.
 ### CLI (idt command)
 
 ```bash
-# Basic usage with ONNX provider
-idt workflow --provider onnx --model microsoft/Florence-2-base --prompt-style narrative input_folder/
+# Basic usage with HuggingFace provider
+idt workflow --provider huggingface --model microsoft/Florence-2-base --prompt-style narrative input_folder/
 
 # With specific output directory
-idt workflow --provider onnx --model microsoft/Florence-2-large --output results/ images/
+idt workflow --provider huggingface --model microsoft/Florence-2-large --output results/ images/
 
 # Single image
-idt describe --provider onnx --model microsoft/Florence-2-base image.jpg
+idt describe --provider huggingface --model microsoft/Florence-2-base image.jpg
 ```
 
 ### Python API
 
 ```python
-from imagedescriber.ai_providers import ONNXProvider
+from imagedescriber.ai_providers import HuggingFaceProvider
 
-provider = ONNXProvider()
+provider = HuggingFaceProvider()
 
 # Check availability
 if provider.is_available():
@@ -202,8 +175,10 @@ This is normal on CPU (5-10 seconds per image). Phase 2 will add NPU acceleratio
 
 ## Version History
 
-- **v3.5.0** (2025-11-13): Initial ONNX provider with Florence-2 support
-  - CPU-only inference
+- **v3.6.0** (2025-12-04): Renamed from ONNX to HuggingFace provider
+  - Provider renamed to accurately reflect HuggingFace transformers usage
+  - All references updated across codebase (CLI, GUI, documentation)
+  - Florence-2 models now correctly identified as HuggingFace models
   - Python 3.13 compatible
   - Three detail levels
   - Base and large models

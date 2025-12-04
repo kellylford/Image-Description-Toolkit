@@ -1,12 +1,12 @@
 ## [4.0.0] - 2025-11-18
 
-### íº€ Major Features
+### ï¿½ï¿½ï¿½ Major Features
 
 **ONNX Provider with Florence-2 Models**
 - **CPU-only AI vision models**: Microsoft Florence-2-base and Florence-2-large models
 - **No GPU required**: Production-ready ONNX Runtime execution on any CPU
 - **Three prompt styles**: Simple (8 words), Technical (40+ words), Narrative (70+ words)
-- **Comprehensive documentation**: See [ONNX_PROVIDER_GUIDE.md](docs/ONNX_PROVIDER_GUIDE.md)
+- **Comprehensive documentation**: See [HUGGINGFACE_PROVIDER_GUIDE.md](docs/HUGGINGFACE_PROVIDER_GUIDE.md)
 - **Performance benchmarking**: 8.63s to 145.16s per image depending on model/prompt
 - **Production tested**: Validated on 1000+ image workflows
 
@@ -18,7 +18,7 @@
 - **Design documentation**: [redescribe-feature-design.md](docs/WorkTracking/redescribe-feature-design.md)
 - **Example**: `idt workflow --redescribe wf_photos_ollama_llava --provider onnx --model Florence-2-base`
 
-### í°› Critical Bug Fixes
+### ï¿½ï¿½ï¿½ Critical Bug Fixes
 
 **File Discovery**
 - **Fixed uppercase extension handling**: Now correctly finds .PNG, .HEIC, .MOV files (not just lowercase)
@@ -35,7 +35,7 @@
 - **Impact**: Redescribe mode failed with "file in use" error
 - **Solution**: Use Path().resolve() for absolute path comparison before workflow mode detection
 
-### í» ï¸ Build & Quality Improvements
+### ï¿½ï¿½ï¿½ï¸ Build & Quality Improvements
 
 **Build System**
 - **PyInstaller cache cleaning**: All build scripts now clean cache to prevent stale code issues
@@ -52,7 +52,7 @@
 - **UTF-8 enforcement**: Consistent encoding across all build and validation scripts
 - **Better error messages**: Enhanced logging throughout workflow orchestration
 
-### í³š Documentation
+### ï¿½ï¿½ï¿½ Documentation
 
 **New Documentation**
 - **ONNX Provider Guide**: 213-line comprehensive guide with examples and benchmarks
@@ -60,7 +60,7 @@
 - **Florence-2 Analysis**: Performance and quality comparison across 6 model configurations
 - **DirectML Experiments**: GPU acceleration research and findings
 
-### í´§ Other Improvements
+### ï¿½ï¿½ï¿½ Other Improvements
 
 **Workflow Enhancements**
 - **Preserve frame subdirectories**: Video frame extraction maintains original structure
@@ -72,7 +72,7 @@
 - **Better config loading**: More robust path resolution for PyInstaller executables
 - **Command logging**: --provider logged in original command for accurate resume
 
-### í³¦ Dependencies
+### ï¿½ï¿½ï¿½ Dependencies
 
 **New Dependencies**
 - `optimum[onnxruntime]>=1.23.3` - ONNX model optimization
@@ -87,7 +87,7 @@
 
 None - all changes are backward compatible
 
-### í¾¯ Performance
+### ï¿½ï¿½ï¿½ Performance
 
 **Florence-2 Benchmarks** (per image, 5 test images):
 - Florence-2-base + Simple: 8.63s (fastest)
@@ -100,7 +100,7 @@ None - all changes are backward compatible
 
 **Key Finding**: Prompt complexity has 6-8x more impact on speed than model size (2-3x)
 
-### í¹ Testing Credits
+### ï¿½ï¿½ï¿½ Testing Credits
 
 Extensive testing and bug discovery by Kelly Ford across:
 - 6 Florence-2 model configurations
