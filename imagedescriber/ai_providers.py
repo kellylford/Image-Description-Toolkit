@@ -826,14 +826,56 @@ PILImage = None
 torch = None
 
 def _check_transformers_available():
-    """Check if transformers is available at runtime"""
-    try:
-        from transformers import AutoProcessor, AutoModelForCausalLM
-        from PIL import Image as PILImage
-        import torch
-        return True
-    except ImportError:
-        return False
+    """Check if transformers is available at runtime
+    
+    For frozen executables, this will try to import from system Python
+    by temporarily adding site-packages to sys.path.
+    """
+    # If running as frozen executable, add system site-packages to path
+    if getattr(sys, 'frozen', False):
+        try:
+            import site
+            import sysconfig
+            
+            # Get system site-packages directories
+            user_site = site.getusersitepackages()
+            global_site = sysconfig.get_path('purelib')
+            
+            # Temporarily add to path if not already there
+            paths_to_add = []
+            if user_site and user_site not in sys.path:
+                paths_to_add.append(user_site)
+            if global_site and global_site not in sys.path:
+                paths_to_add.append(global_site)
+            
+            # Add paths temporarily
+            for p in paths_to_add:
+                sys.path.insert(0, p)
+            
+            # Try to import
+            try:
+                from transformers import AutoProcessor, AutoModelForCausalLM
+                from PIL import Image as PILImage
+                import torch
+                return True
+            except ImportError:
+                return False
+            finally:
+                # Remove added paths
+                for p in paths_to_add:
+                    if p in sys.path:
+                        sys.path.remove(p)
+        except Exception:
+            return False
+    else:
+        # Not frozen, use normal import
+        try:
+            from transformers import AutoProcessor, AutoModelForCausalLM
+            from PIL import Image as PILImage
+            import torch
+            return True
+        except ImportError:
+            return False
 
 # Try import if not running as frozen executable
 if not getattr(sys, 'frozen', False):
@@ -904,6 +946,24 @@ class HuggingFaceProvider(AIProvider):
         # Import transformers at runtime (needed for frozen executables)
         global AutoProcessor, AutoModelForCausalLM, torch, PILImage
         if AutoProcessor is None:
+            # Add system site-packages for frozen executables
+            paths_added = []
+            if getattr(sys, 'frozen', False):
+                try:
+                    import site
+                    import sysconfig
+                    user_site = site.getusersitepackages()
+                    global_site = sysconfig.get_path('purelib')
+                    
+                    if user_site and user_site not in sys.path:
+                        sys.path.insert(0, user_site)
+                        paths_added.append(user_site)
+                    if global_site and global_site not in sys.path:
+                        sys.path.insert(0, global_site)
+                        paths_added.append(global_site)
+                except Exception:
+                    pass
+            
             try:
                 from transformers import AutoProcessor as AP, AutoModelForCausalLM as AM
                 from PIL import Image as PI
@@ -912,10 +972,15 @@ class HuggingFaceProvider(AIProvider):
                 AutoModelForCausalLM = AM
                 PILImage = PI
                 torch = t
-            except ImportError:
+            except ImportError as e:
+                # Clean up added paths
+                for p in paths_added:
+                    if p in sys.path:
+                        sys.path.remove(p)
                 raise ImportError(
-                    "Florence-2 requires transformers>=4.45.0, torch, and Pillow.\n"
-                    "Install with: pip install 'transformers>=4.45.0' torch torchvision pillow"
+                    f"Florence-2 requires transformers>=4.45.0, torch, and Pillow.\n"
+                    f"Install with: pip install 'transformers>=4.45.0' torch torchvision pillow\n"
+                    f"Error: {str(e)}"
                 )
         
         try:
