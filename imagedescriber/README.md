@@ -296,6 +296,24 @@ ollama pull bakllava
 ollama pull llava-phi3
 ```
 
+### Supported AI Providers
+
+ImageDescriber GUI supports the following providers:
+
+- **Ollama (Local)** - Free local AI models (recommended starting point)
+- **Ollama Cloud** - Massive cloud models (200B-671B parameters)
+- **OpenAI** - GPT-4 Vision via API (requires API key)
+- **Claude** - Anthropic Claude Vision via API (requires API key)
+
+**Note**: **HuggingFace (Florence-2)** is available via command-line only to keep the GUI installer size reasonable (~100MB instead of ~2GB). Use the CLI for HuggingFace:
+```bash
+# Single image
+idt describe image.jpg --provider huggingface --model microsoft/Florence-2-base
+
+# Full workflow  
+idt workflow --provider huggingface --model microsoft/Florence-2-base
+```
+
 ### Ollama Cloud Models ⭐ NEW!
 ImageDescriber now supports Ollama's cloud models for access to massive models without local hardware requirements:
 
