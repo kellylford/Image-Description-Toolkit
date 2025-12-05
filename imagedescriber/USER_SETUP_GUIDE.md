@@ -160,35 +160,37 @@ To unlock **AI-powered image descriptions**, you need to set up at least ONE AI 
 
 ---
 
-### 🔥 Optional: Enhanced ONNX (Hybrid: YOLO + Ollama)
+### 🔥 Optional: HuggingFace Provider (Local Florence-2 Models)
 
-**Best for**: Maximum accuracy, combining object detection with AI descriptions
+**Best for**: Free, privacy-focused local AI vision without internet connection
 
-**What it does**: YOLO detects objects first, then Ollama describes the image using both vision and detection data
+**What it does**: Runs Microsoft Florence-2 vision models entirely on your computer
 
-**Requirements**: Both Ollama AND YOLO must be installed
+**Requirements**: Python environment with transformers library
 
-**Setup time**: 3-5 minutes (after Ollama and YOLO are set up)
+**Setup time**: 5-10 minutes (first download)
 
 **Steps**:
 
-1. **Ensure Prerequisites**
-   - ✅ Ollama installed and running (see above)
-   - ✅ YOLO installed (see above)
+1. **Install Florence-2 Dependencies**
+   ```bash
+   pip install transformers torch torchvision einops timm
+   ```
 
-2. **Download ONNX Models** (optional, for faster inference)
-   - Double-click: **download_onnx_models.bat** (included with ImageDescriber, source: models/)
-   - Wait 5-10 minutes (downloads ~230MB of optimized models)
-   - These models are pre-optimized for faster CPU/GPU inference
+2. **First Use Setup**
+   - In ImageDescriber, select provider: **HuggingFace**
+   - Choose model:
+     - **microsoft/Florence-2-base** (230MB, faster)
+     - **microsoft/Florence-2-large** (700MB, better quality)
+   - First use will download the model automatically
 
 3. **Verify Setup**
-   - In ImageDescriber provider dropdown, look for:
-     - **Enhanced ONNX** (basic)
-     - **Enhanced ONNX with Spatial Details** (includes object locations)
-     - **Enhanced ONNX with Comprehensive Details** (full analysis)
+   - Process a test image
+   - Model should load and generate descriptions
+   - Subsequent uses will be faster (model cached locally)
 
 **Usage**:
-- Provider: Choose an Enhanced ONNX variant
+- Provider: Choose HuggingFace for local processing
 - YOLO settings are available in the dialog
 - Result: Descriptions include object detection data + AI understanding
 
@@ -331,7 +333,7 @@ Use this checklist to track what you've set up:
 ### Optional Enhancements
 - [ ] YOLO installed (`pip install ultralytics`)
 - [ ] "Object Detection" provider appears in ImageDescriber
-- [ ] ONNX models downloaded (for Enhanced ONNX provider)
+- [ ] Florence-2 dependencies installed (for HuggingFace provider)
 - [ ] OpenAI API key configured (if using OpenAI)
 - [ ] HuggingFace token configured (if using HuggingFace)
 
@@ -407,8 +409,8 @@ Use this checklist to track what you've set up:
 ### **Power User** (Best quality, all features)
 - ✅ Install Ollama
 - ✅ Install YOLO
-- ✅ Download ONNX models
-- ✅ Use Enhanced ONNX provider
+- ✅ Install Florence-2 dependencies
+- ✅ Use HuggingFace provider
 - Time: 20 minutes
 
 ### **Professional** (High volume, quality matters)
@@ -450,7 +452,7 @@ Use this checklist to track what you've set up:
 
 **Minimum to start**: Just run ImageDescriber.exe (0 minutes)  
 **Recommended setup**: + Ollama (10 minutes)  
-**Maximum features**: + YOLO + ONNX (25 minutes total)
+**Maximum features**: + HuggingFace Florence-2 (25 minutes total)
 
 **Remember**: Start simple, add features as needed. The core app works great without any AI setup!
 

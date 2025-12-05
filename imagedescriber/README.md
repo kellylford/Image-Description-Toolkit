@@ -1,184 +1,51 @@
-# ImageDescriber - AI-Powered Image Analysis Tool# ImageDescriber - Clean Production Directory# ImageDescriber - AI-Powered Image Description GUI
+# ImageDescriber - AI-Powered Image Description GUI
 
+A Qt6-based standalone application for processing images and generating AI descriptions with a comprehensive document-based workspace approach, advanced batch processing capabilities, and full accessibility support.
 
+## Overview
 
-A multi-provider image description tool supporting 7 different AI backends with visual output and batch processing.
+ImageDescriber provides a professional workspace for managing image description projects. Unlike traditional batch processing tools, it treats your image collections as documents that can be saved, reopened, and incrementally developed over time. The application features enterprise-level batch processing controls, WCAG-compliant accessibility, and advanced filtering and visualization options.
 
+## Key Features
 
+### Document-Based Workspace
+- **Save/Load Projects**: Store your work as `.idw` (ImageDescriber Workspace) files
+- **Persistent State**: Batch markings, descriptions, and processing history survive app restarts
+- **Multiple Descriptions**: Each image can have multiple AI descriptions with different models and prompts
+- **Metadata Tracking**: Track which model, prompt style, and creation date for each description
+- **Batch Selection Persistence**: Batch-marked items are saved with workspace files for later processing
 
-## OverviewThe imagedescriber directory has been cleaned up and organized. All experimental code has been moved to the `experiments/` directory while preserving the core production files.A Qt6-based standalone application for processing images and generating AI descriptions with a comprehensive document-based workspace approach, advanced batch processing capabilities, and full accessibility support.
-
-
-
-ImageDescriber is a Windows desktop application that generates descriptions for images using various AI providers. It features a modern GUI, visual annotation support, and flexible deployment options.
-
-
-
-## Core Components## Core Production Files (Current Directory)## Overview
-
-
-
-### Source Files
-
-- `imagedescriber.py` - Main application entry point and GUI
-
-- `ai_providers.py` - Provider implementations (Ollama, OpenAI, HuggingFace, ONNX/YOLO, Copilot+ NPU, GroundingDINO)### Main Application FilesImageDescriber provides a professional workspace for managing image description projects. Unlike traditional batch processing tools, it treats your image collections as documents that can be saved, reopened, and incrementally developed over time. The application features enterprise-level batch processing controls, WCAG-compliant accessibility, and advanced filtering and visualization options.
-
-- `ui_components.py` - Reusable UI widgets and dialogs
-
-- `data_models.py` - Data structures and configuration- `imagedescriber.py` - Main GUI application
-
-- `worker_threads.py` - Background processing threads
-
-- `ai_providers.py` - Core AI provider system with all model integrations## Key Features
-
-### Build Scripts
-
-- `build_imagedescriber.bat` - Build Intel/AMD x64 distribution- `data_models.py` - Data models and structures  
-
-- `build_imagedescriber_amd.bat` - Build AMD Ryzen AI distribution
-
-- `build_imagedescriber_arm.bat` - Build ARM64/Copilot+ distribution- `ui_components.py` - UI component definitions### Document-Based Workspace
-
-- `setup_imagedescriber.bat` - Install dependencies for development
-
-- `worker_threads.py` - Threading for async operations- **Save/Load Projects**: Store your work as `.idw` (ImageDescriber Workspace) files
-
-## Quick Start
-
-- `dialogs.py` - Dialog windows and UI interactions- **Persistent State**: Batch markings, descriptions, and processing history survive app restarts
-
-### Development Setup
-
-```bash- **Multiple Descriptions**: Each image can have multiple AI descriptions with different models and prompts
-
-# Install dependencies
-
-setup_imagedescriber.bat### Build Scripts- **Metadata Tracking**: Track which model, prompt style, and creation date for each description
-
-
-
-# Run from source- `build_imagedescriber.bat` - Standard build script- **Batch Selection Persistence**: Batch-marked items are saved with workspace files for later processing
-
-python imagedescriber.py
-
-```- `build_imagedescriber_amd.bat` - AMD-optimized build  
-
-
-
-### Building Distributions- `build_imagedescriber_arm.bat` - ARM build script### Advanced Batch Processing
-
-```bash
-
-# Build for your platform- **Visual Indicators**: Batch-marked items show with "b" prefix and accessible light blue background
-
-build_imagedescriber.bat          # Intel/AMD x64
-
-build_imagedescriber_amd.bat      # AMD Ryzen AI NPU### Model Storage- **Progress Tracking**: Real-time progress in window title ("Batch Processing: 3 of 10")
-
-build_imagedescriber_arm.bat      # ARM64/Copilot+
-
-```- `onnx_models/` - Directory containing all ONNX model files- **Batch Queue Display**: Shows number of items marked for batch processing
-
-
-
-### Using Pre-built Distribution  - Real production models (MobileNet, ResNet, BLIP, Florence-2, etc.)- **Completion Confirmation**: Choice to clear or keep batch selection after processing
-
-See `dist_templates/USER_SETUP_GUIDE.md` for end-user instructions.
-
-  - NPU/GPU optimized models for Copilot+ hardware- **Stop Processing**: Graceful cancellation of batch operations
-
-## AI Provider Support
-
+### Advanced Batch Processing
+- **Visual Indicators**: Batch-marked items show with "b" prefix and accessible light blue background
+- **Progress Tracking**: Real-time progress in window title ("Batch Processing: 3 of 10")
+- **Batch Queue Display**: Shows number of items marked for batch processing
+- **Completion Confirmation**: Choice to clear or keep batch selection after processing
+- **Stop Processing**: Graceful cancellation of batch operations
 - **Filter by Batch Status**: View only batch-marked items
+- **Manual Batch Clearing**: Clear all batch markings via menu option
 
-- **Ollama** - Local inference server
-
-- **Ollama Cloud** - Cloud-based Ollama API### Experimental Work (Organized)- **Manual Batch Clearing**: Clear all batch markings via menu option
-
-- **OpenAI** - GPT-4o Vision API
-
-- **HuggingFace** - BLIP, GIT, ViT-GPT2 models- `experiments/` - All test scripts, tools, backups, and documentation
-
-- **ONNX/YOLO** - Hardware-accelerated object detection
-
-- **Copilot+ NPU** - DirectML NPU acceleration  - 48+ Python files organized into logical subdirectories### Processing Capabilities
-
-- **GroundingDINO** - Open-set object detection with text prompts
-
-  - Nothing deleted - everything preserved and categorized- **Individual Processing**: Process single images with the P key
-
-## Documentation
-
+### Processing Capabilities
+- **Individual Processing**: Process single images with the P key
 - **Batch Processing**: Mark multiple images with B key, then process all at once
-
-- **[Detailed Documentation](../docs/IMAGEDESCRIBER_DETAILED.md)** - Comprehensive features and architecture
-
-- **[Provider Guides](../docs/COPILOT_PC_PROVIDER_GUIDE.md)** - Provider-specific setup## Key Features Active- **Process All**: Process all images in workspace with one command
-
-- **[Distribution Guide](../docs/packaging/PACKAGING_OVERVIEW.md)** - Building and distributing
-
+- **Process All**: Process all images in workspace with one command
 - **HEIC Conversion**: Automatic conversion of HEIC/HEIF images to JPEG
+- **Video Frame Extraction**: Extract frames from videos (MP4, MOV, AVI, MKV) for description
+- **Live Ollama Integration**: Select from installed Ollama models in real-time
+- **Custom Prompts**: Use predefined prompt styles or write custom prompts
+- **Skip Model Verification**: Optional faster processing by skipping model checks
 
-## Distribution Templates
-
-✅ **NPU Acceleration** - All models use DirectML with NPU/GPU acceleration- **Video Frame Extraction**: Extract frames from videos (MP4, MOV, AVI, MKV) for description
-
-Template files for building distributions are in `dist_templates/`:
-
-- `DISTRIBUTION_README.txt` - End-user README✅ **Enhanced ViT Vision-Language** - Hybrid approach with real object detection  - **Live Ollama Integration**: Select from installed Ollama models in real-time
-
-- `USER_SETUP_GUIDE.md` - Installation instructions
-
-- `WHATS_INCLUDED.txt` - Package contents✅ **Multiple Model Support** - MobileNet, ResNet, BLIP, Florence-2, LLaVA- **Custom Prompts**: Use predefined prompt styles or write custom prompts
-
-
-
-## Model Management✅ **Accessibility Optimized** - Screen reader friendly, no emoji names- **Skip Model Verification**: Optional faster processing by skipping model checks
-
-
-
-Model installation and checking tools are in `../models/`:✅ **Sub-second Inference** - 0.4-0.5s processing with quality descriptions
-
-- `check_models.py` - Check status of all providers and models
-
-- `manage_models.py` - Install, remove, and list models✅ **Context-Aware Descriptions** - Intelligent interpretation based on prompts### Accessibility & Visual Features
-
-- `checkmodels.bat` - Quick status checker
-
+### Accessibility & Visual Features
 - **WCAG AA/AAA Compliant**: Light blue backgrounds with 18.39:1 contrast ratio
-
-See **[Model Management Guide](../docs/MODEL_MANAGEMENT_QUICKSTART.md)** for details.
-
-## Production Ready- **Screen Reader Support**: Full accessibility descriptions for all interface elements
-
-## Testing
-
+- **Screen Reader Support**: Full accessibility descriptions for all interface elements
 - **Multiple Indicators**: Visual prefixes (p/d/b) + color coding + screen reader text
+- **Keyboard Navigation**: Complete keyboard control with shortcuts
+- **Status Indicators**: "p" for processing, "d" for described, "b" for batch-marked
+- **Focus Tracking**: Proper focus management for screen readers and keyboard users
 
-Test files are located in `../tests/`:
-
-- `test_groundingdino.bat` - Test GroundingDINO installationThe main imagedescriber directory is now clean and production-ready with:- **Keyboard Navigation**: Complete keyboard control with shortcuts
-
-- `validate_groundingdino_hybrid.py` - Validate hybrid mode
-
-- Only essential core files- **Status Indicators**: "p" for processing, "d" for described, "b" for batch-marked
-
-## License
-
-- All models functional with NPU acceleration  - **Focus Tracking**: Proper focus management for screen readers and keyboard users
-
-See LICENSE file in repository root.
-
-- Enhanced vision-language capabilities
-
-- Comprehensive AI provider system### Advanced Filtering & Views
-
-- All experimental work safely preserved in organized structure- **Filter Options**: View All, Described Only, or Batch-Marked Only
-
+### Advanced Filtering & Views
+- **Filter Options**: View All, Described Only, or Batch-Marked Only
 - **View Menu Filters**: Organized filter options in View menu
-
-Run with: `python imagedescriber.py`- **Smart Refresh**: Maintains current filter when updating views
+- **Smart Refresh**: Maintains current filter when updating views
 - **All Descriptions Dialog**: Browse all descriptions across all images
 - **Hierarchical Display**: Videos show extracted frames as children with proper accessibility
 

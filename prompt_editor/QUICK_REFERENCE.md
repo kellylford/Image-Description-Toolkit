@@ -13,9 +13,9 @@ python prompt_editor/prompt_editor.py
 |----------|------|------|------------------|--------|
 | **Ollama** | Local | Free | No | moondream, llama3.2-vision, llava |
 | **OpenAI** | Cloud | Paid | Yes | gpt-4o, gpt-4o-mini, gpt-4-turbo |
-| **ONNX** | Local | Free | No | florence-2-base, florence-2-large |
+| **HuggingFace** | Local | Free | No | microsoft/Florence-2-base, microsoft/Florence-2-large |
 | **Copilot** | Cloud | Subscription | Via GitHub | gpt-4o, claude-3.5-sonnet |
-| **HuggingFace** | Cloud | Free tier | Yes | Florence, BLIP models |
+| **Claude** | Cloud | Paid | Yes | claude-3.5-sonnet, claude-opus |
 
 ## Quick Setup
 
