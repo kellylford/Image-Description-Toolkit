@@ -2750,7 +2750,7 @@ Redescribe Examples (reuse images with different AI settings):
   idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\
     --prompt-style technical
   
-  # Test local ONNX model vs cloud
+  # Test local HuggingFace model vs cloud
   idt workflow --redescribe wf_photos_openai_gpt-4o_narrative_20251115_100000 \\
     --provider huggingface --model microsoft/Florence-2-base
   

@@ -11,9 +11,9 @@ manually edit JSON. Features include:
 - Add new prompt styles
 - Delete existing prompts
 - Set default prompt style
-- Multi-provider AI support (Ollama, OpenAI, ONNX, Copilot, HuggingFace)
+- Multi-provider AI support (Ollama, OpenAI, Claude, Copilot, HuggingFace)
 - Set default AI provider and model
-- API key configuration for cloud providers (OpenAI, HuggingFace)
+- API key configuration for cloud providers (OpenAI, Claude, HuggingFace)
 - Live model discovery from selected AI provider
 - Save and Save As functionality for creating custom configurations
 - Open different configuration files
