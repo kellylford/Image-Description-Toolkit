@@ -527,7 +527,7 @@ def guided_workflow(custom_config_path=None):
     # Step 6: Prompt Style (Optional)
     print_header("Step 6: Prompt Style (Optional)")
     
-    # Check if using Florence-2 model (ONNX provider)
+    # Check if using Florence-2 model (HuggingFace provider)
     is_florence = provider == 'huggingface' and model and 'florence' in model.lower()
     
     if is_florence:

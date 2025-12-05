@@ -562,7 +562,7 @@ Examples:
     # List command
     list_parser = subparsers.add_parser('list', help='List available models')
     list_parser.add_argument('--installed', action='store_true', help='Show only installed models')
-    list_parser.add_argument('--provider', choices=['ollama', 'openai', 'claude'], help='Filter by provider')
+    list_parser.add_argument('--provider', choices=['ollama', 'openai', 'claude', 'huggingface'], help='Filter by provider')
     
     # Install command
     install_parser = subparsers.add_parser('install', help='Install a model')
