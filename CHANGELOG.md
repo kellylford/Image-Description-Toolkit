@@ -8,7 +8,14 @@
 - **Zero cost**: No API keys, no cloud costs
 - **Privacy-focused**: All processing happens locally on your hardware
 - **Three prompt styles**: Simple, Technical, and Narrative descriptions
+- **CLI-only in GUI installer**: Available via command-line to keep installer size reasonable (~100MB vs ~2GB)
 - **Comprehensive documentation**: See [HUGGINGFACE_PROVIDER_GUIDE.md](docs/HUGGINGFACE_PROVIDER_GUIDE.md)
+
+**Note**: HuggingFace provider is **not available in ImageDescriber GUI** to avoid bundling 2GB of transformers/PyTorch dependencies. Use CLI commands instead:
+```bash
+idt describe image.jpg --provider huggingface --model microsoft/Florence-2-base
+idt workflow --provider huggingface --model microsoft/Florence-2-base
+```
 
 **Redescribe Feature - Workflow Reuse**
 - **Re-describe with different AI**: Test multiple models/prompts on identical images

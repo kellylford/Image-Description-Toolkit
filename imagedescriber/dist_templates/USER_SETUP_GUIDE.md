@@ -160,7 +160,9 @@ To unlock **AI-powered image descriptions**, you need to set up at least ONE AI 
 
 ---
 
-### 🔥 Optional: HuggingFace Provider (Local Florence-2 Models)
+### 🔥 Optional: HuggingFace Provider (CLI Only - Florence-2 Models)
+
+**Note**: HuggingFace is **available via command-line only** to keep the ImageDescriber GUI installer size reasonable (~100MB instead of ~2GB).
 
 **Best for**: Free, privacy-focused local AI vision without internet connection
 
@@ -177,22 +179,24 @@ To unlock **AI-powered image descriptions**, you need to set up at least ONE AI 
    pip install transformers torch torchvision einops timm
    ```
 
-2. **First Use Setup**
-   - In ImageDescriber, select provider: **HuggingFace**
-   - Choose model:
-     - **microsoft/Florence-2-base** (230MB, faster)
-     - **microsoft/Florence-2-large** (700MB, better quality)
+2. **Use via Command Line**
+   ```bash
+   # Single image
+   idt describe image.jpg --provider huggingface --model microsoft/Florence-2-base
+   
+   # Full workflow
+   idt workflow --provider huggingface --model microsoft/Florence-2-base
+   ```
+
+3. **Available Models**
+   - **microsoft/Florence-2-base** (230MB, faster)
+   - **microsoft/Florence-2-large** (700MB, better quality)
    - First use will download the model automatically
 
-3. **Verify Setup**
-   - Process a test image
-   - Model should load and generate descriptions
-   - Subsequent uses will be faster (model cached locally)
-
-**Usage**:
-- Provider: Choose HuggingFace for local processing
-- Select desired Florence-2 model
-- Result: AI-generated image descriptions running entirely on your computer
+**Why CLI-only?**
+- Bundling transformers + PyTorch would increase installer from ~100MB to ~2.5GB
+- CLI provides full functionality without GUI overhead
+- GUI focuses on providers optimized for interactive use
 
 ---
 

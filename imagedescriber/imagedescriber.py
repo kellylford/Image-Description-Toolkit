@@ -2177,6 +2177,11 @@ class ProcessingDialog(QDialog):
         for provider_key, provider in all_providers.items():
             if provider is None:
                 continue  # Skip None providers
+            
+            # Skip HuggingFace in GUI (CLI-only to avoid 2GB bundle size)
+            if provider_key == "huggingface":
+                continue
+                
             try:
                 display_name = provider.get_provider_name()
                 # Skip availability check in dev mode for faster loading
@@ -2275,10 +2280,8 @@ class ProcessingDialog(QDialog):
                 else:
                     self.status_label.setText("Claude not available. Requires API key in claude.txt file (current directory, ~/, or ~/onedrive/), or set ANTHROPIC_API_KEY environment variable.")
             elif current_data == "huggingface":
-                if provider.is_available():
-                    self.status_label.setText(f"HuggingFace: Local Florence-2 vision models. Free, runs on your computer. First use will download model (~230-700MB).")
-                else:
-                    self.status_label.setText("HuggingFace not available. Install with: pip install transformers torch torchvision einops timm")
+                # HuggingFace is available via CLI only (to avoid bundling 2GB of transformers/torch)
+                self.status_label.setText("HuggingFace (Florence-2): Available via CLI only. Use: idt workflow --provider huggingface. Not bundled in GUI to keep installer size small (~100MB vs ~2GB).")
             elif current_data == "copilot":
                 if provider.is_available():
                     self.status_label.setText(f"Copilot+ PC: Native Windows AI acceleration. Status: {provider.npu_info}")
