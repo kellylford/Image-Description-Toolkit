@@ -1,11 +1,8 @@
 name: Test and Build (Disabled)
 
-# Workflow temporarily disabled - remove the [] to re-enable
+# Workflow temporarily disabled - workflow_dispatch only (manual runs)
 on:
-  push:
-    branches: []
-  pull_request:
-    branches: []
+  workflow_dispatch:
 
 jobs:
   test:
