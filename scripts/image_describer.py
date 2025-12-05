@@ -162,7 +162,7 @@ class ImageDescriber:
             config_file: Path to the JSON configuration file
             prompt_style: Style of prompt to use (detailed, concise, artistic, technical)
             output_dir: Custom output directory (default: same as input directory)
-            provider: AI provider to use (ollama, onnx, openai, huggingface)
+            provider: AI provider to use (ollama, openai, claude, huggingface)
             api_key: API key for providers that require authentication
             log_dir: Directory where log files and progress tracking are stored
             workflow_name: Name of the workflow (for window title display)
@@ -334,15 +334,15 @@ class ImageDescriber:
                 print(f"INFO: Claude provider - API key set: {bool(provider.api_key)}, Client: {bool(provider.client)}, Available: {provider.is_available()}")
                 return provider
                 
-            elif self.provider_name == "onnx":
-                logger.info("Initializing ONNX provider...")
-                provider = ONNXProvider()
+            elif self.provider_name == "huggingface":
+                logger.info("Initializing HuggingFace provider...")
+                provider = HuggingFaceProvider()
                 if not provider.is_available():
-                    raise ValueError("ONNX provider requires Florence-2 dependencies. Install with: pip install 'transformers>=4.45.0' torch torchvision einops timm")
+                    raise ValueError("HuggingFace provider requires Florence-2 dependencies. Install with: pip install 'transformers>=4.45.0' torch torchvision einops timm")
                 return provider
                 
             else:
-                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, onnx")
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, huggingface")
                 
         except Exception as e:
             logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
@@ -1860,11 +1860,7 @@ def main():
         print("             Models: gpt-4o, gpt-4o-mini, gpt-4-vision-preview")
         print("             Requires: API key (--api-key-file or OPENAI_API_KEY)")
         print()
-        print("onnx         - Enhanced Ollama with YOLO object detection")
-        print("             Models: Same as Ollama")
-        print("             Features: NPU acceleration, spatial awareness")
-        print()
-        print("copilot      - Copilot+ PC NPU acceleration")
+        print("copilot      - Copilot+ PC NPU acceleration (experimental)")
         print("             Models: florence-2")
         print("             Requires: Copilot+ PC with NPU, DirectML")
         print()
@@ -1915,10 +1911,11 @@ Examples:
   python {Path(__file__).name} exportedphotos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file ~/claude.txt
   python {Path(__file__).name} exportedphotos --provider claude --model claude-3-5-haiku-20241022
   
-  # ONNX (Enhanced Ollama with YOLO detection)
-  python {Path(__file__).name} exportedphotos --provider onnx --model llava:latest
+  # HuggingFace (Local Florence-2 models)
+  python {Path(__file__).name} exportedphotos --provider huggingface --model microsoft/Florence-2-base
+  python {Path(__file__).name} exportedphotos --provider huggingface --model microsoft/Florence-2-large --prompt-style narrative
   
-  # Copilot+ PC NPU
+  # Copilot+ PC NPU (experimental)
   python {Path(__file__).name} exportedphotos --provider copilot --model florence-2
 
 Configuration:
