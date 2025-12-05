@@ -1020,7 +1020,7 @@ def get_available_providers() -> Dict[str, AIProvider]:
     if _claude_provider.is_available():
         providers['claude'] = _claude_provider
     
-    if _onnx_provider.is_available():
+    if _huggingface_provider.is_available():
         providers['huggingface'] = _huggingface_provider
     
     return providers

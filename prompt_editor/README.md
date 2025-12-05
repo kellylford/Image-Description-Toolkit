@@ -12,7 +12,7 @@ A user-friendly Qt6 application for editing image description prompts and config
 - **Duplicate prompts** - Copy existing prompts as templates for new ones
 
 ### AI Provider Support (NEW!)
-- **Multi-provider selection** - Choose from Ollama, OpenAI, ONNX, Copilot, or HuggingFace
+- **Multi-provider selection** - Choose from Ollama, OpenAI, Claude, Copilot, or HuggingFace
 - **API key management** - Secure storage for cloud provider credentials
 - **Provider-specific models** - Model list updates based on selected provider
 - **Live model discovery** - Automatically detects available models for each provider
@@ -47,7 +47,7 @@ A user-friendly Qt6 application for editing image description prompts and config
 - At least one AI provider installed:
   - **Ollama** - For local models (free)
   - **OpenAI** - For cloud models (requires API key)
-  - **ONNX** - For local Florence-2 models (free)
+  - **HuggingFace** - For local Florence-2 models (free)
   - **HuggingFace** - For cloud models (requires token)
   - **Copilot** - For GitHub Copilot models (requires access)
 
@@ -73,7 +73,7 @@ python prompt_editor/prompt_editor.py
 ```
 
 ### Basic Workflow
-1. **Select AI provider** - Choose Ollama, OpenAI, ONNX, Copilot, or HuggingFace
+1. **Select AI provider** - Choose Ollama, OpenAI, Claude, Copilot, or HuggingFace
 2. **Configure API key** (if needed) - Enter key for OpenAI/HuggingFace or leave empty for env vars
 3. **Refresh models** - Click Refresh to load available models for selected provider
 4. **Edit prompts** - Select a prompt from the list and modify the text
@@ -98,14 +98,14 @@ python prompt_editor/prompt_editor.py
 5. Select model (recommend gpt-4o-mini for cost-effectiveness)
 6. Save configuration
 
-#### Using ONNX (Local, Free)
-1. Select **onnx** from AI Provider dropdown
-2. Model list shows: florence-2-base, florence-2-large
+#### Using HuggingFace (Local, Free)
+1. Select **huggingface** from AI Provider dropdown
+2. Model list shows: microsoft/Florence-2-base, microsoft/Florence-2-large
 3. No API key needed
-4. Models run locally via ONNX runtime
+4. Models run locally via transformers library
 5. First use will download model (~700MB)
 
-#### Using HuggingFace (Cloud, Requires Token)
+#### Using HuggingFace Cloud (Requires Token)
 1. Select **huggingface** from AI Provider dropdown
 2. API Key field appears (for HuggingFace token)
 3. Enter token OR leave empty to use `HUGGINGFACE_TOKEN` env var

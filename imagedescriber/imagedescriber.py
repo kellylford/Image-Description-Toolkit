@@ -100,9 +100,9 @@ try:
 except ImportError:
     # Fallback if provider_configs not available
     def supports_prompts(provider_name: str) -> bool:
-        return provider_name not in ["ONNX", "HuggingFace", "Object Detection", "Grounding DINO"]
+        return provider_name not in ["HuggingFace", "Object Detection", "Grounding DINO"]
     def supports_custom_prompts(provider_name: str) -> bool:
-        return provider_name not in ["ONNX", "HuggingFace", "Object Detection", "Grounding DINO"]
+        return provider_name not in ["HuggingFace", "Object Detection", "Grounding DINO"]
     def get_provider_capabilities(provider_name: str) -> dict:
         return {}
     def get_all_options_for_provider(provider_name: str) -> dict:
@@ -2196,7 +2196,7 @@ class ProcessingDialog(QDialog):
             return
         
         # Map provider internal names to display names for capability lookup
-        # ONNX provider shows as "Enhanced Ollama" so it should support prompts
+        # HuggingFace provider supports prompts
         provider_display_names = {
             "ollama": "Ollama",
             "ollama_cloud": "Ollama Cloud",
@@ -2274,11 +2274,11 @@ class ProcessingDialog(QDialog):
                     self.status_label.setText("Claude (Anthropic): Cloud AI processing with advanced reasoning. Requires API key in claude.txt file or ANTHROPIC_API_KEY env var.")
                 else:
                     self.status_label.setText("Claude not available. Requires API key in claude.txt file (current directory, ~/, or ~/onedrive/), or set ANTHROPIC_API_KEY environment variable.")
-            elif current_data == "onnx":
+            elif current_data == "huggingface":
                 if provider.is_available():
-                    self.status_label.setText(f"ONNX Runtime: Hardware-accelerated AI models. Status: {provider.hardware_type}. Run download_onnx_models.bat to get models.")
+                    self.status_label.setText(f"HuggingFace: Local Florence-2 vision models. Free, runs on your computer. First use will download model (~230-700MB).")
                 else:
-                    self.status_label.setText("ONNX Runtime not available. Install with: pip install onnxruntime onnx huggingface-hub")
+                    self.status_label.setText("HuggingFace not available. Install with: pip install transformers torch torchvision einops timm")
             elif current_data == "copilot":
                 if provider.is_available():
                     self.status_label.setText(f"Copilot+ PC: Native Windows AI acceleration. Status: {provider.npu_info}")
@@ -9931,8 +9931,8 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
             
             properties["AI Provider Analysis"] = provider_info
             
-            # Enhanced Processing Detection (for ONNX/Object Detection providers)
-            if provider in ["onnx", "object_detection"]:
+            # Enhanced Processing Detection (for Object Detection providers)
+            if provider in ["object_detection"]:
                 enhanced_info = {}
                 
                 try:
