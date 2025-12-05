@@ -6,6 +6,7 @@ Ollama, OpenAI, and HuggingFace providers.
 """
 
 import os
+import sys
 import requests
 import json
 import base64
@@ -817,17 +818,32 @@ except ImportError:
     HAS_ONNX = False
 
 # Try to import transformers for Florence-2 (optional dependency)
-try:
-    from transformers import AutoProcessor, AutoModelForCausalLM
-    from PIL import Image as PILImage
-    import torch
-    HAS_TRANSFORMERS = True
-except ImportError:
-    AutoProcessor = None
-    AutoModelForCausalLM = None
-    PILImage = None
-    torch = None
-    HAS_TRANSFORMERS = False
+# When running as frozen executable, delay import to allow system-installed packages
+HAS_TRANSFORMERS = False
+AutoProcessor = None
+AutoModelForCausalLM = None
+PILImage = None
+torch = None
+
+def _check_transformers_available():
+    """Check if transformers is available at runtime"""
+    try:
+        from transformers import AutoProcessor, AutoModelForCausalLM
+        from PIL import Image as PILImage
+        import torch
+        return True
+    except ImportError:
+        return False
+
+# Try import if not running as frozen executable
+if not getattr(sys, 'frozen', False):
+    try:
+        from transformers import AutoProcessor, AutoModelForCausalLM
+        from PIL import Image as PILImage
+        import torch
+        HAS_TRANSFORMERS = True
+    except ImportError:
+        pass
 
 from pathlib import Path
 import platform
@@ -865,11 +881,18 @@ class HuggingFaceProvider(AIProvider):
     
     def is_available(self) -> bool:
         """Check if Florence-2 dependencies are available"""
+        # For frozen executables, check at runtime instead of import time
+        if getattr(sys, 'frozen', False):
+            return _check_transformers_available()
         return HAS_TRANSFORMERS
     
     def get_available_models(self) -> List[str]:
         """Get list of available Florence-2 models"""
-        if not HAS_TRANSFORMERS:
+        # Check availability at runtime for frozen executables
+        if getattr(sys, 'frozen', False):
+            if not _check_transformers_available():
+                return []
+        elif not HAS_TRANSFORMERS:
             return []
         return self._available_models.copy()
     
@@ -878,11 +901,22 @@ class HuggingFaceProvider(AIProvider):
         if self.model is not None and self.model_name == model:
             return  # Already loaded
         
-        if not HAS_TRANSFORMERS:
-            raise ImportError(
-                "Florence-2 requires transformers>=4.45.0, torch, and Pillow.\n"
-                "Install with: pip install 'transformers>=4.45.0' torch torchvision pillow"
-            )
+        # Import transformers at runtime (needed for frozen executables)
+        global AutoProcessor, AutoModelForCausalLM, torch, PILImage
+        if AutoProcessor is None:
+            try:
+                from transformers import AutoProcessor as AP, AutoModelForCausalLM as AM
+                from PIL import Image as PI
+                import torch as t
+                AutoProcessor = AP
+                AutoModelForCausalLM = AM
+                PILImage = PI
+                torch = t
+            except ImportError:
+                raise ImportError(
+                    "Florence-2 requires transformers>=4.45.0, torch, and Pillow.\n"
+                    "Install with: pip install 'transformers>=4.45.0' torch torchvision pillow"
+                )
         
         try:
             # Determine device (NPU/GPU/CPU)
