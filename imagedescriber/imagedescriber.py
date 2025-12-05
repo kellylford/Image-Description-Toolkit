@@ -2202,8 +2202,7 @@ class ProcessingDialog(QDialog):
             "ollama_cloud": "Ollama Cloud",
             "openai": "OpenAI",
             "claude": "Claude",
-            "onnx": "Enhanced Ollama (CPU + YOLO)",  # Use capability name for ONNX
-            "huggingface": "HuggingFace",
+            "huggingface": "HuggingFace (Florence-2 local models)",
             "copilot": "Copilot+ PC",
             "object_detection": "Object Detection",
             "grounding_dino": "Grounding DINO",
@@ -2355,8 +2354,8 @@ class ProcessingDialog(QDialog):
                 print("Warning: OpenAI models not available. Check API key in openai.txt")
             elif provider_key == "claude":
                 print("Warning: Claude models not available. Check API key in claude.txt file or ANTHROPIC_API_KEY environment variable")
-            elif provider_key == "onnx":
-                print("Warning: No ONNX models found. Run download_onnx_models.bat to download models.")
+            elif provider_key == "huggingface":
+                print("Warning: Florence-2 dependencies not installed. Install with: pip install transformers torch torchvision einops timm")
             elif provider_key == "copilot":
                 print("Warning: Copilot+ PC hardware not detected or Windows AI APIs not available.")
             elif provider_key == "object_detection":
@@ -9387,7 +9386,7 @@ https://github.com/kellylford/Image-Description-Toolkit</a></p>
             "<code>python check_models.py --list-providers</code></p>"
             "<h4>Benefits of External Tools:</h4>"
             "<ul>"
-            "<li>Support all providers (Ollama, OpenAI, ONNX, Copilot+ PC, HuggingFace)</li>"
+            "<li>Support all providers (Ollama, OpenAI, Claude, Copilot+ PC, HuggingFace)</li>"
             "<li>Can be used independently of GUI or in scripts</li>"
             "<li>Better search and filtering capabilities</li>"
             "<li>Recommended models clearly marked</li>"
