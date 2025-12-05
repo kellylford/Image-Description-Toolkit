@@ -8,20 +8,32 @@
 
 Local AI-powered image descriptions using Microsoft's Florence-2 vision models. Run entirely on your hardware with **zero API costs** and **no internet required** (after initial model download).
 
+**⚠️ Important:** HuggingFace provider is **available via CLI only** in this release. Not included in ImageDescriber GUI to keep installer size reasonable (~100MB instead of ~2.5GB).
+
 **Key Features:**
 - ✅ **Zero Cost** - No API keys, no cloud costs
 - ✅ **Privacy** - All processing happens locally
 - ✅ **Self-Contained** - No Ollama or external AI servers needed
 - ✅ **Three Detail Levels** - Simple, detailed, narrative descriptions
 - ✅ **Two Model Sizes** - Base (230MB, faster) and Large (700MB, better quality)
+- ⚙️ **CLI-Only** - Use command-line tools (not GUI) to avoid large installer
 
 **Quick Start:**
 ```bash
+# Install dependencies first
+pip install transformers torch torchvision einops timm
+
 # Process images locally with Florence-2
 idt workflow --provider huggingface --model microsoft/Florence-2-base images/
 
-# GUI: Open ImageDescriber → Select Provider: HuggingFace → Choose model → Process
+# Single image
+idt describe image.jpg --provider huggingface --model microsoft/Florence-2-base
 ```
+
+**Why CLI-only?**
+- Bundling transformers + PyTorch would increase installer from ~100MB to ~2.5GB
+- CLI provides full functionality without GUI bundle overhead
+- GUI focuses on providers optimized for interactive use (Ollama, OpenAI, Claude)
 
 📖 **Full Guide:** [docs/HUGGINGFACE_PROVIDER_GUIDE.md](https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/HUGGINGFACE_PROVIDER_GUIDE.md)
 
