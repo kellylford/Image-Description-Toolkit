@@ -224,11 +224,9 @@ def print_status_line(provider_name: str, available: bool, models: List[str], me
                 print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Add OpenAI API key to 'openai.txt' or OPENAI_API_KEY env var")
         elif "transformers" in message.lower():
             print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install transformers torch")
-        elif "huggingface" in message.lower() or "onnx" in message.lower():
-            print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install onnxruntime")
-            print(f"    Download models: run models/download_onnx_models.bat")
-
-            print(f"    This will install the package and download model files")
+        elif "huggingface" in message.lower():
+            print(f"  {Fore.YELLOW}->{Style.RESET_ALL} Install: pip install transformers torch torchvision einops timm")
+            print(f"    Models will download automatically on first use")
 
 
 def get_recommendations(all_status: Dict) -> List[str]:
@@ -256,10 +254,10 @@ def get_recommendations(all_status: Dict) -> List[str]:
     if 'claude' in all_status and not all_status['claude']['available']:
         recommendations.append("Optional: Configure Claude (Anthropic) for cloud-based models")
     
-    # Check if YOLO is available
-    if 'onnx' in all_status and not all_status['onnx']['available']:
-        recommendations.append("Optional: Install YOLO for enhanced object detection")
-        recommendations.append("  pip install ultralytics")
+    # Check if HuggingFace is available
+    if 'huggingface' in all_status and not all_status['huggingface']['available']:
+        recommendations.append("Optional: Install HuggingFace for local Florence-2 models")
+        recommendations.append("  pip install transformers torch torchvision einops timm")
     
 
     
