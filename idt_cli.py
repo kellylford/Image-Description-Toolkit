@@ -121,7 +121,7 @@ def main():
     if command == 'workflow':
         # Add default output directory if not specified
         args = sys.argv[2:]
-        if '--output-dir' not in args and '-o' not in args and '--resume' not in args:
+        if '--output-dir' not in args and '-o' not in args and '--resume' not in args and '--redescribe' not in args:
             # Insert default output directory
             args = ['--output-dir', 'Descriptions'] + args
         
