@@ -822,6 +822,216 @@ class RedescribeDialog(QDialog):
             # For all other keys, use the default behavior
             QPlainTextEdit.keyPressEvent(self.prompt_edit, event)
 
+
+class ApiKeyDialog(QDialog):
+    """Dialog for requesting API key file path"""
+    
+    def __init__(self, provider_name, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"{provider_name} API Key Required")
+        self.setModal(True)
+        self.setMinimumSize(400, 150)
+        
+        self.provider_name = provider_name
+        self.api_key_file = None
+        
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        # Info label
+        info_label = QLabel(f"{self.provider_name} requires an API key.\nPlease select your API key file:")
+        info_label.setWordWrap(True)
+        info_label.setAccessibleName("API Key Request Label")
+        info_label.setAccessibleDescription(f"{self.provider_name} requires an API key to process images.")
+        layout.addWidget(info_label)
+        
+        # File selection row
+        file_layout = QHBoxLayout()
+        self.file_label = QLabel("No file selected")
+        self.file_label.setAccessibleName("Selected API Key File")
+        self.file_label.setAccessibleDescription("Shows the path to the selected API key file.")
+        file_layout.addWidget(self.file_label)
+        
+        browse_btn = QPushButton("Browse...")
+        browse_btn.setAccessibleName("Browse for API Key File")
+        browse_btn.setAccessibleDescription("Click to select your API key file from the file system.")
+        browse_btn.clicked.connect(self.browse_file)
+        file_layout.addWidget(browse_btn)
+        
+        layout.addLayout(file_layout)
+        
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+        
+        # Disable OK until file selected
+        self.ok_button = button_box.button(QDialogButtonBox.StandardButton.Ok)
+        self.ok_button.setEnabled(False)
+    
+    def browse_file(self):
+        """Browse for API key file"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            f"Select {self.provider_name} API Key File",
+            "",
+            "Text Files (*.txt);;All Files (*.*)"
+        )
+        
+        if file_path:
+            self.api_key_file = file_path
+            self.file_label.setText(Path(file_path).name)
+            self.ok_button.setEnabled(True)
+    
+    def get_api_key_file(self):
+        """Return the selected API key file path"""
+        return self.api_key_file
+
+
+class RedescribeWorkflowDialog(QDialog):
+    """Dialog for selecting provider, model, and prompt for redescribing a workflow"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Redescribe Workflow")
+        self.setModal(True)
+        self.setMinimumSize(500, 400)
+        
+        self.selected_provider = None
+        self.selected_model = None
+        self.selected_prompt = None
+        
+        self.init_ui()
+        self.load_providers()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        # Info label
+        info_label = QLabel("Select AI provider, model, and prompt style to re-describe all images in this workflow:")
+        info_label.setWordWrap(True)
+        info_label.setAccessibleName("Redescribe Info")
+        info_label.setAccessibleDescription("Choose provider, model, and prompt style for re-describing workflow images.")
+        layout.addWidget(info_label)
+        
+        # Provider selection
+        layout.addWidget(QLabel("Provider:"))
+        self.provider_combo = QComboBox()
+        self.provider_combo.setAccessibleName("Provider Selection")
+        self.provider_combo.setAccessibleDescription("Choose the AI provider to use for redescribing.")
+        self.provider_combo.currentTextChanged.connect(self.on_provider_changed)
+        layout.addWidget(self.provider_combo)
+        
+        # Model selection
+        layout.addWidget(QLabel("Model:"))
+        self.model_combo = QComboBox()
+        self.model_combo.setAccessibleName("Model Selection")
+        self.model_combo.setAccessibleDescription("Choose the AI model to use for redescribing.")
+        layout.addWidget(self.model_combo)
+        
+        # Prompt style selection
+        layout.addWidget(QLabel("Prompt Style:"))
+        self.prompt_combo = QComboBox()
+        self.prompt_combo.setAccessibleName("Prompt Style Selection")
+        self.prompt_combo.setAccessibleDescription("Choose the description style for redescribing.")
+        layout.addWidget(self.prompt_combo)
+        
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+    
+    def load_providers(self):
+        """Load available providers and their models"""
+        # Add providers (no import needed - just list them)
+        providers_to_show = ["Ollama", "OpenAI", "Claude"]
+        self.provider_combo.addItems(providers_to_show)
+        
+        # Set default to Ollama
+        self.provider_combo.setCurrentIndex(0)
+    
+    def on_provider_changed(self, provider_name):
+        """Update available models when provider changes"""
+        self.model_combo.clear()
+        self.prompt_combo.clear()
+        
+        try:
+            # Load models based on provider - query dynamically
+            if provider_name == "Ollama":
+                # Try to get Ollama models dynamically
+                if ollama is not None:
+                    try:
+                        models_response = ollama.list()
+                        model_names = [model.model for model in models_response['models']]
+                        if model_names:
+                            self.model_combo.addItems(model_names)
+                        else:
+                            # Fallback if no models found
+                            self.model_combo.addItems(["llama3.2-vision:11b", "llava:7b", "moondream"])
+                    except:
+                        # Fallback to common models if query fails
+                        self.model_combo.addItems(["llama3.2-vision:11b", "llava:7b", "moondream"])
+                else:
+                    self.model_combo.addItems(["llama3.2-vision:11b", "llava:7b", "moondream"])
+                    
+            elif provider_name == "OpenAI":
+                self.model_combo.addItems(["gpt-4o", "gpt-4o-mini"])
+                
+            elif provider_name == "Claude":
+                self.model_combo.addItems([
+                    "claude-sonnet-4-5-20250929",
+                    "claude-sonnet-4-20250514", 
+                    "claude-opus-4-20250514",
+                    "claude-haiku-3-5-20241022"
+                ])
+            
+            # Load prompt styles from config file
+            self.load_prompt_styles()
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Warning", f"Could not load models: {e}")
+    
+    def load_prompt_styles(self):
+        """Load available prompt styles from config"""
+        try:
+            config_file = get_scripts_directory() / "image_describer_config.json"
+            
+            if config_file.exists():
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                prompt_variations = config.get('prompt_variations', {})
+                prompt_styles = list(prompt_variations.keys())
+                
+                if prompt_styles:
+                    self.prompt_combo.addItems(prompt_styles)
+                    # Set default to narrative if available
+                    if "narrative" in prompt_styles:
+                        self.prompt_combo.setCurrentText("narrative")
+                else:
+                    self.prompt_combo.addItems(["detailed", "concise", "narrative"])
+            else:
+                self.prompt_combo.addItems(["detailed", "concise", "narrative"])
+                
+        except Exception as e:
+            # Fallback
+            self.prompt_combo.addItems(["detailed", "concise", "narrative"])
+    
+    def get_selections(self):
+        """Return selected provider, model, and prompt style"""
+        return (
+            self.provider_combo.currentText(),
+            self.model_combo.currentText(),
+            self.prompt_combo.currentText()
+        )
+
+
 class ImageDescriptionViewer(QWidget):
     def __init__(self):
         super().__init__()
@@ -946,14 +1156,25 @@ class ImageDescriptionViewer(QWidget):
         self.copy_img_btn.clicked.connect(self.copy_image_to_clipboard)
         btn_layout.addWidget(self.copy_img_btn)
 
-        # Redescribe button removed - use 'idt' commands for re-processing
-        # self.redescribe_btn = QPushButton("Redescribe")
-        # self.redescribe_btn.setAccessibleName("Redescribe Button")
-        # self.redescribe_btn.setAccessibleDescription("Generate a new description for the selected image using a chosen model and prompt.")
-        # self.redescribe_btn.clicked.connect(self.redescribe_image)
-        # btn_layout.addWidget(self.redescribe_btn)
-
         layout.addLayout(btn_layout)
+        
+        # Workflow action buttons
+        workflow_btn_layout = QHBoxLayout()
+        
+        self.resume_btn = QPushButton("Resume Workflow")
+        self.resume_btn.setAccessibleName("Resume Workflow Button")
+        self.resume_btn.setAccessibleDescription("Resume an incomplete workflow from where it left off. Will prompt for API key if needed.")
+        self.resume_btn.clicked.connect(self.resume_workflow)
+        workflow_btn_layout.addWidget(self.resume_btn)
+        
+        self.redescribe_btn = QPushButton("Redescribe Workflow")
+        self.redescribe_btn.setAccessibleName("Redescribe Workflow Button")
+        self.redescribe_btn.setAccessibleDescription("Re-describe all images in this workflow with different AI settings. You can choose provider, model, and prompt style.")
+        self.redescribe_btn.clicked.connect(self.redescribe_workflow)
+        workflow_btn_layout.addWidget(self.redescribe_btn)
+        
+        workflow_btn_layout.addStretch()
+        layout.addLayout(workflow_btn_layout)
 
         # Status bar
         self.status_bar = QStatusBar()
@@ -1537,6 +1758,242 @@ class ImageDescriptionViewer(QWidget):
         ready_message = "Ready"
         self.status_bar.showMessage(ready_message)
         self.status_bar.setAccessibleName(f"Status: {ready_message}")
+    
+    def resume_workflow(self):
+        """Resume the current workflow"""
+        if not self.current_dir:
+            QMessageBox.information(self, "No Workflow", "Please load a workflow first.")
+            return
+        
+        # Load workflow metadata to determine provider (read directly without imports)
+        try:
+            metadata_file = Path(self.current_dir) / "workflow_metadata.json"
+            
+            if not metadata_file.exists():
+                QMessageBox.warning(self, "No Metadata", 
+                    "Could not find workflow metadata file. Cannot determine provider settings.")
+                return
+            
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            
+            provider = metadata.get('provider', 'ollama')
+            
+            # Check if provider requires API key
+            api_key_file = None
+            if provider.lower() in ['openai', 'claude']:
+                # Prompt for API key
+                dialog = ApiKeyDialog(provider.capitalize(), self)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    api_key_file = dialog.get_api_key_file()
+                else:
+                    # User cancelled
+                    return
+            
+            # Build the resume command
+            if getattr(sys, 'frozen', False):
+                # Running as executable - use idt.exe
+                # Try multiple locations for idt.exe
+                viewer_dir = Path(sys.executable).parent
+                possible_locations = [
+                    viewer_dir / "idt.exe",  # Same directory as viewer
+                    viewer_dir.parent / "idt.exe",  # Parent directory (c:\idt\idt.exe)
+                    Path("c:/idt/idt.exe"),  # Absolute fallback
+                ]
+                
+                idt_exe = None
+                for loc in possible_locations:
+                    if loc.exists():
+                        idt_exe = loc
+                        break
+                
+                if not idt_exe:
+                    QMessageBox.critical(self, "Error", 
+                        f"Could not find idt.exe. Searched:\n" + 
+                        "\n".join([str(p) for p in possible_locations]))
+                    return
+                cmd = [str(idt_exe), "workflow", "--resume", str(self.current_dir)]
+            else:
+                # Development mode - use python script
+                workflow_script = get_scripts_directory() / "workflow.py"
+                cmd = [sys.executable, str(workflow_script), "--resume", str(self.current_dir)]
+            
+            # Add API key if needed
+            if api_key_file:
+                cmd.extend(["--api-key-file", api_key_file])
+            
+            # Show confirmation
+            response = QMessageBox.question(
+                self,
+                "Resume Workflow",
+                f"This will resume the workflow:\n{Path(self.current_dir).name}\n\n"
+                f"Provider: {provider}\n"
+                f"Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if response != QMessageBox.StandardButton.Yes:
+                return
+            
+            # Update status
+            self.status_bar.showMessage("Launching workflow resume...")
+            self.status_bar.setAccessibleName("Status: Launching workflow resume...")
+            
+            # Launch the subprocess
+            try:
+                # Set working directory to parent of workflow directory
+                workflow_parent = Path(self.current_dir).parent
+                
+                # Launch in new console window on Windows
+                if sys.platform == 'win32':
+                    subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=str(workflow_parent))
+                else:
+                    subprocess.Popen(cmd, cwd=str(workflow_parent))
+                
+                QMessageBox.information(
+                    self,
+                    "Workflow Resumed",
+                    f"Workflow resume has been launched.\n\n"
+                    f"The workflow will continue in a separate window.\n"
+                    f"You can continue using the viewer to monitor progress."
+                )
+                
+                self.status_bar.showMessage("Workflow resumed")
+                self.status_bar.setAccessibleName("Status: Workflow resumed")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to launch workflow resume:\n{e}")
+                self.status_bar.showMessage("Ready")
+                self.status_bar.setAccessibleName("Status: Ready")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to resume workflow:\n{e}")
+    
+    def redescribe_workflow(self):
+        """Redescribe all images in the current workflow with new AI settings"""
+        if not self.current_dir:
+            QMessageBox.information(self, "No Workflow", "Please load a workflow first.")
+            return
+        
+        # Show provider/model selection dialog
+        dialog = RedescribeWorkflowDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        
+        provider, model, prompt_style = dialog.get_selections()
+        
+        if not provider or not model or not prompt_style:
+            QMessageBox.warning(self, "Invalid Selection", 
+                "Please select provider, model, and prompt style.")
+            return
+        
+        # Check if provider requires API key
+        api_key_file = None
+        provider_lower = provider.lower()
+        if 'openai' in provider_lower or 'claude' in provider_lower:
+            # Prompt for API key
+            dialog = ApiKeyDialog(provider, self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                api_key_file = dialog.get_api_key_file()
+            else:
+                # User cancelled
+                return
+        
+        # Map provider names to command-line format
+        provider_map = {
+            "Ollama": "ollama",
+            "Ollama Cloud": "ollama-cloud",
+            "OpenAI": "openai",
+            "Claude": "claude"
+        }
+        provider_cmd = provider_map.get(provider, provider.lower())
+        
+        # Build the redescribe command
+        if getattr(sys, 'frozen', False):
+            # Running as executable - use idt.exe
+            # Try multiple locations for idt.exe
+            viewer_dir = Path(sys.executable).parent
+            possible_locations = [
+                viewer_dir / "idt.exe",  # Same directory as viewer
+                viewer_dir.parent / "idt.exe",  # Parent directory (c:\idt\idt.exe)
+                Path("c:/idt/idt.exe"),  # Absolute fallback
+            ]
+            
+            idt_exe = None
+            for loc in possible_locations:
+                if loc.exists():
+                    idt_exe = loc
+                    break
+            
+            if not idt_exe:
+                QMessageBox.critical(self, "Error", 
+                    f"Could not find idt.exe. Searched:\n" + 
+                    "\n".join([str(p) for p in possible_locations]))
+                return
+            cmd = [str(idt_exe), "workflow", "--redescribe", str(self.current_dir)]
+        else:
+            # Development mode - use python script
+            workflow_script = get_scripts_directory() / "workflow.py"
+            cmd = [sys.executable, str(workflow_script), "--redescribe", str(self.current_dir)]
+        
+        # Add provider, model, and prompt
+        cmd.extend([
+            "--provider", provider_cmd,
+            "--model", model,
+            "--prompt-style", prompt_style
+        ])
+        
+        # Add API key if needed
+        if api_key_file:
+            cmd.extend(["--api-key-file", api_key_file])
+        
+        # Show confirmation
+        response = QMessageBox.question(
+            self,
+            "Redescribe Workflow",
+            f"This will create a new workflow that re-describes all images with:\n\n"
+            f"Provider: {provider}\n"
+            f"Model: {model}\n"
+            f"Prompt Style: {prompt_style}\n\n"
+            f"The original workflow will not be modified.\n\n"
+            f"Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if response != QMessageBox.StandardButton.Yes:
+            return
+        
+        # Update status
+        self.status_bar.showMessage("Launching workflow redescribe...")
+        self.status_bar.setAccessibleName("Status: Launching workflow redescribe...")
+        
+        # Launch the subprocess
+        try:
+            # Set working directory to parent of workflow directory
+            # This ensures the new workflow is created at the same level, not inside the source
+            workflow_parent = Path(self.current_dir).parent
+            
+            # Launch in new console window on Windows
+            if sys.platform == 'win32':
+                subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=str(workflow_parent))
+            else:
+                subprocess.Popen(cmd, cwd=str(workflow_parent))
+            
+            QMessageBox.information(
+                self,
+                "Workflow Redescribe Started",
+                f"Workflow redescribe has been launched.\n\n"
+                f"A new workflow will be created with the selected settings.\n"
+                f"The process will run in a separate window."
+            )
+            
+            self.status_bar.showMessage("Workflow redescribe launched")
+            self.status_bar.setAccessibleName("Status: Workflow redescribe launched")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to launch workflow redescribe:\n{e}")
+            self.status_bar.showMessage("Ready")
+            self.status_bar.setAccessibleName("Status: Ready")
 
     def closeEvent(self, event):
         """Handle application closing to clean up resources"""
