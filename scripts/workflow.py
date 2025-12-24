@@ -2851,8 +2851,8 @@ Viewing Results:
     parser.add_argument(
         "--provider",
         choices=["ollama", "openai", "claude", "huggingface"],
-        default="ollama",
-        help="AI provider to use for image description (default: ollama)"
+        default=None,
+        help="AI provider to use for image description (default: ollama for new workflows, auto-detected for resume)"
     )
     
     parser.add_argument(
@@ -2964,6 +2964,10 @@ Viewing Results:
         if not args.config_image_describer:
             args.config_image_describer = args._deprecated_config
     
+    # For new workflows (not resume), set default provider if not specified
+    if not args.resume and not args.provider:
+        args.provider = "ollama"
+    
     # Handle resume mode
     if args.resume:
         # Resume mode - validate resume directory and extract workflow state
@@ -3036,27 +3040,40 @@ Viewing Results:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Override with state from logs if available, otherwise keep metadata values
+        # Priority: command-line args > workflow_state (from logs) > metadata > defaults
+        
         if workflow_state["model"]:
-            args.model = workflow_state["model"]
-            model_name = workflow_state["model"]
+            # Log parsing found model
+            if not args.model:
+                args.model = workflow_state["model"]
+                model_name = workflow_state["model"]
         elif not args.model:
-            # Use metadata value if no command-line override
+            # No command-line override and no log data - use metadata
             args.model = model_name
             
         if workflow_state["prompt_style"]:
-            args.prompt_style = workflow_state["prompt_style"]
-            prompt_style = workflow_state["prompt_style"]
+            # Log parsing found prompt style
+            if not args.prompt_style:
+                args.prompt_style = workflow_state["prompt_style"]
+                prompt_style = workflow_state["prompt_style"]
         elif not args.prompt_style:
-            # Use metadata value if no command-line override
+            # No command-line override and no log data - use metadata
             args.prompt_style = prompt_style
             
         if workflow_state["provider"]:
-            args.provider = workflow_state["provider"]
-            provider_name = workflow_state["provider"]
-        else:
-            # CRITICAL: Use metadata provider if log parsing failed
-            # Without this, args.provider defaults to "ollama" from argument parser
+            # Log parsing found provider
+            if not args.provider:
+                args.provider = workflow_state["provider"]
+                provider_name = workflow_state["provider"]
+        elif not args.provider:
+            # CRITICAL: User didn't specify --provider, use metadata value
+            # This allows resume to work without re-specifying provider
             args.provider = provider_name
+        
+        # If args.provider is still None (no metadata, no logs, no CLI), use default
+        if not args.provider:
+            args.provider = "ollama"
+            provider_name = "ollama"
             
         if workflow_state["config"]:
             # Old workflow_state used single "config" - map to image_describer_config for backward compatibility
