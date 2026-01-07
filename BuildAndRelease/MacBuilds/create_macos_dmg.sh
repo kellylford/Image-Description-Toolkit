@@ -27,6 +27,9 @@ DMG_NAME="IDT-${VERSION}"
 echo "Building disk image for version: $VERSION"
 echo ""
 
+# Create dist_macos directory if it doesn't exist
+mkdir -p dist_macos
+
 # Check if all applications are built
 MISSING_APPS=0
 
@@ -144,7 +147,7 @@ ln -s /Applications "$DMG_STAGING/Applications"
 
 # Create temporary DMG
 echo "Creating temporary DMG..."
-TEMP_DMG="BuildAndRelease/${DMG_NAME}-temp.dmg"
+TEMP_DMG="dist_macos/${DMG_NAME}-temp.dmg"
 rm -f "$TEMP_DMG"
 
 hdiutil create \
@@ -156,38 +159,11 @@ hdiutil create \
     -size 500m \
     "$TEMP_DMG"
 
-# Mount the temporary DMG
-echo "Mounting DMG..."
-MOUNT_DIR=$(hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" | grep -E '^/dev/' | sed 's/^[^ ]* *//;s/[ ]*$//')
+echo "Skipping Finder customization (can be done manually after mounting)..."
 
-# Set view options (requires AppleScript)
-echo "Setting Finder view options..."
-osascript << EOF
-tell application "Finder"
-    tell disk "Image Description Toolkit"
-        open
-        set current view of container window to icon view
-        set toolbar visible of container window to false
-        set statusbar visible of container window to false
-        set the bounds of container window to {100, 100, 900, 500}
-        set viewOptions to the icon view options of container window
-        set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 72
-        close
-    end tell
-end tell
-EOF
-
-# Sync filesystem
-sync
-
-# Unmount
-echo "Unmounting DMG..."
-hdiutil detach "$MOUNT_DIR"
-
-# Convert to compressed read-only image
+# Convert to compressed read-only image immediately
 echo "Compressing DMG..."
-FINAL_DMG="BuildAndRelease/${DMG_NAME}.dmg"
+FINAL_DMG="dist_macos/${DMG_NAME}.dmg"
 rm -f "$FINAL_DMG"
 
 hdiutil convert \
@@ -206,7 +182,7 @@ if [ $? -eq 0 ]; then
     echo "========================================================================"
     echo "DISK IMAGE CREATED SUCCESSFULLY"
     echo "========================================================================"
-    echo "Disk Image: BuildAndRelease/${DMG_NAME}.dmg"
+    echo "Disk Image: dist_macos/${DMG_NAME}.dmg"
     echo ""
     echo "To distribute: Double-click to mount, then drag apps to Applications"
     echo ""
