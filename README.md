@@ -36,16 +36,49 @@ imagedescriber.exe
 
 ## Documentation
 
+### User Guides
 - **[What's New in v3.6.0](docs/WHATS_NEW_v3.6.0.md)** - Latest features (HuggingFace provider, redescribe)
-- **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions
+- **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions (Windows)
+- **[macOS User Guide](docs/MACOS_USER_GUIDE.md)** - macOS installation and usage
 - **[CLI Reference](docs/CLI_REFERENCE.md)** - All commands and options
+
+### Configuration & Setup
 - **[Configuration Guide](docs/CONFIGURATION_GUIDE.md)** - Setup and customization
 - **[HuggingFace Provider Guide](docs/HUGGINGFACE_PROVIDER_GUIDE.md)** - Florence-2 local models
+
+### Developer Documentation
+- **[Build Guide (Windows)](BuildAndRelease/README.md)** - Windows build instructions
+- **[Build Guide (macOS)](docs/BUILD_MACOS.md)** - macOS build instructions
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ## Requirements
 
+### Windows
 - **Windows 10/11** (AMD64 or ARM64)
+- **Built Executable**: No Python required - download installer from releases
+- **AI Provider** (choose one or more):
+  - [Ollama](https://ollama.com) (free, runs locally)
+  - [OpenAI API](https://platform.openai.com/api-keys) (GPT-4o, paid)
+  - [Claude API](https://console.anthropic.com) (paid)
+  - HuggingFace Florence-2 (free, local, no API needed)
+
+### macOS
+- **macOS 10.13+** (High Sierra or later)
+- **Python 3.8+** (system Python or Homebrew)
+- **Installation**: Download .pkg installer or .dmg disk image from releases
+- **Build from Source**: See [macOS Build Guide](docs/BUILD_MACOS.md)
+- **AI Providers**: Same as Windows (Ollama, OpenAI, Claude, HuggingFace)
+
+**macOS Quick Start:**
+```bash
+# Install via Homebrew (if building from source)
+brew install python@3
+
+# Or download pre-built installer from releases
+# Double-click IDT-{version}.pkg or IDT-{version}.dmg
+```
+
+### Development (All Platforms)
 - **Python 3.10+** (for development only, not required for built executables)
 - **AI Provider** (choose one or more):
   - Ollama (local, free)

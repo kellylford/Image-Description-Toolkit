@@ -20,6 +20,7 @@ Pillow>=10.0.0         # Image processing
 pillow-heif>=0.13.0    # HEIC/HEIF image support
 opencv-python>=4.8.0   # Video frame extraction
 numpy>=1.24.0          # Array operations (required by opencv)
+piexif>=1.1.3          # EXIF metadata embedding for video frames
 
 # ----------------------------------------------------------------------------
 # REQUIRED - AI Providers

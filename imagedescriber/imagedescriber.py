@@ -5148,18 +5148,28 @@ class ImageDescriberGUI(QMainWindow):
             
             # Create temp directory if it doesn't exist
             temp_dir = Path(tempfile.gettempdir()) / "ImageDescriber_Pasted"
-            temp_dir.mkdir(exist_ok=True)
+            temp_dir.mkdir(exist_ok=True, parents=True)
             
             # Save the image to temp file
             temp_file_path = temp_dir / filename
-            success = qimage.save(str(temp_file_path), "PNG")
+            
+            # Convert QImage to bytes using QBuffer (more stable than direct save)
+            from PyQt6.QtCore import QBuffer, QIODevice
+            buffer = QBuffer()
+            buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+            success = qimage.save(buffer, "PNG")
+            buffer.close()
             
             if success:
+                # Write buffer to file
+                with open(temp_file_path, 'wb') as f:
+                    f.write(buffer.data().data())
+                
                 # Add to workspace and process
                 self.add_file_to_workspace(str(temp_file_path), is_pasted=True)
                 self.status_bar.showMessage(f"Pasted image added as {filename}", 3000)
             else:
-                raise Exception("Failed to save image to temporary file")
+                raise Exception("Failed to save image to buffer")
                 
         except Exception as e:
             QMessageBox.warning(self, "Paste Error", f"Failed to process pasted image:\n{e}")
@@ -6017,8 +6027,20 @@ class ImageDescriberGUI(QMainWindow):
             list_item = QListWidgetItem(display_name)
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
             
-            # Set accessibility properties
-            self.set_item_accessibility(list_item, file_path, display_name)
+            # Set accessibility properties for VoiceOver
+            # Build accessible description with full context
+            item_type = "Video" if item.item_type == "video" else "Image"
+            desc_status = f"{len(item.descriptions)} description" + ("s" if len(item.descriptions) != 1 else "") if item.descriptions else "No descriptions"
+            processing_status = ""
+            if file_path in self.processing_items:
+                if file_path in self.processing_status:
+                    processing_status = f", Processing: {self.processing_status[file_path]}"
+                else:
+                    processing_status = ", Processing"
+            
+            accessible_text = f"{item_type}: {base_name}. {desc_status}{processing_status}"
+            list_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
+            list_item.setToolTip(accessible_text)
             
             self.image_list.addItem(list_item)
             
@@ -6199,22 +6221,22 @@ class ImageDescriberGUI(QMainWindow):
             model_info = f"Model: {desc.model}" if desc.model else "Model: Unknown"
             prompt_info = f"Prompt: {desc.prompt_style}" if desc.prompt_style else "Prompt: Unknown"
             
-            # For visual display: Full description + metadata
-            display_name = f"{desc_text}\n\nImage: {file_name}\n{model_info}\n{prompt_info}"
+            # For display: Show truncated description with "..." indicator if over 100 chars
+            display_text = desc_text if len(desc_text) <= 100 else f"{desc_text[:97]}..."
+            display_name = f"{display_text} ({desc.model or 'Unknown'}, {desc.prompt_style or 'Unknown'})"
             
-            # Create list item
+            # Create list item with single-line text for VoiceOver
             list_item = QListWidgetItem(display_name)
             # Store both file path and description ID for retrieval
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
             list_item.setData(Qt.ItemDataRole.UserRole + 1, desc.id)  # Description ID
             
-            # Build accessibility text - this is what screen readers read
-            # Use AccessibleTextRole (not Description) to override the display text completely
-            # Strip to remove any leading/trailing whitespace that causes "blank" announcements
-            accessibility_text = f"{desc_text}. Image: {file_name}. {model_info}. {prompt_info}".strip()
-            
+            # Build accessibility text - full description for screen readers
+            # VoiceOver reads the item text, so use AccessibleTextRole for the full description
+            accessibility_text = f"Description: {desc_text}. Image: {file_name}. {model_info}. {prompt_info}".strip()
             list_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessibility_text)
-            # Tooltip shows same information in structured format
+            
+            # Tooltip shows full description
             list_item.setToolTip(f"Image: {file_name}\n{model_info}\n{prompt_info}\n\nDescription:\n{desc.text}")
             
             self.image_list.addItem(list_item)
