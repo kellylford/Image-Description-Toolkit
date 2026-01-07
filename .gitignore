@@ -29,6 +29,7 @@ __pycache__/
 
 # Virtual environments
 venv/
+.venv/
 env/
 ENV/
 
@@ -134,3 +135,4 @@ build_log.txt
 # Experimental test scripts (should be in pytest_tests/ or documented separately)
 test_onnx*.py
 test_directml*.py
+dist_macos/

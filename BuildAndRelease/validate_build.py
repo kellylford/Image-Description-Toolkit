@@ -8,10 +8,11 @@ Runs quick smoke tests against the built executable to catch common issues:
 - Help commands work
 - Basic CLI structure is intact
 
-Run this after builditall.bat to catch frozen-executable issues before deployment.
+Run this after builditall.bat/builditall_macos.sh to catch frozen-executable issues before deployment.
 """
 import subprocess
 import sys
+import platform
 from pathlib import Path
 
 
@@ -33,11 +34,21 @@ def run_command(cmd, description):
         return False, "", str(e)
 
 
+def get_executable_path():
+    """Get the path to the IDT executable based on platform"""
+    base_dir = Path(__file__).parent.parent
+    
+    if platform.system() == 'Windows':
+        return base_dir / 'dist' / 'idt.exe'
+    else:  # macOS/Linux
+        return base_dir / 'dist' / 'idt'
+
+
 def test_executable_exists():
     """Verify the executable was actually built"""
-    exe_path = Path(__file__).parent.parent / 'dist' / 'idt.exe'
+    exe_path = get_executable_path()
     if not exe_path.exists():
-        print("[FAIL] dist/idt.exe not found")
+        print(f"[FAIL] {exe_path.name} not found")
         print(f"   Expected at: {exe_path}")
         return False
     print(f"[PASS] Executable exists: {exe_path}")
@@ -46,11 +57,11 @@ def test_executable_exists():
 
 def test_version_command():
     """Verify version command works and shows build info"""
-    exe = str(Path(__file__).parent.parent / 'dist' / 'idt.exe')
+    exe = str(get_executable_path())
     success, stdout, stderr = run_command([exe, 'version'], "version command")
     
     if not success:
-        print("[FAIL] FAIL: idt.exe version command failed")
+        print(f"[FAIL] FAIL: {Path(exe).name} version command failed")
         print(f"   stderr: {stderr}")
         return False
     
@@ -71,11 +82,11 @@ def test_version_command():
 
 def test_help_command():
     """Verify help command works"""
-    exe = str(Path(__file__).parent.parent / 'dist' / 'idt.exe')
+    exe = str(get_executable_path())
     success, stdout, stderr = run_command([exe, '--help'], "help command")
     
     if not success:
-        print("[FAIL] FAIL: idt.exe --help failed")
+        print(f"[FAIL] FAIL: {Path(exe).name} --help failed")
         return False
     
     if 'workflow' not in stdout.lower():
@@ -88,11 +99,11 @@ def test_help_command():
 
 def test_workflow_help():
     """Verify workflow command exists and imports work"""
-    exe = str(Path(__file__).parent.parent / 'dist' / 'idt.exe')
+    exe = str(get_executable_path())
     success, stdout, stderr = run_command([exe, 'workflow', '--help'], "workflow help")
     
     if not success:
-        print("[FAIL] FAIL: idt.exe workflow --help failed")
+        print(f"[FAIL] FAIL: {Path(exe).name} workflow --help failed")
         print(f"   This often means versioning import failed in frozen build")
         print(f"   stderr: {stderr[:500]}")
         return False
@@ -103,7 +114,7 @@ def test_workflow_help():
 
 def test_list_commands():
     """Verify other key commands are present"""
-    exe = str(Path(__file__).parent.parent / 'dist' / 'idt.exe')
+    exe = str(get_executable_path())
     
     commands_to_test = [
         ('image_describer', 'Image describer'),
