@@ -508,11 +508,20 @@ class WorkflowBrowserDialog(QDialog):
         self.status_label.setAccessibleDescription("Shows the current directory and number of workflows found.")
         layout.addWidget(self.status_label)
         
-        # List widget for displaying workflows
-        self.list_widget = QListWidget()
+        # Table widget for displaying workflows
+        self.list_widget = QTableWidget()
         self.list_widget.setAccessibleName("Workflows List")
         self.list_widget.setAccessibleDescription("List of available workflows. Use arrow keys to navigate, Enter to select. Each entry contains workflow name, provider, model, prompt style, number of descriptions, and timestamp.")
+        self.list_widget.setColumnCount(1)
+        self.list_widget.setHorizontalHeaderLabels(["Workflow"])
+        self.list_widget.horizontalHeader().setStretchLastSection(True)
+        self.list_widget.horizontalHeader().setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.list_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.list_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.list_widget.verticalHeader().setVisible(False)
+        self.list_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.list_widget.setTabKeyNavigation(False)  # Fix: Prevent Tab from getting stuck in table
         
         # Double-click to select
         self.list_widget.itemDoubleClicked.connect(self.on_double_click)
@@ -565,7 +574,7 @@ class WorkflowBrowserDialog(QDialog):
         self.current_dir = directory
         
         # Clear existing items
-        self.list_widget.clear()
+        self.list_widget.setRowCount(0)
         
         # Find workflows using list_results logic
         try:
@@ -581,9 +590,12 @@ class WorkflowBrowserDialog(QDialog):
         # Sort workflows by timestamp (newest first)
         workflows.sort(key=lambda x: x[1].get('timestamp', ''), reverse=True)
         
+        # PRE-ALLOCATE all rows at once (crucial for Qt focus stability)
+        self.list_widget.setRowCount(len(workflows))
+        
         # Populate list
         self.workflows = []  # Store for selection
-        for workflow_path, metadata in workflows:
+        for row, (workflow_path, metadata) in enumerate(workflows):
             # Store workflow path
             self.workflows.append(workflow_path)
             
@@ -631,20 +643,20 @@ class WorkflowBrowserDialog(QDialog):
             # Changed order as requested
             display_text = f"{name} | {prompt} | {desc_count} images | {model} | {provider} | {timestamp}"
             
-            # Create list item with full text as accessible description
-            item = QListWidgetItem(display_text)
+            # Create table item with full text as accessible description (no insertRow - already allocated)
+            item = QTableWidgetItem(display_text)
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # Make non-editable
             item.setData(Qt.ItemDataRole.AccessibleTextRole, display_text)
             item.setData(Qt.ItemDataRole.UserRole, str(workflow_path))  # Store full path
             
-            self.list_widget.addItem(item)
+            self.list_widget.setItem(row, 0, item)
         
         # Update status
         self.status_label.setText(f"Found {len(workflows)} workflow(s) in: {directory}")
         
         # Select first item by default
-        if self.list_widget.count() > 0:
-            self.list_widget.setCurrentRow(0)
-            self.list_widget.setFocus()
+        if self.list_widget.rowCount() > 0:
+            self.list_widget.selectRow(0)
     
     def browse_directory(self):
         """Browse for a different directory."""
@@ -1033,7 +1045,7 @@ class RedescribeWorkflowDialog(QDialog):
 
 
 class ImageDescriptionViewer(QWidget):
-    def __init__(self):
+    def __init__(self, auto_load_dir=None):
         super().__init__()
         self.setWindowTitle("Image Description Viewer")
         self.setMinimumSize(800, 600)
@@ -1062,6 +1074,9 @@ class ImageDescriptionViewer(QWidget):
         # Progress tracking
         self.progress_info = {"current": 0, "total": 0, "active": False}
         
+        # Auto-load directory for testing
+        self._auto_load_dir = auto_load_dir
+        
         self.init_ui()
 
     def init_ui(self):
@@ -1081,7 +1096,6 @@ class ImageDescriptionViewer(QWidget):
         self.refresh_btn.setAccessibleDescription("Manually refresh the content to check for new or updated descriptions. Will preserve your current position.")
         self.refresh_btn.clicked.connect(self.manual_refresh)
         dir_layout.addWidget(self.refresh_btn)
-        dir_layout.addWidget(self.refresh_btn)
         
         self.browse_results_btn = QPushButton("Browse Results")
         self.browse_results_btn.setAccessibleName("Browse Results Button")
@@ -1096,12 +1110,21 @@ class ImageDescriptionViewer(QWidget):
         dir_layout.addWidget(self.change_dir_btn)
         layout.addLayout(dir_layout)
 
-        # List of descriptions
-        self.list_widget = QListWidget()
+        # Table of descriptions
+        self.list_widget = QTableWidget()
         self.list_widget.setAccessibleName("Descriptions List")
         self.list_widget.setAccessibleDescription("List of image descriptions. Use arrow keys to navigate. Each entry contains the full description for screen readers.")
+        self.list_widget.setColumnCount(1)
+        self.list_widget.setHorizontalHeaderLabels(["Description"])
+        self.list_widget.horizontalHeader().setStretchLastSection(True)
+        self.list_widget.horizontalHeader().setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.list_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.list_widget.currentRowChanged.connect(self.display_description)
+        self.list_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.list_widget.verticalHeader().setVisible(False)
+        self.list_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.list_widget.setTabKeyNavigation(False)  # Fix: Prevent Tab from getting stuck in table
+        self.list_widget.currentCellChanged.connect(lambda row, col, oldRow, oldCol: self.display_description(row))
         layout.addWidget(self.list_widget)
 
         # Image preview
@@ -1182,6 +1205,10 @@ class ImageDescriptionViewer(QWidget):
         self.status_bar.setAccessibleDescription("Shows current operation status and progress.")
         self.status_bar.showMessage("Ready")
         layout.addWidget(self.status_bar)
+        
+        # Auto-load directory if specified (for testing)
+        if self._auto_load_dir:
+            QTimer.singleShot(100, lambda: self.load_descriptions(self._auto_load_dir))
 
     def start_live_monitoring(self):
         """Start monitoring the descriptions file for changes"""
@@ -1309,9 +1336,16 @@ class ImageDescriptionViewer(QWidget):
             # Set updating flag to prevent recursive updates
             self.updating_content = True
             
+            # CRITICAL: Temporarily disable focus on table during update to prevent focus corruption
+            original_focus_policy = self.list_widget.focusPolicy()
+            self.list_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            
+            # Block signals during update to prevent performance issues
+            self.list_widget.blockSignals(True)
+            
             # Save current state before updating
             current_row = self.list_widget.currentRow()
-            current_item_count = self.list_widget.count()
+            current_item_count = self.list_widget.rowCount()
             was_focused_on_list = focused_widget == self.list_widget
             
             # Parse the file
@@ -1343,8 +1377,12 @@ class ImageDescriptionViewer(QWidget):
                 # Base directory for resolving image paths
                 base_dir = Path(self.current_dir)
                 
+                # PRE-ALLOCATE all new rows at once (crucial for Qt focus stability)
+                start_row = current_item_count
+                self.list_widget.setRowCount(start_row + len(new_entries))
+                
                 # Add only new entries
-                for entry in new_entries:
+                for i, entry in enumerate(new_entries):
                     # Resolve image path
                     rel_path = entry['relative_path']
                     
@@ -1370,12 +1408,13 @@ class ImageDescriptionViewer(QWidget):
                     self.descriptions.append(entry['description'])
                     self.descriptions_updated.append(False)
                     
-                    # Create list item
+                    # Create table item (no insertRow - already allocated)
                     truncated = entry['description'][:100] + ("..." if len(entry['description']) > 100 else "")
-                    from PyQt6.QtWidgets import QListWidgetItem
-                    item = QListWidgetItem(truncated)
+                    row = start_row + i
+                    item = QTableWidgetItem(truncated)
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # Make non-editable
                     item.setData(Qt.ItemDataRole.AccessibleTextRole, entry['description'].strip())
-                    self.list_widget.addItem(item)
+                    self.list_widget.setItem(row, 0, item)
                 
                 # Update status quietly (no focus disruption)
                 count = len(entries)
@@ -1385,14 +1424,28 @@ class ImageDescriptionViewer(QWidget):
                 # Preserve current selection - don't change focus or selection unless there was nothing selected
                 if current_row >= 0:
                     # Keep current selection
-                    self.list_widget.setCurrentRow(current_row)
+                    self.list_widget.setCurrentCell(current_row, 0)
                 elif not was_focused_on_list and len(entries) == len(new_entries):
                     # This is the first load - set initial selection but don't steal focus
-                    self.list_widget.setCurrentRow(0)
+                    # CRITICAL: Use setCurrentCell, not selectRow, to ensure keyboard navigation works
+                    self.list_widget.setCurrentCell(0, 0)
                     
         except Exception as e:
             self.status_bar.showMessage(f"Error refreshing live content: {e}")
         finally:
+            # Re-enable signals
+            self.list_widget.blockSignals(False)
+            
+            # CRITICAL: Restore focus policy and ensure table is keyboard-ready
+            self.list_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            
+            # If table has items, ensure it's properly initialized for keyboard navigation
+            if self.list_widget.rowCount() > 0 and self.list_widget.currentRow() < 0:
+                # Set current cell to make keyboard navigation work
+                self.list_widget.setCurrentCell(0, 0)
+                # Force viewport update to complete initialization
+                self.list_widget.viewport().update()
+            
             # Clear updating flag
             self.updating_content = False
 
@@ -1458,8 +1511,8 @@ class ImageDescriptionViewer(QWidget):
         self.refresh_live_content()
         
         # Restore focus and position
-        if current_row >= 0 and current_row < self.list_widget.count():
-            self.list_widget.setCurrentRow(current_row)
+        if current_row >= 0 and current_row < self.list_widget.rowCount():
+            self.list_widget.selectRow(current_row)
         
         if focused_widget:
             focused_widget.setFocus()
@@ -2060,28 +2113,32 @@ Keyboard shortcuts:
 
     # Create Qt application
     app = QApplication(sys.argv)
-    viewer = ImageDescriptionViewer()
     
-    # Handle command-line options
-    if args.open:
-        # Show the directory dialog immediately
-        viewer.show()
-        QTimer.singleShot(100, viewer.change_directory)
-    elif args.directory:
-        # Load the specified directory
-        dir_path = Path(args.directory).resolve()
-        if dir_path.exists() and dir_path.is_dir():
-            viewer.load_descriptions(str(dir_path))
-            viewer.show()
-        else:
-            print(f"Error: Directory not found: {args.directory}", file=sys.stderr)
-            QMessageBox.critical(None, "Directory Not Found", 
-                               f"The specified directory does not exist:\n{args.directory}\n\nPlease select a valid workflow output directory.")
-            viewer.show()
-            QTimer.singleShot(100, viewer.change_directory)
-    else:
-        # Normal startup - show empty viewer
-        viewer.show()
+    # TEST: Auto-load specific directory for VoiceOver testing
+    test_workflow_dir = "/Users/kellyford/Desktop/Descriptions/wf_bigrun_ollama_moondreamlatest_narrative_20260107_102713"
+    viewer = ImageDescriptionViewer(auto_load_dir=test_workflow_dir)
+    viewer.show()
+    
+    # Handle command-line options (disabled for testing)
+    # if args.open:
+    #     # Show the directory dialog immediately
+    #     viewer.show()
+    #     QTimer.singleShot(100, viewer.change_directory)
+    # elif args.directory:
+    #     # Load the specified directory
+    #     dir_path = Path(args.directory).resolve()
+    #     if dir_path.exists() and dir_path.is_dir():
+    #         viewer.load_descriptions(str(dir_path))
+    #         viewer.show()
+    #     else:
+    #         print(f"Error: Directory not found: {args.directory}", file=sys.stderr)
+    #         QMessageBox.critical(None, "Directory Not Found", 
+    #                            f"The specified directory does not exist:\n{args.directory}\n\nPlease select a valid workflow output directory.")
+    #         viewer.show()
+    #         QTimer.singleShot(100, viewer.change_directory)
+    # else:
+    #     # Normal startup - show empty viewer
+    #     viewer.show()
     
     sys.exit(app.exec())
 

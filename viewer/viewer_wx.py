@@ -1,0 +1,1215 @@
+#!/usr/bin/env python3
+"""
+wxPython Image Description Viewer - COMPLETE VERSION
+Full-featured port of the PyQt6 viewer with better VoiceOver support
+
+Features:
+- Browse and load workflow directories
+- View image descriptions with previews
+- Live monitoring of active workflows
+- Copy descriptions/images to clipboard
+- Redescribe individual images
+- Redescribe entire workflows
+- Resume incomplete workflows  
+- Export functionality
+- Full keyboard navigation
+- Complete VoiceOver/accessibility support
+"""
+
+import sys
+import os
+import json
+import subprocess
+import re
+import time
+import threading
+from pathlib import Path
+from datetime import datetime
+
+# Add project root to path for shared module imports
+_project_root = Path(__file__).parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+import wx
+import wx.lib.scrolledpanel as scrolled
+
+# Import shared utilities
+from shared.wx_common import (
+    find_scripts_directory,
+    show_error,
+    show_warning,
+    show_info,
+    ask_yes_no,
+    select_directory_dialog,
+    open_file_dialog,
+    format_timestamp as format_timestamp_shared,
+)
+
+def get_scripts_directory():
+    """Get the scripts directory (uses shared library)"""
+    return find_scripts_directory()
+
+# Import workflow scanning functions
+scripts_dir = get_scripts_directory()
+if str(scripts_dir) not in sys.path:
+    sys.path.insert(0, str(scripts_dir))
+
+try:
+    from list_results import (
+        find_workflow_directories,
+        count_descriptions,
+        format_timestamp,
+        parse_directory_name
+    )
+except ImportError as e:
+    print(f"Warning: Could not import from list_results: {e}")
+    find_workflow_directories = None
+    count_descriptions = None
+    format_timestamp = None
+    parse_directory_name = None
+
+try:
+    import ollama
+except ImportError:
+    ollama = None
+
+
+def get_image_date(image_path: str) -> str:
+    """Extract date/time from EXIF data, format as M/D/YYYY H:MMP"""
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS
+        
+        with Image.open(image_path) as img:
+            exif_data = img.getexif()
+            
+            if exif_data:
+                exif_dict = {}
+                for tag_id, value in exif_data.items():
+                    tag = TAGS.get(tag_id, tag_id)
+                    exif_dict[tag] = value
+                
+                datetime_fields = ['DateTimeOriginal', 'DateTimeDigitized', 'DateTime']
+                
+                for field in datetime_fields:
+                    if field in exif_dict:
+                        dt_str = exif_dict[field]
+                        if dt_str:
+                            try:
+                                dt = datetime.strptime(dt_str, '%Y:%m:%d %H:%M:%S')
+                                hour = dt.hour
+                                if hour == 0:
+                                    hour_12 = 12
+                                    suffix = 'A'
+                                elif hour < 12:
+                                    hour_12 = hour
+                                    suffix = 'A'
+                                elif hour == 12:
+                                    hour_12 = 12
+                                    suffix = 'P'
+                                else:
+                                    hour_12 = hour - 12
+                                    suffix = 'P'
+                                
+                                return f"{dt.month}/{dt.day}/{dt.year} {hour_12}:{dt.minute:02d}{suffix}"
+                            except:
+                                pass
+        
+        # Fallback to file modification time
+        stat = Path(image_path).stat()
+        dt = datetime.fromtimestamp(stat.st_mtime)
+        hour = dt.hour
+        if hour == 0:
+            hour_12 = 12
+            suffix = 'A'
+        elif hour < 12:
+            hour_12 = hour
+            suffix = 'A'
+        elif hour == 12:
+            hour_12 = 12
+            suffix = 'P'
+        else:
+            hour_12 = hour - 12
+            suffix = 'P'
+        
+        return f"{dt.month}/{dt.day}/{dt.year} {hour_12}:{dt.minute:02d}{suffix}"
+    
+    except Exception as e:
+        return "Unknown date"
+
+
+class WorkflowBrowserDialog(wx.Dialog):
+    """Dialog for browsing and selecting workflows"""
+    
+    def __init__(self, parent, default_dir=None):
+        super().__init__(parent, title="Select Workflow", size=(800, 600))
+        
+        self.selected_workflow = None
+        
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Instructions
+        label = wx.StaticText(panel, label="Select a workflow to view:")
+        sizer.Add(label, 0, wx.ALL, 10)
+        
+        # Status label
+        self.status_label = wx.StaticText(panel, label="Loading...")
+        sizer.Add(self.status_label, 0, wx.ALL, 10)
+        
+        # Workflow list
+        self.workflow_list = wx.ListBox(panel, style=wx.LB_SINGLE)
+        self.workflow_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_double_click)
+        sizer.Add(self.workflow_list, 1, wx.ALL | wx.EXPAND, 10)
+        
+        # Browse button
+        browse_btn = wx.Button(panel, label="Browse Different Directory...")
+        browse_btn.Bind(wx.EVT_BUTTON, self.on_browse)
+        sizer.Add(browse_btn, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # OK/Cancel buttons
+        btn_sizer = wx.StdDialogButtonSizer()
+        ok_btn = wx.Button(panel, wx.ID_OK, label="Open Workflow")
+        cancel_btn = wx.Button(panel, wx.ID_CANCEL)
+        btn_sizer.AddButton(ok_btn)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 10)
+        
+        panel.SetSizer(sizer)
+        
+        # Load workflows - start with browse dialog if no default
+        if default_dir:
+            self.load_workflows(default_dir)
+        else:
+            # Show file browser immediately
+            wx.CallAfter(self.on_browse, None)
+        
+        ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
+    
+    def load_workflows(self, directory):
+        """Load workflows from directory"""
+        self.workflow_list.Clear()
+        self.workflows = []
+        
+        dir_path = Path(directory)
+        if not dir_path.exists():
+            self.status_label.SetLabel(f"Directory not found: {directory}")
+            return
+        
+        if not find_workflow_directories:
+            self.status_label.SetLabel("Workflow scanner not available")
+            return
+        
+        workflows = find_workflow_directories(dir_path)
+        if not workflows:
+            self.status_label.SetLabel(f"No workflows found in: {directory}")
+            return
+        
+        workflows.sort(key=lambda x: x.name, reverse=True)
+        
+        for workflow_path in workflows:
+            metadata_file = workflow_path / "workflow_metadata.json"
+            metadata = {}
+            
+            if metadata_file.exists():
+                try:
+                    with open(metadata_file) as f:
+                        metadata = json.load(f)
+                except:
+                    pass
+            
+            # Parse directory name
+            name_parts = parse_directory_name(workflow_path.name) if parse_directory_name else {}
+            provider = name_parts.get('provider', 'unknown')
+            model = name_parts.get('model', 'unknown')
+            prompt = name_parts.get('prompt_style', 'unknown')
+            
+            # Count descriptions
+            desc_count = 0
+            if count_descriptions:
+                desc_info = count_descriptions(workflow_path)
+                desc_count = desc_info.get('descriptions', 0)
+            
+            timestamp = metadata.get('timestamp', 'unknown')
+            
+            display_text = f"{workflow_path.name} | {prompt} | {desc_count} images | {model} | {provider} | {timestamp}"
+            
+            self.workflow_list.Append(display_text)
+            self.workflows.append(workflow_path)
+        
+        self.status_label.SetLabel(f"Found {len(workflows)} workflow(s) in: {directory}")
+        
+        if self.workflow_list.GetCount() > 0:
+            self.workflow_list.SetSelection(0)
+    
+    def on_browse(self, event):
+        """Browse for different directory"""
+        path = select_directory_dialog(self, "Select Descriptions Directory")
+        if path:
+            self.load_workflows(path)
+    
+    def on_double_click(self, event):
+        """Handle double-click on workflow"""
+        sel = self.workflow_list.GetSelection()
+        if sel != wx.NOT_FOUND:
+            self.selected_workflow = self.workflows[sel]
+            self.EndModal(wx.ID_OK)
+    
+    def on_ok(self, event):
+        """Handle OK button"""
+        sel = self.workflow_list.GetSelection()
+        if sel != wx.NOT_FOUND:
+            self.selected_workflow = self.workflows[sel]
+            self.EndModal(wx.ID_OK)
+        else:
+            show_warning(self, "Please select a workflow", "No Selection")
+
+
+class RedescribeDialog(wx.Dialog):
+    """Dialog for selecting model and prompt for redescribing an image"""
+    
+    def __init__(self, parent):
+        super().__init__(parent, title="Redescribe Image", size=(500, 400))
+        
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Instructions
+        label = wx.StaticText(panel, label="Select model and prompt style to redescribe this image:")
+        sizer.Add(label, 0, wx.ALL, 10)
+        
+        # Model selection
+        model_label = wx.StaticText(panel, label="Model:")
+        sizer.Add(model_label, 0, wx.ALL, 5)
+        
+        self.model_choice = wx.Choice(panel)
+        sizer.Add(self.model_choice, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Prompt style selection
+        prompt_label = wx.StaticText(panel, label="Prompt Style:")
+        sizer.Add(prompt_label, 0, wx.ALL, 5)
+        
+        self.prompt_choice = wx.Choice(panel)
+        sizer.Add(self.prompt_choice, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Load available models and prompts
+        self.load_models()
+        self.load_prompts()
+        
+        # OK/Cancel buttons
+        btn_sizer = wx.StdDialogButtonSizer()
+        ok_btn = wx.Button(panel, wx.ID_OK)
+        cancel_btn = wx.Button(panel, wx.ID_CANCEL)
+        btn_sizer.AddButton(ok_btn)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 10)
+        
+        panel.SetSizer(sizer)
+    
+    def load_models(self):
+        """Load available Ollama models"""
+        if not ollama:
+            self.model_choice.Append("Ollama not available")
+            return
+        
+        try:
+            models = ollama.list()
+            for model in models.get('models', []):
+                self.model_choice.Append(model['name'])
+            
+            if self.model_choice.GetCount() > 0:
+                self.model_choice.SetSelection(0)
+        except:
+            self.model_choice.Append("Error loading models")
+    
+    def load_prompts(self):
+        """Load available prompt styles"""
+        # Load from config
+        config_path = get_scripts_directory() / "image_describer_config.json"
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    config = json.load(f)
+                
+                prompts = config.get('prompt_variations', {})
+                for prompt_name in prompts.keys():
+                    self.prompt_choice.Append(prompt_name)
+                
+                if self.prompt_choice.GetCount() > 0:
+                    self.prompt_choice.SetSelection(0)
+            except:
+                self.prompt_choice.Append("narrative")
+        else:
+            self.prompt_choice.Append("narrative")
+    
+    def get_selections(self):
+        """Get selected model and prompt"""
+        model = self.model_choice.GetStringSelection()
+        prompt = self.prompt_choice.GetStringSelection()
+        return model, prompt
+
+
+class ApiKeyDialog(wx.Dialog):
+    """Dialog for entering API key file path"""
+    
+    def __init__(self, provider_name, parent):
+        super().__init__(parent, title=f"{provider_name} API Key", size=(500, 200))
+        
+        self.api_key_file = None
+        
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Instructions
+        label = wx.StaticText(panel, label=f"Enter the path to your {provider_name} API key file:")
+        sizer.Add(label, 0, wx.ALL, 10)
+        
+        # File path entry
+        file_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.file_text = wx.TextCtrl(panel)
+        file_sizer.Add(self.file_text, 1, wx.ALL | wx.EXPAND, 5)
+        
+        browse_btn = wx.Button(panel, label="Browse...")
+        browse_btn.Bind(wx.EVT_BUTTON, self.on_browse)
+        file_sizer.Add(browse_btn, 0, wx.ALL, 5)
+        
+        sizer.Add(file_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # OK/Cancel buttons
+        btn_sizer = wx.StdDialogButtonSizer()
+        ok_btn = wx.Button(panel, wx.ID_OK)
+        cancel_btn = wx.Button(panel, wx.ID_CANCEL)
+        btn_sizer.AddButton(ok_btn)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 10)
+        
+        panel.SetSizer(sizer)
+    
+    def on_browse(self, event):
+        """Browse for API key file"""
+        path = open_file_dialog(self, "Select API Key File")
+        if path:
+            self.file_text.SetValue(path)
+    
+    def get_api_key_file(self):
+        """Get the API key file path"""
+        return self.file_text.GetValue()
+
+
+class RedescribeWorkflowDialog(wx.Dialog):
+    """Dialog for selecting provider, model, and prompt for redescribing entire workflow"""
+    
+    def __init__(self, parent):
+        super().__init__(parent, title="Redescribe Workflow", size=(500, 450))
+        
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Instructions
+        label = wx.StaticText(panel, label="Select provider, model, and prompt to redescribe all images:")
+        sizer.Add(label, 0, wx.ALL, 10)
+        
+        # Provider selection
+        provider_label = wx.StaticText(panel, label="Provider:")
+        sizer.Add(provider_label, 0, wx.ALL, 5)
+        
+        self.provider_choice = wx.Choice(panel, choices=["Ollama", "Ollama Cloud", "OpenAI", "Claude"])
+        self.provider_choice.SetSelection(0)
+        self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
+        sizer.Add(self.provider_choice, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Model selection
+        model_label = wx.StaticText(panel, label="Model:")
+        sizer.Add(model_label, 0, wx.ALL, 5)
+        
+        self.model_choice = wx.Choice(panel)
+        sizer.Add(self.model_choice, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Prompt style selection
+        prompt_label = wx.StaticText(panel, label="Prompt Style:")
+        sizer.Add(prompt_label, 0, wx.ALL, 5)
+        
+        self.prompt_choice = wx.Choice(panel)
+        sizer.Add(self.prompt_choice, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Load available prompts
+        self.load_prompts()
+        
+        # Load initial provider models
+        self.on_provider_changed(None)
+        
+        # OK/Cancel buttons
+        btn_sizer = wx.StdDialogButtonSizer()
+        ok_btn = wx.Button(panel, wx.ID_OK)
+        cancel_btn = wx.Button(panel, wx.ID_CANCEL)
+        btn_sizer.AddButton(ok_btn)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 10)
+        
+        panel.SetSizer(sizer)
+    
+    def on_provider_changed(self, event):
+        """Handle provider change"""
+        provider = self.provider_choice.GetStringSelection()
+        self.model_choice.Clear()
+        
+        if provider in ["Ollama", "Ollama Cloud"]:
+            if ollama:
+                try:
+                    models = ollama.list()
+                    for model in models.get('models', []):
+                        self.model_choice.Append(model['name'])
+                except:
+                    pass
+        elif provider == "OpenAI":
+            self.model_choice.Append("gpt-4o")
+            self.model_choice.Append("gpt-4o-mini")
+        elif provider == "Claude":
+            self.model_choice.Append("claude-3-5-sonnet-20241022")
+            self.model_choice.Append("claude-3-5-haiku-20241022")
+        
+        if self.model_choice.GetCount() > 0:
+            self.model_choice.SetSelection(0)
+    
+    def load_prompts(self):
+        """Load available prompt styles"""
+        config_path = get_scripts_directory() / "image_describer_config.json"
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    config = json.load(f)
+                
+                prompts = config.get('prompt_variations', {})
+                for prompt_name in prompts.keys():
+                    self.prompt_choice.Append(prompt_name)
+                
+                if self.prompt_choice.GetCount() > 0:
+                    # Default to narrative
+                    narrative_idx = self.prompt_choice.FindString("narrative")
+                    if narrative_idx != wx.NOT_FOUND:
+                        self.prompt_choice.SetSelection(narrative_idx)
+                    else:
+                        self.prompt_choice.SetSelection(0)
+            except:
+                self.prompt_choice.Append("narrative")
+        else:
+            self.prompt_choice.Append("narrative")
+    
+    def get_selections(self):
+        """Get selected provider, model, and prompt"""
+        provider = self.provider_choice.GetStringSelection()
+        model = self.model_choice.GetStringSelection()
+        prompt = self.prompt_choice.GetStringSelection()
+        return provider, model, prompt
+
+
+class LiveMonitorThread(threading.Thread):
+    """Background thread for monitoring workflow progress"""
+    
+    def __init__(self, viewer, workflow_dir):
+        super().__init__(daemon=True)
+        self.viewer = viewer
+        self.workflow_dir = Path(workflow_dir)
+        self.running = True
+        self.descriptions_file = self.workflow_dir / "descriptions.txt"
+        self.last_modified = 0
+    
+    def run(self):
+        """Monitor descriptions file for changes"""
+        while self.running:
+            try:
+                if self.descriptions_file.exists():
+                    stat = self.descriptions_file.stat()
+                    if stat.st_mtime > self.last_modified:
+                        self.last_modified = stat.st_mtime
+                        # Notify viewer to refresh
+                        wx.CallAfter(self.viewer.on_live_update)
+            except:
+                pass
+            
+            time.sleep(2)  # Check every 2 seconds
+    
+    def stop(self):
+        """Stop monitoring"""
+        self.running = False
+
+
+class ImageDescriptionViewer(wx.Frame):
+    """Main viewer window with complete functionality"""
+    
+    def __init__(self, auto_load_dir=None):
+        super().__init__(None, title="Image Description Viewer", size=(1200, 800))
+        
+        self.current_dir = None
+        self.workflow_name = None
+        self.image_files = []
+        self.descriptions = []
+        self.current_index = -1
+        self.monitor_thread = None
+        self.is_live = False
+        
+        # Create menu bar
+        self.create_menu()
+        
+        # Create main panel with splitter
+        splitter = wx.SplitterWindow(self)
+        
+        # Left panel - list of descriptions
+        left_panel = wx.Panel(splitter)
+        left_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Controls
+        controls_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        refresh_btn = wx.Button(left_panel, label="Refresh")
+        refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh)
+        controls_sizer.Add(refresh_btn, 0, wx.ALL, 5)
+        
+        self.live_checkbox = wx.CheckBox(left_panel, label="Live Mode")
+        self.live_checkbox.Bind(wx.EVT_CHECKBOX, self.on_live_toggle)
+        controls_sizer.Add(self.live_checkbox, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        
+        left_sizer.Add(controls_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Description list
+        list_label = wx.StaticText(left_panel, label="Descriptions:")
+        left_sizer.Add(list_label, 0, wx.ALL, 5)
+        
+        self.desc_list = wx.ListBox(left_panel, style=wx.LB_SINGLE)
+        self.desc_list.Bind(wx.EVT_LISTBOX, self.on_description_selected)
+        self.desc_list.Bind(wx.EVT_KEY_DOWN, self.on_list_key_down)
+        left_sizer.Add(self.desc_list, 1, wx.ALL | wx.EXPAND, 5)
+        
+        left_panel.SetSizer(left_sizer)
+        
+        # Right panel - description details
+        right_panel = wx.Panel(splitter)
+        right_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Image preview
+        self.image_label = wx.StaticBitmap(right_panel)
+        right_sizer.Add(self.image_label, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        
+        # Metadata label
+        self.metadata_label = wx.StaticText(right_panel, label="")
+        self.metadata_label.SetForegroundColour(wx.Colour(0, 102, 204))
+        font = self.metadata_label.GetFont()
+        font.MakeBold()
+        self.metadata_label.SetFont(font)
+        right_sizer.Add(self.metadata_label, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Description text
+        desc_label = wx.StaticText(right_panel, label="Description:")
+        right_sizer.Add(desc_label, 0, wx.ALL, 5)
+        
+        self.desc_text = wx.TextCtrl(right_panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
+        right_sizer.Add(self.desc_text, 1, wx.ALL | wx.EXPAND, 5)
+        
+        # Button panel
+        btn_panel = wx.Panel(right_panel)
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        copy_desc_btn = wx.Button(btn_panel, label="Copy Description")
+        copy_desc_btn.Bind(wx.EVT_BUTTON, self.on_copy_description)
+        btn_sizer.Add(copy_desc_btn, 0, wx.ALL, 5)
+        
+        copy_path_btn = wx.Button(btn_panel, label="Copy Image Path")
+        copy_path_btn.Bind(wx.EVT_BUTTON, self.on_copy_path)
+        btn_sizer.Add(copy_path_btn, 0, wx.ALL, 5)
+        
+        copy_img_btn = wx.Button(btn_panel, label="Copy Image")
+        copy_img_btn.Bind(wx.EVT_BUTTON, self.on_copy_image)
+        btn_sizer.Add(copy_img_btn, 0, wx.ALL, 5)
+        
+        btn_panel.SetSizer(btn_sizer)
+        right_sizer.Add(btn_panel, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Workflow action buttons
+        workflow_panel = wx.Panel(right_panel)
+        workflow_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        redescribe_btn = wx.Button(workflow_panel, label="Redescribe Image")
+        redescribe_btn.Bind(wx.EVT_BUTTON, self.on_redescribe_image)
+        workflow_sizer.Add(redescribe_btn, 0, wx.ALL, 5)
+        
+        resume_btn = wx.Button(workflow_panel, label="Resume Workflow")
+        resume_btn.Bind(wx.EVT_BUTTON, self.on_resume_workflow)
+        workflow_sizer.Add(resume_btn, 0, wx.ALL, 5)
+        
+        redescribe_workflow_btn = wx.Button(workflow_panel, label="Redescribe Workflow")
+        redescribe_workflow_btn.Bind(wx.EVT_BUTTON, self.on_redescribe_workflow)
+        workflow_sizer.Add(redescribe_workflow_btn, 0, wx.ALL, 5)
+        
+        workflow_panel.SetSizer(workflow_sizer)
+        right_sizer.Add(workflow_panel, 0, wx.ALL | wx.EXPAND, 5)
+        
+        right_panel.SetSizer(right_sizer)
+        
+        # Setup splitter
+        splitter.SplitVertically(left_panel, right_panel)
+        splitter.SetSashPosition(400)
+        splitter.SetMinimumPaneSize(200)
+        
+        # Status bar
+        self.CreateStatusBar()
+        self.SetStatusText("Ready - No workflow loaded")
+        
+        # Auto-load if specified
+        if auto_load_dir:
+            wx.CallAfter(self.load_descriptions, auto_load_dir)
+        
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+    
+    def create_menu(self):
+        """Create menu bar"""
+        menubar = wx.MenuBar()
+        
+        # File menu
+        file_menu = wx.Menu()
+        browse_item = file_menu.Append(wx.ID_ANY, "Browse Workflows...\tCtrl+B")
+        open_item = file_menu.Append(wx.ID_OPEN, "Open Directory...\tCtrl+O")
+        change_item = file_menu.Append(wx.ID_ANY, "Change Directory...\tCtrl+D")
+        file_menu.AppendSeparator()
+        quit_item = file_menu.Append(wx.ID_EXIT, "Quit\tCtrl+Q")
+        
+        menubar.Append(file_menu, "&File")
+        
+        # View menu
+        view_menu = wx.Menu()
+        refresh_item = view_menu.Append(wx.ID_REFRESH, "Refresh\tF5")
+        live_item = view_menu.AppendCheckItem(wx.ID_ANY, "Live Mode\tCtrl+L")
+        
+        menubar.Append(view_menu, "&View")
+        
+        # Workflow menu
+        workflow_menu = wx.Menu()
+        redesc_img_item = workflow_menu.Append(wx.ID_ANY, "Redescribe Image\tCtrl+R")
+        resume_item = workflow_menu.Append(wx.ID_ANY, "Resume Workflow")
+        redesc_wf_item = workflow_menu.Append(wx.ID_ANY, "Redescribe Workflow")
+        
+        menubar.Append(workflow_menu, "&Workflow")
+        
+        self.SetMenuBar(menubar)
+        
+        # Bind menu events
+        self.Bind(wx.EVT_MENU, self.on_browse_workflows, browse_item)
+        self.Bind(wx.EVT_MENU, self.on_open_directory, open_item)
+        self.Bind(wx.EVT_MENU, self.on_change_directory, change_item)
+        self.Bind(wx.EVT_MENU, self.on_quit, quit_item)
+        self.Bind(wx.EVT_MENU, self.on_refresh, refresh_item)
+        self.Bind(wx.EVT_MENU, lambda e: self.live_checkbox.SetValue(not self.live_checkbox.GetValue()), live_item)
+        self.Bind(wx.EVT_MENU, self.on_redescribe_image, redesc_img_item)
+        self.Bind(wx.EVT_MENU, self.on_resume_workflow, resume_item)
+        self.Bind(wx.EVT_MENU, self.on_redescribe_workflow, redesc_wf_item)
+    
+    def on_browse_workflows(self, event):
+        """Open workflow browser dialog"""
+        dlg = WorkflowBrowserDialog(self)
+        if dlg.ShowModal() == wx.ID_OK and dlg.selected_workflow:
+            self.load_descriptions(str(dlg.selected_workflow))
+        dlg.Destroy()
+    
+    def on_open_directory(self, event):
+        """Open directory picker"""
+        path = select_directory_dialog(self, "Select Workflow Directory")
+        if path:
+            self.load_descriptions(path)
+    
+    def on_change_directory(self, event):
+        """Change to different directory"""
+        self.on_open_directory(event)
+    
+    def on_quit(self, event):
+        """Quit application"""
+        self.Close()
+    
+    def on_close(self, event):
+        """Handle window close"""
+        # Stop monitoring thread
+        if self.monitor_thread:
+            self.monitor_thread.stop()
+            self.monitor_thread = None
+        event.Skip()
+    
+    def on_refresh(self, event):
+        """Manually refresh descriptions"""
+        if self.current_dir:
+            current_sel = self.desc_list.GetSelection()
+            self.load_descriptions(self.current_dir, preserve_selection=current_sel)
+    
+    def on_live_toggle(self, event):
+        """Toggle live monitoring mode"""
+        self.is_live = self.live_checkbox.GetValue()
+        
+        if self.is_live:
+            # Start monitoring thread
+            if self.current_dir and not self.monitor_thread:
+                self.monitor_thread = LiveMonitorThread(self, self.current_dir)
+                self.monitor_thread.start()
+            self.SetStatusText("Live Mode: Monitoring for changes...")
+        else:
+            # Stop monitoring thread
+            if self.monitor_thread:
+                self.monitor_thread.stop()
+                self.monitor_thread = None
+            self.SetStatusText("Live Mode: Off")
+    
+    def on_live_update(self):
+        """Called by monitoring thread when file changes"""
+        if self.is_live and self.current_dir:
+            current_sel = self.desc_list.GetSelection()
+            self.load_descriptions(self.current_dir, preserve_selection=current_sel)
+    
+    def load_descriptions(self, directory, preserve_selection=-1):
+        """Load descriptions from workflow directory"""
+        self.current_dir = Path(directory)
+        prev_count = len(self.descriptions)
+        self.descriptions = []
+        self.image_files = []
+        
+        # Find descriptions file - check multiple possible locations
+        possible_locations = [
+            self.current_dir / "descriptions" / "image_descriptions.txt",  # Standard location
+            self.current_dir / "Descriptions" / "image_descriptions.txt",  # Capitalized subdirectory
+            self.current_dir / "image_descriptions.txt",  # Root of workflow
+        ]
+        
+        desc_file = None
+        for location in possible_locations:
+            if location.exists():
+                desc_file = location
+                break
+        
+        if not desc_file:
+            # Show what we found to help debug
+            msg = f"No image_descriptions.txt file found.\n\nSearched in:\n{self.current_dir}\n\n"
+            msg += "Checked locations:\n"
+            for loc in possible_locations:
+                msg += f"  • {loc.relative_to(self.current_dir) if loc.is_relative_to(self.current_dir) else loc}\n"
+            
+            # List what files ARE in the directory
+            if self.current_dir.exists():
+                msg += f"\nContents of {self.current_dir.name}:\n"
+                try:
+                    items = sorted(self.current_dir.iterdir(), key=lambda x: (not x.is_dir(), x.name))[:20]
+                    for item in items:
+                        if item.is_dir():
+                            msg += f"  📁 {item.name}/\n"
+                        else:
+                            msg += f"  📄 {item.name}\n"
+                    if len(list(self.current_dir.iterdir())) > 20:
+                        msg += f"  ... and {len(list(self.current_dir.iterdir())) - 20} more items\n"
+                except:
+                    msg += "  (Unable to list directory contents)\n"
+            
+            show_warning(self, msg, "Descriptions File Not Found")
+            self.SetStatusText("No workflow loaded")
+            return
+        
+        # Load workflow metadata
+        metadata_file = self.current_dir / "workflow_metadata.json"
+        if metadata_file.exists():
+            try:
+                with open(metadata_file) as f:
+                    metadata = json.load(f)
+                    self.workflow_name = metadata.get('name', self.current_dir.name)
+            except:
+                self.workflow_name = self.current_dir.name
+        else:
+            self.workflow_name = self.current_dir.name
+        
+        # Parse descriptions file
+        entries = self.parse_descriptions_file(desc_file)
+        self.descriptions = [e['description'] for e in entries]
+        self.image_files = [e['file_path'] for e in entries]
+        
+        # Populate list
+        self.desc_list.Clear()
+        for i, entry in enumerate(entries):
+            relative_path = entry.get('relative_path', 'Unknown')
+            photo_date = get_image_date(entry.get('file_path', ''))
+            display_text = f"{relative_path} [{photo_date}]"
+            self.desc_list.Append(display_text)
+        
+        # Update window title
+        desc_count = len(self.descriptions)
+        if desc_count > 0:
+            percentage = 100
+            title = f"{percentage}%, {desc_count} of {desc_count} images described"
+            if self.is_live:
+                title += " (Live)"
+            self.SetTitle(f"{title} - {self.workflow_name}")
+        else:
+            self.SetTitle(f"Image Description Viewer - {self.workflow_name}")
+        
+        # Update status
+        if self.is_live and desc_count > prev_count:
+            self.SetStatusText(f"Live update: {desc_count} descriptions (+{desc_count - prev_count})")
+        else:
+            self.SetStatusText(f"Loaded {desc_count} descriptions from {self.workflow_name}")
+        
+        # Restore or set selection
+        if preserve_selection >= 0 and preserve_selection < self.desc_list.GetCount():
+            self.desc_list.SetSelection(preserve_selection)
+            self.display_description(preserve_selection)
+        elif self.desc_list.GetCount() > 0:
+            self.desc_list.SetSelection(0)
+            self.display_description(0)
+    
+    def parse_descriptions_file(self, file_path):
+        """Parse the descriptions.txt file"""
+        descriptions = []
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            separator = '-' * 80
+            sections = content.split(separator)
+            
+            for section in sections[1:]:
+                if not section.strip():
+                    continue
+                
+                desc = self.parse_entry(section.strip())
+                if desc:
+                    descriptions.append(desc)
+        
+        except Exception as e:
+            print(f"Error parsing descriptions: {e}")
+        
+        return descriptions
+    
+    def parse_entry(self, section):
+        """Parse a single description entry"""
+        lines = section.split('\n')
+        entry = {
+            'file_path': '',
+            'relative_path': '',
+            'description': '',
+            'model': '',
+            'prompt_style': '',
+            'photo_date': '',
+            'camera': '',
+            'source': ''
+        }
+        
+        description_started = False
+        description_lines = []
+        
+        for line in lines:
+            line_stripped = line.strip()
+            
+            if not line_stripped:
+                if description_started:
+                    description_lines.append('')
+                continue
+            
+            # Parse metadata fields
+            if line_stripped.startswith('File: '):
+                entry['relative_path'] = line_stripped[6:].strip()
+            elif line_stripped.startswith('Path: '):
+                entry['file_path'] = line_stripped[6:].strip()
+            elif line_stripped.startswith('Model: '):
+                entry['model'] = line_stripped[7:].strip()
+            elif line_stripped.startswith('Prompt Style: '):
+                entry['prompt_style'] = line_stripped[14:].strip()
+            elif line_stripped.startswith('Photo Date: '):
+                entry['photo_date'] = line_stripped[12:].strip()
+            elif line_stripped.startswith('Camera: '):
+                entry['camera'] = line_stripped[8:].strip()
+            elif line_stripped.startswith('Source: '):
+                entry['source'] = line_stripped[8:].strip()
+            elif line_stripped.startswith('Provider: '):
+                pass  # Ignore provider line
+            elif line_stripped.startswith('Timestamp: '):
+                pass  # Ignore timestamp line
+            elif line_stripped.startswith('Description: '):
+                description_started = True
+                desc_text = line_stripped[13:].strip()
+                if desc_text:
+                    description_lines.append(desc_text)
+            elif line_stripped.startswith('[') and line_stripped.endswith(']'):
+                # Skip summary lines like "[12/31/2001 8:00A, CAMERA]"
+                continue
+            elif description_started and not line_stripped.startswith(('Timestamp:', 'File:', 'Path:', 'Source:', 'Model:', 'Prompt Style:', 'Photo Date:', 'Camera:', 'Provider:')):
+                # This is part of the description
+                description_lines.append(line_stripped)
+        
+        if description_lines:
+            entry['description'] = '\n'.join(description_lines).strip()
+        
+        # Return entry only if it has both a file path and description
+        return entry if (entry['description'] and entry['file_path']) else None
+    
+    def on_description_selected(self, event):
+        """Handle description selection"""
+        sel = self.desc_list.GetSelection()
+        if sel != wx.NOT_FOUND:
+            self.display_description(sel)
+    
+    def on_list_key_down(self, event):
+        """Handle keyboard navigation in list"""
+        keycode = event.GetKeyCode()
+        
+        if keycode == wx.WXK_UP or keycode == wx.WXK_DOWN:
+            event.Skip()  # Let default handling work
+            wx.CallAfter(self.update_after_key_nav)
+        elif keycode == wx.WXK_RETURN:
+            # Enter key - just display current
+            sel = self.desc_list.GetSelection()
+            if sel != wx.NOT_FOUND:
+                self.display_description(sel)
+        else:
+            event.Skip()
+    
+    def update_after_key_nav(self):
+        """Update display after keyboard navigation"""
+        sel = self.desc_list.GetSelection()
+        if sel != wx.NOT_FOUND:
+            self.display_description(sel)
+    
+    def display_description(self, index):
+        """Display the selected description"""
+        if 0 <= index < len(self.descriptions):
+            self.current_index = index
+            desc = self.descriptions[index]
+            
+            # Display description text
+            self.desc_text.SetValue(desc)
+            
+            # Update metadata if available
+            # (would need to parse from entry dict - simplified here)
+            self.metadata_label.SetLabel("")
+            
+            # Load and display image
+            image_path = self.image_files[index]
+            if image_path and Path(image_path).exists():
+                self.load_image(image_path)
+            else:
+                self.image_label.SetBitmap(wx.NullBitmap)
+    
+    def load_image(self, image_path):
+        """Load and display image with size constraint"""
+        try:
+            img = wx.Image(image_path, wx.BITMAP_TYPE_ANY)
+            
+            # Scale to max 500x500 while maintaining aspect ratio
+            max_size = 500
+            width, height = img.GetWidth(), img.GetHeight()
+            
+            if width > max_size or height > max_size:
+                if width > height:
+                    new_width = max_size
+                    new_height = int(height * (max_size / width))
+                else:
+                    new_height = max_size
+                    new_width = int(width * (max_size / height))
+                
+                img = img.Scale(new_width, new_height, wx.IMAGE_QUALITY_HIGH)
+            
+            bitmap = wx.Bitmap(img)
+            self.image_label.SetBitmap(bitmap)
+        
+        except Exception as e:
+            print(f"Error loading image: {e}")
+            self.image_label.SetBitmap(wx.NullBitmap)
+    
+    def on_copy_description(self, event):
+        """Copy description to clipboard"""
+        if self.current_index >= 0:
+            desc = self.descriptions[self.current_index]
+            if wx.TheClipboard.Open():
+                wx.TheClipboard.SetData(wx.TextDataObject(desc))
+                wx.TheClipboard.Close()
+                self.SetStatusText("Description copied to clipboard")
+    
+    def on_copy_path(self, event):
+        """Copy image path to clipboard"""
+        if self.current_index >= 0:
+            path = self.image_files[self.current_index]
+            if wx.TheClipboard.Open():
+                wx.TheClipboard.SetData(wx.TextDataObject(path))
+                wx.TheClipboard.Close()
+                self.SetStatusText("Image path copied to clipboard")
+    
+    def on_copy_image(self, event):
+        """Copy image to clipboard"""
+        if self.current_index >= 0:
+            image_path = self.image_files[self.current_index]
+            if Path(image_path).exists():
+                try:
+                    img = wx.Image(image_path, wx.BITMAP_TYPE_ANY)
+                    bitmap = wx.Bitmap(img)
+                    
+                    if wx.TheClipboard.Open():
+                        wx.TheClipboard.SetData(wx.BitmapDataObject(bitmap))
+                        wx.TheClipboard.Close()
+                        self.SetStatusText("Image copied to clipboard")
+                except:
+                    show_error(self, "Failed to copy image", "Error")
+    
+    def on_redescribe_image(self, event):
+        """Redescribe the current image"""
+        if self.current_index < 0:
+            show_info(self, "Please select an image first", "No Selection")
+            return
+        
+        if not ollama:
+            show_error(self, "Ollama is not available. Please install Ollama to redescribe images.", 
+                      "Ollama Not Available")
+            return
+        
+        dlg = RedescribeDialog(self)
+        if dlg.ShowModal() == wx.ID_OK:
+            model, prompt = dlg.get_selections()
+            if model and prompt:
+                self.redescribe_image_with_model(self.image_files[self.current_index], model, prompt)
+        dlg.Destroy()
+    
+    def redescribe_image_with_model(self, image_path, model, prompt_style):
+        """Redescribe image with specified model and prompt"""
+        # This would need to call the image_describer module
+        # For now, show a message
+        show_info(self, f"Redescribing with {model} and {prompt_style}\n\n"
+                 "This feature requires integration with image_describer module.")
+    
+    def on_resume_workflow(self, event):
+        """Resume the current workflow"""
+        if not self.current_dir:
+            show_info(self, "Please load a workflow first")
+            return
+        
+        # Load metadata to determine provider
+        metadata_file = self.current_dir / "workflow_metadata.json"
+        if not metadata_file.exists():
+            show_error(self, "Could not find workflow metadata")
+            return
+        
+        try:
+            with open(metadata_file) as f:
+                metadata = json.load(f)
+            
+            provider = metadata.get('provider', 'ollama')
+            
+            # Check if API key needed
+            api_key_file = None
+            if provider.lower() in ['openai', 'claude']:
+                dlg = ApiKeyDialog(provider.capitalize(), self)
+                if dlg.ShowModal() == wx.ID_OK:
+                    api_key_file = dlg.get_api_key_file()
+                else:
+                    dlg.Destroy()
+                    return
+                dlg.Destroy()
+            
+            # Build command
+            if getattr(sys, 'frozen', False):
+                idt_exe = Path(sys.executable).parent / "idt"
+                if not idt_exe.exists():
+                    idt_exe = Path(sys.executable).parent / "idt.exe"
+                cmd = [str(idt_exe), "workflow", "--resume", str(self.current_dir)]
+            else:
+                workflow_script = get_scripts_directory() / "workflow.py"
+                cmd = [sys.executable, str(workflow_script), "--resume", str(self.current_dir)]
+            
+            if api_key_file:
+                cmd.extend(["--api-key-file", api_key_file])
+            
+            # Confirm
+            if ask_yes_no(self, f"Resume workflow: {self.workflow_name}?\n\nProvider: {provider}"):
+                subprocess.Popen(cmd, cwd=str(self.current_dir.parent))
+                show_info(self, "Workflow resume launched")
+        
+        except Exception as e:
+            show_error(self, f"Failed to resume workflow:\n{e}")
+    
+    def on_redescribe_workflow(self, event):
+        """Redescribe entire workflow"""
+        if not self.current_dir:
+            show_info(self, "Please load a workflow first")
+            return
+        
+        dlg = RedescribeWorkflowDialog(self)
+        if dlg.ShowModal() != wx.ID_OK:
+            dlg.Destroy()
+            return
+        
+        provider, model, prompt_style = dlg.get_selections()
+        dlg.Destroy()
+        
+        if not provider or not model or not prompt_style:
+            show_warning(self, "Please select all options")
+            return
+        
+        # Check if API key needed
+        api_key_file = None
+        provider_lower = provider.lower()
+        if 'openai' in provider_lower or 'claude' in provider_lower:
+            dlg = ApiKeyDialog(provider, self)
+            if dlg.ShowModal() == wx.ID_OK:
+                api_key_file = dlg.get_api_key_file()
+            else:
+                dlg.Destroy()
+                return
+            dlg.Destroy()
+        
+        # Map provider names
+        provider_map = {
+            "Ollama": "ollama",
+            "Ollama Cloud": "ollama-cloud",
+            "OpenAI": "openai",
+            "Claude": "claude"
+        }
+        provider_cmd = provider_map.get(provider, provider.lower())
+        
+        # Build command
+        if getattr(sys, 'frozen', False):
+            idt_exe = Path(sys.executable).parent / "idt"
+            if not idt_exe.exists():
+                idt_exe = Path(sys.executable).parent / "idt.exe"
+            cmd = [str(idt_exe), "workflow", "--redescribe", str(self.current_dir)]
+        else:
+            workflow_script = get_scripts_directory() / "workflow.py"
+            cmd = [sys.executable, str(workflow_script), "--redescribe", str(self.current_dir)]
+        
+        cmd.extend([
+            "--provider", provider_cmd,
+            "--model", model,
+            "--prompt-style", prompt_style
+        ])
+        
+        if api_key_file:
+            cmd.extend(["--api-key-file", api_key_file])
+        
+        # Confirm
+        if ask_yes_no(self,
+            f"Redescribe all images in: {self.workflow_name}?\n\n"
+            f"Provider: {provider}\nModel: {model}\nPrompt: {prompt_style}\n\n"
+            f"This will create a new workflow directory."):
+            try:
+                subprocess.Popen(cmd, cwd=str(self.current_dir.parent))
+                show_info(self, "Redescribe workflow launched")
+            except Exception as e:
+                show_error(self, f"Failed to launch redescribe:\n{e}")
+
+
+def main():
+    app = wx.App()
+    
+    frame = ImageDescriptionViewer()
+    frame.Show()
+    
+    # Auto-show browse dialog on startup
+    wx.CallAfter(frame.on_browse_workflows, None)
+    
+    app.MainLoop()
+
+
+if __name__ == "__main__":
+    main()
