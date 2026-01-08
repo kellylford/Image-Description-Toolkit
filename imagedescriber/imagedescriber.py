@@ -72,7 +72,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QProgressBar, QProgressDialog, QStatusBar, QTreeWidget, QTreeWidgetItem,
     QInputDialog, QPlainTextEdit, QCheckBox, QPushButton, QFormLayout,
     QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup, QGroupBox, QLineEdit,
-    QTextEdit, QTabWidget, QScrollArea, QFrame
+    QTextEdit, QTabWidget, QScrollArea, QFrame, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QMutex, QMutexLocker
 from PyQt6.QtGui import (
@@ -4341,9 +4341,15 @@ class ImageDescriberGUI(QMainWindow):
         left_layout = QVBoxLayout(left_panel)
 
         left_layout.addWidget(QLabel("Images:"))
-        self.image_list = QListWidget()
+        self.image_list = QTableWidget()
         self.image_list.setAccessibleName("Image List")
         self.image_list.setAccessibleDescription("List of images and video frames in the workspace. Use arrow keys to navigate, P to process selected image.")
+        self.image_list.setColumnCount(1)
+        self.image_list.setHorizontalHeaderLabels(["Images"])
+        self.image_list.horizontalHeader().setStretchLastSection(True)
+        self.image_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.image_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.image_list.verticalHeader().setVisible(False)
         self.image_list.itemSelectionChanged.connect(self.on_image_selection_changed)
         # Enable proper focus tracking
         self.image_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -4356,9 +4362,15 @@ class ImageDescriberGUI(QMainWindow):
         right_layout = QVBoxLayout(right_panel)
 
         right_layout.addWidget(QLabel("Descriptions:"))
-        self.description_list = QListWidget()
+        self.description_list = QTableWidget()
         self.description_list.setAccessibleName("Description List")
         self.description_list.setAccessibleDescription("List of descriptions for the selected image. Use arrow keys to navigate and view different descriptions.")
+        self.description_list.setColumnCount(1)
+        self.description_list.setHorizontalHeaderLabels(["Descriptions"])
+        self.description_list.horizontalHeader().setStretchLastSection(True)
+        self.description_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.description_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.description_list.verticalHeader().setVisible(False)
         self.description_list.itemSelectionChanged.connect(self.on_description_selection_changed)
         # Enable proper focus tracking
         self.description_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -5202,8 +5214,8 @@ class ImageDescriberGUI(QMainWindow):
             self.refresh_view()
             
             # Select the new item
-            for i in range(self.image_list.count()):
-                list_item = self.image_list.item(i)
+            for i in range(self.image_list.rowCount()):
+                list_item = self.image_list.item(i, 0)
                 if list_item.data(Qt.ItemDataRole.UserRole) == file_path:
                     self.image_list.setCurrentItem(list_item)
                     break
@@ -5360,8 +5372,8 @@ class ImageDescriberGUI(QMainWindow):
         self.workspace = ImageWorkspace(new_workspace=True)  # Explicitly mark as new workspace
         self.current_workspace_file = None
         self.batch_queue.clear()
-        self.image_list.clear()
-        self.description_list.clear()
+        self.image_list.setRowCount(0)
+        self.description_list.setRowCount(0)
         self.description_text.clear()
         self.update_window_title()
         
@@ -5865,7 +5877,7 @@ class ImageDescriberGUI(QMainWindow):
                 import traceback
                 error_details = traceback.format_exc()
                 # Try a simpler refresh
-                self.image_list.clear()
+                self.image_list.setRowCount(0)
                 QMessageBox.warning(
                     self,
                     "Display Warning",
@@ -5941,7 +5953,7 @@ class ImageDescriberGUI(QMainWindow):
     
     def refresh_tree_view(self):
         """Refresh the image list in tree view mode (original view)"""
-        self.image_list.clear()
+        self.image_list.setRowCount(0)
         
         # Collect items to display
         items_to_display = []
@@ -6023,8 +6035,8 @@ class ImageDescriberGUI(QMainWindow):
                 prefix = "".join(prefix_parts)
                 display_name = f"{prefix} {base_name}"
             
-            # Create list item
-            list_item = QListWidgetItem(display_name)
+            # Create table item
+            list_item = QTableWidgetItem(display_name)
             list_item.setData(Qt.ItemDataRole.UserRole, file_path)
             
             # Set accessibility properties for VoiceOver
@@ -6042,7 +6054,9 @@ class ImageDescriberGUI(QMainWindow):
             list_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
             list_item.setToolTip(accessible_text)
             
-            self.image_list.addItem(list_item)
+            row = self.image_list.rowCount()
+            self.image_list.insertRow(row)
+            self.image_list.setItem(row, 0, list_item)
             
             # Add extracted frames as children for videos (also sorted)
             if item.item_type == "video" and item.extracted_frames:
@@ -6087,10 +6101,12 @@ class ImageDescriberGUI(QMainWindow):
                     else:
                         frame_display = f"    {frame_name}"
                     
-                    frame_item = QListWidgetItem(frame_display)
+                    frame_item = QTableWidgetItem(frame_display)
                     frame_item.setData(Qt.ItemDataRole.UserRole, frame_path)
                     
-                    self.image_list.addItem(frame_item)
+                    row = self.image_list.rowCount()
+                    self.image_list.insertRow(row)
+                    self.image_list.setItem(row, 0, frame_item)
         
         # Add chat sessions to the list
         if hasattr(self.workspace, 'chat_sessions'):
@@ -6105,7 +6121,7 @@ class ImageDescriberGUI(QMainWindow):
                     display_name = f"c{conversation_count} {display_name}"
                 
                 # Create chat item
-                chat_item = QListWidgetItem(display_name)
+                chat_item = QTableWidgetItem(display_name)
                 chat_item.setData(Qt.ItemDataRole.UserRole, chat_id)
                 chat_item.setData(Qt.ItemDataRole.UserRole + 1, "chat_session")  # Mark as chat
                 chat_item.setToolTip(f"Chat session: {chat_name}\nProvider: {chat_session.get('provider', 'Unknown')}\nModel: {chat_session.get('model', 'Unknown')}\nMessages: {conversation_count}")
@@ -6113,7 +6129,9 @@ class ImageDescriberGUI(QMainWindow):
                 # Set chat icon and styling
                 chat_item.setForeground(QColor(0, 100, 200))  # Blue color for chats
                 
-                self.image_list.addItem(chat_item)
+                row = self.image_list.rowCount()
+                self.image_list.insertRow(row)
+                self.image_list.setItem(row, 0, chat_item)
         
         # Also refresh master-detail view if it's the current mode
         if self.navigation_mode == "master_detail":
@@ -6122,7 +6140,8 @@ class ImageDescriberGUI(QMainWindow):
     def refresh_view_preserving_chat_selection(self, active_chat_id):
         """Refresh the image list view while preserving chat selection"""
         # Store current selection if it's a chat
-        current_item = self.image_list.currentItem()
+        current_row = self.image_list.currentRow()
+        current_item = self.image_list.item(current_row, 0) if current_row >= 0 else None
         current_chat_id = None
         if current_item and current_item.data(Qt.ItemDataRole.UserRole) == active_chat_id:
             current_chat_id = active_chat_id
@@ -6133,10 +6152,10 @@ class ImageDescriberGUI(QMainWindow):
         # Restore chat selection if it was active
         if current_chat_id:
             try:
-                for i in range(self.image_list.count()):
-                    item = self.image_list.item(i)
+                for i in range(self.image_list.rowCount()):
+                    item = self.image_list.item(i, 0)
                     if item and item.data(Qt.ItemDataRole.UserRole) == current_chat_id:
-                        self.image_list.setCurrentItem(item)
+                        self.image_list.setCurrentCell(i, 0)
                         break
             except Exception as e:
                 print(f"Warning: Could not restore chat selection: {e}")
@@ -6144,7 +6163,7 @@ class ImageDescriberGUI(QMainWindow):
     
     def refresh_flat_view(self):
         """Refresh the image list in flat view mode - shows all descriptions in a single list"""
-        self.image_list.clear()
+        self.image_list.setRowCount(0)
         
         # Collect all items with their descriptions
         all_descriptions = []
@@ -6525,7 +6544,8 @@ class ImageDescriberGUI(QMainWindow):
     def get_current_selected_file_path(self):
         """Get currently selected file path regardless of navigation mode"""
         if self.navigation_mode == "tree":
-            current_item = self.image_list.currentItem()
+            current_row = self.image_list.currentRow()
+            current_item = self.image_list.item(current_row, 0) if current_row >= 0 else None
             if current_item:
                 return current_item.data(Qt.ItemDataRole.UserRole)
         elif self.navigation_mode == "master_detail":
@@ -6665,8 +6685,8 @@ class ImageDescriberGUI(QMainWindow):
                 self.refresh_current_view()
                 
                 # Restore selection and focus
-                if current_selection >= 0 and current_selection < self.image_list.count():
-                    self.image_list.setCurrentRow(current_selection)
+                if current_selection >= 0 and current_selection < self.image_list.rowCount():
+                    self.image_list.setCurrentCell(current_selection, 0)
                     self.image_list.setFocus()
                 
                 self.statusBar().showMessage(f"Auto-renamed to: {sanitized_caption}", 3000)
@@ -6676,8 +6696,8 @@ class ImageDescriberGUI(QMainWindow):
         except Exception as e:
             self.statusBar().showMessage(f"Error during auto-rename: {str(e)}", 3000)
             # Restore selection and focus even on error
-            if current_selection >= 0 and current_selection < self.image_list.count():
-                self.image_list.setCurrentRow(current_selection)
+            if current_selection >= 0 and current_selection < self.image_list.rowCount():
+                self.image_list.setCurrentCell(current_selection, 0)
                 self.image_list.setFocus()
 
     def _generate_short_caption(self, image_path: str) -> str:
@@ -6788,7 +6808,8 @@ class ImageDescriberGUI(QMainWindow):
     # Event handlers
     def on_image_selection_changed(self):
         """Handle image selection change"""
-        current_item = self.image_list.currentItem()
+        current_row = self.image_list.currentRow()
+        current_item = self.image_list.item(current_row, 0) if current_row >= 0 else None
         if current_item:
             # Check if this is a chat session
             item_type = current_item.data(Qt.ItemDataRole.UserRole + 1)
@@ -6800,7 +6821,7 @@ class ImageDescriberGUI(QMainWindow):
                 desc_id = item_type  # In flat view, UserRole+1 stores description ID
                 
                 # Clear description list and show just this description
-                self.description_list.clear()
+                self.description_list.setRowCount(0)
                 
                 # Find and display the specific description
                 workspace_item = self.workspace.get_item(file_path)
@@ -6833,14 +6854,14 @@ class ImageDescriberGUI(QMainWindow):
     def display_chat_conversation(self, chat_id: str):
         """Display chat conversation in the description area"""
         if not hasattr(self.workspace, 'chat_sessions') or chat_id not in self.workspace.chat_sessions:
-            self.description_list.clear()
+            self.description_list.setRowCount(0)
             self.description_text.setPlainText("Chat session not found.")
             return
         
         chat_session = self.workspace.chat_sessions[chat_id]
         
         # Clear description list and populate with conversation
-        self.description_list.clear()
+        self.description_list.setRowCount(0)
         
         for i, msg in enumerate(chat_session['conversation']):
             if msg['type'] == 'user':
@@ -6859,7 +6880,7 @@ class ImageDescriberGUI(QMainWindow):
                 item_text = f"{short_model}: {preview}"
                 full_text = f"{short_model}: {msg['content']} ({msg['timestamp']})"
             
-            list_item = QListWidgetItem(item_text)
+            list_item = QTableWidgetItem(item_text)
             list_item.setData(Qt.ItemDataRole.UserRole, i)  # Store message index
             list_item.setData(Qt.ItemDataRole.UserRole + 1, full_text)  # Store full text
             list_item.setToolTip(full_text)
@@ -6870,19 +6891,23 @@ class ImageDescriberGUI(QMainWindow):
             else:
                 list_item.setForeground(QColor(0, 0, 150))  # Blue for AI
             
-            self.description_list.addItem(list_item)
+            row = self.description_list.rowCount()
+            self.description_list.insertRow(row)
+            self.description_list.setItem(row, 0, list_item)
         
         # If there are messages, select the last one
-        if self.description_list.count() > 0:
-            self.description_list.setCurrentRow(self.description_list.count() - 1)
+        if self.description_list.rowCount() > 0:
+            self.description_list.setCurrentCell(self.description_list.rowCount() - 1, 0)
     
     def on_description_selection_changed(self):
         """Handle description selection change"""
-        current_item = self.description_list.currentItem()
+        current_desc_row = self.description_list.currentRow()
+        current_item = self.description_list.item(current_desc_row, 0) if current_desc_row >= 0 else None
         
         if current_item:
             # Check if we're in a chat session
-            image_item = self.image_list.currentItem()
+            image_row = self.image_list.currentRow()
+            image_item = self.image_list.item(image_row, 0) if image_row >= 0 else None
             if image_item and image_item.data(Qt.ItemDataRole.UserRole + 1) == "chat_session":
                 # This is a chat message selection
                 full_text = current_item.data(Qt.ItemDataRole.UserRole + 1)
@@ -6920,7 +6945,7 @@ class ImageDescriberGUI(QMainWindow):
     
     def load_descriptions_for_image(self, file_path: str):
         """Load descriptions for the selected image"""
-        self.description_list.clear()
+        self.description_list.setRowCount(0)
         
         workspace_item = self.workspace.get_item(file_path)
         if workspace_item and workspace_item.descriptions:
@@ -6950,7 +6975,7 @@ class ImageDescriberGUI(QMainWindow):
                 
                 # Create list widget item with formatted display
                 display_text = f"{model_text} {prompt_text}: {desc_preview}"
-                list_item = QListWidgetItem(display_text)
+                list_item = QTableWidgetItem(display_text)
                 list_item.setData(Qt.ItemDataRole.UserRole, desc.id)
                 
                 # Set full text for screen readers - just model, prompt, description, then date
@@ -6960,11 +6985,13 @@ class ImageDescriberGUI(QMainWindow):
                 list_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole,
                                 f"{model_text} {prompt_text}")
                 
-                self.description_list.addItem(list_item)
+                row = self.description_list.rowCount()
+                self.description_list.insertRow(row)
+                self.description_list.setItem(row, 0, list_item)
             
             # Auto-select the first description
-            if self.description_list.count() > 0:
-                self.description_list.setCurrentRow(0)
+            if self.description_list.rowCount() > 0:
+                self.description_list.setCurrentCell(0, 0)
         else:
             self.description_text.clear()
             self.description_text.setAccessibleDescription("No description available.")
@@ -7067,10 +7094,10 @@ class ImageDescriberGUI(QMainWindow):
             # Restore focus after refresh
             if current_file_path:
                 def restore_focus():
-                    for i in range(self.image_list.count()):
-                        item = self.image_list.item(i)
+                    for i in range(self.image_list.rowCount()):
+                        item = self.image_list.item(i, 0)
                         if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
-                            self.image_list.setCurrentItem(item)
+                            self.image_list.setCurrentCell(i, 0)
                             break
                 QTimer.singleShot(0, restore_focus)
     
@@ -7418,10 +7445,10 @@ class ImageDescriberGUI(QMainWindow):
         self.refresh_view()
         
         # Select the new chat session in the list
-        for i in range(self.image_list.count()):
-            item = self.image_list.item(i)
+        for i in range(self.image_list.rowCount()):
+            item = self.image_list.item(i, 0)
             if item and item.data(Qt.ItemDataRole.UserRole) == chat_id:
-                self.image_list.setCurrentItem(item)
+                self.image_list.setCurrentCell(i, 0)
                 break
         
         # Initialize chat windows dict if not exists
@@ -7533,10 +7560,10 @@ class ImageDescriberGUI(QMainWindow):
         chat_window.show()
         
         # Select the chat in the image list so user knows which chat is active
-        for i in range(self.image_list.count()):
-            item = self.image_list.item(i)
+        for i in range(self.image_list.rowCount()):
+            item = self.image_list.item(i, 0)
             if item and item.data(Qt.ItemDataRole.UserRole) == chat_id:
-                self.image_list.setCurrentItem(item)
+                self.image_list.setCurrentCell(i, 0)
                 break
     
     def view_chat_sessions(self):
@@ -7752,8 +7779,8 @@ class ImageDescriberGUI(QMainWindow):
     def show_chat_processing(self, chat_id):
         """Show processing indicator for chat"""
         # Find the chat item in the list and add processing indicator
-        for i in range(self.image_list.count()):
-            item = self.image_list.item(i)
+        for i in range(self.image_list.rowCount()):
+            item = self.image_list.item(i, 0)
             if item.data(Qt.ItemDataRole.UserRole) == chat_id:
                 original_text = item.text()
                 if not original_text.endswith(" (processing...)"):
@@ -7762,8 +7789,8 @@ class ImageDescriberGUI(QMainWindow):
     
     def hide_chat_processing(self, chat_id):
         """Hide processing indicator for chat"""
-        for i in range(self.image_list.count()):
-            item = self.image_list.item(i)
+        for i in range(self.image_list.rowCount()):
+            item = self.image_list.item(i, 0)
             if item.data(Qt.ItemDataRole.UserRole) == chat_id:
                 original_text = item.text()
                 if original_text.endswith(" (processing...)"):
@@ -7891,8 +7918,8 @@ class ImageDescriberGUI(QMainWindow):
                         self.refresh_view()  # This updates the description count in the tree
                         
                         # Select the newly added description
-                        for i in range(self.description_list.count()):
-                            item = self.description_list.item(i)
+                        for i in range(self.description_list.rowCount()):
+                            item = self.description_list.item(i, 0)
                             if item.data(Qt.ItemDataRole.UserRole) == manual_desc.id:
                                 self.description_list.setCurrentItem(item)
                                 break
@@ -8308,8 +8335,10 @@ Please answer the follow-up question about this image, taking into account the c
     
     def edit_description(self):
         """Edit the selected description"""
-        current_desc_item = self.description_list.currentItem()
-        current_image_item = self.image_list.currentItem()
+        current_desc_row = self.description_list.currentRow()
+        current_desc_item = self.description_list.item(current_desc_row, 0) if current_desc_row >= 0 else None
+        current_image_row = self.image_list.currentRow()
+        current_image_item = self.image_list.item(current_image_row, 0) if current_image_row >= 0 else None
         
         if not current_desc_item or not current_image_item:
             return
@@ -8358,8 +8387,10 @@ Please answer the follow-up question about this image, taking into account the c
     
     def delete_description(self):
         """Delete the selected description"""
-        current_desc_item = self.description_list.currentItem()
-        current_image_item = self.image_list.currentItem()
+        current_desc_row = self.description_list.currentRow()
+        current_desc_item = self.description_list.item(current_desc_row, 0) if current_desc_row >= 0 else None
+        current_image_row = self.image_list.currentRow()
+        current_image_item = self.image_list.item(current_image_row, 0) if current_image_row >= 0 else None
         
         if not current_desc_item or not current_image_item:
             return
@@ -8830,12 +8861,12 @@ Please answer the follow-up question about this image, taking into account the c
         current_item = self.image_list.currentItem()
         if not current_item:
             # Find and select the processed item
-            for i in range(self.image_list.count()):
-                item = self.image_list.item(i)
+            for i in range(self.image_list.rowCount()):
+                item = self.image_list.item(i, 0)
                 if item:
                     item_path = item.data(Qt.ItemDataRole.UserRole)
                     if item_path == file_path:
-                        self.image_list.setCurrentItem(item)
+                        self.image_list.setCurrentCell(i, 0)
                         break
         
         # Show status update
@@ -8971,8 +9002,8 @@ Please answer the follow-up question about this image, taking into account the c
     def update_specific_item_display(self, file_path: str):
         """Update display text for a specific item without losing focus"""
         # Find the item in the current list
-        for i in range(self.image_list.count()):
-            item = self.image_list.item(i)
+        for i in range(self.image_list.rowCount()):
+            item = self.image_list.item(i, 0)
             if item and item.data(Qt.ItemDataRole.UserRole) == file_path:
                 # Get the workspace item to rebuild the display name
                 workspace_item = self.workspace.get_item(file_path)
@@ -9060,10 +9091,10 @@ Please answer the follow-up question about this image, taking into account the c
             if current_file_path:
                 # Use QTimer.singleShot to ensure focus restoration happens after UI update
                 def restore_focus():
-                    for i in range(self.image_list.count()):
-                        item = self.image_list.item(i)
+                    for i in range(self.image_list.rowCount()):
+                        item = self.image_list.item(i, 0)
                         if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
-                            self.image_list.setCurrentItem(item)
+                            self.image_list.setCurrentCell(i, 0)
                             self.image_list.scrollToItem(item)  # Ensure it's visible
                             break
                 
@@ -9111,10 +9142,10 @@ Please answer the follow-up question about this image, taking into account the c
         if current_file_path:
             # Use QTimer.singleShot to ensure focus restoration happens after UI update
             def restore_focus():
-                for i in range(self.image_list.count()):
-                    item = self.image_list.item(i)
+                for i in range(self.image_list.rowCount()):
+                    item = self.image_list.item(i, 0)
                     if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
-                        self.image_list.setCurrentItem(item)
+                        self.image_list.setCurrentCell(i, 0)
                         self.image_list.scrollToItem(item)  # Ensure it's visible
                         break
             
@@ -9235,10 +9266,10 @@ You can check Ollama logs for more details."""
         if current_file_path:
             # Use QTimer.singleShot to ensure focus restoration happens after UI update
             def restore_focus():
-                for i in range(self.image_list.count()):
-                    item = self.image_list.item(i)
+                for i in range(self.image_list.rowCount()):
+                    item = self.image_list.item(i, 0)
                     if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
-                        self.image_list.setCurrentItem(item)
+                        self.image_list.setCurrentCell(i, 0)
                         self.image_list.scrollToItem(item)  # Ensure it's visible
                         break
             
@@ -9298,10 +9329,10 @@ You can check Ollama logs for more details."""
         if current_file_path:
             # Use QTimer.singleShot to ensure focus restoration happens after UI update
             def restore_focus():
-                for i in range(self.image_list.count()):
-                    item = self.image_list.item(i)
+                for i in range(self.image_list.rowCount()):
+                    item = self.image_list.item(i, 0)
                     if item and item.data(Qt.ItemDataRole.UserRole) == current_file_path:
-                        self.image_list.setCurrentItem(item)
+                        self.image_list.setCurrentCell(i, 0)
                         self.image_list.scrollToItem(item)  # Ensure it's visible
                         break
             
