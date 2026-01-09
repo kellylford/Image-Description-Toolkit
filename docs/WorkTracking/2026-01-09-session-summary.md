@@ -102,6 +102,25 @@ Removed duplicate/standalone files:
 
 3. **Verify paths** in any CI/CD or automated build systems
 
+## Build Script Path Fixes (Second Commit)
+
+After testing, discovered and fixed critical path issues caused by moving scripts to subdirectories:
+
+### MacBuilds Path Fixes
+- **builditall_macos.sh**:
+  - Fixed `idt_cli.py` path → `idt/idt_cli.py` (not in project root)
+  - Changed build script names from `*_macos.sh` to `*_wx.sh` (actual file names)
+  - Changed to use `idt/build_idt.sh` instead of `build_idt_macos.sh` (consistent with Windows approach)
+- **package_all_macos.sh**: Fixed all relative paths from `../` to `../../` (scripts now in MacBuilds/)
+- **create_macos_dmg.sh**: Updated error message to reference `builditall_macos.sh`
+
+### WinBuilds Path Fixes
+- **builditall_wx.bat**: Changed project root navigation from `..` to `..\..` (now in WinBuilds/)
+- **package_all_windows.bat**: Fixed all paths from `..\` to `..\..\` (now in WinBuilds/)  
+- **build_installer.bat**: Fixed VERSION file path from `..\` to `..\..\`
+
+All scripts now correctly navigate relative to their new locations in platform-specific subdirectories.
+
 ## Impact
 
 - **Breaking change**: All direct references to build scripts must be updated to use new paths
