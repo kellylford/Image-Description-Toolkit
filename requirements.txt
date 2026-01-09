@@ -1,10 +1,15 @@
 # ============================================================================
-# Image Description Toolkit - Dependencies
+# Image Description Toolkit - Core Dependencies
 # ============================================================================
+# This file contains core dependencies for CLI/script usage.
+# 
+# GUI Applications (viewer, imagedescriber, prompt_editor, idtconfigure):
+#   Each GUI app has its own requirements.txt in its directory with wxPython
+#   Example: cd viewer && pip install -r requirements.txt
+#
 # Installation options:
-#   Minimal (scripts only):     pip install Pillow requests ollama openai anthropic
-#   GUI applications:           pip install -r requirements.txt
-#   Full (all features):        pip install -r requirements.txt
+#   CLI/Scripts only:       pip install -r requirements.txt
+#   GUI applications:       See individual app directories
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -28,24 +33,6 @@ anthropic>=0.18.0       # Anthropic Claude official SDK (retry logic, token trac
 
 # Web Image Download Support (scripts/web_image_downloader.py)
 beautifulsoup4>=4.9.0   # HTML parsing for web image extraction
-
-# ----------------------------------------------------------------------------
-# GUI APPLICATIONS (imagedescriber, viewer, prompt_editor)
-# ----------------------------------------------------------------------------
-PyQt6>=6.4.0                                # GUI framework
-pywin32>=306; sys_platform == "win32"       # Windows system integration
-
-# ----------------------------------------------------------------------------
-# ONNX/FLORENCE-2 SUPPORT (Local vision models)
-# ----------------------------------------------------------------------------
-# Florence-2 provides lightweight local image description without requiring Ollama
-# Note: NPU acceleration not available on ARM64 Windows (CPU-only on Copilot+ Snapdragon)
-# WARNING: Adds ~500MB to installation and increases startup time
-transformers>=4.45.0    # HuggingFace transformers (Florence-2 support, Python 3.13 compatible)
-torch>=2.0.0            # PyTorch backend for Florence-2
-torchvision>=0.15.0     # Vision utilities for PyTorch
-einops>=0.8.0           # Tensor operations (required by Florence-2)
-timm>=1.0.0             # PyTorch Image Models (required by Florence-2)
 
 # ----------------------------------------------------------------------------
 # VIDEO PROCESSING (scripts/video_frame_extractor.py only)
@@ -97,17 +84,23 @@ pyinstaller>=6.0.0      # Executable bundling for distribution
 # Metadata utilities (optional advanced features):
 #   pip install pyexiv2 ExifRead geopy
 #
-# ============================================================================
-# NOTES
-# ============================================================================
-# 
-# Python 3.13 Compatibility:
-#   - All core dependencies work with Python 3.13+
-#   - pyexiv2 may require compilation on Python 3.13 (optional feature)
-#   - pillow-heif should work but check PyPI for latest wheels
+# ======================CLI/scripts only, no video, no HEIC):
+#   pip install Pillow requests ollama openai anthropic
 #
-# API Keys Required:
-#   - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
+# CLI with HEIC support (iPhone photos):
+#   pip install Pillow requests ollama openai anthropic pillow-heif piexif
+#
+# CLI with video processing:
+#   pip install Pillow requests ollama openai anthropic opencv-python numpy piexif
+#
+# Full CLI/scripts (all features):
+#   pip install -r requirements.txt
+#
+# GUI applications:
+#   cd viewer && pip install -r requirements.txt
+#   cd imagedescriber && pip install -r requirements.txt
+#   cd prompt_editor && pip install -r requirements.txt
+#   cd idtconfigure && - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
 #   - Claude: Set ANTHROPIC_API_KEY environment variable or create claude.txt
 #   - Ollama: Local installation, no API key needed
 #

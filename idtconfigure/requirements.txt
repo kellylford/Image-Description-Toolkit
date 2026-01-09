@@ -1,2 +1,19 @@
-PyQt6>=6.4.0
-pyinstaller>=6.0.0
+# ============================================================================
+# IDTConfigure - Complete Dependencies (wxPython Version)
+# ============================================================================
+# Install in idtconfigure's virtual environment:
+#   cd idtconfigure
+#   python -m venv .venv
+#   .venv\Scripts\activate (Windows) or source .venv/bin/activate (macOS/Linux)
+#   pip install -r requirements.txt
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# REQUIRED - GUI Framework
+# ----------------------------------------------------------------------------
+wxPython>=4.2.0        # Cross-platform GUI framework
+
+# ----------------------------------------------------------------------------
+# REQUIRED - Build Tool
+# ----------------------------------------------------------------------------
+pyinstaller>=6.0.0     # For building the executable
