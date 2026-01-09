@@ -102,6 +102,45 @@ Removed duplicate/standalone files:
 
 3. **Verify paths** in any CI/CD or automated build systems
 
+## Build Script Validation and Fixes (Third Commit)
+
+After user reported build failures, performed actual build testing instead of just syntax checking:
+
+### Issues Found and Fixed
+
+**Critical Build Issue - idt.spec**:
+- **Problem**: Hidden imports failed because `pathex` was empty (`pathex=[]`)
+- **Root Cause**: When building from `idt/` directory, PyInstaller couldn't find `scripts` module
+- **Fix**: Added parent directory to pathex: `pathex=['..']`
+- **Result**: ✅ All hidden imports now resolve correctly
+
+**Obsolete Validation - builditall_macos.sh**:
+- **Problem**: Script checked for non-existent `BuildAndRelease/final_working.spec`
+- **Root Cause**: Old PyQt6 build system validation no longer applicable to wxPython multi-app builds
+- **Fix**: Removed check_spec_completeness.py call from master build script
+- **Result**: ✅ Build script no longer fails on obsolete spec file check
+
+### Build Testing Results
+
+**Individual App Builds (from app directories):**
+- ✅ `idt/build_idt.sh` - PASS (tested and verified with `./dist/idt version`)
+- ✅ `viewer/build_viewer_wx.sh` - PASS
+- ✅ `prompt_editor/build_prompt_editor_wx.sh` - PASS
+- ✅ `imagedescriber/build_imagedescriber_wx.sh` - PASS
+- ✅ `idtconfigure/build_idtconfigure_wx.sh` - PASS
+
+**Master Build Script:**
+- ✅ `BuildAndRelease/MacBuilds/builditall_macos.sh` - In progress (successfully building IDT)
+
+### Key Learnings
+
+The issue demonstrated the importance of:
+1. Actually **running builds**, not just checking syntax
+2. Testing individual components before testing the master script
+3. Verifying spec files have correct pathex when building from subdirectories
+
+All macOS builds now work correctly from their respective directories.
+
 ## Build Script Path Fixes (Second Commit)
 
 After testing, discovered and fixed critical path issues caused by moving scripts to subdirectories:
