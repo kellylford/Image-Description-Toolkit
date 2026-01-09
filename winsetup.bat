@@ -220,9 +220,9 @@ if "%SETUP_ERRORS%"=="0" (
     echo   - idtconfigure\.winenv
     echo.
     echo Next steps:
-    echo   1. Build all applications: BuildAndRelease\builditall_wx.bat
-    echo   2. Package executables: BuildAndRelease\package_all_windows.bat
-    echo   3. Create installer: BuildAndRelease\build_installer.bat
+    echo   1. Build all applications: BuildAndRelease\WinBuilds\builditall_wx.bat
+    echo   2. Package executables: BuildAndRelease\WinBuilds\package_all_windows.bat
+    echo   3. Create installer: BuildAndRelease\WinBuilds\build_installer.bat
     echo.
 ) else (
     echo ERRORS: %SETUP_ERRORS% setup failures encountered

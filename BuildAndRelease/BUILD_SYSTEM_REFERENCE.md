@@ -18,20 +18,20 @@ The Image Description Toolkit build system supports creating distributable packa
 
 ```batch
 REM Build all applications
-BuildAndRelease\builditall_wx.bat
+BuildAndRelease\WinBuilds\builditall_wx.bat
 
 REM Collect executables to dist_all\bin\
-BuildAndRelease\package_all_windows.bat
+BuildAndRelease\WinBuilds\package_all_windows.bat
 
 REM Create Windows installer (Inno Setup required)
-BuildAndRelease\build_installer.bat
+BuildAndRelease\WinBuilds\build_installer.bat
 ```
 
 ### macOS
 
 ```bash
 # Build all applications (double-click in Finder or run in Terminal)
-BuildAndRelease/builditall_wx.command
+BuildAndRelease/MacBuilds/builditall_macos.command
 
 # Collect .app bundles to MacBuilds/dist_all/Applications/
 BuildAndRelease/MacBuilds/package_all_macos.command
@@ -62,7 +62,7 @@ Located in `BuildAndRelease/`:
 
 | Purpose | Windows | macOS (Terminal) | macOS (Finder) |
 |---------|---------|------------------|----------------|
-| Build all apps | `builditall_wx.bat` | `builditall_wx.sh` | `builditall_wx.command` |
+| Build all apps | `builditall_wx.bat` | `builditall_macos.sh` | `builditall_macos.command` |
 | Package all apps | `package_all_windows.bat` | (See MacBuilds below) | |
 
 Located in `BuildAndRelease/MacBuilds/`:
@@ -76,7 +76,7 @@ Located in `BuildAndRelease/MacBuilds/`:
 
 ### Windows
 
-After `builditall_wx.bat`:
+After `WinBuilds/builditall_wx.bat`:
 ```
 idt/dist/idt.exe
 viewer/dist/Viewer.exe
@@ -97,7 +97,7 @@ BuildAndRelease/dist_all/bin/
 
 ### macOS
 
-After `builditall_wx.sh`:
+After `MacBuilds/builditall_macos.sh`:
 ```
 idt/dist/idt
 viewer/dist/Viewer.app
@@ -159,15 +159,15 @@ pip install -r requirements.txt
 
 ### Windows
 
-1. **Build**: `BuildAndRelease\builditall_wx.bat`
-2. **Package**: `BuildAndRelease\package_all_windows.bat`
-3. **Create Installer**: `BuildAndRelease\build_installer.bat` (optional)
+1. **Build**: `BuildAndRelease\WinBuilds\builditall_wx.bat`
+2. **Package**: `BuildAndRelease\WinBuilds\package_all_windows.bat`
+3. **Create Installer**: `BuildAndRelease\WinBuilds\build_installer.bat` (optional)
 4. **Test**: Run executables from `dist_all\bin\`
 5. **Distribute**: Share `dist_all\` folder or installer
 
 ### macOS
 
-1. **Build**: `BuildAndRelease/builditall_wx.command` (double-click or run in Terminal)
+1. **Build**: `BuildAndRelease/MacBuilds/builditall_macos.command` (double-click or run in Terminal)
 2. **Package**: `BuildAndRelease/MacBuilds/package_all_macos.command`
 3. **Create DMG**: `BuildAndRelease/MacBuilds/create_macos_dmg.command`
 4. **Test**: Mount DMG and test applications
@@ -194,7 +194,7 @@ pip install -r requirements.txt
 - Run: `pip install -r requirements.txt`
 
 ### macOS: ".command file won't run"
-- Make executable: `chmod +x BuildAndRelease/builditall_wx.command`
+- Make executable: `chmod +x BuildAndRelease/MacBuilds/builditall_macos.command`
 - Or: Right-click → Open (first time only)
 
 ### Windows: "Build failed for app X"
