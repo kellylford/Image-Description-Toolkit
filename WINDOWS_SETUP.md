@@ -33,13 +33,13 @@ Once `winsetup.bat` completes successfully:
 
 ```batch
 REM Build all applications
-BuildAndRelease\builditall_wx.bat
+BuildAndRelease\WinBuilds\builditall_wx.bat
 
 REM Collect executables
-BuildAndRelease\package_all_windows.bat
+BuildAndRelease\WinBuilds\package_all_windows.bat
 
 REM Create installer (requires Inno Setup)
-BuildAndRelease\build_installer.bat
+BuildAndRelease\WinBuilds\build_installer.bat
 ```
 
 ## Troubleshooting

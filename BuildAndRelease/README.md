@@ -4,30 +4,37 @@ This directory contains all the build and release automation scripts for the Ima
 
 **All GUI applications now use wxPython.** See [BUILD_SYSTEM_REFERENCE.md](BUILD_SYSTEM_REFERENCE.md) for comprehensive documentation.
 
+## Directory Structure
+
+- **`MacBuilds/`** - macOS-specific build scripts and configurations
+- **`WinBuilds/`** - Windows-specific build scripts and configurations
+- **`check_spec_completeness.py`** - Validates PyInstaller spec files
+- **`validate_build.py`** - Post-build validation tool
+
 ## Quick Start
 
 ### Windows
 
 **Build all applications:**
 ```batch
-BuildAndRelease\builditall_wx.bat
+BuildAndRelease\WinBuilds\builditall_wx.bat
 ```
 
 **Package all executables:**
 ```batch
-BuildAndRelease\package_all_windows.bat
+BuildAndRelease\WinBuilds\package_all_windows.bat
 ```
 
 **Create Windows installer:**
 ```batch
-BuildAndRelease\build_installer.bat
+BuildAndRelease\WinBuilds\build_installer.bat
 ```
 
 ### macOS
 
 **Build all applications (double-click or run in Terminal):**
 ```bash
-BuildAndRelease/builditall_wx.command
+BuildAndRelease/MacBuilds/builditall_macos.command
 ```
 
 **Package all .app bundles:**
@@ -42,45 +49,43 @@ BuildAndRelease/MacBuilds/create_macos_dmg.command
 
 ## Script Overview
 
-### Master Scripts (Windows)
+### Windows Build Scripts
+
+Located in `WinBuilds/`:
 
 - **`builditall_wx.bat`** - Build all five applications (wxPython version)
 - **`package_all_windows.bat`** - Collect all executables to dist_all/bin/
-- **`build_idt.bat`** - Build IDT CLI executable (PyInstaller)
 - **`build_installer.bat`** - Build Windows installer (Inno Setup)
+- **`installer.iss`** - Inno Setup configuration for Windows installer
 
-### Master Scripts (macOS)
+### macOS Build Scripts
 
 Located in `MacBuilds/`:
 
 - **`builditall_macos.command`** - Build all applications for macOS
 - **`package_all_macos.command`** - Collect all .app bundles
 - **`create_macos_dmg.command`** - Create .dmg installer
-
-### Configuration Files
-
-- **`installer.iss`** - Inno Setup configuration for Windows installer
-- **`check_spec_completeness.py`** - Validates PyInstaller spec files
-- **`validate_build.py`** - Post-build validation tool
+- **`build_idt_macos.command`** - Build IDT CLI for macOS
 
 ### Documentation
 
 - **`BUILD_SYSTEM_REFERENCE.md`** - Comprehensive build system documentation
 - **`MacBuilds/README_MACOS.md`** - macOS-specific build instructions
+- **`WinBuilds/README.md`** - Windows-specific build instructions
 
 ## How It Works
 
 ### Windows Build Process
 
-1. **Setup** (one-time): Run `winsetup.bat` from project root to create .winenv for each app
-2. **Build**: Run `builditall_wx.bat` to build all executables
-3. **Package**: Run `package_all_windows.bat` to collect to dist_all/bin/
+1. **Setup** (one-tWinBuilds/builditall_wx.bat` to build all executables
+3. **Package**: Run `WinBuilds/package_all_windows.bat` to collect to dist_all/bin/
+4. **Installer**: Run `WinBuilds/ckage_all_windows.bat` to collect to dist_all/bin/
 4. **Installer**: Run `build_installer.bat` to create Windows installer
 
 ### macOS Build Process
 
 1. **Setup** (one-time): Each app has its own .venv (created by individual build scripts)
-2. **Build**: Run `builditall_wx.command` to build all .app bundles  
+2. **Build**: Run `MacBuilds/builditall_macos.command` to build all .app bundles  
 3. **Package**: Run `MacBuilds/package_all_macos.command` to collect apps
 4. **DMG**: Run `MacBuilds/create_macos_dmg.command` to create installer
 
@@ -119,23 +124,23 @@ Located in `MacBuilds/`:
 ```batch
 cd /path/to/Image-Description-Toolkit
 winsetup.bat
-BuildAndRelease\builditall_wx.bat
-BuildAndRelease\package_all_windows.bat
-BuildAndRelease\build_installer.bat
+BuildAndRelease\WinBuilds\builditall_wx.bat
+BuildAndRelease\WinBuilds\package_all_windows.bat
+BuildAndRelease\WinBuilds\build_installer.bat
 ```
 
 **macOS - Full workflow:**
 ```bash
 cd /path/to/Image-Description-Toolkit
-BuildAndRelease/builditall_wx.command
+BuildAndRelease/MacBuilds/builditall_macos.command
 BuildAndRelease/MacBuilds/package_all_macos.command
 BuildAndRelease/MacBuilds/create_macos_dmg.command
 ```
 
 **Build only IDT CLI:**
 ```bash
-BuildAndRelease/build_idt.bat    # Windows
-idt/build_idt.sh                 # macOS
+BuildAndRelease\WinBuilds\build_idt.bat    # Windows
+idt/build_idt.sh                           # macOS
 ```
 
 ## Troubleshooting
