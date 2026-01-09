@@ -8,6 +8,9 @@ REM   2. Viewer (wxPython)
 REM   3. Prompt Editor (wxPython)
 REM   4. ImageDescriber (wxPython)
 REM   5. IDTConfigure (wxPython)
+REM
+REM NOTE: Uses .winenv virtual environments (created by winsetup.bat)
+REM       This allows .venv (macOS) and .winenv (Windows) to coexist
 REM ============================================================================
 
 echo.
@@ -42,8 +45,8 @@ echo ========================================================================
 echo.
 
 cd viewer
-if exist ".venv\Scripts\activate.bat" (
-    call .venv\Scripts\activate.bat
+if exist ".winenv\Scripts\activate.bat" (
+    call .winenv\Scripts\activate.bat
     call build_viewer_wx.bat
     if errorlevel 1 (
         echo ERROR: Viewer build failed!
@@ -53,7 +56,7 @@ if exist ".venv\Scripts\activate.bat" (
     )
     call deactivate
 ) else (
-    echo ERROR: Viewer virtual environment not found
+    echo ERROR: Viewer .winenv not found - run winsetup.bat first
     set /a BUILD_ERRORS+=1
 )
 cd ..
@@ -65,8 +68,8 @@ echo ========================================================================
 echo.
 
 cd prompt_editor
-if exist ".venv\Scripts\activate.bat" (
-    call .venv\Scripts\activate.bat
+if exist ".winenv\Scripts\activate.bat" (
+    call .winenv\Scripts\activate.bat
     call build_prompt_editor_wx.bat
     if errorlevel 1 (
         echo ERROR: Prompt Editor build failed!
@@ -76,7 +79,7 @@ if exist ".venv\Scripts\activate.bat" (
     )
     call deactivate
 ) else (
-    echo ERROR: Prompt Editor virtual environment not found
+    echo ERROR: Prompt Editor .winenv not found - run winsetup.bat first
     set /a BUILD_ERRORS+=1
 )
 cd ..
@@ -88,8 +91,8 @@ echo ========================================================================
 echo.
 
 cd imagedescriber
-if exist ".venv\Scripts\activate.bat" (
-    call .venv\Scripts\activate.bat
+if exist ".winenv\Scripts\activate.bat" (
+    call .winenv\Scripts\activate.bat
     call build_imagedescriber_wx.bat
     if errorlevel 1 (
         echo ERROR: ImageDescriber build failed!
@@ -99,7 +102,7 @@ if exist ".venv\Scripts\activate.bat" (
     )
     call deactivate
 ) else (
-    echo ERROR: ImageDescriber virtual environment not found
+    echo ERROR: ImageDescriber .winenv not found - run winsetup.bat first
     set /a BUILD_ERRORS+=1
 )
 cd ..
@@ -111,8 +114,8 @@ echo ========================================================================
 echo.
 
 cd idtconfigure
-if exist ".venv\Scripts\activate.bat" (
-    call .venv\Scripts\activate.bat
+if exist ".winenv\Scripts\activate.bat" (
+    call .winenv\Scripts\activate.bat
     call build_idtconfigure_wx.bat
     if errorlevel 1 (
         echo ERROR: IDTConfigure build failed!
@@ -122,7 +125,7 @@ if exist ".venv\Scripts\activate.bat" (
     )
     call deactivate
 ) else (
-    echo ERROR: IDTConfigure virtual environment not found
+    echo ERROR: IDTConfigure .winenv not found - run winsetup.bat first
     set /a BUILD_ERRORS+=1
 )
 cd ..
@@ -148,5 +151,7 @@ if "%BUILD_ERRORS%"=="0" (
     exit /b 0
 ) else (
     echo ERRORS: %BUILD_ERRORS% build failures encountered
+    echo.
+    echo If .winenv errors, run: winsetup.bat
     exit /b 1
 )
