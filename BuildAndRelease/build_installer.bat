@@ -1,30 +1,33 @@
 @echo off
-REM Build Inno Setup Installer for Image Description Toolkit
+REM ============================================================================
+REM Build Inno Setup Installer for Image Description Toolkit (wxPython Version)
+REM ============================================================================
 REM This script compiles the installer.iss file into a Windows installer
+REM Works directly from dist_all directory (no zip files needed)
+REM
+REM Prerequisites:
+REM   - Run builditall_wx.bat first to build all executables
+REM   - Run package_all_windows.bat to collect them in dist_all/bin/
+REM   - Inno Setup 6 installed
+REM ============================================================================
 
 echo ================================================
 echo Building Image Description Toolkit Installer
 echo ================================================
 echo.
 
-REM Change to project root directory
-cd /d "%~dp0.."
+REM Change to BuildAndRelease directory
+cd /d "%~dp0"
 
 REM Read version from VERSION file
 set VERSION=unknown
-if exist "VERSION" (
-    set /p VERSION=<VERSION
+if exist "..\VERSION" (
+    set /p VERSION=<..\VERSION
 )
 REM Remove any trailing whitespace or newlines
 set VERSION=%VERSION: =%
 
 echo Using version: %VERSION%
-echo.
-
-REM Print composed build version and commit info for installer logs
-echo --- Build Version Banner ---
-python idt_cli.py version
-echo ----------------------------
 echo.
 
 REM Check if Inno Setup is installed
@@ -39,28 +42,49 @@ if not exist "%INNO_PATH%" (
     exit /b 1
 )
 
-REM Check if required files exist
-if not exist "releases\ImageDescriptionToolkit_v%VERSION%.zip" (
-    echo ERROR: ImageDescriptionToolkit_v%VERSION%.zip not found in releases\
-    echo Please run packageitall.bat first to create release packages.
+REM Check if dist_all directory exists
+if not exist "dist_all\bin" (
+    echo ERROR: dist_all\bin directory not found
+    echo Please run package_all_windows.bat first to collect all executables.
+    echo.
     pause
     exit /b 1
 )
 
-if not exist "releases\viewer_v%VERSION%.zip" (
-    echo ERROR: viewer_v%VERSION%.zip not found in releases\
-    pause
-    exit /b 1
+REM Check if all required executables exist
+set MISSING_FILES=0
+
+if not exist "dist_all\bin\idt.exe" (
+    echo ERROR: idt.exe not found
+    set MISSING_FILES=1
 )
 
-if not exist "releases\imagedescriber_v%VERSION%.zip" (
-    echo ERROR: imagedescriber_v%VERSION%.zip not found in releases\
-    pause
-    exit /b 1
+if not exist "dist_all\bin\Viewer.exe" (
+    echo ERROR: Viewer.exe not found
+    set MISSING_FILES=1
 )
 
-if not exist "releases\prompt_editor_v%VERSION%.zip" (
-    echo ERROR: prompt_editor_v%VERSION%.zip not found in releases\
+if not exist "dist_all\bin\ImageDescriber.exe" (
+    echo ERROR: ImageDescriber.exe not found
+    set MISSING_FILES=1
+)
+
+if not exist "dist_all\bin\PromptEditor.exe" (
+    echo ERROR: PromptEditor.exe not found
+    set MISSING_FILES=1
+)
+
+if not exist "dist_all\bin\IDTConfigure.exe" (
+    echo ERROR: IDTConfigure.exe not found
+    set MISSING_FILES=1
+)
+
+if %MISSING_FILES%==1 (
+    echo.
+    echo Please run:
+    echo   1. builditall_wx.bat
+    echo   2. package_all_windows.bat
+    echo.
     pause
     exit /b 1
 )
@@ -68,7 +92,7 @@ if not exist "releases\prompt_editor_v%VERSION%.zip" (
 echo All required files found.
 echo.
 echo Compiling installer...
-"%INNO_PATH%" BuildAndRelease\installer.iss
+"%INNO_PATH%" installer.iss
 
 if %ERRORLEVEL% EQU 0 (
     echo.
@@ -76,7 +100,16 @@ if %ERRORLEVEL% EQU 0 (
     echo SUCCESS: Installer created successfully!
     echo ================================================
     echo.
-    echo Output: releases\ImageDescriptionToolkit_Setup_v%VERSION%.exe
+    echo Output: ..\releases\ImageDescriptionToolkit_Setup_v%VERSION%.exe
+    echo.
+    echo The installer includes:
+    echo   - idt.exe (CLI)
+    echo   - Viewer.exe
+    echo   - ImageDescriber.exe
+    echo   - PromptEditor.exe
+    echo   - IDTConfigure.exe
+    echo   - Configuration files
+    echo   - Documentation
     echo.
 ) else (
     echo.

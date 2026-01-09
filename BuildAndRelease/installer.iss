@@ -1,5 +1,6 @@
 ; Image Description Toolkit - Inno Setup Script
 ; Version dynamically read from VERSION file
+; wxPython Version - Simplified installer that works directly from dist_all directory
 
 #define MyAppName "Image Description Toolkit"
 #define VersionFile FileOpen(SourcePath + "\..\VERSION")
@@ -44,27 +45,32 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "addtopath"; Description: "Add to PATH (allows running 'idt' from any command prompt)"; GroupDescription: "System Integration:"; Flags: unchecked
 
 [Files]
-; Main toolkit files (from ImageDescriptionToolkit zip)
-Source: "..\releases\ImageDescriptionToolkit_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+; Main IDT CLI executable
+Source: "dist_all\bin\idt.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+; GUI Applications
+Source: "dist_all\bin\Viewer.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist_all\bin\ImageDescriber.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist_all\bin\PromptEditor.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist_all\bin\IDTConfigure.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+; Configuration files (from scripts directory)
+Source: "..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
+Source: "..\scripts\prompts\*"; DestDir: "{app}\scripts\prompts"; Flags: ignoreversion recursesubdirs
+
+; Shared utilities
+Source: "..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
+
+; Documentation
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-
-; Viewer
-Source: "..\releases\viewer_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
-
-; ImageDescriber
-Source: "..\releases\imagedescriber_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
-
-; Prompt Editor
-Source: "..\releases\prompt_editor_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
-
-; IDTConfigure
-Source: "..\releases\idtconfigure_v{#MyAppVersion}.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
-
-[Icons]
-Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"
-Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber\imagedescriber.exe"; WorkingDir: "{app}\ImageDescriber"
-Name: "{group}\Viewer"; Filename: "{app}\Viewer\viewer.exe"; WorkingDir: "{app}\Viewer"
-Name: "{group}\Prompt Editor"; Filename: "{app}\PromptEditor\prompteditor.exe"; WorkingDir: "{app}\PromptEditor"
+Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion.exe"; WorkingDir: "{app}"
+Name: "{group}\Viewer"; Filename: "{app}\Viewer.exe"; WorkingDir: "{app}"
+Name: "{group}\Prompt Editor"; Filename: "{app}\PromptEditor.exe"; WorkingDir: "{app}"
+Name: "{group}\Configure"; Filename: "{app}\IDTConfigure.exe"; WorkingDir: "{app}"
+Name: "{group}\Documentation"; Filename: "{app}\docs"
+Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}
 Name: "{group}\Configure"; Filename: "{app}\IDTConfigure\idtconfigure.exe"; WorkingDir: "{app}\IDTConfigure"
 Name: "{group}\Documentation"; Filename: "{app}\docs"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
@@ -113,26 +119,9 @@ begin
     'If you don''t have Ollama installed yet:' + #13#10 +
     '1. Visit https://ollama.com' + #13#10 +
     '2. Download and install Ollama' + #13#10 +
-    '3. Run: ollama pull llava' + #13#10 + #13#10 +
-    'You can also use cloud-based AI providers (OpenAI, Claude) by setting API keys.');
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
-  begin
-    // Extract main toolkit
-    Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\ImageDescriptionToolkit_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    
-    // Extract Viewer
-    Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\viewer_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\Viewer') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    
-    // Extract ImageDescriber
-    Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\imagedescriber_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\ImageDescriber') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    
-    // Extract Prompt Editor
+  begin// Extract Prompt Editor
     Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\prompt_editor_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\PromptEditor') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     
     // Extract IDTConfigure
