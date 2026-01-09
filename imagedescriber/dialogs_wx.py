@@ -54,9 +54,12 @@ class DirectorySelectionDialog(wx.Dialog):
         dir_sizer = wx.StaticBoxSizer(dir_box, wx.VERTICAL)
         
         self.dir_label = wx.StaticText(self, label="No directory selected")
+        self.dir_label.SetAccessibleName("Selected directory")
         dir_sizer.Add(self.dir_label, 0, wx.ALL | wx.EXPAND, 5)
         
-        self.browse_btn = wx.Button(self, label="Browse for Directory...")
+        self.browse_btn = wx.Button(self, label="&Browse for Directory...")
+        self.browse_btn.SetAccessibleName("Browse for directory")
+        self.browse_btn.SetAccessibleDescription("Open directory chooser to select an image directory")
         self.browse_btn.Bind(wx.EVT_BUTTON, self.on_browse)
         dir_sizer.Add(self.browse_btn, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -66,11 +69,13 @@ class DirectorySelectionDialog(wx.Dialog):
         options_box = wx.StaticBox(self, label="Options")
         options_sizer = wx.StaticBoxSizer(options_box, wx.VERTICAL)
         
-        self.recursive_cb = wx.CheckBox(self, label="Search subdirectories recursively")
+        self.recursive_cb = wx.CheckBox(self, label="&Search subdirectories recursively")
         self.recursive_cb.SetToolTip("When checked, searches all subdirectories for images")
+        self.recursive_cb.SetAccessibleName("Search subdirectories recursively")
         options_sizer.Add(self.recursive_cb, 0, wx.ALL, 5)
         
-        self.add_to_existing_cb = wx.CheckBox(self, label="Add to existing workspace")
+        self.add_to_existing_cb = wx.CheckBox(self, label="&Add to existing workspace")
+        self.add_to_existing_cb.SetAccessibleName("Add to existing workspace")
         if existing_directories:
             tip = "Add to existing directories:\n" + "\n".join([Path(d).name for d in existing_directories[:5]])
             self.add_to_existing_cb.SetToolTip(tip)
@@ -224,24 +229,29 @@ class ProcessingOptionsDialog(wx.Dialog):
         """Initialize the dialog UI"""
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        # Create notebook for tabs
-        notebook = wx.Notebook(self)
+        # Create notebook for tabs with keyboard navigation support
+        self.notebook = wx.Notebook(self, style=wx.NB_TOP)
+        self.notebook.SetAccessibleName("Processing options tabs")
+        self.notebook.SetAccessibleDescription("Use left and right arrow keys to navigate between tabs")
         
         # General tab
-        general_panel = self.create_general_panel(notebook)
-        notebook.AddPage(general_panel, "General")
+        general_panel = self.create_general_panel(self.notebook)
+        self.notebook.AddPage(general_panel, "&General")
         
         # AI Model tab
-        ai_panel = self.create_ai_panel(notebook)
-        notebook.AddPage(ai_panel, "AI Model")
+        ai_panel = self.create_ai_panel(self.notebook)
+        self.notebook.AddPage(ai_panel, "&AI Model")
         
-        main_sizer.Add(notebook, 1, wx.ALL | wx.EXPAND, 10)
+        main_sizer.Add(self.notebook, 1, wx.ALL | wx.EXPAND, 10)
         
         # Dialog buttons
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
         main_sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
         self.SetSizer(main_sizer)
+        
+        # Set focus to first control for keyboard access
+        wx.CallAfter(self.skip_existing_cb.SetFocus)
     
     def create_general_panel(self, parent):
         """Create general options panel"""
@@ -254,9 +264,10 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         self.skip_existing_cb = wx.CheckBox(
             panel,
-            label="Skip images that already have descriptions"
+            label="&Skip images that already have descriptions"
         )
         self.skip_existing_cb.SetValue(self.config.get('skip_existing', False))
+        self.skip_existing_cb.SetAccessibleName("Skip images that already have descriptions")
         batch_sizer.Add(self.skip_existing_cb, 0, wx.ALL, 5)
         
         sizer.Add(batch_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -273,8 +284,13 @@ class ProcessingOptionsDialog(wx.Dialog):
         provider_box = wx.StaticBox(panel, label="AI Provider")
         provider_sizer = wx.StaticBoxSizer(provider_box, wx.VERTICAL)
         
+        provider_label = wx.StaticText(panel, label="&Provider:")
+        provider_sizer.Add(provider_label, 0, wx.ALL, 5)
+        
         self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude"])
         self.provider_choice.SetSelection(0)
+        self.provider_choice.SetAccessibleName("AI provider")
+        provider_label.SetNextHandler(self.provider_choice)
         provider_sizer.Add(self.provider_choice, 0, wx.ALL | wx.EXPAND, 5)
         
         sizer.Add(provider_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -283,8 +299,13 @@ class ProcessingOptionsDialog(wx.Dialog):
         model_box = wx.StaticBox(panel, label="Model")
         model_sizer = wx.StaticBoxSizer(model_box, wx.VERTICAL)
         
+        model_label = wx.StaticText(panel, label="&Model name:")
+        model_sizer.Add(model_label, 0, wx.ALL, 5)
+        
         self.model_text = wx.TextCtrl(panel)
         self.model_text.SetValue(self.config.get('model', 'moondream'))
+        self.model_text.SetAccessibleName("Model name")
+        model_label.SetNextHandler(self.model_text)
         model_sizer.Add(self.model_text, 0, wx.ALL | wx.EXPAND, 5)
         
         sizer.Add(model_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -293,11 +314,16 @@ class ProcessingOptionsDialog(wx.Dialog):
         prompt_box = wx.StaticBox(panel, label="Prompt Style")
         prompt_sizer = wx.StaticBoxSizer(prompt_box, wx.VERTICAL)
         
+        prompt_label = wx.StaticText(panel, label="P&rompt style:")
+        prompt_sizer.Add(prompt_label, 0, wx.ALL, 5)
+        
         self.prompt_choice = wx.Choice(
             panel,
             choices=["narrative", "detailed", "concise", "technical", "artistic"]
         )
         self.prompt_choice.SetSelection(0)
+        self.prompt_choice.SetAccessibleName("Prompt style")
+        prompt_label.SetNextHandler(self.prompt_choice)
         prompt_sizer.Add(self.prompt_choice, 0, wx.ALL | wx.EXPAND, 5)
         
         sizer.Add(prompt_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -334,18 +360,20 @@ class ImageDetailDialog(wx.Dialog):
         """Initialize the dialog UI"""
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        # Create notebook for tabs
-        notebook = wx.Notebook(self)
+        # Create notebook for tabs with keyboard navigation support
+        self.detail_notebook = wx.Notebook(self, style=wx.NB_TOP)
+        self.detail_notebook.SetAccessibleName("Image detail tabs")
+        self.detail_notebook.SetAccessibleDescription("Use left and right arrow keys to navigate between tabs")
         
         # Details tab
-        details_panel = self.create_details_panel(notebook)
-        notebook.AddPage(details_panel, "Details")
+        details_panel = self.create_details_panel(self.detail_notebook)
+        self.detail_notebook.AddPage(details_panel, "&Details")
         
         # Descriptions tab
-        desc_panel = self.create_descriptions_panel(notebook)
-        notebook.AddPage(desc_panel, "Descriptions")
+        desc_panel = self.create_descriptions_panel(self.detail_notebook)
+        self.detail_notebook.AddPage(desc_panel, "D&escriptions")
         
-        main_sizer.Add(notebook, 1, wx.ALL | wx.EXPAND, 10)
+        main_sizer.Add(self.detail_notebook, 1, wx.ALL | wx.EXPAND, 10)
         
         # Dialog buttons
         btn_sizer = self.CreateButtonSizer(wx.CLOSE)
