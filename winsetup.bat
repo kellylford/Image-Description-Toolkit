@@ -17,6 +17,7 @@ echo This will create .winenv directories for each GUI application and
 echo install all required dependencies.
 echo.
 echo Applications to set up:
+echo   - IDT (CLI)
 echo   - Viewer
 echo   - ImageDescriber
 echo   - Prompt Editor
@@ -28,7 +29,42 @@ set SETUP_ERRORS=0
 
 REM ============================================================================
 echo.
-echo [1/4] Setting up Viewer...
+echo [1/5] Setting up IDT (CLI)...
+echo ========================================================================
+echo.
+
+cd idt
+if exist ".winenv" (
+    echo Removing old .winenv...
+    rmdir /s /q .winenv
+)
+
+echo Creating virtual environment...
+python -m venv .winenv
+if errorlevel 1 (
+    echo ERROR: Failed to create virtual environment for IDT
+    set /a SETUP_ERRORS+=1
+    cd ..
+    goto :viewer
+)
+
+echo Installing dependencies...
+call .winenv\Scripts\activate.bat
+pip install --upgrade pip
+pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERROR: Failed to install dependencies for IDT
+    set /a SETUP_ERRORS+=1
+) else (
+    echo SUCCESS: IDT setup complete
+)
+call deactivate
+cd ..
+
+REM ============================================================================
+:viewer
+echo.
+echo [2/5] Setting up Viewer...
 echo ========================================================================
 echo.
 
@@ -63,7 +99,7 @@ cd ..
 REM ============================================================================
 :imagedescriber
 echo.
-echo [2/4] Setting up ImageDescriber...
+echo [3/5] Setting up ImageDescriber...
 echo ========================================================================
 echo.
 
@@ -98,7 +134,7 @@ cd ..
 REM ============================================================================
 :prompteditor
 echo.
-echo [3/4] Setting up Prompt Editor...
+echo [4/5] Setting up Prompt Editor...
 echo ========================================================================
 echo.
 
@@ -133,7 +169,7 @@ cd ..
 REM ============================================================================
 :idtconfigure
 echo.
-echo [4/4] Setting up IDTConfigure...
+echo [5/5] Setting up IDTConfigure...
 echo ========================================================================
 echo.
 
@@ -177,6 +213,7 @@ if "%SETUP_ERRORS%"=="0" (
     echo SUCCESS: All Windows environments set up successfully!
     echo.
     echo Virtual environments created:
+    echo   - idt\.winenv
     echo   - viewer\.winenv
     echo   - imagedescriber\.winenv
     echo   - prompt_editor\.winenv
