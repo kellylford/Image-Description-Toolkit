@@ -1,15 +1,15 @@
 #!/bin/bash
 # ============================================================================
-# Double-click launcher for build_imagedescriber_macos.sh
+# Double-click launcher for build_imagedescriber_wx.sh
 # ============================================================================
-# This wrapper allows double-clicking from Finder to run the build script
+# This wrapper allows double-clicking from Finder to run the wxPython build
 # ============================================================================
 
 # Change to the script's directory
 cd "$(dirname "$0")"
 
 # Run the actual build script
-./build_imagedescriber_macos.sh
+./build_imagedescriber_wx.sh
 
 # Keep terminal open on completion (remove these lines if you don't want this)
 echo ""

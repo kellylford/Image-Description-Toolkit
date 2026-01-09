@@ -625,3 +625,72 @@ if sys.platform == 'darwin':
 - viewer.py, viewer.spec, viewer_macos.spec, build_viewer.bat (old PyQt6 files)
 
 ---
+
+## ImageDescriber Code Cleanup & Windows Build Support (2026-01-08 Late Evening)
+
+### Bug Fix - AttributeError on Launch
+**Issue**: ImageDescriber wouldn't launch - threw `AttributeError: 'ImageDescriberFrame' object has no attribute 'is_modified'`
+
+**Root Cause**: The `ModifiedStateMixin` class in `shared/wx_common.py` doesn't have an `is_modified()` method - it only has a `modified` attribute (boolean).
+
+**Fix**: Changed `imagedescriber_wx.py` line 223 from `if self.is_modified():` to `if self.modified:`
+
+### Directory Cleanup - Removed Old PyQt6 Files  
+Cleaned up the imagedescriber directory to remove obsolete PyQt6 files:
+
+**Files Deleted:**
+- `imagedescriber.py` - Old PyQt6 application
+- `imagedescriber_macos.spec` - Old PyQt6 macOS spec
+- `build_imagedescriber.bat` - Old PyQt6 Windows build
+- `build_imagedescriber_macos.sh` - Old PyQt6 macOS build
+
+**Files Retained:**
+- `imagedescriber_wx.py` - wxPython application (~884 lines)
+- `imagedescriber_wx.spec` - Cross-platform wxPython spec
+- `dialogs_wx.py` - wxPython dialogs
+- `workers_wx.py` - wxPython worker threads
+- `ai_providers.py`, `data_models.py` - Shared modules
+- `build_imagedescriber_wx.sh` - macOS/Linux build script
+- `build_imagedescriber_macos.command` - macOS Finder double-click wrapper
+
+### Created Windows Build Script
+Created [imagedescriber/build_imagedescriber_wx.bat](imagedescriber/build_imagedescriber_wx.bat) for Windows builds:
+- Checks for **wxPython** instead of PyQt6: `python -c "import wx"`
+- Installs dependencies from `requirements.txt`
+- Verifies `scripts/`, `shared/`, and `models/` directories exist
+- Builds using `imagedescriber_wx.spec` with `--clean` flag
+- Creates `dist\ImageDescriber.exe`
+
+### Updated Spec File for Cross-Platform Support  
+Modified [imagedescriber/imagedescriber_wx.spec](imagedescriber/imagedescriber_wx.spec):
+- Made `target_arch` conditional: `'arm64' if sys.platform == 'darwin' else None`
+- Wrapped BUNDLE section in platform check: `if sys.platform == 'darwin':`
+- Changed `upx=True` to `upx=False` for better compatibility
+- Now supports both Windows (.exe) and macOS (.app) builds from same spec file
+
+### Updated macOS Finder Wrapper
+Updated [build_imagedescriber_macos.command](imagedescriber/build_imagedescriber_macos.command):
+- Changed script call from `./build_imagedescriber_macos.sh` to `./build_imagedescriber_wx.sh`
+- Now points to wxPython build script
+
+### Testing Status
+- ✅ ImageDescriber launches successfully on macOS
+- ✅ No import errors or attribute errors
+- ✅ Windows build script created with correct syntax
+- ✅ Spec file updated for cross-platform compatibility
+- ⏳ Windows build needs verification on actual Windows system
+- ⏳ Functional testing of all ImageDescriber features
+
+### Files Modified
+- [imagedescriber/imagedescriber_wx.py](imagedescriber/imagedescriber_wx.py) - Fixed is_modified() bug
+- [imagedescriber/imagedescriber_wx.spec](imagedescriber/imagedescriber_wx.spec) - Cross-platform support
+- [imagedescriber/build_imagedescriber_macos.command](imagedescriber/build_imagedescriber_macos.command) - Point to wx script
+
+### Files Created
+- [imagedescriber/build_imagedescriber_wx.bat](imagedescriber/build_imagedescriber_wx.bat) - Windows build script
+
+### Files Deleted
+- imagedescriber.py, imagedescriber_macos.spec, build_imagedescriber.bat, build_imagedescriber_macos.sh (old PyQt6 files)
+
+---
+
