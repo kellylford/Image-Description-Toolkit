@@ -354,6 +354,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         file_menu.AppendSeparator()
         
+        load_dir_item = file_menu.Append(wx.ID_ANY, "&Load Directory\tCtrl+L")
+        self.Bind(wx.EVT_MENU, self.on_load_directory, load_dir_item)
+        
+        file_menu.AppendSeparator()
+        
         exit_item = file_menu.Append(wx.ID_EXIT, "E&xit\tCtrl+Q")
         self.Bind(wx.EVT_MENU, self.on_close, exit_item)
         
@@ -362,8 +367,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Edit menu
         edit_menu = wx.Menu()
         
-        load_dir_item = edit_menu.Append(wx.ID_ANY, "&Load Directory\tCtrl+L")
-        self.Bind(wx.EVT_MENU, self.on_load_directory, load_dir_item)
+        # Empty for now - can add copy/paste/undo later if needed
         
         menubar.Append(edit_menu, "&Edit")
         
