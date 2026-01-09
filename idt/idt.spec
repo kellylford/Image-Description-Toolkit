@@ -19,7 +19,7 @@ bs4_datas, bs4_binaries, bs4_hiddenimports = collect_all('bs4')
 
 a = Analysis(
     ['idt_cli.py'],
-    pathex=[],
+    pathex=['..'],  # Add parent directory to import path
     binaries=bs4_binaries,
     datas=[
         # Include ALL scripts files

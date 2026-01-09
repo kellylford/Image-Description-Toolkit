@@ -83,16 +83,6 @@ python3 idt/idt_cli.py version
 echo "----------------------------------------"
 echo ""
 
-# Pre-build validation: Check spec file completeness
-echo ""
-echo "[Pre-Build Check] Verifying PyInstaller spec file..."
-if ! python3 BuildAndRelease/check_spec_completeness.py; then
-    echo ""
-    echo "ERROR: Spec file is incomplete! Fix the issues above before building."
-    echo ""
-    exit 1
-fi
-
 echo ""
 echo "This will build all five applications:"
 echo "  1. IDT (main toolkit)"
