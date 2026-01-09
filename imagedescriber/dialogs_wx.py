@@ -23,8 +23,12 @@ from shared.wx_common import (
     save_file_dialog,
 )
 
-# Import data models (framework-independent)
-from data_models import ImageDescription, ImageItem, ImageWorkspace
+# Import data models (framework-independent) from same directory
+try:
+    from .data_models import ImageDescription, ImageItem, ImageWorkspace
+except ImportError:
+    # Fallback for direct execution
+    from data_models import ImageDescription, ImageItem, ImageWorkspace
 
 
 class DirectorySelectionDialog(wx.Dialog):
