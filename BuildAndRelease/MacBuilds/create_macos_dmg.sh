@@ -33,34 +33,34 @@ mkdir -p dist_macos
 # Check if all applications are built
 MISSING_APPS=0
 
-if [ ! -f "dist/idt" ]; then
-    echo "ERROR: dist/idt not found. Please build the CLI tool first."
+if [ ! -f "idt/dist/idt" ]; then
+    echo "ERROR: idt/dist/idt not found. Please build the CLI tool first."
     MISSING_APPS=1
 fi
 
-if [ ! -d "viewer/dist/viewer.app" ]; then
-    echo "ERROR: viewer/dist/viewer.app not found. Please build Viewer first."
+if [ ! -d "viewer/dist/Viewer.app" ]; then
+    echo "ERROR: viewer/dist/Viewer.app not found. Please build Viewer first."
     MISSING_APPS=1
 fi
 
-if [ ! -d "imagedescriber/dist/imagedescriber.app" ]; then
-    echo "ERROR: imagedescriber/dist/imagedescriber.app not found. Please build ImageDescriber first."
+if [ ! -d "imagedescriber/dist/ImageDescriber.app" ]; then
+    echo "ERROR: imagedescriber/dist/ImageDescriber.app not found. Please build ImageDescriber first."
     MISSING_APPS=1
 fi
 
-if [ ! -d "prompt_editor/dist/prompteditor.app" ]; then
-    echo "ERROR: prompt_editor/dist/prompteditor.app not found. Please build PromptEditor first."
+if [ ! -d "prompt_editor/dist/PromptEditor.app" ]; then
+    echo "ERROR: prompt_editor/dist/PromptEditor.app not found. Please build PromptEditor first."
     MISSING_APPS=1
 fi
 
-if [ ! -d "idtconfigure/dist/idtconfigure.app" ]; then
-    echo "ERROR: idtconfigure/dist/idtconfigure.app not found. Please build IDTConfigure first."
+if [ ! -d "idtconfigure/dist/IDTConfigure.app" ]; then
+    echo "ERROR: idtconfigure/dist/IDTConfigure.app not found. Please build IDTConfigure first."
     MISSING_APPS=1
 fi
 
 if [ $MISSING_APPS -ne 0 ]; then
     echo ""
-    echo "Please run: ./BuildAndRelease/MacBuilds/builditall_macos.sh"
+    echo "Please run: ./BuildAndRelease/builditall_wx.sh"
     exit 1
 fi
 
@@ -72,15 +72,15 @@ mkdir -p "$DMG_STAGING"
 
 # Copy GUI applications
 echo "Copying GUI applications..."
-cp -R "viewer/dist/viewer.app" "$DMG_STAGING/"
-cp -R "imagedescriber/dist/imagedescriber.app" "$DMG_STAGING/"
-cp -R "prompt_editor/dist/prompteditor.app" "$DMG_STAGING/"
-cp -R "idtconfigure/dist/idtconfigure.app" "$DMG_STAGING/"
+cp -R "viewer/dist/Viewer.app" "$DMG_STAGING/"
+cp -R "imagedescriber/dist/ImageDescriber.app" "$DMG_STAGING/"
+cp -R "prompt_editor/dist/PromptEditor.app" "$DMG_STAGING/"
+cp -R "idtconfigure/dist/IDTConfigure.app" "$DMG_STAGING/"
 
 # Create CLI Tools folder
 echo "Creating CLI Tools folder..."
 mkdir -p "$DMG_STAGING/CLI Tools"
-cp "dist/idt" "$DMG_STAGING/CLI Tools/idt"
+cp "idt/dist/idt" "$DMG_STAGING/CLI Tools/idt"
 chmod +x "$DMG_STAGING/CLI Tools/idt"
 
 # Create install script for CLI tool
@@ -113,10 +113,10 @@ CLI Tool:
 
 WHAT'S INCLUDED:
 
-  viewer.app          - View and monitor image description workflows
-  imagedescriber.app  - Batch process images with AI descriptions  
-  prompteditor.app    - Edit AI prompt templates
-  idtconfigure.app    - Configure toolkit settings
+  Viewer.app          - View and monitor image description workflows
+  ImageDescriber.app  - Batch process images with AI descriptions  
+  PromptEditor.app    - Edit AI prompt templates
+  IDTConfigure.app    - Configure toolkit settings
   idt (CLI)           - Command-line interface for all features
 
 ACCESSIBILITY:
@@ -189,7 +189,7 @@ if [ $? -eq 0 ]; then
     echo "NOTE: For distribution, you should code sign the applications first:"
     echo "  codesign --deep --force --verify --verbose \\"
     echo "    --sign 'Developer ID Application: Your Name' \\"
-    echo "    viewer.app"
+    echo "    Viewer.app ImageDescriber.app PromptEditor.app IDTConfigure.app"
     echo ""
 else
     echo ""

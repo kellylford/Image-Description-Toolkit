@@ -129,7 +129,7 @@ echo.
 cd viewer
 if exist ".venv\Scripts\activate.bat" (
     call .venv\Scripts\activate.bat
-    call build_viewer.bat
+    call build_viewer_wx.bat
     if errorlevel 1 (
         echo ERROR: Viewer build failed!
         set /a BUILD_ERRORS+=1
@@ -153,7 +153,7 @@ echo.
 cd prompt_editor
 if exist ".venv\Scripts\activate.bat" (
     call .venv\Scripts\activate.bat
-    call build_prompt_editor.bat
+    call build_prompt_editor_wx.bat
     if errorlevel 1 (
         echo ERROR: Prompt Editor build failed!
         set /a BUILD_ERRORS+=1
@@ -177,7 +177,7 @@ echo.
 cd imagedescriber
 if exist ".venv\Scripts\activate.bat" (
     call .venv\Scripts\activate.bat
-    call build_imagedescriber.bat
+    call build_imagedescriber_wx.bat
     if errorlevel 1 (
         echo ERROR: ImageDescriber build failed!
         set /a BUILD_ERRORS+=1
