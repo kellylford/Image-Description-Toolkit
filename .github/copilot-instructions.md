@@ -50,13 +50,13 @@ Follow these guidelines for all coding work on this project.
 
 ### Multi-Application Structure
 IDT consists of five standalone applications, each with isolated dependencies:
-- **`idt.exe`** - CLI dispatcher (routes to all commands via `idt_cli.py`)
-- **`viewer.exe`** - PyQt6 workflow results browser with live monitoring
-- **`imagedescriber.exe`** - PyQt6 batch processing GUI (10k+ lines)
-- **`prompteditor.exe`** - Visual prompt template editor
-- **`idtconfigure.exe`** - Configuration management interface
+- **`idt.exe`** / **`idt`** - CLI dispatcher (routes to all commands via `idt_cli.py`)
+- **`viewer.exe`** / **`Viewer.app`** - wxPython workflow results browser with live monitoring
+- **`imagedescriber.exe`** / **`ImageDescriber.app`** - wxPython batch processing GUI (883 lines main frame)
+- **`prompteditor.exe`** / **`PromptEditor.app`** - Visual prompt template editor
+- **`idtconfigure.exe`** / **`IDTConfigure.app`** - Configuration management interface
 
-Each GUI application has its own `.venv` and build scripts in its directory.
+Each GUI application has its own `.venv` and build scripts in its directory. All GUI apps migrated from PyQt6 to **wxPython** for cross-platform compatibility (Windows/macOS).
 
 ### Dual Execution Model
 All code must support both development and production modes:
@@ -95,9 +95,13 @@ Multi-provider abstraction in `imagedescriber/ai_providers.py`:
 - **Capabilities**: `models/provider_configs.py` - dynamic UI based on `supports_prompts()`, `supports_custom_prompts()`
 
 ### Build & Release System
-- **Master Build**: `BuildAndRelease/builditall.bat` - builds all 5 apps sequentially
-- **Spec File**: `BuildAndRelease/final_working.spec` - PyInstaller config with explicit imports
-- **Per-App Builds**: Each GUI has `build_*.bat` in its directory
+- **Windows Master Build**: `BuildAndRelease/WinBuilds/builditall_wx.bat` - builds all 5 apps sequentially
+- **macOS Master Build**: `BuildAndRelease/MacBuilds/builditall_macos.command` - builds all 5 .app bundles
+- **Spec Files**: Each app directory has its own `.spec` file (e.g., `viewer/viewer_wx.spec`)
+- **Per-App Builds**: Each app has platform-specific build scripts
+  - Windows: `build_*_wx.bat`
+  - macOS Terminal: `build_*_wx.sh`
+  - macOS Finder: `build_*_macos.command` (double-clickable)
 - **Critical**: Update `hiddenimports` in spec file when adding modules
 
 ## Development Workflows
@@ -114,18 +118,46 @@ python run_unit_tests.py
 pytest --cov=scripts pytest_tests/
 ```
 
-**Test structure**: `pytest_tests/unit/` and `pytest_tests/smoke/`
-**Config**: `pyproject.toml` (pytest options, coverage settings)
 
-### Building Executables
+**Windows:**
+```batch
+REM Build all applications (recommended)
+BuildAndRelease\WinBuilds\builditall_wx.bat
+
+REM Build individual apps
+cd idt && build_idt.bat
+cd viewer && build_viewer_wx.bat
+cd imagedescriber && build_imagedescriber_wx.bat
+```
+
+**macOS:**
 ```bash
 # Build all applications (recommended)
-BuildAndRelease\builditall.bat
+./BuildAndRelease/MacBuilds/builditall_macos.command
 
-# Build IDT CLI only
-BuildAndRelease\build_idt.bat
 
-# Build individual GUI apps
+**Windows:**
+```batch
+REM Quick smoke test
+dist\idt.exe version
+
+REM Path debugging
+dist\idt.exe --debug-paths
+
+REM Test GUI apps
+dist\Viewer.exe
+```
+
+**macOS:**
+```bash
+# Quick smoke test
+./dist/idt version
+
+# Path debugging
+./dist/idt --debug-paths
+
+# Test GUI apps
+open dist/Viewer.apps
 cd viewer && build_viewer.bat
 cd imagedescriber && build_imagedescriber.bat
 ```
@@ -146,12 +178,19 @@ Use `sanitize_name()` from `scripts/workflow.py` for model/prompt names:
 - Removes non-alphanumeric chars (except `_`, `-`, `.`)
 - Preserves case by default (pass `preserve_case=False` to lowercase)
 - Example: `"GPT-4 Vision"` → `"GPT-4Vision"`
+wxPython)
 
-### Prompt Style Handling
-- Prompt variations stored in `image_describer_config.json`
-- **Case-insensitive lookup**: `validate_prompt_style()` uses `lower_variations` dict
-- Default style: `"narrative"`
-- Access via `get_default_prompt_style()` in `scripts/image_describer.py`
+### Accessibility Requirements (WCAG 2.2 AA)
+- **Single Tab Stops**: Use `wx.ListBox` instead of `wx.ListCtrl` when possible
+- **Combined Text**: Concatenate data into single strings for list items (not multiple columns)
+- **Screen Reader Support**: Set `name=` parameter in widget constructors for accessible labels
+  ```python
+  # CORRECT
+  self.image_list = wx.ListBox(panel, name="Images in workspace")
+  
+  # WRONG - wxPython doesn't have SetAccessibleName()
+  label.SetAccessibleName("Images list")  # ❌ Invalid API
+  ``
 
 ### Workflow Metadata
 - **Metadata file**: `workflow_metadata.json` in each workflow directory
@@ -177,11 +216,13 @@ All accessible via `idt` commands:
 ## GUI Development (PyQt6)
 
 ### Accessibility Requirements (WCAG 2.2 AA)
-- **Single Tab Stops**: Use `QListWidget` instead of `QTableWidget` when possible
-- **Combined Text**: Concatenate data into single strings for list items (not multiple columns)
-- **Screen Reader Support**: Always set `setAccessibleName()` and `setAccessibleDescription()`
-- **Keyboard Navigation**: All functionality must work via keyboard (arrows, Enter, Tab)
-
+- **Single Tab Stops*the app-specific `.spec` file in each app directory
+```python
+# Example: viewer/viewer_wx.spec
+hiddenimports=[
+    'scripts.new_module',  # Add your module here
+    'anthropic._client',   # Include submodules for SDKs
+    'shared.wx_common',    # Shared wxPython utilitie
 ### Date/Time Formatting Standard
 **Format**: `M/D/YYYY H:MMP` (no leading zeros, A/P suffix)
 - Examples: `3/25/2025 7:35P`, `10/16/2025 8:03A`
@@ -209,6 +250,19 @@ except Exception:
 ```
 
 ## Common Pitfalls
+
+### Virtual Environment Path Inconsistency (CRITICAL)
+**Problem**: Build scripts fail with "winenv not found" error
+**Root Cause**: Windows uses `.winenv` directory (with dot prefix), not `winenv`
+**Solution**: ALL build scripts must reference `.winenv\Scripts\activate.bat`
+```batch
+REM WRONG - missing dot prefix
+call winenv\Scripts\activate.bat
+
+REM CORRECT - includes dot prefix
+call .winenv\Scripts\activate.bat
+```
+**Historical Context**: The idt/build_idt.bat had this bug, causing builditall_wx.bat to fail on step 1/5. All other apps were already correct. This is easy to miss because the directory appears as `winenv` in some tools that hide dotfiles.
 
 ### PyInstaller Hidden Imports
 **Problem**: Modules not found in frozen executable
@@ -243,6 +297,31 @@ grep -r "similar_concept" *.py
 # Check for existing workflow utilities
 grep -r "find_workflow\|count_descriptions\|format_timestamp" scripts/
 ```
+
+## Platform-Specific Considerations
+
+### macOS Development
+- **Module Imports**: Always add project root to `sys.path` for shared modules:
+  ```python
+  _project_root = Path(__file__).parent.parent
+  if str(_project_root) not in sys.path:
+      sys.path.insert(0, str(_project_root))
+  ```
+- **Path Resolution**: Pass `Path` objects directly to utilities (don't convert to strings unnecessarily)
+- **Default Directories**: Never hardcode `~/Desktop` paths - use directory picker dialogs
+- **Build Scripts**: `.command` files can be double-clicked in Finder; `.sh` files require Terminal
+
+### Windows Development
+- **UTF-8 Encoding**: Console output uses UTF-8 wrapper in workflow scripts
+- **Console Titles**: Use `ctypes.windll.kernel32.SetConsoleTitleW()` for progress visibility
+- **Path Separators**: Use `Path()` for cross-platform compatibility
+
+## Additional Resources
+
+For in-depth technical details, see:
+- **[docs/archive/AI_AGENT_REFERENCE.md](docs/archive/AI_AGENT_REFERENCE.md)** - Complete CLI command reference, image optimization math, provider limits
+- **[docs/AI_ONBOARDING.md](docs/AI_ONBOARDING.md)** - Current development status, active issues, session context
+- **[BuildAndRelease/BUILD_SYSTEM_REFERENCE.md](BuildAndRelease/BUILD_SYSTEM_REFERENCE.md)** - Build system architecture and troubleshooting
 
 ## Documentation Requirements
 
