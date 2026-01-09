@@ -1,10 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-Viewer wxPython - macOS Build Spec
+Viewer wxPython - Cross-Platform Build Spec
 
-Builds the Viewer GUI application using wxPython for macOS VoiceOver accessibility.
+Builds the Viewer GUI application using wxPython for accessibility.
+Supports both Windows (.exe) and macOS (.app) builds.
 """
 
+import sys
 from PyInstaller.utils.hooks import collect_all
 
 # Collect all wxPython files
@@ -50,14 +52,16 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch='arm64',
+    target_arch='arm64' if sys.platform == 'darwin' else None,
     codesign_identity=None,
     entitlements_file=None,
 )
 
-app = BUNDLE(
-    exe,
-    name='Viewer.app',
-    icon=None,
-    bundle_identifier='com.idt.viewer',
-)
+# macOS-specific bundle (only created on macOS)
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        exe,
+        name='Viewer.app',
+        icon=None,
+        bundle_identifier='com.idt.viewer',
+    )

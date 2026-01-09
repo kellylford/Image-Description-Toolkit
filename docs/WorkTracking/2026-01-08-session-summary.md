@@ -382,3 +382,246 @@ The app is now **functionally complete** for its core purpose - loading images a
 **Session Duration**: Continuing until migration complete
 **Token Usage**: ~950k remaining (of 1M budget)
 **Status**: Phase 3 complete, proceeding to testing and Phase 4
+
+---
+
+## Bug Fixes - Viewer App (2026-01-08 Evening)
+
+### Issue Reported
+User reported that the Viewer app wasn't loading workflows or descriptions when using:
+- "Browse Results" pointing to `/idt/dist/Descriptions` directory
+- "Open Directory" or "Change Directory" pointing to a workflow directory
+
+### Root Cause Analysis
+Two bugs in [viewer/viewer_wx.py](viewer/viewer_wx.py):
+
+**Bug #1: Incorrect handling of `find_workflow_directories()` return value**
+- **Expected**: `find_workflow_directories()` returns list of `(path, metadata)` tuples
+- **Actual code**: Treated return value as list of paths only
+- **Impact**: Code tried to call `.name` on tuples, causing errors or crashes
+
+**Bug #2: Incorrect workflow sorting**
+- **Expected**: Sort by `path.name` where `path` is first element of tuple
+- **Actual code**: `workflows.sort(key=lambda x: x.name)` - tried to access `.name` on tuple
+- **Impact**: Sorting failed, workflows not displayed in correct order
+
+### Fixes Applied
+
+Modified `load_workflows()` method in [viewer/viewer_wx.py](viewer/viewer_wx.py#L191-L243):
+
+1. **Renamed variable** for clarity: `workflows` → `workflow_tuples`
+2. **Unpacked tuples properly**: `for workflow_path, metadata in workflow_tuples:`
+3. **Fixed sorting**: `workflow_tuples.sort(key=lambda x: x[0].name, reverse=True)`
+4. **Added defensive code** for `count_descriptions()` return value (handles both int and dict)
+
+### Code Changes
+```python
+# BEFORE (buggy)
+workflows = find_workflow_directories(dir_path)
+workflows.sort(key=lambda x: x.name, reverse=True)  # BUG: x is tuple, not path
+for workflow_path in workflows:  # BUG: workflow_path is actually a tuple
+
+# AFTER (fixed)
+workflow_tuples = find_workflow_directories(dir_path)
+workflow_tuples.sort(key=lambda x: x[0].name, reverse=True)
+for workflow_path, metadata in workflow_tuples:  # Properly unpack tuple
+```
+
+### Testing
+- ✅ Built successfully: `dist/Viewer.app`
+- ⏳ Needs user testing to confirm fix works with real workflows
+
+### Files Modified
+- [viewer/viewer_wx.py](viewer/viewer_wx.py) - Fixed `load_workflows()` method
+
+---
+
+## Bug Fix #2 - Accessible Names (2026-01-08 Evening)
+
+### Issue Reported  
+User reported that accessible names/screen reader text was wrong. Screen reader announced:
+- "input_images/sr - 11.jpeg [6/16/2018 2:50p]"
+
+Expected behavior (from original PyQt6 viewer):
+- Display text: Truncated description (first 100 characters)
+- Accessible text: Full description text
+
+### Root Cause
+The wxPython viewer was displaying **file path + date** instead of **description text** in the list.
+
+### Comparison
+
+**Original PyQt6 viewer:**
+```python
+truncated = entry['description'][:100] + ("..." if len(entry['description']) > 100 else "")
+item = QTableWidgetItem(truncated)
+item.setData(Qt.ItemDataRole.AccessibleTextRole, entry['description'].strip())
+```
+
+**wxPython viewer (BEFORE - buggy):**
+```python
+relative_path = entry.get('relative_path', 'Unknown')
+photo_date = get_image_date(entry.get('file_path', ''))
+display_text = f"{relative_path} [{photo_date}]"
+self.desc_list.Append(display_text)
+```
+
+**wxPython viewer (AFTER - fixed):**
+```python
+description = entry.get('description', '')
+truncated = description[:100] + ("..." if len(description) > 100 else "")
+self.desc_list.Append(truncated)
+```
+
+### Fix Applied
+Modified `load_descriptions()` method in [viewer/viewer_wx.py](viewer/viewer_wx.py#L822-L831):
+- Changed display text from file path to truncated description (100 chars)
+- Matches original PyQt6 viewer behavior
+- Screen readers now hear the actual description text
+
+### Testing
+- ✅ Built successfully: `dist/Viewer.app`
+- ⏳ Needs user testing to confirm accessible text is correct
+
+### Files Modified
+- [viewer/viewer_wx.py](viewer/viewer_wx.py) - Fixed description display in list
+
+---
+
+## Bug Fix #3 - Accessible Text Clipping (2026-01-08 Evening)
+
+### Issue Reported
+User reported that accessible names were being clipped at 100 characters, same as the visual display.
+Expected: Visual text truncated (100 chars), but screen reader should hear **full description**.
+
+### Root Cause
+wxPython `wx.ListBox` and `wx.ListCtrl` don't have separate accessible text like PyQt6's `AccessibleTextRole`.
+In PyQt6:
+- Display text: `item.setText(truncated)`
+- Accessible text: `item.setData(Qt.ItemDataRole.AccessibleTextRole, full_description)`
+
+In wxPython, both display and accessible text come from the same string by default.
+
+### Solution
+Created custom `AccessibleListCtrl` class that:
+1. Stores full descriptions separately in `self.full_descriptions`
+2. Displays truncated text (100 chars) in the list
+3. Overrides `GetAccessibleDescription()` to return full text for screen readers
+
+### Code Changes
+
+**Added AccessibleListCtrl class:**
+```python
+class AccessibleListCtrl(wx.ListCtrl):
+    \"\"\"ListCtrl with full description accessible text instead of truncated display text\"\"\"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.full_descriptions = []  # Store full descriptions for accessibility
+    
+    def SetFullDescriptions(self, descriptions):
+        \"\"\"Set the full descriptions for accessibility\"\"\"
+        self.full_descriptions = descriptions
+    
+    def GetAccessibleDescription(self, index):
+        \"\"\"Override to provide full description for screen readers\"\"\"
+        if 0 <= index < len(self.full_descriptions):
+            return self.full_descriptions[index]
+        return super().GetAccessibleDescription(index)
+```
+
+**Usage in load_descriptions:**
+```python
+self.desc_list.SetFullDescriptions(self.descriptions)  # Full text for screen readers
+for i, entry in enumerate(entries):
+    truncated = description[:100] + (\"...\" if len(description) > 100 else \"\")  # Visual only
+    idx = self.desc_list.InsertItem(i, truncated)
+```
+
+### Testing
+- ✅ Built successfully: `dist/Viewer.app`
+- ⏳ Needs VoiceOver testing to confirm screen readers hear full descriptions
+- ⏳ Visual display should still show truncated text (100 chars)
+
+### Files Modified
+- [viewer/viewer_wx.py](viewer/viewer_wx.py) - Added AccessibleListCtrl class and updated list population
+
+---
+## Viewer Code Cleanup & Windows Build Support (2026-01-08 Evening)
+
+### Directory Cleanup - Removed Old PyQt6 Files
+Cleaned up the viewer directory to remove obsolete PyQt6 files, keeping only wxPython versions:
+
+**Files Deleted:**
+- `viewer.py` - Old PyQt6 viewer application (2147 lines, replaced by viewer_wx.py)
+- `viewer.spec` - Old PyQt6 PyInstaller spec (39 lines)
+- `viewer_macos.spec` - Old PyQt6 macOS-specific spec
+- `build_viewer.bat` - Old PyQt6 Windows build script (96 lines)
+
+**Files Retained:**
+- `viewer_wx.py` - wxPython viewer application (1246 lines)
+- `viewer_wx.spec` - Cross-platform wxPython PyInstaller spec
+- `build_viewer_wx.sh` - macOS/Linux build script
+- `build_viewer_macos.command` - macOS clickable build script
+- `build_viewer_macos.sh` - macOS-specific build script
+- `package_viewer.bat` - Distribution packaging script (still needs updating for wx version)
+
+### Created Windows Build Script
+Created [viewer/build_viewer_wx.bat](viewer/build_viewer_wx.bat) for Windows builds:
+- Based on `idtconfigure/build_idtconfigure.bat` pattern
+- Checks for **wxPython** instead of PyQt6: `python -c "import wx"`
+- Installs dependencies from `requirements.txt`
+- Verifies `scripts/` and `shared/` directories exist
+- Builds using `viewer_wx.spec` with `--clean` flag
+- Creates `dist\Viewer.exe`
+
+### Updated Spec File for Cross-Platform Support
+Modified [viewer/viewer_wx.spec](viewer/viewer_wx.spec):
+- Changed description from "macOS Build Spec" to "Cross-Platform Build Spec"
+- Made `target_arch` conditional: `'arm64' if sys.platform == 'darwin' else None`
+- Wrapped BUNDLE section in platform check: `if sys.platform == 'darwin':`
+- Now supports both Windows (.exe) and macOS (.app) builds from same spec file
+
+### Implementation Details
+**Build Script Pattern:**
+```bat
+REM Check if wxPython is installed
+python -c "import wx" 2>nul
+if errorlevel 1 (
+    echo wxPython not found. Installing dependencies...
+    pip install -r requirements.txt
+)
+
+REM Build using the spec file
+pyinstaller viewer_wx.spec --clean
+```
+
+**Spec File Platform Detection:**
+```python
+exe = EXE(
+    ...
+    target_arch='arm64' if sys.platform == 'darwin' else None,
+    ...
+)
+
+# macOS-specific bundle (only created on macOS)
+if sys.platform == 'darwin':
+    app = BUNDLE(exe, name='Viewer.app', ...)
+```
+
+### Testing Status
+- ✅ Windows build script created with correct syntax
+- ✅ Spec file updated for cross-platform compatibility
+- ⏳ Windows build needs verification on actual Windows system
+- ✅ macOS builds still work with updated spec file
+
+### Files Modified
+- [viewer/viewer_wx.spec](viewer/viewer_wx.spec) - Added cross-platform support
+
+### Files Created
+- [viewer/build_viewer_wx.bat](viewer/build_viewer_wx.bat) - Windows build script
+
+### Files Deleted
+- viewer.py, viewer.spec, viewer_macos.spec, build_viewer.bat (old PyQt6 files)
+
+---
