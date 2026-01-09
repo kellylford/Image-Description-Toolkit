@@ -60,7 +60,7 @@ fi
 
 if [ $MISSING_APPS -ne 0 ]; then
     echo ""
-    echo "Please run: ./BuildAndRelease/builditall_wx.sh"
+    echo "Please run: ./BuildAndRelease/MacBuilds/builditall_macos.sh"
     exit 1
 fi
 

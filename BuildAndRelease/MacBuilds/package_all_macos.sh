@@ -28,8 +28,8 @@ rm -f dist_all/*.md dist_all/*.txt dist_all/idt
 
 # Copy IDT CLI
 echo "Copying IDT CLI..."
-if [ -f "../idt/dist/idt" ]; then
-    cp "../idt/dist/idt" "dist_all/"
+if [ -f "../../idt/dist/idt" ]; then
+    cp "../../idt/dist/idt" "dist_all/"
     chmod +x "dist_all/idt"
     echo "  ✓ idt"
 else
@@ -38,8 +38,8 @@ fi
 
 # Copy Viewer.app
 echo "Copying Viewer..."
-if [ -d "../viewer/dist/Viewer.app" ]; then
-    cp -R "../viewer/dist/Viewer.app" "dist_all/Applications/"
+if [ -d "../../viewer/dist/Viewer.app" ]; then
+    cp -R "../../viewer/dist/Viewer.app" "dist_all/Applications/"
     echo "  ✓ Viewer.app"
 else
     echo "  ✗ Viewer.app NOT FOUND"
@@ -47,8 +47,8 @@ fi
 
 # Copy PromptEditor.app
 echo "Copying Prompt Editor..."
-if [ -d "../prompt_editor/dist/PromptEditor.app" ]; then
-    cp -R "../prompt_editor/dist/PromptEditor.app" "dist_all/Applications/"
+if [ -d "../../prompt_editor/dist/PromptEditor.app" ]; then
+    cp -R "../../prompt_editor/dist/PromptEditor.app" "dist_all/Applications/"
     echo "  ✓ PromptEditor.app"
 else
     echo "  ✗ PromptEditor.app NOT FOUND"
@@ -56,8 +56,8 @@ fi
 
 # Copy ImageDescriber.app
 echo "Copying ImageDescriber..."
-if [ -d "../imagedescriber/dist/ImageDescriber.app" ]; then
-    cp -R "../imagedescriber/dist/ImageDescriber.app" "dist_all/Applications/"
+if [ -d "../../imagedescriber/dist/ImageDescriber.app" ]; then
+    cp -R "../../imagedescriber/dist/ImageDescriber.app" "dist_all/Applications/"
     echo "  ✓ ImageDescriber.app"
 else
     echo "  ✗ ImageDescriber.app NOT FOUND"
@@ -65,8 +65,8 @@ fi
 
 # Copy IDTConfigure.app
 echo "Copying IDTConfigure..."
-if [ -d "../idtconfigure/dist/IDTConfigure.app" ]; then
-    cp -R "../idtconfigure/dist/IDTConfigure.app" "dist_all/Applications/"
+if [ -d "../../idtconfigure/dist/IDTConfigure.app" ]; then
+    cp -R "../../idtconfigure/dist/IDTConfigure.app" "dist_all/Applications/"
     echo "  ✓ IDTConfigure.app"
 else
     echo "  ✗ IDTConfigure.app NOT FOUND"
@@ -75,10 +75,10 @@ fi
 # Copy documentation
 echo ""
 echo "Copying documentation..."
-if [ -f "../README.md" ]; then cp "../README.md" "dist_all/"; fi
-if [ -f "../LICENSE" ]; then cp "../LICENSE" "dist_all/"; fi
-if [ -f "../install_idt_macos.sh" ]; then 
-    cp "../install_idt_macos.sh" "dist_all/"
+if [ -f "../../README.md" ]; then cp "../../README.md" "dist_all/"; fi
+if [ -f "../../LICENSE" ]; then cp "../../LICENSE" "dist_all/"; fi
+if [ -f "../../install_idt_macos.sh" ]; then 
+    cp "../../install_idt_macos.sh" "dist_all/"
     chmod +x "dist_all/install_idt_macos.sh"
 fi
 

@@ -79,7 +79,7 @@ fi
 
 # Show composed build version and commit before starting
 echo "--- Build Version Banner (pre-build) ---"
-python3 idt_cli.py version
+python3 idt/idt_cli.py version
 echo "----------------------------------------"
 echo ""
 
@@ -112,12 +112,14 @@ echo "[1/5] Building IDT (main toolkit)..."
 echo "========================================================================"
 echo ""
 
-if bash BuildAndRelease/MacBuilds/build_idt_macos.sh; then
+cd idt
+if bash build_idt.sh; then
     echo "SUCCESS: IDT built successfully"
 else
     echo "ERROR: IDT build failed!"
     ((BUILD_ERRORS++))
 fi
+cd ..
 
 # ============================================================================
 echo ""
@@ -128,7 +130,7 @@ echo ""
 cd viewer
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
-    if bash build_viewer_macos.sh; then
+    if bash build_viewer_wx.sh; then
         echo "SUCCESS: Viewer built successfully"
     else
         echo "ERROR: Viewer build failed!"
@@ -151,7 +153,7 @@ echo ""
 cd prompt_editor
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
-    if bash build_prompt_editor_macos.sh; then
+    if bash build_prompt_editor_wx.sh; then
         echo "SUCCESS: Prompt Editor built successfully"
     else
         echo "ERROR: Prompt Editor build failed!"
@@ -174,7 +176,7 @@ echo ""
 cd imagedescriber
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
-    if bash build_imagedescriber_macos.sh; then
+    if bash build_imagedescriber_wx.sh; then
         echo "SUCCESS: ImageDescriber built successfully"
     else
         echo "ERROR: ImageDescriber build failed!"
@@ -197,7 +199,7 @@ echo ""
 cd idtconfigure
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
-    if bash build_idtconfigure_macos.sh; then
+    if bash build_idtconfigure_wx.sh; then
         echo "SUCCESS: IDTConfigure built successfully"
     else
         echo "ERROR: IDTConfigure build failed!"
