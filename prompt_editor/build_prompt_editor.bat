@@ -1,7 +1,20 @@
 @echo off
 echo ========================================================================
-echo Building Image Description Prompt Editor
+echo Building Image Description Prompt Editor (wxPython Version)
 echo ========================================================================
+echo.
+
+REM Auto-activate .winenv if not already in a virtual environment
+if not defined VIRTUAL_ENV (
+    if exist ".winenv\Scripts\activate.bat" (
+        echo Activating .winenv...
+        call .winenv\Scripts\activate.bat
+        set VENV_ACTIVATED=1
+    ) else (
+        echo WARNING: .winenv not found. Run winsetup.bat first.
+        echo Proceeding with system Python...
+    )
+)
 echo.
 
 REM Clean PyInstaller cache for fresh build
@@ -21,10 +34,10 @@ if errorlevel 1 (
     echo.
 )
 
-REM Check if PyQt6 is installed
-python -c "import PyQt6" 2>nul
+REM Check if wxPython is installed
+python -c "import wx" 2>nul
 if errorlevel 1 (
-    echo PyQt6 not found. Installing prompt editor dependencies...
+    echo wxPython not found. Installing prompt editor dependencies...
     pip install -r requirements.txt
     if errorlevel 1 (
         echo ERROR: Failed to install dependencies.
@@ -61,9 +74,6 @@ pyinstaller --onefile ^
     --workpath "build" ^
     --specpath "build" ^
     --add-data "%SCRIPTS_DIR%;scripts" ^
-    --hidden-import PyQt6.QtCore ^
-    --hidden-import PyQt6.QtGui ^
-    --hidden-import PyQt6.QtWidgets ^
     prompt_editor.py
 
 if errorlevel 1 (
@@ -82,3 +92,9 @@ echo Executable created: dist\prompteditor.exe
 echo.
 echo To test: cd dist ^&^& prompteditor.exe
 echo.
+
+REM Deactivate venv if we activated it
+if defined VENV_ACTIVATED (
+    call deactivate
+    set VENV_ACTIVATED=
+)

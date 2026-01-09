@@ -45,19 +45,12 @@ echo ========================================================================
 echo.
 
 cd viewer
-if exist ".winenv\Scripts\activate.bat" (
-    call .winenv\Scripts\activate.bat
-    call build_viewer_wx.bat
-    if errorlevel 1 (
-        echo ERROR: Viewer build failed!
-        set /a BUILD_ERRORS+=1
-    ) else (
-        echo SUCCESS: Viewer built successfully
-    )
-    call deactivate
-) else (
-    echo ERROR: Viewer .winenv not found - run winsetup.bat first
+call build_viewer_wx.bat
+if errorlevel 1 (
+    echo ERROR: Viewer build failed!
     set /a BUILD_ERRORS+=1
+) else (
+    echo SUCCESS: Viewer built successfully
 )
 cd ..
 
@@ -68,19 +61,12 @@ echo ========================================================================
 echo.
 
 cd prompt_editor
-if exist ".winenv\Scripts\activate.bat" (
-    call .winenv\Scripts\activate.bat
-    call build_prompt_editor_wx.bat
-    if errorlevel 1 (
-        echo ERROR: Prompt Editor build failed!
-        set /a BUILD_ERRORS+=1
-    ) else (
-        echo SUCCESS: Prompt Editor built successfully
-    )
-    call deactivate
-) else (
-    echo ERROR: Prompt Editor .winenv not found - run winsetup.bat first
+call build_prompt_editor.bat
+if errorlevel 1 (
+    echo ERROR: Prompt Editor build failed!
     set /a BUILD_ERRORS+=1
+) else (
+    echo SUCCESS: Prompt Editor built successfully
 )
 cd ..
 
@@ -91,19 +77,12 @@ echo ========================================================================
 echo.
 
 cd imagedescriber
-if exist ".winenv\Scripts\activate.bat" (
-    call .winenv\Scripts\activate.bat
-    call build_imagedescriber_wx.bat
-    if errorlevel 1 (
-        echo ERROR: ImageDescriber build failed!
-        set /a BUILD_ERRORS+=1
-    ) else (
-        echo SUCCESS: ImageDescriber built successfully
-    )
-    call deactivate
-) else (
-    echo ERROR: ImageDescriber .winenv not found - run winsetup.bat first
+call build_imagedescriber_wx.bat
+if errorlevel 1 (
+    echo ERROR: ImageDescriber build failed!
     set /a BUILD_ERRORS+=1
+) else (
+    echo SUCCESS: ImageDescriber built successfully
 )
 cd ..
 
@@ -114,19 +93,12 @@ echo ========================================================================
 echo.
 
 cd idtconfigure
-if exist ".winenv\Scripts\activate.bat" (
-    call .winenv\Scripts\activate.bat
-    call build_idtconfigure_wx.bat
-    if errorlevel 1 (
-        echo ERROR: IDTConfigure build failed!
-        set /a BUILD_ERRORS+=1
-    ) else (
-        echo SUCCESS: IDTConfigure built successfully
-    )
-    call deactivate
-) else (
-    echo ERROR: IDTConfigure .winenv not found - run winsetup.bat first
+call build_idtconfigure.bat
+if errorlevel 1 (
+    echo ERROR: IDTConfigure build failed!
     set /a BUILD_ERRORS+=1
+) else (
+    echo SUCCESS: IDTConfigure built successfully
 )
 cd ..
 

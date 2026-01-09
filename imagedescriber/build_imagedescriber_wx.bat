@@ -4,6 +4,19 @@ echo Building ImageDescriber (wxPython Version) for Windows
 echo ========================================================================
 echo.
 
+REM Auto-activate .winenv if not already in a virtual environment
+if not defined VIRTUAL_ENV (
+    if exist ".winenv\Scripts\activate.bat" (
+        echo Activating .winenv...
+        call .winenv\Scripts\activate.bat
+        set VENV_ACTIVATED=1
+    ) else (
+        echo WARNING: .winenv not found. Run winsetup.bat first.
+        echo Proceeding with system Python...
+    )
+)
+echo.
+
 REM Clean PyInstaller cache for fresh build
 echo Cleaning PyInstaller cache...
 python -c "import shutil; from pathlib import Path; cache_dir = Path.home() / 'AppData' / 'Local' / 'pyinstaller'; shutil.rmtree(cache_dir, ignore_errors=True); print(f'Cleaned: {cache_dir}')"
