@@ -31,6 +31,24 @@ except ImportError:
     from data_models import ImageDescription, ImageItem, ImageWorkspace
 
 
+def set_accessible_name(widget, name):
+    """Safely set accessible name if supported"""
+    if hasattr(widget, 'SetAccessibleName'):
+        try:
+            widget.SetAccessibleName(name)
+        except Exception:
+            pass  # Silently ignore if not supported
+
+
+def set_accessible_description(widget, desc):
+    """Safely set accessible description if supported"""
+    if hasattr(widget, 'SetAccessibleDescription'):
+        try:
+            widget.SetAccessibleDescription(desc)
+        except Exception:
+            pass  # Silently ignore if not supported
+
+
 class DirectorySelectionDialog(wx.Dialog):
     """Dialog for selecting directory with options for recursive search and multiple directories"""
     
@@ -48,6 +66,9 @@ class DirectorySelectionDialog(wx.Dialog):
         self.init_ui(existing_directories)
         self.SetSize((600, 500))
         self.Centre()
+        
+        # Set initial focus to browse button for accessibility
+        wx.CallAfter(self.browse_btn.SetFocus)
     
     def init_ui(self, existing_directories: List[str]):
         """Initialize the dialog UI"""
@@ -58,12 +79,12 @@ class DirectorySelectionDialog(wx.Dialog):
         dir_sizer = wx.StaticBoxSizer(dir_box, wx.VERTICAL)
         
         self.dir_label = wx.StaticText(self, label="No directory selected")
-        self.dir_label.SetAccessibleName("Selected directory")
+        set_accessible_name(self.dir_label, "Selected directory")
         dir_sizer.Add(self.dir_label, 0, wx.ALL | wx.EXPAND, 5)
         
         self.browse_btn = wx.Button(self, label="&Browse for Directory...")
-        self.browse_btn.SetAccessibleName("Browse for directory")
-        self.browse_btn.SetAccessibleDescription("Open directory chooser to select an image directory")
+        set_accessible_name(self.browse_btn, "Browse for directory")
+        set_accessible_description(self.browse_btn, "Open directory chooser to select an image directory")
         self.browse_btn.Bind(wx.EVT_BUTTON, self.on_browse)
         dir_sizer.Add(self.browse_btn, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -75,11 +96,11 @@ class DirectorySelectionDialog(wx.Dialog):
         
         self.recursive_cb = wx.CheckBox(self, label="&Search subdirectories recursively")
         self.recursive_cb.SetToolTip("When checked, searches all subdirectories for images")
-        self.recursive_cb.SetAccessibleName("Search subdirectories recursively")
+        set_accessible_name(self.recursive_cb, "Search subdirectories recursively")
         options_sizer.Add(self.recursive_cb, 0, wx.ALL, 5)
         
         self.add_to_existing_cb = wx.CheckBox(self, label="&Add to existing workspace")
-        self.add_to_existing_cb.SetAccessibleName("Add to existing workspace")
+        set_accessible_name(self.add_to_existing_cb, "Add to existing workspace")
         if existing_directories:
             tip = "Add to existing directories:\n" + "\n".join([Path(d).name for d in existing_directories[:5]])
             self.add_to_existing_cb.SetToolTip(tip)
@@ -125,8 +146,13 @@ class DirectorySelectionDialog(wx.Dialog):
         
         self.SetSizer(main_sizer)
         
-        # Update button state
+        # Update button state (disable OK until directory selected)
         self.update_ok_button()
+        
+        # Enable tab traversal for all controls
+        self.browse_btn.SetCanFocus(True)
+        self.recursive_cb.SetCanFocus(True)
+        self.add_to_existing_cb.SetCanFocus(True)
     
     def on_browse(self, event):
         """Browse for directory"""
@@ -235,8 +261,8 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         # Create notebook for tabs with keyboard navigation support
         self.notebook = wx.Notebook(self, style=wx.NB_TOP)
-        self.notebook.SetAccessibleName("Processing options tabs")
-        self.notebook.SetAccessibleDescription("Use left and right arrow keys to navigate between tabs")
+        set_accessible_name(self.notebook, "Processing options tabs")
+        set_accessible_description(self.notebook, "Use left and right arrow keys to navigate between tabs")
         
         # General tab
         general_panel = self.create_general_panel(self.notebook)
@@ -271,7 +297,7 @@ class ProcessingOptionsDialog(wx.Dialog):
             label="&Skip images that already have descriptions"
         )
         self.skip_existing_cb.SetValue(self.config.get('skip_existing', False))
-        self.skip_existing_cb.SetAccessibleName("Skip images that already have descriptions")
+        set_accessible_name(self.skip_existing_cb, "Skip images that already have descriptions")
         batch_sizer.Add(self.skip_existing_cb, 0, wx.ALL, 5)
         
         sizer.Add(batch_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -293,7 +319,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude"])
         self.provider_choice.SetSelection(0)
-        self.provider_choice.SetAccessibleName("AI provider")
+        set_accessible_name(self.provider_choice, "AI provider")
         provider_label.SetNextHandler(self.provider_choice)
         provider_sizer.Add(self.provider_choice, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -308,7 +334,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         self.model_text = wx.TextCtrl(panel)
         self.model_text.SetValue(self.config.get('model', 'moondream'))
-        self.model_text.SetAccessibleName("Model name")
+        set_accessible_name(self.model_text, "Model name")
         model_label.SetNextHandler(self.model_text)
         model_sizer.Add(self.model_text, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -326,7 +352,7 @@ class ProcessingOptionsDialog(wx.Dialog):
             choices=["narrative", "detailed", "concise", "technical", "artistic"]
         )
         self.prompt_choice.SetSelection(0)
-        self.prompt_choice.SetAccessibleName("Prompt style")
+        set_accessible_name(self.prompt_choice, "Prompt style")
         prompt_label.SetNextHandler(self.prompt_choice)
         prompt_sizer.Add(self.prompt_choice, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -366,8 +392,8 @@ class ImageDetailDialog(wx.Dialog):
         
         # Create notebook for tabs with keyboard navigation support
         self.detail_notebook = wx.Notebook(self, style=wx.NB_TOP)
-        self.detail_notebook.SetAccessibleName("Image detail tabs")
-        self.detail_notebook.SetAccessibleDescription("Use left and right arrow keys to navigate between tabs")
+        set_accessible_name(self.detail_notebook, "Image detail tabs")
+        set_accessible_description(self.detail_notebook, "Use left and right arrow keys to navigate between tabs")
         
         # Details tab
         details_panel = self.create_details_panel(self.detail_notebook)

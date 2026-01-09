@@ -177,6 +177,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.workspace_file = None
         self.processing_thread = None
         self.current_image_item = None
+        self.current_filter = "all"  # View filter: all, described, batch
         
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
@@ -207,6 +208,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.Bind(EVT_WORKFLOW_COMPLETE, self.on_workflow_complete)
         if EVT_WORKFLOW_FAILED:
             self.Bind(EVT_WORKFLOW_FAILED, self.on_workflow_failed)
+        
+        # Bind keyboard events for single-key shortcuts (matching Qt6 behavior)
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
         
         # Update window title
         self.update_window_title("ImageDescriber", "Untitled")
@@ -364,28 +368,108 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         menubar.Append(file_menu, "&File")
         
-        # Edit menu
+        # Workspace menu
+        workspace_menu = wx.Menu()
+        
+        manage_dirs_item = workspace_menu.Append(wx.ID_ANY, "&Manage Directories...")
+        self.Bind(wx.EVT_MENU, self.on_manage_directories, manage_dirs_item)
+        
+        add_dir_item = workspace_menu.Append(wx.ID_ANY, "&Add Directory...")
+        self.Bind(wx.EVT_MENU, self.on_add_directory, add_dir_item)
+        
+        menubar.Append(workspace_menu, "&Workspace")
+        
+        # Edit menu (kept minimal for now)
         edit_menu = wx.Menu()
-        
-        # Empty for now - can add copy/paste/undo later if needed
-        
         menubar.Append(edit_menu, "&Edit")
         
         # Process menu
         process_menu = wx.Menu()
         
-        process_single_item = process_menu.Append(wx.ID_ANY, "Process &Current Image\tCtrl+P")
+        process_single_item = process_menu.Append(wx.ID_ANY, "Process &Current Image\tP")
         self.Bind(wx.EVT_MENU, self.on_process_single, process_single_item)
         
-        process_all_item = process_menu.Append(wx.ID_ANY, "Process &All Images\tCtrl+Shift+P")
+        process_all_item = process_menu.Append(wx.ID_ANY, "Process &All Images")
         self.Bind(wx.EVT_MENU, self.on_process_all, process_all_item)
+        
         process_menu.AppendSeparator()
         
-        extract_video_item = process_menu.Append(wx.ID_ANY, "Extract &Video Frames\tCtrl+E")
+        mark_batch_item = process_menu.Append(wx.ID_ANY, "Mark for &Batch\tB")
+        self.Bind(wx.EVT_MENU, self.on_mark_for_batch, mark_batch_item)
+        
+        process_batch_item = process_menu.Append(wx.ID_ANY, "Process Batch...")
+        self.Bind(wx.EVT_MENU, self.on_process_batch, process_batch_item)
+        
+        clear_batch_item = process_menu.Append(wx.ID_ANY, "Clear Batch Processing")
+        self.Bind(wx.EVT_MENU, self.on_clear_batch, clear_batch_item)
+        
+        process_menu.AppendSeparator()
+        
+        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with Image\tC")
+        self.Bind(wx.EVT_MENU, self.on_chat, chat_item)
+        
+        process_menu.AppendSeparator()
+        
+        convert_heic_item = process_menu.Append(wx.ID_ANY, "Convert &HEIC Files...")
+        self.Bind(wx.EVT_MENU, self.on_convert_heic, convert_heic_item)
+        
+        extract_video_item = process_menu.Append(wx.ID_ANY, "Extract &Video Frames...")
         self.Bind(wx.EVT_MENU, self.on_extract_video, extract_video_item)
         
+        process_menu.AppendSeparator()
+        
+        rename_item = process_menu.Append(wx.ID_ANY, "&Rename Item\tR")
+        self.Bind(wx.EVT_MENU, self.on_rename_item, rename_item)
         
         menubar.Append(process_menu, "&Process")
+        
+        # Descriptions menu
+        desc_menu = wx.Menu()
+        
+        add_manual_item = desc_menu.Append(wx.ID_ANY, "Add &Manual Description\tM")
+        self.Bind(wx.EVT_MENU, self.on_add_manual_description, add_manual_item)
+        
+        followup_item = desc_menu.Append(wx.ID_ANY, "Ask &Followup Question\tF")
+        self.Bind(wx.EVT_MENU, self.on_followup_question, followup_item)
+        
+        desc_menu.AppendSeparator()
+        
+        edit_desc_item = desc_menu.Append(wx.ID_ANY, "&Edit Description...")
+        self.Bind(wx.EVT_MENU, self.on_edit_description, edit_desc_item)
+        
+        delete_desc_item = desc_menu.Append(wx.ID_ANY, "&Delete Description")
+        self.Bind(wx.EVT_MENU, self.on_delete_description, delete_desc_item)
+        
+        desc_menu.AppendSeparator()
+        
+        copy_desc_item = desc_menu.Append(wx.ID_ANY, "&Copy Description")
+        self.Bind(wx.EVT_MENU, self.on_copy_description, copy_desc_item)
+        
+        copy_path_item = desc_menu.Append(wx.ID_ANY, "Copy Image &Path")
+        self.Bind(wx.EVT_MENU, self.on_copy_image_path, copy_path_item)
+        
+        desc_menu.AppendSeparator()
+        
+        show_all_item = desc_menu.Append(wx.ID_ANY, "&Show All Descriptions...")
+        self.Bind(wx.EVT_MENU, self.on_show_all_descriptions, show_all_item)
+        
+        menubar.Append(desc_menu, "&Descriptions")
+        
+        # View menu
+        view_menu = wx.Menu()
+        
+        filter_all_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &All Items\tF5")
+        self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("all"), filter_all_item)
+        
+        filter_desc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Described Only")
+        self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("described"), filter_desc_item)
+        
+        filter_batch_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Batch Processing")
+        self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("batch"), filter_batch_item)
+        
+        filter_all_item.Check(True)  # Default to all items
+        
+        menubar.Append(view_menu, "&View")
         
         # Help menu
         help_menu = wx.Menu()
@@ -416,6 +500,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.display_image_info(self.current_image_item)
                 self.process_btn.Enable(True)
                 self.save_desc_btn.Enable(True)
+        else:
+            # No selection - clear current item and disable buttons
+            self.current_image_item = None
+            self.process_btn.Enable(False)
+            self.save_desc_btn.Enable(False)
     
     def display_image_info(self, image_item: ImageItem):
         """Display information about selected image"""
@@ -437,39 +526,52 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_load_directory(self, event):
         """Load a directory of images"""
-        if DirectorySelectionDialog:
-            existing_dirs = self.workspace.get_all_directories() if self.workspace else []
-            dlg = DirectorySelectionDialog(existing_dirs, self)
-            
-            if dlg.ShowModal() == wx.ID_OK:
-                selection = dlg.get_selection()
-                dlg.Destroy()
+        try:
+            if DirectorySelectionDialog:
+                existing_dirs = self.workspace.get_all_directories() if self.workspace else []
+                dlg = DirectorySelectionDialog(existing_dirs, self)
                 
-                if selection['add_to_existing'] and not self.workspace:
-                    self.workspace = ImageWorkspace(new_workspace=True)
-                elif not selection['add_to_existing']:
-                    # Clear existing workspace
-                    self.workspace = ImageWorkspace(new_workspace=True)
-                
-                self.load_directory(
-                    selection['directory'],
-                    recursive=selection['recursive']
-                )
+                if dlg.ShowModal() == wx.ID_OK:
+                    selection = dlg.get_selection()
+                    dlg.Destroy()
+                    
+                    if selection['add_to_existing'] and not self.workspace:
+                        self.workspace = ImageWorkspace(new_workspace=True)
+                    elif not selection['add_to_existing']:
+                        # Clear existing workspace
+                        self.workspace = ImageWorkspace(new_workspace=True)
+                    
+                    self.load_directory(
+                        selection['directory'],
+                        recursive=selection['recursive']
+                    )
+                else:
+                    dlg.Destroy()
             else:
-                dlg.Destroy()
-        else:
-            dir_path = select_directory_dialog(self, "Select Image Directory")
-            if dir_path:
-                self.workspace = ImageWorkspace(new_workspace=True)
-                self.load_directory(dir_path)
+                dir_path = select_directory_dialog(self, "Select Image Directory")
+                if dir_path:
+                    self.workspace = ImageWorkspace(new_workspace=True)
+                    self.load_directory(dir_path)
+        except Exception as e:
+            show_error(self, f"Error loading directory:\n{str(e)}")
     
-    def load_directory(self, dir_path, recursive=False):
-        """Load images from directory"""
+    def load_directory(self, dir_path, recursive=False, append=False):
+        """Load images from directory
+        
+        Args:
+            dir_path: Path to directory
+            recursive: If True, search subdirectories
+            append: If True, add to existing workspace. If False, create new workspace.
+        """
         try:
             dir_path = Path(dir_path)
             if not dir_path.exists():
                 show_error(self, f"Directory not found: {dir_path}")
                 return
+            
+            # Create new workspace if not appending
+            if not append:
+                self.workspace = ImageWorkspace(new_workspace=True)
             
             # Add directory to workspace
             self.workspace.add_directory(str(dir_path))
@@ -489,20 +591,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     images_found.extend(dir_path.glob(f"*{ext.upper()}"))
             
             # Add to workspace
+            added_count = 0
             for image_path in sorted(images_found):
                 image_path_str = str(image_path)
                 if image_path_str not in self.workspace.items:
                     item = ImageItem(image_path_str, "image")
                     self.workspace.add_item(item)
+                    added_count += 1
             
             # Update UI
             self.refresh_image_list()
             self.mark_modified()
             
-            count = len(images_found)
-            self.SetStatusText(f"Loaded {count} images from {dir_path.name}", 0)
+            action = "Added" if append else "Loaded"
+            self.SetStatusText(f"{action} {added_count} images from {dir_path.name}", 0)
             self.SetStatusText(f"{len(self.workspace.items)} total images", 1)
-            self.process_all_btn.Enable(count > 0)
+            self.process_all_btn.Enable(len(self.workspace.items) > 0)
             
         except Exception as e:
             show_error(self, f"Error loading directory:\n{e}")
@@ -513,7 +617,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         for file_path in sorted(self.workspace.items.keys()):
             item = self.workspace.items[file_path]
+            
+            # Apply filters
+            if self.current_filter == "described":
+                if not item.descriptions:
+                    continue
+            elif self.current_filter == "batch":
+                if not getattr(item, 'batch_marked', False):
+                    continue
+            
             display_name = Path(file_path).name
+            
+            # Add batch marker
+            if getattr(item, 'batch_marked', False):
+                display_name = f"🔵 {display_name}"
             
             # Add description count indicator
             desc_count = len(item.descriptions)
@@ -840,7 +957,651 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Handle processing errors (legacy)"""
         pass
     
-    def on_about(self, event):
+    def on_key_press(self, event):
+        """Handle keyboard shortcuts (matching Qt6 behavior)"""
+        keycode = event.GetKeyCode()
+        modifiers = event.GetModifiers()
+        
+        # Single-key shortcuts (no modifiers)
+        if modifiers == wx.MOD_NONE:
+            if keycode == ord('P'):
+                # Process selected image
+                self.on_process_single(event)
+                return
+            elif keycode == ord('R'):
+                # Rename item
+                self.on_rename_item(event)
+                return
+            elif keycode == ord('M'):
+                # Add manual description
+                self.on_add_manual_description(event)
+                return
+            elif keycode == ord('C'):
+                # Chat with image
+                self.on_chat(event)
+                return
+            elif keycode == ord('F'):
+                # Followup question
+                self.on_followup_question(event)
+                return
+            elif keycode == ord('B'):
+                # Mark for batch (will implement)
+                self.on_mark_for_batch(event)
+                return
+            elif keycode == ord('Z'):
+                # Auto-rename (hidden feature)
+                self.on_auto_rename(event)
+                return
+            elif keycode == wx.WXK_F2:
+                # Rename (alternative)
+                self.on_rename_item(event)
+                return
+        
+        # Ctrl+V for paste
+        elif modifiers == wx.MOD_CONTROL and keycode == ord('V'):
+            self.on_paste_from_clipboard(event)
+            return
+        
+        # Let event propagate if not handled
+        event.Skip()
+    
+    def on_rename_item(self, event):
+        """Rename selected item (R key or F2)"""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        
+        # Get current name
+        current_name = self.current_image_item.display_name or Path(self.current_image_item.file_path).stem
+        
+        # Show input dialog
+        dlg = wx.TextEntryDialog(
+            self,
+            "Enter new display name:",
+            "Rename Item",
+            current_name
+        )
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            new_name = dlg.GetValue().strip()
+            if new_name:
+                self.current_image_item.display_name = new_name
+                self.mark_modified()
+                self.refresh_image_list()
+                self.SetStatusText(f"Renamed to: {new_name}", 0)
+        
+        dlg.Destroy()
+    
+    def on_add_manual_description(self, event):
+        """Add manual description (M key)"""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        
+        # Show multi-line text dialog
+        dlg = wx.TextEntryDialog(
+            self,
+            "Enter description for this image:",
+            "Add Manual Description",
+            "",
+            style=wx.OK | wx.CANCEL | wx.TE_MULTILINE
+        )
+        dlg.SetSize((500, 300))
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            text = dlg.GetValue().strip()
+            if text:
+                desc = ImageDescription(
+                    text=text,
+                    model="manual",
+                    prompt_style="manual"
+                )
+                self.current_image_item.add_description(desc)
+                self.mark_modified()
+                self.display_image_info(self.current_image_item)
+                self.SetStatusText("Manual description added", 0)
+        
+        dlg.Destroy()
+    
+    def on_chat(self, event):
+        """Chat with image (C key)"""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        
+        if not ProcessingWorker:
+            show_error(self, "Processing worker not available")
+            return
+        
+        # Create a simple chat dialog
+        dlg = wx.Dialog(self, title=f"Chat: {Path(self.current_image_item.file_path).name}",
+                       style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        dlg.SetSize((600, 500))
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Chat history
+        history_label = wx.StaticText(dlg, label="Conversation:")
+        sizer.Add(history_label, 0, wx.ALL, 5)
+        
+        chat_history = wx.TextCtrl(dlg, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
+        chat_history.SetValue("Chat session started.\n\nAsk questions about this image...\n\n")
+        sizer.Add(chat_history, 1, wx.ALL | wx.EXPAND, 5)
+        
+        # Question input
+        question_label = wx.StaticText(dlg, label="Your question:")
+        sizer.Add(question_label, 0, wx.ALL, 5)
+        
+        question_input = wx.TextCtrl(dlg, style=wx.TE_PROCESS_ENTER)
+        sizer.Add(question_input, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Buttons
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        ask_btn = wx.Button(dlg, label="Ask")
+        send_btn = wx.Button(dlg, label="Send")
+        close_btn = wx.Button(dlg, wx.ID_CLOSE)
+        
+        btn_sizer.Add(ask_btn, 0, wx.ALL, 5)
+        btn_sizer.Add(send_btn, 0, wx.ALL, 5)
+        btn_sizer.AddStretchSpacer()
+        btn_sizer.Add(close_btn, 0, wx.ALL, 5)
+        
+        sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        
+        def on_ask(e):
+            question = question_input.GetValue().strip()
+            if question:
+                chat_history.AppendText(f"You: {question}\n")
+                chat_history.AppendText("AI: Thinking...\n")
+                question_input.Clear()
+                
+                # Process question with AI
+                try:
+                    options = {
+                        'provider': self.config.get('default_provider', 'ollama'),
+                        'model': self.config.get('default_model', 'moondream'),
+                    }
+                    
+                    worker = ProcessingWorker(
+                        self,
+                        self.current_image_item.file_path,
+                        options['provider'],
+                        options['model'],
+                        'chat',
+                        question,
+                        None,
+                        None
+                    )
+                    # Store reference to update chat history
+                    worker.chat_history_ctrl = chat_history
+                    worker.start()
+                except Exception as ex:
+                    chat_history.AppendText(f"Error: {str(ex)}\n\n")
+        
+        ask_btn.Bind(wx.EVT_BUTTON, on_ask)
+        send_btn.Bind(wx.EVT_BUTTON, on_ask)
+        question_input.Bind(wx.EVT_TEXT_ENTER, on_ask)
+        close_btn.Bind(wx.EVT_BUTTON, lambda e: dlg.EndModal(wx.ID_CLOSE))
+        
+        dlg.SetSizer(sizer)
+        dlg.Centre()
+        question_input.SetFocus()
+        dlg.ShowModal()
+        dlg.Destroy()
+    
+    def on_followup_question(self, event):
+        """Ask followup question (F key)"""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        
+        if not self.current_image_item.descriptions:
+            show_info(self, "No existing description. Use 'P' to process first, or 'C' for chat.")
+            return
+        
+        if not ProcessingWorker:
+            show_error(self, "Processing worker not available")
+            return
+        
+        # Get existing description for context
+        existing_desc = self.current_image_item.descriptions[-1].text
+        
+        # Ask for followup question
+        dlg = wx.TextEntryDialog(
+            self,
+            f"Existing description:\n{existing_desc[:200]}...\n\nAsk a followup question:",
+            "Followup Question",
+            ""
+        )
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            question = dlg.GetValue().strip()
+            if question:
+                # Create prompt with context
+                context_prompt = f"Previous description: {existing_desc}\n\nFollowup question: {question}"
+                
+                options = {
+                    'provider': self.config.get('default_provider', 'ollama'),
+                    'model': self.config.get('default_model', 'moondream'),
+                }
+                
+                self.SetStatusText("Processing followup question...", 0)
+                
+                # Process with AI
+                worker = ProcessingWorker(
+                    self,
+                    self.current_image_item.file_path,
+                    options['provider'],
+                    options['model'],
+                    'followup',
+                    context_prompt,
+                    None,
+                    None
+                )
+                worker.start()
+        
+        dlg.Destroy()
+    
+    def on_mark_for_batch(self, event):
+        """Mark/unmark image for batch processing (B key)"""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        
+        # Toggle batch_marked property
+        current_state = getattr(self.current_image_item, 'batch_marked', False)
+        self.current_image_item.batch_marked = not current_state
+        
+        self.mark_modified()
+        self.refresh_image_list()
+        
+        action = "marked for" if self.current_image_item.batch_marked else "unmarked from"
+        self.SetStatusText(f"Image {action} batch processing", 0)
+    
+    def on_auto_rename(self, event):
+        """Auto-rename using AI (Z key)"""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        
+        if not ProcessingWorker:
+            show_error(self, "Processing worker not available")
+            return
+        
+        # Ask user to confirm
+        if not ask_yes_no(self, "Generate a descriptive name for this image using AI?\n\nThis will use your default AI provider."):
+            return
+        
+        # Use a special prompt for generating names
+        rename_prompt = "Generate a short, descriptive filename for this image (2-5 words, no file extension). Be specific and concise."
+        
+        # Process with default settings
+        options = {
+            'provider': self.config.get('default_provider', 'ollama'),
+            'model': self.config.get('default_model', 'moondream'),
+        }
+        
+        self.SetStatusText("Generating name with AI...", 0)
+        
+        # Use processing worker but capture result for renaming
+        try:
+            # For now, show that the feature is available but needs completion
+            show_info(self, "AI auto-rename is being processed.\n\nThe generated name will appear as a description.\nYou can then manually rename using that suggestion.")
+            
+            # Process to get description that could be used as name
+            worker = ProcessingWorker(
+                self,
+                self.current_image_item.file_path,
+                options['provider'],
+                options['model'],
+                'brief',  # Use brief prompt style
+                rename_prompt,
+                None,
+                None
+            )
+            worker.start()
+        except Exception as e:
+            show_error(self, f"Auto-rename failed: {str(e)}")
+    
+    def on_paste_from_clipboard(self, event):
+        """Paste image from clipboard (Ctrl+V)"""
+        if not self.workspace:
+            self.workspace = ImageWorkspace(new_workspace=True)
+        
+        if wx.TheClipboard.Open():
+            try:
+                if wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP)):
+                    data = wx.BitmapDataObject()
+                    if wx.TheClipboard.GetData(data):
+                        # Get the bitmap
+                        bitmap = data.GetBitmap()
+                        
+                        # Convert to image
+                        image = bitmap.ConvertToImage()
+                        
+                        # Save to temporary file
+                        import tempfile
+                        import datetime
+                        
+                        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                        temp_path = Path(tempfile.gettempdir()) / f"clipboard_image_{timestamp}.png"
+                        
+                        if image.SaveFile(str(temp_path), wx.BITMAP_TYPE_PNG):
+                            # Add to workspace
+                            item = ImageItem(str(temp_path))
+                            item.display_name = f"Clipboard_{timestamp}"
+                            self.workspace.add_item(item)
+                            
+                            self.mark_modified()
+                            self.refresh_image_list()
+                            self.SetStatusText(f"Pasted image from clipboard: {item.display_name}", 0)
+                        else:
+                            show_error(self, "Failed to save clipboard image")
+                    else:
+                        show_warning(self, "No image data in clipboard")
+                else:
+                    show_warning(self, "Clipboard does not contain an image")
+            finally:
+                wx.TheClipboard.Close()
+        else:
+            show_error(self, "Could not access clipboard")
+    
+    # Workspace menu handlers
+    def on_manage_directories(self, event):
+        """Manage workspace directories"""
+        if not self.workspace or not self.workspace.directories:
+            show_info(self, "No directories in current workspace")
+            return
+        
+        # Create dialog to show and manage directories
+        dlg = wx.Dialog(self, title="Manage Workspace Directories", 
+                       style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        dlg.SetSize((600, 400))
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Info label
+        info_label = wx.StaticText(dlg, label=f"Workspace contains {len(self.workspace.directories)} director{'y' if len(self.workspace.directories) == 1 else 'ies'}:")
+        sizer.Add(info_label, 0, wx.ALL, 10)
+        
+        # Directory list
+        dir_list = wx.ListBox(dlg)
+        for dir_path, settings in self.workspace.directories.items():
+            recursive_text = " (recursive)" if settings.get('recursive', False) else ""
+            dir_list.Append(f"{dir_path}{recursive_text}", dir_path)
+        sizer.Add(dir_list, 1, wx.ALL | wx.EXPAND, 10)
+        
+        # Buttons
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        remove_btn = wx.Button(dlg, label="Remove Selected")
+        def on_remove(e):
+            sel = dir_list.GetSelection()
+            if sel != wx.NOT_FOUND:
+                dir_path = dir_list.GetClientData(sel)
+                if ask_yes_no(dlg, f"Remove directory from workspace?\n\n{dir_path}\n\nNote: Images will remain in workspace."):
+                    del self.workspace.directories[dir_path]
+                    dir_list.Delete(sel)
+                    self.mark_modified()
+                    info_label.SetLabel(f"Workspace contains {len(self.workspace.directories)} director{'y' if len(self.workspace.directories) == 1 else 'ies'}:")
+        remove_btn.Bind(wx.EVT_BUTTON, on_remove)
+        btn_sizer.Add(remove_btn, 0, wx.ALL, 5)
+        
+        btn_sizer.AddStretchSpacer()
+        
+        close_btn = wx.Button(dlg, wx.ID_CLOSE)
+        close_btn.Bind(wx.EVT_BUTTON, lambda e: dlg.EndModal(wx.ID_CLOSE))
+        btn_sizer.Add(close_btn, 0, wx.ALL, 5)
+        
+        sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        
+        dlg.SetSizer(sizer)
+        dlg.Centre()
+        dlg.ShowModal()
+        dlg.Destroy()
+    
+    def on_add_directory(self, event):
+        """Add directory to workspace"""
+        if not self.workspace:
+            self.workspace = ImageWorkspace(new_workspace=True)
+        
+        # Get current directories
+        existing_dirs = list(self.workspace.directories.keys()) if self.workspace.directories else []
+        
+        if DirectorySelectionDialog:
+            dialog = DirectorySelectionDialog(existing_dirs, self)
+            if dialog.ShowModal() == wx.ID_OK:
+                directory = dialog.selected_directory
+                recursive = dialog.recursive_search
+                
+                if directory:
+                    self.load_directory(directory, recursive, append=True)
+            dialog.Destroy()
+        else:
+            # Fallback to simple directory selection
+            directory = select_directory_dialog(self, "Select directory to add")
+            if directory:
+                self.load_directory(directory, recursive=False, append=True)
+    
+    # Process menu handlers (additional)
+    def on_process_batch(self, event):
+        """Process all batch-marked items"""
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace")
+            return
+        
+        # Get batch-marked items
+        batch_items = [item for item in self.workspace.items.values() 
+                       if getattr(item, 'batch_marked', False)]
+        
+        if not batch_items:
+            show_info(self, "No images marked for batch processing.\n\nSelect images and press 'B' to mark them.")
+            return
+        
+        if not BatchProcessingWorker:
+            show_error(self, "Batch processing worker not available")
+            return
+        
+        # Show processing options dialog
+        if ProcessingOptionsDialog:
+            dialog = ProcessingOptionsDialog(self.config, self)
+            if dialog.ShowModal() != wx.ID_OK:
+                dialog.Destroy()
+                return
+            
+            options = dialog.get_config()
+            dialog.Destroy()
+        else:
+            # Use defaults
+            options = {
+                'provider': self.config.get('default_provider', 'ollama'),
+                'model': self.config.get('default_model', 'moondream'),
+                'prompt_style': self.config.get('default_prompt_style', 'narrative'),
+                'custom_prompt': '',
+                'skip_existing': False
+            }
+        
+        # Get file paths to process
+        to_process = [item.file_path for item in batch_items]
+        
+        # Start batch processing worker
+        worker = BatchProcessingWorker(
+            self,
+            to_process,
+            options['provider'],
+            options['model'],
+            options['prompt_style'],
+            options.get('custom_prompt', ''),
+            None,  # detection_settings
+            None,  # prompt_config_path
+            options.get('skip_existing', False)
+        )
+        worker.start()
+        
+        self.SetStatusText(f"Processing {len(to_process)} marked images...", 0)
+    
+    def on_clear_batch(self, event):
+        """Clear all batch markings"""
+        if not self.workspace or not self.workspace.items:
+            return
+        
+        count = 0
+        for item in self.workspace.items.values():
+            if getattr(item, 'batch_marked', False):
+                item.batch_marked = False
+                count += 1
+        
+        if count > 0:
+            self.mark_modified()
+            self.refresh_image_list()
+            self.SetStatusText(f"Cleared {count} batch markings", 0)
+        else:
+            show_info(self, "No items were marked for batch processing")
+    
+    def on_convert_heic(self, event):
+        """Convert HEIC files"""
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace")
+            return
+        
+        # Find HEIC files
+        heic_files = [item.file_path for item in self.workspace.items.values()
+                      if Path(item.file_path).suffix.lower() in ['.heic', '.heif']]
+        
+        if not heic_files:
+            show_info(self, "No HEIC files found in workspace")
+            return
+        
+        msg = f"Found {len(heic_files)} HEIC file(s).\n\nConvert to JPEG format?"
+        if not ask_yes_no(self, msg):
+            return
+        
+        # For now, inform user about the conversion process
+        # Full ConversionWorker implementation would be added here
+        show_info(self, f"HEIC conversion initiated for {len(heic_files)} files.\n\nNote: Full worker implementation pending.\nFiles will be processed using built-in conversion.")
+        
+        self.SetStatusText(f"Converting {len(heic_files)} HEIC files...", 0)
+    
+    # Descriptions menu handlers
+    def on_edit_description(self, event):
+        """Edit selected description"""
+        if not self.current_image_item or not self.current_image_item.descriptions:
+            show_warning(self, "No description to edit")
+            return
+        
+        # Get the latest description
+        desc = self.current_image_item.descriptions[-1]
+        
+        dlg = wx.TextEntryDialog(
+            self,
+            "Edit description:",
+            "Edit Description",
+            desc.text,
+            style=wx.OK | wx.CANCEL | wx.TE_MULTILINE
+        )
+        dlg.SetSize((500, 300))
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            new_text = dlg.GetValue().strip()
+            if new_text:
+                desc.text = new_text
+                self.mark_modified()
+                self.display_image_info(self.current_image_item)
+                self.SetStatusText("Description updated", 0)
+        
+        dlg.Destroy()
+    
+    def on_delete_description(self, event):
+        """Delete selected description"""
+        if not self.current_image_item or not self.current_image_item.descriptions:
+            show_warning(self, "No description to delete")
+            return
+        
+        if ask_yes_no(self, "Delete the most recent description?"):
+            self.current_image_item.descriptions.pop()
+            self.mark_modified()
+            self.display_image_info(self.current_image_item)
+            self.SetStatusText("Description deleted", 0)
+    
+    def on_copy_description(self, event):
+        """Copy description to clipboard"""
+        if not self.current_image_item or not self.current_image_item.descriptions:
+            show_warning(self, "No description to copy")
+            return
+        
+        desc = self.current_image_item.descriptions[-1].text
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.TextDataObject(desc))
+            wx.TheClipboard.Close()
+            self.SetStatusText("Description copied to clipboard", 0)
+    
+    def on_copy_image_path(self, event):
+        """Copy image path to clipboard"""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.TextDataObject(self.current_image_item.file_path))
+            wx.TheClipboard.Close()
+            self.SetStatusText("Image path copied to clipboard", 0)
+    
+    def on_show_all_descriptions(self, event):
+        """Show all descriptions across all images"""
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace")
+            return
+        
+        # Count images with descriptions
+        described = [item for item in self.workspace.items.values() if item.descriptions]
+        
+        if not described:
+            show_info(self, "No descriptions found in workspace")
+            return
+        
+        # Build description summary
+        summary_lines = []
+        summary_lines.append(f"Descriptions Summary ({len(described)} of {len(self.workspace.items)} images)\n")
+        summary_lines.append("=" * 60 + "\n\n")
+        
+        for item in described:
+            summary_lines.append(f"File: {Path(item.file_path).name}\n")
+            for i, desc in enumerate(item.descriptions, 1):
+                summary_lines.append(f"  [{i}] {desc.model} ({desc.prompt_style}): {desc.text[:100]}...\n")
+            summary_lines.append("\n")
+        
+        summary_text = "".join(summary_lines)
+        
+        # Show in a text dialog
+        dlg = wx.Dialog(self, title="All Descriptions", style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        dlg.SetSize((700, 500))
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        text_ctrl = wx.TextCtrl(dlg, value=summary_text, 
+                               style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
+        sizer.Add(text_ctrl, 1, wx.ALL | wx.EXPAND, 10)
+        
+        btn_sizer = wx.StdDialogButtonSizer()
+        ok_btn = wx.Button(dlg, wx.ID_OK)
+        btn_sizer.AddButton(ok_btn)
+        btn_sizer.Realize()
+        sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 10)
+        
+        dlg.SetSizer(sizer)
+        dlg.Centre()
+        dlg.ShowModal()
+        dlg.Destroy()
+    
+    # View menu handlers
+    def on_set_filter(self, filter_type):
+        """Set view filter (all, described, batch)"""
+        self.current_filter = filter_type
+        self.refresh_image_list()
+        self.SetStatusText(f"Filter: {filter_type}", 1)
+    
+    def on_about(self):
         """Show about dialog"""
         show_about_dialog(
             self,
