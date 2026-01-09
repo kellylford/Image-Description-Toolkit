@@ -1,17 +1,17 @@
 # ============================================================================
-# Viewer Application - Complete Dependencies
+# Viewer Application - Complete Dependencies (wxPython Version)
 # ============================================================================
 # Install in viewer's virtual environment:
 #   cd viewer
 #   python -m venv .venv
-#   .venv\Scripts\activate
+#   .venv\Scripts\activate (Windows) or source .venv/bin/activate (macOS/Linux)
 #   pip install -r requirements.txt
 # ============================================================================
 
 # ----------------------------------------------------------------------------
 # REQUIRED - GUI Framework
 # ----------------------------------------------------------------------------
-PyQt6>=6.4.0           # Qt6 GUI framework for the viewer interface
+wxPython>=4.2.0        # Cross-platform GUI framework for the viewer interface
 
 # ----------------------------------------------------------------------------
 # REQUIRED - For Redescribe Feature (uses scripts/image_describer.py)

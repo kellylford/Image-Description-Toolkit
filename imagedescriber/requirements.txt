@@ -1,17 +1,17 @@
 # ============================================================================
-# ImageDescriber GUI - Complete Dependencies
+# ImageDescriber GUI - Complete Dependencies (wxPython Version)
 # ============================================================================
 # Install in imagedescriber's virtual environment:
 #   cd imagedescriber
 #   python -m venv .venv
-#   .venv\Scripts\activate
+#   .venv\Scripts\activate (Windows) or source .venv/bin/activate (macOS/Linux)
 #   pip install -r requirements.txt
 # ============================================================================
 
 # ----------------------------------------------------------------------------
 # REQUIRED - GUI Framework
 # ----------------------------------------------------------------------------
-PyQt6>=6.4.0           # Qt6 GUI framework
+wxPython>=4.2.0        # Cross-platform GUI framework
 
 # ----------------------------------------------------------------------------
 # REQUIRED - Image Processing
