@@ -534,12 +534,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Show processing options dialog
         if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self)
+            dialog = ProcessingOptionsDialog(self.config, self)
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
             
-            options = dialog.get_options()
+            options = dialog.get_config()
             dialog.Destroy()
         else:
             # Use defaults
@@ -578,12 +578,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Show processing options dialog
         if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self)
+            dialog = ProcessingOptionsDialog(self.config, self)
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
             
-            options = dialog.get_options()
+            options = dialog.get_config()
             dialog.Destroy()
         else:
             # Use defaults
