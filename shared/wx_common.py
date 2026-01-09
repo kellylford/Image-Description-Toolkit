@@ -754,3 +754,133 @@ def get_app_version() -> str:
     
     # Default
     return "1.0.0"
+
+
+# ==================== ACCESSIBLE LISTBOX COMPONENTS ====================
+
+class AccessibleDescriptionListBox(wx.Accessible):
+    """
+    Custom accessible object for ListBox that provides full text to screen readers
+    while allowing visual truncation in the ListBox display.
+    
+    This solves a key accessibility challenge: wxPython ListBox doesn't support
+    different visual vs screen-reader text. This class overrides the accessibility
+    API to announce full descriptions to screen readers while the ListBox displays
+    truncated versions.
+    
+    Used by: DescriptionListBox (wrapper class below)
+    """
+    
+    def __init__(self, listbox, descriptions_data):
+        """
+        Initialize accessible wrapper.
+        
+        Args:
+            listbox: The wx.ListBox being wrapped
+            descriptions_data: List of dicts with 'description' key + optional metadata
+        """
+        super().__init__()
+        self.listbox = listbox
+        self.descriptions_data = descriptions_data
+    
+    def GetName(self, childId):
+        """Return full description text for screen readers"""
+        if childId == wx.ACC_SELF:
+            return wx.ACC_OK, "Descriptions"
+        
+        # childId is 1-based for list items
+        if childId > 0 and childId <= len(self.descriptions_data):
+            idx = childId - 1
+            entry = self.descriptions_data[idx]
+            
+            # Return full description text to screen reader
+            full_text = entry.get('description', '')
+            return wx.ACC_OK, full_text
+        
+        return wx.ACC_NOT_IMPLEMENTED, ""
+    
+    def GetValue(self, childId):
+        """Return full description as value"""
+        if childId > 0 and childId <= len(self.descriptions_data):
+            idx = childId - 1
+            return wx.ACC_OK, self.descriptions_data[idx].get('description', '')
+        return wx.ACC_NOT_IMPLEMENTED, ""
+    
+    def GetDescription(self, childId):
+        """Return full description"""
+        if childId > 0 and childId <= len(self.descriptions_data):
+            idx = childId - 1
+            return wx.ACC_OK, self.descriptions_data[idx].get('description', '')
+        return wx.ACC_NOT_IMPLEMENTED, ""
+
+
+class DescriptionListBox(wx.ListBox):
+    """
+    Drop-in replacement for wx.ListBox that displays truncated text visually
+    but provides full descriptions to screen readers.
+    
+    This is essential for any ListBox displaying long text (100+ characters).
+    Visual truncation saves screen space, but full text must be available to
+    assistive technology users via screen readers.
+    
+    Usage:
+        # Create the listbox
+        desc_list = DescriptionListBox(parent, name="Description list")
+        
+        # Load descriptions (each dict must have 'description' key)
+        descriptions = [
+            {'description': 'Long text here...', 'model': 'gpt4', ...},
+            {'description': 'Another long text...', 'model': 'claude', ...},
+        ]
+        desc_list.LoadDescriptions(descriptions)
+        
+        # Later, get the full description for a selected item
+        idx = desc_list.GetSelection()
+        full_desc = desc_list.GetFullDescription(idx)
+    """
+    
+    def __init__(self, *args, **kwargs):
+        """Initialize the accessible description listbox"""
+        super().__init__(*args, **kwargs)
+        self.descriptions_data = []
+        self.custom_accessible = None
+    
+    def LoadDescriptions(self, descriptions_list, truncate_at=100):
+        """
+        Load descriptions into the listbox with accessibility support.
+        
+        Args:
+            descriptions_list: List of description dicts, each with:
+                - 'description' (str): Full description text (100-500+ chars typical)
+                - Other keys are optional metadata (model, prompt_style, etc.)
+            truncate_at: Character count at which to truncate display (default: 100)
+        """
+        self.Clear()
+        self.descriptions_data = descriptions_list
+        
+        # Add items with truncated text for visual display
+        for entry in descriptions_list:
+            description = entry.get('description', '')
+            # Truncate for visual display, keep full text in data
+            truncated = (description[:truncate_at] + "..." 
+                        if len(description) > truncate_at 
+                        else description)
+            self.Append(truncated)
+        
+        # Create custom accessible that provides full text to screen readers
+        self.custom_accessible = AccessibleDescriptionListBox(self, self.descriptions_data)
+        self.SetAccessible(self.custom_accessible)
+    
+    def GetFullDescription(self, index):
+        """
+        Get the full description dict for an item.
+        
+        Args:
+            index: 0-based index of the item
+            
+        Returns:
+            Dict with full 'description' and other metadata, or empty dict if invalid index
+        """
+        if 0 <= index < len(self.descriptions_data):
+            return self.descriptions_data[index]
+        return {}

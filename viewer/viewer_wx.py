@@ -44,12 +44,8 @@ from shared.wx_common import (
     select_directory_dialog,
     open_file_dialog,
     format_timestamp as format_timestamp_shared,
+    DescriptionListBox,  # NEW: Import accessible listbox from shared module
 )
-
-# Import custom accessible listbox for screen reader support
-# This provides full descriptions to screen readers while showing truncated text visually
-# See ACCESSIBLE_LISTBOX_PATTERN.txt for detailed documentation
-from custom_accessible_listbox_viewer import DescriptionListBox
 
 def get_scripts_directory():
     """Get the scripts directory (uses shared library)"""
