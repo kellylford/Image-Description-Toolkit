@@ -61,24 +61,26 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=None,
+    target_arch='arm64' if sys.platform == 'darwin' else None,
     codesign_identity=None,
     entitlements_file=None,
 )
 
-app = BUNDLE(
-    exe,
-    name='ImageDescriber.app',
-    icon=None,
-    bundle_identifier='com.imagedescriber.app',
-    info_plist={
-        'NSHighResolutionCapable': 'True',
-        'LSMinimumSystemVersion': '10.13.0',
-    },
-)
+# macOS-specific bundle (only created on macOS)
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        exe,
+        name='ImageDescriber.app',
+        icon=None,
+        bundle_identifier='com.imagedescriber.app',
+        info_plist={
+            'NSHighResolutionCapable': 'True',
+            'LSMinimumSystemVersion': '10.13.0',
+        },
+    )

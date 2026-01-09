@@ -220,7 +220,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def update_window_title(self, app_name, document_name):
         """Update window title with app name and document name"""
-        if self.is_modified():
+        if self.modified:
             title = f"{app_name} - {document_name} *"
         else:
             title = f"{app_name} - {document_name}"
