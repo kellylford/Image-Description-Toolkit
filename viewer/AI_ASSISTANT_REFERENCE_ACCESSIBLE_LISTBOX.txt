@@ -1,0 +1,230 @@
+"""
+AI ASSISTANT QUICK REFERENCE: Accessible ListBox Pattern
+==========================================================
+
+FOR AI ASSISTANTS WORKING ON IMAGE-DESCRIPTION-TOOLKIT PROJECT:
+
+CONTEXT:
+--------
+This project has wxPython apps that display long image descriptions in lists.
+For visual clarity, we truncate text to 100 characters.
+For accessibility (WCAG 2.0), screen readers must hear FULL descriptions.
+
+THE PROBLEM:
+------------
+wxPython's wx.ListBox does NOT support different accessible text vs visual text.
+Qt6 has setAccessibleText() - wxPython does not.
+Standard solutions (tooltips, client data, status bar) don't work for screen reader list navigation.
+
+THE SOLUTION:
+-------------
+Use custom wx.Accessible subclass to override what screen readers receive.
+Implementation: custom_accessible_listbox_viewer.py
+
+WHEN TO USE THIS:
+-----------------
+ANY app in this project that shows descriptions/long text in a wx.ListBox where:
+1. Visual display needs to be truncated for space
+2. Screen readers need full text
+3. WCAG 2.0 compliance is required
+
+APPS CURRENTLY USING THIS:
+---------------------------
+✓ viewer/viewer_wx.py - Image description viewer
+
+APPS THAT MAY NEED THIS:
+-------------------------
+- Any future wx apps with lists of descriptions
+- Log viewers
+- File path displays
+- Any truncated text lists
+
+HOW TO INTEGRATE:
+-----------------
+
+STEP 1: Copy the custom listbox module
+---------------------------------------
+cp viewer/custom_accessible_listbox_viewer.py <your_app_directory>/
+
+STEP 2: Import it
+-----------------
+# Add after other wx imports
+from custom_accessible_listbox_viewer import DescriptionListBox
+
+STEP 3: Replace wx.ListBox
+---------------------------
+# OLD:
+self.my_list = wx.ListBox(parent, style=wx.LB_SINGLE)
+
+# NEW:
+self.my_list = DescriptionListBox(parent, style=wx.LB_SINGLE)
+
+STEP 4: Load data
+-----------------
+# Instead of:
+self.my_list.Clear()
+for item in items:
+    truncated = item['text'][:100] + "..."
+    self.my_list.Append(truncated)
+
+# Do this:
+self.my_list.LoadDescriptions(items)
+
+# items must be list of dicts with at least:
+# - 'description': str (the full text)
+# - 'filename': str (optional, for screen reader context)
+
+EXPECTED DATA FORMAT:
+---------------------
+items = [
+    {
+        'filename': 'image1.jpg',  # Optional but recommended
+        'description': 'Full long description here...',
+        # ... other fields are fine too
+    },
+    # ... more items
+]
+
+WHAT IT DOES:
+-------------
+Visual:        Shows first 100 chars + "..."
+Screen Reader: Announces "filename. full description text"
+Keyboard:      Works identically to wx.ListBox (arrow keys, etc.)
+
+TESTING:
+--------
+1. Visual: Check list shows truncated text
+2. Functionality: All events and bindings work normally
+3. Accessibility: Test with NVDA/Narrator/VoiceOver
+   - NVDA: Insert+Down Arrow to read current item
+   - Should announce FULL description, not truncated
+
+COMMON MISTAKES TO AVOID:
+--------------------------
+❌ Don't try to use SetClientData() for accessibility - doesn't work
+❌ Don't use wx.ListCtrl if simple list is fine - ListBox is simpler
+❌ Remember childId in wx.Accessible is 1-based, not 0-based
+❌ Must return tuple (wx.ACC_OK, text), not just text
+❌ Must store reference to custom_accessible (self.custom_accessible)
+
+CODE PATTERN - COMPLETE EXAMPLE:
+---------------------------------
+```python
+from custom_accessible_listbox_viewer import DescriptionListBox
+
+class MyViewer(wx.Frame):
+    def __init__(self):
+        super().__init__(None, title="My Viewer")
+        
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Create custom accessible listbox
+        self.item_list = DescriptionListBox(panel, style=wx.LB_SINGLE)
+        self.item_list.Bind(wx.EVT_LISTBOX, self.on_selection)
+        sizer.Add(self.item_list, 1, wx.EXPAND)
+        
+        panel.SetSizer(sizer)
+        
+        # Load data
+        self.load_items()
+    
+    def load_items(self):
+        items = [
+            {
+                'filename': 'item1.txt',
+                'description': 'This is a very long description that needs to be accessible to screen readers...'
+            },
+            # ... more items
+        ]
+        
+        # This one call replaces Clear() + Append() loop
+        self.item_list.LoadDescriptions(items)
+    
+    def on_selection(self, event):
+        sel = self.item_list.GetSelection()
+        if sel != wx.NOT_FOUND:
+            # Get full description dict
+            item = self.item_list.GetFullDescription(sel)
+            print(item['description'])
+```
+
+DEBUGGING:
+----------
+If screen readers aren't announcing full text:
+
+1. Check import succeeded:
+   from custom_accessible_listbox_viewer import DescriptionListBox
+   
+2. Check you're using DescriptionListBox, not wx.ListBox
+
+3. Check you called LoadDescriptions(), not Append()
+
+4. Verify data format:
+   print(items[0].get('description'))  # Should print full text
+
+5. Test accessible directly:
+   acc = self.item_list.GetAccessible()
+   result, text = acc.GetName(1)  # childId 1 = first item
+   print(text)  # Should be full description
+
+BACKWARDS COMPATIBILITY:
+------------------------
+DescriptionListBox is a drop-in replacement for wx.ListBox:
+- Same constructor parameters
+- Same methods (GetSelection, SetSelection, etc.)
+- Same events (EVT_LISTBOX, etc.)
+- Same bindings work
+
+Only difference:
+- Use LoadDescriptions(items) instead of Append() loop
+- Adds GetFullDescription(index) method
+
+FILES TO REFERENCE:
+-------------------
+1. custom_accessible_listbox_viewer.py - The implementation
+2. ACCESSIBLE_LISTBOX_PATTERN.txt - Detailed technical docs
+3. viewer/viewer_wx.py - Example integration (lines 38, 598, 898)
+4. test_screen_reader_output.py - Testing tool
+
+WCAG COMPLIANCE:
+----------------
+This implementation satisfies:
+- WCAG 2.0 Level AA
+- Section 508
+- 1.1.1 Non-text Content
+- 4.1.2 Name, Role, Value
+- Full keyboard accessibility
+
+DO NOT:
+-------
+❌ Suggest using tooltips alone - only announced on hover
+❌ Suggest using wx.ListCtrl unless specifically needed for columns
+❌ Suggest platform-specific hacks
+❌ Suggest removing accessibility features
+❌ Try to "simplify" with SetClientData() - doesn't work for screen readers
+
+DO:
+---
+✓ Use this pattern for any truncated list content
+✓ Test with actual screen readers
+✓ Document which apps use this pattern
+✓ Keep custom_accessible_listbox_viewer.py in sync across apps
+✓ Refer users to ACCESSIBLE_LISTBOX_PATTERN.txt for deep dive
+
+MAINTAINER NOTES:
+-----------------
+Owner: kelly
+Created: 2026-01-09
+Purpose: WCAG 2.0 compliance for truncated list content
+Status: Production - working in viewer_wx.py
+Testing: Use test_screen_reader_output.py in WXPythonDemo folder
+
+CHANGELOG:
+----------
+2026-01-09: Initial implementation for viewer_wx.py
+           - Created custom wx.Accessible pattern
+           - Integrated into viewer
+           - Verified with NVDA
+           - Documented for AI assistants
+"""
