@@ -19,7 +19,7 @@ echo BUILD ALL wxPython APPLICATIONS (Windows)
 echo ========================================================================
 echo.
 
-cd /d "%~dp0.."
+cd /d "%~dp0..\.."
 
 set BUILD_ERRORS=0
 

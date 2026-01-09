@@ -21,8 +21,8 @@ cd /d "%~dp0"
 
 REM Read version from VERSION file
 set VERSION=unknown
-if exist "..\VERSION" (
-    set /p VERSION=<..\VERSION
+if exist "..\..\VERSION" (
+    set /p VERSION=<..\..\VERSION
 )
 REM Remove any trailing whitespace or newlines
 set VERSION=%VERSION: =%
