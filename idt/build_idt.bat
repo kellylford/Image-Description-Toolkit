@@ -6,7 +6,7 @@ echo Building IDT CLI...
 echo.
 
 REM Activate virtual environment
-call ..\.venv\Scripts\activate.bat
+call .winenv\Scripts\activate.bat
 
 REM Run PyInstaller
 pyinstaller --noconfirm idt.spec
