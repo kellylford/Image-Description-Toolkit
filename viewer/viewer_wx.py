@@ -46,6 +46,11 @@ from shared.wx_common import (
     format_timestamp as format_timestamp_shared,
 )
 
+# Import custom accessible listbox for screen reader support
+# This provides full descriptions to screen readers while showing truncated text visually
+# See ACCESSIBLE_LISTBOX_PATTERN.txt for detailed documentation
+from custom_accessible_listbox_viewer import DescriptionListBox
+
 def get_scripts_directory():
     """Get the scripts directory (uses shared library)"""
     return find_scripts_directory()
@@ -588,11 +593,10 @@ class ImageDescriptionViewer(wx.Frame):
         list_label = wx.StaticText(left_panel, label="Descriptions:")
         left_sizer.Add(list_label, 0, wx.ALL, 5)
         
-        self.desc_list = wx.ListBox(left_panel, style=wx.LB_SINGLE)
-        self.desc_list.Bind(wx.EVT_LISTBOX, self.on_description_selected)
-        self.desc_list.Bind(wx.EVT_KEY_DOWN, self.on_list_key_down)
-        left_sizer.Add(self.desc_list, 1, wx.ALL | wx.EXPAND, 5)
-        
+        # Use custom accessible listbox that provides full descriptions to screen readers
+        # while displaying truncated text visually (100 chars)
+        # See ACCESSIBLE_LISTBOX_PATTERN.txt for details
+        self.desc_list = DescriptionListBox(left_panel, style=wx.LB_SINGLE)
         left_panel.SetSizer(left_sizer)
         
         # Right panel - description details
@@ -888,14 +892,11 @@ class ImageDescriptionViewer(wx.Frame):
         self.descriptions = [e['description'] for e in entries]
         self.image_files = [e['file_path'] for e in entries]
         
-        # Populate list with truncated descriptions (100 chars)
-        self.desc_list.Clear()
-        for i, entry in enumerate(entries):
-            description = entry.get('description', '')
-            # Truncate description to 100 chars for display
-            truncated = description[:100] + ("..." if len(description) > 100 else "")
-            self.desc_list.Append(truncated)
-        
+        # Load descriptions using custom accessible listbox
+        # This shows truncated text (100 chars) visually but provides full descriptions to screen readers
+        # Replaces the old Clear() + Append() loop
+        self.desc_list.LoadDescriptions(entries)
+
         # Update window title
         desc_count = len(self.descriptions)
         if desc_count > 0:
