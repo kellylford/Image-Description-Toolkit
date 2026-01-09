@@ -55,6 +55,7 @@ from shared.wx_common import (
     select_directory_dialog,
     show_about_dialog,
     get_app_version,
+    DescriptionListBox,  # NEW: Accessible listbox for descriptions with full text in screen readers
 )
 
 # Optional imports with graceful fallback
@@ -300,7 +301,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         return panel
     
     def create_description_panel(self, parent):
-        """Create the right panel with description editor"""
+        """
+        Create the right panel with descriptions list and editor.
+        
+        Two-part design:
+        - TOP: Descriptions ListBox (accessible, shows multiple descriptions per image)
+        - BOTTOM: Description editor TextCtrl (for editing selected description)
+        """
         panel = wx.Panel(parent)
         sizer = wx.BoxSizer(wx.VERTICAL)
         
@@ -308,10 +315,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.image_info_label = wx.StaticText(panel, label="No image selected")
         sizer.Add(self.image_info_label, 0, wx.ALL, 5)
         
-        # Description text editor
-        label = wx.StaticText(panel, label="Description:")
-        sizer.Add(label, 0, wx.ALL, 5)
+        # ===== TOP SECTION: DESCRIPTIONS LIST =====
         
+        # Label for descriptions list
+        desc_list_label = wx.StaticText(panel, label="Descriptions for this image:")
+        sizer.Add(desc_list_label, 0, wx.ALL, 5)
+        
+        # Descriptions list using accessible pattern
+        # Shows truncated text visually, full text to screen readers
+        self.desc_list = DescriptionListBox(
+            panel, 
+            name="Description list for current image",
+            style=wx.LB_SINGLE | wx.LB_NEEDED_SB
+        )
+        self.desc_list.Bind(wx.EVT_LISTBOX, self.on_description_selected)
+        sizer.Add(self.desc_list, 1, wx.EXPAND | wx.ALL, 5)
+        
+        # ===== BOTTOM SECTION: EDITOR =====
+        
+        # Label for editor
+        editor_label = wx.StaticText(panel, label="Edit selected description:")
+        sizer.Add(editor_label, 0, wx.ALL, 5)
+        
+        # Description text editor
         self.description_text = wx.TextCtrl(
             panel,
             name="Image description editor",
@@ -507,7 +533,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.save_desc_btn.Enable(False)
     
     def display_image_info(self, image_item: ImageItem):
-        """Display information about selected image"""
+        """
+        Display information about selected image.
+        
+        Updates:
+        1. Image info label with filename and description count
+        2. Descriptions list with all descriptions for this image
+        3. Editor with the first (or selected) description text
+        """
         file_path = Path(image_item.file_path)
         
         # Update info label
@@ -517,12 +550,44 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             info += f" ({desc_count} description{'s' if desc_count != 1 else ''})"
         self.image_info_label.SetLabel(info)
         
-        # Load latest description if exists
+        # Populate descriptions list with accessible pattern
         if image_item.descriptions:
-            latest_desc = image_item.descriptions[-1]
-            self.description_text.SetValue(latest_desc.text)
+            # Build description list data with full text + metadata
+            desc_data = []
+            for desc in image_item.descriptions:
+                # Create dict with full description + metadata for accessibility
+                entry = {
+                    'description': desc.text,  # Full text for screen readers
+                    'model': desc.model,
+                    'prompt_style': desc.prompt_style,
+                    'created': desc.created,
+                    'provider': desc.provider
+                }
+                desc_data.append(entry)
+            
+            # Load into accessible listbox (truncates visually, full text to screen readers)
+            self.desc_list.LoadDescriptions(desc_data)
+            
+            # Show the first description in editor
+            self.description_text.SetValue(image_item.descriptions[0].text)
+            
+            # Enable save button
+            self.save_desc_btn.Enable(True)
         else:
+            # No descriptions yet
+            self.desc_list.Clear()
             self.description_text.SetValue("")
+            self.save_desc_btn.Enable(False)
+    
+    def on_description_selected(self, event):
+        """Handle selection of a description from the descriptions list"""
+        selection = self.desc_list.GetSelection()
+        if selection != wx.NOT_FOUND and self.current_image_item:
+            # Show the selected description in the editor
+            if selection < len(self.current_image_item.descriptions):
+                selected_desc = self.current_image_item.descriptions[selection]
+                self.description_text.SetValue(selected_desc.text)
+                self.save_desc_btn.Enable(True)
     
     def on_load_directory(self, event):
         """Load a directory of images"""
