@@ -2,138 +2,174 @@
 
 This directory contains all the build and release automation scripts for the Image Description Toolkit project.
 
+**All GUI applications now use wxPython.** See [BUILD_SYSTEM_REFERENCE.md](BUILD_SYSTEM_REFERENCE.md) for comprehensive documentation.
+
 ## Quick Start
 
-**Build everything and create release packages:**
-```bash
-BuildAndRelease/releaseitall.bat
+### Windows
+
+**Build all applications:**
+```batch
+BuildAndRelease\builditall_wx.bat
 ```
 
-**Build Windows installer:**
+**Package all executables:**
+```batch
+BuildAndRelease\package_all_windows.bat
+```
+
+**Create Windows installer:**
+```batch
+BuildAndRelease\build_installer.bat
+```
+
+### macOS
+
+**Build all applications (double-click or run in Terminal):**
 ```bash
-BuildAndRelease/build_installer.bat
+BuildAndRelease/builditall_wx.command
+```
+
+**Package all .app bundles:**
+```bash
+BuildAndRelease/MacBuilds/package_all_macos.command
+```
+
+**Create .dmg installer:**
+```bash
+BuildAndRelease/MacBuilds/create_macos_dmg.command
 ```
 
 ## Script Overview
 
-### Master Scripts
+### Master Scripts (Windows)
 
-- **`releaseitall.bat`** - Complete release process (build → package → create master ZIP)
-- **`builditall.bat`** - Build all four applications
-- **`packageitall.bat`** - Package all applications into distribution ZIPs
-
-### Individual Build Scripts
-
+- **`builditall_wx.bat`** - Build all five applications (wxPython version)
+- **`package_all_windows.bat`** - Collect all executables to dist_all/bin/
 - **`build_idt.bat`** - Build IDT CLI executable (PyInstaller)
 - **`build_installer.bat`** - Build Windows installer (Inno Setup)
 
-### Individual Package Scripts
+### Master Scripts (macOS)
 
-- **`package_idt.bat`** - Package IDT CLI into distribution ZIP
+Located in `MacBuilds/`:
+
+- **`builditall_macos.command`** - Build all applications for macOS
+- **`package_all_macos.command`** - Collect all .app bundles
+- **`create_macos_dmg.command`** - Create .dmg installer
 
 ### Configuration Files
 
 - **`installer.iss`** - Inno Setup configuration for Windows installer
-- **`final_working.spec`** - PyInstaller specification for IDT CLI executable
+- **`check_spec_completeness.py`** - Validates PyInstaller spec files
+- **`validate_build.py`** - Post-build validation tool
 
-### Linux/macOS Scripts
+### Documentation
 
-- **`build_executable.sh`** - Build IDT executable on Unix systems
-- **`release.sh`** - Release automation for Unix systems
+- **`BUILD_SYSTEM_REFERENCE.md`** - Comprehensive build system documentation
+- **`MacBuilds/README_MACOS.md`** - macOS-specific build instructions
 
 ## How It Works
 
-All scripts automatically change to the project root directory before executing, so they work correctly from the `BuildAndRelease/` subdirectory.
+### Windows Build Process
 
-### Build Process
+1. **Setup** (one-time): Run `winsetup.bat` from project root to create .winenv for each app
+2. **Build**: Run `builditall_wx.bat` to build all executables
+3. **Package**: Run `package_all_windows.bat` to collect to dist_all/bin/
+4. **Installer**: Run `build_installer.bat` to create Windows installer
 
-1. **Build Phase** (`builditall.bat`)
-   - Builds `idt.exe` from Python source
-   - Builds `viewer.exe` from Qt application
-   - Builds `prompt_editor.exe` from Qt application
-   - Builds `imagedescriber.exe` from Qt application
+### macOS Build Process
 
-2. **Package Phase** (`packageitall.bat`)
-   - Creates distribution ZIPs for each application
-   - Includes executables, configs, documentation
-   - Places all packages in `releases/` directory
+1. **Setup** (one-time): Each app has its own .venv (created by individual build scripts)
+2. **Build**: Run `builditall_wx.command` to build all .app bundles  
+3. **Package**: Run `MacBuilds/package_all_macos.command` to collect apps
+4. **DMG**: Run `MacBuilds/create_macos_dmg.command` to create installer
 
-3. **Master Package** (`releaseitall.bat`)
-   - Creates `idt_v[VERSION].zip` containing all individual packages
-   - Includes `install_idt.bat` for easy installation
-   - Ready for GitHub release upload
+## Output Locations
 
-### Installer Build
+### Windows
+- Individual builds: `<app>/dist/<App>.exe`
+- Packaged: `dist_all/bin/` (all executables together)
+- Installer: `dist_all/ImageDescriptionToolkit_Setup_v{version}.exe`
 
-The Windows installer (`build_installer.bat`) requires:
-- All four application ZIPs in `releases/` directory
-- Inno Setup 6 installed at default location
-- Runs from project root after changing directory
-
-Output: `releases/ImageDescriptionToolkit_Setup_v3.0.1.exe`
+### macOS
+- Individual builds: `<app>/dist/<App>.app`
+- Packaged: `MacBuilds/dist_all/Applications/` (all .app bundles)
+- DMG: `MacBuilds/dist_all/ImageDescriptionToolkit-{version}.dmg`
 
 ## Prerequisites
 
 ### For Building Executables
-- Python virtual environment with PyInstaller
-- Qt for Python (PySide6) for GUI applications
+- Python 3.10+ with virtual environments
+- wxPython 4.2.0+ for GUI applications
+- PyInstaller for creating executables
 - All project dependencies installed
 
-### For Building Installer
-- Inno Setup 6: https://jrsoftware.org/isdl.php
-- All distribution packages built first
+### Windows-Specific
+- Run `winsetup.bat` from project root (one-time setup)
+- Inno Setup 6 for creating installer: https://jrsoftware.org/isdl.php
+
+### macOS-Specific
+- Individual .venv created automatically by build scripts
+- Xcode Command Line Tools (for some dependencies)
+- create-dmg for DMG creation (installed by scripts if needed)
 
 ## Usage Examples
 
-**Full release build:**
+**Windows - Full workflow:**
+```batch
+cd /path/to/Image-Description-Toolkit
+winsetup.bat
+BuildAndRelease\builditall_wx.bat
+BuildAndRelease\package_all_windows.bat
+BuildAndRelease\build_installer.bat
+```
+
+**macOS - Full workflow:**
 ```bash
 cd /path/to/Image-Description-Toolkit
-BuildAndRelease/releaseitall.bat
+BuildAndRelease/builditall_wx.command
+BuildAndRelease/MacBuilds/package_all_macos.command
+BuildAndRelease/MacBuilds/create_macos_dmg.command
 ```
 
 **Build only IDT CLI:**
 ```bash
-cd /path/to/Image-Description-Toolkit
-BuildAndRelease/build_idt.bat
+BuildAndRelease/build_idt.bat    # Windows
+idt/build_idt.sh                 # macOS
 ```
-
-**Build installer after packages are ready:**
-```bash
-cd /path/to/Image-Description-Toolkit
-BuildAndRelease/build_installer.bat
-```
-
-## Output Locations
-
-All build outputs go to the project root directories:
-
-- **Executables:** `dist/`, `viewer/dist/`, `prompt_editor/dist/`, `imagedescriber/dist/`
-- **Packages:** `releases/`
-- **Installer:** `releases/ImageDescriptionToolkit_Setup_v3.0.1.exe`
 
 ## Troubleshooting
 
-**"Virtual environment not found"**
-- Ensure `.venv` exists in project root and GUI app directories
-- Run: `python -m venv .venv` and install requirements
+**Windows: "Virtual environment not found"**
+- Run `winsetup.bat` from project root to create all .winenv directories
+- Alternatively, manually create for specific app: `cd <app> && python -m venv .winenv && .winenv\Scripts\activate && pip install -r requirements.txt`
 
-**"PyInstaller not installed"**
-- Activate venv and run: `pip install pyinstaller`
+**macOS: "Virtual environment not found"**
+- Individual build scripts create .venv automatically
+- Or manually: `cd <app> && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
 
-**"Inno Setup not found"**
+**"wxPython not installed"**
+- Windows: Activate .winenv and run `pip install wxPython>=4.2.0`
+- macOS: Activate .venv and run `pip install wxPython>=4.2.0`
+
+**"Inno Setup not found" (Windows only)**
 - Install from https://jrsoftware.org/isdl.php
-- Or update `INNO_PATH` in `build_installer.bat`
+- Or update path in `build_installer.bat`
 
-**"Package not found"**
-- Run `BuildAndRelease/releaseitall.bat` to build everything
-- Or run build and package steps individually
+**macOS .app won't open: "damaged or can't be verified"**
+- Run: `xattr -cr <path-to-app>`
+- This removes quarantine attribute from unsigned app
 
 ## Notes
 
-- Scripts use relative paths and automatically change to project root
-- All scripts can be run from anywhere in the project
-- Windows batch files use `cd /d "%~dp0.."` to find project root
-- PyInstaller spec file uses `../` paths for all sources
+- **Virtual Environments:**
+  - Windows: `.winenv` directories (allows coexistence with macOS .venv)
+  - macOS: `.venv` directories
+- **Cross-Platform Development:**
+  - Same project directory can have both .venv (macOS) and .winenv (Windows)
+  - See `WINDOWS_SETUP.md` for details on running Windows in VM on Mac
+- Scripts automatically change to project root before executing
+- Each app has its own isolated virtual environment and requirements.txt
 
 ## Versioning and Build Numbers
 

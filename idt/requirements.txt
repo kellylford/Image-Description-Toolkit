@@ -1,0 +1,108 @@
+# ============================================================================
+# Image Description Toolkit - Core Dependencies
+# ============================================================================
+# This file contains core dependencies for CLI/script usage.
+# 
+# GUI Applications (viewer, imagedescriber, prompt_editor, idtconfigure):
+#   Each GUI app has its own requirements.txt in its directory with wxPython
+#   Example: cd viewer && pip install -r requirements.txt
+#
+# Installation options:
+#   CLI/Scripts only:       pip install -r requirements.txt
+#   GUI applications:       See individual app directories
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# CORE DEPENDENCIES (Required for all usage)
+# ----------------------------------------------------------------------------
+Pillow>=10.0.0          # Image processing (all components)
+requests>=2.25.0        # HTTP requests for AI providers
+ollama>=0.3.0           # Ollama Python client
+psutil>=5.9.0           # System/hardware information for environment logging
+
+# HEIC/HEIF Support (Strongly recommended for iPhone/iOS photos)
+# Without this, HEIC files lose GPS location and camera metadata
+pillow-heif>=0.13.0     # HEIC/HEIF image format support (iPhone photos)
+
+# Video Metadata Embedding (for frame extraction with GPS/date preservation)
+piexif>=1.1.3           # Write EXIF metadata to extracted video frames
+
+# Cloud AI Provider SDKs (used by both scripts and GUI)
+openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
+anthropic>=0.18.0       # Anthropic Claude official SDK (retry logic, token tracking, streaming)
+
+# Web Image Download Support (scripts/web_image_downloader.py)
+beautifulsoup4>=4.9.0   # HTML parsing for web image extraction
+
+# ----------------------------------------------------------------------------
+# VIDEO PROCESSING (scripts/video_frame_extractor.py only)
+# ----------------------------------------------------------------------------
+opencv-python>=4.8.0    # Video frame extraction
+numpy>=1.24.0           # Array operations (required by opencv-python)
+
+# ----------------------------------------------------------------------------
+# HEIC IMAGE SUPPORT (scripts/ConvertImage.py only)
+# ----------------------------------------------------------------------------
+pillow-heif>=0.13.0     # HEIC/HEIF image format conversion
+
+# ----------------------------------------------------------------------------
+# METADATA UTILITIES (MetaData/ directory - optional, not required for core workflow)
+# ----------------------------------------------------------------------------
+# Uncomment if you need advanced metadata extraction features:
+# pyexiv2>=2.15.0       # Advanced EXIF metadata extraction (may require C++ compilation)
+# ExifRead>=3.0.0       # Alternative EXIF reader
+# geopy>=2.4.0          # GPS coordinate reverse geocoding (Nominatim)
+
+# ----------------------------------------------------------------------------
+# DEVELOPMENT & TESTING
+# ----------------------------------------------------------------------------
+tqdm>=4.60.0            # Progress bars (optional, nice-to-have)
+pytest>=6.0.0           # Unit testing framework
+pytest-mock>=3.6.0      # Test mocking utilities
+pytest-cov>=4.0.0       # Test coverage reporting
+pyinstaller>=6.0.0      # Executable bundling for distribution
+
+# ============================================================================
+# INSTALLATION EXAMPLES
+# ============================================================================
+# 
+# Minimal installation (scripts only, no GUI, no video, no HEIC):
+#   pip install Pillow requests ollama openai anthropic
+#
+# Scripts with HEIC support:
+#   pip install Pillow requests ollama openai anthropic pillow-heif
+#
+# Scripts with video processing and metadata embedding:
+#   pip install Pillow requests ollama openai anthropic opencv-python numpy piexif
+#
+# GUI applications (full featured):
+#   pip install -r requirements.txt
+#
+# Development environment (includes testing):
+#   pip install -r requirements.txt
+#
+# Metadata utilities (optional advanced features):
+#   pip install pyexiv2 ExifRead geopy
+#
+# ======================CLI/scripts only, no video, no HEIC):
+#   pip install Pillow requests ollama openai anthropic
+#
+# CLI with HEIC support (iPhone photos):
+#   pip install Pillow requests ollama openai anthropic pillow-heif piexif
+#
+# CLI with video processing:
+#   pip install Pillow requests ollama openai anthropic opencv-python numpy piexif
+#
+# Full CLI/scripts (all features):
+#   pip install -r requirements.txt
+#
+# GUI applications:
+#   cd viewer && pip install -r requirements.txt
+#   cd imagedescriber && pip install -r requirements.txt
+#   cd prompt_editor && pip install -r requirements.txt
+#   cd idtconfigure && - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
+#   - Claude: Set ANTHROPIC_API_KEY environment variable or create claude.txt
+#   - Ollama: Local installation, no API key needed
+#
+# See docs/OPENAI_SETUP_GUIDE.md for detailed configuration instructions
+# ============================================================================
