@@ -161,6 +161,7 @@ class WorkflowBrowserDialog(wx.Dialog):
         # Workflow list
         self.workflow_list = wx.ListBox(panel, style=wx.LB_SINGLE)
         self.workflow_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_double_click)
+        self.workflow_list.Bind(wx.EVT_KEY_DOWN, self.on_list_key_down)
         sizer.Add(self.workflow_list, 1, wx.ALL | wx.EXPAND, 10)
         
         # Browse button
@@ -202,35 +203,31 @@ class WorkflowBrowserDialog(wx.Dialog):
             self.status_label.SetLabel("Workflow scanner not available")
             return
         
-        workflows = find_workflow_directories(dir_path)
-        if not workflows:
+        # find_workflow_directories returns list of (path, metadata) tuples
+        workflow_tuples = find_workflow_directories(dir_path)
+        if not workflow_tuples:
             self.status_label.SetLabel(f"No workflows found in: {directory}")
             return
         
-        workflows.sort(key=lambda x: x.name, reverse=True)
+        # Sort by path name
+        workflow_tuples.sort(key=lambda x: x[0].name, reverse=True)
         
-        for workflow_path in workflows:
-            metadata_file = workflow_path / "workflow_metadata.json"
-            metadata = {}
-            
-            if metadata_file.exists():
-                try:
-                    with open(metadata_file) as f:
-                        metadata = json.load(f)
-                except:
-                    pass
-            
+        for workflow_path, metadata in workflow_tuples:
             # Parse directory name
             name_parts = parse_directory_name(workflow_path.name) if parse_directory_name else {}
             provider = name_parts.get('provider', 'unknown')
             model = name_parts.get('model', 'unknown')
             prompt = name_parts.get('prompt_style', 'unknown')
             
-            # Count descriptions
+            # Count descriptions - returns a dict with 'descriptions' key
             desc_count = 0
             if count_descriptions:
                 desc_info = count_descriptions(workflow_path)
-                desc_count = desc_info.get('descriptions', 0)
+                # count_descriptions returns a dict
+                if isinstance(desc_info, dict):
+                    desc_count = desc_info.get('descriptions', 0)
+                else:
+                    desc_count = desc_info if isinstance(desc_info, int) else 0
             
             timestamp = metadata.get('timestamp', 'unknown')
             
@@ -239,7 +236,7 @@ class WorkflowBrowserDialog(wx.Dialog):
             self.workflow_list.Append(display_text)
             self.workflows.append(workflow_path)
         
-        self.status_label.SetLabel(f"Found {len(workflows)} workflow(s) in: {directory}")
+        self.status_label.SetLabel(f"Found {len(workflow_tuples)} workflow(s) in: {directory}")
         
         if self.workflow_list.GetCount() > 0:
             self.workflow_list.SetSelection(0)
@@ -256,6 +253,17 @@ class WorkflowBrowserDialog(wx.Dialog):
         if sel != wx.NOT_FOUND:
             self.selected_workflow = self.workflows[sel]
             self.EndModal(wx.ID_OK)
+    
+    def on_list_key_down(self, event):
+        """Handle Enter key on workflow list"""
+        keycode = event.GetKeyCode()
+        if keycode == wx.WXK_RETURN or keycode == wx.WXK_NUMPAD_ENTER:
+            sel = self.workflow_list.GetSelection()
+            if sel != wx.NOT_FOUND:
+                self.selected_workflow = self.workflows[sel]
+                self.EndModal(wx.ID_OK)
+        else:
+            event.Skip()
     
     def on_ok(self, event):
         """Handle OK button"""
@@ -592,8 +600,23 @@ class ImageDescriptionViewer(wx.Frame):
         right_sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Image preview
-        self.image_label = wx.StaticBitmap(right_panel)
-        right_sizer.Add(self.image_label, 0, wx.ALL | wx.ALIGN_CENTER, 5)
+        # Use a button-style control for proper tab stop with accessible name
+        self.image_panel = wx.Panel(right_panel, style=wx.BORDER_SIMPLE | wx.TAB_TRAVERSAL)
+        self.image_panel.SetMinSize((400, 300))
+        # Make panel focusable
+        self.image_panel.SetCanFocus(True)
+        
+        image_sizer = wx.BoxSizer(wx.VERTICAL)
+        # Add label for accessible name that will be announced
+        self.image_filename_label = wx.StaticText(self.image_panel, label="")
+        self.image_filename_label.SetForegroundColour(wx.Colour(0, 102, 204))
+        image_sizer.Add(self.image_filename_label, 0, wx.ALL | wx.ALIGN_CENTER, 2)
+        
+        self.image_label = wx.StaticBitmap(self.image_panel)
+        image_sizer.Add(self.image_label, 1, wx.ALL | wx.ALIGN_CENTER, 5)
+        self.image_panel.SetSizer(image_sizer)
+        
+        right_sizer.Add(self.image_panel, 0, wx.ALL | wx.ALIGN_CENTER, 5)
         
         # Metadata label
         self.metadata_label = wx.StaticText(right_panel, label="")
@@ -664,6 +687,8 @@ class ImageDescriptionViewer(wx.Frame):
             wx.CallAfter(self.load_descriptions, auto_load_dir)
         
         self.Bind(wx.EVT_CLOSE, self.on_close)
+        # Bind key events for navigation shortcuts
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
     
     def create_menu(self):
         """Create menu bar"""
@@ -735,6 +760,39 @@ class ImageDescriptionViewer(wx.Frame):
             self.monitor_thread.stop()
             self.monitor_thread = None
         event.Skip()
+    
+    def on_char_hook(self, event):
+        """Handle keyboard shortcuts for navigation"""
+        keycode = event.GetKeyCode()
+        
+        # Check for Cmd+Left/Right (macOS) or Alt+Left/Right (Windows)
+        if keycode in (wx.WXK_LEFT, wx.WXK_RIGHT):
+            # macOS: Cmd key, Windows: Alt key
+            if event.CmdDown() or event.AltDown():
+                # Remember if focus is in description text box
+                focused_widget = wx.Window.FindFocus()
+                preserve_focus = (focused_widget == self.desc_text)
+                
+                current_sel = self.desc_list.GetSelection()
+                if current_sel != wx.NOT_FOUND:
+                    if keycode == wx.WXK_LEFT:
+                        # Previous image
+                        new_sel = max(0, current_sel - 1)
+                    else:
+                        # Next image
+                        new_sel = min(self.desc_list.GetCount() - 1, current_sel + 1)
+                    
+                    if new_sel != current_sel:
+                        self.desc_list.SetSelection(new_sel)
+                        self.display_description(new_sel)
+                        
+                        # Restore focus to description text if it was there
+                        if preserve_focus:
+                            self.desc_text.SetFocus()
+                
+                return  # Don't skip - we handled it
+        
+        event.Skip()  # Let other handlers process the event
     
     def on_refresh(self, event):
         """Manually refresh descriptions"""
@@ -828,13 +886,13 @@ class ImageDescriptionViewer(wx.Frame):
         self.descriptions = [e['description'] for e in entries]
         self.image_files = [e['file_path'] for e in entries]
         
-        # Populate list
+        # Populate list with truncated descriptions (100 chars)
         self.desc_list.Clear()
         for i, entry in enumerate(entries):
-            relative_path = entry.get('relative_path', 'Unknown')
-            photo_date = get_image_date(entry.get('file_path', ''))
-            display_text = f"{relative_path} [{photo_date}]"
-            self.desc_list.Append(display_text)
+            description = entry.get('description', '')
+            # Truncate description to 100 chars for display
+            truncated = description[:100] + ("..." if len(description) > 100 else "")
+            self.desc_list.Append(truncated)
         
         # Update window title
         desc_count = len(self.descriptions)
@@ -990,8 +1048,15 @@ class ImageDescriptionViewer(wx.Frame):
             # Load and display image
             image_path = self.image_files[index]
             if image_path and Path(image_path).exists():
+                # Set accessible name and label on image panel with filename for tab stop
+                img_filename = Path(image_path).name
+                self.image_filename_label.SetLabel(img_filename)
+                self.image_panel.SetName(img_filename)
+                self.image_panel.SetLabel(img_filename)
+                
                 self.load_image(image_path)
             else:
+                self.image_filename_label.SetLabel("")
                 self.image_label.SetBitmap(wx.NullBitmap)
     
     def load_image(self, image_path):
