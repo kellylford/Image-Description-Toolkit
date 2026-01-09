@@ -1553,8 +1553,6 @@ class WorkflowOrchestrator:
         
         # Build the list of images to process
         all_image_files = []
-        unique_source_count = 0  # Track unique source images
-        conversion_count = 0  # Track format conversions
         
         if is_workflow_dir:
             # We're processing a workflow directory (redescribe mode)
@@ -1565,22 +1563,18 @@ class WorkflowOrchestrator:
             if input_images_dir.exists() and any(input_images_dir.iterdir()):
                 existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
                 all_image_files.extend(existing_images)
-                unique_source_count += len(existing_images)
                 self.logger.info(f"Found {len(existing_images)} image(s) in: {input_images_dir}")
             
             # Check converted_images directory
             if converted_dir.exists() and any(converted_dir.iterdir()):
                 converted_images = self.discovery.find_files_by_type(converted_dir, "images")
                 all_image_files.extend(converted_images)
-                unique_source_count += len(converted_images)
-                conversion_count = len(converted_images)
                 self.logger.info(f"Found {len(converted_images)} converted image(s) in: {converted_dir}")
             
             # Check extracted_frames directory
             if frames_dir.exists() and any(frames_dir.iterdir()):
                 frame_images = self.discovery.find_files_by_type(frames_dir, "images")
                 all_image_files.extend(frame_images)
-                unique_source_count += len(frame_images)
                 self.logger.info(f"Found {len(frame_images)} extracted frame(s) in: {frames_dir}")
         
         else:
@@ -1610,36 +1604,46 @@ class WorkflowOrchestrator:
                     dest = input_images_dir / img.name
                     shutil.copy2(str(img), str(dest))
                     all_image_files.append(dest)
-                unique_source_count += len(regular_input_images)
                 self.logger.info(f"Copied {len(regular_input_images)} images to: {input_images_dir}")
             
             # Add converted images OR HEIC files (not both)
             if has_conversions:
                 converted_images = self.discovery.find_files_by_type(converted_dir, "images")
                 all_image_files.extend(converted_images)
-                unique_source_count += len(converted_images)
-                conversion_count = len(converted_images)
                 self.logger.info(f"Including {len(converted_images)} converted image(s) from: {converted_dir}")
             elif heic_files_in_input:
                 # If conversion hasn't run yet, include HEIC files directly
                 all_image_files.extend(heic_files_in_input)
-                unique_source_count += len(heic_files_in_input)
                 self.logger.info(f"Found {len(heic_files_in_input)} HEIC image(s) in input directory (not yet converted)")
             
             # Add extracted frames from videos
             if frames_dir.exists() and any(frames_dir.iterdir()):
                 frame_images = self.discovery.find_files_by_type(frames_dir, "images")
                 all_image_files.extend(frame_images)
-                unique_source_count += len(frame_images)
                 self.logger.info(f"Including {len(frame_images)} extracted frame(s) from: {frames_dir}")
         
         if not all_image_files:
             self.logger.info("No image files found to describe")
-            return {"success": True, "processed": 0, "unique_images": 0, "conversions": 0, "output_dir": output_dir}
+            return {"success": True, "processed": 0, "output_dir": output_dir}
         
-        self.logger.info(f"Total unique images to describe: {unique_source_count}")
-        if conversion_count > 0:
-            self.logger.info(f"Format conversions included: {conversion_count} (HEIC to JPG)")
+        # Log total count and check for duplicates
+        total_images = len(all_image_files)
+        unique_images = len(set(all_image_files))
+        
+        self.logger.info(f"Total images to describe: {total_images}")
+        if total_images != unique_images:
+            self.logger.warning(f"Duplicate images detected: {total_images} total, {unique_images} unique")
+            # Remove duplicates
+            all_image_files = list(set(all_image_files))
+            self.logger.info(f"Removed {total_images - unique_images} duplicates, proceeding with {len(all_image_files)} images")
+        
+        # Count conversions for reporting
+        conversion_count = 0
+        if converted_dir.exists():
+            converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+            conversion_count = len([f for f in all_image_files if f in converted_images])
+            if conversion_count > 0:
+                self.logger.info(f"Format conversions included: {conversion_count} (HEIC to JPG)")
         
         try:
             # Get description settings

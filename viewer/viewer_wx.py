@@ -600,19 +600,21 @@ class ImageDescriptionViewer(wx.Frame):
         right_sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Image preview
-        # Use a button-style control for proper tab stop with accessible name
-        self.image_panel = wx.Panel(right_panel, style=wx.BORDER_SIMPLE | wx.TAB_TRAVERSAL)
+        # Use a focusable StaticBitmap for proper screen reader announcement
+        self.image_panel = wx.Panel(right_panel, style=wx.BORDER_SIMPLE)
         self.image_panel.SetMinSize((400, 300))
-        # Make panel focusable
-        self.image_panel.SetCanFocus(True)
         
         image_sizer = wx.BoxSizer(wx.VERTICAL)
-        # Add label for accessible name that will be announced
+        # Add label for filename display
         self.image_filename_label = wx.StaticText(self.image_panel, label="")
         self.image_filename_label.SetForegroundColour(wx.Colour(0, 102, 204))
         image_sizer.Add(self.image_filename_label, 0, wx.ALL | wx.ALIGN_CENTER, 2)
         
-        self.image_label = wx.StaticBitmap(self.image_panel)
+        # StaticBitmap for the actual image - this should receive focus
+        self.image_label = wx.StaticBitmap(self.image_panel, style=wx.TAB_TRAVERSAL)
+        # Make the image bitmap focusable
+        if hasattr(self.image_label, 'SetCanFocus'):
+            self.image_label.SetCanFocus(True)
         image_sizer.Add(self.image_label, 1, wx.ALL | wx.ALIGN_CENTER, 5)
         self.image_panel.SetSizer(image_sizer)
         
@@ -1048,15 +1050,22 @@ class ImageDescriptionViewer(wx.Frame):
             # Load and display image
             image_path = self.image_files[index]
             if image_path and Path(image_path).exists():
-                # Set accessible name and label on image panel with filename for tab stop
+                # Set accessible name and label on the image bitmap for proper screen reader announcement
                 img_filename = Path(image_path).name
                 self.image_filename_label.SetLabel(img_filename)
-                self.image_panel.SetName(img_filename)
-                self.image_panel.SetLabel(img_filename)
+                
+                # Set the image label (StaticBitmap) properties for screen reader
+                self.image_label.SetName(img_filename)
+                self.image_label.SetLabel(f"Graphic: {img_filename}")
                 
                 self.load_image(image_path)
+                
+                # Set focus to the image so screen readers announce it
+                self.image_label.SetFocus()
             else:
                 self.image_filename_label.SetLabel("")
+                self.image_label.SetName("")
+                self.image_label.SetLabel("")
                 self.image_label.SetBitmap(wx.NullBitmap)
     
     def load_image(self, image_path):
