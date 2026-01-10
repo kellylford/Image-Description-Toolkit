@@ -163,14 +163,29 @@ except Exception as e:
     print(f"[ERROR] Traceback:")
     traceback.print_exc()
     print(f"[ERROR] Using fallback stub classes")
-    # Define fallbacks
-    class ImageDescription:
-        pass
-    class ImageItem:
-        pass
-    class ImageWorkspace:
-        pass
-    WORKSPACE_VERSION = "1.0"
+    # Attempt to import core data models even if provider/worker/dialog imports failed
+    try:
+        # Prefer relative import; fall back to absolute
+        try:
+            from .data_models import ImageDescription as _ImageDescription, ImageItem as _ImageItem, ImageWorkspace as _ImageWorkspace, WORKSPACE_VERSION as _WORKSPACE_VERSION
+        except ImportError:
+            from data_models import ImageDescription as _ImageDescription, ImageItem as _ImageItem, ImageWorkspace as _ImageWorkspace, WORKSPACE_VERSION as _WORKSPACE_VERSION
+        ImageDescription = _ImageDescription
+        ImageItem = _ImageItem
+        ImageWorkspace = _ImageWorkspace
+        WORKSPACE_VERSION = _WORKSPACE_VERSION
+    except Exception:
+        # Final fallback stubs (minimal, avoid constructor argument errors)
+        class ImageDescription:
+            def __init__(self, *args, **kwargs):
+                pass
+        class ImageItem:
+            def __init__(self, *args, **kwargs):
+                pass
+        class ImageWorkspace:
+            def __init__(self, *args, **kwargs):
+                pass
+        WORKSPACE_VERSION = "1.0"
     DirectorySelectionDialog = None
     ApiKeyDialog = None
     ProcessingOptionsDialog = None
