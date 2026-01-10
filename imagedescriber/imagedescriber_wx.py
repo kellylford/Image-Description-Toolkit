@@ -859,7 +859,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def refresh_image_list(self):
         """Refresh the image list display"""
+        # PRESERVE FOCUS: Remember currently selected item before refresh
+        current_selection = self.image_list.GetSelection()
+        current_file_path = None
+        if current_selection != wx.NOT_FOUND:
+            current_file_path = self.image_list.GetClientData(current_selection)
+        
         self.image_list.Clear()
+        
+        new_selection_index = wx.NOT_FOUND
         
         for file_path in sorted(self.workspace.items.keys()):
             item = self.workspace.items[file_path]
@@ -900,7 +908,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             else:
                 display_name = base_name
             
-            self.image_list.Append(display_name, file_path)  # Store file_path as client data
+            index = self.image_list.Append(display_name, file_path)  # Store file_path as client data
+            
+            # Track if this is the previously selected item
+            if current_file_path and file_path == current_file_path:
+                new_selection_index = index
+        
+        # RESTORE FOCUS: Select the same item after refresh
+        if new_selection_index != wx.NOT_FOUND:
+            self.image_list.SetSelection(new_selection_index)
+            # Ensure it's visible
+            self.image_list.EnsureVisible(new_selection_index)
     
     def on_process_single(self, event):
         """Process single selected image"""
