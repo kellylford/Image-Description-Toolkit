@@ -7,6 +7,7 @@
 #define MyAppPublisher "Kelly Ford"
 #define MyAppURL "https://github.com/kellylford/Image-Description-Toolkit"
 #define MyAppExeName "idt.exe"
+#define LicensePath SourcePath + "\\..\\..\\LICENSE"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -21,7 +22,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={sd}\idt
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=..\..\..\LICENSE
+LicenseFile={#LicensePath}
 OutputDir=..\releases
 OutputBaseFilename=ImageDescriptionToolkit_Setup_v{#MyAppVersion}
 Compression=lzma
@@ -53,15 +54,15 @@ Source: "dist_all\bin\prompteditor.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist_all\bin\idtconfigure.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Configuration files (from scripts directory)
-Source: "..\..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
+Source: "..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
 ; Note: scripts\prompts folder is no longer present; omit to avoid build failure
 
 ; Shared utilities
-Source: "..\..\..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
+Source: "..\..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
 
 ; Documentation
-Source: "..\..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit && echo Type 'idt --help' for usage"; IconFilename: "{app}\{#MyAppExeName}"
