@@ -293,8 +293,16 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         self.SetSizer(main_sizer)
         
-        # Set focus to first control for keyboard access
-        wx.CallAfter(self.skip_existing_cb.SetFocus)
+        # Set focus to AI provider control (the key area for user interaction)
+        # Use CallAfter to ensure UI is fully initialized
+        wx.CallAfter(self._set_initial_focus)
+    
+    def _set_initial_focus(self):
+        """Set initial focus to AI provider choice on AI Model tab"""
+        # Switch to AI Model tab (index 1)
+        self.notebook.SetSelection(1)
+        # Focus on provider choice
+        self.provider_choice.SetFocus()
     
     def create_general_panel(self, parent):
         """Create general options panel"""
