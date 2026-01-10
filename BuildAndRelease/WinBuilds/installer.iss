@@ -54,7 +54,7 @@ Source: "dist_all\bin\idtconfigure.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Configuration files (from scripts directory)
 Source: "..\..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
-Source: "..\..\..\scripts\prompts\*"; DestDir: "{app}\scripts\prompts"; Flags: ignoreversion recursesubdirs
+; Note: scripts\prompts folder is no longer present; omit to avoid build failure
 
 ; Shared utilities
 Source: "..\..\..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
