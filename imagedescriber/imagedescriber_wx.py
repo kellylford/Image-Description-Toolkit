@@ -231,7 +231,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.processing_thread = None
         self.current_image_item = None
         self.current_filter = "all"  # View filter: all, described, batch
-        self.processing_items = set()  # Track items currently being processed
+        self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
         
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
@@ -244,6 +244,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.init_ui()
         self.create_menu_bar()
         self.create_status_bar()
+        
+        # Set logical tab order for screen reader users:
+        # 1. Image list (select image)
+        # 2. Description list (view descriptions for that image)
+        # 3. Description editor (edit selected description)
+        # Use CallAfter to ensure all widgets are fully initialized
+        wx.CallAfter(self._set_tab_order)
         
         # Bind events
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -278,6 +285,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     # Note: update_window_title() is now provided by ModifiedStateMixin
     # It automatically handles the modified state indicator (*)
+    
+    def _set_tab_order(self):
+        """Set logical tab order for screen reader navigation"""
+        # Tab order: image list → description list → description editor
+        # Ensure controls can receive focus
+        self.image_list.SetFocus()  # Start with image list focused
+        self.desc_list.MoveAfterInTabOrder(self.image_list)
+        self.description_text.MoveAfterInTabOrder(self.desc_list)
+    
+    def update_window_title(self, app_name="ImageDescriber", document_name=""):
+        """Override to show processing status in title bar"""
+        # Call parent for basic title formatting
+        super().update_window_title(app_name, document_name)
+        
+        # Add processing status if items are being processed
+        if self.processing_items:
+            num_processing = len(self.processing_items)
+            if num_processing == 1:
+                current_title = self.GetTitle()
+                self.SetTitle(f"{current_title} - Processing 1 item...")
+            else:
+                current_title = self.GetTitle()
+                self.SetTitle(f"{current_title} - Processing {num_processing} items...")
     
     def load_config(self):
         """Load application configuration"""
@@ -330,20 +360,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.image_list = wx.ListBox(panel, name="Images in workspace", style=wx.LB_SINGLE | wx.LB_NEEDED_SB)
         self.image_list.Bind(wx.EVT_LISTBOX, self.on_image_selected)
         sizer.Add(self.image_list, 1, wx.EXPAND | wx.ALL, 5)
-        
-        # Buttons
-        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        
-        self.load_dir_btn = wx.Button(panel, label="Load Directory")
-        self.load_dir_btn.Bind(wx.EVT_BUTTON, self.on_load_directory)
-        button_sizer.Add(self.load_dir_btn, 0, wx.ALL, 2)
-        
-        self.process_all_btn = wx.Button(panel, label="Process All")
-        self.process_all_btn.Bind(wx.EVT_BUTTON, self.on_process_all)
-        self.process_all_btn.Enable(False)
-        button_sizer.Add(self.process_all_btn, 0, wx.ALL, 2)
-        
-        sizer.Add(button_sizer, 0, wx.ALL, 5)
         
         panel.SetSizer(sizer)
         return panel
@@ -673,7 +689,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Show the selected description in the editor
             if selection < len(self.current_image_item.descriptions):
                 selected_desc = self.current_image_item.descriptions[selection]
-                self.description_text.SetValue(selected_desc.text)
+                
+                # Format description with metadata appended
+                desc_text = selected_desc.text
+                
+                # Append metadata at the end (provider, model, prompt)
+                metadata_lines = []
+                metadata_lines.append("\n\n---")
+                if selected_desc.provider:
+                    metadata_lines.append(f"Provider: {selected_desc.provider}")
+                if selected_desc.model:
+                    metadata_lines.append(f"Model: {selected_desc.model}")
+                if selected_desc.prompt_style:
+                    # If custom prompt was used, show 'custom' instead of base style
+                    if selected_desc.custom_prompt:
+                        prompt_display = "custom"
+                    else:
+                        prompt_display = selected_desc.prompt_style
+                    metadata_lines.append(f"Prompt: {prompt_display}")
+                if selected_desc.created:
+                    created_date = selected_desc.created.split('T')[0] if 'T' in selected_desc.created else selected_desc.created
+                    metadata_lines.append(f"Created: {created_date}")
+                
+                full_text = desc_text + "\n".join(metadata_lines)
+                self.description_text.SetValue(full_text)
                 self.save_desc_btn.Enable(True)
     
     # Edit Menu Handlers
@@ -852,7 +891,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             action = "Added" if append else "Loaded"
             self.SetStatusText(f"{action} {added_count} images from {dir_path.name}", 0)
             self.SetStatusText(f"{len(self.workspace.items)} total images", 1)
-            self.process_all_btn.Enable(len(self.workspace.items) > 0)
             
         except Exception as e:
             show_error(self, f"Error loading directory:\n{e}")
@@ -892,9 +930,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if desc_count > 0:
                 prefix_parts.append(f"d{desc_count}")
             
-            # 3. Processing indicator
+            # 3. Processing indicator with provider/model info
             if file_path in self.processing_items:
-                prefix_parts.append("p")
+                proc_info = self.processing_items[file_path]
+                provider = proc_info.get('provider', 'unknown')
+                model = proc_info.get('model', 'unknown')
+                prefix_parts.append(f"p Processing with {provider} {model}")
             
             # 4. Video extraction status
             if item.item_type == "video" and hasattr(item, 'extracted_frames') and item.extracted_frames:
@@ -975,8 +1016,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         )
         print(f"[on_process_single] Worker created: {worker}")
         
-        # Mark as processing
-        self.processing_items.add(self.current_image_item.file_path)
+        # Mark as processing with provider/model info
+        self.processing_items[self.current_image_item.file_path] = {
+            'provider': options['provider'],
+            'model': options['model']
+        }
         self.refresh_image_list()
         
         print("[on_process_single] Starting worker thread...")
@@ -1087,7 +1131,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.SetStatusText("New workspace created", 0)
         self.SetStatusText("No images", 1)
         self.update_window_title("ImageDescriber", "Untitled")
-        self.process_all_btn.Enable(False)
         self.process_btn.Enable(False)
         self.save_desc_btn.Enable(False)
         self.clear_modified()
@@ -1126,7 +1169,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             count = len(self.workspace.items)
             self.SetStatusText(f"Workspace loaded: {Path(file_path).name}", 0)
             self.SetStatusText(f"{count} images", 1)
-            self.process_all_btn.Enable(count > 0)
             self.clear_modified()
             
         except Exception as e:
@@ -1183,7 +1225,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         print(f"[on_worker_complete] Description: {event.description[:100]}...")
         
         # Remove from processing items
-        self.processing_items.discard(event.file_path)
+        self.processing_items.pop(event.file_path, None)
         
         # Find the image item and add description
         if event.file_path in self.workspace.items:
@@ -1201,6 +1243,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.mark_modified()
             self.refresh_image_list()
             
+            # Update window title to reflect processing status
+            self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
+            
             # Update display if this is the current image
             if self.current_image_item == image_item:
                 self.display_image_info(image_item)
@@ -1214,8 +1259,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         print(f"[on_worker_failed] Processing failed: {event.error}")
         
         # Remove from processing items
-        self.processing_items.discard(event.file_path)
+        self.processing_items.pop(event.file_path, None)
         self.refresh_image_list()
+        
+        # Update window title to reflect processing status
+        self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
         
         show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{event.error}")
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
