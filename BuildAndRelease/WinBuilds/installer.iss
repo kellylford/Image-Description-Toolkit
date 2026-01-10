@@ -10,7 +10,8 @@
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
-AppId={{8F7A3B2D-5E9C-4A1F-B3D6-7C8E9F0A1B2C}
+; Double braces are required in Inno Setup to escape the GUID braces
+AppId={{8F7A3B2D-5E9C-4A1F-B3D6-7C8E9F0A1B2C}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
