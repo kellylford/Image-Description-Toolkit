@@ -35,6 +35,18 @@ from typing import Dict, Any, Optional, List
 
 import wx
 
+# Ensure project root is on sys.path so sibling modules (shared/, imagedescriber/) import in dev and frozen modes
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
+if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
+    _project_root = Path(sys.executable).parent
+else:
+    # Development mode - use __file__ relative path
+    _project_root = Path(__file__).parent.parent
+
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 # Import shared utilities
 from shared.wx_common import (
     find_config_file,
@@ -95,7 +107,8 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         
         # Load initial data
         self.load_config()
-        self.update_window_title("Image Description Prompt Editor", self.config_file.name)
+        # Initialize window title context (app name + current file)
+        self.update_window_title("Image Description Prompt Editor", self.config_file.name if self.config_file else "(No config)")
     
     def init_ui(self):
         """Initialize the user interface"""

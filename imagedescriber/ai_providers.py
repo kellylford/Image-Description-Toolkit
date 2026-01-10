@@ -18,6 +18,18 @@ from pathlib import Path
 import platform
 import subprocess
 
+# Add project root to sys.path for shared module imports
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
+if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
+    _project_root = Path(sys.executable).parent
+else:
+    # Development mode - use __file__ relative path
+    _project_root = Path(__file__).parent.parent
+
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 # Try to import Windows Runtime for Copilot+ PC support (Windows only)
 try:
     import winrt

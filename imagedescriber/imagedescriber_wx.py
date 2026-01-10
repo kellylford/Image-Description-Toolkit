@@ -32,9 +32,20 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 
 # Add project root to path for shared module imports
-_project_root = Path(__file__).parent.parent
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
+if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
+    _project_root = Path(sys.executable).parent
+    _imagedescriber_dir = _project_root  # In frozen mode, all modules are at exe level
+else:
+    # Development mode - use __file__ relative path
+    _project_root = Path(__file__).parent.parent
+    _imagedescriber_dir = Path(__file__).parent
+
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
+if str(_imagedescriber_dir) not in sys.path:
+    sys.path.insert(0, str(_imagedescriber_dir))
 
 import wx
 import wx.lib.newevent
@@ -76,7 +87,10 @@ except ImportError:
 
 # Import shared metadata extraction module
 try:
-    scripts_dir = Path(__file__).parent.parent / "scripts"
+    if getattr(sys, 'frozen', False):
+        scripts_dir = Path(sys.executable).parent / "scripts"
+    else:
+        scripts_dir = Path(__file__).parent.parent / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
     from metadata_extractor import MetadataExtractor, NominatimGeocoder
@@ -93,30 +107,62 @@ except Exception:
 
 # Import refactored AI provider modules
 try:
-    from ai_providers import (
-        AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider,
-        get_available_providers, get_all_providers
-    )
-    from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
-    from dialogs_wx import (
-        DirectorySelectionDialog,
-        ApiKeyDialog,
-        ProcessingOptionsDialog,
-        ImageDetailDialog,
-    )
-    from workers_wx import (
-        ProcessingWorker,
-        BatchProcessingWorker,
-        WorkflowProcessWorker,
-        VideoProcessingWorker,
-        EVT_PROGRESS_UPDATE,
-        EVT_PROCESSING_COMPLETE,
-        EVT_PROCESSING_FAILED,
-        EVT_WORKFLOW_COMPLETE,
-        EVT_WORKFLOW_FAILED,
-    )
-except ImportError as e:
-    print(f"Warning: Could not import AI modules: {e}")
+    # Try relative imports first (for package context)
+    try:
+        from .ai_providers import (
+            AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider,
+            get_available_providers, get_all_providers
+        )
+        from .data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
+        from .dialogs_wx import (
+            DirectorySelectionDialog,
+            ApiKeyDialog,
+            ProcessingOptionsDialog,
+            ImageDetailDialog,
+        )
+        from .workers_wx import (
+            ProcessingWorker,
+            BatchProcessingWorker,
+            WorkflowProcessWorker,
+            VideoProcessingWorker,
+            EVT_PROGRESS_UPDATE,
+            EVT_PROCESSING_COMPLETE,
+            EVT_PROCESSING_FAILED,
+            EVT_WORKFLOW_COMPLETE,
+            EVT_WORKFLOW_FAILED,
+        )
+    except ImportError as e_rel:
+        print(f"[DEBUG] Relative import failed: {e_rel}")
+        # Fall back to absolute imports (for direct execution)
+        from ai_providers import (
+            AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider,
+            get_available_providers, get_all_providers
+        )
+        from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
+        from dialogs_wx import (
+            DirectorySelectionDialog,
+            ApiKeyDialog,
+            ProcessingOptionsDialog,
+            ImageDetailDialog,
+        )
+        from workers_wx import (
+            ProcessingWorker,
+            BatchProcessingWorker,
+            WorkflowProcessWorker,
+            VideoProcessingWorker,
+            EVT_PROGRESS_UPDATE,
+            EVT_PROCESSING_COMPLETE,
+            EVT_PROCESSING_FAILED,
+            EVT_WORKFLOW_COMPLETE,
+            EVT_WORKFLOW_FAILED,
+        )
+except Exception as e:
+    import traceback
+    print(f"[ERROR] Failed to import AI modules!")
+    print(f"[ERROR] Exception: {e}")
+    print(f"[ERROR] Traceback:")
+    traceback.print_exc()
+    print(f"[ERROR] Using fallback stub classes")
     # Define fallbacks
     class ImageDescription:
         pass
@@ -141,9 +187,15 @@ except ImportError as e:
 
 # Import provider capabilities
 try:
-    models_path = Path(__file__).parent.parent / 'models'
-    if str(models_path) not in sys.path:
-        sys.path.insert(0, str(models_path))
+    # Use the same project root resolution as above
+    if getattr(sys, 'frozen', False):
+        _models_path = Path(sys.executable).parent / 'models'
+    else:
+        _models_path = Path(__file__).parent.parent / 'models'
+    
+    if str(_models_path) not in sys.path:
+        sys.path.insert(0, str(_models_path))
+    
     from provider_configs import supports_prompts, supports_custom_prompts, get_provider_capabilities
     from model_options import get_all_options_for_provider, get_default_value
 except ImportError:
@@ -223,13 +275,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             except Exception:
                 pass
     
-    def update_window_title(self, app_name, document_name):
-        """Update window title with app name and document name"""
-        if self.modified:
-            title = f"{app_name} - {document_name} *"
-        else:
-            title = f"{app_name} - {document_name}"
-        self.SetTitle(title)
+    # Note: update_window_title() is now provided by ModifiedStateMixin
+    # It automatically handles the modified state indicator (*)
     
     def load_config(self):
         """Load application configuration"""
@@ -302,10 +349,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def create_description_panel(self, parent):
         """
-        Create the right panel with descriptions list and editor.
+        Create the right panel with image preview, descriptions list, and editor.
         
-        Two-part design:
-        - TOP: Descriptions ListBox (accessible, shows multiple descriptions per image)
+        Layout:
+        - TOP: Image preview panel (thumbnail of selected image)
+        - MIDDLE: Descriptions ListBox (all descriptions for current image)
         - BOTTOM: Description editor TextCtrl (for editing selected description)
         """
         panel = wx.Panel(parent)
@@ -315,7 +363,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.image_info_label = wx.StaticText(panel, label="No image selected")
         sizer.Add(self.image_info_label, 0, wx.ALL, 5)
         
-        # ===== TOP SECTION: DESCRIPTIONS LIST =====
+        # ===== TOP SECTION: IMAGE PREVIEW =====
+        
+        preview_label = wx.StaticText(panel, label="Image Preview:")
+        sizer.Add(preview_label, 0, wx.ALL, 5)
+        
+        # Preview panel with fixed size for thumbnail display
+        self.image_preview_panel = wx.Panel(panel, size=(250, 250))
+        self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
+        self.image_preview_panel.SetName("Image preview panel")
+        
+        # Store bitmap for painting and initialize to None
+        self.image_preview_bitmap = None
+        
+        # Bind paint event for displaying image
+        self.image_preview_panel.Bind(wx.EVT_PAINT, self.on_paint_preview)
+        
+        sizer.Add(self.image_preview_panel, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # ===== MIDDLE SECTION: DESCRIPTIONS LIST =====
         
         # Label for descriptions list
         desc_list_label = wx.StaticText(panel, label="Descriptions for this image:")
@@ -405,8 +471,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         menubar.Append(workspace_menu, "&Workspace")
         
-        # Edit menu (kept minimal for now)
+        # Edit menu
         edit_menu = wx.Menu()
+        
+        cut_item = edit_menu.Append(wx.ID_CUT, "&Cut\tCtrl+X")
+        self.Bind(wx.EVT_MENU, self.on_cut, cut_item)
+        
+        copy_item = edit_menu.Append(wx.ID_COPY, "&Copy\tCtrl+C")
+        self.Bind(wx.EVT_MENU, self.on_copy, copy_item)
+        
+        paste_item = edit_menu.Append(wx.ID_PASTE, "&Paste\tCtrl+V")
+        self.Bind(wx.EVT_MENU, self.on_paste, paste_item)
+        
+        edit_menu.AppendSeparator()
+        
+        select_all_item = edit_menu.Append(wx.ID_SELECTALL, "Select &All\tCtrl+A")
+        self.Bind(wx.EVT_MENU, self.on_select_all, select_all_item)
+        
         menubar.Append(edit_menu, "&Edit")
         
         # Process menu
@@ -524,11 +605,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if file_path and file_path in self.workspace.items:
                 self.current_image_item = self.workspace.items[file_path]
                 self.display_image_info(self.current_image_item)
+                # Load preview image
+                self.load_preview_image(file_path)
                 self.process_btn.Enable(True)
                 self.save_desc_btn.Enable(True)
         else:
             # No selection - clear current item and disable buttons
             self.current_image_item = None
+            self.image_preview_bitmap = None
+            self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
+            self.image_preview_panel.Refresh()
             self.process_btn.Enable(False)
             self.save_desc_btn.Enable(False)
     
@@ -588,6 +674,100 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 selected_desc = self.current_image_item.descriptions[selection]
                 self.description_text.SetValue(selected_desc.text)
                 self.save_desc_btn.Enable(True)
+    
+    # Edit Menu Handlers
+    
+    def on_cut(self, event):
+        """Handle cut from Edit menu"""
+        control = self.FindFocus()
+        if control and hasattr(control, 'Cut'):
+            try:
+                control.Cut()
+            except Exception:
+                pass
+    
+    def on_copy(self, event):
+        """Handle copy from Edit menu"""
+        control = self.FindFocus()
+        if control and hasattr(control, 'Copy'):
+            try:
+                control.Copy()
+            except Exception:
+                pass
+    
+    def on_paste(self, event):
+        """Handle paste from Edit menu"""
+        control = self.FindFocus()
+        if control and hasattr(control, 'Paste'):
+            try:
+                control.Paste()
+            except Exception:
+                pass
+    
+    def on_select_all(self, event):
+        """Handle select all from Edit menu"""
+        control = self.FindFocus()
+        if control and hasattr(control, 'SelectAll'):
+            try:
+                control.SelectAll()
+            except Exception:
+                pass
+    
+    # Image Preview Handlers
+    
+    def on_paint_preview(self, event):
+        """Paint the image preview on the preview panel"""
+        dc = wx.PaintDC(self.image_preview_panel)
+        if self.image_preview_bitmap:
+            # Draw the bitmap at top-left corner
+            dc.DrawBitmap(self.image_preview_bitmap, 0, 0)
+    
+    def load_preview_image(self, file_path):
+        """
+        Load and display a preview thumbnail of the image.
+        
+        Args:
+            file_path: Path to the image file to preview
+        """
+        try:
+            # Try to import PIL for image loading
+            try:
+                from PIL import Image
+            except ImportError:
+                # Fallback: PIL not available
+                self.image_preview_bitmap = None
+                self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
+                self.image_preview_panel.Refresh()
+                return
+            
+            # Load and resize image to fit preview panel
+            img = Image.open(file_path)
+            img.thumbnail((250, 250), Image.Resampling.LANCZOS)
+            
+            # Get dimensions
+            width, height = img.size
+            
+            # Convert to RGB if needed (handle transparency, grayscale, etc.)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Convert PIL image to wx.Image
+            wx_image = wx.Image(width, height)
+            rgb_data = img.tobytes()
+            wx_image.SetData(rgb_data)
+            
+            # Convert to bitmap for display
+            self.image_preview_bitmap = wx.Bitmap(wx_image)
+            
+            # Update panel appearance
+            self.image_preview_panel.SetBackgroundColour(wx.Colour(255, 255, 255))
+            self.image_preview_panel.Refresh()
+            
+        except Exception as e:
+            # If image can't be loaded, show grey placeholder
+            self.image_preview_bitmap = None
+            self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
+            self.image_preview_panel.Refresh()
     
     def on_load_directory(self, event):
         """Load a directory of images"""
@@ -706,25 +886,37 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_process_single(self, event):
         """Process single selected image"""
+        print("[on_process_single] Button clicked!")
+        
         if not self.current_image_item:
+            print("[on_process_single] No image selected!")
             show_warning(self, "No image selected")
             return
         
+        print(f"[on_process_single] Processing: {self.current_image_item.file_path}")
+        
         if not ProcessingWorker:
+            print("[on_process_single] ProcessingWorker is None!")
             show_error(self, "Processing worker not available")
             return
         
+        print(f"[on_process_single] ProcessingWorker available: {ProcessingWorker}")
+        
         # Show processing options dialog
         if ProcessingOptionsDialog:
+            print("[on_process_single] Showing options dialog...")
             dialog = ProcessingOptionsDialog(self.config, self)
             if dialog.ShowModal() != wx.ID_OK:
+                print("[on_process_single] Dialog cancelled")
                 dialog.Destroy()
                 return
             
             options = dialog.get_config()
+            print(f"[on_process_single] Options: {options}")
             dialog.Destroy()
         else:
             # Use defaults
+            print("[on_process_single] Using default options")
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
                 'model': self.config.get('default_model', 'moondream'),
@@ -734,6 +926,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             }
         
         # Start processing worker
+        print("[on_process_single] Creating worker thread...")
         worker = ProcessingWorker(
             self,
             self.current_image_item.file_path,
@@ -744,7 +937,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,  # detection_settings
             None   # prompt_config_path
         )
+        print(f"[on_process_single] Worker created: {worker}")
+        print("[on_process_single] Starting worker thread...")
         worker.start()
+        print("[on_process_single] Worker thread started!")
         
         self.SetStatusText(f"Processing: {Path(self.current_image_item.file_path).name}...", 0)
     
@@ -942,8 +1138,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_worker_complete(self, event):
         """Handle successful processing completion"""
+        print(f"[on_worker_complete] Processing complete for: {event.file_path}")
+        print(f"[on_worker_complete] Description: {event.description[:100]}...")
+        
         # Find the image item and add description
         if event.file_path in self.workspace.items:
+            print(f"[on_worker_complete] Found image in workspace")
             image_item = self.workspace.items[event.file_path]
             desc = ImageDescription(
                 text=event.description,
@@ -953,6 +1153,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 provider=event.provider
             )
             image_item.add_description(desc)
+            print(f"[on_worker_complete] Added description to image")
             self.mark_modified()
             self.refresh_image_list()
             
@@ -961,9 +1162,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.display_image_info(image_item)
             
             self.SetStatusText(f"Completed: {Path(event.file_path).name}", 0)
+        else:
+            print(f"[on_worker_complete] Image NOT found in workspace!")
     
     def on_worker_failed(self, event):
         """Handle processing failures"""
+        print(f"[on_worker_failed] Processing failed: {event.error}")
         show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{event.error}")
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
     

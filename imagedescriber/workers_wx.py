@@ -17,11 +17,26 @@ from typing import Optional, Dict, Any
 import wx
 import wx.lib.newevent
 
+# Add project root to sys.path for shared module imports
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
+if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
+    _project_root = Path(sys.executable).parent
+else:
+    # Development mode - use __file__ relative path
+    _project_root = Path(__file__).parent.parent
+
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 # Import AI providers
 try:
-    from ai_providers import get_available_providers
+    from .ai_providers import get_available_providers
 except ImportError:
-    get_available_providers = None
+    try:
+        from ai_providers import get_available_providers
+    except ImportError:
+        get_available_providers = None
 
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
@@ -29,6 +44,50 @@ ProcessingCompleteEvent, EVT_PROCESSING_COMPLETE = wx.lib.newevent.NewEvent()
 ProcessingFailedEvent, EVT_PROCESSING_FAILED = wx.lib.newevent.NewEvent()
 WorkflowCompleteEvent, EVT_WORKFLOW_COMPLETE = wx.lib.newevent.NewEvent()
 WorkflowFailedEvent, EVT_WORKFLOW_FAILED = wx.lib.newevent.NewEvent()
+
+
+# Custom event classes that properly store attributes
+class ProcessingCompleteEventData(ProcessingCompleteEvent):
+    """Event data for processing completion"""
+    def __init__(self, file_path, description, provider, model, prompt_style, custom_prompt):
+        ProcessingCompleteEvent.__init__(self)
+        self.file_path = file_path
+        self.description = description
+        self.provider = provider
+        self.model = model
+        self.prompt_style = prompt_style
+        self.custom_prompt = custom_prompt
+
+
+class ProcessingFailedEventData(ProcessingFailedEvent):
+    """Event data for processing failure"""
+    def __init__(self, file_path, error):
+        ProcessingFailedEvent.__init__(self)
+        self.file_path = file_path
+        self.error = error
+
+
+class ProgressUpdateEventData(ProgressUpdateEvent):
+    """Event data for progress updates"""
+    def __init__(self, file_path, message):
+        ProgressUpdateEvent.__init__(self)
+        self.file_path = file_path
+        self.message = message
+
+
+class WorkflowCompleteEventData(WorkflowCompleteEvent):
+    """Event data for workflow completion"""
+    def __init__(self, input_dir, output_dir):
+        WorkflowCompleteEvent.__init__(self)
+        self.input_dir = input_dir
+        self.output_dir = output_dir
+
+
+class WorkflowFailedEventData(WorkflowFailedEvent):
+    """Event data for workflow failure"""
+    def __init__(self, error):
+        WorkflowFailedEvent.__init__(self)
+        self.error = error
 
 
 class ProcessingWorker(threading.Thread):
@@ -76,8 +135,12 @@ class ProcessingWorker(threading.Thread):
     def run(self):
         """Execute processing in background thread"""
         try:
+            print(f"[ProcessingWorker] Starting processing: {Path(self.file_path).name}")
+            print(f"[ProcessingWorker] Provider: {self.provider}, Model: {self.model}")
+            
             # Load prompt configuration
             config = self._load_prompt_config()
+            print(f"[ProcessingWorker] Config loaded")
             
             # Get the actual prompt text
             if self.custom_prompt:
@@ -93,14 +156,19 @@ class ProcessingWorker(threading.Thread):
                 else:
                     prompt_text = "Describe this image."
             
+            print(f"[ProcessingWorker] Prompt text: {prompt_text[:50]}...")
+            
             # Emit progress
             self._post_progress(f"Processing with {self.provider} {self.model}...")
             
             # Process the image with selected provider
+            print(f"[ProcessingWorker] Starting AI processing...")
             description = self._process_with_ai(self.file_path, prompt_text)
+            print(f"[ProcessingWorker] Got description: {description[:50]}...")
             
             # Emit success
-            evt = ProcessingCompleteEvent(
+            print(f"[ProcessingWorker] Posting success event...")
+            evt = ProcessingCompleteEventData(
                 file_path=self.file_path,
                 description=description,
                 provider=self.provider,
@@ -109,15 +177,19 @@ class ProcessingWorker(threading.Thread):
                 custom_prompt=self.custom_prompt
             )
             wx.PostEvent(self.parent_window, evt)
+            print(f"[ProcessingWorker] Success event posted")
             
         except Exception as e:
             # Emit failure
-            evt = ProcessingFailedEvent(file_path=self.file_path, error=str(e))
+            print(f"[ProcessingWorker] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e))
             wx.PostEvent(self.parent_window, evt)
     
     def _post_progress(self, message: str):
         """Post progress update to parent window"""
-        evt = ProgressUpdateEvent(file_path=self.file_path, message=message)
+        evt = ProgressUpdateEventData(file_path=self.file_path, message=message)
         wx.PostEvent(self.parent_window, evt)
     
     def _load_prompt_config(self) -> dict:
@@ -185,21 +257,29 @@ class ProcessingWorker(threading.Thread):
     
     def _process_with_ai(self, image_path: str, prompt: str) -> str:
         """Process image with selected AI provider"""
+        print(f"[_process_with_ai] Starting with provider: {self.provider}")
+        
         if not get_available_providers:
+            print(f"[_process_with_ai] ERROR: get_available_providers is None!")
             raise Exception("AI providers module not available")
         
         # Get available providers
+        print(f"[_process_with_ai] Getting available providers...")
         providers = get_available_providers()
+        print(f"[_process_with_ai] Available providers: {list(providers.keys())}")
         
         if self.provider not in providers:
+            print(f"[_process_with_ai] ERROR: Provider '{self.provider}' not in available providers")
             raise Exception(f"Provider '{self.provider}' not available")
         
         provider = providers[self.provider]
+        print(f"[_process_with_ai] Got provider object: {provider}")
         
         try:
             # Check if it's a HEIC file and convert if needed
             path_obj = Path(image_path)
             if path_obj.suffix.lower() in ['.heic', '.heif']:
+                print(f"[_process_with_ai] Converting HEIC file...")
                 converted_path = self._convert_heic_to_jpeg(image_path)
                 if converted_path:
                     image_path = converted_path
@@ -207,6 +287,7 @@ class ProcessingWorker(threading.Thread):
                     raise Exception("Failed to convert HEIC file")
             
             # Read and encode image with size limits
+            print(f"[_process_with_ai] Reading image file...")
             with open(image_path, 'rb') as f:
                 image_data = f.read()
             
@@ -214,6 +295,7 @@ class ProcessingWorker(threading.Thread):
             # Claude has 5MB limit, target 3.75MB to account for base64 encoding overhead
             max_size = 3.75 * 1024 * 1024  # 3.75MB
             if len(image_data) > max_size:
+                print(f"[_process_with_ai] Image too large ({len(image_data)} bytes), resizing...")
                 image_data = self._resize_image_data(image_data, max_size)
             
             print(f"Processing {path_obj.name} with {self.provider} {self.model}")
@@ -221,6 +303,7 @@ class ProcessingWorker(threading.Thread):
             print(f"Prompt: {prompt[:100]}...")
             
             # Process with the selected provider
+            print(f"[_process_with_ai] Calling provider.describe_image()...")
             if self.provider == "object_detection" and self.detection_settings:
                 description = provider.describe_image(image_path, prompt, self.model, 
                                                      yolo_settings=self.detection_settings)
@@ -230,6 +313,7 @@ class ProcessingWorker(threading.Thread):
             else:
                 description = provider.describe_image(image_path, prompt, self.model)
             
+            print(f"[_process_with_ai] Got description from provider")
             return description
                 
         except Exception as e:
@@ -363,24 +447,24 @@ class WorkflowProcessWorker(threading.Thread):
             # Check if process completed successfully
             return_code = process.poll()
             if return_code == 0:
-                evt = WorkflowCompleteEvent(
+                evt = WorkflowCompleteEventData(
                     input_dir=self.input_dir,
                     output_dir=self.output_dir
                 )
                 wx.PostEvent(self.parent_window, evt)
             else:
-                evt = WorkflowFailedEvent(
+                evt = WorkflowFailedEventData(
                     error=f"Workflow process failed with code {return_code}"
                 )
                 wx.PostEvent(self.parent_window, evt)
                 
         except Exception as e:
-            evt = WorkflowFailedEvent(error=f"Error running workflow: {str(e)}")
+            evt = WorkflowFailedEventData(error=f"Error running workflow: {str(e)}")
             wx.PostEvent(self.parent_window, evt)
     
     def _post_progress(self, message: str):
         """Post progress update to parent window"""
-        evt = ProgressUpdateEvent(file_path="", message=message)
+        evt = ProgressUpdateEventData(file_path="", message=message)
         wx.PostEvent(self.parent_window, evt)
 
 
@@ -438,7 +522,7 @@ class BatchProcessingWorker(threading.Thread):
                 break
             
             # Post progress
-            evt = ProgressUpdateEvent(
+            evt = ProgressUpdateEventData(
                 file_path=file_path,
                 message=f"Processing {i}/{total}: {Path(file_path).name}"
             )
@@ -464,7 +548,7 @@ class BatchProcessingWorker(threading.Thread):
             completed += 1
         
         # Post final completion
-        evt = WorkflowCompleteEvent(
+        evt = WorkflowCompleteEventData(
             input_dir=f"{completed}/{total} images",
             output_dir=""
         )
@@ -517,22 +601,22 @@ class VideoProcessingWorker(threading.Thread):
             
             if extracted_frames:
                 self._post_progress(f"Extracted {len(extracted_frames)} frames")
-                evt = WorkflowCompleteEvent(
+                evt = WorkflowCompleteEventData(
                     input_dir=self.video_path,
                     output_dir=str(Path(extracted_frames[0]).parent)
                 )
                 wx.PostEvent(self.parent_window, evt)
             else:
-                evt = WorkflowFailedEvent(error="No frames were extracted from video")
+                evt = WorkflowFailedEventData(error="No frames were extracted from video")
                 wx.PostEvent(self.parent_window, evt)
                 
         except Exception as e:
-            evt = WorkflowFailedEvent(error=f"Video processing failed: {str(e)}")
+            evt = WorkflowFailedEventData(error=f"Video processing failed: {str(e)}")
             wx.PostEvent(self.parent_window, evt)
     
     def _post_progress(self, message: str):
         """Post progress update"""
-        evt = ProgressUpdateEvent(file_path=self.video_path, message=message)
+        evt = ProgressUpdateEventData(file_path=self.video_path, message=message)
         wx.PostEvent(self.parent_window, evt)
     
     def _extract_frames(self) -> list:

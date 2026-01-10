@@ -27,6 +27,18 @@ from typing import Dict, Any, Optional, List, Tuple
 import wx
 import wx.lib.masked as masked
 
+# Ensure project root is on sys.path so sibling modules (shared/) import in dev and frozen modes
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
+if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
+    _project_root = Path(sys.executable).parent
+else:
+    # Development mode - use __file__ relative path
+    _project_root = Path(__file__).parent.parent
+
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 # Import shared utilities
 from shared.wx_common import (
     find_config_file,
