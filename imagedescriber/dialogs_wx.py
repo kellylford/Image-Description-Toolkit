@@ -340,6 +340,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude"])
         self.provider_choice.SetSelection(0)
+        self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
         provider_sizer.Add(self.provider_choice, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -352,10 +353,10 @@ class ProcessingOptionsDialog(wx.Dialog):
         model_label = wx.StaticText(panel, label="&Model name:")
         model_sizer.Add(model_label, 0, wx.ALL, 5)
         
-        self.model_text = wx.TextCtrl(panel)
-        self.model_text.SetValue(self.config.get('model', 'moondream'))
-        set_accessible_name(self.model_text, "Model name")
-        model_sizer.Add(self.model_text, 0, wx.ALL | wx.EXPAND, 5)
+        self.model_combo = wx.ComboBox(panel, style=wx.CB_DROPDOWN)
+        self.model_combo.SetValue(self.config.get('model', 'moondream'))
+        set_accessible_name(self.model_combo, "Model name")
+        model_sizer.Add(self.model_combo, 0, wx.ALL | wx.EXPAND, 5)
         
         sizer.Add(model_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
@@ -411,14 +412,64 @@ class ProcessingOptionsDialog(wx.Dialog):
         sizer.Add(custom_prompt_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
         panel.SetSizer(sizer)
+        
+        # Populate models for initial provider
+        wx.CallAfter(self.populate_models_for_provider)
+        
         return panel
+    
+    def on_provider_changed(self, event):
+        """Handle provider selection change - populate available models"""
+        self.populate_models_for_provider()
+    
+    def populate_models_for_provider(self):
+        """Populate model list based on selected provider"""
+        provider = self.provider_choice.GetStringSelection().lower()
+        self.model_combo.Clear()
+        
+        try:
+            if provider == "ollama":
+                # Get installed Ollama models
+                from ai_providers import get_available_providers
+                providers = get_available_providers()
+                if 'ollama' in providers:
+                    ollama_provider = providers['ollama']
+                    models = ollama_provider.get_available_models()
+                    if models:
+                        for model in models:
+                            self.model_combo.Append(model)
+                        # Set default if in list
+                        default_model = self.config.get('model', 'moondream')
+                        if default_model in models:
+                            self.model_combo.SetValue(default_model)
+                        elif models:
+                            self.model_combo.SetValue(models[0])
+                    else:
+                        self.model_combo.SetValue("moondream")
+                else:
+                    self.model_combo.SetValue("moondream")
+            elif provider == "openai":
+                # Common OpenAI models
+                models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"]
+                for model in models:
+                    self.model_combo.Append(model)
+                self.model_combo.SetValue("gpt-4o")
+            elif provider == "claude":
+                # Claude models
+                models = ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+                for model in models:
+                    self.model_combo.Append(model)
+                self.model_combo.SetValue("claude-3-5-sonnet-20241022")
+        except Exception as e:
+            print(f"Error populating models: {e}")
+            self.model_combo.SetValue(self.config.get('model', 'moondream'))
     
     def get_config(self):
         """Get the configured options"""
         return {
             'skip_existing': self.skip_existing_cb.GetValue(),
             'provider': self.provider_choice.GetStringSelection().lower(),
-            'model': self.model_text.GetValue(),
+            'model': self.model_combo.GetValue(),
             'prompt_style': self.prompt_choice.GetStringSelection(),
             'custom_prompt': self.custom_prompt_input.GetValue(),
         }
