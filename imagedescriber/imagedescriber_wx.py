@@ -231,6 +231,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.processing_thread = None
         self.current_image_item = None
         self.current_filter = "all"  # View filter: all, described, batch
+        self.processing_items = set()  # Track items currently being processed
         
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
@@ -871,16 +872,33 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if not getattr(item, 'batch_marked', False):
                     continue
             
-            display_name = Path(file_path).name
+            base_name = Path(file_path).name
+            prefix_parts = []
             
-            # Add batch marker
+            # 1. Batch marker
             if getattr(item, 'batch_marked', False):
-                display_name = f"🔵 {display_name}"
+                prefix_parts.append("b")
             
-            # Add description count indicator
+            # 2. Description count
             desc_count = len(item.descriptions)
             if desc_count > 0:
-                display_name = f"✓ {display_name} ({desc_count})"
+                prefix_parts.append(f"d{desc_count}")
+            
+            # 3. Processing indicator
+            if file_path in self.processing_items:
+                prefix_parts.append("p")
+            
+            # 4. Video extraction status
+            if item.item_type == "video" and hasattr(item, 'extracted_frames') and item.extracted_frames:
+                frame_count = len(item.extracted_frames)
+                prefix_parts.append(f"E{frame_count}")
+            
+            # Combine prefix and display name
+            if prefix_parts:
+                prefix = "".join(prefix_parts)
+                display_name = f"{prefix} {base_name}"
+            else:
+                display_name = base_name
             
             self.image_list.Append(display_name, file_path)  # Store file_path as client data
     
@@ -938,6 +956,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None   # prompt_config_path
         )
         print(f"[on_process_single] Worker created: {worker}")
+        
+        # Mark as processing
+        self.processing_items.add(self.current_image_item.file_path)
+        self.refresh_image_list()
+        
         print("[on_process_single] Starting worker thread...")
         worker.start()
         print("[on_process_single] Worker thread started!")
@@ -1141,6 +1164,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         print(f"[on_worker_complete] Processing complete for: {event.file_path}")
         print(f"[on_worker_complete] Description: {event.description[:100]}...")
         
+        # Remove from processing items
+        self.processing_items.discard(event.file_path)
+        
         # Find the image item and add description
         if event.file_path in self.workspace.items:
             print(f"[on_worker_complete] Found image in workspace")
@@ -1168,6 +1194,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_worker_failed(self, event):
         """Handle processing failures"""
         print(f"[on_worker_failed] Processing failed: {event.error}")
+        
+        # Remove from processing items
+        self.processing_items.discard(event.file_path)
+        self.refresh_image_list()
+        
         show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{event.error}")
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
     
