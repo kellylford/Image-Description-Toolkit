@@ -22,7 +22,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={sd}\idt
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=..\LICENSE
+LicenseFile=..\..\..\LICENSE
 OutputDir=..\releases
 OutputBaseFilename=ImageDescriptionToolkit_Setup_v{#MyAppVersion}
 Compression=lzma
@@ -51,31 +51,27 @@ Source: "dist_all\bin\idt.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; GUI Applications
 Source: "dist_all\bin\Viewer.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist_all\bin\ImageDescriber.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist_all\bin\PromptEditor.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist_all\bin\IDTConfigure.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist_all\bin\prompteditor.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist_all\bin\idtconfigure.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Configuration files (from scripts directory)
-Source: "..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
-Source: "..\scripts\prompts\*"; DestDir: "{app}\scripts\prompts"; Flags: ignoreversion recursesubdirs
+Source: "..\..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
+Source: "..\..\..\scripts\prompts\*"; DestDir: "{app}\scripts\prompts"; Flags: ignoreversion recursesubdirs
 
 ; Shared utilities
-Source: "..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
+Source: "..\..\..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
 
 ; Documentation
-Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion.exe"; WorkingDir: "{app}"
+Source: "..\..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion[Icons]
+Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit && echo Type 'idt --help' for usage"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\Viewer"; Filename: "{app}\Viewer.exe"; WorkingDir: "{app}"
-Name: "{group}\Prompt Editor"; Filename: "{app}\PromptEditor.exe"; WorkingDir: "{app}"
-Name: "{group}\Configure"; Filename: "{app}\IDTConfigure.exe"; WorkingDir: "{app}"
-Name: "{group}\Documentation"; Filename: "{app}\docs"
+Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"
+Name: "{group}\Prompt Editor"; Filename: "{app}\prompteditor.exe"; WorkingDir: "{app}"
+Name: "{group}\Configure"; Filename: "{app}\idtconfigure.exe"; WorkingDir: "{app}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}
-Name: "{group}\Configure"; Filename: "{app}\IDTConfigure\idtconfigure.exe"; WorkingDir: "{app}\IDTConfigure"
-Name: "{group}\Documentation"; Filename: "{app}\docs"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber\imagedescriber.exe"; WorkingDir: "{app}\ImageDescriber"; Tasks: desktopicon
+Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Code]
 const
@@ -119,14 +115,14 @@ begin
     'If you don''t have Ollama installed yet:' + #13#10 +
     '1. Visit https://ollama.com' + #13#10 +
     '2. Download and install Ollama' + #13#10 +
+    '3. Run: ollama pull moondream' + #13#10 + #13#10 +
+    'You can install Ollama now or after installing IDT.');
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
-  begin// Extract Prompt Editor
-    Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\prompt_editor_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\PromptEditor') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    
-    // Extract IDTConfigure
-    Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path ''' + ExpandConstant('{tmp}\idtconfigure_v{#MyAppVersion}.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\IDTConfigure') + ''' -Force"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    
+  begin
     // Set IDT_CONFIG_DIR environment variable to point to scripts directory
     RegWriteStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'IDT_CONFIG_DIR', ExpandConstant('{app}\scripts'));
     Log('Set IDT_CONFIG_DIR environment variable to: ' + ExpandConstant('{app}\scripts'));
@@ -167,6 +163,6 @@ end;
 
 [Run]
 Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent
-Filename: "{app}\ImageDescriber\imagedescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\ImageDescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent unchecked
 Filename: "https://ollama.com"; Description: "Open Ollama website to download (if not installed)"; Flags: shellexec postinstall skipifsilent unchecked
 Filename: "{app}\docs"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked
