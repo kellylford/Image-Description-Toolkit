@@ -245,12 +245,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.create_menu_bar()
         self.create_status_bar()
         
-        # Set logical tab order for screen reader users:
-        # 1. Image list (select image)
-        # 2. Description list (view descriptions for that image)
-        # 3. Description editor (edit selected description)
-        # Use CallAfter to ensure all widgets are fully initialized
-        wx.CallAfter(self._set_tab_order)
+        # Set initial focus to image list for keyboard navigation
+        wx.CallAfter(self.image_list.SetFocus)
+        # TODO: Tab order needs different approach (controls in different panels)
         
         # Bind events
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -285,14 +282,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     # Note: update_window_title() is now provided by ModifiedStateMixin
     # It automatically handles the modified state indicator (*)
-    
-    def _set_tab_order(self):
-        """Set logical tab order for screen reader navigation"""
-        # Tab order: image list → description list → description editor
-        # Ensure controls can receive focus
-        self.image_list.SetFocus()  # Start with image list focused
-        self.desc_list.MoveAfterInTabOrder(self.image_list)
-        self.description_text.MoveAfterInTabOrder(self.desc_list)
+    # TODO: Implement proper tab order - requires controls to be siblings or NavigationEnabled
     
     def update_window_title(self, app_name="ImageDescriber", document_name=""):
         """Override to show processing status in title bar"""
