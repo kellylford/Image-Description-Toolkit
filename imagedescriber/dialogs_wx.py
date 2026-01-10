@@ -36,6 +36,15 @@ from shared.wx_common import (
     save_file_dialog,
 )
 
+# Import config loader for prompt loading
+try:
+    from scripts.config_loader import load_json_config
+except ImportError:
+    try:
+        from config_loader import load_json_config
+    except ImportError:
+        load_json_config = None
+
 # Import data models (framework-independent) from same directory
 try:
     from .data_models import ImageDescription, ImageItem, ImageWorkspace
@@ -367,13 +376,12 @@ class ProcessingOptionsDialog(wx.Dialog):
         prompt_label = wx.StaticText(panel, label="P&rompt style:")
         prompt_sizer.Add(prompt_label, 0, wx.ALL, 5)
         
-        self.prompt_choice = wx.Choice(
-            panel,
-            choices=["narrative", "detailed", "concise", "technical", "artistic"]
-        )
-        self.prompt_choice.SetSelection(0)
+        self.prompt_choice = wx.Choice(panel, choices=[])
         set_accessible_name(self.prompt_choice, "Prompt style")
         prompt_sizer.Add(self.prompt_choice, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Load prompts from config file
+        wx.CallAfter(self.load_prompts)
         
         sizer.Add(prompt_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
@@ -463,6 +471,43 @@ class ProcessingOptionsDialog(wx.Dialog):
         except Exception as e:
             print(f"Error populating models: {e}")
             self.model_combo.SetValue(self.config.get('model', 'moondream'))
+    
+    def load_prompts(self):
+        """Load available prompt styles from config file"""
+        self.prompt_choice.Clear()
+        prompts_added = False
+        default_style = "narrative"
+        
+        # Try to load from config file using config_loader
+        if load_json_config:
+            try:
+                cfg, path, source = load_json_config(
+                    'image_describer_config.json',
+                    env_var_file='IDT_IMAGE_DESCRIBER_CONFIG'
+                )
+                if cfg:
+                    prompts = cfg.get('prompt_variations', {})
+                    default_style = cfg.get('default_prompt_style', 'narrative')
+                    for prompt_name in prompts.keys():
+                        self.prompt_choice.Append(prompt_name)
+                        prompts_added = True
+            except Exception:
+                pass
+        
+        # Fallback to hardcoded prompts if config load failed
+        if not prompts_added:
+            fallback_prompts = ["narrative", "detailed", "concise", "technical", "artistic"]
+            for prompt in fallback_prompts:
+                self.prompt_choice.Append(prompt)
+            default_style = "narrative"
+        
+        # Select default prompt style
+        if self.prompt_choice.GetCount() > 0:
+            default_idx = self.prompt_choice.FindString(default_style)
+            if default_idx != wx.NOT_FOUND:
+                self.prompt_choice.SetSelection(default_idx)
+            else:
+                self.prompt_choice.SetSelection(0)
     
     def get_config(self):
         """Get the configured options"""
