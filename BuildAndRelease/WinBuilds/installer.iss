@@ -63,7 +63,9 @@ Source: "..\..\..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
 
 ; Documentation
 Source: "..\..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion[Icons]
+Source: "..\..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+
+[Icons]
 Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit && echo Type 'idt --help' for usage"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\Viewer"; Filename: "{app}\Viewer.exe"; WorkingDir: "{app}"
 Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"
