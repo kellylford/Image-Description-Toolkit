@@ -1103,3 +1103,90 @@ The frozen executable build was hitting error #2 (wxPython crash), while dev mod
 | 9 | | | |
 | 10 | | | |
 
+
+---
+
+## Part 11: Migration Issues - Status Indicators Restored
+
+**Issue**: PyQt6 to wxPython migration lost key UI features:
+- Image list status indicators (b, d#, p, E#) replaced with Unicode symbols
+- Focus jumping to top of list on refresh
+- Processing dialog opening on wrong tab with wrong focus
+
+**Fixes Applied**:
+1. **Status Indicators** - Restored compact letter-based format:
+   - `b` = batch marked
+   - `d#` = description count (e.g., d2)
+   - `p` = currently processing
+   - `E#` = extracted video frames (e.g., E15)
+   - Example: `bd2p IMG_0123.JPG`
+
+2. **Focus Preservation** - Image list now preserves selection:
+   - Save selected file_path before refresh
+   - Restore selection after rebuild
+   - Scroll to ensure visible
+   - Prevents focus jumping during processing
+
+3. **Dialog Initial Focus** - Processing options dialog:
+   - Opens on AI Model tab (index 1) instead of General
+   - Focus goes to provider_choice control
+   - Users can immediately select provider
+
+**Files Changed**:
+- imagedescriber/imagedescriber_wx.py (refresh_image_list, processing tracking)
+- imagedescriber/dialogs_wx.py (_set_initial_focus method)
+
+**Commits**:
+- cf785da - Restore PyQt6 image list status indicators
+- 49f9b72 - Fix focus preservation and dialog initial focus
+
+---
+
+## SESSION END - Current State
+
+**Branch**: MacApp (ahead of main)
+**Status**: Code fixes complete, NOT TESTED in frozen executable
+
+**What Works** (dev mode tested):
+- ✅ ImageDescriber opens and loads images
+- ✅ Processing dialog opens without crash
+- ✅ Image descriptions generated
+- ✅ Status indicators show correctly (b, d#, p, E#)
+- ✅ Focus preserved during list refresh
+- ✅ Dialog opens on AI Model tab
+
+**What Still Needs Testing**:
+- ❓ Frozen executable build (imagedescriber.exe)
+- ❓ All processing features in frozen mode
+- ❓ Other apps (Viewer, PromptEditor, IDTConfigure)
+
+**Known Migration Issues Discovered**:
+1. SetNextHandler() calls on StaticText (FIXED - Part 10)
+2. Status indicators changed to Unicode (FIXED - Part 11)
+3. Focus jumping on refresh (FIXED - Part 11)
+4. Dialog wrong tab/focus (FIXED - Part 11)
+5. **Likely more exist** - migration was not systematic
+
+**Reference Code Available**:
+- PyQt6 version preserved in `main` and `3.60` branches
+- Can diff against these for missing features
+- Git history has old code in commit 731e17c and earlier
+
+**Next Steps When Resuming**:
+1. Rebuild all executables
+2. Test frozen mode thoroughly
+3. Compare PyQt6 vs wxPython side-by-side
+4. Create systematic feature parity checklist
+5. Test remaining apps (Viewer, PromptEditor, IDTConfigure)
+
+**Total Commits This Session**: 6
+- c3de131 - Fix Part 10 (SetNextHandler removal)
+- 9135fcc - Next session documentation
+- 44e3df4 - Remove executables from git
+- cf785da - Restore status indicators
+- 49f9b72 - Fix focus preservation
+
+**Documentation Created**:
+- docs/worktracking/2026-01-09-session-summary.md (this file)
+- docs/worktracking/2026-01-09-NEXT-SESSION-CRITICAL.md
+
