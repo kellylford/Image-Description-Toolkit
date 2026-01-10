@@ -69,13 +69,13 @@ if not exist "dist_all\bin\ImageDescriber.exe" (
     set MISSING_FILES=1
 )
 
-if not exist "dist_all\bin\PromptEditor.exe" (
-    echo ERROR: PromptEditor.exe not found
+if not exist "dist_all\bin\prompteditor.exe" (
+    echo ERROR: prompteditor.exe not found
     set MISSING_FILES=1
 )
 
-if not exist "dist_all\bin\IDTConfigure.exe" (
-    echo ERROR: IDTConfigure.exe not found
+if not exist "dist_all\bin\idtconfigure.exe" (
+    echo ERROR: idtconfigure.exe not found
     set MISSING_FILES=1
 )
 
