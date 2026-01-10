@@ -27,7 +27,14 @@ from pathlib import Path
 from datetime import datetime
 
 # Add project root to path for shared module imports
-_project_root = Path(__file__).parent.parent
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
+if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
+    _project_root = Path(sys.executable).parent
+else:
+    # Development mode - use __file__ relative path
+    _project_root = Path(__file__).parent.parent
+
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
@@ -46,6 +53,17 @@ from shared.wx_common import (
     format_timestamp as format_timestamp_shared,
     DescriptionListBox,  # NEW: Import accessible listbox from shared module
 )
+
+# Import model registry and config loader for robust model/prompt resolution
+try:
+    from models.model_registry import list_models as registry_list_models
+except Exception:
+    registry_list_models = None
+
+try:
+    from scripts.config_loader import load_json_config as loader_load_json_config
+except Exception:
+    loader_load_json_config = None
 
 def get_scripts_directory():
     """Get the scripts directory (uses shared library)"""
@@ -319,40 +337,56 @@ class RedescribeDialog(wx.Dialog):
         panel.SetSizer(sizer)
     
     def load_models(self):
-        """Load available Ollama models"""
-        if not ollama:
-            self.model_choice.Append("Ollama not available")
-            return
-        
-        try:
-            models = ollama.list()
-            for model in models.get('models', []):
-                self.model_choice.Append(model['name'])
-            
-            if self.model_choice.GetCount() > 0:
-                self.model_choice.SetSelection(0)
-        except:
-            self.model_choice.Append("Error loading models")
+        """Load available models using the central registry (provider: Ollama)."""
+        self.model_choice.Clear()
+        if registry_list_models:
+            try:
+                models = registry_list_models(provider="ollama", recommended_only=False)
+                if models:
+                    for m in models:
+                        self.model_choice.Append(m)
+                    self.model_choice.SetSelection(0)
+                    return
+            except Exception:
+                pass
+        # Fallback messaging if registry unavailable
+        self.model_choice.Append("No models found (check models registry)")
     
     def load_prompts(self):
-        """Load available prompt styles"""
-        # Load from config
-        config_path = get_scripts_directory() / "image_describer_config.json"
-        if config_path.exists():
+        """Load available prompt styles via layered config resolution."""
+        self.prompt_choice.Clear()
+        prompts_added = False
+        # Preferred: use config_loader for robust path handling in dev/frozen
+        if loader_load_json_config:
             try:
-                with open(config_path) as f:
-                    config = json.load(f)
-                
-                prompts = config.get('prompt_variations', {})
-                for prompt_name in prompts.keys():
-                    self.prompt_choice.Append(prompt_name)
-                
-                if self.prompt_choice.GetCount() > 0:
-                    self.prompt_choice.SetSelection(0)
-            except:
-                self.prompt_choice.Append("narrative")
-        else:
+                cfg, path, source = loader_load_json_config('image_describer_config.json', env_var_file='IDT_IMAGE_DESCRIBER_CONFIG')
+                if cfg:
+                    prompts = cfg.get('prompt_variations', {})
+                    for prompt_name in prompts.keys():
+                        self.prompt_choice.Append(prompt_name)
+                        prompts_added = True
+            except Exception:
+                pass
+        # Fallback: direct path under scripts
+        if not prompts_added:
+            config_path = get_scripts_directory() / "image_describer_config.json"
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        config = json.load(f)
+                    prompts = config.get('prompt_variations', {})
+                    for prompt_name in prompts.keys():
+                        self.prompt_choice.Append(prompt_name)
+                        prompts_added = True
+                except Exception:
+                    pass
+        # Final fallback
+        if not prompts_added:
             self.prompt_choice.Append("narrative")
+        # Select a sensible default
+        if self.prompt_choice.GetCount() > 0:
+            default_idx = self.prompt_choice.FindString("narrative")
+            self.prompt_choice.SetSelection(default_idx if default_idx != wx.NOT_FOUND else 0)
     
     def get_selections(self):
         """Get selected model and prompt"""
@@ -463,51 +497,65 @@ class RedescribeWorkflowDialog(wx.Dialog):
         panel.SetSizer(sizer)
     
     def on_provider_changed(self, event):
-        """Handle provider change"""
+        """Handle provider change using model registry lists."""
         provider = self.provider_choice.GetStringSelection()
         self.model_choice.Clear()
-        
-        if provider in ["Ollama", "Ollama Cloud"]:
-            if ollama:
-                try:
-                    models = ollama.list()
-                    for model in models.get('models', []):
-                        self.model_choice.Append(model['name'])
-                except:
-                    pass
-        elif provider == "OpenAI":
-            self.model_choice.Append("gpt-4o")
-            self.model_choice.Append("gpt-4o-mini")
-        elif provider == "Claude":
-            self.model_choice.Append("claude-3-5-sonnet-20241022")
-            self.model_choice.Append("claude-3-5-haiku-20241022")
-        
+        provider_map = {
+            "Ollama": "ollama",
+            "Ollama Cloud": "ollama",  # Cloud uses same model names
+            "OpenAI": "openai",
+            "Claude": "claude"
+        }
+        prov_key = provider_map.get(provider, provider.lower())
+        if registry_list_models:
+            try:
+                models = registry_list_models(provider=prov_key, recommended_only=False)
+                for m in models:
+                    self.model_choice.Append(m)
+            except Exception:
+                pass
+        # Sensible defaults if registry unavailable
+        if self.model_choice.GetCount() == 0:
+            if prov_key == "openai":
+                self.model_choice.Append("gpt-4o")
+                self.model_choice.Append("gpt-4o-mini")
+            elif prov_key == "claude":
+                self.model_choice.Append("claude-3-5-sonnet-20241022")
+                self.model_choice.Append("claude-3-5-haiku-20241022")
         if self.model_choice.GetCount() > 0:
             self.model_choice.SetSelection(0)
     
     def load_prompts(self):
-        """Load available prompt styles"""
-        config_path = get_scripts_directory() / "image_describer_config.json"
-        if config_path.exists():
+        """Load available prompt styles via layered config resolution."""
+        self.prompt_choice.Clear()
+        prompts_added = False
+        if loader_load_json_config:
             try:
-                with open(config_path) as f:
-                    config = json.load(f)
-                
-                prompts = config.get('prompt_variations', {})
-                for prompt_name in prompts.keys():
-                    self.prompt_choice.Append(prompt_name)
-                
-                if self.prompt_choice.GetCount() > 0:
-                    # Default to narrative
-                    narrative_idx = self.prompt_choice.FindString("narrative")
-                    if narrative_idx != wx.NOT_FOUND:
-                        self.prompt_choice.SetSelection(narrative_idx)
-                    else:
-                        self.prompt_choice.SetSelection(0)
-            except:
-                self.prompt_choice.Append("narrative")
-        else:
+                cfg, path, source = loader_load_json_config('image_describer_config.json', env_var_file='IDT_IMAGE_DESCRIBER_CONFIG')
+                if cfg:
+                    prompts = cfg.get('prompt_variations', {})
+                    for prompt_name in prompts.keys():
+                        self.prompt_choice.Append(prompt_name)
+                        prompts_added = True
+            except Exception:
+                pass
+        if not prompts_added:
+            config_path = get_scripts_directory() / "image_describer_config.json"
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        config = json.load(f)
+                    prompts = config.get('prompt_variations', {})
+                    for prompt_name in prompts.keys():
+                        self.prompt_choice.Append(prompt_name)
+                        prompts_added = True
+                except Exception:
+                    pass
+        if not prompts_added:
             self.prompt_choice.Append("narrative")
+        if self.prompt_choice.GetCount() > 0:
+            narrative_idx = self.prompt_choice.FindString("narrative")
+            self.prompt_choice.SetSelection(narrative_idx if narrative_idx != wx.NOT_FOUND else 0)
     
     def get_selections(self):
         """Get selected provider, model, and prompt"""

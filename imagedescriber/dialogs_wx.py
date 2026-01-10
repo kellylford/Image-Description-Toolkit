@@ -6,11 +6,24 @@ All dialogs use shared utilities and follow accessibility best practices.
 """
 
 import os
+import sys
 import json
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
 import wx
+
+# Add project root to sys.path for shared module imports
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
+if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
+    _project_root = Path(sys.executable).parent
+else:
+    # Development mode - use __file__ relative path
+    _project_root = Path(__file__).parent.parent
+
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 # Import shared utilities
 from shared.wx_common import (
@@ -320,7 +333,6 @@ class ProcessingOptionsDialog(wx.Dialog):
         self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude"])
         self.provider_choice.SetSelection(0)
         set_accessible_name(self.provider_choice, "AI provider")
-        provider_label.SetNextHandler(self.provider_choice)
         provider_sizer.Add(self.provider_choice, 0, wx.ALL | wx.EXPAND, 5)
         
         sizer.Add(provider_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -335,7 +347,6 @@ class ProcessingOptionsDialog(wx.Dialog):
         self.model_text = wx.TextCtrl(panel)
         self.model_text.SetValue(self.config.get('model', 'moondream'))
         set_accessible_name(self.model_text, "Model name")
-        model_label.SetNextHandler(self.model_text)
         model_sizer.Add(self.model_text, 0, wx.ALL | wx.EXPAND, 5)
         
         sizer.Add(model_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -353,10 +364,43 @@ class ProcessingOptionsDialog(wx.Dialog):
         )
         self.prompt_choice.SetSelection(0)
         set_accessible_name(self.prompt_choice, "Prompt style")
-        prompt_label.SetNextHandler(self.prompt_choice)
         prompt_sizer.Add(self.prompt_choice, 0, wx.ALL | wx.EXPAND, 5)
         
         sizer.Add(prompt_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # Custom prompt override
+        custom_prompt_box = wx.StaticBox(panel, label="Custom Prompt (Optional)")
+        custom_prompt_sizer = wx.StaticBoxSizer(custom_prompt_box, wx.VERTICAL)
+        
+        custom_prompt_label = wx.StaticText(
+            panel,
+            label="&Enter a custom prompt to override the selected style:"
+        )
+        custom_prompt_sizer.Add(custom_prompt_label, 0, wx.ALL, 5)
+        
+        self.custom_prompt_input = wx.TextCtrl(
+            panel,
+            value=self.config.get('custom_prompt', ''),
+            style=wx.TE_MULTILINE | wx.TE_WORDWRAP,
+            name="Custom prompt override"
+        )
+        self.custom_prompt_input.SetMinSize((400, 80))
+        set_accessible_name(self.custom_prompt_input, "Custom prompt override")
+        set_accessible_description(
+            self.custom_prompt_input,
+            "Leave blank to use the selected prompt style, or enter a custom prompt here"
+        )
+        custom_prompt_sizer.Add(self.custom_prompt_input, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Help text
+        help_text = wx.StaticText(
+            panel,
+            label="Leave blank to use selected style; fill in to override with custom prompt"
+        )
+        help_text.SetFont(help_text.GetFont().MakeItalic())
+        custom_prompt_sizer.Add(help_text, 0, wx.ALL, 5)
+        
+        sizer.Add(custom_prompt_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
         panel.SetSizer(sizer)
         return panel
@@ -368,6 +412,7 @@ class ProcessingOptionsDialog(wx.Dialog):
             'provider': self.provider_choice.GetStringSelection().lower(),
             'model': self.model_text.GetValue(),
             'prompt_style': self.prompt_choice.GetStringSelection(),
+            'custom_prompt': self.custom_prompt_input.GetValue(),
         }
 
 

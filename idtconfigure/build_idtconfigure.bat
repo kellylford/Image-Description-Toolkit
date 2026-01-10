@@ -72,7 +72,9 @@ pyinstaller --onefile ^
     --workpath "build" ^
     --specpath "build" ^
     --add-data "%SCRIPTS_DIR%;scripts" ^
-    idtconfigure.py
+    --paths "%cd%\.." ^
+    --hidden-import shared.wx_common ^
+    idtconfigure_wx.py
 
 if errorlevel 1 (
     echo.

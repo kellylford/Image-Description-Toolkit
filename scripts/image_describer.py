@@ -599,6 +599,92 @@ class ImageDescriber:
         except Exception as e:
             return False, f"Validation error: {str(e)}"
     
+    def _get_output_file(self, base_dir: Path) -> Path:
+        """Determine output file path for descriptions."""
+        if self.output_dir:
+            base = Path(self.output_dir)
+        else:
+            base = base_dir / "descriptions"
+        return base / "image_descriptions.txt"
+
+    def _write_description_entry(self, output_file: Path, image_path: Path, description: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Write a single viewer-compatible entry to the output file."""
+        separator = '-' * 80
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        rel = image_path.name
+        lines = [
+            separator,
+            f"File: {rel}",
+            f"Path: {str(image_path.resolve())}",
+            f"Provider: {self.provider_name}",
+            f"Model: {self.model_name}",
+            f"Prompt Style: {self.prompt_style}",
+            f"Timestamp: {timestamp}",
+        ]
+        # Optional compact metadata suffix (for human skim); main metadata block inclusion can be added later
+        if metadata and self.config.get('output_format', {}).get('include_metadata', True):
+            suffix = self._build_meta_suffix(image_path, metadata)
+            if suffix:
+                lines.append(suffix)
+        # Description block
+        first_line, *rest = (description or '').splitlines()
+        lines.append(f"Description: {first_line or ''}")
+        for extra in rest:
+            lines.append(extra)
+        lines.append('\n')
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        with output_file.open('a', encoding='utf-8') as f:
+            f.write('\n'.join(lines))
+
+    def process_directory(self, directory_path: Path, recursive: bool = False, max_files: Optional[int] = None) -> None:
+        """Process all supported images in a directory and write descriptions file."""
+        if not directory_path.exists() or not directory_path.is_dir():
+            raise ValueError(f"Input directory does not exist: {directory_path}")
+        # Discover images
+        patterns = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff", "*.webp"]
+        files: list[Path] = []
+        for pat in patterns:
+            if recursive:
+                files.extend(directory_path.rglob(pat))
+            else:
+                files.extend(directory_path.glob(pat))
+        if max_files:
+            files = files[:max_files]
+        if not files:
+            logger.warning("No supported images found to process.")
+        out_file = self._get_output_file(directory_path)
+        processed = 0
+        for idx, img in enumerate(files, start=1):
+            is_valid, err = self.validate_image_for_processing(img)
+            if not is_valid:
+                logger.warning(f"Skipping {img.name}: {err}")
+                continue
+            try:
+                desc = self.get_image_description(img)
+                if not desc:
+                    logger.warning(f"No description for {img.name}")
+                    continue
+                # Extract basic metadata if enabled
+                meta = None
+                if METADATA_SUPPORT and self.config.get('processing_options', {}).get('extract_metadata', True):
+                    try:
+                        meta = self.metadata_extractor.extract_metadata(img)
+                    except Exception:
+                        meta = None
+                self._write_description_entry(out_file, img, desc, meta)
+                processed += 1
+                # Delay to manage memory
+                time.sleep(max(0.0, float(self.batch_delay)))
+                # Progress title
+                try:
+                    pct = int((processed / max(1, len(files))) * 100)
+                    set_console_title(self._build_window_title(pct, processed, len(files)))
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.error(f"Failed to process {img.name}: {e}")
+        logger.info(f"Processed {processed} images. Output: {out_file}")
+
     def get_image_description(self, image_path: Path) -> Optional[str]:
         """
         Get description of an image using configured AI provider with retry logic

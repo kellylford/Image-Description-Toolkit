@@ -376,8 +376,30 @@ class ModifiedStateMixin:
             self.modified = False
             self._update_title()
     
+    def update_window_title(self, app_name: str, document_name: str = ""):
+        """
+        Set the base window title with app name and optional document name.
+        
+        This is the public API for apps to update their window title context.
+        The modified state indicator (*) is automatically added when needed.
+        
+        Args:
+            app_name: Name of the application (e.g., "Prompt Editor")
+            document_name: Optional document/file name to append (e.g., "config.json")
+        
+        Example:
+            self.update_window_title("Prompt Editor", "image_describer_config.json")
+            # Results in: "Prompt Editor - image_describer_config.json"
+            # Or when modified: "Prompt Editor - image_describer_config.json *"
+        """
+        if document_name:
+            self.original_title = f"{app_name} - {document_name}"
+        else:
+            self.original_title = app_name
+        self._update_title()
+    
     def _update_title(self):
-        """Update window title to reflect modified state."""
+        """Update window title to reflect modified state (internal)."""
         if hasattr(self, 'original_title') and self.original_title:
             title = self.original_title
         else:

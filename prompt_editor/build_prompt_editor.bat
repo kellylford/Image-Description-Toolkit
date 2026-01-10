@@ -74,7 +74,10 @@ pyinstaller --onefile ^
     --workpath "build" ^
     --specpath "build" ^
     --add-data "%SCRIPTS_DIR%;scripts" ^
-    prompt_editor.py
+    --paths "%cd%\.." ^
+    --hidden-import shared.wx_common ^
+    --hidden-import imagedescriber.ai_providers ^
+    prompt_editor_wx.py
 
 if errorlevel 1 (
     echo.
