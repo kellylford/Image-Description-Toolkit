@@ -116,6 +116,13 @@ tools/show_metadata/.show_metadata_last_command
 *.log
 deployment_test_*.log
 
+# Test media files and gallery workspace files (large files, should not be in repo)
+test_data/*.MOV
+test_data/*.HEIC
+test_data/*.jpeg
+tools/ImageGallery/content-creation/gallery-identification/*.idw
+tools/ImageGallery/content-creation/gallery-identification/*_results.json
+
 # IDT application build artifacts and staging directories
 idtconfigure/idtconfigure_releases/staging/
 viewer/viewer_releases/staging/
