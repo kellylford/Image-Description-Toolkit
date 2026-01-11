@@ -317,6 +317,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Create splitter for resizable panels
         splitter = wx.SplitterWindow(panel, style=wx.SP_LIVE_UPDATE)
+        splitter.SetCanFocus(False)  # Keep focus on child controls for tab navigation
         
         # Left panel - Image list
         left_panel = self.create_image_list_panel(splitter)
@@ -336,6 +337,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def create_image_list_panel(self, parent):
         """Create the left panel with image list"""
         panel = wx.Panel(parent)
+        panel.SetCanFocus(False)  # Avoid panel stealing focus
         sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Label
@@ -345,6 +347,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Image list (using ListBox for accessibility - single tab stop)
         self.image_list = wx.ListBox(panel, name="Images in workspace", style=wx.LB_SINGLE | wx.LB_NEEDED_SB)
         self.image_list.Bind(wx.EVT_LISTBOX, self.on_image_selected)
+        self.image_list.Bind(wx.EVT_CHAR_HOOK, self.on_image_list_key)
         sizer.Add(self.image_list, 1, wx.EXPAND | wx.ALL, 5)
         
         panel.SetSizer(sizer)
@@ -360,6 +363,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         - BOTTOM: Description editor TextCtrl (for editing selected description)
         """
         panel = wx.Panel(parent)
+        panel.SetCanFocus(False)  # Avoid panel stealing focus
         sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Image info label
@@ -398,6 +402,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             style=wx.LB_SINGLE | wx.LB_NEEDED_SB
         )
         self.desc_list.Bind(wx.EVT_LISTBOX, self.on_description_selected)
+        self.desc_list.Bind(wx.EVT_CHAR_HOOK, self.on_desc_list_key)
         sizer.Add(self.desc_list, 1, wx.EXPAND | wx.ALL, 5)
         
         # ===== BOTTOM SECTION: EDITOR =====
@@ -412,6 +417,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             name="Image description editor",
             style=wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_RICH2
         )
+        self.description_text.Bind(wx.EVT_CHAR_HOOK, self.on_description_text_key)
         sizer.Add(self.description_text, 1, wx.EXPAND | wx.ALL, 5)
         
         # Buttons
@@ -455,6 +461,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         load_dir_item = file_menu.Append(wx.ID_ANY, "&Load Directory\tCtrl+L")
         self.Bind(wx.EVT_MENU, self.on_load_directory, load_dir_item)
+
+        import_workflow_item = file_menu.Append(wx.ID_ANY, "&Import Workflow...")
+        self.Bind(wx.EVT_MENU, self.on_import_workflow, import_workflow_item)
         
         file_menu.AppendSeparator()
         
@@ -620,6 +629,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_preview_panel.Refresh()
             self.process_btn.Enable(False)
             self.save_desc_btn.Enable(False)
+
+    # Explicit tab order: image_list -> desc_list -> description_text
+    def on_image_list_key(self, event):
+        if event.GetKeyCode() == wx.WXK_TAB and not event.ShiftDown():
+            if self.desc_list:
+                self.desc_list.SetFocus()
+            return
+        event.Skip()
+
+    def on_desc_list_key(self, event):
+        if event.GetKeyCode() == wx.WXK_TAB:
+            if event.ShiftDown():
+                if self.image_list:
+                    self.image_list.SetFocus()
+            else:
+                if self.description_text:
+                    self.description_text.SetFocus()
+            return
+        event.Skip()
+
+    def on_description_text_key(self, event):
+        if event.GetKeyCode() == wx.WXK_TAB and event.ShiftDown():
+            if self.desc_list:
+                self.desc_list.SetFocus()
+            return
+        event.Skip()
     
     def display_image_info(self, image_item: ImageItem):
         """
@@ -794,6 +829,164 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_preview_bitmap = None
             self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
             self.image_preview_panel.Refresh()
+
+    def on_import_workflow(self, event):
+        """Import descriptions from a completed workflow directory."""
+        progress_dlg = None
+        try:
+            workflow_dir = select_directory_dialog(
+                self,
+                "Select Workflow Directory (e.g., wf_...)"
+            )
+
+            if not workflow_dir:
+                return
+
+            workflow_path = Path(workflow_dir)
+            desc_file = workflow_path / "descriptions" / "image_descriptions.txt"
+            if not desc_file.exists():
+                show_error(
+                    self,
+                    "Not a valid workflow directory.\n\n"
+                    "Expected: descriptions/image_descriptions.txt\n\n"
+                    f"Selected: {workflow_dir}"
+                )
+                return
+
+            if not self.workspace:
+                self.workspace = ImageWorkspace(new_workspace=True)
+
+            progress_dlg = wx.ProgressDialog(
+                "Importing Workflow",
+                "Reading workflow descriptions...",
+                maximum=100,
+                parent=self,
+                style=wx.PD_APP_MODAL | wx.PD_AUTO_HIDE
+            )
+
+            mapping_file = workflow_path / "descriptions" / "file_path_mapping.json"
+            file_mapping = {}
+            if mapping_file.exists():
+                with open(mapping_file, 'r', encoding='utf-8') as f:
+                    file_mapping = json.load(f)
+
+            with open(desc_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            entry_pattern = re.compile(
+                r"File:\s*(.+?)\r?\n"
+                r"Provider:\s*(.*?)\r?\n"
+                r"Model:\s*(.*?)\r?\n"
+                r"Prompt Style:\s*(.*?)\r?\n"
+                r"Description:\s*([\s\S]*?)(?:\r?\n-{4,}|$)",
+                re.MULTILINE
+            )
+            entries = entry_pattern.findall(content)
+
+            if not entries:
+                blocks = re.split(r'\r?\n-{40,}\r?\n', content)
+                for block in blocks:
+                    if not block.strip():
+                        continue
+                    file_match = re.search(r'^File:\s*(.+?)$', block, re.MULTILINE)
+                    provider_match = re.search(r'^Provider:\s*(.+?)$', block, re.MULTILINE)
+                    model_match = re.search(r'^Model:\s*(.+?)$', block, re.MULTILINE)
+                    prompt_match = re.search(r'^Prompt Style:\s*(.+?)$', block, re.MULTILINE)
+                    desc_start = block.find('Description:')
+                    if file_match and desc_start != -1:
+                        entries.append((
+                            file_match.group(1).strip(),
+                            provider_match.group(1).strip() if provider_match else "",
+                            model_match.group(1).strip() if model_match else "",
+                            prompt_match.group(1).strip() if prompt_match else "",
+                            block[desc_start + 12:].strip()
+                        ))
+
+            imported = 0
+            duplicates = 0
+            missing = 0
+            total_entries = len(entries)
+
+            if progress_dlg:
+                progress_dlg.Update(10, "Parsing descriptions...")
+
+            for idx, entry in enumerate(entries):
+                file_path_str, provider_val, model_val, prompt_val, desc_text = entry
+                file_path_str = file_path_str.strip()
+                desc_text = desc_text.strip()
+
+                resolved_path = None
+                if file_mapping:
+                    for temp_path, orig_path in file_mapping.items():
+                        if temp_path in file_path_str or Path(temp_path).name == Path(file_path_str).name:
+                            resolved_path = Path(orig_path)
+                            break
+
+                if not resolved_path:
+                    candidate = Path(file_path_str)
+                    if candidate.exists():
+                        resolved_path = candidate
+                    else:
+                        for subdir in ['converted_images', 'extracted_frames']:
+                            test_path = workflow_path / subdir / Path(file_path_str).name
+                            if test_path.exists():
+                                resolved_path = test_path
+                                break
+
+                if not resolved_path or not resolved_path.exists():
+                    missing += 1
+                    continue
+
+                item = self.workspace.items.get(str(resolved_path))
+                if item:
+                    desc_exists = any(d.text == desc_text for d in item.descriptions)
+                    if desc_exists:
+                        duplicates += 1
+                        continue
+                else:
+                    item = ImageItem(str(resolved_path))
+                    self.workspace.add_item(item)
+
+                desc = ImageDescription(
+                    text=desc_text,
+                    model=model_val.strip() if model_val else "unknown",
+                    prompt_style=prompt_val.strip() if prompt_val else "",
+                    provider=provider_val.strip() if provider_val else "",
+                    custom_prompt=""
+                )
+                item.add_description(desc)
+                imported += 1
+
+                if progress_dlg and total_entries:
+                    pct = 10 + int(((idx + 1) / total_entries) * 80)
+                    progress_dlg.Update(min(pct, 95), f"Imported {imported} of {total_entries}...")
+
+            if progress_dlg:
+                progress_dlg.Update(97, "Updating workspace...")
+
+            self.workspace.imported_workflow_dir = str(workflow_path)
+            self.workspace.mark_modified()
+            self.mark_modified()
+            self.refresh_image_list()
+
+            if progress_dlg:
+                progress_dlg.Update(100, "Complete!")
+                progress_dlg.Destroy()
+                progress_dlg = None
+
+            summary = (
+                "Import Complete\n\n"
+                f"Imported: {imported}\n"
+                f"Duplicates: {duplicates}\n"
+                f"Missing Files: {missing}\n\n"
+                f"Workflow: {workflow_path.name}"
+            )
+            show_info(self, summary)
+
+        except Exception as e:
+            if progress_dlg:
+                progress_dlg.Destroy()
+            show_error(self, f"Error importing workflow:\n{str(e)}")
     
     def on_load_directory(self, event):
         """Load a directory of images"""
@@ -1126,11 +1319,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if not self.confirm_unsaved_changes():
             return
         
+        default_dir = ""
+        default_file = ""
+        if self.workspace_file:
+            default_dir = str(Path(self.workspace_file).parent)
+
         file_path = open_file_dialog(
             self,
             "Open Workspace",
-            None,
-            "ImageDescriber Workspace (*.idw)|*.idw|All files (*.*)|*.*"
+            "ImageDescriber Workspace (*.idw)|*.idw|All files (*.*)|*.*",
+            default_dir,
+            default_file
         )
         
         if file_path:
@@ -1160,25 +1359,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             show_error(self, f"Error loading workspace:\n{e}")
     
+    def on_save_workspace_as(self, event):
+        """Save workspace to new file"""
+        default_dir = ""
+        default_file = "untitled.idw"
+        if self.workspace_file:
+            default_dir = str(Path(self.workspace_file).parent)
+            default_file = Path(self.workspace_file).name
+
+        file_path = save_file_dialog(
+            self,
+            "Save Workspace As",
+            "ImageDescriber Workspace (*.idw)|*.idw|All files (*.*)|*.*",
+            default_dir,
+            default_file
+        )
+
+        if file_path:
+            self.save_workspace(file_path)
+
     def on_save_workspace(self, event):
         """Save current workspace"""
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
         else:
             self.on_save_workspace_as(event)
-    
-    def on_save_workspace_as(self, event):
-        """Save workspace to new file"""
-        file_path = save_file_dialog(
-            self,
-            "Save Workspace As",
-            None,
-            "untitled.idw",
-            "ImageDescriber Workspace (*.idw)|*.idw"
-        )
-        
-        if file_path:
-            self.save_workspace(file_path)
     
     def save_workspace(self, file_path):
         """Save workspace to file"""
