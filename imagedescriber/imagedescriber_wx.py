@@ -106,8 +106,33 @@ except Exception:
     get_full_version = None
 
 # Import refactored AI provider modules
-try:
-    # Try relative imports first (for package context)
+# In frozen mode, modules are at top level; in dev mode, use relative imports
+if getattr(sys, 'frozen', False):
+    # Frozen: import directly without package prefix
+    from ai_providers import (
+        AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider,
+        get_available_providers, get_all_providers
+    )
+    from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
+    from dialogs_wx import (
+        DirectorySelectionDialog,
+        ApiKeyDialog,
+        ProcessingOptionsDialog,
+        ImageDetailDialog,
+    )
+    from workers_wx import (
+        ProcessingWorker,
+        BatchProcessingWorker,
+        WorkflowProcessWorker,
+        VideoProcessingWorker,
+        EVT_PROGRESS_UPDATE,
+        EVT_PROCESSING_COMPLETE,
+        EVT_PROCESSING_FAILED,
+        EVT_WORKFLOW_COMPLETE,
+        EVT_WORKFLOW_FAILED,
+    )
+else:
+    # Development: try relative imports first, fall back to absolute
     try:
         from .ai_providers import (
             AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider,
@@ -132,8 +157,7 @@ try:
             EVT_WORKFLOW_FAILED,
         )
     except ImportError as e_rel:
-        print(f"[DEBUG] Relative import failed: {e_rel}")
-        # Fall back to absolute imports (for direct execution)
+        print(f"[DEBUG] Relative import failed, trying absolute: {e_rel}")
         from ai_providers import (
             AIProvider, OllamaProvider, OpenAIProvider, ClaudeProvider,
             get_available_providers, get_all_providers
@@ -156,49 +180,6 @@ try:
             EVT_WORKFLOW_COMPLETE,
             EVT_WORKFLOW_FAILED,
         )
-except Exception as e:
-    import traceback
-    print(f"[ERROR] Failed to import AI modules!")
-    print(f"[ERROR] Exception: {e}")
-    print(f"[ERROR] Traceback:")
-    traceback.print_exc()
-    print(f"[ERROR] Using fallback stub classes")
-    # Attempt to import core data models even if provider/worker/dialog imports failed
-    try:
-        # Prefer relative import; fall back to absolute
-        try:
-            from .data_models import ImageDescription as _ImageDescription, ImageItem as _ImageItem, ImageWorkspace as _ImageWorkspace, WORKSPACE_VERSION as _WORKSPACE_VERSION
-        except ImportError:
-            from data_models import ImageDescription as _ImageDescription, ImageItem as _ImageItem, ImageWorkspace as _ImageWorkspace, WORKSPACE_VERSION as _WORKSPACE_VERSION
-        ImageDescription = _ImageDescription
-        ImageItem = _ImageItem
-        ImageWorkspace = _ImageWorkspace
-        WORKSPACE_VERSION = _WORKSPACE_VERSION
-    except Exception:
-        # Final fallback stubs (minimal, avoid constructor argument errors)
-        class ImageDescription:
-            def __init__(self, *args, **kwargs):
-                pass
-        class ImageItem:
-            def __init__(self, *args, **kwargs):
-                pass
-        class ImageWorkspace:
-            def __init__(self, *args, **kwargs):
-                pass
-        WORKSPACE_VERSION = "1.0"
-    DirectorySelectionDialog = None
-    ApiKeyDialog = None
-    ProcessingOptionsDialog = None
-    ImageDetailDialog = None
-    ProcessingWorker = None
-    BatchProcessingWorker = None
-    WorkflowProcessWorker = None
-    VideoProcessingWorker = None
-    EVT_PROGRESS_UPDATE = None
-    EVT_PROCESSING_COMPLETE = None
-    EVT_PROCESSING_FAILED = None
-    EVT_WORKFLOW_COMPLETE = None
-    EVT_WORKFLOW_FAILED = None
 
 # Import provider capabilities
 try:
