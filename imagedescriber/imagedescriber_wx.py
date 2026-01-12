@@ -125,11 +125,14 @@ if getattr(sys, 'frozen', False):
         BatchProcessingWorker,
         WorkflowProcessWorker,
         VideoProcessingWorker,
+        HEICConversionWorker,
         EVT_PROGRESS_UPDATE,
         EVT_PROCESSING_COMPLETE,
         EVT_PROCESSING_FAILED,
         EVT_WORKFLOW_COMPLETE,
         EVT_WORKFLOW_FAILED,
+        EVT_CONVERSION_COMPLETE,
+        EVT_CONVERSION_FAILED,
     )
 else:
     # Development: try relative imports first, fall back to absolute
@@ -150,11 +153,14 @@ else:
             BatchProcessingWorker,
             WorkflowProcessWorker,
             VideoProcessingWorker,
+            HEICConversionWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
             EVT_WORKFLOW_COMPLETE,
             EVT_WORKFLOW_FAILED,
+            EVT_CONVERSION_COMPLETE,
+            EVT_CONVERSION_FAILED,
         )
     except ImportError as e_rel:
         print(f"[DEBUG] Relative import failed, trying absolute: {e_rel}")
@@ -174,11 +180,14 @@ else:
             BatchProcessingWorker,
             WorkflowProcessWorker,
             VideoProcessingWorker,
+            HEICConversionWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
             EVT_WORKFLOW_COMPLETE,
             EVT_WORKFLOW_FAILED,
+            EVT_CONVERSION_COMPLETE,
+            EVT_CONVERSION_FAILED,
         )
 
 # Import provider capabilities
@@ -262,6 +271,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.Bind(EVT_WORKFLOW_COMPLETE, self.on_workflow_complete)
         if EVT_WORKFLOW_FAILED:
             self.Bind(EVT_WORKFLOW_FAILED, self.on_workflow_failed)
+        if EVT_CONVERSION_COMPLETE:
+            self.Bind(EVT_CONVERSION_COMPLETE, self.on_conversion_complete)
+        if EVT_CONVERSION_FAILED:
+            self.Bind(EVT_CONVERSION_FAILED, self.on_conversion_failed)
         
         # Bind keyboard events for single-key shortcuts (matching Qt6 behavior)
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
@@ -2017,7 +2030,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, "No items were marked for batch processing")
     
     def on_convert_heic(self, event):
-        """Convert HEIC files"""
+        """Convert HEIC files to JPEG format"""
         if not self.workspace or not self.workspace.items:
             show_warning(self, "No images in workspace")
             return
@@ -2030,15 +2043,60 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, "No HEIC files found in workspace")
             return
         
-        msg = f"Found {len(heic_files)} HEIC file(s).\n\nConvert to JPEG format?"
+        msg = f"Found {len(heic_files)} HEIC file(s).\n\nConvert to JPEG format?\n\n"
+        msg += "Note: Original HEIC files will be deleted after successful conversion."
         if not ask_yes_no(self, msg):
             return
         
-        # For now, inform user about the conversion process
-        # Full ConversionWorker implementation would be added here
-        show_info(self, f"HEIC conversion initiated for {len(heic_files)} files.\n\nNote: Full worker implementation pending.\nFiles will be processed using built-in conversion.")
+        # Start HEIC conversion worker
+        if HEICConversionWorker:
+            worker = HEICConversionWorker(self, heic_files, quality=95)
+            worker.start()
+            self.SetStatusText(f"Converting {len(heic_files)} HEIC files...", 0)
+        else:
+            show_error(self, "HEIC conversion worker not available")
+    
+    def on_conversion_complete(self, event):
+        """Handle HEIC conversion completion"""
+        converted_count = event.converted_count
+        failed_count = event.failed_count
+        converted_files = event.converted_files
         
-        self.SetStatusText(f"Converting {len(heic_files)} HEIC files...", 0)
+        # Reload workspace to include newly converted JPG files
+        if converted_count > 0:
+            # Add converted JPG files to workspace
+            for jpg_path in converted_files:
+                if jpg_path not in self.workspace.items:
+                    from data_models import ImageItem
+                    new_item = ImageItem(file_path=jpg_path)
+                    self.workspace.items[jpg_path] = new_item
+            
+            # Remove HEIC files from workspace (they've been deleted)
+            heic_paths_to_remove = [
+                path for path in self.workspace.items.keys()
+                if Path(path).suffix.lower() in ['.heic', '.heif']
+            ]
+            for heic_path in heic_paths_to_remove:
+                del self.workspace.items[heic_path]
+            
+            self.mark_modified()
+            self.refresh_image_list()
+        
+        # Show completion message
+        if failed_count == 0:
+            msg = f"Successfully converted {converted_count} HEIC file(s) to JPEG"
+            show_info(self, msg)
+            self.SetStatusText(msg, 0)
+        else:
+            msg = f"Converted {converted_count} file(s), {failed_count} failed"
+            show_warning(self, msg + f"\n\nFailed files:\n" + "\n".join(event.failed_files))
+            self.SetStatusText(msg, 0)
+    
+    def on_conversion_failed(self, event):
+        """Handle HEIC conversion failure"""
+        error_msg = f"HEIC conversion failed: {event.error}"
+        show_error(self, error_msg)
+        self.SetStatusText("Conversion failed", 0)
     
     # Descriptions menu handlers
     def on_edit_description(self, event):

@@ -44,6 +44,8 @@ ProcessingCompleteEvent, EVT_PROCESSING_COMPLETE = wx.lib.newevent.NewEvent()
 ProcessingFailedEvent, EVT_PROCESSING_FAILED = wx.lib.newevent.NewEvent()
 WorkflowCompleteEvent, EVT_WORKFLOW_COMPLETE = wx.lib.newevent.NewEvent()
 WorkflowFailedEvent, EVT_WORKFLOW_FAILED = wx.lib.newevent.NewEvent()
+ConversionCompleteEvent, EVT_CONVERSION_COMPLETE = wx.lib.newevent.NewEvent()
+ConversionFailedEvent, EVT_CONVERSION_FAILED = wx.lib.newevent.NewEvent()
 
 
 # Custom event classes that properly store attributes
@@ -752,3 +754,96 @@ class VideoProcessingWorker(threading.Thread):
             frame_num += 1
         
         return extracted_paths
+
+
+class HEICConversionWorker(threading.Thread):
+    """Worker thread for converting HEIC files to JPEG
+    
+    Converts HEIC/HEIF images to JPEG format in-place, preserving metadata.
+    Emits progress updates and results via wxPython events.
+    
+    Events:
+        ProgressUpdateEvent: Progress messages during conversion
+        ConversionCompleteEvent: Successful conversion (count, converted_files)
+        ConversionFailedEvent: Conversion error (error message)
+    """
+    
+    def __init__(self, parent_window, heic_files: list, quality: int = 95):
+        """Initialize HEIC conversion worker
+        
+        Args:
+            parent_window: Parent wxPython window for event posting
+            heic_files: List of HEIC file paths to convert
+            quality: JPEG quality (1-100, default 95)
+        """
+        super().__init__(daemon=True)
+        self.parent = parent_window
+        self.heic_files = heic_files
+        self.quality = quality
+        self._stop_event = threading.Event()
+    
+    def run(self):
+        """Convert HEIC files to JPEG"""
+        try:
+            # Import conversion function from scripts
+            sys.path.insert(0, str(_project_root / 'scripts'))
+            from ConvertImage import convert_heic_to_jpg
+            
+            converted = []
+            failed = []
+            total = len(self.heic_files)
+            
+            for i, heic_path in enumerate(self.heic_files, 1):
+                if self._stop_event.is_set():
+                    break
+                
+                heic_file = Path(heic_path)
+                self._post_progress(f"Converting {i}/{total}: {heic_file.name}")
+                
+                # Convert in-place (HEIC -> JPG in same directory)
+                output_path = heic_file.with_suffix('.jpg')
+                
+                try:
+                    success = convert_heic_to_jpg(
+                        heic_file,
+                        output_path,
+                        quality=self.quality,
+                        keep_metadata=True
+                    )
+                    
+                    if success:
+                        converted.append(str(output_path))
+                        # Delete original HEIC file after successful conversion
+                        try:
+                            heic_file.unlink()
+                        except OSError as e:
+                            # If deletion fails, log but don't treat as conversion failure
+                            print(f"Warning: Could not delete {heic_file}: {e}")
+                    else:
+                        failed.append(heic_file.name)
+                
+                except Exception as e:
+                    failed.append(f"{heic_file.name} ({str(e)})")
+            
+            # Post completion event
+            evt = ConversionCompleteEvent(
+                converted_count=len(converted),
+                failed_count=len(failed),
+                converted_files=converted,
+                failed_files=failed
+            )
+            wx.PostEvent(self.parent, evt)
+        
+        except Exception as e:
+            # Post failure event
+            evt = ConversionFailedEvent(error=str(e))
+            wx.PostEvent(self.parent, evt)
+    
+    def _post_progress(self, message: str):
+        """Post progress update to parent window"""
+        evt = ProgressUpdateEvent(file_path=None, message=message)
+        wx.PostEvent(self.parent, evt)
+    
+    def stop(self):
+        """Request worker to stop"""
+        self._stop_event.set()
