@@ -2044,7 +2044,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
         
         msg = f"Found {len(heic_files)} HEIC file(s).\n\nConvert to JPEG format?\n\n"
-        msg += "Note: Original HEIC files will be deleted after successful conversion."
+        msg += "Note: Original HEIC files will be preserved. JPG copies will be created in the same directory."
         if not ask_yes_no(self, msg):
             return
         
@@ -2071,13 +2071,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     new_item = ImageItem(file_path=jpg_path)
                     self.workspace.items[jpg_path] = new_item
             
-            # Remove HEIC files from workspace (they've been deleted)
-            heic_paths_to_remove = [
-                path for path in self.workspace.items.keys()
-                if Path(path).suffix.lower() in ['.heic', '.heif']
-            ]
-            for heic_path in heic_paths_to_remove:
-                del self.workspace.items[heic_path]
+            # NOTE: HEIC files are preserved in workspace
+            # Users can manually remove them if desired
             
             self.mark_modified()
             self.refresh_image_list()

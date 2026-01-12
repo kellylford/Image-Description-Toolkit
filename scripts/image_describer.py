@@ -702,6 +702,11 @@ class ImageDescriber:
                 return None
             
             # Optimize image size for cloud providers (Claude 5MB limit, OpenAI 20MB)
+            # WARNING: optimize_image_size modifies the file in-place!
+            # This is safe here because:
+            # 1. When called via workflow, files are copies in workflow_output directory
+            # 2. When called standalone, user is responsible for working on copies
+            # See workflow.py copy_or_link_images() for how workflow protects originals
             if self.provider_name in ["claude", "openai"]:
                 # Determine appropriate size limit based on provider
                 max_size = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
@@ -908,6 +913,8 @@ class ImageDescriber:
                 
                 # SAFETY CHECK: Ensure image size is under limit before sending to provider
                 # This is a fallback in case the earlier optimization didn't run
+                # WARNING: optimize_image_size modifies the file in-place!
+                # Safe when files are in workflow directories (copies), but be cautious with standalone use
                 if self.provider_name in ["claude", "openai"]:
                     current_size = image_path.stat().st_size
                     max_allowed = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
@@ -1977,7 +1984,13 @@ def main():
         default_style = get_default_prompt_style()
     
     parser = argparse.ArgumentParser(
-        description="Process images with AI vision models and save descriptions to a text file",
+        description="""Process images with AI vision models and save descriptions to a text file
+
+⚠️  IMPORTANT: For cloud providers (OpenAI, Claude), large images may be optimized in-place
+    to meet file size limits. Always use the workflow command or work on copies of your photos!
+    
+    Recommended: Use 'idt workflow' instead to ensure originals are never modified.
+    Direct use: Only run this on copies in a workflow output directory.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Available prompt styles: {', '.join(available_styles)}

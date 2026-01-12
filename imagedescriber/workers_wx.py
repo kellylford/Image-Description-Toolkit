@@ -813,12 +813,8 @@ class HEICConversionWorker(threading.Thread):
                     
                     if success:
                         converted.append(str(output_path))
-                        # Delete original HEIC file after successful conversion
-                        try:
-                            heic_file.unlink()
-                        except OSError as e:
-                            # If deletion fails, log but don't treat as conversion failure
-                            print(f"Warning: Could not delete {heic_file}: {e}")
+                        # NOTE: Original HEIC file is preserved (not deleted)
+                        # This follows IDT's rule: never modify originals in original location
                     else:
                         failed.append(heic_file.name)
                 
