@@ -121,28 +121,27 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
         pass
     
     # Fall back to default image_describer_config.json
+    # Use config_loader for PyInstaller-compatible path resolution
     try:
-        import json
-        # Try different possible paths for the config file
-        config_paths = [
-            "image_describer_config.json",
-            "scripts/image_describer_config.json"
-        ]
-        
-        for config_path in config_paths:
-            try:
-                with open(config_path, 'r') as f:
-                    img_config = json.load(f)
-                    default_model = img_config.get("default_model")
-                    if default_model:
-                        return sanitize_name(default_model)
-                    # Fallback to old structure
-                    model = img_config.get("model_settings", {}).get("model")
-                    if model:
-                        return sanitize_name(model)
-            except FileNotFoundError:
-                continue
-                
+        from scripts.config_loader import load_json_config
+    except ImportError:
+        try:
+            from config_loader import load_json_config
+        except ImportError:
+            # Fallback: config_loader not available
+            return "unknown"
+    
+    try:
+        cfg, path, source = load_json_config('image_describer_config.json',
+                                              env_var_file='IDT_IMAGE_DESCRIBER_CONFIG')
+        if cfg:
+            default_model = cfg.get("default_model")
+            if default_model:
+                return sanitize_name(default_model)
+            # Fallback to old structure
+            model = cfg.get("model_settings", {}).get("model")
+            if model:
+                return sanitize_name(model)
     except Exception:
         pass
         

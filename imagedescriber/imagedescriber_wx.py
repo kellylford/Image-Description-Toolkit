@@ -301,11 +301,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Add processing status if items are being processed
         if self.processing_items:
             num_processing = len(self.processing_items)
+            current_title = self.GetTitle()
             if num_processing == 1:
-                current_title = self.GetTitle()
-                self.SetTitle(f"{current_title} - Processing 1 item...")
+                self.SetTitle(f"{current_title} - Processing...")
             else:
-                current_title = self.GetTitle()
                 self.SetTitle(f"{current_title} - Processing {num_processing} items...")
     
     def load_config(self):
@@ -689,12 +688,35 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Populate descriptions list with accessible pattern
         if image_item.descriptions:
-            # Build description list data with full text + metadata
+            # Build description list data with full text + metadata appended
             desc_data = []
             for desc in image_item.descriptions:
+                # Format description with metadata appended for screen readers
+                full_text = desc.text
+                
+                # Append metadata at the end (provider, model, prompt)
+                metadata_lines = []
+                metadata_lines.append("\n\n---")
+                if desc.provider:
+                    metadata_lines.append(f"Provider: {desc.provider}")
+                if desc.model:
+                    metadata_lines.append(f"Model: {desc.model}")
+                if desc.prompt_style:
+                    # If custom prompt was used, show 'custom' instead of base style
+                    if desc.custom_prompt:
+                        prompt_display = "custom"
+                    else:
+                        prompt_display = desc.prompt_style
+                    metadata_lines.append(f"Prompt: {prompt_display}")
+                if desc.created:
+                    created_date = desc.created.split('T')[0] if 'T' in desc.created else desc.created
+                    metadata_lines.append(f"Created: {created_date}")
+                
+                full_text_with_metadata = full_text + "\n".join(metadata_lines)
+                
                 # Create dict with full description + metadata for accessibility
                 entry = {
-                    'description': desc.text,  # Full text for screen readers
+                    'description': full_text_with_metadata,  # Full text with metadata for screen readers
                     'model': desc.model,
                     'prompt_style': desc.prompt_style,
                     'created': desc.created,
@@ -705,8 +727,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Load into accessible listbox (truncates visually, full text to screen readers)
             self.desc_list.LoadDescriptions(desc_data)
             
-            # Show the first description in editor
-            self.description_text.SetValue(image_item.descriptions[0].text)
+            # Show the first description in editor with metadata
+            first_desc = image_item.descriptions[0]
+            first_text = first_desc.text
+            
+            # Append metadata to first description for editor display
+            metadata_lines = []
+            metadata_lines.append("\n\n---")
+            if first_desc.provider:
+                metadata_lines.append(f"Provider: {first_desc.provider}")
+            if first_desc.model:
+                metadata_lines.append(f"Model: {first_desc.model}")
+            if first_desc.prompt_style:
+                if first_desc.custom_prompt:
+                    prompt_display = "custom"
+                else:
+                    prompt_display = first_desc.prompt_style
+                metadata_lines.append(f"Prompt: {prompt_display}")
+            if first_desc.created:
+                created_date = first_desc.created.split('T')[0] if 'T' in first_desc.created else first_desc.created
+                metadata_lines.append(f"Created: {created_date}")
+            
+            first_text_with_metadata = first_text + "\n".join(metadata_lines)
+            self.description_text.SetValue(first_text_with_metadata)
             
             # Enable save button
             self.save_desc_btn.Enable(True)
@@ -1152,40 +1195,37 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_list.SetSelection(new_selection_index)
             # Ensure it's visible
             self.image_list.EnsureVisible(new_selection_index)
+        elif self.image_list.GetCount() > 0:
+            # No previous selection - select first item (e.g., after loading directory)
+            self.image_list.SetSelection(0)
+            self.image_list.EnsureVisible(0)
+            # Trigger selection event to update display
+            first_file_path = self.image_list.GetClientData(0)
+            if first_file_path and first_file_path in self.workspace.items:
+                self.current_image_item = self.workspace.items[first_file_path]
+                self.display_image_info(self.current_image_item)
     
     def on_process_single(self, event):
         """Process single selected image"""
-        print("[on_process_single] Button clicked!")
-        
         if not self.current_image_item:
-            print("[on_process_single] No image selected!")
             show_warning(self, "No image selected")
             return
         
-        print(f"[on_process_single] Processing: {self.current_image_item.file_path}")
-        
         if not ProcessingWorker:
-            print("[on_process_single] ProcessingWorker is None!")
             show_error(self, "Processing worker not available")
             return
         
-        print(f"[on_process_single] ProcessingWorker available: {ProcessingWorker}")
-        
         # Show processing options dialog
         if ProcessingOptionsDialog:
-            print("[on_process_single] Showing options dialog...")
             dialog = ProcessingOptionsDialog(self.config, self)
             if dialog.ShowModal() != wx.ID_OK:
-                print("[on_process_single] Dialog cancelled")
                 dialog.Destroy()
                 return
             
             options = dialog.get_config()
-            print(f"[on_process_single] Options: {options}")
             dialog.Destroy()
         else:
             # Use defaults
-            print("[on_process_single] Using default options")
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
                 'model': self.config.get('default_model', 'moondream'),
@@ -1195,7 +1235,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             }
         
         # Start processing worker
-        print("[on_process_single] Creating worker thread...")
         worker = ProcessingWorker(
             self,
             self.current_image_item.file_path,
@@ -1206,7 +1245,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,  # detection_settings
             None   # prompt_config_path
         )
-        print(f"[on_process_single] Worker created: {worker}")
         
         # Mark as processing with provider/model info
         self.processing_items[self.current_image_item.file_path] = {
@@ -1215,9 +1253,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         }
         self.refresh_image_list()
         
-        print("[on_process_single] Starting worker thread...")
+        # Update window title to show processing status
+        self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
+        
         worker.start()
-        print("[on_process_single] Worker thread started!")
         
         self.SetStatusText(f"Processing: {Path(self.current_image_item.file_path).name}...", 0)
     
@@ -1425,15 +1464,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_worker_complete(self, event):
         """Handle successful processing completion"""
-        print(f"[on_worker_complete] Processing complete for: {event.file_path}")
-        print(f"[on_worker_complete] Description: {event.description[:100]}...")
-        
         # Remove from processing items
         self.processing_items.pop(event.file_path, None)
         
         # Find the image item and add description
         if event.file_path in self.workspace.items:
-            print(f"[on_worker_complete] Found image in workspace")
             image_item = self.workspace.items[event.file_path]
             desc = ImageDescription(
                 text=event.description,
@@ -1443,11 +1478,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 provider=event.provider
             )
             image_item.add_description(desc)
-            print(f"[on_worker_complete] Added description to image")
             self.mark_modified()
             self.refresh_image_list()
             
-            # Update window title to reflect processing status
+            # Update window title to reflect processing status (removes "Processing" when done)
             self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
             
             # Update display if this is the current image
@@ -1455,18 +1489,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.display_image_info(image_item)
             
             self.SetStatusText(f"Completed: {Path(event.file_path).name}", 0)
-        else:
-            print(f"[on_worker_complete] Image NOT found in workspace!")
     
     def on_worker_failed(self, event):
         """Handle processing failures"""
-        print(f"[on_worker_failed] Processing failed: {event.error}")
-        
         # Remove from processing items
         self.processing_items.pop(event.file_path, None)
         self.refresh_image_list()
         
-        # Update window title to reflect processing status
+        # Update window title to reflect processing status (removes "Processing" when failed)
         self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
         
         show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{event.error}")

@@ -137,12 +137,8 @@ class ProcessingWorker(threading.Thread):
     def run(self):
         """Execute processing in background thread"""
         try:
-            print(f"[ProcessingWorker] Starting processing: {Path(self.file_path).name}")
-            print(f"[ProcessingWorker] Provider: {self.provider}, Model: {self.model}")
-            
             # Load prompt configuration
             config = self._load_prompt_config()
-            print(f"[ProcessingWorker] Config loaded")
             
             # Get the actual prompt text
             if self.custom_prompt:
@@ -158,18 +154,13 @@ class ProcessingWorker(threading.Thread):
                 else:
                     prompt_text = "Describe this image."
             
-            print(f"[ProcessingWorker] Prompt text: {prompt_text[:50]}...")
-            
             # Emit progress
             self._post_progress(f"Processing with {self.provider} {self.model}...")
             
             # Process the image with selected provider
-            print(f"[ProcessingWorker] Starting AI processing...")
             description = self._process_with_ai(self.file_path, prompt_text)
-            print(f"[ProcessingWorker] Got description: {description[:50]}...")
             
             # Emit success
-            print(f"[ProcessingWorker] Posting success event...")
             evt = ProcessingCompleteEventData(
                 file_path=self.file_path,
                 description=description,
@@ -179,13 +170,9 @@ class ProcessingWorker(threading.Thread):
                 custom_prompt=self.custom_prompt
             )
             wx.PostEvent(self.parent_window, evt)
-            print(f"[ProcessingWorker] Success event posted")
             
         except Exception as e:
             # Emit failure
-            print(f"[ProcessingWorker] ERROR: {e}")
-            import traceback
-            traceback.print_exc()
             evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e))
             wx.PostEvent(self.parent_window, evt)
     
@@ -230,8 +217,8 @@ class ProcessingWorker(threading.Thread):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                     return self._normalize_prompt_config(config)
-        except Exception as e:
-            print(f"Failed to load config: {e}")
+        except Exception:
+            pass
         
         # Return default config
         return {
@@ -259,29 +246,21 @@ class ProcessingWorker(threading.Thread):
     
     def _process_with_ai(self, image_path: str, prompt: str) -> str:
         """Process image with selected AI provider"""
-        print(f"[_process_with_ai] Starting with provider: {self.provider}")
-        
         if not get_available_providers:
-            print(f"[_process_with_ai] ERROR: get_available_providers is None!")
             raise Exception("AI providers module not available")
         
         # Get available providers
-        print(f"[_process_with_ai] Getting available providers...")
         providers = get_available_providers()
-        print(f"[_process_with_ai] Available providers: {list(providers.keys())}")
         
         if self.provider not in providers:
-            print(f"[_process_with_ai] ERROR: Provider '{self.provider}' not in available providers")
             raise Exception(f"Provider '{self.provider}' not available")
         
         provider = providers[self.provider]
-        print(f"[_process_with_ai] Got provider object: {provider}")
         
         try:
             # Check if it's a HEIC file and convert if needed
             path_obj = Path(image_path)
             if path_obj.suffix.lower() in ['.heic', '.heif']:
-                print(f"[_process_with_ai] Converting HEIC file...")
                 converted_path = self._convert_heic_to_jpeg(image_path)
                 if converted_path:
                     image_path = converted_path
@@ -289,7 +268,6 @@ class ProcessingWorker(threading.Thread):
                     raise Exception("Failed to convert HEIC file")
             
             # Read and encode image with size limits
-            print(f"[_process_with_ai] Reading image file...")
             with open(image_path, 'rb') as f:
                 image_data = f.read()
             
@@ -297,15 +275,9 @@ class ProcessingWorker(threading.Thread):
             # Claude has 5MB limit, target 3.75MB to account for base64 encoding overhead
             max_size = 3.75 * 1024 * 1024  # 3.75MB
             if len(image_data) > max_size:
-                print(f"[_process_with_ai] Image too large ({len(image_data)} bytes), resizing...")
                 image_data = self._resize_image_data(image_data, max_size)
             
-            print(f"Processing {path_obj.name} with {self.provider} {self.model}")
-            print(f"Image size: {len(image_data)} bytes")
-            print(f"Prompt: {prompt[:100]}...")
-            
             # Process with the selected provider
-            print(f"[_process_with_ai] Calling provider.describe_image()...")
             if self.provider == "object_detection" and self.detection_settings:
                 description = provider.describe_image(image_path, prompt, self.model, 
                                                      yolo_settings=self.detection_settings)
@@ -315,22 +287,9 @@ class ProcessingWorker(threading.Thread):
             else:
                 description = provider.describe_image(image_path, prompt, self.model)
             
-            print(f"[_process_with_ai] Got description from provider")
             return description
                 
         except Exception as e:
-            print(f"AI processing error: {str(e)}")
-            print(f"Provider: {self.provider}")
-            print(f"Model: {self.model}")
-            print(f"Image path: {image_path}")
-            
-            # Try to get more detailed error info
-            try:
-                import traceback
-                traceback.print_exc()
-            except:
-                pass
-            
             raise Exception(f"AI processing failed: {str(e)}")
     
     def _convert_heic_to_jpeg(self, heic_path: str) -> Optional[str]:
