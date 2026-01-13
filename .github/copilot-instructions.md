@@ -2,6 +2,13 @@
 
 **Agent Acknowledgment**: At the start of each response, identify yourself using your actual model name and confirm you understand and will follow these instructions.
 
+# ⚠️ CRITICAL REMINDERS
+
+**NEVER claim code is fixed without actually RUNNING it**
+**PyInstaller frozen executables are NOT the same as Python scripts**
+**`from scripts.X` ALWAYS fails in frozen mode - use module-level imports**
+**Production code that's been working for months should be changed with EXTREME caution**
+
 Follow these guidelines for all coding work on this project.
 
 ## Code Quality Standards
@@ -43,6 +50,87 @@ Follow these guidelines for all coding work on this project.
     - Verify argument parsers don't have conflicting flags (e.g., two `-c` arguments)
     - Check if frozen executable vs dev mode have different code paths
     - Assume there ARE related bugs you haven't found yet - actively hunt for them
+
+## Forbidden Code Patterns (PyInstaller Compatibility)
+
+These patterns ALWAYS break in PyInstaller frozen mode:
+
+❌ **NEVER use these imports:**
+```python
+from scripts.module_name import X
+from imagedescriber.module import X
+from analysis.module import X
+```
+
+✅ **ALWAYS use module-level imports with try/except:**
+```python
+# At module level (top of file)
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
+# Then use the imported variable in functions
+# DON'T re-import inside functions!
+```
+
+✅ **If you MUST import in a function (rare), use this pattern:**
+```python
+try:
+    from module_name import X  # Frozen mode
+except ImportError:
+    from scripts.module_name import X  # Dev mode only
+```
+
+**Why this matters:** In frozen executables, PyInstaller flattens the directory structure. The `scripts` package doesn't exist in `_MEIPASS`. Code that works perfectly in development will crash in production if you use `from scripts.X`.
+
+## Mandatory Testing Protocol for Core Files
+
+**Files requiring BUILD + RUN testing before claiming complete:**
+- `scripts/workflow.py`
+- `scripts/image_describer.py`
+- `idt/idt_cli.py`
+- Any file included in PyInstaller .spec files
+
+**Testing Protocol:**
+1. Make code changes
+2. Run `cd idt && build_idt.bat` (Windows) or full `builditall_wx.bat`
+3. Run `dist\idt.exe workflow testimages` with actual test data
+4. Verify it completes WITHOUT ERRORS (exit code 0)
+5. Check log files in `wf_*/logs/` for actual errors
+6. Read the workflow log AND the image_describer log
+7. ONLY THEN claim the fix is complete
+
+**Session Summary Requirements:**
+Must include:
+- **Build verification**: "Built idt.exe successfully: [YES/NO]"
+- **Runtime testing**: "Tested with command: `[actual command]`"
+- **Test results**: "Exit code: [X], Errors: [Y/N], Log file reviewed: [path]"
+- **NOT tested**: Explicitly state what wasn't tested and why
+
+**Never say "this should work" or "the fix looks correct" - PROVE it works.**
+
+## Variable Renaming Safety Checklist
+
+When renaming variables or refactoring:
+1. Search for ALL usages: `grep -r "old_name" scripts/` or use `list_code_usages` tool
+2. Check both the variable itself AND similar names (e.g., `unique_images` vs `unique_source_count`)
+3. In functions with 500+ lines, assume high risk of missing references
+4. Test after EVERY change, not just at the end
+5. If renaming affects return values, check ALL callers
+
+**Example of what goes wrong:** Renaming `unique_images` to `unique_source_count` in one place but missing it in return statements causes `NameError: name 'unique_source_count' is not defined`.
+
+## Regression Prevention Rules
+
+Before "fixing" working code:
+1. **Verify the bug exists** - Don't fix based on theory alone
+2. **Test the current behavior** - What actually happens vs. what should happen?
+3. **Minimal changes only** - Don't refactor while fixing bugs
+4. **One problem at a time** - Don't fix multiple issues in one commit
+5. **Production code caution** - If code has been working in production for months, be EXTREMELY cautious about "improvements"
+
+If the user reports something "has been working for months," your first assumption should be: **The code is probably correct, and the issue is elsewhere.**
 
 
 

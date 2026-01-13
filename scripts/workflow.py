@@ -122,14 +122,9 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
     
     # Fall back to default image_describer_config.json
     # Use config_loader for PyInstaller-compatible path resolution
-    try:
-        from scripts.config_loader import load_json_config
-    except ImportError:
-        try:
-            from config_loader import load_json_config
-        except ImportError:
-            # Fallback: config_loader not available
-            return "unknown"
+    if load_json_config is None:
+        # config_loader not available (module-level import failed)
+        return "unknown"
     
     try:
         cfg, path, source = load_json_config('image_describer_config.json',
@@ -156,17 +151,12 @@ def validate_prompt_style(style: str, config_file: str = "image_describer_config
     if not style:
         return "detailed"
     
-    try:
-        # Import at module level to avoid repeated imports
-        from scripts.config_loader import load_json_config
-    except ImportError:
-        try:
-            from config_loader import load_json_config
-        except ImportError:
-            # Fallback: config_loader not available, return style as-is if it looks valid
-            if style and len(style) > 0:
-                return style
-            return "detailed"
+    # Use module-level load_json_config
+    if load_json_config is None:
+        # Fallback: config_loader not available, return style as-is if it looks valid
+        if style and len(style) > 0:
+            return style
+        return "detailed"
     
     try:
         cfg, path, source = load_json_config('image_describer_config.json', 
@@ -1022,7 +1012,11 @@ class WorkflowOrchestrator:
         Returns:
             Dict containing download results and statistics
         """
-        from scripts.web_image_downloader import WebImageDownloader
+        try:
+            from scripts.web_image_downloader import WebImageDownloader
+        except ImportError:
+            # Frozen mode - scripts package doesn't exist
+            from web_image_downloader import WebImageDownloader
         
         if not self.url:
             raise ValueError("URL is required for download step")
@@ -2029,16 +2023,16 @@ class WorkflowOrchestrator:
                 total_processed = len(combined_image_list)
                 
                 # Validate that we described the expected number of images
-                if total_processed != unique_source_count:
-                    self.logger.warning(f"Description count mismatch: processed {total_processed} but expected {unique_source_count} unique images")
+                if total_processed != unique_images:
+                    self.logger.warning(f"Description count mismatch: processed {total_processed} but expected {unique_images} unique images")
                 else:
-                    self.logger.info(f"Validation: All {unique_source_count} unique images were described")
+                    self.logger.info(f"Validation: All {unique_images} unique images were described")
             else:
                 self.logger.error(f"Image description failed: {result.stderr}")
                 return {
                     "success": False, 
                     "error": f"Image description process failed: {result.stderr}",
-                    "unique_images": unique_source_count,
+                    "unique_images": unique_images,
                     "conversions": conversion_count
                 }
             
@@ -2051,7 +2045,7 @@ class WorkflowOrchestrator:
                 return {
                     "success": True,
                     "processed": total_processed,
-                    "unique_images": unique_source_count,
+                    "unique_images": unique_images,
                     "conversions": conversion_count,
                     "output_dir": output_dir,
                     "description_file": target_desc_file
@@ -2061,7 +2055,7 @@ class WorkflowOrchestrator:
                 return {
                     "success": False, 
                     "error": "Description file not created",
-                    "unique_images": unique_source_count,
+                    "unique_images": unique_images,
                     "conversions": conversion_count
                 }
                 
@@ -2070,7 +2064,7 @@ class WorkflowOrchestrator:
             return {
                 "success": False, 
                 "error": str(e),
-                "unique_images": unique_source_count if 'unique_source_count' in locals() else 0,
+                "unique_images": unique_images if 'unique_images' in locals() else 0,
                 "conversions": conversion_count if 'conversion_count' in locals() else 0
             }
     
