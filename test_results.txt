@@ -1,0 +1,51 @@
+======================================================================
+Running Unit Tests (Python 3.13 compatible runner)
+======================================================================
+
+Found 15 test file(s)
+
+======================================================================
+Running: test_entry_points.py
+======================================================================
+
+  Testing test_entry_points::TestCLIEntryPoints
+    [FAIL] test_idt_check_models_launches
+      AssertionError: check-models should exit cleanly (got 2)
+    [PASS] test_idt_guideme_launches
+    [FAIL] test_idt_help
+      AssertionError: idt help should exit cleanly
+    [FAIL] test_idt_results_list_launches
+      AssertionError: results-list should exit cleanly (got 2)
+    [FAIL] test_idt_version
+      AssertionError: idt version should exit successfully
+    [FAIL] test_idt_workflow_help
+      AssertionError: workflow --help should exit successfully (got 2)
+
+  Testing test_entry_points::TestGUIEntryPoints
+ImageDescriber not found, skipping launch test
+    [PASS] test_imagedescriber_launches
+PromptEditor not found, skipping launch test
+    [PASS] test_prompteditor_launches
+Viewer not found, skipping launch test
+    [PASS] test_viewer_launches
+
+======================================================================
+Running: test_configuration_system.py
+======================================================================
+
+  Testing test_configuration_system::TestBasicConfigResolution
+    [PASS] test_cwd_resolution
+    [PASS] test_explicit_path_resolution
+    [PASS] test_missing_config_returns_fallback
+
+  Testing test_configuration_system::TestConfigFiles
+    [PASS] test_image_describer_config_exists_and_valid
+    [PASS] test_video_frame_extractor_config_exists_and_valid
+    [PASS] test_workflow_config_exists_and_valid
+
+  Testing test_configuration_system::TestConfigFlagSupport
+    [PASS] test_guided_workflow_accepts_config_argument
+    [PASS] test_list_prompts_accepts_config_argument
+    [PASS] test_list_prompts_uses_config_loader
+ERROR: PIL (Pillow) not installed
+Install with: pip install Pillow
