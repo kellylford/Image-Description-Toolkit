@@ -20,6 +20,13 @@ try:
     from config_loader import load_json_config
 except ImportError:
     load_json_config = None
+
+# Import shared window title builder
+try:
+    from shared.window_title_builder import build_window_title
+except ImportError:
+    build_window_title = None
+
 import logging
 from datetime import datetime
 import sys
@@ -82,6 +89,24 @@ class VideoFrameExtractor:
 
     def _build_window_title(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
         """Build a descriptive window title similar to image_describer."""
+        if build_window_title:
+            return build_window_title(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                operation="Extracting Video Frames",
+                suffix=suffix
+            )
+        else:
+            return self._build_window_title_fallback(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                suffix=suffix
+            )
+    
+    def _build_window_title_fallback(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
+        """Fallback window title builder (used when shared module unavailable)"""
         base = f"IDT - Extracting Video Frames ({progress_percent}%, {current} of {total})"
         return base + suffix
         

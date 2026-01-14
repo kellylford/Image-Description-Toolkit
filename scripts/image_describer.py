@@ -29,6 +29,12 @@ import gc
 import time
 from datetime import datetime
 
+# Import shared window title builder
+try:
+    from shared.window_title_builder import build_window_title_from_context
+except ImportError:
+    build_window_title_from_context = None
+
 # Import shared metadata extraction module
 try:
     from metadata_extractor import MetadataExtractor, NominatimGeocoder
@@ -242,6 +248,27 @@ class ImageDescriber:
     
     def _build_window_title(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
         """Build a descriptive window title with workflow context"""
+        if build_window_title_from_context:
+            return build_window_title_from_context(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                operation="Describing Images",
+                workflow_name=self.workflow_name,
+                prompt_style=self.prompt_style,
+                model_name=self.model_name,
+                suffix=suffix
+            )
+        else:
+            return self._build_window_title_fallback(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                suffix=suffix
+            )
+    
+    def _build_window_title_fallback(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
+        """Fallback window title builder (used when shared module unavailable)"""
         base_title = f"IDT - Describing Images ({progress_percent}%, {current} of {total})"
         
         # Add suffix if provided (e.g., " - Skipped", " - Validation Failed")
