@@ -1211,7 +1211,9 @@ class ImageDescriber:
                     f.write(f"Directory: {directory_path}\n")
                     f.write(f"Runtime Configuration: Model='{self.model_name}', Prompt='{self.prompt_style}'\n")
                     f.write(f"Config File Model Settings: {self.config.get('model_settings', {})}\n")
-                    f.write("=" * 80 + "\n\n")
+                    f.write("=" * 80 + "\n")
+                    # Add separator line before first description entry so it's properly delimited
+                    f.write("-" * 80 + "\n\n")
                 logger.info(f"Created output file: {output_file}")
                 # Create new progress file
                 progress_file.write_text("")

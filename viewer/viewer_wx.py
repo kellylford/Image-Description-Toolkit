@@ -994,8 +994,16 @@ class ImageDescriptionViewer(wx.Frame):
             separator = '-' * 80
             sections = content.split(separator)
             
-            for section in sections[1:]:
+            # Parse all sections, not just sections[1:] - this handles both old and new file formats
+            # The first section may contain only the header, or header + first description (in older files)
+            for section in sections:
                 if not section.strip():
+                    continue
+                
+                # Skip sections that are pure header with no image entries
+                # Pure headers contain metadata but no "File:" entries for actual images
+                section_lower = section.lower()
+                if ('image descriptions generated' in section_lower and 'file:' not in section_lower):
                     continue
                 
                 desc = self.parse_entry(section.strip())
