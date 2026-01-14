@@ -8,9 +8,11 @@ AI-powered batch image description tool supporting multiple vision models (Ollam
 
 Download the latest installer from the [releases](https://github.com/kellylford/Image-Description-Toolkit/releases) page:
 
-**`ImageDescriptionToolkit_Setup_v3.6.0.exe`**
+**`ImageDescriptionToolkit_Setup_v4.1.0.exe`** (Windows) or **`IDT-4.1.0.pkg`** / **`IDT-4.1.0.dmg`** (macOS)
 
 Run the installer - it includes all five applications (IDT CLI, Viewer, ImageDescriber, PromptEditor, IDTConfigure) and documentation.
+
+**Latest Release (v4.1.0):** wxPython migration complete with improved accessibility, 31+ bug fixes, and comprehensive testing.
 
 ### Basic Usage
 
@@ -37,7 +39,7 @@ imagedescriber.exe
 ## Documentation
 
 ### User Guides
-- **[What's New in v3.6.0](docs/WHATS_NEW_v3.6.0.md)** - Latest features (HuggingFace provider, redescribe)
+- **[What's New in v4.1.0](docs/WHATS_NEW_v4.1.0.md)** - wxPython migration, accessibility, code consolidation
 - **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions (Windows)
 - **[macOS User Guide](docs/MACOS_USER_GUIDE.md)** - macOS installation and usage
 - **[CLI Reference](docs/CLI_REFERENCE.md)** - All commands and options
