@@ -19,6 +19,12 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Union
 from datetime import datetime
 
+# Import config_loader for frozen mode compatibility
+try:
+    from scripts.config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
 
 # ==================== PATH RESOLUTION ====================
 
@@ -195,8 +201,12 @@ class ConfigManager:
             raise FileNotFoundError(f"Config file not found: {self.config_file}")
         
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                self.config_data = json.load(f)
+            # Try config_loader first for frozen mode compatibility
+            if load_json_config:
+                self.config_data, _, _ = load_json_config(explicit=str(self.config_file))
+            else:
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    self.config_data = json.load(f)
             return self.config_data
         except json.JSONDecodeError as e:
             raise json.JSONDecodeError(

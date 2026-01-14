@@ -54,6 +54,13 @@ from shared.wx_common import (
     DescriptionListBox,  # NEW: Import accessible listbox from shared module
 )
 
+# Import EXIF utilities
+try:
+    from shared.exif_utils import extract_exif_date_string
+except ImportError:
+    # Fallback for development mode
+    extract_exif_date_string = None
+
 # Import model registry and config loader for robust model/prompt resolution
 try:
     from models.model_registry import list_models as registry_list_models
@@ -94,8 +101,13 @@ except ImportError:
     ollama = None
 
 
-def get_image_date(image_path: str) -> str:
-    """Extract date/time from EXIF data, format as M/D/YYYY H:MMP"""
+# Note: get_image_date() is now imported from shared.exif_utils above.
+# This fallback implementation is used if the shared import fails.
+def _get_image_date_fallback(image_path: str) -> str:
+    """Fallback get_image_date implementation (used if shared import fails).
+    
+    See shared.exif_utils.extract_exif_date_string for full documentation.
+    """
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS
@@ -156,6 +168,13 @@ def get_image_date(image_path: str) -> str:
     
     except Exception as e:
         return "Unknown date"
+
+
+# Use shared version if available, fallback otherwise
+if extract_exif_date_string is not None:
+    get_image_date = extract_exif_date_string
+else:
+    get_image_date = _get_image_date_fallback
 
 
 class WorkflowBrowserDialog(wx.Dialog):
@@ -369,17 +388,15 @@ class RedescribeDialog(wx.Dialog):
                 pass
         # Fallback: direct path under scripts
         if not prompts_added:
-            config_path = get_scripts_directory() / "image_describer_config.json"
-            if config_path.exists():
-                try:
-                    with open(config_path) as f:
-                        config = json.load(f)
+            try:
+                if loader_load_json_config:
+                    config, _, _ = loader_load_json_config('image_describer_config.json')
                     prompts = config.get('prompt_variations', {})
                     for prompt_name in prompts.keys():
                         self.prompt_choice.Append(prompt_name)
                         prompts_added = True
-                except Exception:
-                    pass
+            except Exception:
+                pass
         # Final fallback
         if not prompts_added:
             self.prompt_choice.Append("narrative")
@@ -540,17 +557,15 @@ class RedescribeWorkflowDialog(wx.Dialog):
             except Exception:
                 pass
         if not prompts_added:
-            config_path = get_scripts_directory() / "image_describer_config.json"
-            if config_path.exists():
-                try:
-                    with open(config_path) as f:
-                        config = json.load(f)
+            try:
+                if loader_load_json_config:
+                    config, _, _ = loader_load_json_config('image_describer_config.json')
                     prompts = config.get('prompt_variations', {})
                     for prompt_name in prompts.keys():
                         self.prompt_choice.Append(prompt_name)
                         prompts_added = True
-                except Exception:
-                    pass
+            except Exception:
+                pass
         if not prompts_added:
             self.prompt_choice.Append("narrative")
         if self.prompt_choice.GetCount() > 0:
@@ -923,9 +938,11 @@ class ImageDescriptionViewer(wx.Frame):
         metadata_file = self.current_dir / "workflow_metadata.json"
         if metadata_file.exists():
             try:
-                with open(metadata_file) as f:
-                    metadata = json.load(f)
+                if loader_load_json_config:
+                    metadata, _, _ = loader_load_json_config(explicit=str(metadata_file))
                     self.workflow_name = metadata.get('name', self.current_dir.name)
+                else:
+                    self.workflow_name = self.current_dir.name
             except:
                 self.workflow_name = self.current_dir.name
         else:
@@ -1211,8 +1228,12 @@ class ImageDescriptionViewer(wx.Frame):
             return
         
         try:
-            with open(metadata_file) as f:
-                metadata = json.load(f)
+            if loader_load_json_config:
+                metadata, _, _ = loader_load_json_config(explicit=str(metadata_file))
+            else:
+                # Fallback if config_loader not available
+                with open(metadata_file) as f:
+                    metadata = json.load(f)
             
             provider = metadata.get('provider', 'ollama')
             

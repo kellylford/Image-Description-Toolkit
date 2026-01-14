@@ -5,7 +5,7 @@ import os
 
 def get_resource_path(relative_path):
     """Get the path to a resource, handling PyInstaller bundles."""
-    if hasattr(sys, '_MEIPASS'):
+    if getattr(sys, 'frozen', False):
         # Running as a PyInstaller bundle
         return os.path.join(sys._MEIPASS, relative_path)
     else:
@@ -17,7 +17,7 @@ def main():
     """Main entry point that handles both bundled and source execution."""
     original_cwd = os.getcwd()
     
-    if hasattr(sys, '_MEIPASS'):
+    if getattr(sys, 'frozen', False):
         # Running as PyInstaller bundle - import directly
         scripts_path = get_resource_path('scripts')
         sys.path.insert(0, scripts_path)

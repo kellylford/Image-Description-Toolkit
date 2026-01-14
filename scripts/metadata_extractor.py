@@ -12,6 +12,12 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
 # Import PIL for EXIF extraction
 try:
     from PIL import Image
@@ -384,8 +390,12 @@ class NominatimGeocoder:
         # Load cache if available
         if self.cache_path and self.cache_path.exists():
             try:
-                with open(self.cache_path, 'r', encoding='utf-8') as f:
-                    self.cache = json.load(f)
+                # Try config_loader first for frozen mode compatibility
+                if load_json_config:
+                    self.cache, _, _ = load_json_config(explicit=str(self.cache_path))
+                else:
+                    with open(self.cache_path, 'r', encoding='utf-8') as f:
+                        self.cache = json.load(f)
             except Exception:
                 self.cache = {}
         

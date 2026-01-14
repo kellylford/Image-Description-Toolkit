@@ -29,6 +29,13 @@ except ImportError:
     def get_resource_path(relative_path):
         return Path(__file__).parent.parent / relative_path
 
+# Import shared EXIF utilities
+try:
+    from shared.exif_utils import get_image_date_for_sorting
+except ImportError:
+    # Fallback for development mode
+    get_image_date_for_sorting = None
+
 try:
     from scripts.metadata_extractor import MetadataExtractor
 except ImportError:
@@ -44,22 +51,12 @@ from datetime import datetime
 from analysis_utils import get_safe_filename, ensure_directory
 
 
-def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
-    """
-    Extract the date/time the image was taken from EXIF data for sorting purposes.
+# Note: get_image_date_for_sorting() is now imported from shared.exif_utils above.
+# This fallback implementation is used if the shared import fails.
+def _get_image_date_for_sorting_fallback(image_name: str, base_dir: Path) -> datetime:
+    """Fallback implementation (used if shared import fails).
     
-    Searches for the image file in the workflow directories and tries multiple EXIF fields:
-    1. DateTimeOriginal (when photo was taken)
-    2. DateTimeDigitized (when photo was digitized) 
-    3. DateTime (file modification date in EXIF)
-    4. Falls back to file modification time
-    
-    Args:
-        image_name: The filename to search for
-        base_dir: Base directory containing workflow folders
-        
-    Returns:
-        datetime object for sorting (earliest possible date if file not found)
+    See shared.exif_utils.get_image_date_for_sorting for full documentation.
     """
     try:
         from PIL import Image
@@ -128,6 +125,11 @@ def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
     except Exception as e:
         # Return epoch time if any error occurs (will sort to beginning)
         return datetime.fromtimestamp(0)
+
+
+# Use shared version if available, fallback otherwise
+if get_image_date_for_sorting is None:
+    get_image_date_for_sorting = _get_image_date_for_sorting_fallback
 
 
 def get_image_location_for_display(image_name: str, base_dir: Path) -> str:

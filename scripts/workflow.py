@@ -62,6 +62,13 @@ try:
     from config_loader import load_json_config
 except ImportError:
     load_json_config = None
+
+# Import shared utility functions
+try:
+    from shared.utility_functions import sanitize_name
+except ImportError:
+    # Fallback for development mode - use local implementation
+    sanitize_name = None
 import re
 try:
     # Versioning utilities for logging banner
@@ -70,23 +77,22 @@ except Exception:
     log_build_banner = None
 
 
-def sanitize_name(name: str, preserve_case: bool = True) -> str:
-    """Convert model/prompt names to filesystem-safe strings
+# Note: sanitize_name is now imported from shared.utility_functions above.
+# This fallback implementation is only used if the shared import fails.
+def _sanitize_name_fallback(name: str, preserve_case: bool = True) -> str:
+    """Fallback sanitize_name implementation (used if shared import fails).
     
-    Args:
-        name: The name to sanitize
-        preserve_case: If True, preserve the original case. If False, convert to lowercase.
-    
-    Returns:
-        Sanitized name safe for filesystem use
+    See shared.utility_functions.sanitize_name for full documentation.
     """
     if not name:
         return "unknown"
-    # Remove characters that are not letters, numbers, underscore, hyphen, or dot
-    # Spaces and punctuation are removed (not replaced) to satisfy naming tests
     safe_name = re.sub(r'[^A-Za-z0-9_\-.]', '', str(name))
-    # Convert to lowercase unless case preservation is requested
     return safe_name if preserve_case else safe_name.lower()
+
+
+# Use shared version if available, fallback otherwise
+if sanitize_name is None:
+    sanitize_name = _sanitize_name_fallback
 
 
 def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
@@ -1426,9 +1432,14 @@ class WorkflowOrchestrator:
                 self.logger.warning(f"Config file not found: {config_path}, skipping metadata configuration")
                 return
             
-            # Load current config
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
+            # Load current config using config_loader for frozen mode compatibility
+            if load_json_config:
+                config, actual_config_path, _ = load_json_config(filename=config_file)
+            else:
+                # Fallback to direct loading if config_loader not available
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                actual_config_path = config_path
             
             # Update metadata settings
             if 'metadata' not in config:
@@ -1450,7 +1461,7 @@ class WorkflowOrchestrator:
             config['processing_options']['extract_metadata'] = self.enable_metadata
             
             # Save updated config
-            with open(config_path, 'w', encoding='utf-8') as f:
+            with open(actual_config_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
                 f.flush()  # Ensure buffer is written
                 os.fsync(f.fileno())  # Force OS to write to disk
@@ -2387,15 +2398,20 @@ class WorkflowOrchestrator:
             output_dir: Desired output directory
         """
         try:
-            # Load current config
-            with open(config_file, 'r') as f:
-                config = json.load(f)
+            # Load current config using config_loader for frozen mode compatibility
+            if load_json_config:
+                config, actual_config_path, _ = load_json_config(explicit=config_file)
+            else:
+                # Fallback to direct loading if config_loader not available
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                actual_config_path = Path(config_file)
             
             # Update output directory
             config["output_directory"] = str(output_dir)
             
             # Save updated config
-            with open(config_file, 'w') as f:
+            with open(actual_config_path, 'w') as f:
                 json.dump(config, f, indent=4)
                 
             self.logger.debug(f"Updated frame extractor config: {config_file}")

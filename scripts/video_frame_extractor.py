@@ -13,6 +13,13 @@ import numpy as np
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import time
+import sys
+
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
 import logging
 from datetime import datetime
 import sys
@@ -159,7 +166,15 @@ class VideoFrameExtractor:
             if not config_path.exists():
                 self.logger.warning(f"Config file not found: {config_path}")
                 return self.get_default_config()
-                
+            
+            # Try config_loader first for frozen mode compatibility
+            if load_json_config:
+                config, _, _ = load_json_config(explicit=str(config_path))
+                if config:
+                    self.logger.info(f"Configuration loaded from: {config_path}")
+                    return config
+            
+            # Fallback to direct file loading
             with open(config_path, 'r') as f:
                 content = f.read().strip()
                 if not content:

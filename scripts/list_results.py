@@ -13,6 +13,12 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
 
 def find_workflow_directories(base_dir: Path) -> list:
     """Find all workflow result directories.
@@ -45,8 +51,12 @@ def find_workflow_directories(base_dir: Path) -> list:
         
         if metadata_file.exists():
             try:
-                with open(metadata_file, 'r', encoding='utf-8') as f:
-                    metadata = json.load(f)
+                # Use config_loader for frozen mode compatibility
+                if load_json_config:
+                    metadata, _, _ = load_json_config(explicit=str(metadata_file))
+                else:
+                    with open(metadata_file, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
             except Exception:
                 pass
         

@@ -10,9 +10,16 @@ across all workflow steps.
 import os
 import json
 import logging
+import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Union
+
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
 
 
 class WorkflowConfig:
@@ -32,6 +39,13 @@ class WorkflowConfig:
     def load_config(self) -> Dict[str, Any]:
         """Load workflow configuration from JSON file"""
         try:
+            # Try config_loader first for frozen mode compatibility
+            if load_json_config:
+                config, _, _ = load_json_config(filename=self.config_file)
+                if config:
+                    return config
+            
+            # Fallback to direct file loading
             config_path = Path(self.config_file)
             if not config_path.is_absolute():
                 script_dir = Path(__file__).parent
@@ -597,6 +611,13 @@ def load_workflow_metadata(workflow_dir: Path) -> Optional[Dict[str, Any]]:
         return None
     
     try:
+        # Try config_loader first for frozen mode compatibility
+        if load_json_config:
+            metadata, _, _ = load_json_config(explicit=str(metadata_file))
+            if metadata:
+                return metadata
+        
+        # Fallback to direct file loading
         with open(metadata_file, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
