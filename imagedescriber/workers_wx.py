@@ -29,6 +29,12 @@ else:
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
 # Import AI providers
 try:
     from .ai_providers import get_available_providers
@@ -198,25 +204,40 @@ class ProcessingWorker(threading.Thread):
                     return self._normalize_prompt_config(cfg)
 
             # Try to find the config file
-            config_path = None
+            config = None
             
-            if getattr(sys, 'frozen', False):
-                # Running as executable - check external first
-                exe_dir = Path(sys.executable).parent
-                external_path = exe_dir.parent / "scripts" / "image_describer_config.json"
-                if external_path.exists():
-                    config_path = external_path
-                else:
-                    # Fall back to bundled config
-                    config_path = Path(sys._MEIPASS) / "scripts" / "image_describer_config.json"
+            if load_json_config:
+                # Use shared config_loader for frozen mode compatibility
+                try:
+                    config, _, _ = load_json_config('image_describer_config.json')
+                except Exception:
+                    config = None
             else:
-                # Running from source
-                config_path = Path(__file__).parent.parent / "scripts" / "image_describer_config.json"
+                # Fallback: try to load directly from disk
+                try:
+                    config_path = None
+                    
+                    if getattr(sys, 'frozen', False):
+                        # Running as executable - check external first
+                        exe_dir = Path(sys.executable).parent
+                        external_path = exe_dir.parent / "scripts" / "image_describer_config.json"
+                        if external_path.exists():
+                            config_path = external_path
+                        else:
+                            # Fall back to bundled config
+                            config_path = Path(sys._MEIPASS) / "scripts" / "image_describer_config.json"
+                    else:
+                        # Running from source
+                        config_path = Path(__file__).parent.parent / "scripts" / "image_describer_config.json"
+                    
+                    if config_path and config_path.exists():
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                except Exception:
+                    config = None
             
-            if config_path and config_path.exists():
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    return self._normalize_prompt_config(config)
+            if config:
+                return self._normalize_prompt_config(config)
         except Exception:
             pass
         
