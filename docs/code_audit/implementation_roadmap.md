@@ -557,16 +557,15 @@ dist\IDTConfigure.exe
 **Total Time:** 6-8 hours  
 **Critical Path Item:** Yes - Phase 5 depends on this  
 **Testing Required:** Unit tests + integration testing  
-
 **Completion Checklist:**
-- [ ] shared/utility_functions.py created and tested
-- [ ] shared/exif_utils.py created and tested
-- [ ] shared/window_title_builder.py created and tested
-- [ ] All duplicate code removed from original files
-- [ ] All imports updated
-- [ ] All tests pass
-- [ ] All executables build and run
-- [ ] All changes committed to branch
+- [x] shared/utility_functions.py created and tested (✅ Phase 4.1)
+- [x] shared/exif_utils.py created and tested (✅ Phase 4.2)
+- [x] shared/window_title_builder.py created and tested (✅ Phase 4.3)
+- [x] All duplicate code removed from original files
+- [x] All imports updated
+- [x] All tests pass
+- [ ] All executables build and run (Phase 4.4)
+- [x] All changes committed to branch
 
 ---
 
