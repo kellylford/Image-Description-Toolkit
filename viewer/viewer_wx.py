@@ -905,6 +905,34 @@ class ImageDescriptionViewer(wx.Frame):
                 self.monitor_thread = None
             self.SetStatusText("Live Mode: Off")
     
+    def get_progress_info(self):
+        """Get description progress from progress file.
+        
+        Returns:
+            Tuple of (completed_count, total_count) or (desc_count, desc_count) if progress file not found
+        """
+        # Try to read progress from image_describer_progress.txt
+        progress_file = self.current_dir / 'logs' / 'image_describer_progress.txt'
+        if progress_file.exists():
+            try:
+                with open(progress_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    # Last line has format: "Processed X of Y images"
+                    if lines:
+                        last_line = lines[-1].strip()
+                        import re
+                        match = re.search(r'Processed (\d+) of (\d+)', last_line)
+                        if match:
+                            completed = int(match.group(1))
+                            total = int(match.group(2))
+                            return (completed, total)
+            except Exception:
+                pass
+        
+        # Fallback: return current description count as both values
+        desc_count = len(self.descriptions)
+        return (desc_count, desc_count)
+    
     def on_live_update(self):
         """Called by monitoring thread when file changes - incrementally adds new entries"""
         if not self.is_live or not self.current_dir:
@@ -961,10 +989,18 @@ class ImageDescriptionViewer(wx.Frame):
             # Also update the internal data
             self.desc_list.descriptions_data.append(entry)
         
-        # Update window title with progress
+        # Update window title with progress - get actual counts from progress file
         desc_count = len(self.descriptions)
-        percentage = 100  # We don't know total, assume complete if file exists
-        title = f"{percentage}%, {desc_count} of {desc_count} images described (Live)"
+        completed, total = self.get_progress_info()
+        
+        if total > 0:
+            percentage = int((completed / total) * 100)
+            title = f"{percentage}%, {completed} of {total} images described (Live)"
+        else:
+            # Fallback if no progress info
+            percentage = 100
+            title = f"{percentage}%, {desc_count} of {desc_count} images described (Live)"
+        
         self.SetTitle(f"{title} - {self.workflow_name}")
         
         # Update status
@@ -1050,16 +1086,27 @@ class ImageDescriptionViewer(wx.Frame):
         # Replaces the old Clear() + Append() loop
         self.desc_list.LoadDescriptions(entries)
 
-        # Update window title
+        # Update window title with progress - get actual counts from progress file
         desc_count = len(self.descriptions)
-        if desc_count > 0:
+        completed, total = self.get_progress_info()
+        
+        # Check if we have real progress info (progress file exists and has different value)
+        progress_file = self.current_dir / 'logs' / 'image_describer_progress.txt'
+        has_progress_file = progress_file.exists()
+        
+        if has_progress_file and total > 0 and completed < total:
+            # In-progress workflow with actual progress tracking
+            percentage = int((completed / total) * 100)
+            title = f"{percentage}%, {completed} of {total} images described"
+        else:
+            # Complete workflow or no progress tracking
             percentage = 100
             title = f"{percentage}%, {desc_count} of {desc_count} images described"
-            if self.is_live:
-                title += " (Live)"
-            self.SetTitle(f"{title} - {self.workflow_name}")
-        else:
-            self.SetTitle(f"Image Description Viewer - {self.workflow_name}")
+        
+        if self.is_live:
+            title += " (Live)"
+        
+        self.SetTitle(f"{title} - {self.workflow_name}")
         
         # Update status
         if self.is_live and desc_count > prev_count:
@@ -1446,8 +1493,18 @@ def main():
     frame = ImageDescriptionViewer()
     frame.Show()
     
-    # Auto-show browse dialog on startup
-    wx.CallAfter(frame.on_browse_workflows, None)
+    # Check for command-line argument (workflow directory path)
+    if len(sys.argv) > 1:
+        workflow_path = Path(sys.argv[1])
+        if workflow_path.exists() and workflow_path.is_dir():
+            # Load the specified workflow directly
+            wx.CallAfter(frame.load_workflow, workflow_path)
+        else:
+            show_error(frame, f"Invalid workflow path: {workflow_path}", "Invalid Path")
+            wx.CallAfter(frame.on_browse_workflows, None)
+    else:
+        # No argument - show browse dialog on startup
+        wx.CallAfter(frame.on_browse_workflows, None)
     
     app.MainLoop()
 
