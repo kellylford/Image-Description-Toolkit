@@ -51,23 +51,28 @@ import wx
 import wx.lib.newevent
 
 # Import shared utilities
-from shared.wx_common import (
-    find_config_file,
-    find_scripts_directory,
-    ConfigManager,
-    ModifiedStateMixin,
-    show_error,
-    show_warning,
-    show_info,
-    ask_yes_no,
-    ask_yes_no_cancel,
-    open_file_dialog,
-    save_file_dialog,
-    select_directory_dialog,
-    show_about_dialog,
-    get_app_version,
-    DescriptionListBox,  # NEW: Accessible listbox for descriptions with full text in screen readers
-)
+try:
+    from shared.wx_common import (
+        find_config_file,
+        find_scripts_directory,
+        ConfigManager,
+        ModifiedStateMixin,
+        show_error,
+        show_warning,
+        show_info,
+        ask_yes_no,
+        ask_yes_no_cancel,
+        open_file_dialog,
+        save_file_dialog,
+        select_directory_dialog,
+        show_about_dialog,
+        get_app_version,
+        DescriptionListBox,  # NEW: Accessible listbox for descriptions with full text in screen readers
+    )
+except ImportError as e:
+    print(f"ERROR: Could not import shared.wx_common: {e}")
+    print("This is a critical error. ImageDescriber cannot function without shared utilities.")
+    sys.exit(1)
 
 # Optional imports with graceful fallback
 try:
