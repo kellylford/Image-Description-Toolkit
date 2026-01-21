@@ -281,24 +281,33 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # List results in default Descriptions directory
+  # Auto-detect and list results from common locations
   idt results-list
   
   # List results in specific directory
   idt results-list --input-dir c:\\path\\to\\results
+  
+  # List results in current directory
+  idt results-list --input-dir .
   
   # Save to custom output file
   idt results-list --output my_workflows.csv
   
   # Use absolute paths in viewer commands
   idt results-list --absolute-paths
+  
+Auto-detection searches these locations in order:
+  1. Current directory (for wf_* subdirectories)
+  2. ./Descriptions
+  3. ~/IDT_Descriptions  
+  4. C:\\idt\\Descriptions (Windows) or /opt/idt/Descriptions (Unix)
         """
     )
     
     parser.add_argument(
         '--input-dir', '-i',
-        default='Descriptions',
-        help='Directory containing workflow results (default: Descriptions)'
+        default=None,  # Changed from 'Descriptions' to None - will auto-detect
+        help='Directory containing workflow results (default: auto-detect from common locations)'
     )
     
     parser.add_argument(
@@ -322,15 +331,42 @@ Examples:
     
     args = parser.parse_args()
     
-    # Resolve input directory
-    input_dir = Path(args.input_dir)
-    if not input_dir.is_absolute():
-        input_dir = Path.cwd() / input_dir
+    # Resolve input directory with smart defaults
+    if args.input_dir:
+        input_dir = Path(args.input_dir)
+        if not input_dir.is_absolute():
+            input_dir = Path.cwd() / input_dir
+    else:
+        # Auto-detect workflow directory from common locations
+        possible_dirs = [
+            Path.cwd(),  # Current directory (might have wf_* subdirs)
+            Path.cwd() / 'Descriptions',  # CWD/Descriptions
+            Path.home() / 'IDT_Descriptions',  # ~/IDT_Descriptions
+            Path('C:/idt/Descriptions') if sys.platform == 'win32' else Path('/opt/idt/Descriptions'),  # System install location
+        ]
+        
+        # Find first directory that exists and contains workflows
+        input_dir = None
+        for candidate in possible_dirs:
+            if candidate.exists():
+                # Check if it contains any wf_* directories
+                wf_dirs = list(candidate.glob('wf_*'))
+                if wf_dirs:
+                    input_dir = candidate
+                    print(f"Auto-detected workflow directory: {input_dir}")
+                    break
+        
+        if not input_dir:
+            # None found - default to current directory
+            input_dir = Path.cwd()
+            print(f"No workflow directories found, searching current directory: {input_dir}")
     
     print(f"Scanning for workflow results in: {input_dir}")
     
     if not input_dir.exists():
         print(f"Error: Directory does not exist: {input_dir}")
+        print(f"\nTip: Run 'idt workflow <images_dir>' first to create workflow results")
+        print(f"     Or specify a different directory with --input-dir")
         return 1
     
     # Find all workflow directories
@@ -338,6 +374,9 @@ Examples:
     
     if not workflows:
         print(f"No workflow results found in {input_dir}")
+        print(f"\nSearched for directories starting with 'wf_'")
+        print(f"To create workflow results, run: idt workflow <images_directory>")
+        return 0  # Not an error - just no results yet
         return 0
     
     print(f"Found {len(workflows)} workflow(s)")

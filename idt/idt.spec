@@ -72,8 +72,8 @@ a = Analysis(
         'scripts.list_results',
         # Models and analysis
         'models.check_models',
-        'analysis.analyze_workflow_stats',
-        'analysis.analyze_description_content',
+        'analysis.stats_analysis',  # Fixed: was analyze_workflow_stats (wrong module name)
+        'analysis.content_analysis',  # Fixed: was analyze_description_content (wrong module name)
         'analysis.combine_workflow_descriptions',
         # imagedescriber package
         'imagedescriber',
