@@ -27,8 +27,8 @@ DMG_NAME="IDT-${VERSION}"
 echo "Building disk image for version: $VERSION"
 echo ""
 
-# Create dist_macos directory if it doesn't exist
-mkdir -p dist_macos
+# Create dist directory in MacBuilds if it doesn't exist
+mkdir -p BuildAndRelease/MacBuilds/dist
 
 # Check if all applications are built
 MISSING_APPS=0
@@ -147,7 +147,7 @@ ln -s /Applications "$DMG_STAGING/Applications"
 
 # Create temporary DMG
 echo "Creating temporary DMG..."
-TEMP_DMG="dist_macos/${DMG_NAME}-temp.dmg"
+TEMP_DMG="BuildAndRelease/MacBuilds/dist/${DMG_NAME}-temp.dmg"
 rm -f "$TEMP_DMG"
 
 hdiutil create \
@@ -163,7 +163,7 @@ echo "Skipping Finder customization (can be done manually after mounting)..."
 
 # Convert to compressed read-only image immediately
 echo "Compressing DMG..."
-FINAL_DMG="dist_macos/${DMG_NAME}.dmg"
+FINAL_DMG="BuildAndRelease/MacBuilds/dist/${DMG_NAME}.dmg"
 rm -f "$FINAL_DMG"
 
 hdiutil convert \
@@ -182,7 +182,7 @@ if [ $? -eq 0 ]; then
     echo "========================================================================"
     echo "DISK IMAGE CREATED SUCCESSFULLY"
     echo "========================================================================"
-    echo "Disk Image: dist_macos/${DMG_NAME}.dmg"
+    echo "Disk Image: BuildAndRelease/MacBuilds/dist/${DMG_NAME}.dmg"
     echo ""
     echo "To distribute: Double-click to mount, then drag apps to Applications"
     echo ""

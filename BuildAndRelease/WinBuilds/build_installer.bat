@@ -100,7 +100,7 @@ if %ERRORLEVEL% EQU 0 (
     echo SUCCESS: Installer created successfully!
     echo ================================================
     echo.
-    echo Output: ..\releases\ImageDescriptionToolkit_Setup_v%VERSION%.exe
+    echo Output: dist\ImageDescriptionToolkit_Setup_v%VERSION%.exe
     echo.
     echo The installer includes:
     echo   - idt.exe (CLI)
