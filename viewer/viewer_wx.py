@@ -588,7 +588,20 @@ class LiveMonitorThread(threading.Thread):
         self.viewer = viewer
         self.workflow_dir = Path(workflow_dir)
         self.running = True
-        self.descriptions_file = self.workflow_dir / "descriptions.txt"
+        # Check multiple possible locations for the descriptions file
+        possible_locations = [
+            self.workflow_dir / "descriptions" / "image_descriptions.txt",
+            self.workflow_dir / "descriptions.txt",
+            self.workflow_dir / "image_descriptions.txt",
+        ]
+        self.descriptions_file = None
+        for loc in possible_locations:
+            if loc.exists():
+                self.descriptions_file = loc
+                break
+        if not self.descriptions_file:
+            # Default to most likely location
+            self.descriptions_file = self.workflow_dir / "descriptions" / "image_descriptions.txt"
         self.last_modified = 0
     
     def run(self):
@@ -656,6 +669,9 @@ class ImageDescriptionViewer(wx.Frame):
         # while displaying truncated text visually (100 chars)
         # See ACCESSIBLE_LISTBOX_PATTERN.txt for details
         self.desc_list = DescriptionListBox(left_panel, style=wx.LB_SINGLE)
+        self.desc_list.Bind(wx.EVT_LISTBOX, self.on_description_selected)
+        left_sizer.Add(self.desc_list, 1, wx.ALL | wx.EXPAND, 5)
+        
         left_panel.SetSizer(left_sizer)
         
         # Right panel - description details
@@ -673,11 +689,8 @@ class ImageDescriptionViewer(wx.Frame):
         self.image_filename_label.SetForegroundColour(wx.Colour(0, 102, 204))
         image_sizer.Add(self.image_filename_label, 0, wx.ALL | wx.ALIGN_CENTER, 2)
         
-        # StaticBitmap for the actual image - this should receive focus
-        self.image_label = wx.StaticBitmap(self.image_panel, style=wx.TAB_TRAVERSAL)
-        # Make the image bitmap focusable
-        if hasattr(self.image_label, 'SetCanFocus'):
-            self.image_label.SetCanFocus(True)
+        # StaticBitmap for the actual image (non-focusable - it's just a static display)
+        self.image_label = wx.StaticBitmap(self.image_panel)
         image_sizer.Add(self.image_label, 1, wx.ALL | wx.ALIGN_CENTER, 5)
         self.image_panel.SetSizer(image_sizer)
         
@@ -883,10 +896,79 @@ class ImageDescriptionViewer(wx.Frame):
             self.SetStatusText("Live Mode: Off")
     
     def on_live_update(self):
-        """Called by monitoring thread when file changes"""
-        if self.is_live and self.current_dir:
-            current_sel = self.desc_list.GetSelection()
-            self.load_descriptions(self.current_dir, preserve_selection=current_sel)
+        """Called by monitoring thread when file changes - incrementally adds new entries"""
+        if not self.is_live or not self.current_dir:
+            return
+        
+        # Check if user is actively interacting - if so, defer update
+        focused_widget = wx.Window.FindFocus()
+        if focused_widget in [self.desc_list, self.desc_text]:
+            # User is actively using the interface - don't disrupt them
+            return
+        
+        # Save current state
+        current_sel = self.desc_list.GetSelection()
+        current_count = len(self.descriptions)
+        
+        # Find and parse the descriptions file
+        desc_file = None
+        possible_locations = [
+            self.current_dir / "descriptions" / "image_descriptions.txt",
+            self.current_dir / "descriptions.txt",
+            self.current_dir / "image_descriptions.txt",
+        ]
+        
+        for loc in possible_locations:
+            if loc.exists():
+                desc_file = loc
+                break
+        
+        if not desc_file:
+            return
+        
+        # Parse all entries
+        entries = self.parse_descriptions_file(desc_file)
+        
+        if not entries or len(entries) <= current_count:
+            # No new entries
+            return
+        
+        # Add only new entries (incremental update)
+        new_entries = entries[current_count:]
+        
+        for entry in new_entries:
+            self.descriptions.append(entry['description'])
+            self.image_files.append(entry['file_path'])
+        
+        # Add new entries to listbox without clearing
+        for entry in new_entries:
+            # Append to the existing DescriptionListBox
+            description = entry.get('description', '')
+            truncated = (description[:100] + "..." 
+                        if len(description) > 100 
+                        else description)
+            self.desc_list.Append(truncated)
+            # Also update the internal data
+            self.desc_list.descriptions_data.append(entry)
+        
+        # Update window title with progress
+        desc_count = len(self.descriptions)
+        percentage = 100  # We don't know total, assume complete if file exists
+        title = f"{percentage}%, {desc_count} of {desc_count} images described (Live)"
+        self.SetTitle(f"{title} - {self.workflow_name}")
+        
+        # Update status
+        self.SetStatusText(f"Live update: {desc_count} descriptions (+{len(new_entries)} new)")
+        
+        # Preserve current selection
+        if current_sel >= 0 and current_sel < self.desc_list.GetCount():
+            self.desc_list.SetSelection(current_sel)
+    
+    def on_description_selected(self, event):
+        """Handle selection change in description list"""
+        index = self.desc_list.GetSelection()
+        if index != wx.NOT_FOUND:
+            self.display_description(index)
     
     def load_descriptions(self, directory, preserve_selection=-1):
         """Load descriptions from workflow directory"""
@@ -982,6 +1064,10 @@ class ImageDescriptionViewer(wx.Frame):
         elif self.desc_list.GetCount() > 0:
             self.desc_list.SetSelection(0)
             self.display_description(0)
+        
+        # Set focus to the description list for immediate keyboard navigation
+        if self.desc_list.GetCount() > 0:
+            self.desc_list.SetFocus()
     
     def parse_descriptions_file(self, file_path):
         """Parse the descriptions.txt file"""
@@ -1129,9 +1215,6 @@ class ImageDescriptionViewer(wx.Frame):
                 self.image_label.SetLabel(f"Graphic: {img_filename}")
                 
                 self.load_image(image_path)
-                
-                # Set focus to the image so screen readers announce it
-                self.image_label.SetFocus()
             else:
                 self.image_filename_label.SetLabel("")
                 self.image_label.SetName("")

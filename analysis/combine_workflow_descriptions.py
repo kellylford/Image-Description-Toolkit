@@ -31,10 +31,10 @@ except ImportError:
 
 # Import shared EXIF utilities
 try:
-    from shared.exif_utils import get_image_date_for_sorting
+    from shared.exif_utils import get_image_date_for_sorting as _shared_get_image_date
 except ImportError:
     # Fallback for development mode
-    get_image_date_for_sorting = None
+    _shared_get_image_date = None
 
 try:
     from scripts.metadata_extractor import MetadataExtractor
@@ -127,9 +127,49 @@ def _get_image_date_for_sorting_fallback(image_name: str, base_dir: Path) -> dat
         return datetime.fromtimestamp(0)
 
 
-# Use shared version if available, fallback otherwise
-if get_image_date_for_sorting is None:
-    get_image_date_for_sorting = _get_image_date_for_sorting_fallback
+# Bridge function to handle different signatures
+# shared.exif_utils version takes (image_path) 
+# but we need to pass (image_name, base_dir) from calling code
+def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
+    """Wrapper that finds image path and calls shared EXIF utility.
+    
+    Args:
+        image_name: Filename to search for
+        base_dir: Base directory containing workflow folders
+        
+    Returns:
+        datetime object for sorting
+    """
+    if _shared_get_image_date is not None:
+        # Use shared version - need to find the image file first
+        image_path = None
+        for workflow_dir in base_dir.glob("wf_*"):
+            for subdir in ['converted_images', 'extracted_frames', 'temp_combined_images', 'input_images', '']:
+                search_dir = workflow_dir / subdir if subdir else workflow_dir
+                if search_dir.exists():
+                    potential_path = search_dir / image_name
+                    if potential_path.exists():
+                        image_path = potential_path
+                        break
+                    # Also check subdirectories
+                    for img_file in search_dir.rglob(image_name):
+                        if img_file.is_file():
+                            image_path = img_file
+                            break
+                if image_path:
+                    break
+            if image_path:
+                break
+        
+        # Call shared version with single argument
+        if image_path:
+            return _shared_get_image_date(image_path)
+        else:
+            # File not found, return epoch
+            return datetime.fromtimestamp(0)
+    else:
+        # Use fallback version with 2 arguments
+        return _get_image_date_for_sorting_fallback(image_name, base_dir)
 
 
 def get_image_location_for_display(image_name: str, base_dir: Path) -> str:

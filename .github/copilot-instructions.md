@@ -8,6 +8,16 @@
 **PyInstaller frozen executables are NOT the same as Python scripts**
 **`from scripts.X` ALWAYS fails in frozen mode - use module-level imports**
 **Production code that's been working for months should be changed with EXTREME caution**
+**INCOMPLETE REFACTORS caused 23% of commits to be fixes - ALWAYS check ALL callers**
+**Changing function signatures REQUIRES updating ALL callers - search first, change later**
+
+## 🚨 MANDATORY READING
+
+**Before making ANY code changes**, review:
+- **[AI Comprehensive Review Protocol](docs/worktracking/AI_COMPREHENSIVE_REVIEW_PROTOCOL.md)** - Required checklists for all changes
+- **[Migration Audit](docs/worktracking/2026-01-20-MIGRATION-AUDIT.md)** - Known issues and patterns to avoid
+
+**Failure to follow these protocols has caused critical production failures.**
 
 Follow these guidelines for all coding work on this project.
 
@@ -50,6 +60,22 @@ Follow these guidelines for all coding work on this project.
     - Verify argument parsers don't have conflicting flags (e.g., two `-c` arguments)
     - Check if frozen executable vs dev mode have different code paths
     - Assume there ARE related bugs you haven't found yet - actively hunt for them
+
+11. **MANDATORY Pre-Change Verification** (See AI_COMPREHENSIVE_REVIEW_PROTOCOL.md):
+    - **Variable Renames**: Use `grep -r "variable_name"` to find ALL occurrences before changing ANY
+    - **Function Signature Changes**: Use `list_code_usages` tool to find ALL callers before modifying
+    - **Import Changes**: Verify PyInstaller compatibility with try/except fallback pattern
+    - **Large Functions** (>500 lines): Assume high risk - extra scrutiny required
+    - **Return Statements**: Verify all referenced variables are defined in scope
+    - **Lambda Functions**: Check variable references in sort keys and filters
+
+12. **MANDATORY Post-Change Testing**:
+    - ✅ Syntax validation: `python -m py_compile <file>`
+    - ✅ Development mode: Run actual command with test data
+    - ✅ Build frozen exe: `cd idt && build_idt.bat`
+    - ✅ Test frozen exe: `dist/idt.exe <command> testimages`
+    - ✅ Check logs: `grep -i error wf_*/logs/*.log`
+    - ❌ NEVER claim "fixed" without completing ALL of above
 
 ## Forbidden Code Patterns (PyInstaller Compatibility)
 
