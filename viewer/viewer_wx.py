@@ -1498,7 +1498,7 @@ def main():
         workflow_path = Path(sys.argv[1])
         if workflow_path.exists() and workflow_path.is_dir():
             # Load the specified workflow directly
-            wx.CallAfter(frame.load_workflow, workflow_path)
+            wx.CallAfter(frame.load_descriptions, str(workflow_path))
         else:
             show_error(frame, f"Invalid workflow path: {workflow_path}", "Invalid Path")
             wx.CallAfter(frame.on_browse_workflows, None)
