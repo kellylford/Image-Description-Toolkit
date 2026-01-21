@@ -40,17 +40,22 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 # Import shared utilities
-from shared.wx_common import (
-    find_config_file,
-    ConfigManager,
-    show_error,
-    show_warning,
-    show_info,
-    open_file_dialog,
-    save_file_dialog,
-    show_about_dialog,
-    get_app_version,
-)
+try:
+    from shared.wx_common import (
+        find_config_file,
+        ConfigManager,
+        show_error,
+        show_warning,
+        show_info,
+        open_file_dialog,
+        save_file_dialog,
+        show_about_dialog,
+        get_app_version,
+    )
+except ImportError as e:
+    print(f"ERROR: Cannot import shared.wx_common: {e}")
+    print("This indicates a PyInstaller build issue or missing dependency.")
+    sys.exit(1)
 
 
 class SettingEditDialog(wx.Dialog):
