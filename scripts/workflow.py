@@ -2203,9 +2203,10 @@ class WorkflowOrchestrator:
         # Create workflow directory structure
         workflow_paths = create_workflow_paths(output_dir)
         
-        # Create helper batch files immediately (view_results.bat and resume_workflow.bat)
+        # Create helper scripts immediately (platform-specific: .bat for Windows, .sh/.command for macOS)
         create_workflow_helper_files(output_dir)
-        self.logger.info("Created workflow helper files: view_results.bat and resume_workflow.bat")
+        script_type = "batch files (.bat)" if sys.platform == 'win32' else "shell scripts (.sh/.command)"
+        self.logger.info(f"Created workflow helper {script_type}: view_results, resume_workflow, run_stats")
         
         # Save workflow metadata if provided
         if workflow_metadata:
@@ -2631,38 +2632,69 @@ def launch_viewer(output_dir, logger: logging.Logger) -> None:
             output_dir = Path(output_dir)
         
         # Get the base path (for both dev and executable scenarios)
-        if getattr(sys, 'frozen', False):
-            # Running as executable
+        is_frozen = getattr(sys, 'frozen', False)
+        is_windows = sys.platform == 'win32'
+        
+        if is_frozen:
             base_dir = Path(sys.executable).parent
-            viewer_exe = base_dir / "viewer" / "viewer.exe"
+            if is_windows:
+                # Windows installer: flat structure
+                viewer_exe = base_dir / "Viewer.exe"
+            else:
+                # macOS: .app bundle
+                viewer_exe = "/Applications/Viewer.app"
         else:
             # Running from source
             base_dir = Path(__file__).parent.parent
-            viewer_exe = base_dir / "viewer" / "viewer.py"
+            viewer_exe = base_dir / "viewer" / "viewer_wx.py"
         
-        # Create a reusable .bat file in the output directory
-        bat_file = output_dir / "view_results.bat"
+        # Note: Helper scripts are now created by create_workflow_helper_files()
+        # This code path is for backward compatibility only
+        script_ext = ".bat" if is_windows else ".sh"
+        script_file = output_dir / f"view_results{script_ext}"
+        
         try:
-            with open(bat_file, 'w', encoding='utf-8') as f:
-                f.write("@echo off\n")
-                f.write("REM Auto-generated batch file to view workflow results\n")
-                f.write("REM Double-click this file to reopen the results in the viewer\n\n")
+            if is_windows:
+                with open(script_file, 'w', encoding='utf-8') as f:
+                    f.write("@echo off\n")
+                    f.write("REM Auto-generated batch file to view workflow results\n")
+                    f.write("REM Double-click this file to reopen the results in the viewer\n\n")
+                    
+                    if is_frozen:
+                        f.write(f'"{viewer_exe}" "{output_dir}"\n')
+                    else:
+                        python_exe = sys.executable
+                        f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir}"\n')
+                    
+                    f.write("\nREM If viewer closes immediately, run this from a command prompt to see any errors\n")
+            else:
+                # macOS
+                with open(script_file, 'w', encoding='utf-8') as f:
+                    f.write("#!/bin/bash\n")
+                    f.write("# Auto-generated script to view workflow results\n\n")
+                    
+                    if is_frozen:
+                        f.write(f'WORKFLOW_DIR="{output_dir}"\n')
+                        f.write('if [ -d "/Applications/Viewer.app" ]; then\n')
+                        f.write('    open -a "/Applications/Viewer.app" "$WORKFLOW_DIR"\n')
+                        f.write('else\n')
+                        f.write('    open -a Viewer "$WORKFLOW_DIR"\n')
+                        f.write('fi\n')
+                    else:
+                        python_exe = sys.executable
+                        f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir}"\n')
                 
-                if getattr(sys, 'frozen', False):
-                    # For executable deployment
-                    f.write(f'"{viewer_exe}" "{output_dir}"\n')
-                else:
-                    # For development (need Python)
-                    python_exe = sys.executable
-                    f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir}"\n')
-                
-                f.write("\nREM If viewer closes immediately, run this from a command prompt to see any errors\n")
+                # Make executable
+                import os
+                import stat
+                st = os.stat(script_file)
+                os.chmod(script_file, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
             
-            logger.info(f"Created reusable viewer launcher: {bat_file}")
-            print(f"INFO: Created reusable launcher: {bat_file}")
+            logger.info(f"Created reusable viewer launcher: {script_file}")
+            print(f"INFO: Created reusable launcher: {script_file}")
             print("      Double-click this file anytime to view results again.")
         except Exception as e:
-            logger.warning(f"Failed to create .bat file: {e}")
+            logger.warning(f"Failed to create script file: {e}")
         
         # Launch the viewer
         if viewer_exe.exists():

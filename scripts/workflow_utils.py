@@ -333,110 +333,216 @@ def create_workflow_paths(base_output_dir: Path, preserve_structure: bool = True
 
 def create_workflow_helper_files(output_dir: Path) -> None:
     """
-    Create helper batch files in the workflow directory for easy access.
-    Creates view_results.bat and resume_workflow.bat immediately so they're
-    available even if the workflow is interrupted.
+    Create helper scripts in the workflow directory for easy access.
+    Creates platform-specific scripts (.bat for Windows, .sh/.command for macOS)
+    for viewing results, resuming workflows, and running stats.
     
     Args:
         output_dir: Workflow output directory
     """
     import sys
+    import os
+    import platform
     from pathlib import Path
     
     try:
+        is_frozen = getattr(sys, 'frozen', False)
+        is_windows = sys.platform == 'win32'
+        is_macos = sys.platform == 'darwin'
+        
         # Get the base path (for both dev and executable scenarios)
-        if getattr(sys, 'frozen', False):
-            # Running as executable
+        if is_frozen:
             base_dir = Path(sys.executable).parent
-            idt_exe = base_dir / "idt.exe"
-            viewer_exe = base_dir / "viewer" / "viewer.exe"
+            if is_windows:
+                # Windows installer: flat structure at root
+                idt_exe = base_dir / "idt.exe"
+                viewer_exe = base_dir / "Viewer.exe"
+            else:
+                # macOS: assume apps installed in /Applications
+                idt_exe = "/Applications/idt.app"  # If we ever make this
+                viewer_exe = "/Applications/Viewer.app"
         else:
             # Running from source
             base_dir = Path(__file__).parent.parent
-            idt_exe = None  # Not available in dev mode
-            viewer_exe = base_dir / "viewer" / "viewer.py"
+            idt_exe = None
+            viewer_exe = base_dir / "viewer" / "viewer_wx.py"
         
-        # Create view_results.bat
-        view_bat = output_dir / "view_results.bat"
-        with open(view_bat, 'w', encoding='utf-8') as f:
-            f.write("@echo off\n")
-            f.write("REM Auto-generated: View workflow results in the viewer\n")
-            f.write("REM Double-click this file to view results anytime\n\n")
-            
-            if getattr(sys, 'frozen', False):
-                # For executable deployment
-                f.write(f'"{viewer_exe}" "{output_dir.absolute()}"\n')
-            else:
-                # For development (need Python)
-                python_exe = sys.executable
-                f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir.absolute()}"\n')
-            
-            f.write("\nREM If viewer closes immediately, run from command prompt to see errors\n")
-        
-        # Create resume_workflow.bat
-        resume_bat = output_dir / "resume_workflow.bat"
-        with open(resume_bat, 'w', encoding='utf-8') as f:
-            f.write("@echo off\n")
-            f.write("REM Auto-generated: Resume this workflow if interrupted\n")
-            f.write("REM Double-click this file to resume workflow from last completed step\n\n")
-            
-            if getattr(sys, 'frozen', False) and idt_exe and idt_exe.exists():
-                # For executable deployment
-                f.write(f'"{idt_exe}" workflow --resume "{output_dir.absolute()}"\n')
-            else:
-                # For development or if idt.exe not found
-                workflow_script = base_dir / "scripts" / "workflow.py"
-                python_exe = sys.executable
-                f.write(f'"{python_exe}" "{workflow_script}" --resume "{output_dir.absolute()}"\n')
-            
-            f.write("\nREM This will continue from the last completed workflow step\n")
-            f.write("pause\n")
-        
-        # Create run_stats.bat
-        # This runs idt stats on just this workflow and copies results to stats/ subdirectory
-        stats_bat = output_dir / "run_stats.bat"
-        workflow_name = output_dir.name  # e.g., wf_identifier_20250113_143022
-        
-        with open(stats_bat, 'w', encoding='utf-8') as f:
-            f.write("@echo off\n")
-            f.write("REM Auto-generated: Run statistics analysis on this workflow\n")
-            f.write("REM Double-click this file to analyze timing and generate stats files\n")
-            f.write("REM Results will be saved in the 'stats' subdirectory\n\n")
-            
-            # Create stats subdirectory
-            f.write('echo Creating stats directory...\n')
-            f.write('if not exist "%~dp0stats" mkdir "%~dp0stats"\n\n')
-            
-            # Get parent directory (should be Descriptions/)
-            f.write('echo Running stats analysis...\n')
-            parent_dir = output_dir.parent.absolute()
-            
-            if getattr(sys, 'frozen', False) and idt_exe and idt_exe.exists():
-                # For executable deployment
-                f.write(f'"{idt_exe}" stats ')
-                f.write(f'--input-dir "{parent_dir}" ')
-                f.write(f'--csv-output "%~dp0stats\\workflow_timing_stats.csv" ')
-                f.write(f'--json-output "%~dp0stats\\workflow_statistics.json"\n\n')
-            else:
-                # For development
-                stats_script = base_dir / "analysis" / "stats_analysis.py"
-                python_exe = sys.executable
-                f.write(f'"{python_exe}" "{stats_script}" ')
-                f.write(f'--input-dir "{parent_dir}" ')
-                f.write(f'--csv-output "%~dp0stats\\workflow_timing_stats.csv" ')
-                f.write(f'--json-output "%~dp0stats\\workflow_statistics.json"\n\n')
-            
-            f.write('echo.\n')
-            f.write('echo Stats analysis complete!\n')
-            f.write('echo Results saved in stats\\ subdirectory:\n')
-            f.write('echo   - workflow_timing_stats.csv\n')
-            f.write('echo   - workflow_statistics.json\n')
-            f.write('echo.\n')
-            f.write('pause\n')
+        if is_windows:
+            _create_windows_helper_files(output_dir, base_dir, idt_exe, viewer_exe, is_frozen)
+        else:
+            _create_macos_helper_files(output_dir, base_dir, idt_exe, viewer_exe, is_frozen)
         
     except Exception as e:
         # Silently fail - these are convenience files
         pass
+
+
+def _create_windows_helper_files(output_dir: Path, base_dir: Path, idt_exe, viewer_exe, is_frozen: bool) -> None:
+    """Create Windows .bat helper files"""
+    import sys
+    
+    # Create view_results.bat
+    view_bat = output_dir / "view_results.bat"
+    with open(view_bat, 'w', encoding='utf-8') as f:
+        f.write("@echo off\n")
+        f.write("REM Auto-generated: View workflow results in the viewer\n")
+        f.write("REM Double-click this file to view results anytime\n\n")
+        
+        if is_frozen:
+            f.write(f'"{viewer_exe}" "{output_dir.absolute()}"\n')
+        else:
+            python_exe = sys.executable
+            f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir.absolute()}"\n')
+        
+        f.write("\nREM If viewer closes immediately, run from command prompt to see errors\n")
+    
+    # Create resume_workflow.bat
+    resume_bat = output_dir / "resume_workflow.bat"
+    with open(resume_bat, 'w', encoding='utf-8') as f:
+        f.write("@echo off\n")
+        f.write("REM Auto-generated: Resume this workflow if interrupted\n")
+        f.write("REM Double-click this file to resume workflow from last completed step\n\n")
+        
+        if is_frozen and idt_exe and Path(idt_exe).exists():
+            f.write(f'"{idt_exe}" workflow --resume "{output_dir.absolute()}"\n')
+        else:
+            workflow_script = base_dir / "scripts" / "workflow.py"
+            python_exe = sys.executable
+            f.write(f'"{python_exe}" "{workflow_script}" --resume "{output_dir.absolute()}"\n')
+        
+        f.write("\nREM This will continue from the last completed workflow step\n")
+        f.write("pause\n")
+    
+    # Create run_stats.bat
+    stats_bat = output_dir / "run_stats.bat"
+    with open(stats_bat, 'w', encoding='utf-8') as f:
+        f.write("@echo off\n")
+        f.write("REM Auto-generated: Run statistics analysis on this workflow\n")
+        f.write("REM Double-click this file to analyze timing and generate stats files\n")
+        f.write("REM Results will be saved in the 'stats' subdirectory\n\n")
+        
+        f.write('echo Creating stats directory...\n')
+        f.write('if not exist "%~dp0stats" mkdir "%~dp0stats"\n\n')
+        f.write('echo Running stats analysis...\n')
+        parent_dir = output_dir.parent.absolute()
+        
+        if is_frozen and idt_exe and Path(idt_exe).exists():
+            f.write(f'"{idt_exe}" stats ')
+            f.write(f'--input-dir "{parent_dir}" ')
+            f.write(f'--csv-output "%~dp0stats\\workflow_timing_stats.csv" ')
+            f.write(f'--json-output "%~dp0stats\\workflow_statistics.json"\n\n')
+        else:
+            stats_script = base_dir / "analysis" / "stats_analysis.py"
+            python_exe = sys.executable
+            f.write(f'"{python_exe}" "{stats_script}" ')
+            f.write(f'--input-dir "{parent_dir}" ')
+            f.write(f'--csv-output "%~dp0stats\\workflow_timing_stats.csv" ')
+            f.write(f'--json-output "%~dp0stats\\workflow_statistics.json"\n\n')
+        
+        f.write('echo.\n')
+        f.write('echo Stats analysis complete!\n')
+        f.write('echo Results saved in stats\\ subdirectory:\n')
+        f.write('echo   - workflow_timing_stats.csv\n')
+        f.write('echo   - workflow_statistics.json\n')
+        f.write('echo.\n')
+        f.write('pause\n')
+
+
+def _create_macos_helper_files(output_dir: Path, base_dir: Path, idt_exe, viewer_exe, is_frozen: bool) -> None:
+    """Create macOS .sh and .command helper files"""
+    import sys
+    import os
+    import stat
+    
+    # Helper function to make scripts executable
+    def make_executable(filepath):
+        st = os.stat(filepath)
+        os.chmod(filepath, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    
+    # Create view_results scripts (.sh and .command)
+    for ext in ['.sh', '.command']:
+        view_script = output_dir / f"view_results{ext}"
+        with open(view_script, 'w', encoding='utf-8') as f:
+            f.write("#!/bin/bash\n")
+            f.write("# Auto-generated: View workflow results in the viewer\n")
+            f.write("# Run from terminal (.sh) or double-click in Finder (.command)\n\n")
+            
+            if is_frozen:
+                # Try /Applications first, fall back to open -a
+                f.write('# Try to find and launch Viewer.app\n')
+                f.write(f'WORKFLOW_DIR="{output_dir.absolute()}"\n\n')
+                f.write('if [ -d "/Applications/Viewer.app" ]; then\n')
+                f.write('    open -a "/Applications/Viewer.app" "$WORKFLOW_DIR"\n')
+                f.write('elif [ -d "$HOME/Applications/Viewer.app" ]; then\n')
+                f.write('    open -a "$HOME/Applications/Viewer.app" "$WORKFLOW_DIR"\n')
+                f.write('else\n')
+                f.write('    # Fall back to system search\n')
+                f.write('    open -a Viewer "$WORKFLOW_DIR"\n')
+                f.write('fi\n')
+            else:
+                python_exe = sys.executable
+                f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir.absolute()}"\n')
+        
+        make_executable(view_script)
+    
+    # Create resume_workflow scripts (.sh and .command)
+    for ext in ['.sh', '.command']:
+        resume_script = output_dir / f"resume_workflow{ext}"
+        with open(resume_script, 'w', encoding='utf-8') as f:
+            f.write("#!/bin/bash\n")
+            f.write("# Auto-generated: Resume this workflow if interrupted\n")
+            f.write("# Run from terminal (.sh) or double-click in Finder (.command)\n\n")
+            
+            if is_frozen and idt_exe and Path(idt_exe).exists():
+                f.write(f'open -a "{idt_exe}" --args workflow --resume "{output_dir.absolute()}"\n')
+            else:
+                workflow_script = base_dir / "scripts" / "workflow.py"
+                python_exe = sys.executable
+                f.write(f'"{python_exe}" "{workflow_script}" --resume "{output_dir.absolute()}"\n')
+            
+            f.write('\necho ""\n')
+            f.write('echo "Press any key to close..."\n')
+            f.write('read -n 1\n')
+        
+        make_executable(resume_script)
+    
+    # Create run_stats scripts (.sh and .command)
+    for ext in ['.sh', '.command']:
+        stats_script = output_dir / f"run_stats{ext}"
+        with open(stats_script, 'w', encoding='utf-8') as f:
+            f.write("#!/bin/bash\n")
+            f.write("# Auto-generated: Run statistics analysis on this workflow\n")
+            f.write("# Results will be saved in the 'stats' subdirectory\n\n")
+            
+            f.write('SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\n')
+            f.write('mkdir -p "$SCRIPT_DIR/stats"\n\n')
+            f.write('echo "Running stats analysis..."\n')
+            
+            parent_dir = output_dir.parent.absolute()
+            
+            if is_frozen and idt_exe and Path(idt_exe).exists():
+                f.write(f'open -a "{idt_exe}" --args stats ')
+                f.write(f'--input-dir "{parent_dir}" ')
+                f.write(f'--csv-output "$SCRIPT_DIR/stats/workflow_timing_stats.csv" ')
+                f.write(f'--json-output "$SCRIPT_DIR/stats/workflow_statistics.json"\n\n')
+            else:
+                stats_py = base_dir / "analysis" / "stats_analysis.py"
+                python_exe = sys.executable
+                f.write(f'"{python_exe}" "{stats_py}" ')
+                f.write(f'--input-dir "{parent_dir}" ')
+                f.write(f'--csv-output "$SCRIPT_DIR/stats/workflow_timing_stats.csv" ')
+                f.write(f'--json-output "$SCRIPT_DIR/stats/workflow_statistics.json"\n\n')
+            
+            f.write('echo ""\n')
+            f.write('echo "Stats analysis complete!"\n')
+            f.write('echo "Results saved in stats/ subdirectory:"\n')
+            f.write('echo "  - workflow_timing_stats.csv"\n')
+            f.write('echo "  - workflow_statistics.json"\n')
+            f.write('echo ""\n')
+            f.write('echo "Press any key to close..."\n')
+            f.write('read -n 1\n')
+        
+        make_executable(stats_script)
 
 
 def get_script_compatibility_args(script_name: str, workflow_config: WorkflowConfig, 
