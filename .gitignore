@@ -145,3 +145,4 @@ test_onnx*.py
 test_directml*.py
 dist_macos/
 BuildAndRelease/WinBuilds/dist_all/
+/BuildAndRelease

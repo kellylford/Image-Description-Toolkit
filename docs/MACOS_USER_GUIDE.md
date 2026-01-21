@@ -99,6 +99,103 @@ idt combinedescriptions
 idt version
 ```
 
+## Setting Up API Keys for OpenAI and Claude
+
+IDT supports multiple AI providers. While Ollama runs locally and requires no API key, OpenAI and Claude are cloud services that require authentication.
+
+### Method 1: Environment Variables (CLI)
+
+For command-line usage, set environment variables:
+
+**Temporary (current terminal session only):**
+```bash
+export OPENAI_API_KEY="your-openai-key-here"
+export ANTHROPIC_API_KEY="your-claude-key-here"
+```
+
+**Permanent (recommended):**
+```bash
+# Add to your shell profile (~/.zshrc for modern macOS)
+echo 'export OPENAI_API_KEY="your-openai-key-here"' >> ~/.zshrc
+echo 'export ANTHROPIC_API_KEY="your-claude-key-here"' >> ~/.zshrc
+
+# Reload your profile
+source ~/.zshrc
+```
+
+### Method 2: API Key Files (GUI Apps)
+
+**Important:** GUI applications launched from Finder do not inherit terminal environment variables. Use this method for ImageDescriber, Viewer, and other .app bundles.
+
+**For OpenAI:**
+1. Create a file named `openai.txt` in your home directory or the folder where you launch the app
+2. Paste your API key into the file (just the key, nothing else)
+3. Save the file
+
+```bash
+# Quick setup from terminal:
+echo "your-openai-key-here" > ~/openai.txt
+```
+
+**For Claude:**
+1. Create a file named `claude.txt` in your home directory or the folder where you launch the app
+2. Paste your API key into the file (just the key, nothing else)
+3. Save the file
+
+```bash
+# Quick setup from terminal:
+echo "your-claude-key-here" > ~/claude.txt
+```
+
+### Method 3: System-wide Environment Variables (Advanced)
+
+To make environment variables available to GUI apps launched from Finder:
+
+```bash
+# Set system-wide environment variable
+launchctl setenv OPENAI_API_KEY "your-openai-key-here"
+launchctl setenv ANTHROPIC_API_KEY "your-claude-key-here"
+```
+
+**Note:** These only persist until reboot. For permanent system-wide variables, create a launch agent in `~/Library/LaunchAgents/`.
+
+### Getting Your API Keys
+
+**OpenAI:**
+- Visit https://platform.openai.com
+- Create an account or sign in
+- Go to API Keys section
+- Click "Create new secret key"
+- Copy and save the key (you won't see it again!)
+
+**Claude (Anthropic):**
+- Visit https://console.anthropic.com
+- Create an account or sign in
+- Go to API Keys section
+- Click "Create Key"
+- Copy and save the key
+
+### Testing Your Setup
+
+**For CLI:**
+```bash
+# Verify environment variables are set
+echo $OPENAI_API_KEY
+echo $ANTHROPIC_API_KEY
+
+# Test with a workflow
+idt workflow /path/to/images --model gpt-4o
+```
+
+**For GUI Apps:**
+```bash
+# If using .txt files, verify they exist
+ls -la ~/openai.txt ~/claude.txt
+
+# Launch ImageDescriber and try processing an image
+open /Applications/imagedescriber.app
+```
+
 ## Quick Start Tutorial
 
 ### 1. Set Up AI Provider
@@ -115,7 +212,7 @@ idt workflow /path/to/test/images
 
 **For OpenAI:**
 ```bash
-# Set API key (get from https://platform.openai.com)
+# Set API key (see "Setting Up API Keys" section above)
 export OPENAI_API_KEY="your-key-here"
 
 # Test it
@@ -124,7 +221,7 @@ idt workflow /path/to/images --model gpt-4o
 
 **For Claude:**
 ```bash
-# Set API key (get from https://console.anthropic.com)
+# Set API key (see "Setting Up API Keys" section above)
 export ANTHROPIC_API_KEY="your-key-here"
 
 # Test it
