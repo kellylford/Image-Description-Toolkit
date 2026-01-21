@@ -25,6 +25,11 @@ a = Analysis(
         'wx.adv',
         'wx.lib.newevent',
         'shared.wx_common',
+        'shared.exif_utils',
+        'models.model_registry',
+        'config_loader',  # Note: no scripts. prefix for frozen mode
+        'list_results',   # Note: no scripts. prefix for frozen mode
+        'ollama',
     ] + wx_hiddenimports,
     hookspath=[],
     hooksconfig={},

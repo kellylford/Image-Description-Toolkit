@@ -42,17 +42,22 @@ import wx
 import wx.lib.scrolledpanel as scrolled
 
 # Import shared utilities
-from shared.wx_common import (
-    find_scripts_directory,
-    show_error,
-    show_warning,
-    show_info,
-    ask_yes_no,
-    select_directory_dialog,
-    open_file_dialog,
-    format_timestamp as format_timestamp_shared,
-    DescriptionListBox,  # NEW: Import accessible listbox from shared module
-)
+try:
+    from shared.wx_common import (
+        find_scripts_directory,
+        show_error,
+        show_warning,
+        show_info,
+        ask_yes_no,
+        select_directory_dialog,
+        open_file_dialog,
+        format_timestamp as format_timestamp_shared,
+        DescriptionListBox,  # NEW: Import accessible listbox from shared module
+    )
+except ImportError as e:
+    print(f"ERROR: Could not import shared.wx_common: {e}")
+    print("This is a critical error. The viewer cannot function without shared utilities.")
+    sys.exit(1)
 
 # Import EXIF utilities
 try:
@@ -68,9 +73,14 @@ except Exception:
     registry_list_models = None
 
 try:
-    from scripts.config_loader import load_json_config as loader_load_json_config
-except Exception:
-    loader_load_json_config = None
+    # Try frozen mode first (PyInstaller)
+    from config_loader import load_json_config as loader_load_json_config
+except ImportError:
+    try:
+        # Development mode fallback
+        from scripts.config_loader import load_json_config as loader_load_json_config
+    except Exception:
+        loader_load_json_config = None
 
 def get_scripts_directory():
     """Get the scripts directory (uses shared library)"""
