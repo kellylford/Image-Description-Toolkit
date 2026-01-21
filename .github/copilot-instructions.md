@@ -14,10 +14,24 @@
 ## 🚨 MANDATORY READING
 
 **Before making ANY code changes**, review:
+- **[Pre-Commit Verification Checklist](docs/worktracking/PRE_COMMIT_VERIFICATION_CHECKLIST.md)** - MANDATORY checklist to complete BEFORE any code changes
 - **[AI Comprehensive Review Protocol](docs/worktracking/AI_COMPREHENSIVE_REVIEW_PROTOCOL.md)** - Required checklists for all changes
 - **[Migration Audit](docs/worktracking/2026-01-20-MIGRATION-AUDIT.md)** - Known issues and patterns to avoid
 
 **Failure to follow these protocols has caused critical production failures.**
+
+## ⚠️ PRE-COMMIT VERIFICATION PROTOCOL
+
+**BEFORE making ANY code change:**
+1. ✅ Complete Phase 1: Read actual code, verify names exist
+2. ✅ Complete Phase 2: Search for impacts, check all callers
+3. ✅ Complete Phase 3: Make minimal changes only
+4. ✅ Complete Phase 4: BUILD and TEST the executable
+5. ✅ Complete Phase 5: Document actual results (not "should work")
+
+**See [PRE_COMMIT_VERIFICATION_CHECKLIST.md](docs/worktracking/PRE_COMMIT_VERIFICATION_CHECKLIST.md) for full details.**
+
+**DO NOT claim something is "fixed" or "done" without completing ALL phases.**
 
 Follow these guidelines for all coding work on this project.
 
