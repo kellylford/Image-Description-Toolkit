@@ -654,8 +654,8 @@ class ImageDescriptionViewer(wx.Frame):
         # Create main panel with splitter
         splitter = wx.SplitterWindow(self)
         
-        # Left panel - list of descriptions
-        left_panel = wx.Panel(splitter)
+        # Left panel - list of descriptions (container only, not focusable)
+        left_panel = wx.Panel(splitter, style=wx.TAB_TRAVERSAL)
         left_sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Controls
@@ -684,14 +684,18 @@ class ImageDescriptionViewer(wx.Frame):
         
         left_panel.SetSizer(left_sizer)
         
-        # Right panel - description details
-        right_panel = wx.Panel(splitter)
+        # Right panel - description details (container only, not focusable)
+        right_panel = wx.Panel(splitter, style=wx.TAB_TRAVERSAL)
         right_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        # Image preview
-        # Use a focusable StaticBitmap for proper screen reader announcement
+        # Image preview panel (container for image display - not focusable)
         self.image_panel = wx.Panel(right_panel, style=wx.BORDER_SIMPLE)
         self.image_panel.SetMinSize((400, 300))
+        # Explicitly prevent this panel from being in the tab order
+        try:
+            self.image_panel.SetCanFocus(False)
+        except AttributeError:
+            pass  # Not available in this wxPython version
         
         image_sizer = wx.BoxSizer(wx.VERTICAL)
         # Add label for filename display
@@ -721,8 +725,13 @@ class ImageDescriptionViewer(wx.Frame):
         self.desc_text = wx.TextCtrl(right_panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
         right_sizer.Add(self.desc_text, 1, wx.ALL | wx.EXPAND, 5)
         
-        # Button panel
-        btn_panel = wx.Panel(right_panel)
+        # Button panel (container only, not focusable)
+        btn_panel = wx.Panel(right_panel, style=wx.TAB_TRAVERSAL)
+        # Ensure the button panel itself doesn't accept focus
+        try:
+            btn_panel.SetCanFocus(False)
+        except AttributeError:
+            pass  # Not available in this wxPython version
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
         copy_desc_btn = wx.Button(btn_panel, label="Copy Description")
@@ -740,8 +749,13 @@ class ImageDescriptionViewer(wx.Frame):
         btn_panel.SetSizer(btn_sizer)
         right_sizer.Add(btn_panel, 0, wx.ALL | wx.EXPAND, 5)
         
-        # Workflow action buttons
-        workflow_panel = wx.Panel(right_panel)
+        # Workflow action buttons (container only, not focusable)
+        workflow_panel = wx.Panel(right_panel, style=wx.TAB_TRAVERSAL)
+        # Ensure the workflow panel itself doesn't accept focus
+        try:
+            workflow_panel.SetCanFocus(False)
+        except AttributeError:
+            pass  # Not available in this wxPython version
         workflow_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
         redescribe_btn = wx.Button(workflow_panel, label="Redescribe Image")
@@ -906,30 +920,49 @@ class ImageDescriptionViewer(wx.Frame):
             self.SetStatusText("Live Mode: Off")
     
     def get_progress_info(self):
-        """Get description progress from progress file.
+        """Get description progress from image_describer_*.log file.
         
         Returns:
-            Tuple of (completed_count, total_count) or (desc_count, desc_count) if progress file not found
+            Tuple of (completed_count, total_count) or (desc_count, desc_count) if log file not found
         """
-        # Try to read progress from image_describer_progress.txt
+        # Try to read progress from image_describer_TIMESTAMP.log (NOT progress.txt - that contains paths, not status)
+        # Log filename includes timestamp, so we need to find it with glob
+        logs_dir = self.current_dir / 'logs'
+        if logs_dir.exists():
+            import glob
+            log_files = list(logs_dir.glob('image_describer_*.log'))
+            if log_files:
+                # Use the most recent log file (in case there are multiple)
+                log_file = max(log_files, key=lambda p: p.stat().st_mtime)
+                try:
+                    with open(log_file, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+                        # Search backwards for the last "Describing image X of Y" line
+                        for line in reversed(lines):
+                            if 'Describing image' in line:
+                                import re
+                                # Format: "INFO - Describing image 90 of 176: filename.jpg"
+                                match = re.search(r'Describing image (\d+) of (\d+)', line)
+                                if match:
+                                    completed = int(match.group(1))
+                                    total = int(match.group(2))
+                                    return (completed, total)
+                except Exception:
+                    pass
+        
+        # Fallback: count lines in progress.txt (contains one path per completed image)
         progress_file = self.current_dir / 'logs' / 'image_describer_progress.txt'
         if progress_file.exists():
             try:
                 with open(progress_file, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                    # Last line has format: "Processed X of Y images"
-                    if lines:
-                        last_line = lines[-1].strip()
-                        import re
-                        match = re.search(r'Processed (\d+) of (\d+)', last_line)
-                        if match:
-                            completed = int(match.group(1))
-                            total = int(match.group(2))
-                            return (completed, total)
+                    completed = len([line for line in f if line.strip()])
+                # We don't know total from progress file alone, so return desc count
+                desc_count = len(self.descriptions)
+                return (completed, desc_count)
             except Exception:
                 pass
         
-        # Fallback: return current description count as both values
+        # Final fallback: return current description count as both values
         desc_count = len(self.descriptions)
         return (desc_count, desc_count)
     
