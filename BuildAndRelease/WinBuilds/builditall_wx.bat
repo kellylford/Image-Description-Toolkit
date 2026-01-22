@@ -112,14 +112,82 @@ echo.
 if "%BUILD_ERRORS%"=="0" (
     echo SUCCESS: All wxPython applications built successfully!
     echo.
-    echo Output locations:
-    echo   - idt\dist\idt.exe
-    echo   - viewer\dist\Viewer.exe
-    echo   - prompt_editor\dist\PromptEditor.exe
-    echo   - imagedescriber\dist\ImageDescriber.exe
-    echo   - idtconfigure\dist\IDTConfigure.exe
+    
+    REM ========================================================================
+    echo ========================================================================
+    echo PACKAGING ALL APPLICATIONS
+    echo ========================================================================
     echo.
-    echo Next step: Run package_all_windows.bat to collect all executables
+    
+    REM Create distribution directory in BuildAndRelease\WinBuilds
+    if not exist "BuildAndRelease\WinBuilds\dist_all" mkdir BuildAndRelease\WinBuilds\dist_all
+    if not exist "BuildAndRelease\WinBuilds\dist_all\bin" mkdir BuildAndRelease\WinBuilds\dist_all\bin
+    
+    REM Clean old files
+    echo Cleaning old package...
+    del /Q BuildAndRelease\WinBuilds\dist_all\bin\*.exe 2>nul
+    del /Q BuildAndRelease\WinBuilds\dist_all\*.md 2>nul
+    del /Q BuildAndRelease\WinBuilds\dist_all\*.txt 2>nul
+    
+    echo Packaging applications...
+    echo.
+    
+    REM Copy IDT CLI
+    if exist "idt\dist\idt.exe" (
+        copy /Y "idt\dist\idt.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+        echo   ✓ idt.exe
+    ) else (
+        echo   ✗ idt.exe NOT FOUND
+    )
+    
+    REM Copy Viewer
+    if exist "viewer\dist\Viewer.exe" (
+        copy /Y "viewer\dist\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+        echo   ✓ Viewer.exe
+    ) else (
+        echo   ✗ Viewer.exe NOT FOUND
+    )
+    
+    REM Copy Prompt Editor
+    if exist "prompt_editor\dist\PromptEditor.exe" (
+        copy /Y "prompt_editor\dist\PromptEditor.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+        echo   ✓ PromptEditor.exe
+    ) else (
+        echo   ✗ PromptEditor.exe NOT FOUND
+    )
+    
+    REM Copy ImageDescriber
+    if exist "imagedescriber\dist\ImageDescriber.exe" (
+        copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+        echo   ✓ ImageDescriber.exe
+    ) else (
+        echo   ✗ ImageDescriber.exe NOT FOUND
+    )
+    
+    REM Copy IDTConfigure
+    if exist "idtconfigure\dist\IDTConfigure.exe" (
+        copy /Y "idtconfigure\dist\IDTConfigure.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+        echo   ✓ IDTConfigure.exe
+    ) else (
+        echo   ✗ IDTConfigure.exe NOT FOUND
+    )
+    
+    REM Copy documentation
+    echo.
+    echo Copying documentation...
+    if exist "README.md" copy /Y "README.md" "BuildAndRelease\WinBuilds\dist_all\" >nul
+    if exist "LICENSE" copy /Y "LICENSE" "BuildAndRelease\WinBuilds\dist_all\" >nul
+    
+    echo.
+    echo ========================================================================
+    echo PACKAGING COMPLETE
+    echo ========================================================================
+    echo.
+    echo All applications packaged in: BuildAndRelease\WinBuilds\dist_all\bin\
+    echo.
+    echo Ready for distribution or installer creation.
+    echo.
+    echo Next step: Run build_installer.bat to create Windows installer
     exit /b 0
 ) else (
     echo ERRORS: %BUILD_ERRORS% build failures encountered

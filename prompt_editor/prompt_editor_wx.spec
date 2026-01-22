@@ -40,9 +40,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='PromptEditor',
     debug=False,
     bootloader_ignore_signals=False,
@@ -58,8 +57,18 @@ exe = EXE(
     entitlements_file=None,
 )
 
-app = BUNDLE(
+coll = COLLECT(
     exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='PromptEditor',
+)
+
+app = BUNDLE(
+    coll,
     name='PromptEditor.app',
     icon=None,
     bundle_identifier='com.idt.prompteditor',

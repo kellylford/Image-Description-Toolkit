@@ -57,9 +57,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='ImageDescriber',
     debug=False,
     bootloader_ignore_signals=False,
@@ -75,10 +74,20 @@ exe = EXE(
     entitlements_file=None,
 )
 
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='ImageDescriber',
+)
+
 # macOS-specific bundle (only created on macOS)
 if sys.platform == 'darwin':
     app = BUNDLE(
-        exe,
+        coll,
         name='ImageDescriber.app',
         icon=None,
         bundle_identifier='com.imagedescriber.app',

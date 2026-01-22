@@ -27,6 +27,46 @@ DMG_NAME="IDT-${VERSION}"
 echo "Building disk image for version: $VERSION"
 echo ""
 
+# ============================================================================
+# CODE SIGNING SETUP
+# ============================================================================
+
+# Detect Developer ID certificate
+SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+
+if [ -z "$SIGNING_IDENTITY" ]; then
+    echo "⚠️  No Developer ID certificate found - building unsigned DMG"
+    echo ""
+    SIGN_CODE=0
+    NOTARIZE=0
+else
+    echo "Found Developer ID certificate: $SIGNING_IDENTITY"
+    SIGN_CODE=1
+    
+    # Check for stored notarization credentials
+    PROFILE_NAME=""
+    for profile in "idt" "notarize" "notarytool-password" "notarytool"; do
+        if xcrun notarytool history --keychain-profile "$profile" >/dev/null 2>&1; then
+            PROFILE_NAME="$profile"
+            break
+        fi
+    done
+    
+    if [ -n "$PROFILE_NAME" ]; then
+        echo "Found notarization credentials (profile: $PROFILE_NAME)"
+        echo "✓ Code signing enabled"
+        echo "✓ Notarization enabled"
+        NOTARIZE=1
+    else
+        echo "✓ Code signing enabled"
+        echo "⚠️  No notarization credentials found - DMG will be signed but not notarized"
+        echo "   To set up: xcrun notarytool store-credentials --apple-id 'your@apple.id' --team-id 'P887QF74N8'"
+        NOTARIZE=0
+    fi
+fi
+
+echo ""
+
 # Create dist directory in MacBuilds if it doesn't exist
 mkdir -p BuildAndRelease/MacBuilds/dist
 
@@ -77,11 +117,52 @@ cp -R "imagedescriber/dist/ImageDescriber.app" "$DMG_STAGING/"
 cp -R "prompt_editor/dist/PromptEditor.app" "$DMG_STAGING/"
 cp -R "idtconfigure/dist/IDTConfigure.app" "$DMG_STAGING/"
 
+# Sign GUI applications if code signing is enabled
+if [ "$SIGN_CODE" = "1" ]; then
+    echo ""
+    echo "Signing applications..."
+    for APP in "$DMG_STAGING"/*.app; do
+        if [ -d "$APP" ]; then
+            APP_NAME=$(basename "$APP")
+            echo "  Signing $APP_NAME..."
+            # Remove any existing signature first (PyInstaller adds one)
+            codesign --remove-signature "$APP" 2>/dev/null || true
+            # Sign with our Developer ID
+            codesign --force --deep \
+                --options runtime \
+                --timestamp \
+                --sign "$SIGNING_IDENTITY" \
+                "$APP"
+            codesign --verify --verbose "$APP"
+        fi
+    done
+    echo "✓ All applications signed"
+    echo ""
+fi
+
 # Create CLI Tools folder
 echo "Creating CLI Tools folder..."
 mkdir -p "$DMG_STAGING/CLI Tools"
 cp "idt/dist/idt" "$DMG_STAGING/CLI Tools/idt"
 chmod +x "$DMG_STAGING/CLI Tools/idt"
+
+# Sign CLI if code signing is enabled
+if [ "$SIGN_CODE" = "1" ]; then
+    echo "Signing CLI tool..."
+    # Remove existing signature first
+    codesign --remove-signature "$DMG_STAGING/CLI Tools/idt" 2>/dev/null || true
+    if codesign --force \
+        --options runtime \
+        --timestamp \
+        --sign "$SIGNING_IDENTITY" \
+        "$DMG_STAGING/CLI Tools/idt" 2>/dev/null; then
+        codesign --verify --verbose "$DMG_STAGING/CLI Tools/idt"
+        echo "✓ CLI tool signed"
+    else
+        echo "⚠️  CLI tool signing failed"
+    fi
+    echo ""
+fi
 
 # Create install script for CLI tool
 cat > "$DMG_STAGING/CLI Tools/INSTALL_CLI.sh" << 'EOF'
@@ -156,7 +237,7 @@ hdiutil create \
     -fs HFS+ \
     -fsargs "-c c=64,a=16,e=16" \
     -format UDRW \
-    -size 500m \
+    -size 1500m \
     "$TEMP_DMG"
 
 echo "Skipping Finder customization (can be done manually after mounting)..."
@@ -173,28 +254,69 @@ hdiutil convert \
     -o "$FINAL_DMG"
 
 # Clean up
-echo "Cleaning up..."
+echo "Cleaning up temporary files..."
 rm -f "$TEMP_DMG"
 rm -rf "$DMG_STAGING"
 
-if [ $? -eq 0 ]; then
+# Sign the DMG if code signing is enabled
+if [ "$SIGN_CODE" = "1" ]; then
     echo ""
-    echo "========================================================================"
-    echo "DISK IMAGE CREATED SUCCESSFULLY"
-    echo "========================================================================"
-    echo "Disk Image: BuildAndRelease/MacBuilds/dist/${DMG_NAME}.dmg"
-    echo ""
-    echo "To distribute: Double-click to mount, then drag apps to Applications"
-    echo ""
-    echo "NOTE: For distribution, you should code sign the applications first:"
-    echo "  codesign --deep --force --verify --verbose \\"
-    echo "    --sign 'Developer ID Application: Your Name' \\"
-    echo "    Viewer.app ImageDescriber.app PromptEditor.app IDTConfigure.app"
-    echo ""
-else
-    echo ""
-    echo "ERROR: Failed to create disk image"
-    exit 1
+    echo "Signing DMG..."
+    codesign --force --sign "$SIGNING_IDENTITY" "$FINAL_DMG"
+    codesign --verify --verbose "$FINAL_DMG"
+    echo "✓ DMG signed"
 fi
 
+# Notarize if enabled
+if [ "$SIGN_CODE" = "1" ] && [ "$NOTARIZE" = "1" ]; then
+    echo ""
+    echo "========================================================================"
+    echo "NOTARIZING WITH APPLE"
+    echo "========================================================================"
+    echo "Submitting to Apple (this takes 2-5 minutes)..."
+    echo ""
+    
+    SUBMIT_OUTPUT=$(xcrun notarytool submit "$FINAL_DMG" \
+        --keychain-profile "$PROFILE_NAME" \
+        --wait 2>&1)
+    
+    echo "$SUBMIT_OUTPUT"
+    
+    if echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
+        echo ""
+        echo "✓ Notarization successful!"
+        echo ""
+        echo "Stapling notarization ticket..."
+        xcrun stapler staple "$FINAL_DMG"
+        xcrun stapler validate "$FINAL_DMG"
+        echo "✓ Notarization ticket stapled"
+    else
+        echo ""
+        echo "❌ Notarization failed - see output above"
+        exit 1
+    fi
+fi
+
+# Success summary
+echo ""
+echo "========================================================================"
+echo "BUILD COMPLETE"
+echo "========================================================================"
+echo "DMG: BuildAndRelease/MacBuilds/dist/${DMG_NAME}.dmg"
+echo ""
+
+if [ "$SIGN_CODE" = "1" ]; then
+    echo "✓ Code signed"
+    if [ "$NOTARIZE" = "1" ]; then
+        echo "✓ Notarized and stapled"
+        echo ""
+        echo "This DMG is ready for public distribution!"
+    else
+        echo "⚠️  Not notarized - users will see security warnings"
+    fi
+else
+    echo "⚠️  Unsigned - users must right-click → Open each app"
+fi
+
+echo ""
 exit 0

@@ -226,56 +226,87 @@ if [ -f "dist/idt" ]; then
 fi
 
 # ============================================================================
-# COLLECT ALL BUILDS TO CENTRAL LOCATION
+# COLLECT ALL BUILDS TO CENTRAL LOCATION (PACKAGING)
 # ============================================================================
 if [ $BUILD_ERRORS -eq 0 ]; then
     echo ""
     echo "========================================================================"
-    echo "COLLECTING BUILDS TO CENTRAL LOCATION"
+    echo "PACKAGING ALL APPLICATIONS"
     echo "========================================================================"
     echo ""
     
-    # Create central distribution directory
-    DIST_MACOS="dist_macos"
-    rm -rf "$DIST_MACOS"
-    mkdir -p "$DIST_MACOS"
+    # Create distribution directory in BuildAndRelease/MacBuilds
+    DIST_ALL="BuildAndRelease/MacBuilds/dist_all"
+    rm -rf "$DIST_ALL"
+    mkdir -p "$DIST_ALL"
+    mkdir -p "$DIST_ALL/Applications"
     
-    echo "Copying built applications to $DIST_MACOS/..."
+    echo "Packaging applications to $DIST_ALL/..."
+    echo ""
     
     # Copy IDT CLI
-    if [ -f "dist/idt" ]; then
-        cp "dist/idt" "$DIST_MACOS/"
-        echo "✓ Copied idt (CLI)"
+    if [ -f "idt/dist/idt" ]; then
+        cp "idt/dist/idt" "$DIST_ALL/"
+        chmod +x "$DIST_ALL/idt"
+        echo "✓ idt (CLI)"
+    else
+        echo "✗ idt NOT FOUND"
     fi
     
     # Copy Viewer.app
-    if [ -d "viewer/dist/viewer.app" ]; then
-        cp -R "viewer/dist/viewer.app" "$DIST_MACOS/"
-        echo "✓ Copied viewer.app"
+    if [ -d "viewer/dist/Viewer.app" ]; then
+        cp -R "viewer/dist/Viewer.app" "$DIST_ALL/Applications/"
+        echo "✓ Viewer.app"
+    else
+        echo "✗ Viewer.app NOT FOUND"
     fi
     
     # Copy Prompt Editor.app
-    if [ -d "prompt_editor/dist/prompteditor.app" ]; then
-        cp -R "prompt_editor/dist/prompteditor.app" "$DIST_MACOS/"
-        echo "✓ Copied prompteditor.app"
+    if [ -d "prompt_editor/dist/PromptEditor.app" ]; then
+        cp -R "prompt_editor/dist/PromptEditor.app" "$DIST_ALL/Applications/"
+        echo "✓ PromptEditor.app"
+    else
+        echo "✗ PromptEditor.app NOT FOUND"
     fi
     
     # Copy ImageDescriber.app
-    if [ -d "imagedescriber/dist/imagedescriber.app" ]; then
-        cp -R "imagedescriber/dist/imagedescriber.app" "$DIST_MACOS/"
-        echo "✓ Copied imagedescriber.app"
+    if [ -d "imagedescriber/dist/ImageDescriber.app" ]; then
+        cp -R "imagedescriber/dist/ImageDescriber.app" "$DIST_ALL/Applications/"
+        echo "✓ ImageDescriber.app"
+    else
+        echo "✗ ImageDescriber.app NOT FOUND"
     fi
     
     # Copy IDTConfigure.app
-    if [ -d "idtconfigure/dist/idtconfigure.app" ]; then
-        cp -R "idtconfigure/dist/idtconfigure.app" "$DIST_MACOS/"
-        echo "✓ Copied idtconfigure.app"
+    if [ -d "idtconfigure/dist/IDTConfigure.app" ]; then
+        cp -R "idtconfigure/dist/IDTConfigure.app" "$DIST_ALL/Applications/"
+        echo "✓ IDTConfigure.app"
+    else
+        echo "✗ IDTConfigure.app NOT FOUND"
+    fi
+    
+    # Copy documentation
+    echo ""
+    echo "Copying documentation..."
+    if [ -f "README.md" ]; then cp "README.md" "$DIST_ALL/"; fi
+    if [ -f "LICENSE" ]; then cp "LICENSE" "$DIST_ALL/"; fi
+    if [ -f "install_idt_macos.sh" ]; then 
+        cp "install_idt_macos.sh" "$DIST_ALL/"
+        chmod +x "$DIST_ALL/install_idt_macos.sh"
     fi
     
     echo ""
-    echo "All applications collected in: $DIST_MACOS/"
+    echo "========================================================================"
+    echo "PACKAGING COMPLETE"
+    echo "========================================================================"
     echo ""
-    ls -lh "$DIST_MACOS/"
+    echo "All applications packaged in: $DIST_ALL/"
+    echo ""
+    echo "Contents:"
+    echo "  - dist_all/idt (CLI executable)"
+    echo "  - dist_all/Applications/ (GUI .app bundles)"
+    echo ""
+    echo "Ready for DMG creation or distribution."
     echo ""
 fi
 
