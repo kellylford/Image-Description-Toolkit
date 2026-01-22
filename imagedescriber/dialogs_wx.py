@@ -304,14 +304,17 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         # Set focus to AI provider control (the key area for user interaction)
         # Use CallAfter to ensure UI is fully initialized
+        # CRITICAL: Must happen AFTER populate_models_for_provider to avoid race condition
         wx.CallAfter(self._set_initial_focus)
     
     def _set_initial_focus(self):
         """Set initial focus to AI provider choice on AI Model tab"""
         # Switch to AI Model tab (index 1)
         self.notebook.SetSelection(1)
-        # Focus on provider choice
-        self.provider_choice.SetFocus()
+        # CRITICAL: Don't set focus immediately after tab switch on macOS
+        # The accessibility system needs time to process the tab change
+        # Use CallAfter to defer focus setting to next event cycle
+        wx.CallAfter(self.provider_choice.SetFocus)
     
     def create_general_panel(self, parent):
         """Create general options panel"""
@@ -421,8 +424,10 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         panel.SetSizer(sizer)
         
-        # Populate models for initial provider
-        wx.CallAfter(self.populate_models_for_provider)
+        # CRITICAL: Populate models IMMEDIATELY, not deferred
+        # CallAfter was causing race condition with focus management
+        # Do this synchronously so model list is ready before any focus changes
+        self.populate_models_for_provider()
         
         return panel
     
@@ -433,6 +438,19 @@ class ProcessingOptionsDialog(wx.Dialog):
     def populate_models_for_provider(self):
         """Populate model list based on selected provider"""
         provider = self.provider_choice.GetStringSelection().lower()
+        
+        # CRITICAL FIX: Save focus state before clearing combo box
+        # Clearing a ComboBox while it has focus can crash VoiceOver/accessibility
+        # on macOS due to accessibility API trying to query deallocated parent views
+        focused_widget = self.FindFocus()
+        had_focus = (focused_widget == self.model_combo)
+        
+        if had_focus:
+            # Temporarily move focus to a stable control that won't be modified
+            # Use the parent panel to avoid any control that might be in transition
+            self.model_combo.GetParent().SetFocus()
+        
+        # Clear the combo box (safe now that focus is elsewhere)
         self.model_combo.Clear()
         
         try:
@@ -471,6 +489,13 @@ class ProcessingOptionsDialog(wx.Dialog):
         except Exception as e:
             print(f"Error populating models: {e}")
             self.model_combo.SetValue(self.config.get('model', 'moondream'))
+        
+        # Restore focus to model combo if it had focus before
+        # Use CallAfter to ensure combo box is fully populated and stable
+        if had_focus:
+            # Add a small delay to ensure all GUI updates are complete
+            # This prevents accessibility crashes during rapid state changes
+            wx.CallLater(50, self.model_combo.SetFocus)
     
     def load_prompts(self):
         """Load available prompt styles from config file"""
