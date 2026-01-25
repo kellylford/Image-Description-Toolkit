@@ -19,6 +19,9 @@ echo BUILD ALL wxPython APPLICATIONS (Windows)
 echo ========================================================================
 echo.
 
+REM Save current directory (should be BuildAndRelease\WinBuilds)
+set "ORIGINAL_DIR=%CD%"
+
 cd /d "%~dp0..\.."
 
 set BUILD_ERRORS=0
@@ -141,8 +144,8 @@ if "%BUILD_ERRORS%"=="0" (
     )
     
     REM Copy Viewer
-    if exist "viewer\dist\Viewer.exe" (
-        copy /Y "viewer\dist\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+    if exist "viewer\dist\Viewer\Viewer.exe" (
+        copy /Y "viewer\dist\Viewer\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
         echo   ✓ Viewer.exe
     ) else (
         echo   ✗ Viewer.exe NOT FOUND
@@ -157,8 +160,8 @@ if "%BUILD_ERRORS%"=="0" (
     )
     
     REM Copy ImageDescriber
-    if exist "imagedescriber\dist\ImageDescriber.exe" (
-        copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+    if exist "imagedescriber\dist\ImageDescriber\ImageDescriber.exe" (
+        copy /Y "imagedescriber\dist\ImageDescriber\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
         echo   ✓ ImageDescriber.exe
     ) else (
         echo   ✗ ImageDescriber.exe NOT FOUND
@@ -188,10 +191,16 @@ if "%BUILD_ERRORS%"=="0" (
     echo Ready for distribution or installer creation.
     echo.
     echo Next step: Run build_installer.bat to create Windows installer
+    
+    REM Return to original directory
+    cd /d "%ORIGINAL_DIR%"
     exit /b 0
 ) else (
     echo ERRORS: %BUILD_ERRORS% build failures encountered
     echo.
     echo If .winenv errors, run: winsetup.bat
+    
+    REM Return to original directory
+    cd /d "%ORIGINAL_DIR%"
     exit /b 1
 )
