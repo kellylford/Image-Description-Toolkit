@@ -111,6 +111,7 @@ if %ERRORLEVEL% EQU 0 (
     echo   - Configuration files
     echo   - Documentation
     echo.
+    exit /b 0
 ) else (
     echo.
     echo ERROR: Installer compilation failed!
@@ -118,5 +119,3 @@ if %ERRORLEVEL% EQU 0 (
     pause
     exit /b 1
 )
-
-pause
