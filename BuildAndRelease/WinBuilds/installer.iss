@@ -3,7 +3,9 @@
 ; wxPython Version - Simplified installer that works directly from dist_all directory
 
 #define MyAppName "Image Description Toolkit"
-#define MyAppVersion "3.6.0"
+#define VersionFile FileOpen(SourcePath + "\\..\\..\\VERSION")
+#define MyAppVersion Trim(FileRead(VersionFile))
+#expr FileClose(VersionFile)
 #define MyAppPublisher "Kelly Ford"
 #define MyAppURL "https://github.com/kellylford/Image-Description-Toolkit"
 #define MyAppExeName "idt.exe"
@@ -23,7 +25,7 @@ DefaultDirName={sd}\idt
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile={#LicensePath}
-OutputDir=dist
+OutputDir=dist_all
 OutputBaseFilename=ImageDescriptionToolkit_Setup_v{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
