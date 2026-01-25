@@ -66,6 +66,7 @@ echo Building IDTConfigure with configuration file access...
 echo.
 
 pyinstaller --onefile ^
+    --noconfirm ^
     --windowed ^
     --name "idtconfigure" ^
     --distpath "dist" ^

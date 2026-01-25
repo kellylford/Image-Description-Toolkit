@@ -76,7 +76,7 @@ echo Building Viewer with wxPython and bundled dependencies...
 echo.
 
 REM Build using the spec file
-pyinstaller viewer_wx.spec --clean
+pyinstaller viewer_wx.spec --clean --noconfirm
 
 if errorlevel 1 (
     echo.

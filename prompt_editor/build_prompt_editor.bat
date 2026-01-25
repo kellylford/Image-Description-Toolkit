@@ -68,6 +68,7 @@ echo.
 
 REM Build the executable
 pyinstaller --onefile ^
+    --noconfirm ^
     --windowed ^
     --name "prompteditor" ^
     --distpath "dist" ^
