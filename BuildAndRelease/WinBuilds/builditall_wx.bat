@@ -144,8 +144,8 @@ if "%BUILD_ERRORS%"=="0" (
     )
     
     REM Copy Viewer
-    if exist "viewer\dist\Viewer\Viewer.exe" (
-        copy /Y "viewer\dist\Viewer\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+    if exist "viewer\dist\Viewer.exe" (
+        copy /Y "viewer\dist\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
         echo   ✓ Viewer.exe
     ) else (
         echo   ✗ Viewer.exe NOT FOUND
@@ -160,8 +160,8 @@ if "%BUILD_ERRORS%"=="0" (
     )
     
     REM Copy ImageDescriber
-    if exist "imagedescriber\dist\ImageDescriber\ImageDescriber.exe" (
-        copy /Y "imagedescriber\dist\ImageDescriber\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+    if exist "imagedescriber\dist\ImageDescriber.exe" (
+        copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
         echo   ✓ ImageDescriber.exe
     ) else (
         echo   ✗ ImageDescriber.exe NOT FOUND
