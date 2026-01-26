@@ -405,12 +405,18 @@ class ModifiedStateMixin:
         if not self.modified:
             self.modified = True
             self._update_title()
+            # Update UI state if the method exists (for enabling save buttons, etc.)
+            if hasattr(self, 'update_ui_state'):
+                self.update_ui_state()
     
     def clear_modified(self):
         """Clear modified flag and update window title."""
         if self.modified:
             self.modified = False
             self._update_title()
+            # Update UI state if the method exists (for disabling save buttons, etc.)
+            if hasattr(self, 'update_ui_state'):
+                self.update_ui_state()
     
     def update_window_title(self, app_name: str, document_name: str = ""):
         """
