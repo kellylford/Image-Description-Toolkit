@@ -462,12 +462,14 @@ class ProcessingOptionsDialog(wx.Dialog):
                     # Use cached models for instant loading
                     models = self.cached_ollama_models
                 else:
-                    # Fall back to querying Ollama (slower)
+                    # Auto-populate cache on first use (slower, but only happens once)
                     from ai_providers import get_available_providers
                     providers = get_available_providers()
                     if 'ollama' in providers:
                         ollama_provider = providers['ollama']
                         models = ollama_provider.get_available_models()
+                        # Cache for next time (update passed reference)
+                        self.cached_ollama_models = models
                 
                 if models:
                     for model in models:

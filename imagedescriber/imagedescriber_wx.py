@@ -1411,6 +1411,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.workspace_file = file_path
             self.workspace.saved = True
             
+            # Load cached Ollama models from workspace
+            self.cached_ollama_models = self.workspace.cached_ollama_models
+            
             # Update UI
             self.refresh_image_list()
             self.update_window_title("ImageDescriber", Path(file_path).name)
@@ -1456,6 +1459,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Update workspace metadata
             self.workspace.file_path = file_path
             self.workspace.modified = datetime.now().isoformat()
+            
+            # Sync cached models to workspace
+            self.workspace.cached_ollama_models = self.cached_ollama_models
             
             # Save to file
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -2081,13 +2087,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 ollama_provider = providers['ollama']
                 models = ollama_provider.get_available_models()
                 self.cached_ollama_models = models
+                # Also update workspace cache
+                if self.workspace:
+                    self.workspace.cached_ollama_models = models
                 return models
             else:
                 self.cached_ollama_models = []
+                if self.workspace:
+                    self.workspace.cached_ollama_models = []
                 return []
         except Exception as e:
             self.SetStatusText(f"Error refreshing models: {e}", 0)
             self.cached_ollama_models = None
+            if self.workspace:
+                self.workspace.cached_ollama_models = None
             return None
     
     def on_refresh_ai_models(self, event):

@@ -102,6 +102,7 @@ class ImageWorkspace:
         self.items: Dict[str, ImageItem] = {}
         self.chat_sessions: Dict[str, dict] = {}  # New: chat sessions storage
         self.imported_workflow_dir: Optional[str] = None  # Track imported workflow directory for updates
+        self.cached_ollama_models: Optional[List[str]] = None  # Cached Ollama models for faster dialog loading
         self.created = datetime.now().isoformat()
         self.modified = self.created
         self.saved = new_workspace  # New workspaces start as saved
@@ -163,6 +164,7 @@ class ImageWorkspace:
             "items": {path: item.to_dict() for path, item in self.items.items()},
             "chat_sessions": getattr(self, 'chat_sessions', {}),  # Include chat sessions
             "imported_workflow_dir": getattr(self, 'imported_workflow_dir', None),  # Track workflow imports
+            "cached_ollama_models": getattr(self, 'cached_ollama_models', None),  # Cached Ollama models
             "created": self.created,
             "modified": self.modified
         }
@@ -180,6 +182,7 @@ class ImageWorkspace:
                           for path, item_data in data.get("items", {}).items()}
         workspace.chat_sessions = data.get("chat_sessions", {})  # Load chat sessions
         workspace.imported_workflow_dir = data.get("imported_workflow_dir", None)  # Load workflow dir
+        workspace.cached_ollama_models = data.get("cached_ollama_models", None)  # Load cached models
         workspace.created = data.get("created", workspace.created)
         workspace.modified = data.get("modified", workspace.modified)
         workspace.saved = True
