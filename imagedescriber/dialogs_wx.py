@@ -265,7 +265,7 @@ class ApiKeyDialog(wx.Dialog):
 class ProcessingOptionsDialog(wx.Dialog):
     """Dialog for configuring processing options"""
     
-    def __init__(self, current_config: Dict[str, Any], parent=None):
+    def __init__(self, current_config: Dict[str, Any], cached_ollama_models=None, parent=None):
         super().__init__(
             parent,
             title="Processing Options",
@@ -273,6 +273,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         )
         
         self.config = current_config.copy()
+        self.cached_ollama_models = cached_ollama_models  # Use cached models if available
         self.init_ui()
         self.SetSize((600, 400))
         self.Centre()
@@ -455,23 +456,28 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         try:
             if provider == "ollama":
-                # Get installed Ollama models
-                from ai_providers import get_available_providers
-                providers = get_available_providers()
-                if 'ollama' in providers:
-                    ollama_provider = providers['ollama']
-                    models = ollama_provider.get_available_models()
-                    if models:
-                        for model in models:
-                            self.model_combo.Append(model)
-                        # Set default if in list
-                        default_model = self.config.get('model', 'moondream')
-                        if default_model in models:
-                            self.model_combo.SetValue(default_model)
-                        elif models:
-                            self.model_combo.SetValue(models[0])
-                    else:
-                        self.model_combo.SetValue("moondream")
+                # Use cached models if available, otherwise query Ollama
+                models = None
+                if self.cached_ollama_models is not None:
+                    # Use cached models for instant loading
+                    models = self.cached_ollama_models
+                else:
+                    # Fall back to querying Ollama (slower)
+                    from ai_providers import get_available_providers
+                    providers = get_available_providers()
+                    if 'ollama' in providers:
+                        ollama_provider = providers['ollama']
+                        models = ollama_provider.get_available_models()
+                
+                if models:
+                    for model in models:
+                        self.model_combo.Append(model)
+                    # Set default if in list
+                    default_model = self.config.get('model', 'moondream')
+                    if default_model in models:
+                        self.model_combo.SetValue(default_model)
+                    elif models:
+                        self.model_combo.SetValue(models[0])
                 else:
                     self.model_combo.SetValue("moondream")
             elif provider == "openai":

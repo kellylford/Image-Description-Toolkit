@@ -243,6 +243,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.current_filter = "all"  # View filter: all, described, batch
         self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
         
+        # AI Model caching (for faster dialog loading)
+        self.cached_ollama_models = None  # Will be populated on first use or manual refresh
+        
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
         self.video_extensions = {'.mp4', '.mov', '.avi', '.mkv'}
@@ -538,6 +541,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         clear_batch_item = process_menu.Append(wx.ID_ANY, "Clear Batch Processing")
         self.Bind(wx.EVT_MENU, self.on_clear_batch, clear_batch_item)
+        
+        process_menu.AppendSeparator()
+        
+        refresh_models_item = process_menu.Append(wx.ID_ANY, "Refresh AI &Models")
+        self.Bind(wx.EVT_MENU, self.on_refresh_ai_models, refresh_models_item)
         
         process_menu.AppendSeparator()
         
@@ -1220,9 +1228,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Processing worker not available")
             return
         
-        # Show processing options dialog
+        # Show processing options dialog with cached models
         if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self.config, self)
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
@@ -1275,9 +1283,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Batch processing worker not available")
             return
         
-        # Show processing options dialog
+        # Show processing options dialog with cached models
         if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self.config, self)
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
@@ -2008,9 +2016,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Batch processing worker not available")
             return
         
-        # Show processing options dialog
+        # Show processing options dialog with cached models
         if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self.config, self)
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
@@ -2063,6 +2071,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.SetStatusText(f"Cleared {count} batch markings", 0)
         else:
             show_info(self, "No items were marked for batch processing")
+    
+    def refresh_ollama_models(self):
+        """Refresh cached Ollama models from the system"""
+        try:
+            from ai_providers import get_available_providers
+            providers = get_available_providers()
+            if 'ollama' in providers:
+                ollama_provider = providers['ollama']
+                models = ollama_provider.get_available_models()
+                self.cached_ollama_models = models
+                return models
+            else:
+                self.cached_ollama_models = []
+                return []
+        except Exception as e:
+            self.SetStatusText(f"Error refreshing models: {e}", 0)
+            self.cached_ollama_models = None
+            return None
+    
+    def on_refresh_ai_models(self, event):
+        """Handle menu item to refresh AI model cache"""
+        wx.BeginBusyCursor()
+        try:
+            models = self.refresh_ollama_models()
+            if models is not None:
+                count = len(models)
+                model_list = "\\n".join(models) if models else "No Ollama models found"
+                show_info(self, f"Successfully refreshed {count} Ollama model(s):\\n\\n{model_list}")
+                self.SetStatusText(f"Refreshed {count} Ollama model(s)", 0)
+            else:
+                show_warning(self, "Failed to refresh models", "Could not connect to Ollama. Make sure it's running.")
+        finally:
+            wx.EndBusyCursor()
     
     def on_convert_heic(self, event):
         """Convert HEIC files to JPEG format"""
