@@ -778,9 +778,9 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
             file_path = save_file_dialog(
                 self,
                 "Save Configuration As",
-                str(self.config_file.parent),
-                "custom_prompts.json",
-                "JSON files (*.json)|*.json|All files (*.*)|*.*"
+                wildcard="JSON files (*.json)|*.json|All files (*.*)|*.*",
+                default_dir=str(self.config_file.parent) if self.config_file else "",
+                default_file="custom_prompts.json"
             )
             
             if file_path:

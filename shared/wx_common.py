@@ -91,11 +91,11 @@ def find_scripts_directory() -> Optional[Path]:
     base = get_base_directory()
     
     if getattr(sys, 'frozen', False):
-        # Frozen mode - check for bundled scripts
+        # Frozen mode - check writable locations first, then bundled scripts
         candidates = [
-            Path(sys._MEIPASS) / 'scripts',  # PyInstaller temp directory
-            base / 'scripts',                 # Next to exe
-            base.parent / 'scripts',          # One level up
+            base / 'scripts',                 # Next to exe (writable)
+            base.parent / 'scripts',          # One level up (writable)
+            Path(sys._MEIPASS) / 'scripts',  # PyInstaller temp directory (read-only)
         ]
     else:
         # Development mode
@@ -116,10 +116,13 @@ def find_config_file(filename: str) -> Optional[Path]:
     Find a configuration file using standard search order.
     
     Search order:
-    1. scripts/ directory (most common location)
+    1. scripts/ directory next to exe (writable)
     2. Base directory (exe directory or project root)
     3. Current working directory
-    4. PyInstaller temp directory (frozen mode only)
+    4. PyInstaller temp directory (frozen mode only, read-only)
+    
+    If no writable config found in frozen mode, creates scripts/ directory
+    next to exe and copies bundled config as template.
     
     Args:
         filename: Config filename (e.g., 'image_describer_config.json')
@@ -142,15 +145,38 @@ def find_config_file(filename: str) -> Optional[Path]:
     # Add current directory
     candidates.append(Path.cwd() / filename)
     
-    # In frozen mode, also check PyInstaller temp directory
-    if getattr(sys, 'frozen', False):
-        candidates.append(Path(sys._MEIPASS) / filename)
-        candidates.append(Path(sys._MEIPASS) / 'scripts' / filename)
-    
-    # Return first existing file
+    # Return first existing writable file
     for path in candidates:
         if path.exists() and path.is_file():
             return path
+    
+    # In frozen mode, if no writable config found, create one from bundled template
+    if getattr(sys, 'frozen', False):
+        # Check if bundled config exists in _MEIPASS
+        bundled_candidates = [
+            Path(sys._MEIPASS) / 'scripts' / filename,
+            Path(sys._MEIPASS) / filename,
+        ]
+        
+        bundled_config = None
+        for bundled_path in bundled_candidates:
+            if bundled_path.exists() and bundled_path.is_file():
+                bundled_config = bundled_path
+                break
+        
+        # Create writable config location next to exe
+        writable_scripts = base_dir / 'scripts'
+        writable_scripts.mkdir(exist_ok=True)
+        writable_config = writable_scripts / filename
+        
+        # Copy bundled config as template if available and target doesn't exist
+        if bundled_config and not writable_config.exists():
+            try:
+                writable_config.write_bytes(bundled_config.read_bytes())
+            except Exception:
+                pass  # If copy fails, return path anyway for creation
+        
+        return writable_config
     
     return None
 

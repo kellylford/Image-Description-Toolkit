@@ -720,9 +720,9 @@ class IDTConfigureFrame(wx.Frame):
         export_path = save_file_dialog(
             self,
             "Export Configuration",
-            None,
-            None,
-            "JSON Files (*.json)|*.json"
+            wildcard="JSON Files (*.json)|*.json",
+            default_dir="",
+            default_file="idt_config_export.json"
         )
         
         if export_path:
@@ -738,8 +738,8 @@ class IDTConfigureFrame(wx.Frame):
         import_path = open_file_dialog(
             self,
             "Import Configuration",
-            None,
-            "JSON Files (*.json)|*.json"
+            wildcard="JSON Files (*.json)|*.json",
+            default_dir=""
         )
         
         if import_path:
