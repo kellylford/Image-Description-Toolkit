@@ -35,6 +35,9 @@
 - **[ARCHITECTURE_SEARCH_RESULTS.md](ARCHITECTURE_SEARCH_RESULTS.md)** - Codebase architecture overview
 - **[AI_ONBOARDING.md](AI_ONBOARDING.md)** - AI agent onboarding and project context
 
+### Research & Experiments
+- **[NPU_ACCELERATION_EXPERIMENT.md](NPU_ACCELERATION_EXPERIMENT.md)** - NPU/DirectML acceleration testing (Feb 2026, negative results)
+
 ### Build & Deployment
 - **[BUILD_MACOS.md](BUILD_MACOS.md)** - macOS build process
 - **[BuildAndRelease/BUILD_SYSTEM_REFERENCE.md](../BuildAndRelease/BUILD_SYSTEM_REFERENCE.md)** - Complete build system reference
