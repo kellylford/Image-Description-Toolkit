@@ -222,6 +222,51 @@ ProcessingProgressEvent, EVT_PROCESSING_PROGRESS = wx.lib.newevent.NewEvent()
 ProcessingErrorEvent, EVT_PROCESSING_ERROR = wx.lib.newevent.NewEvent()
 
 
+def format_image_metadata(metadata: dict) -> list:
+    """Format image metadata (GPS, EXIF) for display
+    
+    Args:
+        metadata: Dictionary containing datetime, location, camera, technical sections
+        
+    Returns:
+        List of formatted metadata strings to display
+    """
+    if not metadata:
+        return []
+    
+    lines = []
+    
+    # DateTime information
+    if 'datetime' in metadata and metadata['datetime']:
+        dt_info = metadata['datetime']
+        if 'DateTimeOriginal' in dt_info:
+            lines.append(f"Captured: {dt_info['DateTimeOriginal']}")
+        elif 'DateTime' in dt_info:
+            lines.append(f"Date: {dt_info['DateTime']}")
+    
+    # GPS/Location information  
+    if 'location' in metadata and metadata['location']:
+        loc_info = metadata['location']
+        if 'latitude' in loc_info and 'longitude' in loc_info:
+            lat = loc_info['latitude']
+            lon = loc_info['longitude']
+            lines.append(f"GPS: {lat:.6f}, {lon:.6f}")
+            
+            # Add reverse geocoded location if available
+            if 'location_name' in loc_info:
+                lines.append(f"Location: {loc_info['location_name']}")
+    
+    # Camera information
+    if 'camera' in metadata and metadata['camera']:
+        cam_info = metadata['camera']
+        if 'Make' in cam_info and 'Model' in cam_info:
+            lines.append(f"Camera: {cam_info['Make']} {cam_info['Model']}")
+        elif 'Model' in cam_info:
+            lines.append(f"Camera: {cam_info['Model']}")
+    
+    return lines
+
+
 class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     """Main application window for ImageDescriber"""
     
@@ -240,8 +285,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.workspace_file = None
         self.processing_thread = None
         self.current_image_item = None
-        self.current_filter = "all"  # View filter: all, described, batch
+        self.current_filter = "all"  # View filter: all, described
         self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
+        self.batch_progress = None  # Track batch processing: {current: N, total: M, file_path: "..."}
         
         # AI Model caching (for faster dialog loading)
         self.cached_ollama_models = None  # Will be populated on first use or manual refresh
@@ -533,17 +579,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         process_menu.AppendSeparator()
         
-        mark_batch_item = process_menu.Append(wx.ID_ANY, "Mark for &Batch\tB")
-        self.Bind(wx.EVT_MENU, self.on_mark_for_batch, mark_batch_item)
-        
-        process_batch_item = process_menu.Append(wx.ID_ANY, "Process Batch...")
-        self.Bind(wx.EVT_MENU, self.on_process_batch, process_batch_item)
-        
-        clear_batch_item = process_menu.Append(wx.ID_ANY, "Clear Batch Processing")
-        self.Bind(wx.EVT_MENU, self.on_clear_batch, clear_batch_item)
-        
-        process_menu.AppendSeparator()
-        
         refresh_models_item = process_menu.Append(wx.ID_ANY, "Refresh AI &Models")
         self.Bind(wx.EVT_MENU, self.on_refresh_ai_models, refresh_models_item)
         
@@ -607,9 +642,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         filter_desc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Described Only")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("described"), filter_desc_item)
-        
-        filter_batch_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Batch Processing")
-        self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("batch"), filter_batch_item)
         
         filter_all_item.Check(True)  # Default to all items
         
@@ -725,6 +757,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     created_date = desc.created.split('T')[0] if 'T' in desc.created else desc.created
                     metadata_lines.append(f"Created: {created_date}")
                 
+                # Add image metadata (GPS, EXIF, etc.) if available
+                if desc.metadata:
+                    image_metadata_lines = format_image_metadata(desc.metadata)
+                    if image_metadata_lines:
+                        metadata_lines.append("\n--- Image Info ---")
+                        metadata_lines.extend(image_metadata_lines)
+                
                 full_text_with_metadata = full_text + "\n".join(metadata_lines)
                 
                 # Create dict with full description + metadata for accessibility
@@ -760,6 +799,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if first_desc.created:
                 created_date = first_desc.created.split('T')[0] if 'T' in first_desc.created else first_desc.created
                 metadata_lines.append(f"Created: {created_date}")
+            
+            # Add image metadata (GPS, EXIF, etc.) if available
+            if first_desc.metadata:
+                image_metadata_lines = format_image_metadata(first_desc.metadata)
+                if image_metadata_lines:
+                    metadata_lines.append("\n--- Image Info ---")
+                    metadata_lines.extend(image_metadata_lines)
             
             first_text_with_metadata = first_text + "\n".join(metadata_lines)
             self.description_text.SetValue(first_text_with_metadata)
@@ -800,6 +846,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if selected_desc.created:
                     created_date = selected_desc.created.split('T')[0] if 'T' in selected_desc.created else selected_desc.created
                     metadata_lines.append(f"Created: {created_date}")
+                
+                # Add image metadata (GPS, EXIF, etc.) if available
+                if selected_desc.metadata:
+                    image_metadata_lines = format_image_metadata(selected_desc.metadata)
+                    if image_metadata_lines:
+                        metadata_lines.append("\n--- Image Info ---")
+                        metadata_lines.extend(image_metadata_lines)
                 
                 full_text = desc_text + "\n".join(metadata_lines)
                 self.description_text.SetValue(full_text)
@@ -1162,30 +1215,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if self.current_filter == "described":
                 if not item.descriptions:
                     continue
-            elif self.current_filter == "batch":
-                if not getattr(item, 'batch_marked', False):
-                    continue
             
             base_name = Path(file_path).name
             prefix_parts = []
             
-            # 1. Batch marker
-            if getattr(item, 'batch_marked', False):
-                prefix_parts.append("b")
-            
-            # 2. Description count
+            # 1. Description count
             desc_count = len(item.descriptions)
             if desc_count > 0:
                 prefix_parts.append(f"d{desc_count}")
             
-            # 3. Processing indicator with provider/model info
+            # 2. Processing indicator (P)
             if file_path in self.processing_items:
-                proc_info = self.processing_items[file_path]
-                provider = proc_info.get('provider', 'unknown')
-                model = proc_info.get('model', 'unknown')
-                prefix_parts.append(f"p Processing with {provider} {model}")
+                prefix_parts.append("P")
             
-            # 4. Video extraction status
+            # 3. Video extraction status
             if item.item_type == "video" and hasattr(item, 'extracted_frames') and item.extracted_frames:
                 frame_count = len(item.extracted_frames)
                 prefix_parts.append(f"E{frame_count}")
@@ -1480,6 +1523,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_worker_progress(self, event):
         """Handle progress updates from worker threads"""
         self.SetStatusText(event.message, 0)
+        
+        # Track batch processing progress
+        if hasattr(event, 'current') and hasattr(event, 'total') and event.current > 0:
+            self.batch_progress = {
+                'current': event.current,
+                'total': event.total,
+                'file_path': event.file_path
+            }
+            
+            # Update title bar to show progress
+            progress_percent = int(event.current * 100 / event.total) if event.total > 0 else 0
+            doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+            self.SetTitle(f"{progress_percent}%, {event.current} of {event.total} - ImageDescriber - {doc_name}")
+            
+            # Mark current image being processed with "P"
+            self.processing_items[event.file_path] = {'provider': '', 'model': ''}
+            self.refresh_image_list()
+        else:
+            self.batch_progress = None
     
     def on_worker_complete(self, event):
         """Handle successful processing completion"""
@@ -1494,7 +1556,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 model=event.model,
                 prompt_style=event.prompt_style,
                 custom_prompt=event.custom_prompt,
-                provider=event.provider
+                provider=event.provider,
+                metadata=getattr(event, 'metadata', {})
             )
             image_item.add_description(desc)
             self.mark_modified()
@@ -1602,10 +1665,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             elif keycode == ord('F'):
                 # Followup question
                 self.on_followup_question(event)
-                return
-            elif keycode == ord('B'):
-                # Mark for batch (will implement)
-                self.on_mark_for_batch(event)
                 return
             elif keycode == ord('Z'):
                 # Auto-rename (hidden feature)
@@ -1822,22 +1881,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         dlg.Destroy()
     
-    def on_mark_for_batch(self, event):
-        """Mark/unmark image for batch processing (B key)"""
-        if not self.current_image_item:
-            show_warning(self, "No image selected")
-            return
-        
-        # Toggle batch_marked property
-        current_state = getattr(self.current_image_item, 'batch_marked', False)
-        self.current_image_item.batch_marked = not current_state
-        
-        self.mark_modified()
-        self.refresh_image_list()
-        
-        action = "marked for" if self.current_image_item.batch_marked else "unmarked from"
-        self.SetStatusText(f"Image {action} batch processing", 0)
-    
     def on_auto_rename(self, event):
         """Auto-rename using AI (Z key)"""
         if not self.current_image_item:
@@ -2004,80 +2047,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.load_directory(directory, recursive=False, append=True)
     
     # Process menu handlers (additional)
-    def on_process_batch(self, event):
-        """Process all batch-marked items"""
-        if not self.workspace or not self.workspace.items:
-            show_warning(self, "No images in workspace")
-            return
-        
-        # Get batch-marked items
-        batch_items = [item for item in self.workspace.items.values() 
-                       if getattr(item, 'batch_marked', False)]
-        
-        if not batch_items:
-            show_info(self, "No images marked for batch processing.\n\nSelect images and press 'B' to mark them.")
-            return
-        
-        if not BatchProcessingWorker:
-            show_error(self, "Batch processing worker not available")
-            return
-        
-        # Show processing options dialog with cached models
-        if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
-            if dialog.ShowModal() != wx.ID_OK:
-                dialog.Destroy()
-                return
-            
-            options = dialog.get_config()
-            dialog.Destroy()
-        else:
-            # Use defaults
-            options = {
-                'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
-                'prompt_style': self.config.get('default_prompt_style', 'narrative'),
-                'custom_prompt': '',
-                'skip_existing': False
-            }
-        
-        # Get file paths to process
-        to_process = [item.file_path for item in batch_items]
-        
-        # Start batch processing worker
-        worker = BatchProcessingWorker(
-            self,
-            to_process,
-            options['provider'],
-            options['model'],
-            options['prompt_style'],
-            options.get('custom_prompt', ''),
-            None,  # detection_settings
-            None,  # prompt_config_path
-            options.get('skip_existing', False)
-        )
-        worker.start()
-        
-        self.SetStatusText(f"Processing {len(to_process)} marked images...", 0)
-    
-    def on_clear_batch(self, event):
-        """Clear all batch markings"""
-        if not self.workspace or not self.workspace.items:
-            return
-        
-        count = 0
-        for item in self.workspace.items.values():
-            if getattr(item, 'batch_marked', False):
-                item.batch_marked = False
-                count += 1
-        
-        if count > 0:
-            self.mark_modified()
-            self.refresh_image_list()
-            self.SetStatusText(f"Cleared {count} batch markings", 0)
-        else:
-            show_info(self, "No items were marked for batch processing")
-    
     def refresh_ollama_models(self):
         """Refresh cached Ollama models from the system"""
         try:
@@ -2295,7 +2264,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     # View menu handlers
     def on_set_filter(self, filter_type):
-        """Set view filter (all, described, batch)"""
+        """Set view filter (all, described)"""
         self.current_filter = filter_type
         self.refresh_image_list()
         self.SetStatusText(f"Filter: {filter_type}", 1)

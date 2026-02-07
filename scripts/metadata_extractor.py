@@ -254,7 +254,7 @@ class MetadataExtractor:
                 # Extract all available metadata
                 dt = self._extract_datetime(exif_dict)
                 if dt:
-                    metadata['datetime'] = dt
+                    metadata['datetime'] = dt.isoformat()
                     metadata['datetime_str'] = self._format_mdy_ampm(dt)
                     metadata['date_short'] = self._format_short_date(dt)
                 
@@ -278,7 +278,7 @@ class MetadataExtractor:
         try:
             mtime = datetime.fromtimestamp(image_path.stat().st_mtime)
             if 'datetime' not in metadata:
-                metadata['datetime'] = mtime
+                metadata['datetime'] = mtime.isoformat()
                 metadata['datetime_str'] = self._format_mdy_ampm(mtime)
                 metadata['date_short'] = self._format_short_date(mtime)
         except Exception:

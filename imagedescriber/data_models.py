@@ -17,7 +17,8 @@ WORKSPACE_VERSION = "3.0"
 class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
-                 created: str = "", custom_prompt: str = "", provider: str = "", detection_data: List[dict] = None):
+                 created: str = "", custom_prompt: str = "", provider: str = "", detection_data: List[dict] = None,
+                 metadata: Dict[str, any] = None):
         self.text = text
         self.model = model
         self.prompt_style = prompt_style
@@ -25,6 +26,7 @@ class ImageDescription:
         self.custom_prompt = custom_prompt
         self.provider = provider
         self.detection_data = detection_data or []  # List of detected objects with bounding boxes
+        self.metadata = metadata or {}  # EXIF metadata: datetime, location (GPS), camera info
         self.id = f"{int(time.time() * 1000)}"  # Unique ID
     
     def to_dict(self) -> dict:
@@ -36,7 +38,8 @@ class ImageDescription:
             "created": self.created,
             "custom_prompt": self.custom_prompt,
             "provider": self.provider,
-            "detection_data": self.detection_data
+            "detection_data": self.detection_data,
+            "metadata": self.metadata
         }
     
     @classmethod
@@ -48,7 +51,8 @@ class ImageDescription:
             created=data.get("created", ""),
             custom_prompt=data.get("custom_prompt", ""),
             provider=data.get("provider", ""),
-            detection_data=data.get("detection_data", [])
+            detection_data=data.get("detection_data", []),
+            metadata=data.get("metadata", {})
         )
         desc.id = data.get("id", desc.id)
         return desc

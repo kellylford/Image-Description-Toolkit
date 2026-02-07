@@ -104,7 +104,7 @@ class VideoMetadataExtractor:
             # Extract datetime
             dt = self._extract_datetime(tags_lower)
             if dt:
-                metadata['datetime'] = dt
+                metadata['datetime'] = dt.isoformat()
             
             # Extract camera info
             camera = self._extract_camera_info(tags_lower)

@@ -44,6 +44,12 @@ except ImportError:
     except ImportError:
         get_available_providers = None
 
+# Import metadata extractor
+try:
+    from metadata_extractor import MetadataExtractor
+except ImportError:
+    MetadataExtractor = None
+
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
 ProcessingCompleteEvent, EVT_PROCESSING_COMPLETE = wx.lib.newevent.NewEvent()
@@ -57,7 +63,7 @@ ConversionFailedEvent, EVT_CONVERSION_FAILED = wx.lib.newevent.NewEvent()
 # Custom event classes that properly store attributes
 class ProcessingCompleteEventData(ProcessingCompleteEvent):
     """Event data for processing completion"""
-    def __init__(self, file_path, description, provider, model, prompt_style, custom_prompt):
+    def __init__(self, file_path, description, provider, model, prompt_style, custom_prompt, metadata=None):
         ProcessingCompleteEvent.__init__(self)
         self.file_path = file_path
         self.description = description
@@ -65,6 +71,7 @@ class ProcessingCompleteEventData(ProcessingCompleteEvent):
         self.model = model
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
+        self.metadata = metadata or {}
 
 
 class ProcessingFailedEventData(ProcessingFailedEvent):
@@ -77,10 +84,12 @@ class ProcessingFailedEventData(ProcessingFailedEvent):
 
 class ProgressUpdateEventData(ProgressUpdateEvent):
     """Event data for progress updates"""
-    def __init__(self, file_path, message):
+    def __init__(self, file_path, message, current=0, total=0):
         ProgressUpdateEvent.__init__(self)
         self.file_path = file_path
         self.message = message
+        self.current = current
+        self.total = total
 
 
 class WorkflowCompleteEventData(WorkflowCompleteEvent):
@@ -163,6 +172,9 @@ class ProcessingWorker(threading.Thread):
             # Emit progress
             self._post_progress(f"Processing with {self.provider} {self.model}...")
             
+            # Extract metadata from image
+            metadata = self._extract_metadata(self.file_path)
+            
             # Process the image with selected provider
             description = self._process_with_ai(self.file_path, prompt_text)
             
@@ -173,7 +185,8 @@ class ProcessingWorker(threading.Thread):
                 provider=self.provider,
                 model=self.model,
                 prompt_style=self.prompt_style,
-                custom_prompt=self.custom_prompt
+                custom_prompt=self.custom_prompt,
+                metadata=metadata
             )
             wx.PostEvent(self.parent_window, evt)
             
@@ -371,6 +384,26 @@ class ProcessingWorker(threading.Thread):
         except Exception as e:
             print(f"Image resize error: {e}")
             return image_data  # Return original if resize fails
+    
+    def _extract_metadata(self, image_path: str) -> dict:
+        """Extract EXIF metadata from image file
+        
+        Returns dictionary with metadata sections (datetime, location, camera, technical)
+        """
+        metadata = {}
+        
+        try:
+            if not MetadataExtractor:
+                return metadata
+            
+            extractor = MetadataExtractor()
+            metadata = extractor.extract_metadata(Path(image_path))
+            
+        except Exception:
+            # Silent failure - metadata is optional
+            pass
+        
+        return metadata
 
 
 class WorkflowProcessWorker(threading.Thread):
@@ -503,10 +536,12 @@ class BatchProcessingWorker(threading.Thread):
             if self._cancel:
                 break
             
-            # Post progress
+            # Post progress with current/total counts
             evt = ProgressUpdateEventData(
                 file_path=file_path,
-                message=f"Processing {i}/{total}: {Path(file_path).name}"
+                message=f"Processing {i}/{total}: {Path(file_path).name}",
+                current=i,
+                total=total
             )
             wx.PostEvent(self.parent_window, evt)
             
