@@ -29,6 +29,12 @@ a = Analysis(
         'wx.lib.newevent',
         'shared.wx_common',
         'shared',
+        'imagedescriber.ai_providers',
+        'imagedescriber.data_models',
+        'imagedescriber.dialogs_wx',
+        'imagedescriber.workers_wx',
+        'imagedescriber.prompt_editor_dialog',
+        'imagedescriber.configure_dialog',
         'ai_providers',
         'data_models',
         'dialogs_wx',
@@ -40,12 +46,18 @@ a = Analysis(
         'scripts.config_loader',
         'models.provider_configs',
         'models.model_options',
+        'metadata_extractor',
         'ollama',
         'openai',
         'anthropic',
         'cv2',
         'PIL',
         'pillow_heif',
+        'requests',  # Required for geocoding
+        'urllib3',  # Dependency of requests
+        'charset_normalizer',  # Dependency of requests
+        'certifi',  # Dependency of requests
+        'idna',  # Dependency of requests
     ],
     hookspath=[],
     hooksconfig={},
@@ -69,7 +81,7 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,  # Temporarily enabled for geocoding debug
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

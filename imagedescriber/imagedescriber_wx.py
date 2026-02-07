@@ -560,17 +560,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         menubar.Append(file_menu, "&File")
         
-        # Workspace menu
-        workspace_menu = wx.Menu()
-        
-        manage_dirs_item = workspace_menu.Append(wx.ID_ANY, "&Manage Directories...")
-        self.Bind(wx.EVT_MENU, self.on_manage_directories, manage_dirs_item)
-        
-        add_dir_item = workspace_menu.Append(wx.ID_ANY, "&Add Directory...")
-        self.Bind(wx.EVT_MENU, self.on_add_directory, add_dir_item)
-        
-        menubar.Append(workspace_menu, "&Workspace")
-        
         # Edit menu
         edit_menu = wx.Menu()
         
@@ -2013,82 +2002,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Could not access clipboard")
     
     # Workspace menu handlers
-    def on_manage_directories(self, event):
-        """Manage workspace directories"""
-        if not self.workspace or not self.workspace.directories:
-            show_info(self, "No directories in current workspace")
-            return
-        
-        # Create dialog to show and manage directories
-        dlg = wx.Dialog(self, title="Manage Workspace Directories", 
-                       style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
-        dlg.SetSize((600, 400))
-        
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        # Info label
-        info_label = wx.StaticText(dlg, label=f"Workspace contains {len(self.workspace.directories)} director{'y' if len(self.workspace.directories) == 1 else 'ies'}:")
-        sizer.Add(info_label, 0, wx.ALL, 10)
-        
-        # Directory list
-        dir_list = wx.ListBox(dlg)
-        for dir_path, settings in self.workspace.directories.items():
-            recursive_text = " (recursive)" if settings.get('recursive', False) else ""
-            dir_list.Append(f"{dir_path}{recursive_text}", dir_path)
-        sizer.Add(dir_list, 1, wx.ALL | wx.EXPAND, 10)
-        
-        # Buttons
-        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        
-        remove_btn = wx.Button(dlg, label="Remove Selected")
-        def on_remove(e):
-            sel = dir_list.GetSelection()
-            if sel != wx.NOT_FOUND:
-                dir_path = dir_list.GetClientData(sel)
-                if ask_yes_no(dlg, f"Remove directory from workspace?\n\n{dir_path}\n\nNote: Images will remain in workspace."):
-                    del self.workspace.directories[dir_path]
-                    dir_list.Delete(sel)
-                    self.mark_modified()
-                    info_label.SetLabel(f"Workspace contains {len(self.workspace.directories)} director{'y' if len(self.workspace.directories) == 1 else 'ies'}:")
-        remove_btn.Bind(wx.EVT_BUTTON, on_remove)
-        btn_sizer.Add(remove_btn, 0, wx.ALL, 5)
-        
-        btn_sizer.AddStretchSpacer()
-        
-        close_btn = wx.Button(dlg, wx.ID_CLOSE)
-        close_btn.Bind(wx.EVT_BUTTON, lambda e: dlg.EndModal(wx.ID_CLOSE))
-        btn_sizer.Add(close_btn, 0, wx.ALL, 5)
-        
-        sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
-        
-        dlg.SetSizer(sizer)
-        dlg.Centre()
-        dlg.ShowModal()
-        dlg.Destroy()
-    
-    def on_add_directory(self, event):
-        """Add directory to workspace"""
-        if not self.workspace:
-            self.workspace = ImageWorkspace(new_workspace=True)
-        
-        # Get current directories
-        existing_dirs = list(self.workspace.directories.keys()) if self.workspace.directories else []
-        
-        if DirectorySelectionDialog:
-            dialog = DirectorySelectionDialog(existing_dirs, self)
-            if dialog.ShowModal() == wx.ID_OK:
-                directory = dialog.selected_directory
-                recursive = dialog.recursive_search
-                
-                if directory:
-                    self.load_directory(directory, recursive, append=True)
-            dialog.Destroy()
-        else:
-            # Fallback to simple directory selection
-            directory = select_directory_dialog(self, "Select directory to add")
-            if directory:
-                self.load_directory(directory, recursive=False, append=True)
-    
     # Process menu handlers (additional)
     def refresh_ollama_models(self):
         """Refresh cached Ollama models from the system"""

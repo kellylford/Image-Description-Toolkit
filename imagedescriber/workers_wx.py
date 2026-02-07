@@ -11,8 +11,22 @@ import threading
 import time
 import json
 import tempfile
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+# Setup debug logging to file
+debug_log_path = Path.home() / 'imagedescriber_geocoding_debug.log'
+logging.basicConfig(
+    filename=str(debug_log_path),
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filemode='a'
+)
+logging.info("="*60)
+logging.info("ImageDescriber worker thread started")
+logging.info(f"Debug log: {debug_log_path}")
+logging.info("="*60)
 
 import wx
 import wx.lib.newevent
@@ -45,11 +59,15 @@ except ImportError:
         get_available_providers = None
 
 # Import metadata extractor and geocoder
+MetadataExtractor = None
+NominatimGeocoder = None
 try:
     from metadata_extractor import MetadataExtractor, NominatimGeocoder
 except ImportError:
-    MetadataExtractor = None
-    NominatimGeocoder = None
+    try:
+        from scripts.metadata_extractor import MetadataExtractor, NominatimGeocoder
+    except ImportError:
+        pass
 
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
@@ -383,7 +401,7 @@ class ProcessingWorker(threading.Thread):
                 quality -= 10
             
         except Exception as e:
-            print(f"Image resize error: {e}")
+            logging.error(f"Image resize error: {e}")
             return image_data  # Return original if resize fails
     
     def _extract_metadata(self, image_path: str) -> dict:
@@ -392,9 +410,11 @@ class ProcessingWorker(threading.Thread):
         Returns dictionary with metadata sections (datetime, location, camera, technical)
         """
         metadata = {}
+        logging.info(f"Extracting metadata from: {image_path}")
         
         try:
             if not MetadataExtractor:
+                logging.warning("MetadataExtractor not available")
                 return metadata
             
             extractor = MetadataExtractor()
@@ -403,23 +423,38 @@ class ProcessingWorker(threading.Thread):
             # Add geocoding if GPS coordinates are present
             if NominatimGeocoder and 'location' in metadata:
                 loc = metadata['location']
+                logging.info(f"Found location in metadata: {loc}")
                 # Try geocoding if we have GPS coords (geocoder handles caching internally)
                 if 'latitude' in loc and 'longitude' in loc:
+                    logging.info(f"GPS coords found: lat={loc['latitude']}, lon={loc['longitude']}")
                     try:
                         geocoder = self._get_geocoder()
+                        logging.info(f"Got geocoder instance: {geocoder}")
                         if geocoder:
                             # Let the geocoder enrich the metadata (it will merge results)
+                            logging.info(f"Calling geocoder.enrich_metadata()...")
                             metadata = geocoder.enrich_metadata(metadata)
+                            logging.info(f"After geocoding, location = {metadata.get('location', {})}")
                     except Exception as e:
                         # Geocoding failed - continue without it
-                        print(f"Geocoding failed for {image_path}: {e}")
+                        logging.error(f"Geocoding failed for {image_path}: {e}")
+                        import traceback
+                        logging.error(traceback.format_exc())
+                else:
+                    logging.info(f"No lat/lon in location data")
+            elif not NominatimGeocoder:
+                logging.warning(f"NominatimGeocoder not available")
+            elif 'location' not in metadata:
+                logging.info(f"No location key in metadata")
             
             # Ensure all metadata is JSON-serializable
             metadata = self._sanitize_for_json(metadata)
             
         except Exception as e:
             # Metadata extraction failed - return empty
-            print(f"Metadata extraction failed: {e}")
+            logging.error(f"Metadata extraction failed: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
         
         return metadata
     
@@ -445,27 +480,36 @@ class ProcessingWorker(threading.Thread):
     def _get_geocoder(self):
         """Get or create a shared geocoder instance with caching"""
         # Use class-level cache for geocoder to share cache across images
-        if not hasattr(ImageProcessWorker, '_geocoder_instance'):
+        if not hasattr(ProcessingWorker, '_geocoder_instance'):
             if NominatimGeocoder:
                 try:
+                    # Check if requests module is available
+                    try:
+                        import requests
+                        logging.info(f"requests module available: {requests.__version__}")
+                    except ImportError as req_err:
+                        logging.error(f"requests module NOT available: {req_err}")
+                    
                     # Use a cache file in the user's temp directory or current directory
                     cache_path = Path('geocode_cache.json')
                     user_agent = 'IDT/4.0 (+https://github.com/kellylford/Image-Description-Toolkit)'
-                    print(f"Initializing geocoder with cache: {cache_path}")
-                    ImageProcessWorker._geocoder_instance = NominatimGeocoder(
+                    logging.info(f"Initializing geocoder with cache: {cache_path}")
+                    ProcessingWorker._geocoder_instance = NominatimGeocoder(
                         user_agent=user_agent,
                         delay_seconds=1.0,
                         cache_path=cache_path
                     )
-                    print("Geocoder initialized successfully")
+                    logging.info("Geocoder initialized successfully")
                 except Exception as e:
-                    print(f"Failed to initialize geocoder: {e}")
-                    ImageProcessWorker._geocoder_instance = None
+                    logging.error(f"Failed to initialize geocoder: {e}")
+                    import traceback
+                    logging.error(traceback.format_exc())
+                    ProcessingWorker._geocoder_instance = None
             else:
-                print("NominatimGeocoder not available")
-                ImageProcessWorker._geocoder_instance = None
+                logging.warning("NominatimGeocoder not available")
+                ProcessingWorker._geocoder_instance = None
         
-        return ImageProcessWorker._geocoder_instance
+        return ProcessingWorker._geocoder_instance
 
 
 class WorkflowProcessWorker(threading.Thread):
