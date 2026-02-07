@@ -52,8 +52,7 @@ Source: "dist_all\bin\idt.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; GUI Applications
 Source: "dist_all\bin\Viewer.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist_all\bin\ImageDescriber.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist_all\bin\prompteditor.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist_all\bin\idtconfigure.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Note: PromptEditor and Configure are now integrated into ImageDescriber (Tools menu)
 
 ; Configuration files (from scripts directory)
 Source: "..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
@@ -69,9 +68,7 @@ Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit && echo Type 'idt --help' for usage"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\Viewer"; Filename: "{app}\Viewer.exe"; WorkingDir: "{app}"
-Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"
-Name: "{group}\Prompt Editor"; Filename: "{app}\prompteditor.exe"; WorkingDir: "{app}"
-Name: "{group}\Configure"; Filename: "{app}\idtconfigure.exe"; WorkingDir: "{app}"
+Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Comment: "Batch image processing (Tools menu includes Prompt Editor and Configure)"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Tasks: desktopicon

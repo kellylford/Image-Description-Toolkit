@@ -143,6 +143,82 @@ class ImageWorkspace:
             dirs.append(self.directory_path)
         dirs.extend([d for d in self.directory_paths if d not in dirs])
         return dirs
+    
+    # Chat session management methods
+    def create_chat_session(self, image_path: str, provider: str, model: str) -> str:
+        """Create new chat session and return session ID
+        
+        Args:
+            image_path: Path to the image being discussed
+            provider: AI provider name (ollama, openai, claude)
+            model: Model name
+            
+        Returns:
+            Session ID string
+        """
+        import time
+        session_id = f"chat_{int(time.time() * 1000)}"
+        
+        self.chat_sessions[session_id] = {
+            'id': session_id,
+            'name': f"Chat: {Path(image_path).name}",
+            'image_path': str(image_path),
+            'provider': provider,
+            'model': model,
+            'created': datetime.now().isoformat(),
+            'modified': datetime.now().isoformat(),
+            'messages': []
+        }
+        
+        self.mark_modified()
+        return session_id
+    
+    def get_chat_session(self, session_id: str) -> Optional[dict]:
+        """Get chat session by ID
+        
+        Args:
+            session_id: Session ID to retrieve
+            
+        Returns:
+            Session dictionary or None if not found
+        """
+        return self.chat_sessions.get(session_id)
+    
+    def get_chat_sessions_for_image(self, image_path: str) -> List[dict]:
+        """Get all chat sessions for a specific image
+        
+        Args:
+            image_path: Path to image file
+            
+        Returns:
+            List of session dictionaries
+        """
+        return [
+            session for session in self.chat_sessions.values()
+            if session['image_path'] == str(image_path)
+        ]
+    
+    def delete_chat_session(self, session_id: str):
+        """Delete a chat session
+        
+        Args:
+            session_id: Session ID to delete
+        """
+        if session_id in self.chat_sessions:
+            del self.chat_sessions[session_id]
+            self.mark_modified()
+    
+    def rename_chat_session(self, session_id: str, new_name: str):
+        """Rename a chat session
+        
+        Args:
+            session_id: Session ID to rename
+            new_name: New session name
+        """
+        if session_id in self.chat_sessions:
+            self.chat_sessions[session_id]['name'] = new_name
+            self.chat_sessions[session_id]['modified'] = datetime.now().isoformat()
+            self.mark_modified()
         
     def add_item(self, item: ImageItem):
         self.items[item.file_path] = item

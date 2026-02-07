@@ -78,6 +78,11 @@ WorkflowFailedEvent, EVT_WORKFLOW_FAILED = wx.lib.newevent.NewEvent()
 ConversionCompleteEvent, EVT_CONVERSION_COMPLETE = wx.lib.newevent.NewEvent()
 ConversionFailedEvent, EVT_CONVERSION_FAILED = wx.lib.newevent.NewEvent()
 
+# Chat-specific event types
+ChatUpdateEvent, EVT_CHAT_UPDATE = wx.lib.newevent.NewEvent()
+ChatCompleteEvent, EVT_CHAT_COMPLETE = wx.lib.newevent.NewEvent()
+ChatErrorEvent, EVT_CHAT_ERROR = wx.lib.newevent.NewEvent()
+
 
 # Custom event classes that properly store attributes
 class ProcessingCompleteEventData(ProcessingCompleteEvent):
@@ -630,6 +635,268 @@ class WorkflowProcessWorker(threading.Thread):
         """Post progress update to parent window"""
         evt = ProgressUpdateEventData(file_path="", message=message)
         wx.PostEvent(self.parent_window, evt)
+
+
+class ChatProcessingWorker(threading.Thread):
+    """Worker thread for processing chat messages with AI providers
+    
+    Handles multi-turn conversations with context memory by maintaining
+    a message history array and sending it to the AI provider.
+    
+    Events:
+        ChatUpdateEvent: Incremental message chunks during streaming
+        ChatCompleteEvent: Complete response with metadata
+        ChatErrorEvent: Error during processing
+    """
+    
+    def __init__(self, parent_window, image_path: str, provider: str, model: str, 
+                 messages: list, api_key: str = None):
+        """Initialize chat worker
+        
+        Args:
+            parent_window: wxWindow to receive events
+            image_path: Path to image file for context
+            provider: AI provider name (ollama, openai, claude)
+            model: Model name
+            messages: Full conversation history as list of message dicts
+                     Format: [{'role': 'user', 'content': '...'}, ...]
+            api_key: Optional API key for providers that require it
+        """
+        super().__init__(daemon=True)
+        self.parent_window = parent_window
+        self.image_path = image_path
+        self.provider = provider.lower()
+        self.model = model
+        self.messages = messages
+        self.api_key = api_key
+        self._full_response = ""
+    
+    def run(self):
+        """Execute chat processing in background thread"""
+        try:
+            # Route to provider-specific method
+            if self.provider == 'ollama':
+                self._chat_with_ollama()
+            elif self.provider == 'openai':
+                self._chat_with_openai()
+            elif self.provider == 'claude':
+                self._chat_with_claude()
+            else:
+                raise Exception(f"Unsupported chat provider: {self.provider}")
+                
+        except Exception as e:
+            evt = ChatErrorEvent(error=str(e))
+            wx.PostEvent(self.parent_window, evt)
+    
+    def _chat_with_ollama(self):
+        """Handle Ollama chat with conversation history"""
+        try:
+            import ollama
+            
+            # Format messages for Ollama
+            # First message includes image, subsequent messages are text only
+            ollama_messages = []
+            
+            for i, msg in enumerate(self.messages):
+                if i == 0 and msg['role'] == 'user':
+                    # First user message - include image
+                    ollama_messages.append({
+                        'role': 'user',
+                        'content': msg['content'],
+                        'images': [self.image_path]
+                    })
+                else:
+                    # Subsequent messages - text only
+                    ollama_messages.append({
+                        'role': msg['role'],
+                        'content': msg['content']
+                    })
+            
+            # Stream response from Ollama
+            response_stream = ollama.chat(
+                model=self.model,
+                messages=ollama_messages,
+                stream=True
+            )
+            
+            # Process streaming response
+            for chunk in response_stream:
+                if 'message' in chunk and 'content' in chunk['message']:
+                    content = chunk['message']['content']
+                    self._full_response += content
+                    
+                    # Emit update event for each chunk
+                    evt = ChatUpdateEvent(message_chunk=content)
+                    wx.PostEvent(self.parent_window, evt)
+            
+            # Emit completion event
+            metadata = {
+                'provider': 'ollama',
+                'model': self.model,
+                'tokens': {}  # Ollama doesn't provide token counts in streaming
+            }
+            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata)
+            wx.PostEvent(self.parent_window, evt)
+            
+        except Exception as e:
+            raise Exception(f"Ollama chat error: {str(e)}")
+    
+    def _chat_with_openai(self):
+        """Handle OpenAI chat.completions API with conversation history"""
+        try:
+            import openai
+            import base64
+            
+            # Initialize OpenAI client
+            if self.api_key:
+                client = openai.OpenAI(api_key=self.api_key)
+            else:
+                client = openai.OpenAI()  # Uses OPENAI_API_KEY env var
+            
+            # Format messages for OpenAI
+            openai_messages = []
+            
+            for i, msg in enumerate(self.messages):
+                if i == 0 and msg['role'] == 'user':
+                    # First user message - include image as base64
+                    with open(self.image_path, 'rb') as f:
+                        image_data = base64.b64encode(f.read()).decode('utf-8')
+                    
+                    openai_messages.append({
+                        'role': 'user',
+                        'content': [
+                            {'type': 'text', 'text': msg['content']},
+                            {
+                                'type': 'image_url',
+                                'image_url': {
+                                    'url': f'data:image/jpeg;base64,{image_data}'
+                                }
+                            }
+                        ]
+                    })
+                else:
+                    # Subsequent messages - text only
+                    openai_messages.append({
+                        'role': msg['role'],
+                        'content': msg['content']
+                    })
+            
+            # Stream response from OpenAI
+            response_stream = client.chat.completions.create(
+                model=self.model,
+                messages=openai_messages,
+                stream=True
+            )
+            
+            # Process streaming response
+            for chunk in response_stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    self._full_response += content
+                    
+                    # Emit update event for each chunk
+                    evt = ChatUpdateEvent(message_chunk=content)
+                    wx.PostEvent(self.parent_window, evt)
+            
+            # Emit completion event
+            metadata = {
+                'provider': 'openai',
+                'model': self.model,
+                'tokens': {
+                    # Note: Streaming doesn't provide token counts
+                    # Would need separate API call to get usage
+                }
+            }
+            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata)
+            wx.PostEvent(self.parent_window, evt)
+            
+        except Exception as e:
+            raise Exception(f"OpenAI chat error: {str(e)}")
+    
+    def _chat_with_claude(self):
+        """Handle Anthropic messages API with conversation history"""
+        try:
+            import anthropic
+            import base64
+            
+            # Initialize Anthropic client
+            if self.api_key:
+                client = anthropic.Anthropic(api_key=self.api_key)
+            else:
+                client = anthropic.Anthropic()  # Uses ANTHROPIC_API_KEY env var
+            
+            # Format messages for Claude
+            claude_messages = []
+            
+            for i, msg in enumerate(self.messages):
+                if i == 0 and msg['role'] == 'user':
+                    # First user message - include image as base64
+                    with open(self.image_path, 'rb') as f:
+                        image_data = base64.b64encode(f.read()).decode('utf-8')
+                    
+                    # Determine media type
+                    ext = Path(self.image_path).suffix.lower()
+                    media_types = {
+                        '.jpg': 'image/jpeg',
+                        '.jpeg': 'image/jpeg',
+                        '.png': 'image/png',
+                        '.gif': 'image/gif',
+                        '.webp': 'image/webp'
+                    }
+                    media_type = media_types.get(ext, 'image/jpeg')
+                    
+                    claude_messages.append({
+                        'role': 'user',
+                        'content': [
+                            {
+                                'type': 'image',
+                                'source': {
+                                    'type': 'base64',
+                                    'media_type': media_type,
+                                    'data': image_data
+                                }
+                            },
+                            {'type': 'text', 'text': msg['content']}
+                        ]
+                    })
+                else:
+                    # Subsequent messages - text only
+                    claude_messages.append({
+                        'role': msg['role'],
+                        'content': msg['content']
+                    })
+            
+            # Stream response from Claude
+            with client.messages.stream(
+                model=self.model,
+                max_tokens=2048,
+                messages=claude_messages
+            ) as stream:
+                for text_chunk in stream.text_stream:
+                    self._full_response += text_chunk
+                    
+                    # Emit update event for each chunk
+                    evt = ChatUpdateEvent(message_chunk=text_chunk)
+                    wx.PostEvent(self.parent_window, evt)
+            
+            # Get final message for metadata
+            final_message = stream.get_final_message()
+            
+            # Emit completion event
+            metadata = {
+                'provider': 'claude',
+                'model': self.model,
+                'tokens': {
+                    'input_tokens': final_message.usage.input_tokens,
+                    'output_tokens': final_message.usage.output_tokens,
+                    'total_tokens': final_message.usage.input_tokens + final_message.usage.output_tokens
+                }
+            }
+            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata)
+            wx.PostEvent(self.parent_window, evt)
+            
+        except Exception as e:
+            raise Exception(f"Claude chat error: {str(e)}")
 
 
 class BatchProcessingWorker(threading.Thread):

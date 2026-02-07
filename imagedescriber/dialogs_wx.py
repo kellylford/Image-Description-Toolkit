@@ -8,6 +8,7 @@ All dialogs use shared utilities and follow accessibility best practices.
 import os
 import sys
 import json
+import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
@@ -34,6 +35,7 @@ from shared.wx_common import (
     select_directory_dialog,
     open_file_dialog,
     save_file_dialog,
+    find_config_file,
 )
 
 # Import config loader for prompt loading
@@ -44,6 +46,10 @@ except ImportError:
         from config_loader import load_json_config
     except ImportError:
         load_json_config = None
+        logging.error("Failed to import load_json_config from both scripts.config_loader and config_loader")
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 # Import data models (framework-independent) from same directory
 try:
@@ -506,29 +512,44 @@ class ProcessingOptionsDialog(wx.Dialog):
             wx.CallLater(50, self.model_combo.SetFocus)
     
     def load_prompts(self):
-        """Load available prompt styles from config file"""
+        """Load available prompt styles from config file
+        
+        Uses find_config_file() for consistency with PromptEditor.
+        This ensures both components read/write the SAME config file.
+        """
         self.prompt_choice.Clear()
         prompts_added = False
         default_style = "narrative"
         
-        # Try to load from config file using config_loader
-        if load_json_config:
-            try:
-                cfg, path, source = load_json_config(
-                    'image_describer_config.json',
-                    env_var_file='IDT_IMAGE_DESCRIBER_CONFIG'
-                )
-                if cfg:
-                    prompts = cfg.get('prompt_variations', {})
-                    default_style = cfg.get('default_prompt_style', 'narrative')
+        # Find the config file using same method as PromptEditor
+        try:
+            config_path = find_config_file('image_describer_config.json')
+            if config_path and config_path.exists():
+                logger.debug(f"Loading prompts from: {config_path}")
+                
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                
+                prompts = cfg.get('prompt_variations', {})
+                default_style = cfg.get('default_prompt_style', 'narrative')
+                
+                if prompts:
                     for prompt_name in prompts.keys():
                         self.prompt_choice.Append(prompt_name)
                         prompts_added = True
-            except Exception:
-                pass
+                    logger.debug(f"Loaded {len(prompts)} prompts, default={default_style}")
+                else:
+                    logger.warning(f"Config file has no prompt_variations: {config_path}")
+            else:
+                logger.warning(f"Config file not found: image_describer_config.json")
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in config file: {e}")
+        except Exception as e:
+            logger.error(f"Error loading prompts from config: {e}", exc_info=True)
         
         # Fallback to hardcoded prompts if config load failed
         if not prompts_added:
+            logger.info("Using fallback hardcoded prompts")
             fallback_prompts = ["narrative", "detailed", "concise", "technical", "artistic"]
             for prompt in fallback_prompts:
                 self.prompt_choice.Append(prompt)
@@ -539,8 +560,10 @@ class ProcessingOptionsDialog(wx.Dialog):
             default_idx = self.prompt_choice.FindString(default_style)
             if default_idx != wx.NOT_FOUND:
                 self.prompt_choice.SetSelection(default_idx)
+                logger.debug(f"Selected default prompt: {default_style}")
             else:
                 self.prompt_choice.SetSelection(0)
+                logger.debug(f"Default prompt '{default_style}' not found, using first item")
     
     def get_config(self):
         """Get the configured options"""

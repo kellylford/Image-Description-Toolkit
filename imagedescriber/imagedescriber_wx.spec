@@ -33,12 +33,14 @@ a = Analysis(
         'imagedescriber.data_models',
         'imagedescriber.dialogs_wx',
         'imagedescriber.workers_wx',
+        'imagedescriber.chat_window_wx',  # Chat with Image feature
         'imagedescriber.prompt_editor_dialog',
         'imagedescriber.configure_dialog',
         'ai_providers',
         'data_models',
         'dialogs_wx',
         'workers_wx',
+        'chat_window_wx',  # Chat with Image feature
         'prompt_editor_dialog',  # Integrated PromptEditor
         'configure_dialog',  # Integrated IDTConfigure
         'scripts.metadata_extractor',
@@ -81,7 +83,7 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # Temporarily enabled for geocoding debug
+    console=False,  # GUI application - no console window needed
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

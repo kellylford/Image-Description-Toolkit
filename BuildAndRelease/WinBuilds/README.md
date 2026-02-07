@@ -19,20 +19,14 @@ This directory contains all Windows-specific build scripts for the Image Descrip
 BuildAndRelease\WinBuilds\builditall_wx.bat
 ```
 
-This builds all five IDT applications:
+This builds all three IDT applications:
 - `idt.exe` - CLI dispatcher
-- `viewer.exe` - Workflow results browser
-- `imagedescriber.exe` - Batch processing GUI
-- `prompteditor.exe` - Prompt template editor
-- `idtconfigure.exe` - Configuration manager
+- `Viewer.exe` - Workflow results browser
+- `ImageDescriber.exe` - Batch processing GUI (includes integrated Prompt Editor and Configure tools via Tools menu)
 
 ### Package All Executables
 
-```batch
-BuildAndRelease\WinBuilds\package_all_windows.bat
-```
-
-Collects all built executables to `dist_all/bin/`.
+**NOTE:** This step is now automated by `builditall_wx.bat` - no separate packaging needed.
 
 ### Create Windows Installer
 
@@ -45,20 +39,15 @@ Creates `ImageDescriptionToolkit_Setup_v{version}.exe` in `dist_all/`.
 ## Individual Scripts
 
 ### `builditall_wx.bat`
-Master build script that builds all five applications sequentially.
+Master build script that builds all three applications sequentially and packages them.
 
 **Requirements:**
 - Each app must have a `.winenv` directory (created by `winsetup.bat`)
 - Each app must have `build_*_wx.bat` or `build_*.bat` in its directory
 
-**Output:** Executables in each app's `dist/` folder
+**Output:** Executables in each app's `dist/` folder AND packaged in `dist_all/bin/`
 
-### `package_all_windows.bat`
-Collects all built executables to a single distribution folder.
-
-**Requirements:** All apps must be built first
-
-**Output:** `dist_all/bin/` with all .exe files
+**Note:** PromptEditor and IDTConfigure are deprecated standalone apps - their functionality is now integrated into ImageDescriber under the Tools menu.
 
 ### `build_installer.bat`
 Creates Windows installer using Inno Setup.
@@ -91,11 +80,8 @@ BuildAndRelease\WinBuilds\builditall_wx.bat
 
 REM Package executables
 BuildAndRelease\WinBuilds\package_all_windows.bat
-
-REM Create installer
-BuildAndRelease\WinBuilds\build_installer.bat
-```
-
+ (also packages them automatically)
+BuildAndRelease\WinBuilds\builditall_wx
 ## Output Locations
 
 - **Individual builds:** `<app>/dist/<App>.exe`

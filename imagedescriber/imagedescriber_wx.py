@@ -19,6 +19,7 @@ Features:
 import sys
 import os
 import json
+import logging
 import re
 import subprocess
 import threading
@@ -1774,91 +1775,40 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dlg.Destroy()
     
     def on_chat(self, event):
-        """Chat with image (C key)"""
-        if not self.current_image_item:
-            show_warning(self, "No image selected")
+        """Chat with image (C key) - Full accessible implementation"""
+        selected_item = self.get_selected_image_item()
+        if not selected_item:
+            show_warning(self, "Please select an image first.")
             return
         
-        if not ProcessingWorker:
-            show_error(self, "Processing worker not available")
+        # Import chat components
+        try:
+            from imagedescriber.chat_window_wx import ChatDialog, ChatWindow
+        except ImportError:
+            show_error(self, "Chat feature not available. Please reinstall the application.")
             return
         
-        # Create a simple chat dialog
-        dlg = wx.Dialog(self, title=f"Chat: {Path(self.current_image_item.file_path).name}",
-                       style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
-        dlg.SetSize((600, 500))
-        
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        # Chat history
-        history_label = wx.StaticText(dlg, label="Conversation:")
-        sizer.Add(history_label, 0, wx.ALL, 5)
-        
-        chat_history = wx.TextCtrl(dlg, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
-        chat_history.SetValue("Chat session started.\n\nAsk questions about this image...\n\n")
-        sizer.Add(chat_history, 1, wx.ALL | wx.EXPAND, 5)
-        
-        # Question input
-        question_label = wx.StaticText(dlg, label="Your question:")
-        sizer.Add(question_label, 0, wx.ALL, 5)
-        
-        question_input = wx.TextCtrl(dlg, style=wx.TE_PROCESS_ENTER)
-        sizer.Add(question_input, 0, wx.ALL | wx.EXPAND, 5)
-        
-        # Buttons
-        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        
-        ask_btn = wx.Button(dlg, label="Ask")
-        send_btn = wx.Button(dlg, label="Send")
-        close_btn = wx.Button(dlg, wx.ID_CLOSE)
-        
-        btn_sizer.Add(ask_btn, 0, wx.ALL, 5)
-        btn_sizer.Add(send_btn, 0, wx.ALL, 5)
-        btn_sizer.AddStretchSpacer()
-        btn_sizer.Add(close_btn, 0, wx.ALL, 5)
-        
-        sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 5)
-        
-        def on_ask(e):
-            question = question_input.GetValue().strip()
-            if question:
-                chat_history.AppendText(f"You: {question}\n")
-                chat_history.AppendText("AI: Thinking...\n")
-                question_input.Clear()
-                
-                # Process question with AI
-                try:
-                    options = {
-                        'provider': self.config.get('default_provider', 'ollama'),
-                        'model': self.config.get('default_model', 'moondream'),
-                    }
-                    
-                    worker = ProcessingWorker(
-                        self,
-                        self.current_image_item.file_path,
-                        options['provider'],
-                        options['model'],
-                        'chat',
-                        question,
-                        None,
-                        None
-                    )
-                    # Store reference to update chat history
-                    worker.chat_history_ctrl = chat_history
-                    worker.start()
-                except Exception as ex:
-                    chat_history.AppendText(f"Error: {str(ex)}\n\n")
-        
-        ask_btn.Bind(wx.EVT_BUTTON, on_ask)
-        send_btn.Bind(wx.EVT_BUTTON, on_ask)
-        question_input.Bind(wx.EVT_TEXT_ENTER, on_ask)
-        close_btn.Bind(wx.EVT_BUTTON, lambda e: dlg.EndModal(wx.ID_CLOSE))
-        
-        dlg.SetSizer(sizer)
-        dlg.Centre()
-        question_input.SetFocus()
-        dlg.ShowModal()
-        dlg.Destroy()
+        # Show provider selection dialog
+        chat_dialog = ChatDialog(self, self.config)
+        if chat_dialog.ShowModal() == wx.ID_OK:
+            selections = chat_dialog.get_selections()
+            chat_dialog.Destroy()
+            
+            # Open chat window with selected settings
+            chat_window = ChatWindow(
+                parent=self,
+                workspace=self.workspace,
+                image_item=selected_item,
+                provider=selections['provider'],
+                model=selections['model']
+            )
+            chat_window.ShowModal()
+            chat_window.Destroy()
+            
+            # Refresh UI to show any new chat sessions
+            # (Future enhancement: show sessions in image list tree)
+        else:
+            chat_dialog.Destroy()
     
     def on_followup_question(self, event):
         """Ask followup question (F key)"""
@@ -2238,8 +2188,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             dialog.ShowModal()
             dialog.Destroy()
             
-            # Refresh cached prompts after editing
+            # Refresh cached data after editing
             self.cached_ollama_models = None  # Force reload on next use
+            
+            # Verify config file is readable after editing
+            try:
+                from shared.wx_common import find_config_file
+                config_path = find_config_file('image_describer_config.json')
+                if config_path and config_path.exists():
+                    import json
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        cfg = json.load(f)
+                    prompts = cfg.get('prompt_variations', {})
+                    default = cfg.get('default_prompt_style', 'N/A')
+                    logging.info(f"Config verified after prompt edit: {len(prompts)} prompts, default={default}")
+                else:
+                    logging.warning("Config file not found after prompt editor closed")
+            except Exception as verify_error:
+                logging.error(f"Failed to verify config after prompt edit: {verify_error}")
             
         except Exception as e:
             show_error(self, f"Error launching Prompt Editor:\n{e}")

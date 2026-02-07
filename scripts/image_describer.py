@@ -414,7 +414,12 @@ class ImageDescriber:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
+            # Log prompt-related config details
+            prompts = config.get('prompt_variations', {})
+            default_prompt = config.get('default_prompt_style', 'N/A')
             logger.info(f"Loaded configuration from: {config_path}")
+            logger.debug(f"Config has {len(prompts)} prompts, default={default_prompt}")
+            
             return config
             
         except Exception as e:
@@ -476,9 +481,12 @@ class ImageDescriber:
         lower_variations = {k.lower(): v for k, v in prompt_variations.items()}
         
         if self.prompt_style.lower() in lower_variations:
-            return lower_variations[self.prompt_style.lower()]
+            prompt_text = lower_variations[self.prompt_style.lower()]
+            logger.debug(f"Using prompt style '{self.prompt_style}' ({len(prompt_text)} chars)")
+            return prompt_text
         else:
             # Fallback to default prompt_template
+            logger.warning(f"Prompt style '{self.prompt_style}' not found in config, using prompt_template fallback")
             return self.config.get('prompt_template', 
                                  "Describe this image in detail, including the main subjects, setting, colors, and composition.")
     

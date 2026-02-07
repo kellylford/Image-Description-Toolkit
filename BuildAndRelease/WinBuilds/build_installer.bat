@@ -69,16 +69,6 @@ if not exist "dist_all\bin\ImageDescriber.exe" (
     set MISSING_FILES=1
 )
 
-if not exist "dist_all\bin\prompteditor.exe" (
-    echo ERROR: prompteditor.exe not found
-    set MISSING_FILES=1
-)
-
-if not exist "dist_all\bin\idtconfigure.exe" (
-    echo ERROR: idtconfigure.exe not found
-    set MISSING_FILES=1
-)
-
 if %MISSING_FILES%==1 (
     echo.
     echo Please run:
@@ -105,9 +95,7 @@ if %ERRORLEVEL% EQU 0 (
     echo The installer includes:
     echo   - idt.exe (CLI)
     echo   - Viewer.exe
-    echo   - ImageDescriber.exe
-    echo   - PromptEditor.exe
-    echo   - IDTConfigure.exe
+    echo   - ImageDescriber.exe (includes integrated Prompt Editor and Configure tools)
     echo   - Configuration files
     echo   - Documentation
     echo.
