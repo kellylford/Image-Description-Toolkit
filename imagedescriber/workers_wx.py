@@ -197,6 +197,9 @@ class ProcessingWorker(threading.Thread):
             # Process the image with selected provider
             description = self._process_with_ai(self.file_path, prompt_text)
             
+            # Add location byline if geocoding data is available
+            description = self._add_location_byline(description, metadata)
+            
             # Emit success
             evt = ProcessingCompleteEventData(
                 file_path=self.file_path,
@@ -457,6 +460,46 @@ class ProcessingWorker(threading.Thread):
             logging.error(traceback.format_exc())
         
         return metadata
+    
+    def _add_location_byline(self, description: str, metadata: dict) -> str:
+        """Add location byline to description like a newspaper article
+        
+        Format: "City, State - [description]"
+        
+        Args:
+            description: Original AI-generated description
+            metadata: Metadata dict with location information
+            
+        Returns:
+            Description with location byline prepended (if location available)
+        """
+        if not description or not metadata:
+            return description
+        
+        location = metadata.get('location', {})
+        if not location:
+            return description
+        
+        # Build location string (matching format from format_image_metadata)
+        city = location.get('city') or location.get('town')
+        state = location.get('state')
+        country = location.get('country')
+        
+        byline = None
+        if city and state:
+            byline = f"{city}, {state}"
+        elif city and country:
+            byline = f"{city}, {country}"
+        elif state:
+            byline = state
+        elif country:
+            byline = country
+        
+        if byline:
+            logging.info(f"Adding location byline: {byline}")
+            return f"{byline} - {description}"
+        
+        return description
     
     def _sanitize_for_json(self, obj):
         """Recursively sanitize object to be JSON-serializable"""
