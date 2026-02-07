@@ -33,24 +33,22 @@
 ### 📦 Build System Enhancements
 
 **Executable Quality**
-- All 5 applications build successfully with zero errors
+- All 3 applications build successfully with zero errors
 - PyInstaller spec files optimized and verified
 - Shared modules properly bundled in all executables
 - Configuration files correctly embedded
 
-**Build Artifacts**
+**Build Artifacts** (Updated v4.2.0)
 - `idt.exe` - CLI dispatcher, fully functional
 - `Viewer.exe` - Workflow results browser
-- `ImageDescriber.exe` - Batch processing GUI
-- `PromptEditor.exe` - Visual prompt editor
-- `IDTConfigure.exe` - Configuration manager
+- `ImageDescriber.exe` - Batch processing GUI with integrated prompt editor and configuration manager (formerly 5 apps, now 3)
 
 ### ✅ Testing & Validation
 
 **Comprehensive Testing**
 - All 114+ unit tests passing (100% pass rate)
 - Code quality review - EXCELLENT across all metrics
-- Build testing - All 5 executables compile successfully
+- Build testing - All 3 executables compile successfully
 - Integration testing - All imports validated
 - Frozen mode testing - PyInstaller compatibility verified
 

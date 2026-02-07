@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-IDT Configure (wxPython) - Configuration Manager for Image Description Toolkit
+Configure Dialog for ImageDescriber
 
-wxPython port of the Qt6 IDT Configure with improved macOS VoiceOver accessibility.
+Dialog version of IDT Configure for integration into ImageDescriber.
 Manages configuration files:
 - image_describer_config.json
 - video_frame_extractor_config.json
 - workflow_config.json
 
 Features:
-- Menu-based categorization for accessibility
+- Tabbed interface for configuration categories
 - Settings list with arrow navigation
 - Type-specific editors (bool, int, float, choice, string)
 - Screen reader readable explanations
 - Save/Load functionality
-- Export/Import configurations
 - Professional, accessible interface
+- Dialog buttons: OK (save & close), Cancel (discard), Apply (save & continue)
 """
 
 import sys
@@ -156,11 +156,11 @@ class SettingEditDialog(wx.Dialog):
             return self.editor.GetValue()
 
 
-class IDTConfigureFrame(wx.Frame):
-    """Main application window for IDT Configuration Manager"""
+class ConfigureDialog(wx.Dialog):
+    """Dialog for managing IDT configuration settings"""
     
-    def __init__(self):
-        super().__init__(None, title="IDT Configure - Configuration Manager", size=(900, 600))
+    def __init__(self, parent):
+        super().__init__(parent, title="IDT Configure - Configuration Manager", size=(900, 650))
         
         # Find config files
         self.scripts_dir = self.find_scripts_directory()
@@ -175,20 +175,21 @@ class IDTConfigureFrame(wx.Frame):
         # Current configuration data
         self.configs = {}
         
-        # Current category being viewed
-        self.current_category = None
-        
         # Settings metadata for each category
         self.settings_metadata = self.build_settings_metadata()
+        
+        # Category tab widgets (for refreshing on changes)
+        self.category_widgets = {}
         
         # Load all configs
         self.load_all_configs()
         
         # UI setup
         self.init_ui()
-        self.create_menu_bar()
-        self.create_status_bar()
         
+        # Bind close event
+        self.Bind(wx.EVT_CLOSE, self.on_dialog_close)
+    
     def find_scripts_directory(self) -> Path:
         """Find the scripts directory containing config files"""
         # Try relative to executable
@@ -461,7 +462,7 @@ class IDTConfigureFrame(wx.Frame):
         }
     
     def init_ui(self):
-        """Create the main user interface"""
+        """Create the main user interface with tabbed categories"""
         panel = wx.Panel(self)
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
@@ -471,98 +472,87 @@ class IDTConfigureFrame(wx.Frame):
         header.SetFont(font)
         main_sizer.Add(header, 0, wx.ALIGN_CENTER | wx.ALL, 10)
         
-        # Category label
-        self.category_label = wx.StaticText(panel, label="Select a category from the Settings menu")
-        cat_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        self.category_label.SetFont(cat_font)
-        main_sizer.Add(self.category_label, 0, wx.ALL, 5)
+        # Create notebook with tabs for each category
+        self.notebook = wx.Notebook(panel, name="Configuration categories")
         
-        # Content layout (settings list + explanation)
-        content_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        # Create a tab for each category
+        for category in self.settings_metadata.keys():
+            tab_panel = self.create_category_tab(self.notebook, category)
+            self.notebook.AddPage(tab_panel, category)
+        
+        main_sizer.Add(self.notebook, 1, wx.EXPAND | wx.ALL, 5)
+        
+        # Dialog buttons
+        btn_sizer = self.create_dialog_buttons(panel)
+        main_sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        
+        panel.SetSizer(main_sizer)
+    
+    def create_category_tab(self, parent, category: str) -> wx.Panel:
+        """Create a tab panel for a specific category"""
+        panel = wx.Panel(parent)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
         
         # Left side: Settings list
         left_box = wx.StaticBox(panel, label="Settings:")
         left_sizer = wx.StaticBoxSizer(left_box, wx.VERTICAL)
         
-        self.settings_list = wx.ListBox(left_box, style=wx.LB_SINGLE | wx.LB_NEEDED_SB)
-        self.settings_list.Bind(wx.EVT_LISTBOX, self.on_setting_selected)
-        left_sizer.Add(self.settings_list, 1, wx.EXPAND | wx.ALL, 5)
+        settings_list = wx.ListBox(left_box, style=wx.LB_SINGLE | wx.LB_NEEDED_SB, name=f"{category} settings")
+        settings_list.Bind(wx.EVT_LISTBOX, lambda e: self.on_setting_selected(category, e))
+        left_sizer.Add(settings_list, 1, wx.EXPAND | wx.ALL, 5)
         
         # Change button
-        self.change_button = wx.Button(left_box, label="Change Setting")
-        self.change_button.Enable(False)
-        self.change_button.Bind(wx.EVT_BUTTON, self.change_setting)
-        left_sizer.Add(self.change_button, 0, wx.EXPAND | wx.ALL, 5)
+        change_button = wx.Button(left_box, label="Change Setting")
+        change_button.Enable(False)
+        change_button.Bind(wx.EVT_BUTTON, lambda e: self.change_setting(category, e))
+        left_sizer.Add(change_button, 0, wx.EXPAND | wx.ALL, 5)
         
-        content_sizer.Add(left_sizer, 1, wx.EXPAND | wx.ALL, 5)
+        sizer.Add(left_sizer, 1, wx.EXPAND | wx.ALL, 5)
         
         # Right side: Explanation panel
         right_box = wx.StaticBox(panel, label="Explanation:")
         right_sizer = wx.StaticBoxSizer(right_box, wx.VERTICAL)
         
-        self.explanation_text = wx.TextCtrl(right_box, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
-        right_sizer.Add(self.explanation_text, 1, wx.EXPAND | wx.ALL, 5)
+        explanation_text = wx.TextCtrl(right_box, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP, name=f"{category} explanation")
+        right_sizer.Add(explanation_text, 1, wx.EXPAND | wx.ALL, 5)
         
-        content_sizer.Add(right_sizer, 1, wx.EXPAND | wx.ALL, 5)
+        sizer.Add(right_sizer, 1, wx.EXPAND | wx.ALL, 5)
         
-        main_sizer.Add(content_sizer, 1, wx.EXPAND | wx.ALL, 5)
+        panel.SetSizer(sizer)
         
-        panel.SetSizer(main_sizer)
+        # Store references to widgets for later access
+        self.category_widgets[category] = {
+            'panel': panel,
+            'settings_list': settings_list,
+            'change_button': change_button,
+            'explanation_text': explanation_text
+        }
+        
+        # Populate the settings list
+        self.load_category_settings(category)
+        
+        return panel
     
-    def create_menu_bar(self):
-        """Create the menu bar"""
-        menubar = wx.MenuBar()
+    def create_dialog_buttons(self, parent):
+        """Create OK, Cancel, Apply buttons for the dialog"""
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        # File menu
-        file_menu = wx.Menu()
+        btn_sizer.AddStretchSpacer()
         
-        reload_item = file_menu.Append(wx.ID_REFRESH, "Reload Configurations\tCtrl+R")
-        self.Bind(wx.EVT_MENU, self.reload_configs, reload_item)
+        # OK, Cancel, Apply buttons
+        self.ok_btn = wx.Button(parent, wx.ID_OK, label="OK")
+        self.ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
+        btn_sizer.Add(self.ok_btn, 0, wx.ALL, 5)
         
-        save_item = file_menu.Append(wx.ID_SAVE, "Save All\tCtrl+S")
-        self.Bind(wx.EVT_MENU, self.save_all_configs, save_item)
+        self.cancel_btn = wx.Button(parent, wx.ID_CANCEL, label="Cancel")
+        self.cancel_btn.Bind(wx.EVT_BUTTON, self.on_cancel)
+        btn_sizer.Add(self.cancel_btn, 0, wx.ALL, 5)
         
-        file_menu.AppendSeparator()
+        self.apply_btn = wx.Button(parent, wx.ID_APPLY, label="Apply")
+        self.apply_btn.Bind(wx.EVT_BUTTON, self.on_apply)
+        btn_sizer.Add(self.apply_btn, 0, wx.ALL, 5)
         
-        export_item = file_menu.Append(wx.ID_ANY, "Export Configuration...")
-        self.Bind(wx.EVT_MENU, self.export_config, export_item)
-        
-        import_item = file_menu.Append(wx.ID_ANY, "Import Configuration...")
-        self.Bind(wx.EVT_MENU, self.import_config, import_item)
-        
-        file_menu.AppendSeparator()
-        
-        exit_item = file_menu.Append(wx.ID_EXIT, "Exit\tCtrl+Q")
-        self.Bind(wx.EVT_MENU, lambda e: self.Close(), exit_item)
-        
-        menubar.Append(file_menu, "&File")
-        
-        # Settings menu (categories)
-        settings_menu = wx.Menu()
-        
-        for category in self.settings_metadata.keys():
-            item = settings_menu.Append(wx.ID_ANY, category)
-            self.Bind(wx.EVT_MENU, lambda e, cat=category: self.load_category(cat), item)
-        
-        menubar.Append(settings_menu, "&Settings")
-        
-        # Help menu
-        help_menu = wx.Menu()
-        
-        about_item = help_menu.Append(wx.ID_ABOUT, "About")
-        self.Bind(wx.EVT_MENU, self.show_about, about_item)
-        
-        help_item = help_menu.Append(wx.ID_HELP, "Help\tF1")
-        self.Bind(wx.EVT_MENU, self.show_help, help_item)
-        
-        menubar.Append(help_menu, "&Help")
-        
-        self.SetMenuBar(menubar)
-    
-    def create_status_bar(self):
-        """Create the status bar"""
-        self.CreateStatusBar()
-        self.SetStatusText("Ready")
+        return btn_sizer
     
     def load_all_configs(self):
         """Load all configuration files"""
@@ -573,39 +563,23 @@ class IDTConfigureFrame(wx.Frame):
                         self.configs[name] = json.load(f)
                 else:
                     self.configs[name] = {}
-                    self.SetStatusText(f"Warning: {path} not found")
+                    print(f"Warning: {path} not found")
             except Exception as e:
                 self.configs[name] = {}
                 show_warning(self, f"Error loading {path}:\n{str(e)}")
     
-    def reload_configs(self, event):
-        """Reload all configurations from disk"""
-        self.load_all_configs()
-        if self.current_category:
-            self.load_category(self.current_category)
-        self.SetStatusText("Configurations reloaded")
-    
-    def save_all_configs(self, event):
-        """Save all configuration files"""
-        try:
-            for name, config in self.configs.items():
-                path = self.config_files[name]
-                with open(path, 'w', encoding='utf-8') as f:
-                    json.dump(config, f, indent=2)
-            
-            self.SetStatusText("All configurations saved successfully")
-            show_info(self, "All configurations saved successfully!")
-        except Exception as e:
-            show_error(self, f"Error saving configurations:\\n{str(e)}")
-    
-    def load_category(self, category: str):
-        """Load settings for a specific category"""
-        self.current_category = category
-        self.category_label.SetLabel(f"Category: {category}")
+    def load_category_settings(self, category: str):
+        """Load settings for a specific category into its tab"""
+        widgets = self.category_widgets.get(category)
+        if not widgets:
+            return
+        
+        settings_list = widgets['settings_list']
+        explanation_text = widgets['explanation_text']
         
         # Clear current list
-        self.settings_list.Clear()
-        self.explanation_text.Clear()
+        settings_list.Clear()
+        explanation_text.Clear()
         
         # Load settings for this category
         settings = self.settings_metadata.get(category, {})
@@ -617,25 +591,31 @@ class IDTConfigureFrame(wx.Frame):
             # Format display text: "Setting Name: current_value"
             display_text = f"{setting_name}: {current_value}"
             
-            self.settings_list.Append(display_text, setting_name)
+            settings_list.Append(display_text, setting_name)
         
         # Select first item if available
-        if self.settings_list.GetCount() > 0:
-            self.settings_list.SetSelection(0)
-            self.on_setting_selected(None)
-        
-        self.SetStatusText(f"Loaded {category}")
+        if settings_list.GetCount() > 0:
+            settings_list.SetSelection(0)
+            self.on_setting_selected(category, None)
     
-    def on_setting_selected(self, event):
-        """Handle setting selection"""
-        selection = self.settings_list.GetSelection()
-        if selection == wx.NOT_FOUND:
-            self.change_button.Enable(False)
-            self.explanation_text.Clear()
+    def on_setting_selected(self, category: str, event):
+        """Handle setting selection in a category tab"""
+        widgets = self.category_widgets.get(category)
+        if not widgets:
             return
         
-        setting_name = self.settings_list.GetClientData(selection)
-        setting_info = self.settings_metadata[self.current_category][setting_name]
+        settings_list = widgets['settings_list']
+        change_button = widgets['change_button']
+        explanation_text = widgets['explanation_text']
+        
+        selection = settings_list.GetSelection()
+        if selection == wx.NOT_FOUND:
+            change_button.Enable(False)
+            explanation_text.Clear()
+            return
+        
+        setting_name = settings_list.GetClientData(selection)
+        setting_info = self.settings_metadata[category][setting_name]
         
         # Show explanation with range/choices info
         description = setting_info.get("description", "No description available")
@@ -648,9 +628,9 @@ class IDTConfigureFrame(wx.Frame):
         if "choices" in setting_info:
             description += f"\n\nOptions: {', '.join(setting_info['choices'])}"
         
-        self.explanation_text.SetValue(description)
+        explanation_text.SetValue(description)
         
-        self.change_button.Enable(True)
+        change_button.Enable(True)
     
     def get_setting_value(self, setting_info: Dict[str, Any]) -> Any:
         """Get current value for a setting"""
@@ -686,14 +666,20 @@ class IDTConfigureFrame(wx.Frame):
         # Set the value
         current[path[-1]] = new_value
     
-    def change_setting(self, event):
-        """Open dialog to change the selected setting"""
-        selection = self.settings_list.GetSelection()
+    def change_setting(self, category: str, event):
+        """Open dialog to change the selected setting in a category"""
+        widgets = self.category_widgets.get(category)
+        if not widgets:
+            return
+        
+        settings_list = widgets['settings_list']
+        
+        selection = settings_list.GetSelection()
         if selection == wx.NOT_FOUND:
             return
         
-        setting_name = self.settings_list.GetClientData(selection)
-        setting_info = self.settings_metadata[self.current_category][setting_name]
+        setting_name = settings_list.GetClientData(selection)
+        setting_info = self.settings_metadata[category][setting_name]
         
         current_value = self.get_setting_value(setting_info)
         
@@ -706,133 +692,45 @@ class IDTConfigureFrame(wx.Frame):
             
             # Update the list item text to show new value
             display_text = f"{setting_name}: {new_value}"
-            self.settings_list.SetString(selection, display_text)
+            settings_list.SetString(selection, display_text)
             
             # Refresh the display
-            self.on_setting_selected(None)
-            
-            self.SetStatusText(f"Changed {setting_name} to {new_value}")
+            self.on_setting_selected(category, None)
         
         dialog.Destroy()
     
-    def export_config(self, event):
-        """Export current configuration to a file"""
-        export_path = save_file_dialog(
-            self,
-            "Export Configuration",
-            wildcard="JSON Files (*.json)|*.json",
-            default_dir="",
-            default_file="idt_config_export.json"
-        )
-        
-        if export_path:
-            try:
-                with open(export_path, 'w', encoding='utf-8') as f:
-                    json.dump(self.configs, f, indent=2)
-                show_info(self, f"Configuration exported to:\\n{export_path}")
-            except Exception as e:
-                show_error(self, str(e))
+    def save_all_configs(self):
+        """Save all configuration files"""
+        try:
+            for name, config in self.configs.items():
+                path = self.config_files[name]
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=2)
+            
+            return True
+        except Exception as e:
+            show_error(self, f"Error saving configurations:\n{str(e)}")
+            return False
     
-    def import_config(self, event):
-        """Import configuration from a file"""
-        import_path = open_file_dialog(
-            self,
-            "Import Configuration",
-            wildcard="JSON Files (*.json)|*.json",
-            default_dir=""
-        )
-        
-        if import_path:
-            try:
-                with open(import_path, 'r', encoding='utf-8') as f:
-                    imported = json.load(f)
-                
-                # Merge or replace?
-                msg = wx.MessageDialog(self, 
-                                      "Replace current configuration completely?\n\n"
-                                      "Yes = Replace all\nNo = Merge with current",
-                                      "Import Mode",
-                                      wx.YES_NO | wx.CANCEL | wx.ICON_QUESTION)
-                reply = msg.ShowModal()
-                msg.Destroy()
-                
-                if reply == wx.ID_YES:
-                    self.configs = imported
-                elif reply == wx.ID_NO:
-                    # Merge
-                    for key, value in imported.items():
-                        if key in self.configs:
-                            self.configs[key].update(value)
-                        else:
-                            self.configs[key] = value
-                
-                # Reload display
-                if self.current_category:
-                    self.load_category(self.current_category)
-                
-                show_info(self, "Configuration imported successfully!")
-            except Exception as e:
-                show_error(self, str(e))
+    def on_ok(self, event):
+        """Handle OK button - save and close"""
+        if self.save_all_configs():
+            self.EndModal(wx.ID_OK)
     
-    def show_about(self, event):
-        """Show about dialog"""
-        show_about_dialog(
-            self,
-            "IDT Configure",
-            get_app_version(),
-            "Configuration Manager for Image Description Toolkit\n\n"
-            "Features:\n"
-            "• Manage AI model settings\n"
-            "• Configure video extraction options\n"
-            "• Adjust workflow behavior\n"
-            "• Set processing preferences\n"
-            "• Full keyboard accessibility"
-        )
+    def on_cancel(self, event):
+        """Handle Cancel button - discard changes and close"""
+        # Could add confirmation dialog here if tracking modifications
+        self.EndModal(wx.ID_CANCEL)
     
-    def show_help(self, event):
-        """Show help dialog"""
-        help_text = """IDT Configure Help
-
-Getting Started:
-1. Select a category from the Settings menu
-2. Navigate through settings using arrow keys
-3. Press "Change Setting" or Enter to edit
-4. Use File → Save All to save changes
-
-Categories:
-• AI Model Settings: Temperature, tokens, and other AI parameters
-• Prompt Styles: Choose default description style
-• Video Extraction: Configure frame extraction from videos
-• Processing Options: Memory, delays, and optimization
-• Workflow Settings: Enable/disable workflow steps
-• Output Format: Control what's included in output
-
-Tips:
-• Hover over settings for more information
-• Changes are not saved until you use File → Save All
-• You can reload from disk with Ctrl+R
-• Export/Import to backup or share configurations
-
-Accessibility:
-This application is fully keyboard accessible:
-• Use Tab to move between controls
-• Arrow keys to navigate lists
-• Enter to activate buttons
-• Alt+letter to access menus"""
-        
-        show_info(self, help_text, "Help")
-
-
-def main():
-    """Main entry point"""
-    app = wx.App()
-    app.SetAppName("IDT Configure")
+    def on_apply(self, event):
+        """Handle Apply button - save but keep dialog open"""
+        if self.save_all_configs():
+            show_info(self, "All configurations saved successfully!")
     
-    frame = IDTConfigureFrame()
-    frame.Show()
-    
-    app.MainLoop()
-
-
-if __name__ == "__main__":
-    main()
+    def on_dialog_close(self, event):
+        """Handle dialog close event"""
+        # Could add unsaved changes check here
+        if event.CanVeto():
+            self.EndModal(wx.ID_CANCEL)
+        else:
+            self.Destroy()

@@ -125,7 +125,7 @@ Viewer.exe          # or ./dist/Viewer on macOS
 
 **Configuration:**
 ```bash
-IDTConfigure.exe    # or ./dist/IDTConfigure on macOS
+ImageDescriber.exe   # Open Tools → Configure Settings (or on macOS: ImageDescriber.app)
 ```
 
 **Building from Source:**

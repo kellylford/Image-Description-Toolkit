@@ -4,13 +4,11 @@ This guide covers building native macOS versions of all IDT applications and cre
 
 ## Overview
 
-The Image Description Toolkit consists of five applications:
+The Image Description Toolkit consists of three applications:
 
 1. **idt** - Command-line interface (standalone binary)
-2. **Viewer** - Workflow results browser (PyQt6 .app bundle)
-3. **ImageDescriber** - Batch image processing GUI (PyQt6 .app bundle)
-4. **Prompt Editor** - AI prompt template editor (PyQt6 .app bundle)
-5. **IDT Configure** - Configuration management (PyQt6 .app bundle)
+2. **Viewer** - Workflow results browser (wxPython .app bundle)
+3. **ImageDescriber** - Batch image processing GUI with integrated prompt editor and configuration manager (wxPython .app bundle)
 
 ## Prerequisites
 
@@ -44,25 +42,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cd ..
-
-# Prompt Editor
-cd prompt_editor
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cd ..
-
-# IDT Configure
-cd idtconfigure
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cd ..
 ```
 
 ## Quick Start: Build Everything
 
-Build all five applications with one command:
+Build all three applications with one command:
 
 ```bash
 ./BuildAndRelease/builditall_macos.sh
@@ -70,10 +54,8 @@ Build all five applications with one command:
 
 This will create:
 - `dist/idt` - CLI tool
-- `viewer/dist/viewer.app`
-- `imagedescriber/dist/imagedescriber.app`
-- `prompt_editor/dist/prompteditor.app`
-- `idtconfigure/dist/idtconfigure.app`
+- `viewer/dist/Viewer.app`
+- `imagedescriber/dist/ImageDescriber.app` (with integrated Tools menu)
 
 ## Building Individual Applications
 

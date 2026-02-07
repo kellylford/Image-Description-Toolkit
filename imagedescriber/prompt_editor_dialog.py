@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Prompt Editor (wxPython) - User-friendly application for editing image description prompts
+Prompt Editor Dialog for ImageDescriber
 
-wxPython port of the Qt6 Prompt Editor with improved macOS VoiceOver accessibility.
+Dialog version of the Prompt Editor for integration into ImageDescriber.
 Allows users to view, edit, add, and manage prompt variations in the 
 image_describer_config.json file.
 
@@ -17,12 +17,9 @@ Features:
 - Set default AI provider and model
 - API key configuration for cloud providers
 - Live model discovery from selected AI provider
-- Save and Save As functionality
-- Open different configuration files
-- Backup and restore functionality
 - Input validation and error handling
 - Accessible design with screen reader support
-- Real-time window title updates showing current file and modification status
+- Dialog buttons: OK (save & close), Cancel (discard), Apply (save & continue)
 """
 
 import sys
@@ -85,19 +82,12 @@ except ImportError as e:
     AI_PROVIDERS_AVAILABLE = False
     print(f"Warning: AI providers not available: {e}")
 
-# Versioning support (optional)
-try:
-    from scripts.versioning import log_build_banner, get_full_version
-except Exception:
-    log_build_banner = None
-    get_full_version = None
 
-
-class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
-    """Main window for the prompt editor application"""
+class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
+    """Dialog for editing image description prompts"""
     
-    def __init__(self):
-        wx.Frame.__init__(self, None, title="Image Description Prompt Editor", size=(900, 600))
+    def __init__(self, parent):
+        wx.Dialog.__init__(self, parent, title="Image Description Prompt Editor", size=(900, 650))
         ModifiedStateMixin.__init__(self)
         
         # Find the config file
@@ -107,8 +97,6 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         
         # Setup UI
         self.init_ui()
-        self.create_menu_bar()
-        self.create_status_bar()
         
         # Load initial data
         self.load_config()
@@ -118,7 +106,7 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
     def init_ui(self):
         """Initialize the user interface"""
         panel = wx.Panel(self)
-        main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Create splitter for resizable panels
         splitter = wx.SplitterWindow(panel, style=wx.SP_LIVE_UPDATE)
@@ -133,9 +121,17 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         splitter.SplitVertically(left_panel, right_panel, 300)
         splitter.SetMinimumPaneSize(200)
         
-        main_sizer.Add(splitter, 1, wx.EXPAND)
+        main_sizer.Add(splitter, 1, wx.EXPAND | wx.ALL, 5)
+        
+        # Dialog buttons
+        btn_sizer = self.create_dialog_buttons(panel)
+        main_sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        
         panel.SetSizer(main_sizer)
         
+        # Bind close event
+        self.Bind(wx.EVT_CLOSE, self.on_dialog_close)
+    
     def create_left_panel(self, parent):
         """Create the left panel with prompt list and controls"""
         panel = wx.Panel(parent)
@@ -145,7 +141,7 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         list_box = wx.StaticBox(panel, label="Available Prompts")
         list_sizer = wx.StaticBoxSizer(list_box, wx.VERTICAL)
         
-        self.prompt_list = wx.ListBox(list_box, style=wx.LB_SINGLE | wx.LB_NEEDED_SB)
+        self.prompt_list = wx.ListBox(list_box, style=wx.LB_SINGLE | wx.LB_NEEDED_SB, name="Available prompts")
         self.prompt_list.Bind(wx.EVT_LISTBOX, self.on_prompt_selected)
         list_sizer.Add(self.prompt_list, 1, wx.EXPAND | wx.ALL, 5)
         
@@ -226,30 +222,6 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         default_sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 5)
         sizer.Add(default_sizer, 0, wx.EXPAND | wx.ALL, 5)
         
-        # Action buttons group
-        action_box = wx.StaticBox(panel, label="Actions")
-        action_sizer = wx.StaticBoxSizer(action_box, wx.VERTICAL)
-        
-        # Save buttons in horizontal layout
-        save_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        
-        self.save_btn = wx.Button(action_box, label="Save")
-        self.save_btn.Bind(wx.EVT_BUTTON, self.save_config)
-        self.save_btn.Enable(False)
-        save_sizer.Add(self.save_btn, 1, wx.ALL, 2)
-        
-        self.save_as_btn = wx.Button(action_box, label="Save As...")
-        self.save_as_btn.Bind(wx.EVT_BUTTON, self.save_as_config)
-        save_sizer.Add(self.save_as_btn, 1, wx.ALL, 2)
-        
-        action_sizer.Add(save_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        
-        self.reload_btn = wx.Button(action_box, label="Reload from File")
-        self.reload_btn.Bind(wx.EVT_BUTTON, self.reload_config)
-        action_sizer.Add(self.reload_btn, 0, wx.EXPAND | wx.ALL, 5)
-        
-        sizer.Add(action_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        
         panel.SetSizer(sizer)
         return panel
     
@@ -272,7 +244,7 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         text_box = wx.StaticBox(panel, label="Prompt Text")
         text_sizer = wx.StaticBoxSizer(text_box, wx.VERTICAL)
         
-        self.prompt_text_edit = wx.TextCtrl(text_box, style=wx.TE_MULTILINE | wx.TE_WORDWRAP)
+        self.prompt_text_edit = wx.TextCtrl(text_box, style=wx.TE_MULTILINE | wx.TE_WORDWRAP, name="Prompt text")
         self.prompt_text_edit.Bind(wx.EVT_TEXT, self.on_prompt_text_changed)
         
         # Set monospace font for better editing
@@ -290,78 +262,32 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         panel.SetSizer(sizer)
         return panel
     
-    def create_menu_bar(self):
-        """Create the menu bar"""
-        menubar = wx.MenuBar()
+    def create_dialog_buttons(self, parent):
+        """Create OK, Cancel, Apply buttons for the dialog"""
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        # File menu
-        file_menu = wx.Menu()
+        # Tips button on the left
+        self.tips_btn = wx.Button(parent, label="Prompt Writing Tips")
+        self.tips_btn.Bind(wx.EVT_BUTTON, self.show_tips)
+        btn_sizer.Add(self.tips_btn, 0, wx.ALL, 5)
         
-        new_item = file_menu.Append(wx.ID_NEW, "New Prompt\tCtrl+N")
-        self.Bind(wx.EVT_MENU, self.add_new_prompt, new_item)
+        btn_sizer.AddStretchSpacer()
         
-        file_menu.AppendSeparator()
+        # OK, Cancel, Apply buttons on the right
+        self.ok_btn = wx.Button(parent, wx.ID_OK, label="OK")
+        self.ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
+        btn_sizer.Add(self.ok_btn, 0, wx.ALL, 5)
         
-        save_item = file_menu.Append(wx.ID_SAVE, "Save\tCtrl+S")
-        self.Bind(wx.EVT_MENU, self.save_config, save_item)
+        self.cancel_btn = wx.Button(parent, wx.ID_CANCEL, label="Cancel")
+        self.cancel_btn.Bind(wx.EVT_BUTTON, self.on_cancel)
+        btn_sizer.Add(self.cancel_btn, 0, wx.ALL, 5)
         
-        save_as_item = file_menu.Append(wx.ID_SAVEAS, "Save As...\tCtrl+Shift+S")
-        self.Bind(wx.EVT_MENU, self.save_as_config, save_as_item)
+        self.apply_btn = wx.Button(parent, wx.ID_APPLY, label="Apply")
+        self.apply_btn.Bind(wx.EVT_BUTTON, self.on_apply)
+        self.apply_btn.Enable(False)
+        btn_sizer.Add(self.apply_btn, 0, wx.ALL, 5)
         
-        file_menu.AppendSeparator()
-        
-        open_item = file_menu.Append(wx.ID_OPEN, "Open...\tCtrl+O")
-        self.Bind(wx.EVT_MENU, self.open_config, open_item)
-        
-        reload_item = file_menu.Append(wx.ID_REFRESH, "Reload\tF5")
-        self.Bind(wx.EVT_MENU, self.reload_config, reload_item)
-        
-        file_menu.AppendSeparator()
-        
-        backup_item = file_menu.Append(wx.ID_ANY, "Create Backup")
-        self.Bind(wx.EVT_MENU, self.create_backup, backup_item)
-        
-        restore_item = file_menu.Append(wx.ID_ANY, "Restore from Backup")
-        self.Bind(wx.EVT_MENU, self.restore_backup, restore_item)
-        
-        file_menu.AppendSeparator()
-        
-        exit_item = file_menu.Append(wx.ID_EXIT, "Exit\tCtrl+Q")
-        self.Bind(wx.EVT_MENU, self.on_close, exit_item)
-        
-        menubar.Append(file_menu, "&File")
-        
-        # Edit menu
-        edit_menu = wx.Menu()
-        
-        duplicate_item = edit_menu.Append(wx.ID_ANY, "Duplicate Prompt\tCtrl+D")
-        self.Bind(wx.EVT_MENU, self.duplicate_prompt, duplicate_item)
-        
-        delete_item = edit_menu.Append(wx.ID_DELETE, "Delete Prompt\tDel")
-        self.Bind(wx.EVT_MENU, self.delete_prompt, delete_item)
-        
-        menubar.Append(edit_menu, "&Edit")
-        
-        # Help menu
-        help_menu = wx.Menu()
-        
-        about_item = help_menu.Append(wx.ID_ABOUT, "About")
-        self.Bind(wx.EVT_MENU, self.show_about, about_item)
-        
-        tips_item = help_menu.Append(wx.ID_ANY, "Prompt Writing Tips")
-        self.Bind(wx.EVT_MENU, self.show_tips, tips_item)
-        
-        menubar.Append(help_menu, "&Help")
-        
-        self.SetMenuBar(menubar)
-        
-        # Bind close event
-        self.Bind(wx.EVT_CLOSE, self.on_close)
-    
-    def create_status_bar(self):
-        """Create the status bar"""
-        self.CreateStatusBar()
-        self.SetStatusText("Ready")
+        return btn_sizer
     
     def load_config(self):
         """Load the configuration file"""
@@ -372,7 +298,7 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
             else:
                 # Create default config if file doesn't exist
                 self.config_data = self.create_default_config()
-                self.save_config(None)
+                self.save_config_internal()
             
             # Load provider and API key if present
             provider = self.config_data.get('default_provider', 'ollama')
@@ -389,7 +315,6 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
             self.populate_model_combo()
             self.modified = False
             self.update_ui_state()
-            self.SetStatusText(f"Loaded configuration from {self.config_file.name}")
             
         except Exception as e:
             show_error(self, f"Failed to load configuration file:\n{e}")
@@ -596,7 +521,7 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
     def update_ui_state(self):
         """Update UI state based on current data"""
         self.update_window_title("Image Description Prompt Editor", self.config_file.name)
-        self.save_btn.Enable(self.modified)
+        self.apply_btn.Enable(self.modified)
     
     def add_new_prompt(self, event):
         """Add a new prompt"""
@@ -699,8 +624,8 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         
         dlg.Destroy()
     
-    def save_config(self, event):
-        """Save the configuration to file"""
+    def save_config_internal(self):
+        """Internal method to save configuration to file"""
         try:
             # Update the current prompt if one is being edited
             if self.current_prompt_name and self.prompt_name_text.GetValue().strip():
@@ -763,170 +688,15 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
                 if idx != wx.NOT_FOUND:
                     self.prompt_list.SetSelection(idx)
             
-            self.SetStatusText("Configuration saved successfully")
+            return True
             
         except Exception as e:
             show_error(self, f"Failed to save configuration:\n{e}")
+            return False
     
     def on_save(self, event):
-        """Wrapper for save_config to work with ModifiedStateMixin"""
-        self.save_config(event)
-    
-    def save_as_config(self, event):
-        """Save the configuration to a new file"""
-        try:
-            file_path = save_file_dialog(
-                self,
-                "Save Configuration As",
-                wildcard="JSON files (*.json)|*.json|All files (*.*)|*.*",
-                default_dir=str(self.config_file.parent) if self.config_file else "",
-                default_file="custom_prompts.json"
-            )
-            
-            if file_path:
-                
-                # Update the current prompt if one is being edited
-                if self.current_prompt_name and self.prompt_name_text.GetValue().strip():
-                    new_name = self.prompt_name_text.GetValue().strip()
-                    new_text = self.prompt_text_edit.GetValue()
-                    
-                    # Handle name change
-                    if new_name != self.current_prompt_name:
-                        self.config_data['prompt_variations'].pop(self.current_prompt_name, None)
-                        if self.config_data.get('default_prompt_style') == self.current_prompt_name:
-                            self.config_data['default_prompt_style'] = new_name
-                    
-                    self.config_data['prompt_variations'][new_name] = new_text
-                    self.current_prompt_name = new_name
-                
-                # Update default prompt style
-                self.config_data['default_prompt_style'] = self.default_prompt_combo.GetStringSelection()
-                
-                # Update default provider
-                self.config_data['default_provider'] = self.provider_combo.GetStringSelection()
-                
-                # Update API key
-                api_key = self.api_key_text.GetValue().strip()
-                if api_key:
-                    self.config_data['api_key'] = api_key
-                elif 'api_key' in self.config_data:
-                    del self.config_data['api_key']
-                
-                # Update default model
-                selection = self.default_model_combo.GetSelection()
-                if selection != wx.NOT_FOUND:
-                    model_data = self.default_model_combo.GetClientData(selection)
-                    if model_data:
-                        self.config_data['default_model'] = model_data
-                
-                # Save to the new file
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(self.config_data, f, indent=2, ensure_ascii=False)
-                
-                # Update current file reference
-                self.config_file = Path(file_path)
-                self.clear_modified()
-                self.update_window_title("Image Description Prompt Editor", self.config_file.name)
-                
-                self.SetStatusText(f"Configuration saved as {file_path}")
-            
-        except Exception as e:
-            show_error(self, f"Failed to save configuration:\n{e}")
-    
-    def open_config(self, event):
-        """Open a different configuration file"""
-        if not self.confirm_unsaved_changes():
-            return
-        
-        try:
-            file_path = open_file_dialog(
-                self,
-                "Open Configuration",
-                str(self.config_file.parent),
-                "JSON files (*.json)|*.json|All files (*.*)|*.*"
-            )
-            
-            if file_path:
-                # Update current file reference
-                self.config_file = Path(file_path)
-                
-                # Load the new configuration
-                self.load_config()
-                self.clear_editor()
-                self.update_window_title("Image Description Prompt Editor", self.config_file.name)
-                
-                self.SetStatusText(f"Opened {file_path}")
-            
-        except Exception as e:
-            show_error(self, f"Failed to open configuration:\n{e}")
-    
-    def reload_config(self, event):
-        """Reload configuration from file"""
-        if not self.confirm_unsaved_changes():
-            return
-        
-        self.load_config()
-        self.clear_editor()
-    
-    def create_backup(self, event):
-        """Create a backup of the configuration file"""
-        if not self.config_file.exists():
-            show_warning(self, "Configuration file does not exist.")
-            return
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_name = f"image_describer_config_backup_{timestamp}.json"
-        
-        backup_path = save_file_dialog(
-            self,
-            "Save Backup",
-            None,
-            backup_name,
-            "JSON files (*.json)|*.json"
-        )
-        
-        if backup_path:
-            try:
-                shutil.copy2(self.config_file, backup_path)
-                show_info(self, f"Backup created: {backup_path}")
-            except Exception as e:
-                show_error(self, f"Failed to create backup:\n{e}")
-    
-    def restore_backup(self, event):
-        """Restore from a backup file"""
-        backup_path = open_file_dialog(
-            self,
-            "Restore from Backup",
-            None,
-            "JSON files (*.json)|*.json"
-        )
-        
-        if backup_path:
-            if wx.MessageDialog(self, "This will replace the current configuration. Continue?",
-                              "Restore Backup", wx.YES_NO | wx.ICON_QUESTION).ShowModal() == wx.ID_YES:
-                try:
-                    shutil.copy2(backup_path, self.config_file)
-                    self.load_config()
-                    self.clear_editor()
-                    show_info(self, "Configuration restored from backup.")
-                except Exception as e:
-                    show_error(self, f"Failed to restore backup:\n{e}")
-    
-    def show_about(self, event):
-        """Show about dialog"""
-        show_about_dialog(
-            self,
-            "Image Description Prompt Editor",
-            get_app_version(),
-            "A user-friendly tool for editing AI prompt variations\n"
-            "used by the Image Description Toolkit.\n\n"
-            "Features:\n"
-            "• Visual prompt editing\n"
-            "• Add, edit, delete prompts\n"
-            "• Set default prompt style\n"
-            "• Backup and restore\n"
-            "• Real-time preview"
-        )
+        """Wrapper for save_config_internal to work with ModifiedStateMixin"""
+        return self.save_config_internal()
     
     def show_tips(self, event):
         """Show prompt writing tips"""
@@ -965,38 +735,35 @@ class PromptEditorFrame(wx.Frame, ModifiedStateMixin):
         
         show_info(self, tips, "Prompt Writing Tips")
     
-    def on_close(self, event):
-        """Handle application close"""
-        if self.confirm_unsaved_changes():
+    def on_ok(self, event):
+        """Handle OK button - save and close"""
+        if self.modified:
+            if self.save_config_internal():
+                self.EndModal(wx.ID_OK)
+        else:
+            self.EndModal(wx.ID_OK)
+    
+    def on_cancel(self, event):
+        """Handle Cancel button - discard changes and close"""
+        if self.modified:
+            if not self.confirm_unsaved_changes():
+                return
+        self.EndModal(wx.ID_CANCEL)
+    
+    def on_apply(self, event):
+        """Handle Apply button - save but keep dialog open"""
+        if self.save_config_internal():
+            show_info(self, "Configuration saved successfully")
+    
+    def on_dialog_close(self, event):
+        """Handle dialog close event"""
+        if self.modified:
+            if not self.confirm_unsaved_changes():
+                if event.CanVeto():
+                    event.Veto()
+                return
+        
+        if event.CanVeto():
+            self.EndModal(wx.ID_CANCEL)
+        else:
             self.Destroy()
-        elif event.CanVeto():
-            event.Veto()
-
-
-def main():
-    """Main application entry point"""
-    # Log standardized build banner at startup (if available)
-    if log_build_banner:
-        try:
-            log_build_banner()
-        except Exception:
-            pass
-    
-    app = wx.App()
-    app.SetAppName("Prompt Editor")
-    
-    # Use composed version string if available
-    try:
-        if get_full_version:
-            app.SetAppDisplayName(f"Prompt Editor {get_full_version()}")
-    except Exception:
-        pass
-    
-    frame = PromptEditorFrame()
-    frame.Show()
-    
-    app.MainLoop()
-
-
-if __name__ == "__main__":
-    main()

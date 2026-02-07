@@ -16,9 +16,7 @@ Double-click `macsetup.command`
 This creates `.venv` virtual environments and installs all dependencies for:
 - Root project (core dependencies for IDT CLI)
 - Viewer
-- ImageDescriber  
-- Prompt Editor
-- IDTConfigure
+- ImageDescriber (with integrated prompt editor and configuration manager)
 
 ## What It Does
 
@@ -116,7 +114,7 @@ deactivate
 cd ..
 ```
 
-Repeat for each application: `idt`, `viewer`, `imagedescriber`, `prompt_editor`, `idtconfigure`.
+Repeat for each application: `idt`, `viewer`, `imagedescriber`.
 
 ## Next Steps
 

@@ -177,12 +177,13 @@ If the user reports something "has been working for months," your first assumpti
 ## Architecture Overview
 
 ### Multi-Application Structure
-IDT consists of five standalone applications, each with isolated dependencies:
+IDT consists of three standalone applications, each with isolated dependencies:
 - **`idt.exe`** / **`idt`** - CLI dispatcher (routes to all commands via `idt_cli.py`)
 - **`viewer.exe`** / **`Viewer.app`** - wxPython workflow results browser with live monitoring
-- **`imagedescriber.exe`** / **`ImageDescriber.app`** - wxPython batch processing GUI (883 lines main frame)
-- **`prompteditor.exe`** / **`PromptEditor.app`** - Visual prompt template editor
-- **`idtconfigure.exe`** / **`IDTConfigure.app`** - Configuration management interface
+- **`imagedescriber.exe`** / **`ImageDescriber.app`** - wxPython batch processing GUI with integrated Tools menu
+  - Includes prompt editor (formerly standalone PromptEditor app)
+  - Includes configuration manager (formerly standalone IDTConfigure app)
+  - Access via Tools → Edit Prompts and Tools → Configure Settings
 
 Each GUI application has its own `.venv` and build scripts in its directory. All GUI apps migrated from PyQt6 to **wxPython** for cross-platform compatibility (Windows/macOS).
 
@@ -223,8 +224,8 @@ Multi-provider abstraction in `imagedescriber/ai_providers.py`:
 - **Capabilities**: `models/provider_configs.py` - dynamic UI based on `supports_prompts()`, `supports_custom_prompts()`
 
 ### Build & Release System
-- **Windows Master Build**: `BuildAndRelease/WinBuilds/builditall_wx.bat` - builds all 5 apps sequentially
-- **macOS Master Build**: `BuildAndRelease/MacBuilds/builditall_macos.command` - builds all 5 .app bundles
+- **Windows Master Build**: `BuildAndRelease/WinBuilds/builditall_wx.bat` - builds all 3 apps sequentially
+- **macOS Master Build**: `BuildAndRelease/MacBuilds/builditall_macos.command` - builds all 3 .app bundles
 - **Spec Files**: Each app directory has its own `.spec` file (e.g., `viewer/viewer_wx.spec`)
 - **Per-App Builds**: Each app has platform-specific build scripts
   - Windows: `build_*_wx.bat`

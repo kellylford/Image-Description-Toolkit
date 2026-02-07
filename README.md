@@ -10,7 +10,7 @@ Download the latest installer from the [releases](https://github.com/kellylford/
 
 **`ImageDescriptionToolkit_Setup_v4.1.0.exe`** (Windows) or **`IDT-4.1.0.pkg`** / **`IDT-4.1.0.dmg`** (macOS)
 
-Run the installer - it includes all five applications (IDT CLI, Viewer, ImageDescriber, PromptEditor, IDTConfigure) and documentation.
+Run the installer - it includes all three applications (IDT CLI, Viewer, ImageDescriber with integrated Tools menu) and documentation.
 
 **Latest Release (v4.1.0):** wxPython migration complete with improved accessibility, 31+ bug fixes, and comprehensive testing.
 
@@ -34,7 +34,7 @@ imagedescriber.exe
 - **Workflow Management**: Organized results with metadata tracking
 - **Re-describe Feature**: Test different models/prompts on same images
 - **Analysis Tools**: Compare models, review content, export to CSV/Excel
-- **GUI Applications**: Viewer, ImageDescriber, PromptEditor, Configuration Manager
+- **GUI Applications**: Viewer, ImageDescriber (with integrated prompt editor and configuration manager)
 
 ## Documentation
 

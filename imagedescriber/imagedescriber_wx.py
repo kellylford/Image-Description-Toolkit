@@ -90,6 +90,17 @@ try:
 except ImportError:
     openai = None
 
+# Import integrated tools (PromptEditor and Configure dialogs)
+try:
+    from prompt_editor_dialog import PromptEditorDialog
+except ImportError:
+    PromptEditorDialog = None
+
+try:
+    from configure_dialog import ConfigureDialog
+except ImportError:
+    ConfigureDialog = None
+
 # Import shared metadata extraction module
 try:
     if getattr(sys, 'frozen', False):
@@ -237,24 +248,35 @@ def format_image_metadata(metadata: dict) -> list:
     lines = []
     
     # DateTime information
-    if 'datetime' in metadata and metadata['datetime']:
-        dt_info = metadata['datetime']
-        if 'DateTimeOriginal' in dt_info:
-            lines.append(f"Captured: {dt_info['DateTimeOriginal']}")
-        elif 'DateTime' in dt_info:
-            lines.append(f"Date: {dt_info['DateTime']}")
+    if 'datetime_str' in metadata and metadata['datetime_str']:
+        lines.append(f"Captured: {metadata['datetime_str']}")
+    elif 'datetime' in metadata and metadata['datetime']:
+        # Fallback to ISO format if formatted version not available
+        lines.append(f"Date: {metadata['datetime']}")
     
     # GPS/Location information  
     if 'location' in metadata and metadata['location']:
         loc_info = metadata['location']
+        
+        # Show city/state first if available (like command line version)
+        city = loc_info.get('city') or loc_info.get('town')
+        state = loc_info.get('state')
+        country = loc_info.get('country')
+        
+        if city and state:
+            lines.append(f"Location: {city}, {state}")
+        elif city and country:
+            lines.append(f"Location: {city}, {country}")
+        elif state:
+            lines.append(f"Location: {state}")
+        elif country:
+            lines.append(f"Location: {country}")
+        
+        # Show GPS coordinates after location name
         if 'latitude' in loc_info and 'longitude' in loc_info:
             lat = loc_info['latitude']
             lon = loc_info['longitude']
             lines.append(f"GPS: {lat:.6f}, {lon:.6f}")
-            
-            # Add reverse geocoded location if available
-            if 'location_name' in loc_info:
-                lines.append(f"Location: {loc_info['location_name']}")
     
     # Camera information
     if 'camera' in metadata and metadata['camera']:
@@ -646,6 +668,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         filter_all_item.Check(True)  # Default to all items
         
         menubar.Append(view_menu, "&View")
+        
+        # Tools menu
+        tools_menu = wx.Menu()
+        
+        edit_prompts_item = tools_menu.Append(wx.ID_ANY, "Edit &Prompts...\tCtrl+P")
+        self.Bind(wx.EVT_MENU, self.on_edit_prompts, edit_prompts_item)
+        
+        configure_item = tools_menu.Append(wx.ID_ANY, "&Configure Settings...\tCtrl+Shift+C")
+        self.Bind(wx.EVT_MENU, self.on_configure_settings, configure_item)
+        
+        tools_menu.AppendSeparator()
+        
+        export_config_item = tools_menu.Append(wx.ID_ANY, "E&xport Configuration...")
+        self.Bind(wx.EVT_MENU, self.on_export_configuration, export_config_item)
+        
+        import_config_item = tools_menu.Append(wx.ID_ANY, "&Import Configuration...")
+        self.Bind(wx.EVT_MENU, self.on_import_configuration, import_config_item)
+        
+        menubar.Append(tools_menu, "&Tools")
         
         # Help menu
         help_menu = wx.Menu()
@@ -1467,6 +1508,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.SetStatusText(f"{count} images", 1)
             self.clear_modified()
             
+        except json.JSONDecodeError as e:
+            show_error(self, f"Error loading workspace - Invalid JSON format:\n\nLine {e.lineno}, Column {e.colno}\n{e.msg}\n\nThe workspace file may be corrupted. Try opening it in a text editor to fix the JSON syntax error.")
         except Exception as e:
             show_error(self, f"Error loading workspace:\n{e}")
     
@@ -1506,9 +1549,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Sync cached models to workspace
             self.workspace.cached_ollama_models = self.cached_ollama_models
             
-            # Save to file
+            # Save to file with proper JSON encoding
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.workspace.to_dict(), f, indent=2)
+                json.dump(self.workspace.to_dict(), f, indent=2, ensure_ascii=False, default=str)
             
             self.workspace_file = file_path
             self.workspace.saved = True
@@ -2268,6 +2311,126 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.current_filter = filter_type
         self.refresh_image_list()
         self.SetStatusText(f"Filter: {filter_type}", 1)
+    
+    # ========== Tools Menu Handlers ==========
+    
+    def on_edit_prompts(self, event):
+        """Launch the Prompt Editor dialog"""
+        if not PromptEditorDialog:
+            show_error(self, "Prompt Editor module not available.\n\nThis may be a build configuration issue.")
+            return
+        
+        try:
+            dialog = PromptEditorDialog(self)
+            dialog.ShowModal()
+            dialog.Destroy()
+            
+            # Refresh cached prompts after editing
+            self.cached_ollama_models = None  # Force reload on next use
+            
+        except Exception as e:
+            show_error(self, f"Error launching Prompt Editor:\n{e}")
+    
+    def on_configure_settings(self, event):
+        """Launch the Configure Settings dialog"""
+        if not ConfigureDialog:
+            show_error(self, "Configure Settings module not available.\n\nThis may be a build configuration issue.")
+            return
+        
+        try:
+            dialog = ConfigureDialog(self)
+            dialog.ShowModal()
+            dialog.Destroy()
+            
+            # Refresh cached settings after editing
+            self.cached_ollama_models = None  # Force reload on next use
+            
+        except Exception as e:
+            show_error(self, f"Error launching Configure Settings:\n{e}")
+    
+    def on_export_configuration(self, event):
+        """Export all configuration files as backup"""
+        try:
+            from datetime import datetime
+            import shutil
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_name = f"idt_config_backup_{timestamp}.zip"
+            
+            file_path = save_file_dialog(
+                self,
+                "Export Configuration",
+                wildcard="ZIP files (*.zip)|*.zip",
+                default_file=default_name
+            )
+            
+            if not file_path:
+                return
+            
+            # Find scripts directory
+            scripts_dir = find_scripts_directory()
+            if not scripts_dir or not scripts_dir.exists():
+                show_error(self, "Could not find scripts directory.")
+                return
+            
+            # Create ZIP with all config files
+            import zipfile
+            with zipfile.ZipFile(file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for config_file in ['image_describer_config.json', 'video_frame_extractor_config.json', 'workflow_config.json']:
+                    config_path = scripts_dir / config_file
+                    if config_path.exists():
+                        zipf.write(config_path, config_file)
+                
+                # Also include geocode cache if it exists
+                geocode_cache = scripts_dir / 'geocode_cache.json'
+                if geocode_cache.exists():
+                    zipf.write(geocode_cache, 'geocode_cache.json')
+            
+            show_info(self, f"Configuration exported successfully to:\n{file_path}")
+            
+        except Exception as e:
+            show_error(self, f"Error exporting configuration:\n{e}")
+    
+    def on_import_configuration(self, event):
+        """Import configuration files from backup"""
+        try:
+            file_path = open_file_dialog(
+                self,
+                "Import Configuration",
+                wildcard="ZIP files (*.zip)|*.zip"
+            )
+            
+            if not file_path:
+                return
+            
+            # Confirm before overwriting
+            if not ask_yes_no(self, "This will replace your current configuration files.\n\nContinue?", "Import Configuration"):
+                return
+            
+            # Find scripts directory
+            scripts_dir = find_scripts_directory()
+            if not scripts_dir or not scripts_dir.exists():
+                show_error(self, "Could not find scripts directory.")
+                return
+            
+            # Extract ZIP
+            import zipfile
+            imported_count = 0
+            with zipfile.ZipFile(file_path, 'r') as zipf:
+                for filename in zipf.namelist():
+                    if filename.endswith('.json'):
+                        zipf.extract(filename, scripts_dir)
+                        imported_count += 1
+            
+            if imported_count > 0:
+                show_info(self, f"Successfully imported {imported_count} configuration file(s).\n\nRestart ImageDescriber to use the new settings.")
+            else:
+                show_warning(self, "No configuration files found in the selected archive.")
+            
+        except Exception as e:
+            show_error(self, f"Error importing configuration:\n{e}")
+    
+    # ========== Help Menu Handlers ==========
     
     def on_about(self):
         """Show about dialog"""

@@ -44,11 +44,12 @@ except ImportError:
     except ImportError:
         get_available_providers = None
 
-# Import metadata extractor
+# Import metadata extractor and geocoder
 try:
-    from metadata_extractor import MetadataExtractor
+    from metadata_extractor import MetadataExtractor, NominatimGeocoder
 except ImportError:
     MetadataExtractor = None
+    NominatimGeocoder = None
 
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
@@ -399,11 +400,72 @@ class ProcessingWorker(threading.Thread):
             extractor = MetadataExtractor()
             metadata = extractor.extract_metadata(Path(image_path))
             
-        except Exception:
-            # Silent failure - metadata is optional
-            pass
+            # Add geocoding if GPS coordinates are present
+            if NominatimGeocoder and 'location' in metadata:
+                loc = metadata['location']
+                # Try geocoding if we have GPS coords (geocoder handles caching internally)
+                if 'latitude' in loc and 'longitude' in loc:
+                    try:
+                        geocoder = self._get_geocoder()
+                        if geocoder:
+                            # Let the geocoder enrich the metadata (it will merge results)
+                            metadata = geocoder.enrich_metadata(metadata)
+                    except Exception as e:
+                        # Geocoding failed - continue without it
+                        print(f"Geocoding failed for {image_path}: {e}")
+            
+            # Ensure all metadata is JSON-serializable
+            metadata = self._sanitize_for_json(metadata)
+            
+        except Exception as e:
+            # Metadata extraction failed - return empty
+            print(f"Metadata extraction failed: {e}")
         
         return metadata
+    
+    def _sanitize_for_json(self, obj):
+        """Recursively sanitize object to be JSON-serializable"""
+        from datetime import datetime
+        from pathlib import Path
+        
+        if isinstance(obj, dict):
+            return {k: self._sanitize_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [self._sanitize_for_json(item) for item in obj]
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, Path):
+            return str(obj)
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
+        else:
+            # Convert unknown types to string
+            return str(obj)
+    
+    def _get_geocoder(self):
+        """Get or create a shared geocoder instance with caching"""
+        # Use class-level cache for geocoder to share cache across images
+        if not hasattr(ImageProcessWorker, '_geocoder_instance'):
+            if NominatimGeocoder:
+                try:
+                    # Use a cache file in the user's temp directory or current directory
+                    cache_path = Path('geocode_cache.json')
+                    user_agent = 'IDT/4.0 (+https://github.com/kellylford/Image-Description-Toolkit)'
+                    print(f"Initializing geocoder with cache: {cache_path}")
+                    ImageProcessWorker._geocoder_instance = NominatimGeocoder(
+                        user_agent=user_agent,
+                        delay_seconds=1.0,
+                        cache_path=cache_path
+                    )
+                    print("Geocoder initialized successfully")
+                except Exception as e:
+                    print(f"Failed to initialize geocoder: {e}")
+                    ImageProcessWorker._geocoder_instance = None
+            else:
+                print("NominatimGeocoder not available")
+                ImageProcessWorker._geocoder_instance = None
+        
+        return ImageProcessWorker._geocoder_instance
 
 
 class WorkflowProcessWorker(threading.Thread):

@@ -2,15 +2,17 @@
 REM ============================================================================
 REM Build All wxPython Applications for Windows
 REM ============================================================================
-REM This script builds all five wxPython-based applications:
+REM This script builds all three wxPython-based applications:
 REM   1. IDT (CLI - no GUI framework)
 REM   2. Viewer (wxPython)
-REM   3. Prompt Editor (wxPython)
-REM   4. ImageDescriber (wxPython)
-REM   5. IDTConfigure (wxPython)
+REM   3. ImageDescriber (wxPython - includes integrated PromptEditor and IDTConfigure)
 REM
 REM NOTE: Uses .winenv virtual environments (created by winsetup.bat)
 REM       This allows .venv (macOS) and .winenv (Windows) to coexist
+REM
+REM DEPRECATED (now part of ImageDescriber):
+REM   - Prompt Editor (wxPython) - Tools → Edit Prompts
+REM   - IDTConfigure (wxPython) - Tools → Configure Settings
 REM ============================================================================
 
 echo.
@@ -27,7 +29,7 @@ cd /d "%~dp0..\.."
 set BUILD_ERRORS=0
 
 REM ============================================================================
-echo [1/5] Building IDT (CLI)...
+echo [1/3] Building IDT (CLI)...
 echo ========================================================================
 echo.
 
@@ -43,7 +45,7 @@ cd ..
 
 REM ============================================================================
 echo.
-echo [2/5] Building Viewer (wxPython)...
+echo [2/3] Building Viewer (wxPython)...
 echo ========================================================================
 echo.
 
@@ -58,24 +60,26 @@ if errorlevel 1 (
 cd ..
 
 REM ============================================================================
-echo.
-echo [3/5] Building Prompt Editor (wxPython)...
-echo ========================================================================
-echo.
-
-cd prompt_editor
-call build_prompt_editor.bat
-if errorlevel 1 (
-    echo ERROR: Prompt Editor build failed!
-    set /a BUILD_ERRORS+=1
-) else (
-    echo SUCCESS: Prompt Editor built successfully
-)
-cd ..
+REM [DEPRECATED 3/5] Prompt Editor (wxPython) - now integrated into ImageDescriber
+REM Access via: Tools → Edit Prompts in ImageDescriber
+REM ============================================================================
+REM echo.
+REM echo [3/5] Building Prompt Editor (wxPython)...
+REM echo ========================================================================
+REM echo.
+REM cd prompt_editor
+REM call build_prompt_editor.bat
+REM if errorlevel 1 (
+REM     echo ERROR: Prompt Editor build failed!
+REM     set /a BUILD_ERRORS+=1
+REM ) else (
+REM     echo SUCCESS: Prompt Editor built successfully
+REM )
+REM cd ..
 
 REM ============================================================================
 echo.
-echo [4/5] Building ImageDescriber (wxPython)...
+echo [3/3] Building ImageDescriber (wxPython - includes PromptEditor + IDTConfigure)...
 echo ========================================================================
 echo.
 
@@ -90,20 +94,22 @@ if errorlevel 1 (
 cd ..
 
 REM ============================================================================
-echo.
-echo [5/5] Building IDTConfigure (wxPython)...
-echo ========================================================================
-echo.
-
-cd idtconfigure
-call build_idtconfigure.bat
-if errorlevel 1 (
-    echo ERROR: IDTConfigure build failed!
-    set /a BUILD_ERRORS+=1
-) else (
-    echo SUCCESS: IDTConfigure built successfully
-)
-cd ..
+REM [DEPRECATED 5/5] IDTConfigure (wxPython) - now integrated into ImageDescriber
+REM Access via: Tools → Configure Settings in ImageDescriber
+REM ============================================================================
+REM echo.
+REM echo [5/5] Building IDTConfigure (wxPython)...
+REM echo ========================================================================
+REM echo.
+REM cd idtconfigure
+REM call build_idtconfigure.bat
+REM if errorlevel 1 (
+REM     echo ERROR: IDTConfigure build failed!
+REM     set /a BUILD_ERRORS+=1
+REM ) else (
+REM     echo SUCCESS: IDTConfigure built successfully
+REM )
+REM cd ..
 
 REM ============================================================================
 echo.
@@ -151,29 +157,29 @@ if "%BUILD_ERRORS%"=="0" (
         echo   ✗ Viewer.exe NOT FOUND
     )
     
-    REM Copy Prompt Editor
-    if exist "prompt_editor\dist\PromptEditor.exe" (
-        copy /Y "prompt_editor\dist\PromptEditor.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-        echo   ✓ PromptEditor.exe
-    ) else (
-        echo   ✗ PromptEditor.exe NOT FOUND
-    )
+    REM [DEPRECATED] Prompt Editor - now part of ImageDescriber Tools menu
+    REM if exist "prompt_editor\dist\PromptEditor.exe" (
+    REM     copy /Y "prompt_editor\dist\PromptEditor.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+    REM     echo   ✓ PromptEditor.exe
+    REM ) else (
+    REM     echo   ✗ PromptEditor.exe NOT FOUND
+    REM )
     
-    REM Copy ImageDescriber
+    REM Copy ImageDescriber (includes PromptEditor and IDTConfigure)
     if exist "imagedescriber\dist\ImageDescriber.exe" (
         copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-        echo   ✓ ImageDescriber.exe
+        echo   ✓ ImageDescriber.exe (with integrated tools)
     ) else (
         echo   ✗ ImageDescriber.exe NOT FOUND
     )
     
-    REM Copy IDTConfigure
-    if exist "idtconfigure\dist\IDTConfigure.exe" (
-        copy /Y "idtconfigure\dist\IDTConfigure.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-        echo   ✓ IDTConfigure.exe
-    ) else (
-        echo   ✗ IDTConfigure.exe NOT FOUND
-    )
+    REM [DEPRECATED] IDTConfigure - now part of ImageDescriber Tools menu
+    REM if exist "idtconfigure\dist\IDTConfigure.exe" (
+    REM     copy /Y "idtconfigure\dist\IDTConfigure.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+    REM     echo   ✓ IDTConfigure.exe
+    REM ) else (
+    REM     echo   ✗ IDTConfigure.exe NOT FOUND
+    REM )
     
     REM Copy documentation
     echo.

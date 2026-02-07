@@ -23,15 +23,13 @@ This branch represents the comprehensive v2.0 release candidate with:
 
 #### Core Applications
 - **Unified CLI Dispatcher** (`idt_cli.py`) - Single entry point for all toolkit commands
-- **ImageDescriber GUI** - Interactive application for batch image processing with accessibility features
-- **PromptEditor GUI** - Visual prompt template editor with live Ollama model discovery
+- **ImageDescriber GUI** - Interactive application for batch image processing with integrated prompt editor and configuration manager
 - **Enhanced Viewer** - CLI-enabled viewer with improved functionality
 
 #### CLI Commands
 - `idt workflow` - Automated image description workflow
 - `idt viewer` - Launch the results viewer
-- `idt prompteditor` - Launch the prompt editor
-- `idt imagedescriber` - Launch the ImageDescriber GUI
+- `idt imagedescriber` - Launch the ImageDescriber GUI (with integrated Tools menu)
 - `idt guideme` - Interactive workflow setup wizard
 - `idt analyze` - Model performance analysis tools
 

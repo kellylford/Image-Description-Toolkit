@@ -33,6 +33,8 @@ a = Analysis(
         'data_models',
         'dialogs_wx',
         'workers_wx',
+        'prompt_editor_dialog',  # Integrated PromptEditor
+        'configure_dialog',  # Integrated IDTConfigure
         'scripts.metadata_extractor',
         'scripts.versioning',
         'scripts.config_loader',

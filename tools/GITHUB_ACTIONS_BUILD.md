@@ -8,11 +8,10 @@ This project uses GitHub Actions to automatically build executables for multiple
 ### 1. Windows AMD64 Build
 **File:** `.github/workflows/build-windows-amd64.yml`
 
-Builds all four Windows applications:
+Builds all three Windows applications:
 1. **IDT** (Main CLI toolkit) - `idt.exe`
 2. **Viewer** - `viewer.exe`
-3. **Prompt Editor** - `prompteditor.exe`
-4. **ImageDescriber** - `imagedescriber.exe`
+3. **ImageDescriber** (with integrated tools) - `imagedescriber.exe`
 
 **Platform:** Windows Server 2022 (AMD64)  
 **Build Time:** 15-30 minutes
