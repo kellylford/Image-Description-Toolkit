@@ -1777,10 +1777,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_chat(self, event):
         """Chat with AI Model (C key) - Full accessible implementation"""
         try:
-            selected_item = self.get_selected_image_item()
-            if not selected_item:
+            # Use current_image_item which is set by on_image_selected()
+            if not self.current_image_item:
                 show_warning(self, "Please select an image first.")
                 return
+            
+            selected_item = self.current_image_item
             
             # Import chat components (try both import paths for dev and frozen)
             try:
