@@ -596,7 +596,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         process_menu.AppendSeparator()
         
-        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with Image\tC")
+        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with AI Model\tC")
         self.Bind(wx.EVT_MENU, self.on_chat, chat_item)
         
         process_menu.AppendSeparator()
@@ -1775,40 +1775,48 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dlg.Destroy()
     
     def on_chat(self, event):
-        """Chat with image (C key) - Full accessible implementation"""
-        selected_item = self.get_selected_image_item()
-        if not selected_item:
-            show_warning(self, "Please select an image first.")
-            return
-        
-        # Import chat components
+        """Chat with AI Model (C key) - Full accessible implementation"""
         try:
-            from imagedescriber.chat_window_wx import ChatDialog, ChatWindow
-        except ImportError:
-            show_error(self, "Chat feature not available. Please reinstall the application.")
-            return
-        
-        # Show provider selection dialog
-        chat_dialog = ChatDialog(self, self.config)
-        if chat_dialog.ShowModal() == wx.ID_OK:
-            selections = chat_dialog.get_selections()
-            chat_dialog.Destroy()
+            selected_item = self.get_selected_image_item()
+            if not selected_item:
+                show_warning(self, "Please select an image first.")
+                return
             
-            # Open chat window with selected settings
-            chat_window = ChatWindow(
-                parent=self,
-                workspace=self.workspace,
-                image_item=selected_item,
-                provider=selections['provider'],
-                model=selections['model']
-            )
-            chat_window.ShowModal()
-            chat_window.Destroy()
+            # Import chat components (try both import paths for dev and frozen)
+            try:
+                from chat_window_wx import ChatDialog, ChatWindow
+            except ImportError:
+                try:
+                    from imagedescriber.chat_window_wx import ChatDialog, ChatWindow
+                except ImportError as e:
+                    show_error(self, f"Chat feature not available. Import error: {str(e)}\n\nPlease reinstall the application.")
+                    return
             
-            # Refresh UI to show any new chat sessions
-            # (Future enhancement: show sessions in image list tree)
-        else:
-            chat_dialog.Destroy()
+            # Show provider selection dialog
+            chat_dialog = ChatDialog(self, self.config)
+            if chat_dialog.ShowModal() == wx.ID_OK:
+                selections = chat_dialog.get_selections()
+                chat_dialog.Destroy()
+                
+                # Open chat window with selected settings
+                chat_window = ChatWindow(
+                    parent=self,
+                    workspace=self.workspace,
+                    image_item=selected_item,
+                    provider=selections['provider'],
+                    model=selections['model']
+                )
+                chat_window.ShowModal()
+                chat_window.Destroy()
+                
+                # Refresh UI to show any new chat sessions
+                # (Future enhancement: show sessions in image list tree)
+            else:
+                chat_dialog.Destroy()
+        except Exception as e:
+            import traceback
+            error_msg = f"Error opening chat:\n{str(e)}\n\n{traceback.format_exc()}"
+            show_error(self, error_msg)
     
     def on_followup_question(self, event):
         """Ask followup question (F key)"""
