@@ -1692,7 +1692,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.on_add_manual_description(event)
                 return
             elif keycode == ord('C'):
-                # Chat with image
+                # Chat with AI
                 self.on_chat(event)
                 return
             elif keycode == ord('F'):
@@ -1775,15 +1775,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dlg.Destroy()
     
     def on_chat(self, event):
-        """Chat with AI Model (C key) - Full accessible implementation"""
+        """Chat with AI (C key) - General purpose AI chat, no image required"""
         try:
-            # Use current_image_item which is set by on_image_selected()
-            if not self.current_image_item:
-                show_warning(self, "Please select an image first.")
-                return
-            
-            selected_item = self.current_image_item
-            
             # Import chat components (try both import paths for dev and frozen)
             try:
                 from chat_window_wx import ChatDialog, ChatWindow
@@ -1794,25 +1787,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     show_error(self, f"Chat feature not available. Import error: {str(e)}\n\nPlease reinstall the application.")
                     return
             
-            # Show provider selection dialog
-            chat_dialog = ChatDialog(self, self.config)
+            # Show provider selection dialog (pass cached Ollama models for performance)
+            chat_dialog = ChatDialog(self, self.config, cached_ollama_models=self.cached_ollama_models)
             if chat_dialog.ShowModal() == wx.ID_OK:
                 selections = chat_dialog.get_selections()
                 chat_dialog.Destroy()
                 
-                # Open chat window with selected settings
+                # Open chat window with selected settings (no image required)
                 chat_window = ChatWindow(
                     parent=self,
                     workspace=self.workspace,
-                    image_item=selected_item,
+                    image_item=None,  # Chat doesn't require an image
                     provider=selections['provider'],
                     model=selections['model']
                 )
                 chat_window.ShowModal()
                 chat_window.Destroy()
                 
-                # Refresh UI to show any new chat sessions
-                # (Future enhancement: show sessions in image list tree)
+                # TODO: Refresh image list to show new chat session
+                # self.load_workspace()  # This will reload all items including new chat
             else:
                 chat_dialog.Destroy()
         except Exception as e:

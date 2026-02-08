@@ -145,11 +145,11 @@ class ImageWorkspace:
         return dirs
     
     # Chat session management methods
-    def create_chat_session(self, image_path: str, provider: str, model: str) -> str:
+    def create_chat_session(self, image_path: Optional[str], provider: str, model: str) -> str:
         """Create new chat session and return session ID
         
         Args:
-            image_path: Path to the image being discussed
+            image_path: Optional path to the image being discussed (None for general chat)
             provider: AI provider name (ollama, openai, claude)
             model: Model name
             
@@ -159,10 +159,18 @@ class ImageWorkspace:
         import time
         session_id = f"chat_{int(time.time() * 1000)}"
         
+        # Create session name based on whether we have an image
+        if image_path:
+            session_name = f"Chat: {Path(image_path).name}"
+            image_path_str = str(image_path)
+        else:
+            session_name = f"Chat: {provider.title()} ({model})"
+            image_path_str = None
+        
         self.chat_sessions[session_id] = {
             'id': session_id,
-            'name': f"Chat: {Path(image_path).name}",
-            'image_path': str(image_path),
+            'name': session_name,
+            'image_path': image_path_str,  # None for general chat
             'provider': provider,
             'model': model,
             'created': datetime.now().isoformat(),
@@ -184,18 +192,19 @@ class ImageWorkspace:
         """
         return self.chat_sessions.get(session_id)
     
-    def get_chat_sessions_for_image(self, image_path: str) -> List[dict]:
-        """Get all chat sessions for a specific image
+    def get_chat_sessions_for_image(self, image_path: Optional[str]) -> List[dict]:
+        """Get all chat sessions for a specific image, or general chats if None
         
         Args:
-            image_path: Path to image file
+            image_path: Path to image file, or None for general chat sessions
             
         Returns:
             List of session dictionaries
         """
+        image_path_str = str(image_path) if image_path else None
         return [
             session for session in self.chat_sessions.values()
-            if session['image_path'] == str(image_path)
+            if session.get('image_path') == image_path_str
         ]
     
     def delete_chat_session(self, session_id: str):

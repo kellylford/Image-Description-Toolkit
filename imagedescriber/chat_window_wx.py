@@ -51,17 +51,19 @@ class ChatDialog(wx.Dialog):
     Follows same design pattern as ProcessingOptionsDialog.
     """
     
-    def __init__(self, parent, config: dict):
+    def __init__(self, parent, config: dict, cached_ollama_models=None):
         """Initialize chat settings dialog
         
         Args:
             parent: Parent window
             config: Application configuration dictionary
+            cached_ollama_models: Optional cached Ollama models list for performance
         """
         super().__init__(parent, title="Chat Settings", 
                         style=wx.DEFAULT_DIALOG_STYLE)
         
         self.config = config
+        self.cached_ollama_models = cached_ollama_models
         self._create_ui()
         self.Centre()
         
@@ -109,31 +111,73 @@ class ChatDialog(wx.Dialog):
         self.on_provider_changed(None)
         
     def on_provider_changed(self, event):
-        """Update model list when provider changes"""
+        """Update model list when provider changes - uses dynamic detection"""
         provider = self.provider_choice.GetStringSelection().lower()
         
         # Clear current models
         self.model_combo.Clear()
         
-        # Populate models based on provider
-        if provider == 'ollama':
-            # Default Ollama vision models
-            models = ['llava:7b', 'llava:13b', 'llava:34b', 'bakllava', 'llava-phi3']
-            self.model_combo.Append(models)
-            self.model_combo.SetValue('llava:7b')
-        elif provider == 'openai':
-            models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
-            self.model_combo.Append(models)
-            self.model_combo.SetValue('gpt-4o')
-        elif provider == 'claude':
-            models = ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229']
-            self.model_combo.Append(models)
-            self.model_combo.SetValue('claude-3-5-sonnet-20241022')
-        elif provider == 'huggingface':
-            models = ['Salesforce/blip-image-captioning-large', 'microsoft/git-large-coco']
-            self.model_combo.Append(models)
-            if models:
-                self.model_combo.SetValue(models[0])
+        try:
+            if provider == 'ollama':
+                # Use cached models if available, otherwise query Ollama dynamically
+                models = None
+                if self.cached_ollama_models is not None:
+                    # Use cached models for instant loading
+                    models = self.cached_ollama_models
+                else:
+                    # Auto-populate cache on first use (slower, but only happens once)
+                    try:
+                        from ai_providers import get_available_providers
+                    except ImportError:
+                        from imagedescriber.ai_providers import get_available_providers
+                    
+                    providers = get_available_providers()
+                    if 'ollama' in providers:
+                        ollama_provider = providers['ollama']
+                        models = ollama_provider.get_available_models()
+                        # Cache for next time
+                        self.cached_ollama_models = models
+                
+                if models:
+                    for model in models:
+                        self.model_combo.Append(model)
+                    # Set first model as default
+                    self.model_combo.SetValue(models[0])
+                else:
+                    # Fallback if no models found
+                    self.model_combo.SetValue('llava:latest')
+                    
+            elif provider == 'openai':
+                # Common OpenAI models
+                models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4']
+                for model in models:
+                    self.model_combo.Append(model)
+                self.model_combo.SetValue('gpt-4o')
+                
+            elif provider == 'claude':
+                # Claude models
+                models = ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229']
+                for model in models:
+                    self.model_combo.Append(model)
+                self.model_combo.SetValue('claude-3-5-sonnet-20241022')
+                
+            elif provider == 'huggingface':
+                # HuggingFace models
+                models = ['Salesforce/blip-image-captioning-large', 'microsoft/git-large-coco']
+                for model in models:
+                    self.model_combo.Append(model)
+                if models:
+                    self.model_combo.SetValue(models[0])
+                    
+        except Exception as e:
+            print(f"Error populating models for {provider}: {e}")
+            # Set a reasonable fallback
+            if provider == 'ollama':
+                self.model_combo.SetValue('llava:latest')
+            elif provider == 'openai':
+                self.model_combo.SetValue('gpt-4o')
+            elif provider == 'claude':
+                self.model_combo.SetValue('claude-3-5-sonnet-20241022')
         
     def get_selections(self) -> Dict[str, str]:
         """Get selected provider and model
@@ -159,19 +203,25 @@ class ChatWindow(wx.Dialog):
     - Real-time streaming responses
     """
     
-    def __init__(self, parent, workspace: ImageWorkspace, image_item: ImageItem, 
+    def __init__(self, parent, workspace: ImageWorkspace, image_item: Optional[ImageItem], 
                  provider: str, model: str, session_id: Optional[str] = None):
         """Initialize chat window
         
         Args:
             parent: Parent window
             workspace: ImageWorkspace instance for persistence
-            image_item: ImageItem to chat about
+            image_item: Optional ImageItem (None for general chat)
             provider: AI provider name (ollama, openai, claude)
             model: Model name
             session_id: Optional existing session ID to resume
         """
-        super().__init__(parent, title=f"Chat: {image_item.filename}",
+        # Set window title based on whether we have an image
+        if image_item:
+            title = f"Chat: {Path(image_item.file_path).name}"
+        else:
+            title = f"Chat with AI: {provider.title()} ({model})"
+        
+        super().__init__(parent, title=title,
                         size=(800, 700), 
                         style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         
@@ -202,10 +252,18 @@ class ChatWindow(wx.Dialog):
         
     def _create_new_session(self) -> dict:
         """Create new chat session data structure"""
+        # Name and path depend on whether we have an image
+        if self.image_item:
+            name = f"Chat: {Path(self.image_item.file_path).name}"
+            image_path = str(self.image_item.file_path)
+        else:
+            name = f"Chat: {self.provider.title()} ({self.model})"
+            image_path = None
+        
         return {
             'id': self.session_id,
-            'name': f"Chat: {self.image_item.filename}",
-            'image_path': str(self.image_item.file_path),
+            'name': name,
+            'image_path': image_path,  # None for general chat
             'provider': self.provider,
             'model': self.model,
             'created': datetime.now().isoformat(),
@@ -404,9 +462,12 @@ class ChatWindow(wx.Dialog):
         
     def _start_ai_processing(self):
         """Start ChatProcessingWorker with full message history"""
+        # Get image path if available (None for text-only chat)
+        image_path = str(self.image_item.file_path) if self.image_item else None
+        
         worker = ChatProcessingWorker(
             parent_window=self,
-            image_path=str(self.image_item.file_path),
+            image_path=image_path,  # None for text-only mode
             provider=self.provider,
             model=self.model,
             messages=self.session['messages']

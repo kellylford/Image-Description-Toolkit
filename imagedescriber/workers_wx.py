@@ -649,13 +649,13 @@ class ChatProcessingWorker(threading.Thread):
         ChatErrorEvent: Error during processing
     """
     
-    def __init__(self, parent_window, image_path: str, provider: str, model: str, 
+    def __init__(self, parent_window, image_path: Optional[str], provider: str, model: str, 
                  messages: list, api_key: str = None):
         """Initialize chat worker
         
         Args:
             parent_window: wxWindow to receive events
-            image_path: Path to image file for context
+            image_path: Optional path to image file for context (None for text-only chat)
             provider: AI provider name (ollama, openai, claude)
             model: Model name
             messages: Full conversation history as list of message dicts
@@ -694,19 +694,20 @@ class ChatProcessingWorker(threading.Thread):
             import ollama
             
             # Format messages for Ollama
-            # First message includes image, subsequent messages are text only
+            # If image_path provided: First message includes image, subsequent messages are text only
+            # If no image_path: All messages are text only
             ollama_messages = []
             
             for i, msg in enumerate(self.messages):
-                if i == 0 and msg['role'] == 'user':
-                    # First user message - include image
+                if i == 0 and msg['role'] == 'user' and self.image_path:
+                    # First user message with image - include image
                     ollama_messages.append({
                         'role': 'user',
                         'content': msg['content'],
                         'images': [self.image_path]
                     })
                 else:
-                    # Subsequent messages - text only
+                    # Subsequent messages or text-only mode - text only
                     ollama_messages.append({
                         'role': msg['role'],
                         'content': msg['content']
@@ -757,8 +758,8 @@ class ChatProcessingWorker(threading.Thread):
             openai_messages = []
             
             for i, msg in enumerate(self.messages):
-                if i == 0 and msg['role'] == 'user':
-                    # First user message - include image as base64
+                if i == 0 and msg['role'] == 'user' and self.image_path:
+                    # First user message with image - include image as base64
                     with open(self.image_path, 'rb') as f:
                         image_data = base64.b64encode(f.read()).decode('utf-8')
                     
@@ -775,7 +776,7 @@ class ChatProcessingWorker(threading.Thread):
                         ]
                     })
                 else:
-                    # Subsequent messages - text only
+                    # Subsequent messages or text-only mode - text only
                     openai_messages.append({
                         'role': msg['role'],
                         'content': msg['content']
@@ -829,8 +830,8 @@ class ChatProcessingWorker(threading.Thread):
             claude_messages = []
             
             for i, msg in enumerate(self.messages):
-                if i == 0 and msg['role'] == 'user':
-                    # First user message - include image as base64
+                if i == 0 and msg['role'] == 'user' and self.image_path:
+                    # First user message with image - include image as base64
                     with open(self.image_path, 'rb') as f:
                         image_data = base64.b64encode(f.read()).decode('utf-8')
                     
@@ -860,7 +861,7 @@ class ChatProcessingWorker(threading.Thread):
                         ]
                     })
                 else:
-                    # Subsequent messages - text only
+                    # Subsequent messages or text-only mode - text only
                     claude_messages.append({
                         'role': msg['role'],
                         'content': msg['content']
