@@ -67,21 +67,20 @@ class ChatDialog(wx.Dialog):
         
     def _create_ui(self):
         """Create dialog UI"""
-        panel = wx.Panel(self)
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Instructions
-        intro_text = wx.StaticText(panel, 
+        intro_text = wx.StaticText(self, 
             label="Select AI provider and model for your chat session:")
         main_sizer.Add(intro_text, 0, wx.ALL, 10)
         
         # Provider selection
         provider_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        provider_label = wx.StaticText(panel, label="Provider:")
+        provider_label = wx.StaticText(self, label="Provider:")
         provider_label.SetMinSize((100, -1))
         provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
-        self.provider_choice = wx.Choice(panel, choices=['Ollama', 'OpenAI', 'Claude', 'HuggingFace'])
+        self.provider_choice = wx.Choice(self, choices=['Ollama', 'OpenAI', 'Claude', 'HuggingFace'])
         self.provider_choice.SetSelection(0)  # Default to Ollama
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         provider_sizer.Add(self.provider_choice, 1, wx.ALL | wx.EXPAND, 5)
@@ -90,20 +89,20 @@ class ChatDialog(wx.Dialog):
         
         # Model selection
         model_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        model_label = wx.StaticText(panel, label="Model:")
+        model_label = wx.StaticText(self, label="Model:")
         model_label.SetMinSize((100, -1))
         model_sizer.Add(model_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
-        self.model_combo = wx.ComboBox(panel, style=wx.CB_DROPDOWN)
+        self.model_combo = wx.ComboBox(self, style=wx.CB_DROPDOWN)
         model_sizer.Add(self.model_combo, 1, wx.ALL | wx.EXPAND, 5)
         
         main_sizer.Add(model_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         
         # Buttons
-        btn_sizer = self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL)
+        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
         main_sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
-        panel.SetSizer(main_sizer)
+        self.SetSizer(main_sizer)
         main_sizer.Fit(self)
         
         # Load default provider models
