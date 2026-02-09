@@ -475,6 +475,13 @@ class ViewerPanel(wx.Panel):
     def on_list_key(self, event):
         """Keyboard navigation support"""
         keycode = event.GetKeyCode()
+        
+        # Handle Tab traversal explicitly
+        if keycode == wx.WXK_TAB and not event.ShiftDown():
+            if self.desc_text:
+                self.desc_text.SetFocus()
+            return
+            
         # Pass standard navigation keys to native handler
         event.Skip()
 

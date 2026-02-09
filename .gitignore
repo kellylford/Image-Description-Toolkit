@@ -146,3 +146,4 @@ test_directml*.py
 dist_macos/
 BuildAndRelease/WinBuilds/dist_all/
 /BuildAndRelease
+imagedescriber/build_log_debug.txt

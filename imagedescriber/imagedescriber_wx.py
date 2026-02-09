@@ -1041,6 +1041,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Draw the bitmap at top-left corner
             dc.DrawBitmap(self.image_preview_bitmap, 0, 0)
     
+    def resolve_image_path(self, file_path_str):
+        """Resolve image path handling relative paths and moved workspaces"""
+        path = Path(file_path_str)
+        if path.exists():
+            return path
+            
+        if self.workspace_file:
+            ws_dir = Path(self.workspace_file).parent
+            # Try relative to workspace
+            try_rel = ws_dir / file_path_str
+            if try_rel.exists(): return try_rel
+            
+            # Try filename in workspace dir
+            try_flat = ws_dir / path.name
+            if try_flat.exists(): return try_flat
+            
+            # Try common subfolders
+            for sub in ['images', 'testimages', 'img']:
+                try_sub = ws_dir / sub / path.name
+                if try_sub.exists(): return try_sub
+                
+        return path
+
     def load_preview_image(self, file_path):
         """
         Load and display a preview thumbnail of the image.
@@ -1059,8 +1082,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.image_preview_panel.Refresh()
                 return
             
+            # Resolve path (handle moved workspaces)
+            resolved_path = self.resolve_image_path(file_path)
+
             # Load and resize image to fit preview panel
-            img = Image.open(file_path)
+            img = Image.open(resolved_path)
             img.thumbnail((250, 250), Image.Resampling.LANCZOS)
             
             # Get dimensions
