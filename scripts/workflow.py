@@ -2261,9 +2261,15 @@ class WorkflowOrchestrator:
                         desc_file = self.step_results["describe"]["description_file"]
                     step_result = step_method(current_input_dir, step_output_dir, desc_file)
                 elif step == "describe":
-                    # Description step needs ORIGINAL input_dir to detect workflow mode correctly
-                    # and find regular images that haven't been processed yet
-                    step_result = step_method(input_dir, step_output_dir)
+                    # Description step logic:
+                    # - For URL workflows (download step completed): use current_input_dir (downloaded images location)
+                    # - For regular workflows: use ORIGINAL input_dir to avoid scanning converted_images subdirectory
+                    if "download" in self.step_results and self.step_results["download"].get("success"):
+                        # URL workflow - images were downloaded, use current_input_dir
+                        step_result = step_method(current_input_dir, step_output_dir)
+                    else:
+                        # Regular workflow - use original input_dir
+                        step_result = step_method(input_dir, step_output_dir)
                 elif step == "convert":
                     # Convert step should always work on original input directory
                     step_result = step_method(input_dir, step_output_dir)

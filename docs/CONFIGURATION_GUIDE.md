@@ -720,6 +720,59 @@ idt workflow photos/ --config-image-describer custom.json --model moondream
 idt workflow photos/ --config-image-describer custom.json
 ```
 
+### IDT_CONFIG_DIR Environment Variable Conflicts
+
+**Problem:** Error about "Invalid prompt style" or configs being loaded from unexpected locations (e.g., `C:\idt\scripts\`).
+
+**Symptoms:**
+- Log shows: `Using image_describer_config from C:\idt\scripts\image_describer_config.json (source=idt_config_dir)`
+- Prompt styles or settings don't match your current config files
+- Config from a different IDT installation is being used
+
+**Root Cause:** The `IDT_CONFIG_DIR` environment variable is set and pointing to an old or different config directory. This takes **higher priority** than the executable's local configs.
+
+**How to check:**
+```bash
+# Windows Command Prompt
+echo %IDT_CONFIG_DIR%
+
+# Windows PowerShell
+$env:IDT_CONFIG_DIR
+
+# macOS/Linux
+echo $IDT_CONFIG_DIR
+```
+
+**How to fix:**
+
+**Windows:**
+```batch
+# Option 1: Remove the environment variable (recommended)
+setx IDT_CONFIG_DIR ""
+
+# Option 2: Update it to point to the correct directory
+setx IDT_CONFIG_DIR "C:\path\to\your\idt\installation"
+
+# Option 3: Remove via System Properties
+# Control Panel → System → Advanced → Environment Variables
+# Find IDT_CONFIG_DIR and delete it
+```
+
+**macOS/Linux:**
+```bash
+# Remove from your shell profile (~/.zshrc, ~/.bash_profile, or ~/.bashrc)
+# Delete or comment out line like: export IDT_CONFIG_DIR=/path/to/configs
+
+# Then reload:
+source ~/.zshrc  # or ~/.bash_profile
+```
+
+**After removing, restart your terminal/command prompt for changes to take effect.**
+
+**When IDT_CONFIG_DIR is useful:** This variable is intended for shared config setups (e.g., team configs on a network drive). Most users should **not** set this variable.
+
+---
+
 ### Invalid JSON Syntax
 
 **Problem:** Error parsing config file.

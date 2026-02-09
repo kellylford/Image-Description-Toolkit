@@ -421,6 +421,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'default_prompt_style': 'narrative'
             }
     
+    def get_api_key_for_provider(self, provider: str) -> str:
+        """Get API key for a specific provider from config"""
+        api_keys = self.config.get('api_keys', {})
+        # Try case-insensitive lookup
+        for key in [provider, provider.capitalize(), provider.upper(), provider.lower()]:
+            if key in api_keys and api_keys[key]:
+                return api_keys[key]
+        # Check for openai/OpenAI/OPENAI
+        if provider.lower() == 'openai':
+            for key in ['OpenAI', 'openai', 'OPENAI']:
+                if key in api_keys and api_keys[key]:
+                    return api_keys[key]
+        # Check for claude/Claude/CLAUDE
+        elif provider.lower() == 'claude':
+            for key in ['Claude', 'claude', 'CLAUDE', 'Anthropic', 'anthropic']:
+                if key in api_keys and api_keys[key]:
+                    return api_keys[key]
+        return None
+    
     def init_ui(self):
         """Initialize the user interface with dual mode support"""
         self.current_mode = "editor" # 'editor' or 'viewer'
@@ -1463,6 +1482,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             }
         
         # Start processing worker
+        api_key = self.get_api_key_for_provider(options['provider'])
         worker = ProcessingWorker(
             self,
             self.current_image_item.file_path,
@@ -1471,7 +1491,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options['prompt_style'],
             options.get('custom_prompt', ''),
             None,  # detection_settings
-            None   # prompt_config_path
+            None,  # prompt_config_path
+            api_key  # API key for cloud providers
         )
         
         # Mark as processing with provider/model info
@@ -1964,39 +1985,47 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
         
         # Get existing description for context
-        existing_desc = self.current_image_item.descriptions[-1].text
+        last_description = self.current_image_item.descriptions[-1]
+        existing_desc = last_description.text
         
-        # Ask for followup question
-        dlg = wx.TextEntryDialog(
+        # Get original provider and model from the description
+        # Default to config values if not stored in description
+        original_provider = last_description.provider or self.config.get('default_provider', 'ollama')
+        original_model = last_description.model or self.config.get('default_model', 'moondream')
+        
+        # Show dialog with model selection
+        from dialogs_wx import FollowupQuestionDialog
+        
+        dlg = FollowupQuestionDialog(
             self,
-            f"Existing description:\n{existing_desc[:200]}...\n\nAsk a followup question:",
-            "Followup Question",
-            ""
+            original_provider,
+            original_model,
+            existing_desc[:300] + ("..." if len(existing_desc) > 300 else ""),
+            self.config
         )
         
         if dlg.ShowModal() == wx.ID_OK:
-            question = dlg.GetValue().strip()
+            values = dlg.get_values()
+            question = values['question']
+            
             if question:
                 # Create prompt with context
                 context_prompt = f"Previous description: {existing_desc}\n\nFollowup question: {question}"
                 
-                options = {
-                    'provider': self.config.get('default_provider', 'ollama'),
-                    'model': self.config.get('default_model', 'moondream'),
-                }
+                self.SetStatusText(f"Processing followup with {values['provider']}/{values['model']}...", 0)
                 
-                self.SetStatusText("Processing followup question...", 0)
-                
-                # Process with AI
+                # Process with AI using selected model
+                api_key = self.get_api_key_for_provider(values['provider'])
                 worker = ProcessingWorker(
                     self,
                     self.current_image_item.file_path,
-                    options['provider'],
-                    options['model'],
+                    values['provider'],
+                    values['model'],
                     'followup',
                     context_prompt,
                     None,
-                    None
+                    None,
+                    api_key  # API key for cloud providers
                 )
                 worker.start()
         
@@ -2033,6 +2062,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, "AI auto-rename is being processed.\n\nThe generated name will appear as a description.\nYou can then manually rename using that suggestion.")
             
             # Process to get description that could be used as name
+            api_key = self.get_api_key_for_provider(options['provider'])
             worker = ProcessingWorker(
                 self,
                 self.current_image_item.file_path,
@@ -2041,7 +2071,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'brief',  # Use brief prompt style
                 rename_prompt,
                 None,
-                None
+                None,
+                api_key  # API key for cloud providers
             )
             worker.start()
         except Exception as e:

@@ -118,7 +118,15 @@ class ChatDialog(wx.Dialog):
         
     def on_provider_changed(self, event):
         """Update model list when provider changes - uses dynamic detection"""
-        provider = self.provider_choice.GetStringSelection().lower()
+        # Initialize with default to prevent NameError in exception handlers
+        provider = 'ollama'
+        
+        try:
+            selected = self.provider_choice.GetStringSelection()
+            if selected:  # Guard against empty selection
+                provider = selected.lower()
+        except Exception:
+            pass  # Use default 'ollama'
         
         # Clear current models
         self.model_combo.Clear()

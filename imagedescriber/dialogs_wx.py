@@ -268,6 +268,186 @@ class ApiKeyDialog(wx.Dialog):
         return self.file_text.GetValue().strip()
 
 
+class FollowupQuestionDialog(wx.Dialog):
+    """Dialog for asking follow-up questions with model selection"""
+    
+    def __init__(self, parent, original_provider: str, original_model: str, 
+                 description_preview: str, config: dict):
+        super().__init__(
+            parent,
+            title="Ask Follow-up Question",
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
+        )
+        
+        self.original_provider = original_provider
+        self.original_model = original_model
+        self.config = config
+        self.question = ""
+        self.selected_provider = original_provider
+        self.selected_model = original_model
+        
+        self.init_ui(description_preview)
+        self.SetSize((600, 500))
+        self.Centre()
+    
+    def init_ui(self, description_preview: str):
+        """Initialize the dialog UI"""
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Show existing description preview
+        desc_box = wx.StaticBox(self, label="Existing Description (preview)")
+        desc_sizer = wx.StaticBoxSizer(desc_box, wx.VERTICAL)
+        
+        desc_text = wx.TextCtrl(
+            self,
+            value=description_preview,
+            style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP
+        )
+        desc_text.SetMinSize((550, 100))
+        set_accessible_name(desc_text, "Existing description preview")
+        desc_sizer.Add(desc_text, 0, wx.ALL | wx.EXPAND, 5)
+        
+        main_sizer.Add(desc_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # Model selection section
+        model_box = wx.StaticBox(self, label="AI Model for Follow-up")
+        model_sizer = wx.StaticBoxSizer(model_box, wx.VERTICAL)
+        
+        # Show original model
+        original_label = wx.StaticText(
+            self,
+            label=f"Original: {self.original_provider.title()} - {self.original_model}"
+        )
+        original_label.SetFont(original_label.GetFont().MakeItalic())
+        model_sizer.Add(original_label, 0, wx.ALL, 5)
+        
+        # Provider selection
+        provider_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        provider_label = wx.StaticText(self, label="&Provider:")
+        provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        
+        self.provider_choice = wx.Choice(self, choices=["ollama", "openai", "claude"])
+        self.provider_choice.SetStringSelection(self.original_provider)
+        self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
+        set_accessible_name(self.provider_choice, "AI provider")
+        provider_sizer.Add(self.provider_choice, 1, wx.EXPAND)
+        
+        model_sizer.Add(provider_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Model name input
+        model_name_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        model_label = wx.StaticText(self, label="&Model:")
+        model_name_sizer.Add(model_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        
+        self.model_combo = wx.ComboBox(self, style=wx.CB_DROPDOWN)
+        self.model_combo.SetValue(self.original_model)
+        set_accessible_name(self.model_combo, "Model name")
+        model_name_sizer.Add(self.model_combo, 1, wx.EXPAND)
+        
+        model_sizer.Add(model_name_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        
+        main_sizer.Add(model_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # Populate models for current provider
+        self.populate_models()
+        
+        # Question input
+        question_box = wx.StaticBox(self, label="Your Follow-up Question")
+        question_sizer = wx.StaticBoxSizer(question_box, wx.VERTICAL)
+        
+        self.question_text = wx.TextCtrl(
+            self,
+            value="",
+            style=wx.TE_MULTILINE | wx.TE_WORDWRAP,
+            name="Follow-up question"
+        )
+        self.question_text.SetMinSize((550, 120))
+        self.question_text.SetHint("Enter your question about this image...")
+        set_accessible_name(self.question_text, "Follow-up question")
+        question_sizer.Add(self.question_text, 1, wx.ALL | wx.EXPAND, 5)
+        
+        main_sizer.Add(question_sizer, 1, wx.ALL | wx.EXPAND, 10)
+        
+        # Dialog buttons
+        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        main_sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        
+        self.SetSizer(main_sizer)
+        
+        # Set focus to question input
+        wx.CallAfter(self.question_text.SetFocus)
+    
+    def on_provider_changed(self, event):
+        """Handle provider change - update available models"""
+        self.populate_models()
+    
+    def populate_models(self):
+        """Populate model combobox based on selected provider"""
+        provider = self.provider_choice.GetStringSelection()
+        
+        # Save current value
+        current_model = self.model_combo.GetValue()
+        
+        # Clear combo
+        self.model_combo.Clear()
+        
+        try:
+            if provider == "ollama":
+                # Try to get Ollama models
+                try:
+                    from ai_providers import get_available_providers
+                    providers = get_available_providers()
+                    if 'ollama' in providers:
+                        models = providers['ollama'].get_available_models()
+                        if models:
+                            for model in models:
+                                self.model_combo.Append(model)
+                except Exception:
+                    # Fallback to common models
+                    pass
+                
+                # If no models loaded or original model not in list, add common defaults
+                if self.model_combo.GetCount() == 0:
+                    common_models = ["moondream", "llava", "llama3.2-vision"]
+                    for model in common_models:
+                        self.model_combo.Append(model)
+                        
+            elif provider == "openai":
+                models = ["gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "chatgpt-4o-latest", "gpt-4-turbo"]
+                for model in models:
+                    self.model_combo.Append(model)
+                    
+            elif provider == "claude":
+                models = [
+                    "claude-opus-4-20250514",
+                    "claude-sonnet-4-20250514", 
+                    "claude-3-5-sonnet-20241022",
+                    "claude-3-5-sonnet-20240620",
+                    "claude-3-5-haiku-20241022"
+                ]
+                for model in models:
+                    self.model_combo.Append(model)
+        except Exception as e:
+            logger.warning(f"Error populating models: {e}")
+        
+        # Restore previous value if it exists in new list, otherwise use first item
+        if current_model and current_model in [self.model_combo.GetString(i) for i in range(self.model_combo.GetCount())]:
+            self.model_combo.SetValue(current_model)
+        elif self.model_combo.GetCount() > 0:
+            self.model_combo.SetSelection(0)
+        else:
+            # Fallback to original model
+            self.model_combo.SetValue(self.original_model)
+    
+    def get_values(self):
+        """Get the question and selected model/provider"""
+        return {
+            'question': self.question_text.GetValue().strip(),
+            'provider': self.provider_choice.GetStringSelection(),
+            'model': self.model_combo.GetValue().strip()
+        }
+
+
 class ProcessingOptionsDialog(wx.Dialog):
     """Dialog for configuring processing options"""
     

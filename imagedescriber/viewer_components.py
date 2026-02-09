@@ -211,6 +211,7 @@ class ViewerPanel(wx.Panel):
         
         # --- LEFT PANEL: List ---
         left_panel = wx.Panel(self.splitter)
+        left_panel.SetCanFocus(False)  # Prevent panel from receiving focus
         left_sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Controls area
@@ -225,7 +226,9 @@ class ViewerPanel(wx.Panel):
         left_sizer.Add(controls_sizer, 0, wx.EXPAND | wx.ALL, 2)
         
         # List label
-        left_sizer.Add(wx.StaticText(left_panel, label="Descriptions:"), 0, wx.ALL, 5)
+        desc_list_label = wx.StaticText(left_panel, label="Descriptions:")
+        desc_list_label.SetCanFocus(False)  # Prevent tab stop on label
+        left_sizer.Add(desc_list_label, 0, wx.ALL, 5)
         
         # Description ListBox (Accessible)
         self.desc_list = DescriptionListBox(left_panel, style=wx.LB_SINGLE)
@@ -235,6 +238,7 @@ class ViewerPanel(wx.Panel):
         
         # --- RIGHT PANEL: Details ---
         right_panel = wx.Panel(self.splitter)
+        right_panel.SetCanFocus(False)  # Prevent panel from receiving focus
         right_sizer = wx.BoxSizer(wx.VERTICAL)
         
         # Image Preview (Top Right)
@@ -247,13 +251,16 @@ class ViewerPanel(wx.Panel):
         
         # Metadata Label
         self.metadata_label = wx.StaticText(right_panel, label="")
+        self.metadata_label.SetCanFocus(False)  # Prevent tab stop on label
         font = self.metadata_label.GetFont()
         font.MakeBold()
         self.metadata_label.SetFont(font)
         right_sizer.Add(self.metadata_label, 0, wx.EXPAND | wx.ALL, 5)
         
         # Full Description Text
-        right_sizer.Add(wx.StaticText(right_panel, label="Full Description:"), 0, wx.ALL, 5)
+        desc_label = wx.StaticText(right_panel, label="Description:")
+        desc_label.SetCanFocus(False)  # Prevent tab stop on label
+        right_sizer.Add(desc_label, 0, wx.ALL, 5)
         self.desc_text = wx.TextCtrl(right_panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
         right_sizer.Add(self.desc_text, 1, wx.EXPAND | wx.ALL, 5)
         
@@ -388,21 +395,39 @@ class ViewerPanel(wx.Panel):
         prompt = entry.get('prompt_style', 'Unknown')
         self.metadata_label.SetLabel(f"{fname}\nModel: {model} | Prompt: {prompt}")
         
-        # Image Preview
+        # Image Preview with robust path resolution
         file_path = entry.get('file_path', '')
-        # Handle relative paths if loaded from directory
-        if self.current_dir and not Path(file_path).is_absolute():
-            # Try to resolve relative to workflow root
-            try_path = self.current_dir / file_path
-            if try_path.exists():
-                file_path = str(try_path)
-            else:
-                 # Try typical 'images' subfolder if simple relative path failed
-                 try_path = self.current_dir / "images" / Path(file_path).name
-                 if try_path.exists():
-                     file_path = str(try_path)
-
-        self.load_image_preview(file_path)
+        resolved_path = self.resolve_image_path(file_path)
+        self.load_image_preview(str(resolved_path))
+    
+    def resolve_image_path(self, file_path_str):
+        """Resolve image path handling relative paths and moved workspaces"""
+        path = Path(file_path_str)
+        
+        # Try original path first
+        if path.exists():
+            return path
+        
+        # Try relative to current workflow directory
+        if self.current_dir:
+            # Try relative to workflow root
+            try_rel = self.current_dir / file_path_str
+            if try_rel.exists():
+                return try_rel
+            
+            # Try filename in workflow dir
+            try_flat = self.current_dir / path.name
+            if try_flat.exists():
+                return try_flat
+            
+            # Try common subfolders
+            for sub in ['images', 'input_images', 'testimages', 'img']:
+                try_sub = self.current_dir / sub / path.name
+                if try_sub.exists():
+                    return try_sub
+        
+        # Return original path (will fail but at least we tried)
+        return path
 
     def load_image_preview(self, path):
         """Load and scale image for preview"""

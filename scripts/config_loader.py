@@ -58,6 +58,12 @@ def resolve_config(
     if cfg_dir:
         p = Path(cfg_dir) / filename
         if _exists_file(p):
+            # Log when using IDT_CONFIG_DIR to help with troubleshooting
+            import sys
+            print(f"INFO: Using config from IDT_CONFIG_DIR environment variable", file=sys.stderr)
+            print(f"      Location: {p}", file=sys.stderr)
+            print(f"      To change: Windows: setx IDT_CONFIG_DIR \"\"", file=sys.stderr)
+            print(f"                 macOS: unset IDT_CONFIG_DIR (in ~/.zshrc or ~/.bash_profile)", file=sys.stderr)
             return p, 'idt_config_dir'
 
     exe_dir: Optional[Path] = None

@@ -80,26 +80,33 @@ DEV_OLLAMA_CLOUD_MODELS = [
 ]
 
 DEV_OPENAI_MODELS = [
-    "gpt-5",
+    # O-series (Reasoning models - 2024-2025)
+    "o1",
+    "o1-mini",
+    "o1-preview",
+    # GPT-4o (Omni - Latest)
     "gpt-4o",
     "gpt-4o-mini",
+    "chatgpt-4o-latest",
+    # GPT-4 Turbo
     "gpt-4-turbo",
+    "gpt-4-turbo-preview",
+    # GPT-4
     "gpt-4",
     "gpt-4-vision-preview"
 ]
 
 DEV_CLAUDE_MODELS = [
     # Claude 4 Series (Latest - 2025)
-    "claude-sonnet-4-5-20250929",   # Claude Sonnet 4.5 (best for agents/coding) - RECOMMENDED
-    "claude-opus-4-1-20250805",     # Claude Opus 4.1 (specialized complex tasks, superior reasoning)
-    "claude-sonnet-4-20250514",     # Claude Sonnet 4 (high performance)
-    "claude-opus-4-20250514",       # Claude Opus 4 (very high intelligence)
-    # Claude 3.7
-    "claude-3-7-sonnet-20250219",   # Claude Sonnet 3.7 (high performance with extended thinking)
-    # Claude 3.5
-    "claude-3-5-haiku-20241022",    # Claude Haiku 3.5 (fastest, most affordable)
-    # Claude 3
-    "claude-3-haiku-20240307",      # Claude Haiku 3 (fast and compact)
+    "claude-opus-4-20250514",           # Claude Opus 4 (highest intelligence, complex reasoning)
+    "claude-sonnet-4-20250514",         # Claude Sonnet 4 (balanced performance)
+    # Claude 3.5 (Popular)
+    "claude-3-5-sonnet-20241022",       # Claude Sonnet 3.5 (latest, great for most tasks) - RECOMMENDED
+    "claude-3-5-haiku-20241022",        # Claude Haiku 3.5 (fastest, most affordable)
+    # Claude 3.0
+    "claude-3-opus-20240229",           # Claude Opus 3 (high intelligence)
+    "claude-3-sonnet-20240229",         # Claude Sonnet 3 (balanced)
+    "claude-3-haiku-20240307",          # Claude Haiku 3 (fast and compact)
     # Note: All Claude 3+ models support vision. Claude 2.x excluded (no vision support)
 ]
 

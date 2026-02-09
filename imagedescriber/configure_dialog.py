@@ -867,6 +867,7 @@ class ConfigureDialog(wx.Dialog):
         sizer.Add(list_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         
         self.api_keys_list = wx.ListBox(panel, style=wx.LB_SINGLE | wx.LB_NEEDED_SB, name="API Keys list")
+        self.api_keys_list.Bind(wx.EVT_KEY_DOWN, self.on_api_key_list_key)
         sizer.Add(self.api_keys_list, 1, wx.EXPAND | wx.ALL, 10)
         
         # Buttons
@@ -1009,3 +1010,13 @@ class ConfigureDialog(wx.Dialog):
         # Disable edit/delete buttons
         self.edit_key_btn.Enable(False)
         self.delete_key_btn.Enable(False)
+    
+    def on_api_key_list_key(self, event):
+        """Handle keyboard navigation in API keys list"""
+        keycode = event.GetKeyCode()
+        if keycode == wx.WXK_TAB and not event.ShiftDown():
+            # Move focus to Add Key button
+            if self.add_key_btn:
+                self.add_key_btn.SetFocus()
+            return
+        event.Skip()

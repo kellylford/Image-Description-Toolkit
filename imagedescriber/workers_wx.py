@@ -146,7 +146,8 @@ class ProcessingWorker(threading.Thread):
     def __init__(self, parent_window, file_path: str, provider: str, model: str, 
                  prompt_style: str, custom_prompt: str = "", 
                  detection_settings: dict = None, 
-                 prompt_config_path: Optional[str] = None):
+                 prompt_config_path: Optional[str] = None,
+                 api_key: Optional[str] = None):
         """Initialize worker
         
         Args:
@@ -158,6 +159,7 @@ class ProcessingWorker(threading.Thread):
             custom_prompt: Custom prompt text (overrides prompt_style)
             detection_settings: Optional settings for object detection models
             prompt_config_path: Optional path to prompt config file
+            api_key: Optional API key for cloud providers
         """
         super().__init__(daemon=True)
         self.parent_window = parent_window
@@ -167,6 +169,7 @@ class ProcessingWorker(threading.Thread):
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
         self.detection_settings = detection_settings or {}
+        self.api_key = api_key
         
         try:
             self._prompt_config_path = Path(prompt_config_path) if prompt_config_path else None
@@ -199,11 +202,14 @@ class ProcessingWorker(threading.Thread):
             # Extract metadata from image
             metadata = self._extract_metadata(self.file_path)
             
-            # Process the image with selected provider
-            description = self._process_with_ai(self.file_path, prompt_text)
+            # Process the image with selected provider (passing API key)
+            description = self._process_with_ai(self.file_path, prompt_text, api_key=self.api_key)
             
             # Add location byline if geocoding data is available
             description = self._add_location_byline(description, metadata)
+            
+            # Note: Token usage info not available in this context since provider object
+            # is local to _process_with_ai method. Could be added in future refactoring.
             
             # Emit success
             evt = ProcessingCompleteEventData(
@@ -305,8 +311,14 @@ class ProcessingWorker(threading.Thread):
             pass
         return config
     
-    def _process_with_ai(self, image_path: str, prompt: str) -> str:
-        """Process image with selected AI provider"""
+    def _process_with_ai(self, image_path: str, prompt: str, api_key: Optional[str] = None) -> str:
+        """Process image with selected AI provider
+        
+        Args:
+            image_path: Path to image file
+            prompt: Prompt text
+            api_key: Optional API key for cloud providers (overrides provider's default)
+        """
         if not get_available_providers:
             raise Exception("AI providers module not available")
         
@@ -317,6 +329,13 @@ class ProcessingWorker(threading.Thread):
             raise Exception(f"Provider '{self.provider}' not available")
         
         provider = providers[self.provider]
+        
+        # Inject API key if provided and provider supports it
+        if api_key and hasattr(provider, 'api_key'):
+            provider.api_key = api_key
+            # Reinitialize client if provider has that capability
+            if hasattr(provider, 'reload_api_key'):
+                provider.reload_api_key()
         
         try:
             # Check if it's a HEIC file and convert if needed
@@ -503,6 +522,33 @@ class ProcessingWorker(threading.Thread):
         if byline:
             logging.info(f"Adding location byline: {byline}")
             return f"{byline} - {description}"
+        
+        return description
+    
+    def _add_token_usage_info(self, description: str, provider) -> str:
+        """Add token usage information to description for paid models
+        
+        Args:
+            description: AI-generated description
+            provider: AI provider instance
+            
+        Returns:
+            Description with token usage appended (if available)
+        """
+        if not description or not provider:
+            return description
+        
+        # Check if provider has token usage info
+        if hasattr(provider, 'last_usage') and provider.last_usage:
+            usage = provider.last_usage
+            prompt_tokens = usage.get('prompt_tokens', 0)
+            completion_tokens = usage.get('completion_tokens', 0)
+            total_tokens = usage.get('total_tokens', 0)
+            
+            if total_tokens > 0:
+                usage_text = f"\n\n[Token Usage: {total_tokens:,} total ({prompt_tokens:,} prompt + {completion_tokens:,} completion)]"
+                logging.info(f"Adding token usage info: {total_tokens} tokens")
+                return description + usage_text
         
         return description
     
