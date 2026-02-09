@@ -59,10 +59,11 @@ if not exist "dist_all\bin\idt.exe" (
     set MISSING_FILES=1
 )
 
-if not exist "dist_all\bin\Viewer.exe" (
-    echo ERROR: Viewer.exe not found
-    set MISSING_FILES=1
-)
+REM [DEPRECATED] Viewer - now integrated into ImageDescriber
+REM if not exist "dist_all\bin\Viewer.exe" (
+REM     echo ERROR: Viewer.exe not found
+REM     set MISSING_FILES=1
+REM )
 
 if not exist "dist_all\bin\ImageDescriber.exe" (
     echo ERROR: ImageDescriber.exe not found
@@ -94,8 +95,7 @@ if %ERRORLEVEL% EQU 0 (
     echo.
     echo The installer includes:
     echo   - idt.exe (CLI)
-    echo   - Viewer.exe
-    echo   - ImageDescriber.exe (includes integrated Prompt Editor and Configure tools)
+    echo   - ImageDescriber.exe (includes integrated Viewer Mode, Prompt Editor and Configure tools)
     echo   - Configuration files
     echo   - Documentation
     echo.

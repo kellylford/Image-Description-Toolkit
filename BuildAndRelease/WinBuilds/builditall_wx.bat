@@ -19,6 +19,8 @@ echo.
 echo ========================================================================
 echo BUILD ALL wxPython APPLICATIONS (Windows)
 echo ========================================================================
+echo This script builds IDT and ImageDescriber.
+echo Viewer is now integrated into ImageDescriber (Viewer Mode).
 echo.
 
 REM Save current directory (should be BuildAndRelease\WinBuilds)
@@ -29,8 +31,9 @@ cd /d "%~dp0..\.."
 set BUILD_ERRORS=0
 
 REM ============================================================================
-echo [1/3] Building IDT (CLI)...
+echo [1/2] Building IDT (CLI)...
 echo ========================================================================
+echo.
 echo.
 
 cd idt
@@ -44,42 +47,26 @@ if errorlevel 1 (
 cd ..
 
 REM ============================================================================
-echo.
-echo [2/3] Building Viewer (wxPython)...
-echo ========================================================================
-echo.
-
-cd viewer
-call build_viewer_wx.bat
-if errorlevel 1 (
-    echo ERROR: Viewer build failed!
-    set /a BUILD_ERRORS+=1
-) else (
-    echo SUCCESS: Viewer built successfully
-)
-cd ..
-
-REM ============================================================================
-REM [DEPRECATED 3/5] Prompt Editor (wxPython) - now integrated into ImageDescriber
-REM Access via: Tools → Edit Prompts in ImageDescriber
+REM [DEPRECATED 2/2] Viewer (wxPython) - now integrated into ImageDescriber
+REM Access via: Viewer Mode tab in ImageDescriber
 REM ============================================================================
 REM echo.
-REM echo [3/5] Building Prompt Editor (wxPython)...
+REM echo [2/2] Building Viewer (wxPython)...
 REM echo ========================================================================
 REM echo.
-REM cd prompt_editor
-REM call build_prompt_editor.bat
+REM cd viewer
+REM call build_viewer_wx.bat
 REM if errorlevel 1 (
-REM     echo ERROR: Prompt Editor build failed!
+REM     echo ERROR: Viewer build failed!
 REM     set /a BUILD_ERRORS+=1
 REM ) else (
-REM     echo SUCCESS: Prompt Editor built successfully
+REM     echo SUCCESS: Viewer built successfully
 REM )
 REM cd ..
 
 REM ============================================================================
 echo.
-echo [3/3] Building ImageDescriber (wxPython - includes PromptEditor + IDTConfigure)...
+echo [2/2] Building ImageDescriber (wxPython - includes Viewer Mode + PromptEditor + IDTConfigure)...
 echo ========================================================================
 echo.
 
@@ -149,13 +136,13 @@ if "%BUILD_ERRORS%"=="0" (
         echo   ✗ idt.exe NOT FOUND
     )
     
-    REM Copy Viewer
-    if exist "viewer\dist\Viewer.exe" (
-        copy /Y "viewer\dist\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-        echo   ✓ Viewer.exe
-    ) else (
-        echo   ✗ Viewer.exe NOT FOUND
-    )
+    REM [DEPRECATED] Viewer - now integrated into ImageDescriber as Viewer Mode
+    REM if exist "viewer\dist\Viewer.exe" (
+    REM     copy /Y "viewer\dist\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+    REM     echo   ✓ Viewer.exe
+    REM ) else (
+    REM     echo   ✗ Viewer.exe NOT FOUND
+    REM )
     
     REM [DEPRECATED] Prompt Editor - now part of ImageDescriber Tools menu
     REM if exist "prompt_editor\dist\PromptEditor.exe" (
@@ -165,10 +152,10 @@ if "%BUILD_ERRORS%"=="0" (
     REM     echo   ✗ PromptEditor.exe NOT FOUND
     REM )
     
-    REM Copy ImageDescriber (includes PromptEditor and IDTConfigure)
+    REM Copy ImageDescriber (includes Viewer Mode, PromptEditor and IDTConfigure)
     if exist "imagedescriber\dist\ImageDescriber.exe" (
         copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-        echo   ✓ ImageDescriber.exe (with integrated tools)
+        echo   ✓ ImageDescriber.exe (with integrated Viewer Mode and tools)
     ) else (
         echo   ✗ ImageDescriber.exe NOT FOUND
     )

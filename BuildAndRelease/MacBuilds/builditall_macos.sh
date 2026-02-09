@@ -80,10 +80,9 @@ echo "----------------------------------------"
 echo ""
 
 echo ""
-echo "This will build all three applications:"
+echo "This will build all applications:"
 echo "  1. IDT (main toolkit)"
-echo "  2. Viewer"
-echo "  3. ImageDescriber (with integrated Tools menu)"
+echo "  2. ImageDescriber (with integrated Viewer Mode and Tools menu)"
 echo ""
 echo "Make sure all virtual environments are set up before continuing."
 echo ""
@@ -92,7 +91,7 @@ BUILD_ERRORS=0
 
 # ============================================================================
 echo ""
-echo "[1/3] Building IDT (main toolkit)..."
+echo "[1/2] Building IDT (main toolkit)..."
 echo "========================================================================"
 echo ""
 
@@ -106,31 +105,33 @@ fi
 cd ..
 
 # ============================================================================
-echo ""
-echo "[2/3] Building Viewer..."
-echo "========================================================================"
-echo ""
-
-cd viewer
-if [ -f ".venv/bin/activate" ]; then
-    source .venv/bin/activate
-    if bash build_viewer_wx.sh; then
-        echo "SUCCESS: Viewer built successfully"
-    else
-        echo "ERROR: Viewer build failed!"
-        ((BUILD_ERRORS++))
-    fi
-    deactivate
-else
-    echo "ERROR: Viewer virtual environment not found at viewer/.venv"
-    echo "Please run: cd viewer && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
-    ((BUILD_ERRORS++))
-fi
-cd ..
+# [DEPRECATED 2/2] Viewer - now integrated into ImageDescriber as Viewer Mode
+# ============================================================================
+# echo ""
+# echo "[2/2] Building Viewer..."
+# echo "========================================================================"
+# echo ""
+# 
+# cd viewer
+# if [ -f ".venv/bin/activate" ]; then
+#     source .venv/bin/activate
+#     if bash build_viewer_wx.sh; then
+#         echo "SUCCESS: Viewer built successfully"
+#     else
+#         echo "ERROR: Viewer build failed!"
+#         ((BUILD_ERRORS++))
+#     fi
+#     deactivate
+# else
+#     echo "ERROR: Viewer virtual environment not found at viewer/.venv"
+#     echo "Please run: cd viewer && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+#     ((BUILD_ERRORS++))
+# fi
+# cd ..
 
 # ============================================================================
 echo ""
-echo "[3/3] Building ImageDescriber..."
+echo "[2/2] Building ImageDescriber..."
 echo "========================================================================"
 echo ""
 
@@ -201,18 +202,18 @@ if [ $BUILD_ERRORS -eq 0 ]; then
         echo "✗ idt NOT FOUND"
     fi
     
-    # Copy Viewer.app
-    if [ -d "viewer/dist/Viewer.app" ]; then
-        cp -R "viewer/dist/Viewer.app" "$DIST_ALL/Applications/"
-        echo "✓ Viewer.app"
-    else
-        echo "✗ Viewer.app NOT FOUND"
-    fi
+    # [DEPRECATED] Viewer.app - now integrated into ImageDescriber as Viewer Mode
+    # if [ -d "viewer/dist/Viewer.app" ]; then
+    #     cp -R "viewer/dist/Viewer.app" "$DIST_ALL/Applications/"
+    #     echo "✓ Viewer.app"
+    # else
+    #     echo "✗ Viewer.app NOT FOUND"
+    # fi
     
-    # Copy ImageDescriber.app (includes integrated prompt editor and configuration)
+    # Copy ImageDescriber.app (includes integrated Viewer Mode, prompt editor and configuration)
     if [ -d "imagedescriber/dist/ImageDescriber.app" ]; then
         cp -R "imagedescriber/dist/ImageDescriber.app" "$DIST_ALL/Applications/"
-        echo "✓ ImageDescriber.app (with integrated Tools menu)"
+        echo "✓ ImageDescriber.app (with integrated Viewer Mode and Tools menu)"
     else
         echo "✗ ImageDescriber.app NOT FOUND"
     fi

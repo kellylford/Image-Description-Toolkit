@@ -387,9 +387,29 @@ class ViewerPanel(wx.Panel):
 
     def show_details(self, entry):
         """Display details for an entry"""
-        self.desc_text.SetValue(entry.get('description', ''))
+        # Reconstruct full description with metadata like original format
+        description = entry.get('description', '')
         
-        # Metadata
+        # Build metadata footer
+        metadata_parts = []
+        if entry.get('camera'):
+            metadata_parts.append(f"Camera: {entry['camera']}")
+        if entry.get('photo_date'):
+            metadata_parts.append(f"Photo Date: {entry['photo_date']}")
+        if entry.get('model'):
+            metadata_parts.append(f"Model: {entry['model']}")
+        if entry.get('prompt_style'):
+            metadata_parts.append(f"Prompt Style: {entry['prompt_style']}")
+        
+        # Add metadata footer if available
+        if metadata_parts:
+            full_text = description + "\n\n" + " | ".join(metadata_parts)
+        else:
+            full_text = description
+        
+        self.desc_text.SetValue(full_text)
+        
+        # Header metadata (filename and model info)
         fname = Path(entry.get('file_path', '')).name
         model = entry.get('model', 'Unknown')
         prompt = entry.get('prompt_style', 'Unknown')

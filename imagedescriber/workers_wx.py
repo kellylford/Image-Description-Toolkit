@@ -203,13 +203,14 @@ class ProcessingWorker(threading.Thread):
             metadata = self._extract_metadata(self.file_path)
             
             # Process the image with selected provider (passing API key)
-            description = self._process_with_ai(self.file_path, prompt_text, api_key=self.api_key)
+            # Returns tuple: (description, provider_instance)
+            description, provider_obj = self._process_with_ai(self.file_path, prompt_text, api_key=self.api_key)
             
             # Add location byline if geocoding data is available
             description = self._add_location_byline(description, metadata)
             
-            # Note: Token usage info not available in this context since provider object
-            # is local to _process_with_ai method. Could be added in future refactoring.
+            # Add token usage info if available (for paid APIs)
+            description = self._add_token_usage_info(description, provider_obj)
             
             # Emit success
             evt = ProcessingCompleteEventData(
@@ -311,13 +312,16 @@ class ProcessingWorker(threading.Thread):
             pass
         return config
     
-    def _process_with_ai(self, image_path: str, prompt: str, api_key: Optional[str] = None) -> str:
+    def _process_with_ai(self, image_path: str, prompt: str, api_key: Optional[str] = None) -> tuple:
         """Process image with selected AI provider
         
         Args:
             image_path: Path to image file
             prompt: Prompt text
             api_key: Optional API key for cloud providers (overrides provider's default)
+            
+        Returns:
+            Tuple of (description_text, provider_instance) for token usage tracking
         """
         if not get_available_providers:
             raise Exception("AI providers module not available")
@@ -367,7 +371,8 @@ class ProcessingWorker(threading.Thread):
             else:
                 description = provider.describe_image(image_path, prompt, self.model)
             
-            return description
+            # Return both description and provider instance for token usage tracking
+            return (description, provider)
                 
         except Exception as e:
             raise Exception(f"AI processing failed: {str(e)}")
