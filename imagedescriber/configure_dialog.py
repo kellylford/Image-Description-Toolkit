@@ -27,6 +27,94 @@ from typing import Dict, Any, Optional, List, Tuple
 import wx
 import wx.lib.masked as masked
 
+
+class ApiKeyEditDialog(wx.Dialog):
+    """Dialog for adding or editing an API key"""
+    
+    def __init__(self, parent, provider="", api_key=""):
+        title = "Edit API Key" if provider else "Add API Key"
+        super().__init__(parent, title=title, size=(500, 250))
+        
+        self.provider = provider
+        self.api_key = api_key
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Create the dialog UI"""
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Description
+        desc_text = wx.StaticText(panel, label="Enter API key details:")
+        sizer.Add(desc_text, 0, wx.ALL, 10)
+        
+        # Form grid
+        form_sizer = wx.FlexGridSizer(rows=2, cols=2, vgap=10, hgap=10)
+        form_sizer.AddGrowableCol(1, 1)
+        
+        # Provider selection
+        form_sizer.Add(wx.StaticText(panel, label="Provider:"), 0, wx.ALIGN_CENTER_VERTICAL)
+        self.provider_choice = wx.Choice(panel, choices=["OpenAI", "Claude", "HuggingFace"])
+        if self.provider:
+            # Find index of current provider (case-insensitive)
+            for i, choice in enumerate(["OpenAI", "Claude", "HuggingFace"]):
+                if choice.lower() == self.provider.lower():
+                    self.provider_choice.SetSelection(i)
+                    break
+        else:
+            self.provider_choice.SetSelection(0)  # Default to OpenAI
+        form_sizer.Add(self.provider_choice, 1, wx.EXPAND)
+        
+        # API Key text input
+        form_sizer.Add(wx.StaticText(panel, label="API Key:"), 0, wx.ALIGN_CENTER_VERTICAL)
+        self.key_text = wx.TextCtrl(panel, value=self.api_key, style=wx.TE_PASSWORD)
+        form_sizer.Add(self.key_text, 1, wx.EXPAND)
+        
+        sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        
+        # Help text
+        help_text = wx.StaticText(panel, label="Note: API keys are stored in the config file. Keep your config file secure.")
+        help_text.SetForegroundColour(wx.Colour(100, 100, 100))
+        help_text.Wrap(450)
+        sizer.Add(help_text, 0, wx.ALL, 10)
+        
+        # Buttons
+        btn_sizer = wx.StdDialogButtonSizer()
+        ok_btn = wx.Button(panel, wx.ID_OK)
+        cancel_btn = wx.Button(panel, wx.ID_CANCEL)
+        btn_sizer.AddButton(ok_btn)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        
+        panel.SetSizer(sizer)
+        
+        # Bind OK to validation
+        ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
+        
+    def on_ok(self, event):
+        """Validate input before accepting"""
+        provider = self.provider_choice.GetStringSelection()
+        api_key = self.key_text.GetValue().strip()
+        
+        if not provider:
+            show_warning(self, "Please select a provider.")
+            return
+        
+        if not api_key:
+            show_warning(self, "Please enter an API key.")
+            return
+        
+        self.EndModal(wx.ID_OK)
+    
+    def get_values(self):
+        """Get the entered provider and API key"""
+        return (
+            self.provider_choice.GetStringSelection(),
+            self.key_text.GetValue().strip()
+        )
+
 # Ensure project root is on sys.path so sibling modules (shared/) import in dev and frozen modes
 # Works in both development mode (running script) and frozen mode (PyInstaller exe)
 if getattr(sys, 'frozen', False):
@@ -480,6 +568,10 @@ class ConfigureDialog(wx.Dialog):
             tab_panel = self.create_category_tab(self.notebook, category)
             self.notebook.AddPage(tab_panel, category)
         
+        # Add special API Keys tab
+        api_keys_tab = self.create_api_keys_tab(self.notebook)
+        self.notebook.AddPage(api_keys_tab, "API Keys")
+        
         main_sizer.Add(self.notebook, 1, wx.EXPAND | wx.ALL, 5)
         
         # Dialog buttons
@@ -707,10 +799,36 @@ class ConfigureDialog(wx.Dialog):
                 with open(path, 'w', encoding='utf-8') as f:
                     json.dump(config, f, indent=2)
             
+            # Reload API keys in providers after saving
+            self._reload_provider_api_keys()
+            
             return True
         except Exception as e:
             show_error(self, f"Error saving configurations:\n{str(e)}")
             return False
+    
+    def _reload_provider_api_keys(self):
+        """Reload API keys from config into provider instances
+        
+        This must be called after saving API keys via the Configure dialog
+        to make them available without restarting the application.
+        """
+        try:
+            from ai_providers import get_all_providers
+            
+            # Get all provider instances
+            providers = get_all_providers()
+            
+            # Reload API keys for providers that support it
+            for provider_name, provider in providers.items():
+                if hasattr(provider, 'reload_api_key'):
+                    try:
+                        provider.reload_api_key()
+                        print(f"Reloaded API key for {provider_name}")
+                    except Exception as e:
+                        print(f"Warning: Failed to reload API key for {provider_name}: {e}")
+        except Exception as e:
+            print(f"Warning: Failed to reload provider API keys: {e}")
     
     def on_ok(self, event):
         """Handle OK button - save and close"""
@@ -734,3 +852,160 @@ class ConfigureDialog(wx.Dialog):
             self.EndModal(wx.ID_CANCEL)
         else:
             self.Destroy()
+    
+    def create_api_keys_tab(self, parent) -> wx.Panel:
+        """Create the API Keys management tab"""
+        panel = wx.Panel(parent)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Description
+        desc_text = wx.StaticText(panel, label="Manage API keys for cloud AI providers:")
+        sizer.Add(desc_text, 0, wx.ALL, 10)
+        
+        # ListBox for API keys
+        list_label = wx.StaticText(panel, label="Saved API Keys:")
+        sizer.Add(list_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        
+        self.api_keys_list = wx.ListBox(panel, style=wx.LB_SINGLE | wx.LB_NEEDED_SB, name="API Keys list")
+        sizer.Add(self.api_keys_list, 1, wx.EXPAND | wx.ALL, 10)
+        
+        # Buttons
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        self.add_key_btn = wx.Button(panel, label="Add Key")
+        self.add_key_btn.Bind(wx.EVT_BUTTON, self.on_add_api_key)
+        btn_sizer.Add(self.add_key_btn, 0, wx.ALL, 5)
+        
+        self.edit_key_btn = wx.Button(panel, label="Edit Key")
+        self.edit_key_btn.Bind(wx.EVT_BUTTON, self.on_edit_api_key)
+        self.edit_key_btn.Enable(False)
+        btn_sizer.Add(self.edit_key_btn, 0, wx.ALL, 5)
+        
+        self.delete_key_btn = wx.Button(panel, label="Delete Key")
+        self.delete_key_btn.Bind(wx.EVT_BUTTON, self.on_delete_api_key)
+        self.delete_key_btn.Enable(False)
+        btn_sizer.Add(self.delete_key_btn, 0, wx.ALL, 5)
+        
+        sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        
+        # Help text
+        help_text = wx.StaticText(panel, 
+            label="API keys are required for OpenAI (GPT-4), Claude (Anthropic), and HuggingFace providers. "
+                  "Ollama does not require an API key as it runs locally.")
+        help_text.SetForegroundColour(wx.Colour(100, 100, 100))
+        help_text.Wrap(600)
+        sizer.Add(help_text, 0, wx.ALL, 10)
+        
+        panel.SetSizer(sizer)
+        
+        # Bind selection event
+        self.api_keys_list.Bind(wx.EVT_LISTBOX, self.on_api_key_selected)
+        
+        # Load current API keys
+        self.load_api_keys()
+        
+        return panel
+    
+    def load_api_keys(self):
+        """Load API keys from config and populate the list"""
+        self.api_keys_list.Clear()
+        
+        # Get api_keys from image_describer config
+        config = self.configs.get("image_describer", {})
+        api_keys = config.get("api_keys", {})
+        
+        # Add each key to the list
+        for provider, key in api_keys.items():
+            # Show provider and masked key
+            masked_key = key[:8] + "..." + key[-4:] if len(key) > 12 else "***"
+            display_text = f"{provider}: {masked_key}"
+            index = self.api_keys_list.Append(display_text)
+            # Store full provider name as client data
+            self.api_keys_list.SetClientData(index, provider)
+    
+    def on_api_key_selected(self, event):
+        """Handle API key selection"""
+        selection = self.api_keys_list.GetSelection()
+        if selection != wx.NOT_FOUND:
+            self.edit_key_btn.Enable(True)
+            self.delete_key_btn.Enable(True)
+        else:
+            self.edit_key_btn.Enable(False)
+            self.delete_key_btn.Enable(False)
+    
+    def on_add_api_key(self, event):
+        """Add a new API key"""
+        dialog = ApiKeyEditDialog(self)
+        if dialog.ShowModal() == wx.ID_OK:
+            provider, api_key = dialog.get_values()
+            
+            # Get api_keys from config
+            config = self.configs.get("image_describer", {})
+            if "api_keys" not in config:
+                config["api_keys"] = {}
+            
+            # Add the new key
+            config["api_keys"][provider] = api_key
+            
+            # Reload the list
+            self.load_api_keys()
+        
+        dialog.Destroy()
+    
+    def on_edit_api_key(self, event):
+        """Edit the selected API key"""
+        selection = self.api_keys_list.GetSelection()
+        if selection == wx.NOT_FOUND:
+            return
+        
+        provider = self.api_keys_list.GetClientData(selection)
+        
+        # Get current API key
+        config = self.configs.get("image_describer", {})
+        api_keys = config.get("api_keys", {})
+        current_key = api_keys.get(provider, "")
+        
+        # Open edit dialog
+        dialog = ApiKeyEditDialog(self, provider=provider, api_key=current_key)
+        if dialog.ShowModal() == wx.ID_OK:
+            new_provider, new_key = dialog.get_values()
+            
+            # If provider changed, delete old entry
+            if new_provider != provider:
+                del config["api_keys"][provider]
+            
+            # Update with new key
+            config["api_keys"][new_provider] = new_key
+            
+            # Reload the list
+            self.load_api_keys()
+        
+        dialog.Destroy()
+    
+    def on_delete_api_key(self, event):
+        """Delete the selected API key"""
+        selection = self.api_keys_list.GetSelection()
+        if selection == wx.NOT_FOUND:
+            return
+        
+        provider = self.api_keys_list.GetClientData(selection)
+        
+        # Confirm deletion
+        from shared.wx_common import ask_yes_no
+        if not ask_yes_no(self, f"Delete API key for {provider}?", "Confirm Delete"):
+            return
+        
+        # Get api_keys from config
+        config = self.configs.get("image_describer", {})
+        api_keys = config.get("api_keys", {})
+        
+        # Delete the key
+        if provider in api_keys:
+            del api_keys[provider]
+        
+        # Reload the list
+        self.load_api_keys()
+        
+        # Disable edit/delete buttons
+        self.edit_key_btn.Enable(False)
+        self.delete_key_btn.Enable(False)

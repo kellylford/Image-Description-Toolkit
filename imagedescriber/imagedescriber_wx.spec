@@ -34,6 +34,7 @@ a = Analysis(
         'imagedescriber.dialogs_wx',
         'imagedescriber.workers_wx',
         'imagedescriber.chat_window_wx',  # Chat with Image feature
+        'imagedescriber.viewer_components', # Viewer components
         'imagedescriber.prompt_editor_dialog',
         'imagedescriber.configure_dialog',
         'ai_providers',

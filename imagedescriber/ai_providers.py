@@ -356,9 +356,10 @@ class OpenAIProvider(AIProvider):
     def __init__(self, api_key: Optional[str] = None):
         # Try multiple sources for API key in order of preference:
         # 1. Explicitly passed key
-        # 2. Environment variable  
-        # 3. openai.txt file in current directory
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
+        # 2. Config file (image_describer_config.json)
+        # 3. Environment variable  
+        # 4. openai.txt file in current directory
+        self.api_key = api_key or self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
         self.timeout = 300
         
         # Initialize OpenAI client with SDK
@@ -378,6 +379,60 @@ class OpenAIProvider(AIProvider):
         # Token usage tracking (for cost estimation and logging)
         self.last_usage = None
     
+    def _load_api_key_from_config(self) -> Optional[str]:
+        """Load API key with robust fallback for frozen executables"""
+        # 1. Try standard config_loader import
+        try:
+            # Import config_loader if available
+            try:
+                from config_loader import load_json_config
+            except ImportError:
+                try:
+                    from scripts.config_loader import load_json_config
+                except ImportError:
+                     load_json_config = None
+
+            if load_json_config:
+                config, _, _ = load_json_config('image_describer_config.json')
+                if config:
+                    api_keys = config.get('api_keys', {})
+                    for key in ['OpenAI', 'openai', 'OPENAI']:
+                        if key in api_keys and api_keys[key]:
+                            return api_keys[key].strip()
+        except Exception as e:
+            print(f"DEBUG: OpenAI config_loader failed: {e}")
+
+        # 2. Manual Fallback
+        try:
+            candidates = []
+            if getattr(sys, 'frozen', False):
+                base_dir = Path(sys.executable).parent
+                candidates.append(base_dir / 'image_describer_config.json')
+                candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
+                if hasattr(sys, '_MEIPASS'):
+                    candidates.append(Path(sys._MEIPASS) / 'scripts' / 'image_describer_config.json')
+            else:
+                base_dir = Path(__file__).parent.parent
+                candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
+            
+            candidates.append(Path.cwd() / 'image_describer_config.json')
+            
+            for path in candidates:
+                if path.exists():
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            api_keys = data.get('api_keys', {})
+                            for k in ['OpenAI', 'openai', 'OPENAI']:
+                                if k in api_keys and api_keys[k]:
+                                    return api_keys[k].strip()
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+        return None
+    
     def _load_api_key_from_file(self) -> Optional[str]:
         """Load API key from openai.txt file"""
         try:
@@ -393,6 +448,27 @@ class OpenAIProvider(AIProvider):
     def is_available(self) -> bool:
         """Check if OpenAI is available (has API key and SDK)"""
         return bool(self.api_key and self.client)
+    
+    def reload_api_key(self):
+        """Reload API key from all sources and reinitialize client
+        
+        Call this after API keys are updated via Configure dialog to
+        refresh the provider without restarting the application.
+        """
+        # Reload API key from all sources
+        self.api_key = self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
+        
+        # Reinitialize client if we have a key
+        self.client = None
+        if self.api_key and HAS_OPENAI:
+            try:
+                self.client = openai.OpenAI(
+                    api_key=self.api_key,
+                    timeout=self.timeout,
+                    max_retries=3
+                )
+            except Exception as e:
+                print(f"Warning: Failed to reinitialize OpenAI client: {e}")
     
     def get_available_models(self) -> List[str]:
         """Get list of available OpenAI models"""
@@ -549,9 +625,10 @@ class ClaudeProvider(AIProvider):
     def __init__(self, api_key: Optional[str] = None):
         # Try multiple sources for API key in order of preference:
         # 1. Explicitly passed key
-        # 2. Environment variable  
-        # 3. claude.txt file in current directory
-        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
+        # 2. Config file (image_describer_config.json)
+        # 3. Environment variable  
+        # 4. claude.txt file in current directory
+        self.api_key = api_key or self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
         self.timeout = 300
         
         # Initialize Anthropic client with SDK
@@ -571,6 +648,63 @@ class ClaudeProvider(AIProvider):
         # Token usage tracking (for cost estimation and logging)
         self.last_usage = None
     
+    def _load_api_key_from_config(self) -> Optional[str]:
+        """Load API key with robust fallback for frozen executables"""
+        # 1. Try standard config_loader import
+        try:
+            # Import config_loader if available
+            try:
+                from config_loader import load_json_config
+            except ImportError:
+                try:
+                    from scripts.config_loader import load_json_config
+                except ImportError:
+                     load_json_config = None
+
+            if load_json_config:
+                config, p, s = load_json_config('image_describer_config.json')
+                if config:
+                    api_keys = config.get('api_keys', {})
+                    for key in ['Claude', 'claude', 'CLAUDE']:
+                        if key in api_keys and api_keys[key]:
+                            # print(f"DEBUG: Found Claude key using load_json_config from {s}")
+                            return api_keys[key].strip()
+        except Exception as e:
+            print(f"DEBUG: config_loader failed: {e}")
+
+        # 2. Manual Fallback: Search for JSON file directly
+        # This bypasses import issues in frozen builds
+        try:
+            candidates = []
+            if getattr(sys, 'frozen', False):
+                base_dir = Path(sys.executable).parent
+                candidates.append(base_dir / 'image_describer_config.json')
+                candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
+                if hasattr(sys, '_MEIPASS'):
+                    candidates.append(Path(sys._MEIPASS) / 'scripts' / 'image_describer_config.json')
+            else:
+                base_dir = Path(__file__).parent.parent
+                candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
+            
+            candidates.append(Path.cwd() / 'image_describer_config.json')
+            
+            for path in candidates:
+                if path.exists():
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            api_keys = data.get('api_keys', {})
+                            for k in ['Claude', 'claude', 'CLAUDE']:
+                                if k in api_keys and api_keys[k]:
+                                    print(f"DEBUG: Found Claude key in manual file: {path}")
+                                    return api_keys[k].strip()
+                    except Exception:
+                        continue
+        except Exception as e:
+            print(f"DEBUG: Manual config search failed: {e}")
+
+        return None
+    
     def _load_api_key_from_file(self) -> Optional[str]:
         """Load API key from claude.txt file in current directory only"""
         try:
@@ -585,7 +719,37 @@ class ClaudeProvider(AIProvider):
     
     def is_available(self) -> bool:
         """Check if Claude is available (has API key and SDK)"""
-        return bool(self.api_key and self.client)
+        available = bool(self.api_key and self.client)
+        if not available:
+            # Debug output to help diagnose issues in frozen builds
+            reasons = []
+            if not self.api_key: reasons.append("No API Key")
+            if not self.client: reasons.append("Client init failed")
+            if not HAS_ANTHROPIC: reasons.append("anthropic module missing")
+            if getattr(sys, 'frozen', False):
+                print(f"DEBUG: Claude unavailable. Reasons: {', '.join(reasons)}")
+        return available
+    
+    def reload_api_key(self):
+        """Reload API key from all sources and reinitialize client
+        
+        Call this after API keys are updated via Configure dialog to
+        refresh the provider without restarting the application.
+        """
+        # Reload API key from all sources
+        self.api_key = self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
+        
+        # Reinitialize client if we have a key
+        self.client = None
+        if self.api_key and HAS_ANTHROPIC:
+            try:
+                self.client = anthropic.Anthropic(
+                    api_key=self.api_key,
+                    timeout=self.timeout,
+                    max_retries=3
+                )
+            except Exception as e:
+                print(f"Warning: Failed to reinitialize Anthropic client: {e}")
     
     def get_available_models(self) -> List[str]:
         """Get list of available Claude models"""

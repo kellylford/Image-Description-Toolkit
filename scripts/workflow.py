@@ -1980,8 +1980,22 @@ class WorkflowOrchestrator:
             progress_thread = threading.Thread(target=monitor_progress, daemon=True)
             progress_thread.start()
             
-            # Stream output directly to terminal for real-time progress feedback
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            # Run command, capturing output for logging
+            # Note: explicit console output is suppressed by capture_output=True, 
+            # but we have the progress monitoring thread for feedback.
+            result = subprocess.run(
+                cmd, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace',
+                capture_output=True
+            )
+            
+            # Log the captured output to the workflow log for debugging
+            if result.stdout:
+                self.logger.info(f"[ImageDescriber STDOUT]:\n{result.stdout}")
+            if result.stderr:
+                self.logger.warning(f"[ImageDescriber STDERR]:\n{result.stderr}")
             
             # Mark description as no longer in progress
             if 'describe' in self.step_results:
@@ -1997,9 +2011,9 @@ class WorkflowOrchestrator:
                         self.logger.debug(f"Error reading final progress count: {e}")
                 self._update_status_log()
             
-            # Mark description as no longer in progress
-            if 'describe' in self.step_results:
-                self.step_results['describe']['in_progress'] = False
+            if result.returncode != 0:
+                error_msg = result.stderr if result.stderr else "Unknown output (check logs)"
+                raise RuntimeError(f"Image description process failed: {error_msg}")
             
             # Save file path mapping before cleaning up temp directory
             # This allows import tools to map temp paths back to originals

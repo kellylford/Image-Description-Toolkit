@@ -749,8 +749,20 @@ class ChatProcessingWorker(threading.Thread):
             import base64
             
             # Initialize OpenAI client
-            if self.api_key:
-                client = openai.OpenAI(api_key=self.api_key)
+            api_key_to_use = self.api_key
+
+            # Fallback to shared provider if no key provided
+            if not api_key_to_use:
+                try:
+                    from .ai_providers import get_available_providers
+                    providers = get_available_providers()
+                    if 'openai' in providers:
+                        api_key_to_use = providers['openai'].api_key
+                except ImportError:
+                    pass
+
+            if api_key_to_use:
+                client = openai.OpenAI(api_key=api_key_to_use)
             else:
                 client = openai.OpenAI()  # Uses OPENAI_API_KEY env var
             
@@ -819,10 +831,60 @@ class ChatProcessingWorker(threading.Thread):
         try:
             import anthropic
             import base64
+            import os
             
             # Initialize Anthropic client
-            if self.api_key:
-                client = anthropic.Anthropic(api_key=self.api_key)
+            api_key_to_use = self.api_key
+
+            # Fallback checks if no key provided explicitly
+            if not api_key_to_use and not os.getenv('ANTHROPIC_API_KEY'):
+                # 1. Try shared provider instance (which might have loaded it from config/file)
+                try:
+                    # Robust import to handle frozen/dev differences
+                    get_providers_func = None
+                    try:
+                        from .ai_providers import get_available_providers
+                        get_providers_func = get_available_providers
+                    except ImportError:
+                        try:
+                            from ai_providers import get_available_providers
+                            get_providers_func = get_available_providers
+                        except ImportError:
+                            pass
+                    
+                    if get_providers_func:
+                        providers = get_providers_func()
+                        if 'claude' in providers and providers['claude'].api_key:
+                            api_key_to_use = providers['claude'].api_key
+                except Exception:
+                    pass
+
+                # 2. Try legacy file check (last resort)
+                if not api_key_to_use:
+                    try:
+                        search_paths = [Path.cwd()]
+                        if getattr(sys, 'frozen', False):
+                            search_paths.append(Path(sys.executable).parent)
+                        
+                        for sp in search_paths:
+                            for filename in ['claude.txt', 'anthropic.txt']:
+                                fp = sp / filename
+                                if fp.exists():
+                                    with open(fp, 'r') as f:
+                                        val = f.read().strip()
+                                        if val:
+                                            api_key_to_use = val
+                                            break
+                            if api_key_to_use: break
+                    except Exception:
+                        pass
+
+            # Final validation - Fail fast if no key
+            if not api_key_to_use and not os.getenv('ANTHROPIC_API_KEY'):
+                raise ValueError("Claude API Key not found. Please configure it in Tools > Configure Settings, or ensure ANTHROPIC_API_KEY is set.")
+
+            if api_key_to_use:
+                client = anthropic.Anthropic(api_key=api_key_to_use)
             else:
                 client = anthropic.Anthropic()  # Uses ANTHROPIC_API_KEY env var
             

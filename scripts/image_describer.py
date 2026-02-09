@@ -2260,9 +2260,28 @@ Configuration:
         if ollama is not None and hasattr(ollama, 'list'):
             try:
                 models = ollama.list()
-                available_models = [model['name'] for model in models.get('models', [])]
+                
+                # Robustly handle different response structures (dict vs object)
+                model_list = []
+                if isinstance(models, dict):
+                    model_list = models.get('models', [])
+                elif hasattr(models, 'models'):
+                    model_list = models.models
+                
+                available_models = []
+                for model in model_list:
+                    # Handle dict vs object model items
+                    name = None
+                    if isinstance(model, dict):
+                        name = model.get('name') or model.get('model')
+                    else:
+                        name = getattr(model, 'name', None) or getattr(model, 'model', None)
+                    
+                    if name:
+                        available_models.append(name)
+                        
                 ollama_ok = True
-                logger.info("Ollama is available (python client)")
+                logger.info(f"Ollama is available (python client, found {len(available_models)} models)")
             except Exception as e:
                 logger.warning(f"Ollama python client check failed: {e}")
         # Fallback to HTTP API

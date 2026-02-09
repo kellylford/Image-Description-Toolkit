@@ -21,27 +21,33 @@ import wx
 import wx.lib.newevent
 
 # Add project root to sys.path for shared module imports
+# Works in both development mode (running script) and frozen mode (PyInstaller exe)
 if getattr(sys, 'frozen', False):
+    # Frozen mode - executable directory is base
     _project_root = Path(sys.executable).parent
+    _imagedescriber_dir = _project_root  # In frozen mode, all modules are at exe level
 else:
+    # Development mode - use __file__ relative path
     _project_root = Path(__file__).parent.parent
+    _imagedescriber_dir = Path(__file__).parent
 
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
+if str(_imagedescriber_dir) not in sys.path:
+    sys.path.insert(0, str(_imagedescriber_dir))
 
-# Import shared utilities
+# Import shared utilities (sys.path already configured above)
 from shared.wx_common import show_error, show_warning, show_info
 
-# Import workers and events
-from imagedescriber.workers_wx import (
+# Import workers and events - simple imports work since sys.path includes both
+# the project root and the imagedescriber directory
+from workers_wx import (
     ChatProcessingWorker,
     EVT_CHAT_UPDATE,
     EVT_CHAT_COMPLETE,
     EVT_CHAT_ERROR
 )
-
-# Import data models
-from imagedescriber.data_models import ImageItem, ImageWorkspace
+from data_models import ImageItem, ImageWorkspace
 
 
 class ChatDialog(wx.Dialog):
@@ -229,6 +235,11 @@ class ChatWindow(wx.Dialog):
         self.image_item = image_item
         self.provider = provider
         self.model = model
+        
+        # Try to get config and cache from parent (ImageDescriber)
+        self.config = getattr(parent, 'config', {})
+        self.cached_ollama_models = getattr(parent, 'cached_ollama_models', None)
+        
         self.session_id = session_id or self._create_session_id()
         self.current_response_chunks = []  # Buffer for streaming response
         self.is_processing = False
@@ -330,18 +341,24 @@ class ChatWindow(wx.Dialog):
         """Create header with image thumbnail and session info"""
         header_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        # Image preview (150x150 thumbnail)
-        img_bitmap = self._load_image_thumbnail(self.image_item.file_path, size=(150, 150))
-        if img_bitmap:
-            img_preview = wx.StaticBitmap(parent, bitmap=img_bitmap)
-            header_sizer.Add(img_preview, 0, wx.ALL, 5)
+        # Image preview (150x150 thumbnail) - only if image_item exists
+        if self.image_item is not None:
+            img_bitmap = self._load_image_thumbnail(self.image_item.file_path, size=(150, 150))
+            if img_bitmap:
+                img_preview = wx.StaticBitmap(parent, bitmap=img_bitmap)
+                header_sizer.Add(img_preview, 0, wx.ALL, 5)
         
         # Session info
         info_sizer = wx.BoxSizer(wx.VERTICAL)
         
         provider_text = f"Provider: {self.session['provider']} ({self.session['model']})"
-        provider_label = wx.StaticText(parent, label=provider_text)
-        info_sizer.Add(provider_label, 0, wx.ALL, 2)
+        self.provider_label = wx.StaticText(parent, label=provider_text)
+        info_sizer.Add(self.provider_label, 0, wx.ALL, 2)
+        
+        # Change Model button
+        change_model_btn = wx.Button(parent, label="Change Model...", size=(-1, 24))
+        change_model_btn.Bind(wx.EVT_BUTTON, self.on_change_model)
+        info_sizer.Add(change_model_btn, 0, wx.ALL, 2)
         
         session_text = f"Session: {self.session['name']}"
         session_label = wx.StaticText(parent, label=session_text)
@@ -465,15 +482,172 @@ class ChatWindow(wx.Dialog):
         # Get image path if available (None for text-only chat)
         image_path = str(self.image_item.file_path) if self.image_item else None
         
+        # Get API key from config if provider needs one
+        api_key = self._get_api_key_for_provider(self.provider)
+        
         worker = ChatProcessingWorker(
             parent_window=self,
             image_path=image_path,  # None for text-only mode
             provider=self.provider,
             model=self.model,
-            messages=self.session['messages']
+            messages=self.session['messages'],
+            api_key=api_key
         )
         worker.start()
+    
+    def _get_api_key_for_provider(self, provider: str) -> Optional[str]:
+        """Load API key for the specified provider from various sources
         
+        Check order:
+        1. Environment variables
+        2. Local text files (legacy support)
+        3. Configuration file (via config_loader)
+        
+        Args:
+            provider: Provider name (ollama, openai, claude, huggingface)
+            
+        Returns:
+            API key string or None if not found/not needed
+        """
+        # Ollama doesn't need API key (runs locally)
+        if provider.lower() == 'ollama':
+            return None
+        
+        provider_key = provider.lower()
+        
+        # 1. Environment Variables
+        env_map = {
+            'openai': 'OPENAI_API_KEY',
+            'claude': 'ANTHROPIC_API_KEY',
+            'huggingface': 'HUGGINGFACE_API_KEY'
+        }
+        if provider_key in env_map:
+            env_val = os.getenv(env_map[provider_key])
+            if env_val:
+                print(f"DEBUG: Found {provider} key in environment variables")
+                return env_val
+
+        # 2. Local Text Files (Legacy support)
+        # Common filenames used in this project
+        file_map = {
+            'openai': ['openai_api_key.txt', 'openai.txt'],
+            'claude': ['claude.txt', 'anthropic.txt'],
+            'huggingface': ['huggingface_api_key.txt', 'hf_key.txt']
+        }
+        
+        if provider_key in file_map:
+            filenames = file_map[provider_key]
+            # Search locations: CWD, Exe dir, Script dir
+            search_paths = [Path.cwd()]
+            if getattr(sys, 'frozen', False):
+                search_paths.append(Path(sys.executable).parent)
+            else:
+                search_paths.append(Path(__file__).parent)         # imagedescriber/
+                search_paths.append(Path(__file__).parent.parent)  # project root/
+            
+            for sp in search_paths:
+                for fn in filenames:
+                    fp = sp / fn
+                    if fp.exists():
+                        try:
+                            with open(fp, 'r', encoding='utf-8') as f:
+                                val = f.read().strip()
+                                if val:
+                                    print(f"DEBUG: Found {provider} key in file {fp}")
+                                    return val
+                        except Exception:
+                            pass
+
+        # 3. Configuration File (Standard method)
+        try:
+            # Robust configuration loading (matching ai_providers.py logic)
+            load_json_config_func = None
+
+            # Try imports
+            try:
+                # Try direct import first
+                from config_loader import load_json_config
+                load_json_config_func = load_json_config
+            except ImportError:
+                try:
+                    # Try scripts package import
+                    from scripts.config_loader import load_json_config
+                    load_json_config_func = load_json_config
+                except ImportError:
+                    pass
+
+            config = None
+            if load_json_config_func:
+                try:
+                    config, config_path, source = load_json_config_func('image_describer_config.json')
+                    print(f"DEBUG: Loaded config from {config_path} (Source: {source})")
+                except Exception as e:
+                    print(f"DEBUG: Config loader func failed: {e}")
+
+            # Manual Fallback if config loader failed
+            if not config:
+                import json
+                print("DEBUG: Falling back to manual config file search")
+                
+                candidates = []
+                if getattr(sys, 'frozen', False):
+                    base_dir = Path(sys.executable).parent
+                    candidates.append(base_dir / 'image_describer_config.json')
+                    candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
+                    if hasattr(sys, '_MEIPASS'):
+                        candidates.append(Path(sys._MEIPASS) / 'scripts' / 'image_describer_config.json')
+                else:
+                    base_dir = Path(__file__).parent.parent
+                    candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
+                
+                candidates.append(Path.cwd() / 'image_describer_config.json')
+                
+                for path in candidates:
+                    if path.exists():
+                        try:
+                            with open(path, 'r', encoding='utf-8') as f:
+                                config = json.load(f)
+                                print(f"DEBUG: Found config manually at {path}")
+                                break
+                        except Exception:
+                            continue
+            
+            if not config:
+                print("DEBUG: Config is empty or None")
+                return None
+            
+            # Get API keys dict
+            api_keys = config.get('api_keys', {})
+            print(f"DEBUG: Found API keys for: {list(api_keys.keys())}")
+            
+            # Match provider name (case-insensitive)
+            # Check exact match first
+            if provider_key in api_keys:
+                return api_keys[provider_key]
+                
+            # Check case-insensitive
+            for key_provider, api_key in api_keys.items():
+                if key_provider.lower() == provider_key:
+                    return api_key
+            
+            # Check standard capitalization mappings
+            provider_map = {
+                'openai': ['OpenAI', 'open_ai'],
+                'claude': ['Claude', 'Anthropic', 'anthropic'],
+                'huggingface': ['HuggingFace', 'Hugging Face', 'HF']
+            }
+            
+            if provider_key in provider_map:
+                for variant in provider_map[provider_key]:
+                    if variant in api_keys and api_keys[variant]:
+                        return api_keys[variant]
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error loading API key for {provider}: {e}")
+            return None
+
     def on_chat_update(self, event):
         """Handle streaming response chunks"""
         chunk = event.message_chunk
@@ -570,10 +744,46 @@ class ChatWindow(wx.Dialog):
         """Clear the input field"""
         self.input_text.Clear()
         self.input_text.SetFocus()
+
+    def on_change_model(self, event):
+        """Change the AI provider and model for this session"""
+        chat_dialog = ChatDialog(self, self.config, cached_ollama_models=self.cached_ollama_models)
+        
+        # Pre-select current
+        for i in range(chat_dialog.provider_choice.GetCount()):
+            if chat_dialog.provider_choice.GetString(i).lower() == self.provider.lower():
+                chat_dialog.provider_choice.SetSelection(i)
+                chat_dialog.on_provider_changed(None) # Trigger model update
+                break
+        
+        # Try to select current model
+        chat_dialog.model_combo.SetValue(self.model)
+        
+        if chat_dialog.ShowModal() == wx.ID_OK:
+            selections = chat_dialog.get_selections()
+            self.provider = selections['provider']
+            self.model = selections['model']
+            
+            # Update session data
+            self.session['provider'] = self.provider
+            self.session['model'] = self.model
+            
+            # Update UI
+            provider_text = f"Provider: {self.provider} ({self.model})"
+            self.provider_label.SetLabel(provider_text)
+            
+            # Add system message to history
+            timestamp = datetime.now().isoformat()
+            time_str = datetime.fromisoformat(timestamp).strftime("%I:%M %p")
+            sys_msg = f"System ({time_str}): Switched to {self.provider} - {self.model}"
+            self.history_list.Append(sys_msg)
+            self.history_list.SetSelection(self.history_list.GetCount() - 1)
+            self.workspace.save()
+            
+        chat_dialog.Destroy()
         
     def on_close(self, event):
-        """Handle window close"""
-        # Save workspace before closing
+        # Handle window close and save workspace
         try:
             self.workspace.save()
         except Exception as e:

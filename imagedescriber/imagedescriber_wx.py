@@ -102,6 +102,29 @@ try:
 except ImportError:
     ConfigureDialog = None
 
+# Import chat feature components
+try:
+    from chat_window_wx import ChatDialog, ChatWindow
+except ImportError as e:
+    import traceback
+    # Write error to file for debugging frozen exe
+    try:
+        with open('chat_import_error.log', 'w') as f:
+            f.write(f"CHAT IMPORT ERROR: {e}\n")
+            f.write(traceback.format_exc())
+    except:
+        pass
+    print(f"CHAT IMPORT ERROR: {e}")
+    print(traceback.format_exc())
+    ChatDialog = None
+    ChatWindow = None
+
+# Import Viewer components
+try:
+    from viewer_components import ViewerPanel
+except ImportError:
+    ViewerPanel = None
+
 # Import shared metadata extraction module
 try:
     if getattr(sys, 'frozen', False):
@@ -399,13 +422,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             }
     
     def init_ui(self):
-        """Initialize the user interface"""
-        # Main panel
-        panel = wx.Panel(self)
-        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        """Initialize the user interface with dual mode support"""
+        self.current_mode = "editor" # 'editor' or 'viewer'
+
+        # Main content container
+        self.main_content_panel = wx.Panel(self)
+        self.content_sizer = wx.BoxSizer(wx.VERTICAL)
         
+        # --- EDITOR MODE UI ---
+        self.editor_container = wx.Panel(self.main_content_panel)
+        self.editor_container.SetCanFocus(False)
+        editor_sizer = wx.BoxSizer(wx.VERTICAL)
+
         # Create splitter for resizable panels
-        splitter = wx.SplitterWindow(panel, style=wx.SP_LIVE_UPDATE)
+        splitter = wx.SplitterWindow(self.editor_container, style=wx.SP_LIVE_UPDATE)
         splitter.SetCanFocus(False)  # Keep focus on child controls for tab navigation
         
         # Left panel - Image list
@@ -418,10 +448,71 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         splitter.SplitVertically(left_panel, right_panel, 400)
         splitter.SetMinimumPaneSize(200)
         
-        # Add to main sizer
-        main_sizer.Add(splitter, 1, wx.EXPAND | wx.ALL, 5)
+        editor_sizer.Add(splitter, 1, wx.EXPAND | wx.ALL, 5)
+        self.editor_container.SetSizer(editor_sizer)
         
-        panel.SetSizer(main_sizer)
+        # --- VIEWER MODE UI ---
+        self.viewer_container = wx.Panel(self.main_content_panel)
+        self.viewer_container.SetCanFocus(False)
+        viewer_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        if ViewerPanel:
+            self.viewer_panel = ViewerPanel(self.viewer_container, main_window=self)
+            viewer_sizer.Add(self.viewer_panel, 1, wx.EXPAND)
+        else:
+            self.viewer_panel = None
+            viewer_sizer.Add(wx.StaticText(self.viewer_container, label="Viewer component missing or failed to load"), 0, wx.ALL, 20)
+            
+        self.viewer_container.SetSizer(viewer_sizer)
+        
+        # Add both to content sizer mechanism
+        self.content_sizer.Add(self.editor_container, 1, wx.EXPAND)
+        self.content_sizer.Add(self.viewer_container, 1, wx.EXPAND)
+        
+        # Default to editor mode (Viewer hidden)
+        self.viewer_container.Hide()
+        self.content_sizer.Layout()
+        
+        self.main_content_panel.SetSizer(self.content_sizer)
+        
+    def switch_mode(self, mode, data=None):
+        """Switch between Editor and Viewer modes.
+        :param mode: 'editor' or 'viewer'
+        :param data: Optional data to load (Path for directory, or just use current workspace)
+        """
+        if mode == self.current_mode and data is None:
+            # If checking same mode without new data, do nothing
+            return
+            
+        self.current_mode = mode
+        
+        if mode == 'viewer':
+            self.editor_container.Hide()
+            self.viewer_container.Show()
+            
+            if self.viewer_panel:
+                if isinstance(data, Path):
+                    # Load specific directory
+                    self.viewer_panel.load_from_directory(data)
+                elif data is not None:
+                     # Attempt to load whatever object was passed if applicable (e.g. Workspace)
+                    self.viewer_panel.load_from_workspace(data)
+                elif self.workspace:
+                    # Default: load current workspace
+                    self.viewer_panel.load_from_workspace(self.workspace)
+                else:
+                    # Just show empty viewer
+                    pass
+                
+            # Update menu checkmarks (if we stored references)
+            # (Menu items are referenced in bind lambda, but we didn't store them as attributes
+            #  but we can iterate or just rely on radio behavior if UI updates correctly)
+                
+        else: # editor
+            self.viewer_container.Hide()
+            self.editor_container.Show()
+        
+        self.main_content_panel.Layout()
     
     def create_image_list_panel(self, parent):
         """Create the left panel with image list"""
@@ -551,8 +642,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         load_dir_item = file_menu.Append(wx.ID_ANY, "&Load Directory\tCtrl+L")
         self.Bind(wx.EVT_MENU, self.on_load_directory, load_dir_item)
 
-        import_workflow_item = file_menu.Append(wx.ID_ANY, "&Import Workflow...")
+        import_workflow_item = file_menu.Append(wx.ID_ANY, "&Import Workflow (to Workspace)...")
         self.Bind(wx.EVT_MENU, self.on_import_workflow, import_workflow_item)
+        
+        open_workflow_result = file_menu.Append(wx.ID_ANY, "Open &Workflow Result (Viewer Mode)...")
+        self.Bind(wx.EVT_MENU, self.on_open_workflow_result, open_workflow_result)
         
         file_menu.AppendSeparator()
         
@@ -649,6 +743,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # View menu
         view_menu = wx.Menu()
         
+        # Mode switching
+        mode_menu = wx.Menu()
+        editor_mode_item = mode_menu.AppendRadioItem(wx.ID_ANY, "Editor Mode")
+        viewer_mode_item = mode_menu.AppendRadioItem(wx.ID_ANY, "Viewer Mode")
+        
+        self.Bind(wx.EVT_MENU, lambda e: self.switch_mode('editor'), editor_mode_item)
+        self.Bind(wx.EVT_MENU, lambda e: self.switch_mode('viewer', self.workspace if self.workspace else None), viewer_mode_item)
+        
+        view_menu.AppendSubMenu(mode_menu, "Application &Mode")
+        view_menu.AppendSeparator()
+
         filter_all_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &All Items\tF5")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("all"), filter_all_item)
         
@@ -1141,6 +1246,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 progress_dlg.Destroy()
             show_error(self, f"Error importing workflow:\n{str(e)}")
     
+    def on_open_workflow_result(self, event):
+        """Open a workflow directory in Viewer Mode"""
+        dlg = wx.DirDialog(self, "Select Workflow Directory to View", 
+                          style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST)
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            path = Path(dlg.GetPath())
+            self.switch_mode('viewer', path)
+        dlg.Destroy()
+
     def on_load_directory(self, event):
         """Load a directory of images"""
         try:
@@ -1776,17 +1891,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_chat(self, event):
         """Chat with AI (C key) - General purpose AI chat, no image required"""
+        # Check if chat feature is available
+        if ChatDialog is None or ChatWindow is None:
+            show_error(self, "Chat feature is not available. The chat_window_wx module could not be loaded.")
+            return
+        
         try:
-            # Import chat components (try both import paths for dev and frozen)
-            try:
-                from chat_window_wx import ChatDialog, ChatWindow
-            except ImportError:
-                try:
-                    from imagedescriber.chat_window_wx import ChatDialog, ChatWindow
-                except ImportError as e:
-                    show_error(self, f"Chat feature not available. Import error: {str(e)}\n\nPlease reinstall the application.")
-                    return
-            
             # Show provider selection dialog (pass cached Ollama models for performance)
             chat_dialog = ChatDialog(self, self.config, cached_ollama_models=self.cached_ollama_models)
             if chat_dialog.ShowModal() == wx.ID_OK:
@@ -2344,18 +2454,56 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
 def main():
     """Main application entry point"""
+    import argparse
+    
     # Log standardized build banner at startup
     if log_build_banner:
         try:
             log_build_banner()
         except Exception:
             pass
-    
+
+    parser = argparse.ArgumentParser(description="Image Describer Tool")
+    parser.add_argument('path', nargs='?', help="Directory or workspace to load")
+    parser.add_argument('--viewer', action='store_true', help="Start in viewer mode")
+    args = parser.parse_args()
+
     app = wx.App()
     frame = ImageDescriberFrame()
+    
+    if args.viewer:
+        if args.path:
+            # If path provided, switch to viewer mode with that path
+            # We need to defer this slightly to ensure UI is ready
+            wx.CallAfter(lambda: frame.switch_mode('viewer', Path(args.path)))
+        else:
+            # Just switch to viewer mode
+            wx.CallAfter(lambda: frame.switch_mode('viewer'))
+    elif args.path:
+        # Load directory or workspace normally
+        path = Path(args.path)
+        if path.suffix == '.idt':
+            wx.CallAfter(lambda: frame.load_workspace(path))
+        elif path.is_dir():
+            wx.CallAfter(lambda: frame.load_directory(path))
+
     frame.Show()
     app.MainLoop()
+            
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        error_msg = f"CRITICAL ERROR: {e}\n\n{traceback.format_exc()}"
+        print(error_msg, file=sys.stderr)
+        try:
+            with open("crash_log.txt", "w") as f:
+                f.write(error_msg)
+            print("Error logged to crash_log.txt")
+        except:
+            print("Could not write crash log")
+        
+        input("Application crashed. Press Enter to exit...")

@@ -48,6 +48,23 @@ def on_chat(self, event):
 ### 3. Made ChatWindow Support Optional Image
 **File**: `chat_window_wx.py` (line 207)
 
+**Bug Fix** (2026-02-08): Fixed AttributeError in `_create_header()` line 335 - added None check before accessing `image_item.file_path`. Chat window now opens successfully without an image.
+
+**Bug Fix** (2026-02-08): Fixed import error "No module named 'imagedescriber.chat_window_wx'". Root cause: `chat_window_wx.py` used package-prefixed imports (`from imagedescriber.workers_wx`) which failed when running from the imagedescriber directory. Solution: Changed imports to use try/except pattern, attempting simple imports first (`from workers_wx`) before falling back to package-prefixed imports. Also simplified the import in `on_chat()` to use `import chat_window_wx` instead of complex nested try/except blocks.
+
+**Bug Fix** (2026-02-08): Fixed Claude provider not loading API keys from Configure dialog. Root cause: Global provider instances (`_claude_provider`, `_openai_provider`) were initialized at module import time, before users could configure API keys via the GUI. The providers only checked environment variables and local files, not the `image_describer_config.json` file where the Configure dialog saves keys. Solution:
+1. Added `_load_api_key_from_config()` method to ClaudeProvider and OpenAIProvider
+2. Updated `__init__` to check config file as priority #2 (after explicit parameter, before environment variable)
+3. Added `reload_api_key()` method to both providers for dynamic reloading
+4. Modified ConfigureDialog.save_all_configs() to call `_reload_provider_api_keys()` after saving, which calls `reload_api_key()` on all providers
+5. This allows API keys added via Tools → Configure Settings to work immediately without restarting the application
+
+Files modified: `imagedescriber/ai_providers.py`, `imagedescriber/configure_dialog.py`
+
+**Bug Fix** (2026-02-08): Fixed frozen executable import error "No module named 'chat_window_wx'". Root cause: The `on_chat()` method imported chat_window_wx using `import chat_window_wx`, which works in development but fails in PyInstaller frozen executables because the module structure is flattened. Solution: Changed import to try `from chat_window_wx import ChatDialog, ChatWindow` first (frozen mode), then fall back to `import chat_window_wx` (development mode). The module was already in hiddenimports in the spec file, so just the import syntax needed fixing.
+
+File modified: `imagedescriber/imagedescriber_wx.py` line 1782
+
 **Changes**:
 - `__init__` signature: `image_item: Optional[ImageItem]` (was required)
 - Window title logic: Shows "Chat with AI: {provider} ({model})" when no image
@@ -282,6 +299,25 @@ TODO: Show messages in description list when chat selected
 **User's Vision**: "it should be chat with AI as the name. when you pick it, the provider and model dialog should appear and allow you to initiate a chat with the model of your choice. that should then show up in the image list as a chat with the chat conversation as individual items in the description list for that chat."
 
 **Status**: ✅ Core functionality implemented, ⏳ UI integration pending
+
+## Additional Enhancement: API Key Management
+
+**Added**: API key storage and management in configuration system
+
+**Implementation**:
+1. **New "API Keys" tab** in Configure Settings dialog
+2. **ListBox display** of saved API keys (with masked display)
+3. **Add/Edit/Delete** functionality for managing keys
+4. **Provider selection**: OpenAI, Claude, HuggingFace
+5. **Secure storage**: Keys saved in `image_describer_config.json` under `api_keys` section
+6. **Automatic retrieval**: ChatWindow loads appropriate API key based on selected provider
+
+**Files Modified**:
+- `imagedescriber/configure_dialog.py`: Added ApiKeyEditDialog class and API Keys tab
+- `imagedescriber/chat_window_wx.py`: Added `_get_api_key_for_provider()` method
+- `scripts/image_describer_config.json`: Added `api_keys` section
+
+**User Benefit**: No need to set environment variables or edit code - API keys managed through GUI
 
 ## Notes
 - All typing imports (Optional) were already present in affected files
