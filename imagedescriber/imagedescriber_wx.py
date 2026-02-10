@@ -1883,13 +1883,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.SetStatusText(f"Extracting frames from {video_name} ({video_idx}/{len(videos_to_extract)})...", 0)
                 
                 try:
-                    # Extract frames using default settings
+                    # Extract frames using conservative default settings
                     extraction_config = {
                         "extraction_mode": "time_interval",
-                        "time_interval_seconds": 5,  # Default: 1 frame every 5 seconds
+                        "time_interval_seconds": 15,  # Default: 1 frame every 15 seconds
                         "start_time_seconds": 0,
                         "end_time_seconds": None,
-                        "max_frames_per_video": 100
+                        "max_frames_per_video": 30  # Max 30 frames per video
                     }
                     
                     extracted_frames, video_metadata = self._extract_video_frames_sync(video_path, extraction_config)
