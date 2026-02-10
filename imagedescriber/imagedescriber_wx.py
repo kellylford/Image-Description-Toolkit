@@ -351,6 +351,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.batch_start_time: Optional[float] = None  # For avg time calculation
         self.batch_processing_times: List[float] = []  # Track times per image
         
+        # Batch video extraction state
+        self._batch_video_extraction = False  # Flag for batch video extraction mode
+        
         # AI Model caching (for faster dialog loading)
         self.cached_ollama_models = None  # Will be populated on first use or manual refresh
         
@@ -2029,69 +2032,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
+            # Show progress dialog immediately
+            total_items = len(videos_to_extract) + len(to_process)
+            if BatchProgressDialog:
+                self.batch_progress_dialog = BatchProgressDialog(self, total_items)
+                self.batch_progress_dialog.Show()
+                if hasattr(self, 'show_batch_progress_item'):
+                    self.show_batch_progress_item.Enable(True)
+            
             self.SetStatusText(f"Extracting frames from {len(videos_to_extract)} video(s)...", 0)
             
-            for video_idx, video_path in enumerate(videos_to_extract, 1):
-                video_name = Path(video_path).name
-                self.SetStatusText(f"Extracting frames from {video_name} ({video_idx}/{len(videos_to_extract)})...", 0)
-                
-                try:
-                    # Load extraction settings from config file (with fallback defaults)
-                    extraction_config = {}
-                    try:
-                        from config_loader import load_json_config
-                        video_config, _, _ = load_json_config('video_frame_extractor_config.json')
-                        if video_config:
-                            extraction_config = {
-                                "extraction_mode": video_config.get("extraction_mode", "time_interval"),
-                                "time_interval_seconds": video_config.get("time_interval_seconds", 5.0),
-                                "scene_change_threshold": video_config.get("scene_change_threshold", 30.0),
-                                "min_scene_duration_seconds": video_config.get("min_scene_duration_seconds", 1.0),
-                                "start_time_seconds": video_config.get("start_time_seconds", 0),
-                                "end_time_seconds": video_config.get("end_time_seconds")
-                            }
-                    except Exception:
-                        # Fallback to hardcoded defaults if config can't be loaded
-                        extraction_config = {
-                            "extraction_mode": "time_interval",
-                            "time_interval_seconds": 5.0,
-                            "scene_change_threshold": 30.0,
-                            "min_scene_duration_seconds": 1.0,
-                            "start_time_seconds": 0,
-                            "end_time_seconds": None
-                        }
-                    
-                    extracted_frames, video_metadata = self._extract_video_frames_sync(video_path, extraction_config)
-                    
-                    if extracted_frames:
-                        # Update video item with extracted frames
-                        if video_path in self.workspace.items:
-                            video_item = self.workspace.items[video_path]
-                            video_item.extracted_frames = extracted_frames
-                            if video_metadata:
-                                video_item.video_metadata = video_metadata
-                        
-                        # Add extracted frames as items to workspace
-                        for frame_path in extracted_frames:
-                            if frame_path not in self.workspace.items:
-                                frame_item = ImageItem(frame_path, "extracted_frame")
-                                frame_item.parent_video = video_path
-                                self.workspace.add_item(frame_item)
-                                
-                                # Add to processing queue if not already described
-                                if skip_existing and not frame_item.descriptions:
-                                    images_to_process.append(frame_path)
-                                elif not skip_existing:
-                                    images_to_process.append(frame_path)
-                        
-                        self.SetStatusText(f"Extracted {len(extracted_frames)} frames from {video_name}", 0)
-                except Exception as e:
-                    show_error(self, f"Failed to extract frames from {video_name}:\n{str(e)}")
-                    # Continue with other videos
+            # Store processing options and queue for after video extraction
+            self._pending_batch_options = options
+            self._pending_batch_queue = to_process
+            self._pending_batch_skip_existing = skip_existing
+            self._videos_to_extract = videos_to_extract
+            self._extracted_video_count = 0
             
-            self.refresh_image_list()
-            self.mark_modified()
+            # Start extracting first video
+            self._extract_next_video_in_batch()
+            return  # Will continue in video extraction event handler
         
+        # No videos to extract, proceed directly to image processing
         to_process = images_to_process
         
         if not to_process:
@@ -2145,6 +2107,173 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.batch_processing_times = []
         
         # Save workspace (preserves batch_state)
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
+        
+        self.SetStatusText(f"Processing {len(to_process)} images...", 0)
+    
+    def _extract_next_video_in_batch(self):
+        """Extract next video in batch processing queue"""
+        if self._extracted_video_count >= len(self._videos_to_extract):
+            # All videos extracted, proceed to image processing
+            self._start_batch_image_processing()
+            return
+        
+        # Get next video
+        video_path = self._videos_to_extract[self._extracted_video_count]
+        video_name = Path(video_path).name
+        
+        # Update progress
+        video_num = self._extracted_video_count + 1
+        total_videos = len(self._videos_to_extract)
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.update_progress(
+                current=video_num,
+                total=len(self._videos_to_extract) + len(self._pending_batch_queue),
+                image_name=f"Extracting video {video_name} ({video_num}/{total_videos})",
+                provider="System",
+                model="Video Extraction"
+            )
+        
+        self.SetStatusText(f"Extracting frames from {video_name} ({video_num}/{total_videos})...", 0)
+        
+        # Load extraction config
+        try:
+            from config_loader import load_json_config
+            video_config, _, _ = load_json_config('video_frame_extractor_config.json')
+            if video_config:
+                extraction_config = {
+                    "extraction_mode": video_config.get("extraction_mode", "time_interval"),
+                    "time_interval_seconds": video_config.get("time_interval_seconds", 5.0),
+                    "scene_change_threshold": video_config.get("scene_change_threshold", 30.0),
+                    "min_scene_duration_seconds": video_config.get("min_scene_duration_seconds", 1.0),
+                    "start_time_seconds": video_config.get("start_time_seconds", 0),
+                    "end_time_seconds": video_config.get("end_time_seconds")
+                }
+            else:
+                raise Exception("Config not loaded")
+        except Exception:
+            extraction_config = {
+                "extraction_mode": "time_interval",
+                "time_interval_seconds": 5.0,
+                "scene_change_threshold": 30.0,
+                "min_scene_duration_seconds": 1.0,
+                "start_time_seconds": 0,
+                "end_time_seconds": None
+            }
+        
+        # Mark this as a batch video extraction
+        self._batch_video_extraction = True
+        
+        # Start video extraction worker
+        from workers_wx import VideoProcessingWorker
+        worker = VideoProcessingWorker(self, video_path, extraction_config)
+        worker.start()
+    
+    def _complete_batch_video_extraction(self, video_path, extracted_frames, video_metadata):
+        """Handle completion of one video in batch extraction"""
+        # Update video item
+        if video_path in self.workspace.items:
+            video_item = self.workspace.items[video_path]
+            video_item.extracted_frames = extracted_frames
+            if video_metadata:
+                video_item.video_metadata = video_metadata
+        
+        # Add extracted frames as items to workspace
+        for frame_path in extracted_frames:
+            if frame_path not in self.workspace.items:
+                frame_item = ImageItem(frame_path, "extracted_frame")
+                frame_item.parent_video = video_path
+                self.workspace.add_item(frame_item)
+                
+                # Add to processing queue if needed
+                if self._pending_batch_skip_existing and not frame_item.descriptions:
+                    self._pending_batch_queue.append(frame_path)
+                elif not self._pending_batch_skip_existing:
+                    self._pending_batch_queue.append(frame_path)
+        
+        # Move to next video
+        self._extracted_video_count += 1
+        self._extract_next_video_in_batch()
+    
+    def _start_batch_image_processing(self):
+        """Start batch image processing after video extraction completes"""
+        # Clean up video extraction state
+        self._batch_video_extraction = False
+        del self._videos_to_extract
+        del self._extracted_video_count
+        
+        # Refresh UI
+        self.refresh_image_list()
+        self.mark_modified()
+        
+        # Get final processing queue
+        to_process = self._pending_batch_queue
+        options = self._pending_batch_options
+        skip_existing = self._pending_batch_skip_existing
+        
+        # Clean up pending state
+        del self._pending_batch_queue
+        del self._pending_batch_options
+        del self._pending_batch_skip_existing
+        
+        if not to_process:
+            # Close progress dialog
+            if self.batch_progress_dialog:
+                self.batch_progress_dialog.Close()
+                self.batch_progress_dialog = None
+            show_info(self, "Video frames extracted.\nAll images already have descriptions.")
+            return
+        
+        # Mark items as pending
+        queue_position = 0
+        for file_path in to_process:
+            if file_path in self.workspace.items:
+                item = self.workspace.items[file_path]
+                item.processing_state = "pending"
+                item.batch_queue_position = queue_position
+                queue_position += 1
+        
+        # Store batch parameters
+        self.workspace.batch_state = {
+            "provider": options['provider'],
+            "model": options['model'],
+            "prompt_style": options.get('prompt_style', 'default'),
+            "custom_prompt": options.get('custom_prompt'),
+            "detection_settings": options.get('detection_settings'),
+            "total_queued": len(to_process),
+            "started": datetime.now().isoformat()
+        }
+        
+        # Start batch processing worker
+        self.batch_worker = BatchProcessingWorker(
+            self,
+            to_process,
+            options['provider'],
+            options['model'],
+            options['prompt_style'],
+            options.get('custom_prompt', ''),
+            None,  # detection_settings
+            None,  # prompt_config_path
+            skip_existing
+        )
+        self.batch_worker.start()
+        
+        # Update progress dialog for image processing
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.update_progress(
+                current=0,
+                total=len(to_process),
+                image_name="Starting image processing...",
+                provider=options['provider'],
+                model=options['model']
+            )
+        
+        # Initialize timing
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+        
+        # Save workspace
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
         
@@ -2682,7 +2811,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_workflow_complete(self, event):
         """Handle workflow completion (including video extraction)"""
-        # Check if this was a video extraction
+        # Check if this is part of batch video extraction
+        if hasattr(self, '_batch_video_extraction') and self._batch_video_extraction:
+            # Get extracted frames from output directory
+            output_dir = Path(event.output_dir)
+            extracted_frames = sorted([str(f) for f in output_dir.glob("*.jpg")])
+            
+            # Get video metadata from event if available
+            video_metadata = event.video_metadata if hasattr(event, 'video_metadata') else None
+            
+            # Get the video path from input_dir (parent directory name)
+            video_path = event.input_dir
+            
+            # Complete this video and move to next
+            self._complete_batch_video_extraction(video_path, extracted_frames, video_metadata)
+            return
+        
+        # Check if this was a manual video extraction
         if hasattr(self, 'last_extraction_settings') and self.last_extraction_settings:
             settings = self.last_extraction_settings
             video_path = settings['video_path']
