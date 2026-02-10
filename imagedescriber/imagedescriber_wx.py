@@ -2033,7 +2033,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
             # Show progress dialog immediately
-            total_items = len(videos_to_extract) + len(to_process)
+            total_items = len(videos_to_extract) + len(images_to_process)
             if BatchProgressDialog:
                 self.batch_progress_dialog = BatchProgressDialog(self, total_items)
                 self.batch_progress_dialog.Show()
@@ -2044,7 +2044,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             # Store processing options and queue for after video extraction
             self._pending_batch_options = options
-            self._pending_batch_queue = to_process
+            self._pending_batch_queue = images_to_process.copy()  # FIX: Use images_to_process, not to_process
             self._pending_batch_skip_existing = skip_existing
             self._videos_to_extract = videos_to_extract
             self._extracted_video_count = 0
@@ -2090,7 +2090,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('custom_prompt', ''),
             None,  # detection_settings
             None,  # prompt_config_path
-            skip_existing  # Phase 5: Use parameter instead of options
+            skip_existing,  # Phase 5: Use parameter instead of options
+            progress_offset=0  # No offset when processing without video extraction
         )
         self.batch_worker.start()
         
@@ -2245,7 +2246,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "started": datetime.now().isoformat()
         }
         
-        # Start batch processing worker
+        # Calculate progress offset (number of videos already extracted)
+        progress_offset = len(self._videos_to_extract) if hasattr(self, '_videos_to_extract') else 0
+        
+        # Start batch processing worker with offset
         self.batch_worker = BatchProcessingWorker(
             self,
             to_process,
@@ -2255,15 +2259,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('custom_prompt', ''),
             None,  # detection_settings
             None,  # prompt_config_path
-            skip_existing
+            skip_existing,
+            progress_offset=progress_offset
         )
         self.batch_worker.start()
         
-        # Update progress dialog for image processing
+        # Update progress dialog for image processing (continue from where videos left off)
         if self.batch_progress_dialog:
+            total_items = len(to_process) + progress_offset
             self.batch_progress_dialog.update_progress(
-                current=0,
-                total=len(to_process),
+                current=progress_offset,
+                total=total_items,
                 image_name="Starting image processing...",
                 provider=options['provider'],
                 model=options['model']

@@ -1062,7 +1062,8 @@ class BatchProcessingWorker(threading.Thread):
                  prompt_style: str, custom_prompt: str = "",
                  detection_settings: dict = None,
                  prompt_config_path: Optional[str] = None,
-                 skip_existing: bool = False):
+                 skip_existing: bool = False,
+                 progress_offset: int = 0):
         """Initialize batch worker
         
         Args:
@@ -1075,6 +1076,7 @@ class BatchProcessingWorker(threading.Thread):
             detection_settings: Optional settings for object detection
             prompt_config_path: Optional path to prompt config file
             skip_existing: Skip images that already have descriptions
+            progress_offset: Offset to add to progress counter (for continuing after video extraction)
         """
         super().__init__(daemon=True)
         self.parent_window = parent_window
@@ -1086,6 +1088,7 @@ class BatchProcessingWorker(threading.Thread):
         self.detection_settings = detection_settings
         self.prompt_config_path = prompt_config_path
         self.skip_existing = skip_existing
+        self.progress_offset = progress_offset
         
         # Phase 2: Pause/Resume/Stop controls using threading.Event
         self._stop_event = threading.Event()  # Set = stopped
@@ -1110,12 +1113,14 @@ class BatchProcessingWorker(threading.Thread):
             if self._stop_event.is_set():
                 break
             
-            # Post progress with current/total counts
+            # Post progress with current/total counts (add offset for continuing from video extraction)
+            current_progress = i + self.progress_offset
+            total_progress = total + self.progress_offset
             evt = ProgressUpdateEventData(
                 file_path=file_path,
                 message=f"Processing {i}/{total}: {Path(file_path).name}",
-                current=i,
-                total=total
+                current=current_progress,
+                total=total_progress
             )
             wx.PostEvent(self.parent_window, evt)
             
