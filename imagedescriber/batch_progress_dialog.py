@@ -66,21 +66,14 @@ class BatchProgressDialog(wx.Dialog):
         main_sizer.Add(title_label, 0, wx.ALL, 10)
         
         # Stats list box (read-only, single-selection for accessibility)
+        # Includes current image as last item for keyboard navigation
         self.stats_list = wx.ListBox(
             panel,
             style=wx.LB_SINGLE,
-            name="Processing statistics"
+            name="Processing statistics and current image"
         )
-        self.stats_list.SetMinSize((450, 80))
+        self.stats_list.SetMinSize((450, 100))
         main_sizer.Add(self.stats_list, 0, wx.ALL | wx.EXPAND, 10)
-        
-        # Current image label
-        self.current_image_label = wx.StaticText(
-            panel,
-            label="Current Image: (none)",
-            name="Current image being processed"
-        )
-        main_sizer.Add(self.current_image_label, 0, wx.ALL, 10)
         
         # Progress label
         progress_label = wx.StaticText(
@@ -137,7 +130,7 @@ class BatchProgressDialog(wx.Dialog):
             file_path: Path to current image being processed
             avg_time: Average processing time per image in seconds
         """
-        # Update stats list
+        # Update stats list (including current image as last item)
         self.stats_list.Clear()
         self.stats_list.Append(f"Images Processed: {current} / {total}")
         self.stats_list.Append(f"Average Processing Time: {avg_time:.1f} seconds")
@@ -159,9 +152,12 @@ class BatchProgressDialog(wx.Dialog):
             
             self.stats_list.Append(f"Estimated Time Remaining: {time_str}")
         
-        # Update current image
+        # Add separator line
+        self.stats_list.Append("─" * 40)
+        
+        # Add current image as last item (keyboard-navigable)
         filename = Path(file_path).name
-        self.current_image_label.SetLabel(f"Current Image: {filename}")
+        self.stats_list.Append(f"Current Image: {filename}")
         
         # Update progress bar
         percentage = int((current / total) * 100) if total > 0 else 0
