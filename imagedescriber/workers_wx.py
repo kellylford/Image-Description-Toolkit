@@ -1272,10 +1272,12 @@ class VideoProcessingWorker(threading.Thread):
         video_dir.mkdir(parents=True, exist_ok=True)
         
         # Extract based on mode
-        if self.extraction_config.get("extraction_mode") == "time_interval":
-            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir)
-        else:
+        extraction_mode = self.extraction_config.get("extraction_mode", "time_interval")
+        if extraction_mode == "scene_change":
             extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir)
+        else:
+            # Default to time_interval if mode not recognized
+            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir)
         
         cap.release()
         return extracted_paths, video_metadata
@@ -1287,10 +1289,23 @@ class VideoProcessingWorker(threading.Thread):
         interval_seconds = self.extraction_config.get("time_interval_seconds", 5)
         start_time = self.extraction_config.get("start_time_seconds", 0)
         end_time = self.extraction_config.get("end_time_seconds")
-        max_frames = self.extraction_config.get("max_frames_per_video")
         
-        frame_interval = int(fps * interval_seconds)
+        total_frames_in_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_interval = max(1, int(fps * interval_seconds))  # Minimum 1 frame
         start_frame = int(fps * start_time)
+        
+        # Calculate end point (either user-specified or video end)
+        if end_time:
+            end_frame = int(fps * end_time)
+        else:
+            end_frame = total_frames_in_video
+        
+        # EMERGENCY: Safety limit
+        safety_limit = total_frames_in_video + 10
+        
+        # Log extraction parameters for debugging
+        self._post_progress(f"FPS: {fps:.2f}, Interval: {interval_seconds}s = {frame_interval} frames")
+        self._post_progress(f"Video: {total_frames_in_video} frames total, extracting frames {start_frame} to {end_frame}")
         
         extracted_paths = []
         frame_num = start_frame
@@ -1298,19 +1313,17 @@ class VideoProcessingWorker(threading.Thread):
         
         video_stem = Path(self.video_path).stem
         
-        while True:
-            if max_frames and extract_count >= max_frames:
+        # Use CLI logic: check frame position in while condition
+        while frame_num < end_frame:
+            # EMERGENCY STOP (shouldn't be needed, but keep as safety)
+            if extract_count >= safety_limit:
+                self._post_progress(f"SAFETY STOP: Extracted {extract_count} frames from {total_frames_in_video}-frame video!")
                 break
             
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
             ret, frame = cap.read()
             
             if not ret:
-                break
-            
-            # Check end time limit
-            current_time = frame_num / fps
-            if end_time and current_time > end_time:
                 break
             
             # Save frame
@@ -1333,7 +1346,6 @@ class VideoProcessingWorker(threading.Thread):
         
         threshold = self.extraction_config.get("scene_change_threshold", 30) / 100.0
         min_duration = self.extraction_config.get("min_scene_duration_seconds", 1)
-        max_frames = self.extraction_config.get("max_frames_per_video")
         
         extracted_paths = []
         prev_frame = None
@@ -1345,9 +1357,6 @@ class VideoProcessingWorker(threading.Thread):
         video_stem = Path(self.video_path).stem
         
         while True:
-            if max_frames and extract_count >= max_frames:
-                break
-            
             ret, frame = cap.read()
             if not ret:
                 break

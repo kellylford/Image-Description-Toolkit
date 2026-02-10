@@ -542,32 +542,84 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         video_dir = extracted_frames_dir / f"{video_path_obj.stem}"
         video_dir.mkdir(parents=True, exist_ok=True)
         
-        # Extract frames at time intervals
+        # Extract based on mode (time_interval or scene_change)
+        extraction_mode = extraction_config.get("extraction_mode", "time_interval")
+        print(f"Video extraction mode: {extraction_mode}")
+        print(f"Video: {frame_count} total frames, {duration:.1f}s, fps={fps:.2f}")
+        
+        if extraction_mode == "scene_change":
+            extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir, extraction_config, video_path_obj)
+        else:
+            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir, extraction_config, video_path_obj)
+        
+        cap.release()
+        return extracted_paths, video_metadata
+    
+    def _extract_by_time_interval(self, cap, fps: float, video_dir: Path, extraction_config: dict, video_path_obj: Path) -> list:
+        """Extract frames at time intervals"""
+        import cv2
+        
         interval_seconds = extraction_config.get("time_interval_seconds", 5)
         start_time = extraction_config.get("start_time_seconds", 0)
         end_time = extraction_config.get("end_time_seconds")
-        max_frames = extraction_config.get("max_frames_per_video", 100)
         
-        frame_interval = int(fps * interval_seconds)
+        total_frames_in_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_interval = max(1, int(fps * interval_seconds))  # Minimum 1 frame
         start_frame = int(fps * start_time)
+        
+        # Calculate end point (either user-specified or video end)
+        if end_time:
+            end_frame = int(fps * end_time)
+        else:
+            end_frame = total_frames_in_video
+        
+        # EMERGENCY: Safety limit - can't extract more frames than exist in video!
+        safety_limit = total_frames_in_video + 10  # Add small buffer for edge cases
+        
+        print(f"\n{'='*60}")
+        print(f"EXTRACTION DEBUG: {video_path_obj.stem}")
+        print(f"Video has {total_frames_in_video} total frames, {fps:.2f} fps")
+        print(f"Time interval extraction: {interval_seconds}s = {frame_interval} frames")
+        print(f"Frame range: {start_frame} to {end_frame}")
+        print(f"Safety limit: {safety_limit} extractions max")
+        print(f"{'='*60}\n")
+        
+        # Write to log file too
+        log_file = video_dir / "_extraction_debug.log"
+        with open(log_file, 'w') as f:
+            f.write(f"Video: {video_path_obj.name}\n")
+            f.write(f"Total frames in video: {total_frames_in_video}\n")
+            f.write(f"FPS: {fps:.2f}\n")
+            f.write(f"Interval: {interval_seconds}s = {frame_interval} frames\n")
+            f.write(f"Start frame: {start_frame}\n")
+            f.write(f"End frame: {end_frame}\n")
+            f.write(f"\nExtraction log:\n")
         
         extracted_paths = []
         frame_num = start_frame
         extract_count = 0
         
-        while True:
-            if max_frames and extract_count >= max_frames:
+        # Use CLI logic: check frame position in while condition
+        while frame_num < end_frame:
+            # EMERGENCY STOP (shouldn't be needed now, but keep as safety)
+            if extract_count >= safety_limit:
+                error_msg = f"SAFETY STOP: Extracted {extract_count} frames from {total_frames_in_video}-frame video!"
+                print(f"\n*** {error_msg} ***\n")
+                with open(log_file, 'a') as f:
+                    f.write(f"\n*** {error_msg} ***\n")
                 break
+            
+            # Log every extraction
+            with open(log_file, 'a') as f:
+                f.write(f"  [{extract_count}] Seeking to frame {frame_num}...")
             
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
             ret, frame = cap.read()
             
             if not ret:
-                break
-            
-            # Check end time limit
-            current_time = frame_num / fps
-            if end_time and current_time > end_time:
+                with open(log_file, 'a') as f:
+                    f.write(f" FAILED (ret={ret})\n")
+                print(f"Frame {frame_num} read failed, stopping extraction")
                 break
             
             # Save frame
@@ -576,11 +628,69 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             cv2.imwrite(str(frame_path), frame)
             extracted_paths.append(str(frame_path))
             
+            with open(log_file, 'a') as f:
+                f.write(f" OK, saved as {frame_filename}\n")
+            
             extract_count += 1
+            old_frame_num = frame_num
             frame_num += frame_interval
+            
+            if extract_count % 10 == 0:
+                print(f"Extracted {extract_count} frames (frame {old_frame_num} -> {frame_num})")
         
-        cap.release()
-        return extracted_paths, video_metadata
+        print(f"\nExtraction complete: {extract_count} frames extracted")
+        print(f"Debug log written to: {log_file}\n")
+        
+        return extracted_paths
+    
+    def _extract_by_scene_detection(self, cap, fps: float, video_dir: Path, extraction_config: dict, video_path_obj: Path) -> list:
+        """Extract frames based on scene changes"""
+        import cv2
+        
+        threshold = extraction_config.get("scene_change_threshold", 30.0) / 100.0
+        min_duration = extraction_config.get("min_scene_duration_seconds", 1.0)
+        
+        print(f"Scene detection: threshold={threshold*100:.1f}%, min_duration={min_duration}s")
+        
+        extracted_paths = []
+        prev_frame = None
+        last_extract_frame = -1
+        min_frame_gap = int(fps * min_duration)
+        frame_num = 0
+        extract_count = 0
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Calculate difference from previous frame
+            if prev_frame is not None:
+                # Convert to grayscale for comparison
+                gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                gray_prev = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+                
+                # Calculate mean squared difference
+                diff = cv2.absdiff(gray_current, gray_prev)
+                mean_diff = diff.mean() / 255.0
+                
+                # Check if scene change detected and minimum duration passed
+                if (mean_diff > threshold and 
+                    frame_num - last_extract_frame >= min_frame_gap):
+                    
+                    # Save frame
+                    frame_filename = f"{video_path_obj.stem}_scene_{extract_count:04d}.jpg"
+                    frame_path = video_dir / frame_filename
+                    cv2.imwrite(str(frame_path), frame)
+                    extracted_paths.append(str(frame_path))
+                    
+                    last_extract_frame = frame_num
+                    extract_count += 1
+            
+            prev_frame = frame.copy()
+            frame_num += 1
+        
+        return extracted_paths
     
     def init_ui(self):
         """Initialize the user interface with dual mode support"""
@@ -1892,18 +2002,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             extraction_config = {
                                 "extraction_mode": video_config.get("extraction_mode", "time_interval"),
                                 "time_interval_seconds": video_config.get("time_interval_seconds", 5.0),
+                                "scene_change_threshold": video_config.get("scene_change_threshold", 30.0),
+                                "min_scene_duration_seconds": video_config.get("min_scene_duration_seconds", 1.0),
                                 "start_time_seconds": video_config.get("start_time_seconds", 0),
-                                "end_time_seconds": video_config.get("end_time_seconds"),
-                                "max_frames_per_video": video_config.get("max_frames_per_video")
+                                "end_time_seconds": video_config.get("end_time_seconds")
                             }
                     except Exception:
                         # Fallback to hardcoded defaults if config can't be loaded
                         extraction_config = {
                             "extraction_mode": "time_interval",
                             "time_interval_seconds": 5.0,
+                            "scene_change_threshold": 30.0,
+                            "min_scene_duration_seconds": 1.0,
                             "start_time_seconds": 0,
-                            "end_time_seconds": None,
-                            "max_frames_per_video": None
+                            "end_time_seconds": None
                         }
                     
                     extracted_frames, video_metadata = self._extract_video_frames_sync(video_path, extraction_config)
@@ -2856,13 +2968,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         process_after = settings.pop('process_after_extraction')
         dialog.Destroy()
         
-        # Add defaults for extractor
-        extraction_config = {
-            "start_time_seconds": 0,
-            "end_time_seconds": None,
-            "max_frames_per_video": 100,
-            **settings
-        }
+        # Load defaults from config file, then overlay dialog settings
+        try:
+            from config_loader import load_json_config
+            video_config, _, _ = load_json_config('video_frame_extractor_config.json')
+            if video_config:
+                extraction_config = {
+                    # Defaults from config file
+                    "start_time_seconds": video_config.get("start_time_seconds", 0),
+                    "end_time_seconds": video_config.get("end_time_seconds"),
+                    "time_interval_seconds": video_config.get("time_interval_seconds", 5.0),
+                    "scene_change_threshold": video_config.get("scene_change_threshold", 30.0),
+                    "min_scene_duration_seconds": video_config.get("min_scene_duration_seconds", 1.0),
+                    **settings  # Dialog settings override config file
+                }
+            else:
+                raise Exception("Config not loaded")
+        except Exception:
+            # Fallback to hardcoded defaults
+            extraction_config = {
+                "start_time_seconds": 0,
+                "end_time_seconds": None,
+                "time_interval_seconds": 5.0,
+                "scene_change_threshold": 30.0,
+                "min_scene_duration_seconds": 1.0,
+                **settings
+            }
         
         # Store settings for potential auto-processing
         self.last_extraction_settings = {
