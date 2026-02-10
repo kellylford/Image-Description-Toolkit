@@ -1883,14 +1883,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.SetStatusText(f"Extracting frames from {video_name} ({video_idx}/{len(videos_to_extract)})...", 0)
                 
                 try:
-                    # Extract frames using conservative default settings
-                    extraction_config = {
-                        "extraction_mode": "time_interval",
-                        "time_interval_seconds": 15,  # Default: 1 frame every 15 seconds
-                        "start_time_seconds": 0,
-                        "end_time_seconds": None,
-                        "max_frames_per_video": 30  # Max 30 frames per video
-                    }
+                    # Load extraction settings from config file (with fallback defaults)
+                    extraction_config = {}
+                    try:
+                        from config_loader import load_json_config
+                        video_config, _, _ = load_json_config('video_frame_extractor_config.json')
+                        if video_config:
+                            extraction_config = {
+                                "extraction_mode": video_config.get("extraction_mode", "time_interval"),
+                                "time_interval_seconds": video_config.get("time_interval_seconds", 5.0),
+                                "start_time_seconds": video_config.get("start_time_seconds", 0),
+                                "end_time_seconds": video_config.get("end_time_seconds"),
+                                "max_frames_per_video": video_config.get("max_frames_per_video", 30)  # Default to 30 if not set
+                            }
+                    except Exception:
+                        # Fallback to hardcoded defaults if config can't be loaded
+                        extraction_config = {
+                            "extraction_mode": "time_interval",
+                            "time_interval_seconds": 5.0,
+                            "start_time_seconds": 0,
+                            "end_time_seconds": None,
+                            "max_frames_per_video": 30
+                        }
                     
                     extracted_frames, video_metadata = self._extract_video_frames_sync(video_path, extraction_config)
                     
