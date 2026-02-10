@@ -1726,6 +1726,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.SetStatusText(f"{count} images", 1)
             self.clear_modified()
             
+            # Phase 4: Check for resumable batch
+            if self.workspace.batch_state:
+                wx.CallAfter(self.prompt_resume_batch)
+            
         except json.JSONDecodeError as e:
             show_error(self, f"Error loading workspace - Invalid JSON format:\n\nLine {e.lineno}, Column {e.colno}\n{e.msg}\n\nThe workspace file may be corrupted. Try opening it in a text editor to fix the JSON syntax error.")
         except Exception as e:
@@ -2217,6 +2221,113 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         self.SetStatusText("Batch processing stopped", 0)
         show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
+    
+    # Phase 4: Resume functionality
+    def prompt_resume_batch(self):
+        """Show dialog to resume interrupted batch"""
+        batch_state = self.workspace.batch_state
+        
+        # Count remaining items
+        pending_items = [
+            item for item in self.workspace.items.values()
+            if item.processing_state in ["pending", "paused"]
+        ]
+        
+        if not pending_items:
+            # No items to resume - clear stale batch state
+            self.workspace.batch_state = None
+            return
+        
+        total = batch_state.get('total_queued', len(pending_items))
+        completed = total - len(pending_items)
+        
+        message = (
+            f"Resume batch processing?\n\n"
+            f"Progress: {completed} of {total} images completed\n"
+            f"Remaining: {len(pending_items)} images\n\n"
+            f"Provider: {batch_state.get('provider', 'Unknown')}\n"
+            f"Model: {batch_state.get('model', 'Unknown')}\n"
+            f"Prompt: {batch_state.get('prompt_style', 'Unknown')}"
+        )
+        
+        result = ask_yes_no(self, message)
+        
+        if result:
+            self.resume_batch_processing()
+        else:
+            # User declined - clear batch state
+            self.workspace.batch_state = None
+            for item in self.workspace.items.values():
+                if item.processing_state in ["pending", "paused"]:
+                    item.processing_state = None
+                    item.batch_queue_position = None
+            if self.workspace_file:
+                self.save_workspace(self.workspace_file)
+    
+    def resume_batch_processing(self):
+        """Resume batch processing from saved state"""
+        if not self.workspace.batch_state:
+            return
+        
+        batch_state = self.workspace.batch_state
+        
+        # Collect items to process (pending or paused only)
+        to_process_items = [
+            item for item in self.workspace.items.values()
+            if item.processing_state in ["pending", "paused"]
+        ]
+        
+        # Sort by queue position to maintain original order
+        to_process_items.sort(key=lambda item: item.batch_queue_position or 0)
+        
+        # Extract file paths
+        file_paths = [item.file_path for item in to_process_items]
+        
+        if not file_paths:
+            show_info(self, "No images to resume processing.")
+            self.workspace.batch_state = None
+            return
+        
+        # Recreate processing options from batch state
+        provider = batch_state['provider']
+        model = batch_state['model']
+        prompt_style = batch_state.get('prompt_style', 'default')
+        custom_prompt = batch_state.get('custom_prompt')
+        detection_settings = batch_state.get('detection_settings')
+        
+        # Get prompt config path
+        from shared.wx_common import find_config_file
+        prompt_config_path = find_config_file('image_describer_config.json')
+        
+        # Reset items to pending (from paused)
+        for item in to_process_items:
+            item.processing_state = "pending"
+        
+        # Start worker - STORE REFERENCE
+        self.batch_worker = BatchProcessingWorker(
+            parent_window=self,
+            file_paths=file_paths,
+            provider=provider,
+            model=model,
+            prompt_style=prompt_style,
+            custom_prompt=custom_prompt,
+            detection_settings=detection_settings,
+            prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
+            skip_existing=True  # Always skip completed
+        )
+        self.batch_worker.start()
+        
+        # Show progress dialog (starting from resumed position)
+        total = batch_state.get('total_queued', len(file_paths))
+        if BatchProgressDialog:
+            self.batch_progress_dialog = BatchProgressDialog(self, total)
+            self.batch_progress_dialog.Show()
+        
+        # Initialize timing
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+        
+        self.SetStatusText(f"Resuming batch: {len(file_paths)} images remaining...", 0)
     
     def on_extract_video(self, event):
         """Extract frames from video file"""
