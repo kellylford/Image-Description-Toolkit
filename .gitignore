@@ -147,3 +147,6 @@ dist_macos/
 BuildAndRelease/WinBuilds/dist_all/
 /BuildAndRelease
 imagedescriber/build_log_debug.txt
+
+# Video frame extraction output
+**/imagedescriptiontoolkit/

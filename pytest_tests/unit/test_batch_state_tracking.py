@@ -241,3 +241,91 @@ def test_full_workflow_roundtrip():
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+def test_video_item_type():
+    """Test that ImageItem supports video type"""
+    item = ImageItem("/path/to/video.mp4", "video")
+    
+    assert item.item_type == "video"
+    assert item.file_path == "/path/to/video.mp4"
+    assert hasattr(item, 'extracted_frames')
+    assert item.extracted_frames == []
+
+
+def test_video_with_extracted_frames():
+    """Test video item with extracted frames"""
+    video_item = ImageItem("/path/to/video.mp4", "video")
+    video_item.extracted_frames = [
+        "/path/to/frames/frame_0001.jpg",
+        "/path/to/frames/frame_0002.jpg",
+        "/path/to/frames/frame_0003.jpg"
+    ]
+    
+    # Serialize
+    data = video_item.to_dict()
+    assert data['item_type'] == "video"
+    assert len(data['extracted_frames']) == 3
+    assert data['extracted_frames'][0] == "/path/to/frames/frame_0001.jpg"
+    
+    # Deserialize
+    restored = ImageItem.from_dict(data)
+    assert restored.item_type == "video"
+    assert len(restored.extracted_frames) == 3
+    assert restored.extracted_frames[1] == "/path/to/frames/frame_0002.jpg"
+
+
+def test_extracted_frame_type():
+    """Test that ImageItem supports extracted_frame type"""
+    frame_item = ImageItem("/path/to/frames/frame_0001.jpg", "extracted_frame")
+    frame_item.parent_video = "/path/to/video.mp4"
+    
+    assert frame_item.item_type == "extracted_frame"
+    assert frame_item.parent_video == "/path/to/video.mp4"
+    
+    # Serialize
+    data = frame_item.to_dict()
+    assert data['item_type'] == "extracted_frame"
+    assert data['parent_video'] == "/path/to/video.mp4"
+    
+    # Deserialize
+    restored = ImageItem.from_dict(data)
+    assert restored.item_type == "extracted_frame"
+    assert restored.parent_video == "/path/to/video.mp4"
+
+
+def test_workspace_with_video_items():
+    """Test workspace with mixed image, video, and frame items"""
+    workspace = ImageWorkspace()
+    
+    # Add regular image
+    img_item = ImageItem("/path/to/image.jpg", "image")
+    workspace.add_item(img_item)
+    
+    # Add video
+    video_item = ImageItem("/path/to/video.mp4", "video")
+    video_item.extracted_frames = ["/path/to/frames/frame_0001.jpg"]
+    workspace.add_item(video_item)
+    
+    # Add extracted frame
+    frame_item = ImageItem("/path/to/frames/frame_0001.jpg", "extracted_frame")
+    frame_item.parent_video = "/path/to/video.mp4"
+    workspace.add_item(frame_item)
+    
+    # Serialize
+    data = workspace.to_dict()
+    assert len(data['items']) == 3
+    
+    # Deserialize
+    restored = ImageWorkspace.from_dict(data)
+    assert len(restored.items) == 3
+    
+    # Verify video
+    video = restored.items["/path/to/video.mp4"]
+    assert video.item_type == "video"
+    assert len(video.extracted_frames) == 1
+    
+    # Verify frame
+    frame = restored.items["/path/to/frames/frame_0001.jpg"]
+    assert frame.item_type == "extracted_frame"
+    assert frame.parent_video == "/path/to/video.mp4"

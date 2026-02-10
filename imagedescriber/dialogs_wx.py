@@ -843,3 +843,168 @@ class ImageDetailDialog(wx.Dialog):
         
         panel.SetSizer(sizer)
         return panel
+
+
+class VideoExtractionDialog(wx.Dialog):
+    """Dialog for configuring video frame extraction settings"""
+    
+    def __init__(self, parent=None, video_path: str = ""):
+        super().__init__(
+            parent,
+            title="Extract Video Frames",
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
+        )
+        
+        self.video_path = video_path
+        
+        # Initialize settings with defaults
+        self.extraction_mode = "time_interval"
+        self.time_interval = 5.0
+        self.scene_threshold = 30.0
+        self.process_after_extraction = True
+        
+        self.init_ui()
+        self.SetSize((500, 400))
+        self.Centre()
+        
+        # Set initial focus to extraction mode for accessibility
+        wx.CallAfter(self.time_radio.SetFocus)
+    
+    def init_ui(self):
+        """Initialize the dialog UI"""
+        panel = wx.Panel(self)
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Video info
+        if self.video_path:
+            video_name = Path(self.video_path).name
+            info_label = wx.StaticText(panel, label=f"Video: {video_name}")
+            info_label.SetFont(info_label.GetFont().Bold())
+            main_sizer.Add(info_label, 0, wx.ALL, 10)
+        
+        # Extraction mode selection
+        mode_box = wx.StaticBox(panel, label="Extraction Mode")
+        mode_sizer = wx.StaticBoxSizer(mode_box, wx.VERTICAL)
+        
+        self.time_radio = wx.RadioButton(
+            panel,
+            label="Time Interval",
+            style=wx.RB_GROUP,
+            name="Time interval extraction mode"
+        )
+        self.time_radio.SetValue(True)
+        mode_sizer.Add(self.time_radio, 0, wx.ALL, 5)
+        
+        # Time interval input
+        time_panel = wx.Panel(panel)
+        time_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        time_label = wx.StaticText(time_panel, label="Interval (seconds):")
+        self.time_input = wx.SpinCtrlDouble(
+            time_panel,
+            value="5.0",
+            min=0.1,
+            max=60.0,
+            inc=0.5,
+            name="Time interval in seconds"
+        )
+        self.time_input.SetDigits(1)
+        time_sizer.Add(time_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        time_sizer.Add(self.time_input, 0, wx.ALIGN_CENTER_VERTICAL)
+        time_panel.SetSizer(time_sizer)
+        mode_sizer.Add(time_panel, 0, wx.LEFT | wx.BOTTOM, 25)
+        
+        mode_sizer.AddSpacer(10)
+        
+        self.scene_radio = wx.RadioButton(
+            panel,
+            label="Scene Change Detection",
+            name="Scene change detection mode"
+        )
+        mode_sizer.Add(self.scene_radio, 0, wx.ALL, 5)
+        
+        # Scene threshold input
+        scene_panel = wx.Panel(panel)
+        scene_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        scene_label = wx.StaticText(scene_panel, label="Threshold:")
+        self.scene_input = wx.SpinCtrlDouble(
+            scene_panel,
+            value="30.0",
+            min=1.0,
+            max=100.0,
+            inc=1.0,
+            name="Scene change threshold"
+        )
+        self.scene_input.SetDigits(1)
+        scene_sizer.Add(scene_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        scene_sizer.Add(self.scene_input, 0, wx.ALIGN_CENTER_VERTICAL)
+        scene_panel.SetSizer(scene_sizer)
+        mode_sizer.Add(scene_panel, 0, wx.LEFT | wx.BOTTOM, 25)
+        
+        main_sizer.Add(mode_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # Processing option
+        self.process_checkbox = wx.CheckBox(
+            panel,
+            label="Process extracted frames automatically",
+            name="Auto-process frames checkbox"
+        )
+        self.process_checkbox.SetValue(True)
+        main_sizer.Add(self.process_checkbox, 0, wx.ALL, 10)
+        
+        # Help text
+        help_text = (
+            "Time Interval: Extract frames at regular intervals (e.g., every 5 seconds)\n"
+            "Scene Change: Extract frames when the scene changes significantly\n\n"
+            "Extracted frames will appear in the workspace list after the video."
+        )
+        help_label = wx.StaticText(panel, label=help_text)
+        help_label.SetForegroundColour(wx.Colour(100, 100, 100))
+        main_sizer.Add(help_label, 0, wx.ALL, 10)
+        
+        # Buttons
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_sizer.AddStretchSpacer()
+        
+        cancel_btn = wx.Button(panel, wx.ID_CANCEL, "Cancel")
+        ok_btn = wx.Button(panel, wx.ID_OK, "Extract Frames")
+        ok_btn.SetDefault()
+        
+        btn_sizer.Add(cancel_btn, 0, wx.ALL, 5)
+        btn_sizer.Add(ok_btn, 0, wx.ALL, 5)
+        
+        main_sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        
+        panel.SetSizer(main_sizer)
+        
+        # Bind radio button events to enable/disable inputs
+        self.time_radio.Bind(wx.EVT_RADIOBUTTON, self.on_mode_changed)
+        self.scene_radio.Bind(wx.EVT_RADIOBUTTON, self.on_mode_changed)
+        
+        # Initialize enabled states
+        self.on_mode_changed(None)
+    
+    def on_mode_changed(self, event):
+        """Enable/disable inputs based on selected mode"""
+        time_mode = self.time_radio.GetValue()
+        self.time_input.Enable(time_mode)
+        self.scene_input.Enable(not time_mode)
+    
+    def get_settings(self) -> dict:
+        """Get extraction settings from dialog
+        
+        Returns:
+            Dictionary with extraction settings
+        """
+        mode = "time_interval" if self.time_radio.GetValue() else "scene_change"
+        
+        settings = {
+            "extraction_mode": mode,
+            "process_after_extraction": self.process_checkbox.GetValue()
+        }
+        
+        if mode == "time_interval":
+            settings["time_interval_seconds"] = self.time_input.GetValue()
+        else:
+            settings["scene_change_threshold"] = self.scene_input.GetValue()
+        
+        return settings
