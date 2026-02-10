@@ -69,6 +69,11 @@ class ImageItem:
         self.extracted_frames: List[str] = []  # For videos
         self.display_name = ""  # Custom display name for this version
         
+        # Batch processing state tracking (Phase 1: Batch Management)
+        self.processing_state: Optional[str] = None  # None, "pending", "processing", "completed", "failed", "paused"
+        self.processing_error: Optional[str] = None  # Error message if failed
+        self.batch_queue_position: Optional[int] = None  # Order in queue for resume
+        
     def add_description(self, description: ImageDescription):
         self.descriptions.append(description)
     
@@ -83,7 +88,11 @@ class ImageItem:
             "batch_marked": self.batch_marked,
             "parent_video": self.parent_video,
             "extracted_frames": self.extracted_frames,
-            "display_name": self.display_name
+            "display_name": self.display_name,
+            # Batch processing state (Phase 1: Batch Management)
+            "processing_state": self.processing_state,
+            "processing_error": self.processing_error,
+            "batch_queue_position": self.batch_queue_position
         }
     
     @classmethod
@@ -94,6 +103,10 @@ class ImageItem:
         item.parent_video = data.get("parent_video")
         item.extracted_frames = data.get("extracted_frames", [])
         item.display_name = data.get("display_name", "")
+        # Batch processing state (Phase 1: Batch Management) - backward compatible defaults
+        item.processing_state = data.get("processing_state", None)
+        item.processing_error = data.get("processing_error", None)
+        item.batch_queue_position = data.get("batch_queue_position", None)
         return item
 
 
@@ -111,6 +124,19 @@ class ImageWorkspace:
         self.modified = self.created
         self.saved = new_workspace  # New workspaces start as saved
         self.file_path = None  # Path to the workspace file
+        
+        # Batch processing state (Phase 1: Batch Management)
+        # Structure: {
+        #     "provider": "claude",
+        #     "model": "claude-opus-4-6",
+        #     "prompt_style": "detailed",
+        #     "custom_prompt": "...",
+        #     "detection_settings": {...},
+        #     "paused_at_index": 5,
+        #     "total_queued": 20,
+        #     "started": "2026-02-09T14:30:00"
+        # }
+        self.batch_state: Optional[dict] = None
         
     def add_directory(self, directory_path: str):
         """Add a directory to the workspace"""
@@ -254,6 +280,7 @@ class ImageWorkspace:
             "chat_sessions": getattr(self, 'chat_sessions', {}),  # Include chat sessions
             "imported_workflow_dir": getattr(self, 'imported_workflow_dir', None),  # Track workflow imports
             "cached_ollama_models": getattr(self, 'cached_ollama_models', None),  # Cached Ollama models
+            "batch_state": getattr(self, 'batch_state', None),  # Batch processing state (Phase 1: Batch Management)
             "created": self.created,
             "modified": self.modified
         }
@@ -272,6 +299,7 @@ class ImageWorkspace:
         workspace.chat_sessions = data.get("chat_sessions", {})  # Load chat sessions
         workspace.imported_workflow_dir = data.get("imported_workflow_dir", None)  # Load workflow dir
         workspace.cached_ollama_models = data.get("cached_ollama_models", None)  # Load cached models
+        workspace.batch_state = data.get("batch_state", None)  # Load batch state (Phase 1: Batch Management)
         workspace.created = data.get("created", workspace.created)
         workspace.modified = data.get("modified", workspace.modified)
         workspace.saved = True

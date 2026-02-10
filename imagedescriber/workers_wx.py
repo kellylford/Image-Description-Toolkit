@@ -1049,6 +1049,8 @@ class BatchProcessingWorker(threading.Thread):
     Processes multiple images sequentially, emitting progress for each.
     Uses ProcessingWorker internally for each image but runs them sequentially.
     
+    Phase 2: Enhanced with pause/resume/stop controls using threading.Event
+    
     Events:
         ProgressUpdateEvent: Progress messages for each image
         ProcessingCompleteEvent: Success for each completed image
@@ -1084,7 +1086,11 @@ class BatchProcessingWorker(threading.Thread):
         self.detection_settings = detection_settings
         self.prompt_config_path = prompt_config_path
         self.skip_existing = skip_existing
-        self._cancel = False
+        
+        # Phase 2: Pause/Resume/Stop controls using threading.Event
+        self._stop_event = threading.Event()  # Set = stopped
+        self._pause_event = threading.Event()  # Set = running, cleared = paused
+        self._pause_event.set()  # Start in running state
     
     def run(self):
         """Process all images sequentially"""
@@ -1093,7 +1099,15 @@ class BatchProcessingWorker(threading.Thread):
         failed = 0
         
         for i, file_path in enumerate(self.file_paths, 1):
-            if self._cancel:
+            # Phase 2: Check if stopped
+            if self._stop_event.is_set():
+                break
+            
+            # Phase 2: Wait if paused (blocks here until resume)
+            self._pause_event.wait()
+            
+            # Phase 2: Double-check stop after unpause
+            if self._stop_event.is_set():
                 break
             
             # Post progress with current/total counts
@@ -1131,9 +1145,26 @@ class BatchProcessingWorker(threading.Thread):
         )
         wx.PostEvent(self.parent_window, evt)
     
+    def pause(self):
+        """Pause batch processing after current image completes"""
+        self._pause_event.clear()
+    
+    def resume(self):
+        """Resume paused batch processing"""
+        self._pause_event.set()
+    
+    def stop(self):
+        """Stop batch processing (cannot resume)"""
+        self._stop_event.set()
+        self._pause_event.set()  # Unblock if paused
+    
+    def is_paused(self) -> bool:
+        """Check if currently paused"""
+        return not self._pause_event.is_set()
+    
     def cancel(self):
-        """Request cancellation of batch processing"""
-        self._cancel = True
+        """Deprecated: Use stop() instead. Request cancellation of batch processing"""
+        self.stop()
 
 
 class VideoProcessingWorker(threading.Thread):

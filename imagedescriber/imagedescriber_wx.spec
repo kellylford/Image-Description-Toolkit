@@ -37,6 +37,7 @@ a = Analysis(
         'imagedescriber.viewer_components', # Viewer components
         'imagedescriber.prompt_editor_dialog',
         'imagedescriber.configure_dialog',
+        'imagedescriber.batch_progress_dialog',  # Phase 3: Batch progress dialog
         'ai_providers',
         'data_models',
         'dialogs_wx',
@@ -44,6 +45,7 @@ a = Analysis(
         'chat_window_wx',  # Chat with Image feature
         'prompt_editor_dialog',  # Integrated PromptEditor
         'configure_dialog',  # Integrated IDTConfigure
+        'batch_progress_dialog',  # Phase 3: Batch progress dialog (frozen mode)
         'scripts.metadata_extractor',
         'scripts.versioning',
         'scripts.config_loader',
