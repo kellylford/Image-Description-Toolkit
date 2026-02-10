@@ -79,36 +79,37 @@ DEV_OLLAMA_CLOUD_MODELS = [
     "qwen3-coder:480b-cloud"
 ]
 
-DEV_OPENAI_MODELS = [
-    # O-series (Reasoning models - 2024-2025)
-    "o1",
-    "o1-mini",
-    "o1-preview",
-    # GPT-4o (Omni - Latest)
-    "gpt-4o",
-    "gpt-4o-mini",
-    "chatgpt-4o-latest",
-    # GPT-4 Turbo
-    "gpt-4-turbo",
-    "gpt-4-turbo-preview",
-    # GPT-4
-    "gpt-4",
-    "gpt-4-vision-preview"
-]
+# Import OpenAI models from central configuration
+# IMPORTANT: DO NOT define models here - use models/openai_models.py as single source of truth
+try:
+    from models.openai_models import OPENAI_MODELS as DEV_OPENAI_MODELS
+except ImportError:
+    # Fallback if models package not available
+    DEV_OPENAI_MODELS = [
+        "o1",
+        "o1-mini",
+        "o1-preview",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "chatgpt-4o-latest",
+        "gpt-4-turbo",
+        "gpt-4-turbo-preview",
+        "gpt-4",
+        "gpt-4-vision-preview"
+    ]
 
-DEV_CLAUDE_MODELS = [
-    # Claude 4 Series (Latest - 2025)
-    "claude-opus-4-20250514",           # Claude Opus 4 (highest intelligence, complex reasoning)
-    "claude-sonnet-4-20250514",         # Claude Sonnet 4 (balanced performance)
-    # Claude 3.5 (Popular)
-    "claude-3-5-sonnet-20241022",       # Claude Sonnet 3.5 (latest, great for most tasks) - RECOMMENDED
-    "claude-3-5-haiku-20241022",        # Claude Haiku 3.5 (fastest, most affordable)
-    # Claude 3.0
-    "claude-3-opus-20240229",           # Claude Opus 3 (high intelligence)
-    "claude-3-sonnet-20240229",         # Claude Sonnet 3 (balanced)
-    "claude-3-haiku-20240307",          # Claude Haiku 3 (fast and compact)
-    # Note: All Claude 3+ models support vision. Claude 2.x excluded (no vision support)
-]
+# Import Claude models from central configuration
+# IMPORTANT: DO NOT define models here - use models/claude_models.py as single source of truth
+try:
+    from models.claude_models import CLAUDE_MODELS as DEV_CLAUDE_MODELS
+except ImportError:
+    # Fallback if models package not available
+    DEV_CLAUDE_MODELS = [
+        "claude-opus-4-6",
+        "claude-sonnet-4-5-20250929",
+        "claude-haiku-4-5-20251001",
+        "claude-3-5-haiku-20241022"
+    ]
 
 
 def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):

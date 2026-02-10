@@ -194,6 +194,7 @@ class ViewerPanel(wx.Panel):
         self.workflow_name = None
         self.monitor_thread = None
         self.is_live = False
+        self.workspace_source_dirs = []  # Track workspace source directories for path resolution
         
         # Data storage
         self.descriptions = []
@@ -321,6 +322,8 @@ class ViewerPanel(wx.Panel):
     def load_from_workspace(self, workspace):
         """Load data from an active ImageWorkspace object (Flattening)"""
         self.current_dir = None
+        # Store workspace source directories for image path resolution
+        self.workspace_source_dirs = workspace.get_all_directories() if hasattr(workspace, 'get_all_directories') else []
         self.live_checkbox.SetValue(False)
         self.live_checkbox.Enable(False) # Live monitoring meaningless for memory workspace
         if self.monitor_thread:
@@ -415,10 +418,15 @@ class ViewerPanel(wx.Panel):
         prompt = entry.get('prompt_style', 'Unknown')
         self.metadata_label.SetLabel(f"{fname}\nModel: {model} | Prompt: {prompt}")
         
-        # Image Preview with robust path resolution
-        file_path = entry.get('file_path', '')
-        resolved_path = self.resolve_image_path(file_path)
-        self.load_image_preview(str(resolved_path))
+        # Image Preview with robust path resolution (only if previews enabled)
+        if self.main_window and hasattr(self.main_window, 'show_image_previews') and self.main_window.show_image_previews:
+            file_path = entry.get('file_path', '')
+            resolved_path = self.resolve_image_path(file_path)
+            self.load_image_preview(str(resolved_path))
+        else:
+            # Clear preview if disabled
+            self.image_preview_bitmap = None
+            self.image_preview_panel.Refresh()
     
     def resolve_image_path(self, file_path_str):
         """Resolve image path handling relative paths and moved workspaces"""
@@ -446,13 +454,70 @@ class ViewerPanel(wx.Panel):
                 if try_sub.exists():
                     return try_sub
         
+        # Try workspace source directories (for .idw files)
+        if self.workspace_source_dirs:
+            filename = path.name
+            for source_dir in self.workspace_source_dirs:
+                # Try direct filename match
+                try_direct = Path(source_dir) / filename
+                if try_direct.exists():
+                    return try_direct
+                
+                # Try common subfolders within source directory
+                for sub in ['images', 'input_images', 'testimages', 'img', 'photos']:
+                    try_sub = Path(source_dir) / sub / filename
+                    if try_sub.exists():
+                        return try_sub
+        
         # Return original path (will fail but at least we tried)
         return path
 
     def load_image_preview(self, path):
         """Load and scale image for preview"""
+        # Skip if previews disabled in main window
+        if self.main_window and hasattr(self.main_window, 'show_image_previews') and not self.main_window.show_image_previews:
+            return
+        
         if not path or not os.path.exists(path):
-            self.image_preview_bitmap = None
+            # Create a placeholder bitmap with error message
+            try:
+                w, h = self.image_preview_panel.GetSize()
+                if w > 0 and h > 0:
+                    # Create a gray placeholder bitmap with text
+                    bitmap = wx.Bitmap(w, h)
+                    dc = wx.MemoryDC(bitmap)
+                    dc.SetBackground(wx.Brush(wx.Colour(220, 220, 220)))
+                    dc.Clear()
+                    dc.SetTextForeground(wx.Colour(100, 100, 100))
+                    dc.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+                    
+                    text = "Image not found" if path else "No image"
+                    if path:
+                        filename = Path(path).name
+                        text_lines = [
+                            "Image not found:",
+                            filename,
+                            "",
+                            "Check that the image exists in",
+                            "the workspace source directory"
+                        ]
+                    else:
+                        text_lines = ["No image selected"]
+                    
+                    y_offset = (h - len(text_lines) * 20) // 2
+                    for line in text_lines:
+                        text_w, text_h = dc.GetTextExtent(line)
+                        x = (w - text_w) // 2
+                        dc.DrawText(line, x, y_offset)
+                        y_offset += 20
+                    
+                    dc.SelectObject(wx.NullBitmap)
+                    self.image_preview_bitmap = bitmap
+                else:
+                    self.image_preview_bitmap = None
+            except:
+                self.image_preview_bitmap = None
+            
             self.image_preview_panel.Refresh()
             return
             

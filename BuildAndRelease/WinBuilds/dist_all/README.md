@@ -10,7 +10,7 @@ Download the latest installer from the [releases](https://github.com/kellylford/
 
 **`ImageDescriptionToolkit_Setup_v4.1.0.exe`** (Windows) or **`IDT-4.1.0.pkg`** / **`IDT-4.1.0.dmg`** (macOS)
 
-Run the installer - it includes all three applications (IDT CLI, Viewer, ImageDescriber with integrated Tools menu) and documentation.
+Run the installer - it includes IDT CLI and ImageDescriber (with integrated Viewer Mode, Prompt Editor, and Configuration tools) plus documentation.
 
 **Latest Release (v4.1.0):** wxPython migration complete with improved accessibility, 31+ bug fixes, and comprehensive testing.
 
@@ -20,10 +20,7 @@ Run the installer - it includes all three applications (IDT CLI, Viewer, ImageDe
 # Process images with AI descriptions
 idt workflow --provider huggingface --model microsoft/Florence-2-base images/
 
-# View results in GUI
-viewer.exe
-
-# Batch processing with GUI
+# View and manage results with GUI (includes Viewer Mode)
 imagedescriber.exe
 ```
 
@@ -34,7 +31,7 @@ imagedescriber.exe
 - **Workflow Management**: Organized results with metadata tracking
 - **Re-describe Feature**: Test different models/prompts on same images
 - **Analysis Tools**: Compare models, review content, export to CSV/Excel
-- **GUI Applications**: Viewer, ImageDescriber (with integrated prompt editor and configuration manager)
+- **GUI Applications**: ImageDescriber (with integrated Viewer Mode, prompt editor, and configuration manager)
 
 ## Documentation
 

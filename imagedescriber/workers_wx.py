@@ -202,15 +202,23 @@ class ProcessingWorker(threading.Thread):
             # Extract metadata from image
             metadata = self._extract_metadata(self.file_path)
             
+            # Track processing time
+            import time
+            start_time = time.time()
+            
             # Process the image with selected provider (passing API key)
             # Returns tuple: (description, provider_instance)
             description, provider_obj = self._process_with_ai(self.file_path, prompt_text, api_key=self.api_key)
             
+            # Calculate processing duration
+            processing_duration = time.time() - start_time
+            metadata['processing_time_seconds'] = round(processing_duration, 2)
+            
             # Add location byline if geocoding data is available
             description = self._add_location_byline(description, metadata)
             
-            # Add token usage info if available (for paid APIs)
-            description = self._add_token_usage_info(description, provider_obj)
+            # Add token usage info if available (for paid APIs), including processing time
+            description = self._add_token_usage_info(description, provider_obj, processing_duration)
             
             # Emit success
             evt = ProcessingCompleteEventData(
@@ -488,6 +496,14 @@ class ProcessingWorker(threading.Thread):
             import traceback
             logging.error(traceback.format_exc())
         
+        # Add OSM attribution flag if geocoded data is present
+        if metadata and 'location' in metadata:
+            loc = metadata['location']
+            # Check if geocoded data (city/state/country) is present
+            if loc.get('city') or loc.get('state') or loc.get('country'):
+                metadata['osm_attribution_required'] = True
+                logging.info("OSM attribution required for geocoded location data")
+        
         return metadata
     
     def _add_location_byline(self, description: str, metadata: dict) -> str:
@@ -530,18 +546,21 @@ class ProcessingWorker(threading.Thread):
         
         return description
     
-    def _add_token_usage_info(self, description: str, provider) -> str:
-        """Add token usage information to description for paid models
+    def _add_token_usage_info(self, description: str, provider, processing_duration: float = None) -> str:
+        """Add token usage information and processing time to description
         
         Args:
             description: AI-generated description
             provider: AI provider instance
+            processing_duration: Time taken in seconds (optional)
             
         Returns:
-            Description with token usage appended (if available)
+            Description with token usage and timing appended (if available)
         """
         if not description or not provider:
             return description
+        
+        info_parts = []
         
         # Check if provider has token usage info
         if hasattr(provider, 'last_usage') and provider.last_usage:
@@ -551,9 +570,20 @@ class ProcessingWorker(threading.Thread):
             total_tokens = usage.get('total_tokens', 0)
             
             if total_tokens > 0:
-                usage_text = f"\n\n[Token Usage: {total_tokens:,} total ({prompt_tokens:,} prompt + {completion_tokens:,} completion)]"
+                token_info = f"Token Usage: {total_tokens:,} total ({prompt_tokens:,} prompt + {completion_tokens:,} completion)"
+                info_parts.append(token_info)
                 logging.info(f"Adding token usage info: {total_tokens} tokens")
-                return description + usage_text
+        
+        # Add processing time if available
+        if processing_duration is not None:
+            time_info = f"Time: {processing_duration:.2f}s"
+            info_parts.append(time_info)
+            logging.info(f"Adding processing time: {processing_duration:.2f}s")
+        
+        # Append combined info to description
+        if info_parts:
+            usage_text = "\n\n[" + " | ".join(info_parts) + "]"
+            return description + usage_text
         
         return description
     

@@ -169,9 +169,9 @@ class ChatDialog(wx.Dialog):
                 self.model_combo.SetValue('gpt-4o')
                 
             elif provider == 'claude':
-                # Claude models
-                models = ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229']
-                for model in models:
+                # Import the official Claude models list
+                from ai_providers import DEV_CLAUDE_MODELS
+                for model in DEV_CLAUDE_MODELS:
                     self.model_combo.Append(model)
                 self.model_combo.SetValue('claude-3-5-sonnet-20241022')
                 

@@ -460,13 +460,19 @@ def guided_workflow(custom_config_path=None):
             model = get_input("Enter model name (e.g., 'llava:7b')", default="llava:7b")
     
     elif provider == 'openai':
-        openai_models = [
-            "gpt-4o (best quality, higher cost)",
-            "gpt-4o-mini (good quality, lower cost)",
-            "gpt-5 (experimental)"
-        ]
+        # Import from central configuration for consistency
+        try:
+            from models.openai_models import get_openai_models, format_openai_model_for_display
+            model_ids = get_openai_models()
+            openai_models = [format_openai_model_for_display(m) for m in model_ids]
+        except ImportError:
+            # Fallback if models package not available
+            openai_models = [
+                "gpt-4o (best quality, higher cost)",
+                "gpt-4o-mini (good quality, lower cost)"
+            ]
         print("Available OpenAI models:")
-        model_choice = get_choice("Select a model", openai_models, default=2, allow_back=True)
+        model_choice = get_choice("Select a model", openai_models, default=1, allow_back=True)
         if model_choice == 'EXIT':
             print("Exiting...")
             return
@@ -477,15 +483,19 @@ def guided_workflow(custom_config_path=None):
         model = model_choice.split()[0]
     
     elif provider == 'claude':
-        claude_models = [
-            "claude-sonnet-4-5-20250929 (best balance, recommended)",
-            "claude-opus-4-1-20250805 (highest intelligence)",
-            "claude-opus-4-20250514 (high intelligence, legacy)",
-            "claude-sonnet-4-20250514 (fast, capable)",
-            "claude-3-7-sonnet-20250219 (fast, capable, legacy)",
-            "claude-3-5-haiku-20241022 (fastest, economical)",
-            "claude-3-haiku-20240307 (economical, legacy)"
-        ]
+        # Import from central configuration for consistency
+        try:
+            from models.claude_models import get_claude_models, format_claude_model_for_display
+            model_ids = get_claude_models()
+            claude_models = [format_claude_model_for_display(m) for m in model_ids]
+        except ImportError:
+            # Fallback if models package not available
+            claude_models = [
+                "claude-opus-4-6 (most intelligent, agents and coding)",
+                "claude-sonnet-4-5-20250929 (best balance, recommended)",
+                "claude-haiku-4-5-20251001 (fastest)",
+                "claude-3-5-haiku-20241022 (most affordable)"
+            ]
         print("Available Claude models:")
         model_choice = get_choice("Select a model", claude_models, default=1, allow_back=True)
         if model_choice == 'EXIT':

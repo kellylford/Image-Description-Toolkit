@@ -1345,6 +1345,11 @@ class ImageDescriber:
             logger.info(f"Getting AI description for {image_path.name}{metadata_status}")
             description = self.get_image_description(image_path)
             
+            # Capture token usage from provider if available
+            token_usage = None
+            if hasattr(self.provider, 'get_last_token_usage'):
+                token_usage = self.provider.get_last_token_usage()
+            
             # Log end time for this image
             image_end_time = time.time()
             processing_duration = image_end_time - image_start_time
@@ -1352,6 +1357,15 @@ class ImageDescriber:
             logger.info(f"Processing duration: {processing_duration:.2f} seconds")
             
             if description and not description.startswith("Error:"):
+                # Add processing time to metadata
+                if metadata is None:
+                    metadata = {}
+                metadata['processing_time_seconds'] = round(processing_duration, 2)
+                
+                # Add token usage to metadata if available
+                if token_usage:
+                    metadata['token_usage'] = token_usage
+                
                 # Write description to file with metadata and base directory for relative paths
                 if self.write_description_to_file(image_path, description, output_file, metadata, directory_path):
                     # Update progress file immediately after successful write
@@ -1827,6 +1841,20 @@ class ImageDescriber:
             
             if camera_parts:
                 lines.append("Camera: " + ", ".join(camera_parts))
+        
+        # Format processing time if available
+        if 'processing_time_seconds' in metadata:
+            proc_time = metadata['processing_time_seconds']
+            lines.append(f"Processing Time: {proc_time:.2f} seconds")
+        
+        # Format token usage if available
+        if 'token_usage' in metadata:
+            usage = metadata['token_usage']
+            prompt_tokens = usage.get('prompt_tokens', 0)
+            completion_tokens = usage.get('completion_tokens', 0)
+            total_tokens = usage.get('total_tokens', 0)
+            if total_tokens > 0:
+                lines.append(f"Tokens: {total_tokens:,} total ({prompt_tokens:,} prompt + {completion_tokens:,} completion)")
         
         return "\n".join(lines)
 

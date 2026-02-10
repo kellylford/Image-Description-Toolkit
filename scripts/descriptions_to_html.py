@@ -101,6 +101,7 @@ class DescriptionEntry:
         self.prompt_style = ""
         self.description = ""
         self.timestamp = ""
+        self.processing_time = ""  # Processing time in seconds
         self.raw_metadata = {}
     
     def to_html(self, include_details: bool = False) -> str:
@@ -134,6 +135,9 @@ class DescriptionEntry:
             
             if self.settings:
                 html_content.append(f'<li><strong>Settings:</strong> {html.escape(self.settings)}</li>')
+            
+            if self.processing_time:
+                html_content.append(f'<li><strong>Processing Time:</strong> {html.escape(self.processing_time)}</li>')
             
             if self.model:
                 html_content.append(f'<li><strong>Model:</strong> {html.escape(self.model)}</li>')
@@ -277,6 +281,8 @@ class DescriptionsParser:
                 entry.camera = line[7:].strip()
             elif line.startswith('Settings:'):
                 entry.settings = line[9:].strip()
+            elif line.startswith('Processing Time:'):
+                entry.processing_time = line[16:].strip()
             elif line.startswith('Model:'):
                 entry.model = line[6:].strip()
             elif line.startswith('Prompt Style:'):

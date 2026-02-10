@@ -47,7 +47,10 @@ a = Analysis(
         'scripts.metadata_extractor',
         'scripts.versioning',
         'scripts.config_loader',
+        'scripts.descriptions_to_html',  # HTML export functionality
         'models.provider_configs',
+        'models.claude_models',  # Central Claude model configuration
+        'models.openai_models',  # Central OpenAI model configuration
         'models.model_options',
         'metadata_extractor',
         'ollama',

@@ -331,7 +331,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.workspace_file = None
         self.processing_thread = None
         self.current_image_item = None
-        self.current_filter = "all"  # View filter: all, described
+        self.current_filter = "all"  # View filter: all, described, undescribed
+        self.show_image_previews = True  # View option: show/hide image preview panel
         self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
         self.batch_progress = None  # Track batch processing: {current: N, total: M, file_path: "..."}
         
@@ -571,8 +572,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # ===== TOP SECTION: IMAGE PREVIEW =====
         
-        preview_label = wx.StaticText(panel, label="Image Preview:")
-        sizer.Add(preview_label, 0, wx.ALL, 5)
+        self.image_preview_label = wx.StaticText(panel, label="Image Preview:")
+        sizer.Add(self.image_preview_label, 0, wx.ALL, 5)
         
         # Preview panel with fixed size for thumbnail display
         self.image_preview_panel = wx.Panel(panel, size=(250, 250))
@@ -663,6 +664,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         import_workflow_item = file_menu.Append(wx.ID_ANY, "&Import Workflow (to Workspace)...")
         self.Bind(wx.EVT_MENU, self.on_import_workflow, import_workflow_item)
+        
+        export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
+        self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
         
         open_workflow_result = file_menu.Append(wx.ID_ANY, "Open &Workflow Result (Viewer Mode)...")
         self.Bind(wx.EVT_MENU, self.on_open_workflow_result, open_workflow_result)
@@ -779,7 +783,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         filter_desc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Described Only")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("described"), filter_desc_item)
         
+        filter_undesc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Undescribed Only")
+        self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("undescribed"), filter_undesc_item)
+        
         filter_all_item.Check(True)  # Default to all items
+        
+        view_menu.AppendSeparator()
+        
+        # Image preview toggle
+        self.show_preview_item = view_menu.AppendCheckItem(wx.ID_ANY, "Show &Image Previews")
+        self.show_preview_item.Check(True)  # Default: show previews
+        self.Bind(wx.EVT_MENU, self.on_toggle_image_previews, self.show_preview_item)
         
         menubar.Append(view_menu, "&View")
         
@@ -1090,6 +1104,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         Args:
             file_path: Path to the image file to preview
         """
+        # Skip loading if previews are disabled
+        if not self.show_image_previews:
+            return
+        
         try:
             # Try to import PIL for image loading
             try:
@@ -1406,6 +1424,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if self.current_filter == "described":
                 if not item.descriptions:
                     continue
+            elif self.current_filter == "undescribed":
+                if item.descriptions:
+                    continue
             
             base_name = Path(file_path).name
             prefix_parts = []
@@ -1714,6 +1735,230 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
         except Exception as e:
             show_error(self, f"Error saving workspace:\n{e}")
+    
+    def on_export_descriptions(self, event):
+        """Export all descriptions to text or HTML file (like CLI output)"""
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No descriptions to export. Add images and process them first.")
+            return
+        
+        # Ask user where to save with format options
+        default_dir = str(Path.home() / "Desktop")
+        default_file = "exported_descriptions.txt"
+        
+        file_path = save_file_dialog(
+            self,
+            "Export Descriptions",
+            "Text files (*.txt)|*.txt|HTML files (*.html)|*.html|All files (*.*)|*.*",
+            default_dir,
+            default_file
+        )
+        
+        if not file_path:
+            return  # User cancelled
+        
+        try:
+            # Determine format by file extension
+            path = Path(file_path)
+            if path.suffix.lower() == '.html':
+                self.export_descriptions_to_html(file_path)
+            else:
+                self.export_descriptions_to_text(file_path)
+            show_info(self, f"Successfully exported descriptions to:\n{file_path}")
+        except Exception as e:
+            show_error(self, f"Error exporting descriptions:\n{e}")
+    
+    def export_descriptions_to_text(self, output_file: str):
+        """Export workspace descriptions to text file in CLI format
+        
+        Handles multiple descriptions per image by creating separate sections
+        for each description with its own model/prompt/timestamp information.
+        
+        Args:
+            output_file: Path to output text file
+        """
+        separator = '-' * 80
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            # Write header
+            f.write("Image Descriptions - Exported from ImageDescriber\n")
+            f.write(f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Total Images: {len(self.workspace.items)}\n")
+            f.write("=" * 80 + "\n\n")
+            
+            # Sort images by filename for consistent output
+            sorted_items = sorted(self.workspace.items.items(), key=lambda x: Path(x[0]).name)
+            
+            for file_path, item in sorted_items:
+                path = Path(file_path)
+                
+                # Skip images with no descriptions
+                if not item.descriptions:
+                    continue
+                
+                # Write entry for each description (handles multiple descriptions per image)
+                for desc_index, desc in enumerate(item.descriptions, start=1):
+                    # Note if multiple descriptions (FIRST - before file info)
+                    if len(item.descriptions) > 1:
+                        f.write(f"(Description {desc_index} of {len(item.descriptions)} for this image)\n\n")
+                    
+                    # File info
+                    f.write(f"File: {path.name}\n")
+                    f.write(f"Path: {file_path}\n")
+                    
+                    # Metadata if available
+                    if desc.metadata:
+                        metadata_str = self._format_metadata_for_export(desc.metadata)
+                        if metadata_str:
+                            f.write(metadata_str + "\n")
+                    
+                    # Processing info
+                    f.write(f"Provider: {desc.provider}\n")
+                    f.write(f"Model: {desc.model}\n")
+                    f.write(f"Prompt Style: {desc.prompt_style}\n")
+                    
+                    # Token usage if available
+                    if desc.metadata and 'token_usage' in desc.metadata:
+                        usage = desc.metadata['token_usage']
+                        prompt_tokens = usage.get('prompt_tokens', 0)
+                        completion_tokens = usage.get('completion_tokens', 0)
+                        total_tokens = usage.get('total_tokens', 0)
+                        if total_tokens > 0:
+                            f.write(f"Tokens: {total_tokens:,} total ({prompt_tokens:,} prompt + {completion_tokens:,} completion)\n")
+                    
+                    # Description text
+                    f.write(f"Description: {desc.text}\n")
+                    
+                    # Timestamp
+                    f.write(f"Timestamp: {desc.created}\n")
+                    
+                    # OSM attribution if needed
+                    if desc.metadata and desc.metadata.get('osm_attribution_required'):
+                        f.write("\nLocation data © OpenStreetMap contributors (https://www.openstreetmap.org/copyright)\n")
+                    
+                    f.write(separator + "\n\n")
+    
+    def export_descriptions_to_html(self, output_file: str):
+        """Export workspace descriptions to HTML file using descriptions_to_html module
+        
+        Args:
+            output_file: Path to output HTML file
+        """
+        # Create temporary text file
+        temp_txt = None
+        try:
+            # Export to temporary text file first
+            temp_txt = Path(tempfile.gettempdir()) / f"imagedescriber_export_{int(time.time())}.txt"
+            self.export_descriptions_to_text(str(temp_txt))
+            
+            # Import HTML generation modules
+            try:
+                from scripts.descriptions_to_html import DescriptionsParser, HTMLGenerator
+            except ImportError:
+                # Try without scripts prefix (frozen mode)
+                from descriptions_to_html import DescriptionsParser, HTMLGenerator
+            
+            # Parse the text file
+            parser = DescriptionsParser(temp_txt)
+            entries = parser.parse()
+            
+            if not entries:
+                raise Exception("No description entries found to export")
+            
+            # Generate HTML with full details
+            generator = HTMLGenerator(
+                entries,
+                title="Image Descriptions - Exported from ImageDescriber",
+                include_details=True
+            )
+            html_content = generator.generate()
+            
+            # Write HTML file
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+                
+        finally:
+            # Clean up temporary file
+            if temp_txt and temp_txt.exists():
+                try:
+                    temp_txt.unlink()
+                except Exception:
+                    pass  # Ignore cleanup errors
+    
+    def _format_metadata_for_export(self, metadata: dict) -> str:
+        """Format metadata for text export (matching CLI format)
+        
+        Args:
+            metadata: Metadata dictionary
+            
+        Returns:
+            Formatted metadata string
+        """
+        lines = []
+        
+        # Photo date
+        if 'datetime_str' in metadata:
+            lines.append(f"Photo Date: {metadata['datetime_str']}")
+        elif 'datetime' in metadata:
+            # Handle both string and datetime objects
+            dt_val = metadata['datetime']
+            if isinstance(dt_val, str):
+                lines.append(f"Photo Date: {dt_val}")
+        
+        # Location
+        if 'location' in metadata:
+            location = metadata['location']
+            location_parts = []
+            
+            # City, state, country
+            city = location.get('city') or location.get('town')
+            state = location.get('state')
+            country = location.get('country')
+            
+            readable_parts = []
+            if city:
+                readable_parts.append(city)
+            if state:
+                readable_parts.append(state)
+            if country:
+                readable_parts.append(country)
+            
+            if readable_parts:
+                location_parts.append(f"Location: {', '.join(readable_parts)}")
+            
+            # GPS coordinates
+            if 'latitude' in location and 'longitude' in location:
+                lat = location['latitude']
+                lon = location['longitude']
+                location_parts.append(f"GPS: {lat:.6f}, {lon:.6f}")
+            
+            if 'altitude' in location:
+                alt = location['altitude']
+                location_parts.append(f"Altitude: {alt:.1f}m")
+            
+            if location_parts:
+                lines.append(", ".join(location_parts))
+        
+        # Camera
+        if 'camera' in metadata:
+            camera = metadata['camera']
+            camera_parts = []
+            
+            if 'make' in camera and 'model' in camera:
+                camera_parts.append(f"{camera['make']} {camera['model']}")
+            
+            if 'lens' in camera:
+                camera_parts.append(f"Lens: {camera['lens']}")
+            
+            if camera_parts:
+                lines.append(f"Camera: {', '.join(camera_parts)}")
+        
+        # Processing time
+        if 'processing_time_seconds' in metadata:
+            proc_time = metadata['processing_time_seconds']
+            lines.append(f"Processing Time: {proc_time:.2f} seconds")
+        
+        return "\n".join(lines)
     
     def on_worker_progress(self, event):
         """Handle progress updates from worker threads"""
@@ -2340,10 +2585,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     # View menu handlers
     def on_set_filter(self, filter_type):
-        """Set view filter (all, described)"""
+        """Set view filter (all, described, undescribed)"""
         self.current_filter = filter_type
         self.refresh_image_list()
         self.SetStatusText(f"Filter: {filter_type}", 1)
+    
+    def on_toggle_image_previews(self, event):
+        """Toggle image preview panel visibility"""
+        self.show_image_previews = event.IsChecked()
+        
+        if self.show_image_previews:
+            self.image_preview_label.Show()
+            self.image_preview_panel.Show()
+        else:
+            self.image_preview_label.Hide()
+            self.image_preview_panel.Hide()
+        
+        # Refresh layout
+        self.Layout()
     
     # ========== Tools Menu Handlers ==========
     
