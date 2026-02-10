@@ -102,6 +102,12 @@ try:
 except ImportError:
     ConfigureDialog = None
 
+# Phase 3: Import batch progress dialog
+try:
+    from batch_progress_dialog import BatchProgressDialog
+except ImportError:
+    BatchProgressDialog = None
+
 # Import chat feature components
 try:
     from chat_window_wx import ChatDialog, ChatWindow
@@ -335,6 +341,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.show_image_previews = True  # View option: show/hide image preview panel
         self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
         self.batch_progress = None  # Track batch processing: {current: N, total: M, file_path: "..."}
+        
+        # Phase 3: Batch processing management
+        self.batch_worker: Optional[BatchProcessingWorker] = None  # Store worker reference
+        self.batch_progress_dialog: Optional[BatchProgressDialog] = None  # Progress dialog
+        self.batch_start_time: Optional[float] = None  # For avg time calculation
+        self.batch_processing_times: List[float] = []  # Track times per image
         
         # AI Model caching (for faster dialog loading)
         self.cached_ollama_models = None  # Will be populated on first use or manual refresh
@@ -1570,8 +1582,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, "All images already have descriptions")
             return
         
-        # Start batch processing worker
-        worker = BatchProcessingWorker(
+        # Phase 3: Mark items as pending BEFORE starting batch
+        queue_position = 0
+        for file_path in to_process:
+            if file_path in self.workspace.items:
+                item = self.workspace.items[file_path]
+                item.processing_state = "pending"
+                item.batch_queue_position = queue_position
+                queue_position += 1
+        
+        # Phase 3: Store batch parameters for resume
+        self.workspace.batch_state = {
+            "provider": options['provider'],
+            "model": options['model'],
+            "prompt_style": options.get('prompt_style', 'default'),
+            "custom_prompt": options.get('custom_prompt'),
+            "detection_settings": options.get('detection_settings'),
+            "total_queued": len(to_process),
+            "started": datetime.now().isoformat()
+        }
+        
+        # Start batch processing worker - STORE REFERENCE (Phase 3: KEY FIX)
+        self.batch_worker = BatchProcessingWorker(
             self,
             to_process,
             options['provider'],
@@ -1582,7 +1614,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,  # prompt_config_path
             options.get('skip_existing', False)
         )
-        worker.start()
+        self.batch_worker.start()
+        
+        # Phase 3: Show progress dialog
+        if BatchProgressDialog:
+            self.batch_progress_dialog = BatchProgressDialog(self, len(to_process))
+            self.batch_progress_dialog.Show()
+        
+        # Phase 3: Initialize timing
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+        
+        # Save workspace (preserves batch_state)
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
         
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
     
@@ -1980,6 +2025,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Mark current image being processed with "P"
             self.processing_items[event.file_path] = {'provider': '', 'model': ''}
             self.refresh_image_list()
+            
+            # Phase 3: Track processing time for this image
+            if self.batch_start_time:
+                elapsed = time.time() - self.batch_start_time
+                self.batch_processing_times.append(elapsed)
+                self.batch_start_time = time.time()  # Reset for next image
+            
+            # Phase 3: Calculate average time
+            avg_time = (sum(self.batch_processing_times) / len(self.batch_processing_times)
+                       if self.batch_processing_times else 0.0)
+            
+            # Phase 3: Update progress dialog
+            if self.batch_progress_dialog and self.batch_progress:
+                self.batch_progress_dialog.update_progress(
+                    current=self.batch_progress['current'],
+                    total=self.batch_progress['total'],
+                    file_path=self.batch_progress['file_path'],
+                    avg_time=avg_time
+                )
         else:
             self.batch_progress = None
     
@@ -2000,6 +2064,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 metadata=getattr(event, 'metadata', {})
             )
             image_item.add_description(desc)
+            
+            # Phase 3: Set processing state to completed
+            image_item.processing_state = "completed"
+            image_item.processing_error = None  # Clear any previous error
+            
             self.mark_modified()
             self.refresh_image_list()
             
@@ -2016,6 +2085,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Handle processing failures"""
         # Remove from processing items
         self.processing_items.pop(event.file_path, None)
+        
+        # Phase 3: Set processing state to failed and store error
+        if event.file_path in self.workspace.items:
+            image_item = self.workspace.items[event.file_path]
+            image_item.processing_state = "failed"
+            image_item.processing_error = event.error
+            self.mark_modified()
+        
         self.refresh_image_list()
         
         # Update window title to reflect processing status (removes "Processing" when failed)
@@ -2026,6 +2103,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_workflow_complete(self, event):
         """Handle workflow completion"""
+        # Phase 3: Clear batch state on successful completion
+        if self.workspace.batch_state:
+            self.workspace.batch_state = None
+            
+            # Reset item states (leave completed/failed as-is for history)
+            for item in self.workspace.items.values():
+                if item.processing_state in ["pending", "paused"]:
+                    item.processing_state = None
+                    item.batch_queue_position = None
+        
+        # Phase 3: Close progress dialog
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.Close()
+            self.batch_progress_dialog = None
+        
+        # Phase 3: Clear worker reference
+        self.batch_worker = None
+        
+        # Save workspace
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
+        
         show_info(self, f"Workflow complete!\n{event.input_dir}")
         self.SetStatusText("Workflow complete", 0)
         self.refresh_image_list()
@@ -2034,6 +2133,90 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Handle workflow failures"""
         show_error(self, f"Workflow failed:\n{event.error}")
         self.SetStatusText("Workflow failed", 0)
+    
+    # Phase 3: Batch control handlers
+    def on_pause_batch(self):
+        """Pause batch processing"""
+        if not self.batch_worker:
+            return
+        
+        self.batch_worker.pause()
+        
+        # Update title bar
+        if self.batch_progress:
+            current = self.batch_progress['current']
+            total = self.batch_progress['total']
+            percentage = int((current / total) * 100)
+            doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+            self.SetTitle(f"(Paused) {percentage}%, {current} of {total} - ImageDescriber - {doc_name}")
+        
+        # Mark current item as paused
+        if self.batch_progress and self.batch_progress.get('file_path'):
+            file_path = self.batch_progress['file_path']
+            if file_path in self.workspace.items:
+                item = self.workspace.items[file_path]
+                if item.processing_state == "pending":
+                    item.processing_state = "paused"
+        
+        # Save workspace (preserves paused state)
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
+        
+        self.SetStatusText("Batch processing paused", 0)
+    
+    def on_resume_batch(self):
+        """Resume paused batch processing"""
+        if not self.batch_worker:
+            return
+        
+        self.batch_worker.resume()
+        
+        # Update title bar (remove "Paused")
+        if self.batch_progress:
+            current = self.batch_progress['current']
+            total = self.batch_progress['total']
+            percentage = int((current / total) * 100)
+            doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+            self.SetTitle(f"{percentage}%, {current} of {total} - ImageDescriber - {doc_name}")
+        
+        # Unpause items
+        for item in self.workspace.items.values():
+            if item.processing_state == "paused":
+                item.processing_state = "pending"
+        
+        self.SetStatusText("Batch processing resumed", 0)
+    
+    def on_stop_batch(self):
+        """Stop batch processing permanently"""
+        if not self.batch_worker:
+            return
+        
+        # Call worker stop
+        self.batch_worker.stop()
+        
+        # Clear batch state (won't resume automatically)
+        self.workspace.batch_state = None
+        
+        # Reset item states (leave completed/failed as-is)
+        for item in self.workspace.items.values():
+            if item.processing_state in ["pending", "paused"]:
+                item.processing_state = None
+                item.batch_queue_position = None
+        
+        # Close progress dialog
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.Close()
+            self.batch_progress_dialog = None
+        
+        # Save workspace
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
+        
+        # Clear worker reference
+        self.batch_worker = None
+        
+        self.SetStatusText("Batch processing stopped", 0)
+        show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
     
     def on_extract_video(self, event):
         """Extract frames from video file"""

@@ -1,0 +1,205 @@
+"""
+Batch Progress Dialog for ImageDescriber
+
+Phase 3: Real-time batch processing progress dialog with pause/resume/stop controls.
+
+This modeless dialog shows:
+- Processing statistics (current/total, average time)
+- Current image being processed
+- Progress bar
+- Control buttons (Pause/Resume, Stop, Close)
+
+Accessibility:
+- Uses wx.ListBox for single tab stop stats display
+- Named controls for screen reader context
+- Large click targets for buttons
+"""
+
+import wx
+from pathlib import Path
+from typing import Optional
+
+
+class BatchProgressDialog(wx.Dialog):
+    """Modeless dialog showing batch processing progress and controls"""
+    
+    def __init__(self, parent, total_images: int):
+        """Initialize batch progress dialog
+        
+        Args:
+            parent: Parent window (ImageDescriberFrame)
+            total_images: Total number of images to process
+        """
+        wx.Dialog.__init__(
+            self,
+            parent,
+            title="Batch Processing Progress",
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER  # Modeless, resizable
+        )
+        
+        self.parent_window = parent
+        self.total_images = total_images
+        
+        # Create UI
+        self._create_ui()
+        
+        # Set initial size
+        self.SetSize((500, 350))
+        self.CenterOnParent()
+    
+    def _create_ui(self):
+        """Create dialog UI components"""
+        # Main panel
+        panel = wx.Panel(self)
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Title label
+        title_label = wx.StaticText(
+            panel,
+            label="Processing Statistics:",
+            name="Processing statistics title"
+        )
+        title_font = title_label.GetFont()
+        title_font.PointSize += 2
+        title_font = title_font.Bold()
+        title_label.SetFont(title_font)
+        main_sizer.Add(title_label, 0, wx.ALL, 10)
+        
+        # Stats list box (read-only, single-selection for accessibility)
+        self.stats_list = wx.ListBox(
+            panel,
+            style=wx.LB_SINGLE,
+            name="Processing statistics"
+        )
+        self.stats_list.SetMinSize((450, 80))
+        main_sizer.Add(self.stats_list, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # Current image label
+        self.current_image_label = wx.StaticText(
+            panel,
+            label="Current Image: (none)",
+            name="Current image being processed"
+        )
+        main_sizer.Add(self.current_image_label, 0, wx.ALL, 10)
+        
+        # Progress label
+        progress_label = wx.StaticText(
+            panel,
+            label="Progress:",
+            name="Progress label"
+        )
+        main_sizer.Add(progress_label, 0, wx.LEFT | wx.RIGHT, 10)
+        
+        # Progress bar
+        self.progress_bar = wx.Gauge(
+            panel,
+            range=100,
+            name="Batch progress percentage"
+        )
+        self.progress_bar.SetMinSize((-1, 25))
+        main_sizer.Add(self.progress_bar, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # Button sizer
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        # Pause/Resume button
+        self.pause_button = wx.Button(panel, label="Pause", size=(100, -1))
+        self.pause_button.Bind(wx.EVT_BUTTON, self.on_pause_clicked)
+        button_sizer.Add(self.pause_button, 0, wx.ALL, 5)
+        
+        # Stop button
+        self.stop_button = wx.Button(panel, label="Stop", size=(100, -1))
+        self.stop_button.Bind(wx.EVT_BUTTON, self.on_stop_clicked)
+        button_sizer.Add(self.stop_button, 0, wx.ALL, 5)
+        
+        # Close button
+        self.close_button = wx.Button(panel, label="Close", size=(100, -1))
+        self.close_button.Bind(wx.EVT_BUTTON, lambda e: self.Hide())
+        button_sizer.Add(self.close_button, 0, wx.ALL, 5)
+        
+        main_sizer.Add(button_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
+        
+        # Set panel sizer
+        panel.SetSizer(main_sizer)
+        
+        # Dialog sizer
+        dialog_sizer = wx.BoxSizer(wx.VERTICAL)
+        dialog_sizer.Add(panel, 1, wx.EXPAND)
+        self.SetSizer(dialog_sizer)
+    
+    def update_progress(self, current: int, total: int, 
+                       file_path: str, avg_time: float):
+        """Update progress display
+        
+        Args:
+            current: Current image number (1-based)
+            total: Total number of images
+            file_path: Path to current image being processed
+            avg_time: Average processing time per image in seconds
+        """
+        # Update stats list
+        self.stats_list.Clear()
+        self.stats_list.Append(f"Images Processed: {current} / {total}")
+        self.stats_list.Append(f"Average Processing Time: {avg_time:.1f} seconds")
+        
+        # Calculate estimated time remaining
+        if avg_time > 0 and current < total:
+            remaining_images = total - current
+            estimated_seconds = remaining_images * avg_time
+            
+            # Format time nicely
+            if estimated_seconds < 60:
+                time_str = f"{estimated_seconds:.0f} seconds"
+            elif estimated_seconds < 3600:
+                minutes = estimated_seconds / 60
+                time_str = f"{minutes:.1f} minutes"
+            else:
+                hours = estimated_seconds / 3600
+                time_str = f"{hours:.1f} hours"
+            
+            self.stats_list.Append(f"Estimated Time Remaining: {time_str}")
+        
+        # Update current image
+        filename = Path(file_path).name
+        self.current_image_label.SetLabel(f"Current Image: {filename}")
+        
+        # Update progress bar
+        percentage = int((current / total) * 100) if total > 0 else 0
+        self.progress_bar.SetValue(percentage)
+        
+        # Force refresh
+        self.Layout()
+    
+    def on_pause_clicked(self, event):
+        """Toggle pause/resume"""
+        if self.pause_button.GetLabel() == "Pause":
+            # Call parent's pause handler
+            if hasattr(self.parent_window, 'on_pause_batch'):
+                self.parent_window.on_pause_batch()
+            self.pause_button.SetLabel("Resume")
+        else:
+            # Call parent's resume handler
+            if hasattr(self.parent_window, 'on_resume_batch'):
+                self.parent_window.on_resume_batch()
+            self.pause_button.SetLabel("Pause")
+    
+    def on_stop_clicked(self, event):
+        """Stop processing"""
+        # Import here to avoid circular dependency
+        from shared.wx_common import ask_yes_no
+        
+        # Confirm before stopping
+        result = ask_yes_no(
+            self,
+            "Stop batch processing?\n\n"
+            "Progress will be saved. You can resume later by reopening this workspace."
+        )
+        
+        if result:
+            # Call parent's stop handler
+            if hasattr(self.parent_window, 'on_stop_batch'):
+                self.parent_window.on_stop_batch()
+    
+    def reset_pause_button(self):
+        """Reset pause button to 'Pause' state"""
+        self.pause_button.SetLabel("Pause")
