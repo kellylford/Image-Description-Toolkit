@@ -1292,7 +1292,50 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             # No descriptions yet
             self.desc_list.Clear()
-            self.description_text.SetValue("")
+            
+            # For videos, show metadata in description area for accessibility
+            if image_item.item_type == "video":
+                metadata_text = "Video Metadata\n\n"
+                
+                if hasattr(image_item, 'video_metadata') and image_item.video_metadata:
+                    meta = image_item.video_metadata
+                    if meta.get('duration'):
+                        duration_mins = int(meta['duration'] // 60)
+                        duration_secs = int(meta['duration'] % 60)
+                        metadata_text += f"Duration: {duration_mins} minutes {duration_secs} seconds\n"
+                    if meta.get('fps'):
+                        metadata_text += f"Frame rate: {meta['fps']:.2f} fps\n"
+                    if meta.get('total_frames'):
+                        metadata_text += f"Total frames: {meta['total_frames']}\n"
+                
+                if hasattr(image_item, 'extracted_frames') and image_item.extracted_frames:
+                    metadata_text += f"\nExtracted frames: {len(image_item.extracted_frames)}\n"
+                    
+                    # List first few extracted frame paths
+                    metadata_text += "\nExtracted frame files:\n"
+                    for i, frame_path in enumerate(image_item.extracted_frames[:10]):
+                        frame_name = Path(frame_path).name
+                        metadata_text += f"  {i+1}. {frame_name}\n"
+                    if len(image_item.extracted_frames) > 10:
+                        metadata_text += f"  ... and {len(image_item.extracted_frames) - 10} more\n"
+                
+                if metadata_text == "Video Metadata\n\n":
+                    metadata_text += "No metadata available.\nUse Process > Extract Video Frames to extract frames from this video."
+                
+                self.description_text.SetValue(metadata_text)
+                
+                # Also add to descriptions list for accessibility
+                desc_data = [{
+                    'description': metadata_text,
+                    'model': 'Video Metadata',
+                    'prompt_style': '',
+                    'created': '',
+                    'provider': 'System'
+                }]
+                self.desc_list.LoadDescriptions(desc_data)
+            else:
+                self.description_text.SetValue("")
+            
             self.save_desc_btn.Enable(False)
     
     def on_description_selected(self, event):
