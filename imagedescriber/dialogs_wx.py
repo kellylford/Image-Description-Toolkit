@@ -548,7 +548,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         model_sizer.Add(model_label, 0, wx.ALL, 5)
         
         self.model_combo = wx.ComboBox(panel, style=wx.CB_DROPDOWN)
-        self.model_combo.SetValue(self.config.get('model', 'moondream'))
+        self.model_combo.SetValue(self.config.get('default_model', 'moondream'))
         set_accessible_name(self.model_combo, "Model name")
         model_sizer.Add(self.model_combo, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -656,7 +656,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                     for model in models:
                         self.model_combo.Append(model)
                     # Set default if in list
-                    default_model = self.config.get('model', 'moondream')
+                    default_model = self.config.get('default_model', 'moondream')
                     if default_model in models:
                         self.model_combo.SetValue(default_model)
                     elif models:
@@ -677,7 +677,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                 self.model_combo.SetValue("claude-3-5-sonnet-20241022")
         except Exception as e:
             print(f"Error populating models: {e}")
-            self.model_combo.SetValue(self.config.get('model', 'moondream'))
+            self.model_combo.SetValue(self.config.get('default_model', 'moondream'))
         
         # Restore focus to model combo if it had focus before
         # Use CallAfter to ensure combo box is fully populated and stable

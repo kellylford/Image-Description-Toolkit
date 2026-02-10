@@ -2,18 +2,16 @@
 # ============================================================================
 # Build All Applications - Master Build Script for macOS
 # ============================================================================
-# This script builds all three applications in the Image Description Toolkit:
+# This script builds both applications in the Image Description Toolkit:
 #   1. IDT (main command-line toolkit)
-#   2. Viewer (image description viewer GUI)
-#   3. ImageDescriber (batch processing GUI with integrated prompt editor and configuration)
+#   2. ImageDescriber (batch processing GUI with integrated Viewer Mode, prompt editor, and configuration)
 #
 # Prerequisites:
-#   - Virtual environment set up for each GUI app (viewer, imagedescriber)
+#   - Virtual environment set up for ImageDescriber app
 #   - Main IDT dependencies installed in root .venv or system Python
 #
 # Output:
 #   - dist/idt (CLI binary)
-#   - viewer/dist/Viewer.app
 #   - imagedescriber/dist/ImageDescriber.app
 # ============================================================================
 
@@ -80,8 +78,11 @@ echo "----------------------------------------"
 echo ""
 
 echo ""
-echo "This will build all applications:"
-echo "  1. IDT (main toolkit)"
+echo "This script builds IDT and ImageDescriber."
+echo "Viewer is now integrated into ImageDescriber (Viewer Mode)."
+echo ""
+echo "Applications to build:"
+echo "  1. IDT (CLI)"
 echo "  2. ImageDescriber (with integrated Viewer Mode and Tools menu)"
 echo ""
 echo "Make sure all virtual environments are set up before continuing."

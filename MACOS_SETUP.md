@@ -15,8 +15,7 @@ Double-click `macsetup.command`
 
 This creates `.venv` virtual environments and installs all dependencies for:
 - Root project (core dependencies for IDT CLI)
-- Viewer
-- ImageDescriber (with integrated prompt editor and configuration manager)
+- ImageDescriber (batch processing GUI with integrated Viewer Mode, prompt editor, and configuration manager)
 
 ## What It Does
 
@@ -40,9 +39,8 @@ Once the setup completes successfully:
 # Build all applications
 ./BuildAndRelease/MacBuilds/builditall_macos.command
 
-# Test individual apps
-open dist/Viewer.app
-open dist/ImageDescriber.app
+# Test the app (switch between Editor/Viewer modes with tabs)
+open imagedescriber/dist/ImageDescriber.app
 ```
 
 ## Troubleshooting
@@ -69,16 +67,9 @@ open dist/ImageDescriber.app
 
 Your project structure will look like:
 
+```
 .venv/              ← macOS root virtual environment (for IDT CLI)
 .winenv/            ← Windows root virtual environment (if using VM)
-
-```
-viewer/
-  .venv/          ← macOS virtual environment
-  .winenv/        ← Windows virtual environment (if using VM)
-  requirements.txt
-  viewer_wx.py
-  ...
 
 imagedescriber/
   .venv/          ← macOS virtual environment
@@ -103,18 +94,16 @@ Or double-click `macsetup.command` in Finder.
 
 ## Manual Setup (if needed)
 
-If you prefer to set up apps individually:
+If you prefer to set up ImageDescriber manually:
 
 ```bash
-cd viewer
+cd imagedescriber
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 deactivate
 cd ..
 ```
-
-Repeat for each application: `idt`, `viewer`, `imagedescriber`.
 
 ## Next Steps
 

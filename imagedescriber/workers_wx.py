@@ -1256,10 +1256,19 @@ class VideoProcessingWorker(threading.Thread):
             'duration': duration
         }
         
-        # Create output directory
-        video_path = Path(self.video_path)
-        toolkit_dir = video_path.parent / "imagedescriptiontoolkit"
-        video_dir = toolkit_dir / f"{video_path.stem}_frames"
+        # Create output directory in workspace (NOT in source directory)
+        video_path_obj = Path(self.video_path)
+        
+        # Get workspace directory from parent window
+        if hasattr(self.parent_window, 'get_workspace_directory'):
+            workspace_dir = self.parent_window.get_workspace_directory()
+            extracted_frames_dir = workspace_dir / "extracted_frames"
+            video_dir = extracted_frames_dir / f"{video_path_obj.stem}"
+        else:
+            # Fallback for older code or if method not available
+            toolkit_dir = video_path_obj.parent / "imagedescriptiontoolkit"
+            video_dir = toolkit_dir / f"{video_path_obj.stem}_frames"
+        
         video_dir.mkdir(parents=True, exist_ok=True)
         
         # Extract based on mode

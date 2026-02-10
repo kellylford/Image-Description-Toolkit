@@ -339,11 +339,11 @@ def create_workflow_helper_files(output_dir: Path) -> None:
     
     Args:
         output_dir: Workflow output directory
+    
+    NOTE: Helper file creation temporarily disabled (2026-02-10)
     """
-    import sys
-    import os
-    import platform
-    from pathlib import Path
+    # Skip creating helper files for now - may re-enable in future
+    return
     
     try:
         is_frozen = getattr(sys, 'frozen', False)
@@ -356,16 +356,20 @@ def create_workflow_helper_files(output_dir: Path) -> None:
             if is_windows:
                 # Windows installer: flat structure at root
                 idt_exe = base_dir / "idt.exe"
-                viewer_exe = base_dir / "Viewer.exe"
+                # Note: Viewer.exe no longer exists - merged into ImageDescriber
+                # ImageDescriber doesn't support CLI opening in viewer mode yet
+                viewer_exe = None  # base_dir / "ImageDescriber.exe"
             else:
                 # macOS: assume apps installed in /Applications
                 idt_exe = "/Applications/idt.app"  # If we ever make this
-                viewer_exe = "/Applications/Viewer.app"
+                # Note: Viewer.app no longer exists - merged into ImageDescriber
+                viewer_exe = None  # "/Applications/ImageDescriber.app"
         else:
             # Running from source
             base_dir = Path(__file__).parent.parent
             idt_exe = None
-            viewer_exe = base_dir / "viewer" / "viewer_wx.py"
+            # Note: viewer_wx.py removed - functionality merged into ImageDescriber
+            viewer_exe = None  # base_dir / "imagedescriber" / "imagedescriber_wx.py"
         
         if is_windows:
             _create_windows_helper_files(output_dir, base_dir, idt_exe, viewer_exe, is_frozen)
@@ -381,20 +385,8 @@ def _create_windows_helper_files(output_dir: Path, base_dir: Path, idt_exe, view
     """Create Windows .bat helper files"""
     import sys
     
-    # Create view_results.bat
-    view_bat = output_dir / "view_results.bat"
-    with open(view_bat, 'w', encoding='utf-8') as f:
-        f.write("@echo off\n")
-        f.write("REM Auto-generated: View workflow results in the viewer\n")
-        f.write("REM Double-click this file to view results anytime\n\n")
-        
-        if is_frozen:
-            f.write(f'"{viewer_exe}" "{output_dir.absolute()}"\n')
-        else:
-            python_exe = sys.executable
-            f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir.absolute()}"\n')
-        
-        f.write("\nREM If viewer closes immediately, run from command prompt to see errors\n")
+    # Note: view_results.bat removed - Viewer.exe no longer exists (merged into ImageDescriber)
+    # When ImageDescriber supports CLI opening in viewer mode, we can re-enable this
     
     # Create resume_workflow.bat
     resume_bat = output_dir / "resume_workflow.bat"
@@ -459,31 +451,8 @@ def _create_macos_helper_files(output_dir: Path, base_dir: Path, idt_exe, viewer
         st = os.stat(filepath)
         os.chmod(filepath, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     
-    # Create view_results scripts (.sh and .command)
-    for ext in ['.sh', '.command']:
-        view_script = output_dir / f"view_results{ext}"
-        with open(view_script, 'w', encoding='utf-8') as f:
-            f.write("#!/bin/bash\n")
-            f.write("# Auto-generated: View workflow results in the viewer\n")
-            f.write("# Run from terminal (.sh) or double-click in Finder (.command)\n\n")
-            
-            if is_frozen:
-                # Try /Applications first, fall back to open -a
-                f.write('# Try to find and launch Viewer.app\n')
-                f.write(f'WORKFLOW_DIR="{output_dir.absolute()}"\n\n')
-                f.write('if [ -d "/Applications/Viewer.app" ]; then\n')
-                f.write('    open -a "/Applications/Viewer.app" "$WORKFLOW_DIR"\n')
-                f.write('elif [ -d "$HOME/Applications/Viewer.app" ]; then\n')
-                f.write('    open -a "$HOME/Applications/Viewer.app" "$WORKFLOW_DIR"\n')
-                f.write('else\n')
-                f.write('    # Fall back to system search\n')
-                f.write('    open -a Viewer "$WORKFLOW_DIR"\n')
-                f.write('fi\n')
-            else:
-                python_exe = sys.executable
-                f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir.absolute()}"\n')
-        
-        make_executable(view_script)
+    # Note: view_results scripts removed - Viewer.app no longer exists (merged into ImageDescriber)
+    # When ImageDescriber supports CLI opening in viewer mode, we can re-enable this
     
     # Create resume_workflow scripts (.sh and .command)
     for ext in ['.sh', '.command']:

@@ -618,42 +618,36 @@ class ViewerPanel(wx.Panel):
                 wx.TheClipboard.Close()
     
     def get_workflow_progress(self):
-        """Get workflow progress using the existing progress file mechanism.
+        """Get workflow progress - same approach as image_describer.py.
         Returns (described_count, total_images) tuple.
         """
         if not self.current_dir:
             return 0, 0
         
-        # Count described images from progress file (same as idt workflow uses)
-        progress_file = self.current_dir / "logs" / "image_describer_progress.txt"
-        described_count = 0
+        # Described count = number of parsed descriptions
+        described_count = len(self.entries)
         
-        if progress_file.exists():
-            try:
-                with open(progress_file, 'r', encoding='utf-8') as f:
-                    # Each line is a completed image path
-                    described_count = len([line.strip() for line in f if line.strip()])
-            except Exception:
-                # Fallback to counting entries from descriptions
-                described_count = len(self.entries)
-        else:
-            # No progress file yet - use entries count
-            described_count = len(self.entries)
+        # Total images = count files in the directory that was actually processed
+        # Workflows process temp_combined_images (contains input + converted + extracted)
+        # Fall back to input_images if temp_combined doesn't exist
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic'}
         
-        # Count total images from input_images directory
-        input_dir = self.current_dir / "input_images"
+        # Try temp_combined_images first (this is what workflow actually processes)
+        process_dir = self.current_dir / "temp_combined_images"
+        if not process_dir.exists():
+            # Fallback to input_images
+            process_dir = self.current_dir / "input_images"
+        
         total_images = 0
-        
-        if input_dir.exists():
+        if process_dir.exists():
             try:
-                # Simple count of files in input_images (recursive for extracted frames)
-                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic'}
-                total_images = sum(1 for item in input_dir.rglob('*') 
+                # Recursive count to include extracted frames in subdirectories
+                total_images = sum(1 for item in process_dir.rglob('*') 
                                  if item.is_file() and item.suffix.lower() in image_extensions)
             except Exception:
-                # If rglob fails, use simpler count
+                # If rglob fails, try simple count
                 try:
-                    total_images = sum(1 for item in input_dir.iterdir() 
+                    total_images = sum(1 for item in process_dir.iterdir() 
                                      if item.is_file() and item.suffix.lower() in image_extensions)
                 except Exception:
                     pass

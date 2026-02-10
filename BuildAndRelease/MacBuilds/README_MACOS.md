@@ -26,10 +26,10 @@ This directory contains the complete macOS build infrastructure for Image Descri
 ## What Gets Built
 
 1. **dist/idt** - Command-line interface (standalone binary)
-2. **viewer/dist/viewer.app** - Workflow results browser
-3. **imagedescriber/dist/imagedescriber.app** - Batch processing GUI
-4. **prompt_editor/dist/prompteditor.app** - Prompt template editor
-5. **idtconfigure/dist/idtconfigure.app** - Configuration manager
+2. **imagedescriber/dist/ImageDescriber.app** - Batch processing GUI with integrated:
+   - Viewer Mode (workflow results browser)
+   - Prompt Editor (Tools → Edit Prompts)
+   - Configuration Manager (Tools → Configure Settings)
 
 ## Prerequisites
 
@@ -43,51 +43,41 @@ This directory contains the complete macOS build infrastructure for Image Descri
 
 ### Python Dependencies
 
-Set up virtual environments for each app:
+Set up virtual environment for ImageDescriber:
 
 ```bash
-# Main IDT (optional)
+# Main IDT (optional - uses system Python by default)
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+deactivate
 
-# Each GUI app
-for app in viewer imagedescriber prompt_editor idtconfigure; do
-    cd $app
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    deactivate
-    cd ..
-done
+# ImageDescriber GUI
+cd imagedescriber
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+deactivate
+cd ..
 ```
 
 ## Build Scripts
 
 ### Master Build
-- **builditall_macos.sh** - Builds all 5 applications sequentially
+- **builditall_macos.sh** - Builds both applications sequentially
   - Runs pre-build validation
   - Cleans PyInstaller cache
   - Builds each app in its virtual environment
   - Runs post-build validation
 
 ### Individual Builds
-- **build_idt_macos.sh** - CLI tool only
-- Individual apps have build scripts in their directories:
-  - `viewer/build_viewer_macos.sh`
-  - `imagedescriber/build_imagedescriber_macos.sh`
-  - `prompt_editor/build_prompt_editor_macos.sh`
-  - `idtconfigure/build_idtconfigure_macos.sh`
+- **idt/build_idt.sh** - CLI tool only
+- **imagedescriber/build_imagedescriber_wx.sh** - ImageDescriber GUI
 
 ### Installer Creation
-- **create_macos_installer.sh** - Creates .pkg installer
-  - Installs CLI to `/usr/local/bin/idt`
-  - Installs apps to `/Applications/`
-  - Includes welcome/readme screens
-  
 - **create_macos_dmg.sh** - Creates .dmg disk image
   - Drag-and-drop installation
-  - Portable apps
+  - Portable app
   - Optional CLI installation script
 
 ### Utilities
@@ -98,25 +88,18 @@ done
 ## PyInstaller Spec Files
 
 ### CLI Tool
-- **final_working_macos.spec** - IDT command-line interface
+- **idt/idt.spec** - IDT command-line interface
   - Creates standalone binary (no .app bundle)
   - Bundles all scripts and dependencies
   - Console mode enabled
 
-### GUI Applications
-Each has a macOS-specific spec with .app bundle configuration:
-
-- **viewer/viewer_macos.spec**
-- **imagedescriber/imagedescriber_macos.spec**
-- **prompt_editor/prompteditor_macos.spec**
-- **idtconfigure/idtconfigure_macos.spec**
-
-All GUI specs include:
-- Info.plist with accessibility metadata
-- Bundle identifier (com.idt.{appname})
-- High resolution support (Retina)
-- Minimum macOS version (10.13)
-- NSAccessibility descriptions
+### GUI Application
+- **imagedescriber/imagedescriber_wx.spec** - ImageDescriber with wxPython
+  - Info.plist with accessibility metadata
+  - Bundle identifier (com.idt.imagedescriber)
+  - High resolution support (Retina)
+  - Minimum macOS version (10.13)
+  - NSAccessibility descriptions
 
 ## Accessibility Features
 
@@ -152,11 +135,11 @@ All builds support both Intel and Apple Silicon:
 dist/idt version
 dist/idt --help
 
-# Test GUI apps
-open viewer/dist/viewer.app
-open imagedescriber/dist/imagedescriber.app
-open prompt_editor/dist/prompteditor.app
-open idtconfigure/dist/idtconfigure.app
+# Test GUI app with integrated modes
+open imagedescriber/dist/ImageDescriber.app
+# Switch between Editor Mode and Viewer Mode tabs
+# Test Tools → Edit Prompts
+# Test Tools → Configure Settings
 ```
 
 ### Accessibility Testing
@@ -174,14 +157,11 @@ open idtconfigure/dist/idtconfigure.app
 
 ### Installer Testing
 ```bash
-# .pkg installer
-sudo installer -pkg IDT-3.6.0.pkg -target /
-idt version  # Should work from any directory
-
 # .dmg disk image
-open IDT-3.6.0.dmg
-# Drag apps to Applications
+open IDT-4.1.0.dmg
+# Drag ImageDescriber.app to Applications
 # Run CLI Tools/INSTALL_CLI.sh
+idt version  # Should work from any directory
 ```
 
 ## Build Output
@@ -205,10 +185,7 @@ Python: 3.14.2
 
 ### Expected Sizes
 - IDT CLI: ~80MB
-- Viewer.app: ~120MB
-- ImageDescriber.app: ~250MB
-- PromptEditor.app: ~100MB
-- IDTConfigure.app: ~100MB
+- ImageDescriber.app: ~250MB (includes all integrated features)
 
 ## Code Signing (Optional)
 
@@ -218,22 +195,20 @@ For distribution, sign with Developer ID:
 # Sign individual app
 codesign --deep --force --verify --verbose \
   --sign "Developer ID Application: Your Name (TEAM_ID)" \
-  viewer/dist/viewer.app
+  imagedescriber/dist/ImageDescriber.app
 
-# Sign package installer
-productsign \
-  --sign "Developer ID Installer: Your Name (TEAM_ID)" \
-  IDT-3.6.0.pkg \
-  IDT-3.6.0-signed.pkg
+# Sign DMG
+codesign --force --sign "Developer ID Application: Your Name (TEAM_ID)" \
+  IDT-4.1.0.dmg
 
 # Notarize with Apple
-xcrun notarytool submit IDT-3.6.0-signed.pkg \
+xcrun notarytool submit IDT-4.1.0.dmg \
   --apple-id your@email.com \
   --team-id TEAM_ID \
   --wait
 
 # Staple ticket
-xcrun stapler staple IDT-3.6.0-signed.pkg
+xcrun stapler staple IDT-4.1.0.dmg
 ```
 
 ## Troubleshooting
@@ -254,7 +229,7 @@ pip install -r requirements.txt
 ### "Cannot open" or "App is damaged"
 ```bash
 # Remove quarantine (for testing only)
-xattr -cr viewer/dist/viewer.app
+xattr -cr imagedescriber/dist/ImageDescriber.app
 
 # Or right-click > Open > Open (recommended)
 ```
@@ -277,7 +252,7 @@ source ~/.zshrc
 |---------|---------|-------|
 | Build Script | `.bat` | `.sh` |
 | Executable | `.exe` | (none) or `.app` |
-| Installer | `.msi` | `.pkg` or `.dmg` |
+| Installer | (zip) | `.dmg` |
 | CLI Install | User choice | `/usr/local/bin/` |
 | GUI Install | Program Files | `/Applications/` |
 
@@ -294,10 +269,10 @@ source ~/.zshrc
 4. Regenerate installers
 
 ### Adding New Apps
-1. Create `appname/build_appname_macos.sh`
-2. Create `appname/appname_macos.spec`
+1. Create `appname/build_appname.sh`
+2. Create `appname/appname.spec`
 3. Add to `builditall_macos.sh`
-4. Update installer scripts
+4. Update DMG script
 5. Update documentation
 
 ## Support
@@ -313,4 +288,4 @@ For build issues:
 
 **Ready to build?** Run `./builditall_macos.sh` and grab a coffee! ☕
 
-Build time: ~15 minutes on Apple Silicon, ~25 minutes on Intel
+Build time: ~10 minutes on Apple Silicon, ~20 minutes on Intel

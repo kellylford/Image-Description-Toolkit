@@ -2639,105 +2639,24 @@ def prompt_view_results() -> bool:
 
 def launch_viewer(output_dir, logger: logging.Logger) -> None:
     """
-    Launch the viewer application with the specified output directory.
-    Also creates a reusable .bat file for future viewing.
+    DEPRECATED: Viewer.exe no longer exists (merged into ImageDescriber).
+    This function is kept for backward compatibility but does nothing.
+    
+    Helper scripts (resume_workflow.bat, run_stats.bat) are still created
+    by create_workflow_helper_files() which is called elsewhere.
     
     Args:
         output_dir: Path to the workflow output directory (Path object or string)
         logger: Logger instance for recording actions
     """
-    try:
-        # Ensure output_dir is a Path object
-        if not isinstance(output_dir, Path):
-            output_dir = Path(output_dir)
-        
-        # Get the base path (for both dev and executable scenarios)
-        is_frozen = getattr(sys, 'frozen', False)
-        is_windows = sys.platform == 'win32'
-        
-        if is_frozen:
-            base_dir = Path(sys.executable).parent
-            if is_windows:
-                # Windows installer: flat structure
-                viewer_exe = base_dir / "Viewer.exe"
-            else:
-                # macOS: .app bundle
-                viewer_exe = "/Applications/Viewer.app"
-        else:
-            # Running from source
-            base_dir = Path(__file__).parent.parent
-            viewer_exe = base_dir / "viewer" / "viewer_wx.py"
-        
-        # Note: Helper scripts are now created by create_workflow_helper_files()
-        # This code path is for backward compatibility only
-        script_ext = ".bat" if is_windows else ".sh"
-        script_file = output_dir / f"view_results{script_ext}"
-        
-        try:
-            if is_windows:
-                with open(script_file, 'w', encoding='utf-8') as f:
-                    f.write("@echo off\n")
-                    f.write("REM Auto-generated batch file to view workflow results\n")
-                    f.write("REM Double-click this file to reopen the results in the viewer\n\n")
-                    
-                    if is_frozen:
-                        f.write(f'"{viewer_exe}" "{output_dir}"\n')
-                    else:
-                        python_exe = sys.executable
-                        f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir}"\n')
-                    
-                    f.write("\nREM If viewer closes immediately, run this from a command prompt to see any errors\n")
-            else:
-                # macOS
-                with open(script_file, 'w', encoding='utf-8') as f:
-                    f.write("#!/bin/bash\n")
-                    f.write("# Auto-generated script to view workflow results\n\n")
-                    
-                    if is_frozen:
-                        f.write(f'WORKFLOW_DIR="{output_dir}"\n')
-                        f.write('if [ -d "/Applications/Viewer.app" ]; then\n')
-                        f.write('    open -a "/Applications/Viewer.app" "$WORKFLOW_DIR"\n')
-                        f.write('else\n')
-                        f.write('    open -a Viewer "$WORKFLOW_DIR"\n')
-                        f.write('fi\n')
-                    else:
-                        python_exe = sys.executable
-                        f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir}"\n')
-                
-                # Make executable
-                import os
-                import stat
-                st = os.stat(script_file)
-                os.chmod(script_file, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            
-            logger.info(f"Created reusable viewer launcher: {script_file}")
-            print(f"INFO: Created reusable launcher: {script_file}")
-            print("      Double-click this file anytime to view results again.")
-        except Exception as e:
-            logger.warning(f"Failed to create script file: {e}")
-        
-        # Launch the viewer
-        if viewer_exe.exists():
-            logger.info(f"Launching viewer with directory: {output_dir}")
-            print(f"\nINFO: Launching viewer...")
-            
-            if getattr(sys, 'frozen', False):
-                # Launch executable
-                subprocess.Popen([str(viewer_exe), str(output_dir)], 
-                               creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
-            else:
-                # Launch Python script
-                subprocess.Popen([sys.executable, str(viewer_exe), str(output_dir)])
-            
-            logger.info("Viewer launched successfully")
-            print("INFO: Viewer launched successfully")
-        else:
-            logger.error(f"Viewer not found at: {viewer_exe}")
-            print(f"ERROR: Viewer not found at: {viewer_exe}")
-    
-    except Exception as e:
-        logger.error(f"Failed to launch viewer: {e}")
-        print(f"ERROR: Failed to launch viewer: {e}")
+    # Note: view_results.bat/sh is no longer created
+    # Standalone Viewer was merged into ImageDescriber
+    # When ImageDescriber supports CLI opening in viewer mode, we can re-enable this
+    logger.info("Viewer launch skipped - use ImageDescriber to view results")
+    print("\nINFO: Workflow complete!")
+    print(f"      Results saved to: {output_dir}")
+    print("      To view results: Open ImageDescriber and switch to Viewer Mode tab")
+    return
 
 
 def normalize_model_name(model: str, provider: str) -> str:

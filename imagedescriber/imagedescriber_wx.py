@@ -458,6 +458,129 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if key in api_keys and api_keys[key]:
                     return api_keys[key]
         return None
+
+    def get_video_metadata(self, video_path: str) -> Optional[dict]:
+        """Extract metadata from video file using cv2.
+        
+        Returns dict with {fps, duration, total_frames} or None if extraction fails.
+        """
+        try:
+            import cv2
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                return None
+            
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            duration = total_frames / fps if fps > 0 else 0
+            
+            cap.release()
+            
+            return {
+                'fps': fps,
+                'duration': duration,
+                'total_frames': total_frames
+            }
+        except Exception:
+            # Silently handle missing cv2, corrupted videos, network issues
+            return None
+    
+    def get_workspace_directory(self) -> Path:
+        """Get the workspace data directory for extracted frames, etc.
+        
+        Returns the directory structure:
+        - If workspace saved: {workspace_dir}/{workspace_stem}_workspace/
+        - If unsaved: {home}/ImageDescriber_Workspaces/untitled_workspace/
+        """
+        if self.workspace_file:
+            # Use workspace file location and name
+            ws_path = Path(self.workspace_file)
+            ws_name = ws_path.stem  # e.g., "my_project" from "my_project.idw"
+            workspace_dir = ws_path.parent / f"{ws_name}_workspace"
+        else:
+            # Use temp location for unsaved workspace
+            workspaces_root = Path.home() / "ImageDescriber_Workspaces"
+            workspace_dir = workspaces_root / "untitled_workspace"
+        
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        return workspace_dir
+    
+    def _extract_video_frames_sync(self, video_path: str, extraction_config: dict) -> tuple:
+        """Extract frames from video synchronously (for auto-extraction in Process All).
+        
+        Args:
+            video_path: Path to video file
+            extraction_config: Dict with extraction settings
+        
+        Returns:
+            tuple: (list of extracted frame paths, video metadata dict)
+        """
+        try:
+            import cv2
+        except ImportError:
+            raise Exception("OpenCV (cv2) not available. Please install opencv-python.")
+        
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise Exception(f"Could not open video file: {video_path}")
+        
+        # Get video properties
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = frame_count / fps if fps > 0 else 0
+        
+        video_metadata = {
+            'fps': fps,
+            'total_frames': frame_count,
+            'duration': duration
+        }
+        
+        # Create output directory in workspace (NOT in source directory)
+        video_path_obj = Path(video_path)
+        workspace_dir = self.get_workspace_directory()
+        extracted_frames_dir = workspace_dir / "extracted_frames"
+        video_dir = extracted_frames_dir / f"{video_path_obj.stem}"
+        video_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Extract frames at time intervals
+        interval_seconds = extraction_config.get("time_interval_seconds", 5)
+        start_time = extraction_config.get("start_time_seconds", 0)
+        end_time = extraction_config.get("end_time_seconds")
+        max_frames = extraction_config.get("max_frames_per_video", 100)
+        
+        frame_interval = int(fps * interval_seconds)
+        start_frame = int(fps * start_time)
+        
+        extracted_paths = []
+        frame_num = start_frame
+        extract_count = 0
+        
+        while True:
+            if max_frames and extract_count >= max_frames:
+                break
+            
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+            ret, frame = cap.read()
+            
+            if not ret:
+                break
+            
+            # Check end time limit
+            current_time = frame_num / fps
+            if end_time and current_time > end_time:
+                break
+            
+            # Save frame
+            frame_filename = f"{video_path_obj.stem}_frame_{extract_count:05d}.jpg"
+            frame_path = video_dir / frame_filename
+            cv2.imwrite(str(frame_path), frame)
+            extracted_paths.append(str(frame_path))
+            
+            extract_count += 1
+            frame_num += frame_interval
+        
+        cap.release()
+        return extracted_paths, video_metadata
     
     def init_ui(self):
         """Initialize the user interface with dual mode support"""
@@ -1487,6 +1610,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 video_path_str = str(video_path)
                 if video_path_str not in self.workspace.items:
                     item = ImageItem(video_path_str, "video")
+                    # Get video metadata (duration, fps, frame count)
+                    metadata = self.get_video_metadata(video_path_str)
+                    if metadata:
+                        item.video_metadata = metadata
                     self.workspace.add_item(item)
                     video_count += 1
                     added_count += 1
@@ -1747,24 +1874,54 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             else:
                 images_to_process.append(item.file_path)
         
-        # If we have videos to extract, prompt user to extract them first
+        # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
-            video_names = "\n".join([f"  • {Path(v).name}" for v in videos_to_extract[:5]])
-            if len(videos_to_extract) > 5:
-                video_names += f"\n  ... and {len(videos_to_extract) - 5} more"
+            self.SetStatusText(f"Extracting frames from {len(videos_to_extract)} video(s)...", 0)
             
-            show_info(self, 
-                f"Found {len(videos_to_extract)} video(s) without extracted frames:\n\n"
-                f"{video_names}\n\n"
-                f"Extract frames first:\n"
-                f"  1. Select a video in the list\n"
-                f"  2. Process → Extract Video Frames\n"
-                f"  3. Configure extraction settings\n"
-                f"  4. Run Process All Undescribed again\n\n"
-                f"Tip: Check 'Process frames automatically' in the extraction dialog\n"
-                f"to describe frames immediately after extraction."
-            )
-            return
+            for video_idx, video_path in enumerate(videos_to_extract, 1):
+                video_name = Path(video_path).name
+                self.SetStatusText(f"Extracting frames from {video_name} ({video_idx}/{len(videos_to_extract)})...", 0)
+                
+                try:
+                    # Extract frames using default settings
+                    extraction_config = {
+                        "extraction_mode": "time_interval",
+                        "time_interval_seconds": 5,  # Default: 1 frame every 5 seconds
+                        "start_time_seconds": 0,
+                        "end_time_seconds": None,
+                        "max_frames_per_video": 100
+                    }
+                    
+                    extracted_frames, video_metadata = self._extract_video_frames_sync(video_path, extraction_config)
+                    
+                    if extracted_frames:
+                        # Update video item with extracted frames
+                        if video_path in self.workspace.items:
+                            video_item = self.workspace.items[video_path]
+                            video_item.extracted_frames = extracted_frames
+                            if video_metadata:
+                                video_item.video_metadata = video_metadata
+                        
+                        # Add extracted frames as items to workspace
+                        for frame_path in extracted_frames:
+                            if frame_path not in self.workspace.items:
+                                frame_item = ImageItem(frame_path, "extracted_frame")
+                                frame_item.parent_video = video_path
+                                self.workspace.add_item(frame_item)
+                                
+                                # Add to processing queue if not already described
+                                if skip_existing and not frame_item.descriptions:
+                                    images_to_process.append(frame_path)
+                                elif not skip_existing:
+                                    images_to_process.append(frame_path)
+                        
+                        self.SetStatusText(f"Extracted {len(extracted_frames)} frames from {video_name}", 0)
+                except Exception as e:
+                    show_error(self, f"Failed to extract frames from {video_name}:\n{str(e)}")
+                    # Continue with other videos
+            
+            self.refresh_image_list()
+            self.mark_modified()
         
         to_process = images_to_process
         
@@ -1957,6 +2114,63 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def save_workspace(self, file_path):
         """Save workspace to file"""
         try:
+            # Check if workspace location changed (for moving extracted frames)
+            old_workspace_file = self.workspace_file
+            workspace_changed = old_workspace_file != file_path
+            
+            # Get old and new workspace directories
+            if workspace_changed and old_workspace_file:
+                old_ws_path = Path(old_workspace_file)
+                old_ws_dir = old_ws_path.parent / f"{old_ws_path.stem}_workspace"
+            else:
+                old_ws_dir = None
+            
+            # Update workspace file path BEFORE getting new directory
+            self.workspace_file = file_path
+            new_ws_dir = self.get_workspace_directory()
+            
+            # Move extracted frames if workspace location changed
+            if workspace_changed and old_ws_dir and old_ws_dir.exists():
+                old_extracted_frames = old_ws_dir / "extracted_frames"
+                new_extracted_frames = new_ws_dir / "extracted_frames"
+                
+                if old_extracted_frames.exists():
+                    # Move the entire extracted_frames directory
+                    import shutil
+                    if new_extracted_frames.exists():
+                        shutil.rmtree(new_extracted_frames)
+                    shutil.move(str(old_extracted_frames), str(new_extracted_frames))
+                    
+                    # Update all extracted_frame item paths
+                    for item in self.workspace.items.values():
+                        if item.item_type == "extracted_frame":
+                            old_path = Path(item.file_path)
+                            # Reconstruct path in new location
+                            relative_to_old = old_path.relative_to(old_extracted_frames)
+                            new_path = new_extracted_frames / relative_to_old
+                            item.file_path = str(new_path)
+                        
+                        # Update extracted_frames list for video items
+                        if hasattr(item, 'extracted_frames') and item.extracted_frames:
+                            updated_frames = []
+                            for frame_path in item.extracted_frames:
+                                old_frame_path = Path(frame_path)
+                                try:
+                                    relative_to_old = old_frame_path.relative_to(old_extracted_frames)
+                                    new_frame_path = new_extracted_frames / relative_to_old
+                                    updated_frames.append(str(new_frame_path))
+                                except ValueError:
+                                    # Path not relative to old location, keep as-is
+                                    updated_frames.append(frame_path)
+                            item.extracted_frames = updated_frames
+                    
+                    # Clean up old workspace directory if empty
+                    try:
+                        if old_ws_dir.exists() and not any(old_ws_dir.iterdir()):
+                            old_ws_dir.rmdir()
+                    except:
+                        pass  # Ignore cleanup errors
+            
             # Update workspace metadata
             self.workspace.file_path = file_path
             self.workspace.modified = datetime.now().isoformat()
@@ -1968,7 +2182,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.workspace.to_dict(), f, indent=2, ensure_ascii=False, default=str)
             
-            self.workspace_file = file_path
             self.workspace.saved = True
             self.clear_modified()
             

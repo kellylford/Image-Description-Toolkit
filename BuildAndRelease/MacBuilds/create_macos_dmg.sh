@@ -78,23 +78,8 @@ if [ ! -f "idt/dist/idt" ]; then
     MISSING_APPS=1
 fi
 
-if [ ! -d "viewer/dist/Viewer.app" ]; then
-    echo "ERROR: viewer/dist/Viewer.app not found. Please build Viewer first."
-    MISSING_APPS=1
-fi
-
 if [ ! -d "imagedescriber/dist/ImageDescriber.app" ]; then
     echo "ERROR: imagedescriber/dist/ImageDescriber.app not found. Please build ImageDescriber first."
-    MISSING_APPS=1
-fi
-
-if [ ! -d "prompt_editor/dist/PromptEditor.app" ]; then
-    echo "ERROR: prompt_editor/dist/PromptEditor.app not found. Please build PromptEditor first."
-    MISSING_APPS=1
-fi
-
-if [ ! -d "idtconfigure/dist/IDTConfigure.app" ]; then
-    echo "ERROR: idtconfigure/dist/IDTConfigure.app not found. Please build IDTConfigure first."
     MISSING_APPS=1
 fi
 
@@ -112,10 +97,7 @@ mkdir -p "$DMG_STAGING"
 
 # Copy GUI applications
 echo "Copying GUI applications..."
-cp -R "viewer/dist/Viewer.app" "$DMG_STAGING/"
 cp -R "imagedescriber/dist/ImageDescriber.app" "$DMG_STAGING/"
-cp -R "prompt_editor/dist/PromptEditor.app" "$DMG_STAGING/"
-cp -R "idtconfigure/dist/IDTConfigure.app" "$DMG_STAGING/"
 
 # Sign GUI applications if code signing is enabled
 if [ "$SIGN_CODE" = "1" ]; then
@@ -183,8 +165,8 @@ Image Description Toolkit v${VERSION}
 
 INSTALLATION INSTRUCTIONS:
 
-GUI Applications:
-  Drag the .app files to your Applications folder (or anywhere you like)
+GUI Application:
+  Drag ImageDescriber.app to your Applications folder (or anywhere you like)
 
 CLI Tool:
   1. Open the "CLI Tools" folder
@@ -194,11 +176,13 @@ CLI Tool:
 
 WHAT'S INCLUDED:
 
-  Viewer.app          - View and monitor image description workflows
-  ImageDescriber.app  - Batch process images with AI descriptions  
-  PromptEditor.app    - Edit AI prompt templates
-  IDTConfigure.app    - Configure toolkit settings
-  idt (CLI)           - Command-line interface for all features
+  ImageDescriber.app  - Batch process images with AI descriptions
+                        Includes integrated:
+                        • Viewer Mode (monitor workflows)
+                        • Prompt Editor (Tools → Edit Prompts)
+                        • Configuration Manager (Tools → Configure Settings)
+
+  idt (CLI)          - Command-line interface for all features
 
 ACCESSIBILITY:
 
@@ -214,10 +198,10 @@ REQUIREMENTS:
 
 GETTING STARTED:
 
-  1. Drag .app files to Applications folder
+  1. Drag ImageDescriber.app to Applications folder
   2. Run INSTALL_CLI.sh from "CLI Tools" folder
-  3. Open Viewer to browse existing workflows
-  4. Use ImageDescriber for batch processing
+  3. Open ImageDescriber and switch to Viewer Mode tab to browse workflows
+  4. Use Editor Mode for batch processing
   5. Run 'idt --help' in Terminal for CLI options
 
 For documentation and support, see the project repository.
