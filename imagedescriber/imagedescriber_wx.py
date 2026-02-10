@@ -1894,7 +1894,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                                 "time_interval_seconds": video_config.get("time_interval_seconds", 5.0),
                                 "start_time_seconds": video_config.get("start_time_seconds", 0),
                                 "end_time_seconds": video_config.get("end_time_seconds"),
-                                "max_frames_per_video": video_config.get("max_frames_per_video", 30)  # Default to 30 if not set
+                                "max_frames_per_video": video_config.get("max_frames_per_video")
                             }
                     except Exception:
                         # Fallback to hardcoded defaults if config can't be loaded
@@ -1903,7 +1903,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             "time_interval_seconds": 5.0,
                             "start_time_seconds": 0,
                             "end_time_seconds": None,
-                            "max_frames_per_video": 30
+                            "max_frames_per_video": None
                         }
                     
                     extracted_frames, video_metadata = self._extract_video_frames_sync(video_path, extraction_config)

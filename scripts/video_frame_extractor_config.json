@@ -11,7 +11,7 @@
     "frame_prefix": "frame",
     "start_time_seconds": 0,
     "end_time_seconds": null,
-    "max_frames_per_video": 30,
+    "max_frames_per_video": null,
     "skip_existing": false,
     "log_progress": true,
     "frame_naming": {
