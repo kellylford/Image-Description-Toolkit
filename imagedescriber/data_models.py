@@ -68,6 +68,7 @@ class ImageItem:
         self.parent_video = None  # For extracted frames
         self.extracted_frames: List[str] = []  # For videos
         self.display_name = ""  # Custom display name for this version
+        self.video_metadata: Optional[dict] = None  # Video metadata (fps, duration, total_frames)
         
         # Batch processing state tracking (Phase 1: Batch Management)
         self.processing_state: Optional[str] = None  # None, "pending", "processing", "completed", "failed", "paused"
@@ -89,6 +90,7 @@ class ImageItem:
             "parent_video": self.parent_video,
             "extracted_frames": self.extracted_frames,
             "display_name": self.display_name,
+            "video_metadata": self.video_metadata,
             # Batch processing state (Phase 1: Batch Management)
             "processing_state": self.processing_state,
             "processing_error": self.processing_error,
@@ -103,6 +105,7 @@ class ImageItem:
         item.parent_video = data.get("parent_video")
         item.extracted_frames = data.get("extracted_frames", [])
         item.display_name = data.get("display_name", "")
+        item.video_metadata = data.get("video_metadata", None)
         # Batch processing state (Phase 1: Batch Management) - backward compatible defaults
         item.processing_state = data.get("processing_state", None)
         item.processing_error = data.get("processing_error", None)

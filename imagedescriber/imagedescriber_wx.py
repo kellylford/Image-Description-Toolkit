@@ -404,6 +404,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 log_build_banner()
             except Exception:
                 pass
+        
+        # Cache AI models on startup for faster dialog opening
+        wx.CallAfter(self.refresh_ai_models_silent)
     
     # Note: update_window_title() is now provided by ModifiedStateMixin
     # It automatically handles the modified state indicator (*)
@@ -826,6 +829,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         filter_undesc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Undescribed Only")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("undescribed"), filter_undesc_item)
         
+        filter_videos_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Videos Only")
+        self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("videos"), filter_videos_item)
+        
         filter_all_item.Check(True)  # Default to all items
         
         view_menu.AppendSeparator()
@@ -943,6 +949,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         info = f"Selected: {file_path.name}"
         if desc_count > 0:
             info += f" ({desc_count} description{'s' if desc_count != 1 else ''})"
+        
+        # Add video metadata for videos
+        if image_item.item_type == "video":
+            metadata_parts = []
+            if hasattr(image_item, 'video_metadata'):
+                meta = image_item.video_metadata
+                if meta.get('duration'):
+                    duration_mins = int(meta['duration'] // 60)
+                    duration_secs = int(meta['duration'] % 60)
+                    metadata_parts.append(f"{duration_mins}m {duration_secs}s")
+                if meta.get('fps'):
+                    metadata_parts.append(f"{meta['fps']:.1f} fps")
+                if meta.get('total_frames'):
+                    metadata_parts.append(f"{meta['total_frames']} frames")
+            if hasattr(image_item, 'extracted_frames') and image_item.extracted_frames:
+                metadata_parts.append(f"{len(image_item.extracted_frames)} extracted")
+            if metadata_parts:
+                info += f"\n{' • '.join(metadata_parts)}"
         
         # Phase 6: Display error message if failed
         if hasattr(image_item, 'processing_state') and image_item.processing_state == "failed":
@@ -1539,6 +1563,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     continue
             elif self.current_filter == "undescribed":
                 if item.descriptions:
+                    continue
+            elif self.current_filter == "videos":
+                # Show videos and their extracted frames only
+                if item.item_type not in ["video", "extracted_frame"]:
                     continue
             
             base_name = Path(file_path).name
@@ -2287,6 +2315,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     video_item = self.workspace.items[video_path]
                     video_item.extracted_frames = extracted_frames
                     
+                    # Store video metadata if available from event
+                    if hasattr(event, 'video_metadata') and event.video_metadata:
+                        video_item.video_metadata = event.video_metadata
+                    
                     # Add extracted frames as individual items
                     for frame_path in extracted_frames:
                         if frame_path not in self.workspace.items:
@@ -3013,6 +3045,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if self.workspace:
                 self.workspace.cached_ollama_models = None
             return None
+    
+    def refresh_ai_models_silent(self):
+        """Silently refresh AI model cache on startup (no dialogs)"""
+        try:
+            self.refresh_ollama_models()
+        except Exception:
+            pass  # Silent failure on startup
     
     def on_refresh_ai_models(self, event):
         """Handle menu item to refresh AI model cache"""

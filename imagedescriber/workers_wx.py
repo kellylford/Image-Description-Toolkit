@@ -1204,8 +1204,8 @@ class VideoProcessingWorker(threading.Thread):
         try:
             self._post_progress(f"Extracting frames from: {Path(self.video_path).name}")
             
-            # Extract frames
-            extracted_frames = self._extract_frames()
+            # Extract frames and get video metadata
+            extracted_frames, video_metadata = self._extract_frames()
             
             if extracted_frames:
                 self._post_progress(f"Extracted {len(extracted_frames)} frames")
@@ -1213,6 +1213,8 @@ class VideoProcessingWorker(threading.Thread):
                     input_dir=self.video_path,
                     output_dir=str(Path(extracted_frames[0]).parent)
                 )
+                # Attach video metadata to event
+                evt.video_metadata = video_metadata
                 wx.PostEvent(self.parent_window, evt)
             else:
                 evt = WorkflowFailedEventData(error="No frames were extracted from video")
@@ -1227,8 +1229,12 @@ class VideoProcessingWorker(threading.Thread):
         evt = ProgressUpdateEventData(file_path=self.video_path, message=message)
         wx.PostEvent(self.parent_window, evt)
     
-    def _extract_frames(self) -> list:
-        """Extract frames from video based on configuration"""
+    def _extract_frames(self) -> tuple:
+        """Extract frames from video based on configuration
+        
+        Returns:
+            tuple: (list of extracted frame paths, video metadata dict)
+        """
         try:
             import cv2
         except ImportError:
@@ -1243,6 +1249,13 @@ class VideoProcessingWorker(threading.Thread):
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps if fps > 0 else 0
         
+        # Store metadata
+        video_metadata = {
+            'fps': fps,
+            'total_frames': frame_count,
+            'duration': duration
+        }
+        
         # Create output directory
         video_path = Path(self.video_path)
         toolkit_dir = video_path.parent / "imagedescriptiontoolkit"
@@ -1256,7 +1269,7 @@ class VideoProcessingWorker(threading.Thread):
             extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir)
         
         cap.release()
-        return extracted_paths
+        return extracted_paths, video_metadata
     
     def _extract_by_time_interval(self, cap, fps: float, output_dir: Path) -> list:
         """Extract frames at regular time intervals"""
