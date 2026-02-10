@@ -1170,7 +1170,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Resolve path (handle moved workspaces)
             resolved_path = self.resolve_image_path(file_path)
 
-            # Load and resize image to fit preview panel
+            # Don't pre-check exists() for network paths - os.path.exists() can give
+            # false negatives on network shares due to latency/caching.
+            # Just try to load and fail silently if needed.
             img = Image.open(resolved_path)
             img.thumbnail((250, 250), Image.Resampling.LANCZOS)
             
@@ -1194,7 +1196,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_preview_panel.Refresh()
             
         except Exception as e:
-            # If image can't be loaded, show grey placeholder
+            # If image can't be loaded, silently show grey placeholder
+            # (No error dialogs for missing files, network errors, corrupt images, etc.)
             self.image_preview_bitmap = None
             self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
             self.image_preview_panel.Refresh()

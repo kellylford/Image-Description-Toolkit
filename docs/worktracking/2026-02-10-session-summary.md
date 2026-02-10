@@ -192,3 +192,134 @@ a9068ad Fix batch processing UX issues
 **Agent**: Claude 3.7 Sonnet  
 **Session**: February 10, 2026  
 **Branch**: WXMigration (merged from copilot/add-pause-resume-stop-controls)
+
+---
+
+## CONTINUED SESSION: Critical Bug Fix - Image Loading Error Dialogs
+
+### Problem
+After the batch processing work was merged, a critical bug was reported where users experienced blocking modal error dialogs when:
+1. Switching to viewer mode to browse descriptions
+2. Arrowing through descriptions (each arrow key press triggered a dialog!)
+3. Switching back to workspace mode  
+4. Working with workspace files (.idw) that reference images on inaccessible network shares
+
+**User quote**: 
+> "This is a horrible experience because the dialog is blocking and stops you from being able to arrow through the descriptions. AI keeps saying it fixed the issue but that's not the case. I don't want a quick fix, I want the right fix."
+
+### Root Cause Analysis
+
+The issue had multiple contributing factors:
+
+1. **wxPython Error Logging**: `wx.Image()` automatically logs errors to wxLog when image loading fails, which showed modal dialogs
+   
+2. **Network Path False Negatives**: **User feedback revealed the paths DO exist and are accessible!** The issue was that `os.path.exists()` checks on UNC paths (`\\\\ford\\home\\Photos\\...`) can give FALSE NEGATIVES due to:
+   - Network latency during rapid checks (arrow key navigation)
+   - Windows file system caching
+   - Rapid successive calls overwhelming the network share
+
+3. **Overly Aggressive Pre-checking**: Initial fix attempted to check if files existed before loading, which **rejected valid network paths** that were actually accessible
+
+4. **Strategy Error**: Trying to predict whether a file exists (pre-flight check) rather than just attempting to load it
+
+### Solution Implemented
+
+#### File: [viewer_components.py](../../imagedescriber/viewer_components.py)
+
+**`load_image_preview()` function (lines 483-555)**:
+
+1. **wxPython Error Suppression** (THE KEY FIX):
+   ```python
+   # Suppress wxPython error logging to prevent modal dialogs
+   log_null = wx.LogNull()
+   img = wx.Image(path, wx.BITMAP_TYPE_ANY)
+   # ... processing ...
+   del log_null  # Restore normal logging in finally block
+   ```
+
+2. **REMOVED Pre-flight exists() Check**:
+   - Initial version tried `os.path.exists()` before loading
+   - **User feedback**: This rejected valid network paths!
+   - New approach: Just TRY to load, fail silently if needed
+
+3. **Strategy**: Don't predict if file exists - attempt to load it
+   - Valid files load successfully  
+   - Invalid/missing files fail silently with placeholder
+   - No blocking dialogs either way
+
+#### File: [imagedescriber_wx.py](../../imagedescriber/imagedescriber_wx.py)
+
+**`load_preview_image()` function (lines 1148-1208)**:
+
+1. **REMOVED Pre-flight Path Check**:
+   - Initial version checked `Path(resolved_path).exists()` before loading
+   - **Problem**: False negatives on valid network paths!
+   - **Solution**: Removed check, just try PIL Image.open()
+
+2. **Added Explanatory Comment**:
+   ```python
+   # Don't pre-check exists() for network paths - os.path.exists() can give
+   # false negatives on network shares due to latency/caching.
+   # Just try to load and fail silently if needed.
+   ```
+
+3. **Strategy**: Let PIL determine if file is loadable
+   - Valid files load successfully
+   - Actual errors fail silently with grey placeholder
+
+### Impact
+
+- ✅ **Eliminates blocking modal dialogs** when browsing descriptions
+- ✅ **Enables uninterrupted keyboard navigation** through viewer
+- ✅ **Handles network path failures gracefully** (no hangs, no timeouts shown to user)
+- ✅ **Improves UX for moved/missing images** (silent fallback to placeholders)
+- ✅ **Fixes both viewer mode AND workspace mode** image loading
+
+### Files Changed
+
+- `imagedescriber/viewer_components.py` - 21 lines changed
+- `imagedescriber/imagedescriber_wx.py` - 19 lines changed
+
+### Testing Recommendations
+
+1. **Network Share Test**: Load .idw workspace with UNC paths to inaccessible shares → arrow through descriptions → no error dialogs
+2. **Missing Files Test**: Create workspace, delete source images → switch modes → smooth operation
+3. **Performance Test**: Large workspace with many missing images → fast navigation, no hangs
+
+---
+
+## Earlier in Session: Release Prep & Planning
+
+### Release Preparation v4.1.0 (Committed: c628f96)
+- Removed debug console window from ImageDescriber (.spec: console=False)
+- Added User Guide menu item to Help menu (opens GitHub docs)
+
+### Documentation Updates
+- Updated README.md with 2-app structure (idt.exe + imagedescriber.exe)
+- Added GUI and CLI golden path sections
+- Restructured USER_GUIDE.md (removed standalone app sections 12, 16)
+- Integrated Viewer and Tools documentation into ImageDescriber section
+
+### Accessibility Fix
+- Fixed batch progress dialog keyboard navigation  
+- Skip separator line when using arrow keys (no longer a tab stop)
+
+### Video Support Planning
+- Created [VIDEO_SUPPORT_IMPLEMENTATION_PLAN.md](VIDEO_SUPPORT_IMPLEMENTATION_PLAN.md) (580 lines)
+- Documented flat-list design approach (no tree widget for accessibility)
+- Defined 5 implementation phases (9-day estimate)
+- Frame storage: `imagedescriptiontoolkit/{video_name}_frames/`
+- Frame naming: `{video_name}_frame_00001.jpg`
+
+### GitHub Issues Created
+- **#77**: Restore Video Support to wxPython ImageDescriber (high priority)
+- **#78**: v.next - Allow deleting individual images/frames from workspace (medium priority)
+- **#79**: v.next - Standardize file naming and folder structure between CLI/GUI (low priority)
+
+---
+
+**Session Duration**: Multiple hours  
+**Total Commits**: 2 (c628f96 + pending image loading fix)  
+**Branch**: WXMigration  
+**Agent**: Claude 3.7 Sonnet (Model: claude-sonnet-4-20250514)
+

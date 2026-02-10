@@ -486,7 +486,7 @@ class ViewerPanel(wx.Panel):
         if self.main_window and hasattr(self.main_window, 'show_image_previews') and not self.main_window.show_image_previews:
             return
         
-        if not path or not os.path.exists(path):
+        if not path:
             # Create a placeholder bitmap with error message
             try:
                 w, h = self.image_preview_panel.GetSize()
@@ -500,17 +500,7 @@ class ViewerPanel(wx.Panel):
                     dc.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
                     
                     text = "Image not found" if path else "No image"
-                    if path:
-                        filename = Path(path).name
-                        text_lines = [
-                            "Image not found:",
-                            filename,
-                            "",
-                            "Check that the image exists in",
-                            "the workspace source directory"
-                        ]
-                    else:
-                        text_lines = ["No image selected"]
+                    text_lines = ["No image selected"]
                     
                     y_offset = (h - len(text_lines) * 20) // 2
                     for line in text_lines:
@@ -530,6 +520,8 @@ class ViewerPanel(wx.Panel):
             return
             
         try:
+            # Suppress wxPython error logging to prevent modal dialogs
+            log_null = wx.LogNull()
             img = wx.Image(path, wx.BITMAP_TYPE_ANY)
             
             # Scale to fit panel
@@ -546,8 +538,12 @@ class ViewerPanel(wx.Panel):
             self.image_preview_bitmap = wx.Bitmap(img)
             self.image_preview_panel.Refresh()
         except:
+            # Silently create placeholder for any loading errors
             self.image_preview_bitmap = None
             self.image_preview_panel.Refresh()
+        finally:
+            # Restore normal logging
+            del log_null
 
     def on_paint_preview(self, event):
         """Paint image preview"""
