@@ -728,9 +728,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         redescribe_all_item = process_menu.Append(
             wx.ID_ANY,
             "&Redescribe All Images",
-            "Reprocess ALL images (replaces existing descriptions)"
+            "Process ALL images again (adds new descriptions)"
         )
         self.Bind(wx.EVT_MENU, lambda e: self.on_process_all(e, skip_existing=False), redescribe_all_item)
+        
+        process_menu.AppendSeparator()
+        
+        # Show Batch Progress menu item (enabled only during batch processing)
+        self.show_batch_progress_item = process_menu.Append(
+            wx.ID_ANY,
+            "Show &Batch Progress",
+            "Show batch processing progress dialog"
+        )
+        self.show_batch_progress_item.Enable(False)  # Disabled by default
+        self.Bind(wx.EVT_MENU, self.on_show_batch_progress, self.show_batch_progress_item)
         
         process_menu.AppendSeparator()
         
@@ -1591,8 +1602,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             result = ask_yes_no(
                 self,
                 "Redescribe ALL images?\n\n"
-                "This will REPLACE existing descriptions with new ones.\n"
-                "This action cannot be undone.\n\n"
+                "This will ADD new descriptions to all images (including those already described).\n"
+                "Existing descriptions will be kept - you'll have multiple descriptions per image.\n\n"
                 "Continue?"
             )
             if not result:
@@ -1666,6 +1677,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if BatchProgressDialog:
             self.batch_progress_dialog = BatchProgressDialog(self, len(to_process))
             self.batch_progress_dialog.Show()
+            # Enable "Show Batch Progress" menu item
+            if hasattr(self, 'show_batch_progress_item'):
+                self.show_batch_progress_item.Enable(True)
         
         # Phase 3: Initialize timing
         self.batch_start_time = time.time()
@@ -2171,6 +2185,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Phase 3: Clear worker reference
         self.batch_worker = None
         
+        # Disable "Show Batch Progress" menu item
+        if hasattr(self, 'show_batch_progress_item'):
+            self.show_batch_progress_item.Enable(False)
+        
         # Save workspace
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
@@ -2236,6 +2254,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         self.SetStatusText("Batch processing resumed", 0)
     
+    def on_show_batch_progress(self, event):
+        """Show or raise the batch progress dialog"""
+        if self.batch_progress_dialog:
+            # Dialog exists - show and raise it
+            if not self.batch_progress_dialog.IsShown():
+                self.batch_progress_dialog.Show()
+            self.batch_progress_dialog.Raise()
+        else:
+            # No dialog - shouldn't happen if menu item is properly disabled
+            show_info(self, "No batch processing is currently running.")
+    
     def on_stop_batch(self):
         """Stop batch processing permanently"""
         if not self.batch_worker:
@@ -2264,6 +2293,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Clear worker reference
         self.batch_worker = None
+        
+        # Disable "Show Batch Progress" menu item
+        if hasattr(self, 'show_batch_progress_item'):
+            self.show_batch_progress_item.Enable(False)
         
         self.SetStatusText("Batch processing stopped", 0)
         show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
@@ -2368,6 +2401,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if BatchProgressDialog:
             self.batch_progress_dialog = BatchProgressDialog(self, total)
             self.batch_progress_dialog.Show()
+            # Enable "Show Batch Progress" menu item
+            if hasattr(self, 'show_batch_progress_item'):
+                self.show_batch_progress_item.Enable(True)
         
         # Initialize timing
         self.batch_start_time = time.time()
