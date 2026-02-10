@@ -197,6 +197,15 @@ class SettingEditDialog(wx.Dialog):
             self.editor.SetValue(str(float(self.current_value or 0.0)))
             form_sizer.Add(self.editor, 0, wx.EXPAND)
             
+        elif setting_type == "int_or_null":
+            self.editor = wx.TextCtrl(panel)
+            # Display empty string for None/null, otherwise the integer value
+            if self.current_value is None:
+                self.editor.SetValue("")
+            else:
+                self.editor.SetValue(str(int(self.current_value)))
+            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            
         elif setting_type == "choice":
             self.editor = wx.Choice(panel)
             choices = self.setting_info.get("choices", [])
@@ -238,6 +247,14 @@ class SettingEditDialog(wx.Dialog):
                 return float(self.editor.GetValue())
             except ValueError:
                 return 0.0
+        elif setting_type == "int_or_null":
+            value = self.editor.GetValue().strip()
+            if value == "" or value.lower() == "null" or value.lower() == "none":
+                return None
+            try:
+                return int(value)
+            except ValueError:
+                return None
         elif setting_type == "choice":
             return self.editor.GetStringSelection()
         else:
@@ -369,6 +386,13 @@ class ConfigureDialog(wx.Dialog):
                     "type": "float",
                     "range": [0.5, 30.0],
                     "description": "Seconds between frame extractions when using time_interval mode. Lower = more frames. Recommended: 3-5 seconds for most videos."
+                },
+                "max_frames_per_video": {
+                    "file": "video_extractor",
+                    "path": ["max_frames_per_video"],
+                    "type": "int_or_null",
+                    "range": [1, 1000],
+                    "description": "Maximum frames to extract per video (leave empty for unlimited). Recommended: Leave empty for automatic workflows, or set to 30-50 for manual control."
                 },
                 "scene_change_threshold": {
                     "file": "video_extractor",
