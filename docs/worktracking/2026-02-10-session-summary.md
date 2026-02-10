@@ -491,7 +491,7 @@ video.mp4 E5
 
 ### Video Support Status
 
-**✅ Complete** (Phases 1-3):
+**✅ Complete** (Phases 1-4):
 - Video file loading and scanning (.mp4, .mov, .avi, .mkv)
 - VideoExtractionDialog with time interval and scene detection modes
 - Frame extraction with configurable settings
@@ -499,16 +499,25 @@ video.mp4 E5
 - Status indicators: `E{count}` for extracted frames, `d{count}` for descriptions
 - Workspace serialization (videos and frames persist)
 - Unit tests for video item serialization and workspace persistence
+- Batch processing integration with clear user workflow
 
-**🔲 Remaining** (Phases 4-5):
-- Additional menu items for video extraction
-- Batch processing integration (currently requires manual extraction before batch)
-- Manual testing with actual video files
-- Performance testing with large videos
+**Design Decisions Finalized**:
+- **Frame extraction before batch**: Videos require manual extraction before batch processing
+  - Rationale: Async extraction incompatible with synchronous batch queue
+  - UX: User gets full control over extraction settings per video
+  - Workflow: Extract → optionally auto-process → or batch process later
+- **Clear user guidance**: Improved messaging shows up to 5 video names, step-by-step instructions
+- **"Process frames automatically" checkbox**: In extraction dialog for immediate processing after extraction
+
+**Phase 5 Notes**:
+- Context menu for video operations: Deferred to v.next (not critical for MVP)
+- Re-extraction with overwrite: Deferred to v.next
+- Manual testing: User will build executable and test with real videos
 
 ### Files Changed in This Session
 
-- `imagedescriber/imagedescriber_wx.py` - Fixed duplicate append bug (removed 5 lines)
+- `imagedescriber/imagedescriber_wx.py` - Fixed duplicate append bug, improved batch video messaging
+- `docs/worktracking/2026-02-10-session-summary.md` - Updated with all session work
 
 ### Testing Required
 
