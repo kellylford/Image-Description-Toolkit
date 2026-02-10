@@ -73,6 +73,8 @@ class BatchProgressDialog(wx.Dialog):
             name="Processing statistics and current image"
         )
         self.stats_list.SetMinSize((450, 100))
+        # Bind key handler to skip separator line during navigation
+        self.stats_list.Bind(wx.EVT_KEY_DOWN, self._on_stats_key)
         main_sizer.Add(self.stats_list, 0, wx.ALL | wx.EXPAND, 10)
         
         # Progress label
@@ -154,6 +156,8 @@ class BatchProgressDialog(wx.Dialog):
         
         # Add separator line
         self.stats_list.Append("─" * 40)
+        # Track separator index for keyboard navigation
+        self.separator_index = self.stats_list.GetCount() - 1
         
         # Add current image as last item (keyboard-navigable)
         filename = Path(file_path).name
@@ -197,5 +201,36 @@ class BatchProgressDialog(wx.Dialog):
                 self.parent_window.on_stop_batch()
     
     def reset_pause_button(self):
+    
+    def _on_stats_key(self, event):
+        """Handle keyboard navigation in stats list to skip separator line"""
+        keycode = event.GetKeyCode()
+        current_selection = self.stats_list.GetSelection()
+        
+        # Skip separator line when navigating with arrow keys
+        if keycode == wx.WXK_DOWN:
+            if current_selection != wx.NOT_FOUND:
+                next_index = current_selection + 1
+                # Skip separator line if next item is separator
+                if hasattr(self, 'separator_index') and next_index == self.separator_index:
+                    next_index += 1
+                # Don't go past last item
+                if next_index < self.stats_list.GetCount():
+                    self.stats_list.SetSelection(next_index)
+                    return  # Don't propagate event
+        
+        elif keycode == wx.WXK_UP:
+            if current_selection != wx.NOT_FOUND:
+                prev_index = current_selection - 1
+                # Skip separator line if previous item is separator
+                if hasattr(self, 'separator_index') and prev_index == self.separator_index:
+                    prev_index -= 1
+                # Don't go before first item
+                if prev_index >= 0:
+                    self.stats_list.SetSelection(prev_index)
+                    return  # Don't propagate event
+        
+        # For all other keys, use default behavior
+        event.Skip()
         """Reset pause button to 'Pause' state"""
         self.pause_button.SetLabel("Pause")

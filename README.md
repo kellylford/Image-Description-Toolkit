@@ -10,28 +10,52 @@ Download the latest installer from the [releases](https://github.com/kellylford/
 
 **`ImageDescriptionToolkit_Setup_v4.1.0.exe`** (Windows) or **`IDT-4.1.0.pkg`** / **`IDT-4.1.0.dmg`** (macOS)
 
-Run the installer - it includes IDT CLI and ImageDescriber (with integrated Viewer Mode, Prompt Editor, and Configuration tools) plus documentation.
+Run the installer - it includes:
+- **idt.exe** - Command-line interface for batch processing and automation
+- **imagedescriber.exe** - GUI with integrated viewer, prompt editor, and configuration manager
+- Full documentation and examples
 
 **Latest Release (v4.1.0):** wxPython migration complete with improved accessibility, 31+ bug fixes, and comprehensive testing.
 
-### Basic Usage
+### Quick Start
+
+#### GUI (Easiest for Most Users)
+
+1. **Install** Image Description Toolkit from the installer
+2. **Launch** `imagedescriber.exe` from the install folder (default: `C:\IDT\`)
+3. **Choose** a directory of images (File → Load Directory)
+4. **Select** your AI provider, model, and prompt style in the interface
+5. **Process** all images (Processing → Process All Undescribed)
+
+Your images will be described automatically! Use Tools → Edit Prompts to customize description styles, or File → Switch to Viewer to browse results.
+
+#### Command Line (For Batch Processing)
+
+1. **Open** a command prompt
+2. **Change** to the install directory: `cd C:\IDT`
+3. **Run** the interactive guide: `idt guideme`
+4. **Answer** the prompts to configure and run your workflow
+
+Results are saved in the `Descriptions/` folder with an HTML viewer.
+
+### Advanced Usage
 
 ```bash
-# Process images with AI descriptions
-idt workflow --provider huggingface --model microsoft/Florence-2-base images/
-
-# View and manage results with GUI (includes Viewer Mode)
-imagedescriber.exe
+# Direct workflow with default settings
+idt workflow path/to/images
 ```
 
 ## Features
 
+- **Two Powerful Applications**: GUI for visual workflow, CLI for automation
 - **Multiple AI Providers**: Ollama (local), OpenAI, Claude, HuggingFace Florence-2
+- **Batch Processing**: Process directories of images automatically
 - **Video Frame Extraction**: Extract and describe frames from videos
+- **Integrated Viewer**: Browse and monitor workflows in real-time (built into GUI)
+- **Integrated Tools**: Prompt editor and configuration manager built into GUI
 - **Workflow Management**: Organized results with metadata tracking
 - **Re-describe Feature**: Test different models/prompts on same images
 - **Analysis Tools**: Compare models, review content, export to CSV/Excel
-- **GUI Applications**: ImageDescriber (with integrated Viewer Mode, prompt editor, and configuration manager)
 
 ## Documentation
 
@@ -51,12 +75,12 @@ imagedescriber.exe
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ## Requirements
-
-### Windows
-- **Windows 10/11** (AMD64 or ARM64)
-- **Built Executable**: No Python required - download installer from releases
+Pre-built Executable**: No Python required - download installer from releases
 - **AI Provider** (choose one or more):
-  - [Ollama](https://ollama.com) (free, runs locally)
+  - [Ollama](https://ollama.com) (free, runs locally) - **Recommended for most users**
+  - [OpenAI API](https://platform.openai.com/api-keys) (GPT-4o, paid)
+  - [Claude API](https://console.anthropic.com) (paid)
+  - HuggingFace Florence-2 (free, local, requires more setup
   - [OpenAI API](https://platform.openai.com/api-keys) (GPT-4o, paid)
   - [Claude API](https://console.anthropic.com) (paid)
   - HuggingFace Florence-2 (free, local, no API needed)

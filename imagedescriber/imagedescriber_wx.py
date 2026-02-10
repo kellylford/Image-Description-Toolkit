@@ -856,6 +856,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Help menu
         help_menu = wx.Menu()
         
+        user_guide_item = help_menu.Append(wx.ID_ANY, "&User Guide...")
+        self.Bind(wx.EVT_MENU, self.on_user_guide, user_guide_item)
+        
+        help_menu.AppendSeparator()
+        
         about_item = help_menu.Append(wx.ID_ABOUT, "&About")
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
         
@@ -3115,6 +3120,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, f"Error importing configuration:\n{e}")
     
     # ========== Help Menu Handlers ==========
+    
+    def on_user_guide(self, event):
+        """Open user guide in web browser"""
+        user_guide_url = "https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE.md"
+        try:
+            webbrowser.open(user_guide_url)
+        except Exception as e:
+            show_error(self, f"Could not open user guide:\n{e}")
     
     def on_about(self):
         """Show about dialog"""
