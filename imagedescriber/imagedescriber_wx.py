@@ -715,8 +715,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         process_single_item = process_menu.Append(wx.ID_ANY, "Process &Current Image\tP")
         self.Bind(wx.EVT_MENU, self.on_process_single, process_single_item)
         
-        process_all_item = process_menu.Append(wx.ID_ANY, "Process &All Images")
-        self.Bind(wx.EVT_MENU, self.on_process_all, process_all_item)
+        process_menu.AppendSeparator()
+        
+        # Phase 5: Split Process All into two options
+        process_undesc_item = process_menu.Append(
+            wx.ID_ANY,
+            "Process &Undescribed Images",
+            "Process only images without descriptions (safe default)"
+        )
+        self.Bind(wx.EVT_MENU, lambda e: self.on_process_all(e, skip_existing=True), process_undesc_item)
+        
+        redescribe_all_item = process_menu.Append(
+            wx.ID_ANY,
+            "&Redescribe All Images",
+            "Reprocess ALL images (replaces existing descriptions)"
+        )
+        self.Bind(wx.EVT_MENU, lambda e: self.on_process_all(e, skip_existing=False), redescribe_all_item)
         
         process_menu.AppendSeparator()
         
@@ -1542,8 +1556,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         self.SetStatusText(f"Processing: {Path(self.current_image_item.file_path).name}...", 0)
     
-    def on_process_all(self, event):
-        """Process all images"""
+    def on_process_all(self, event, skip_existing: bool = True):
+        """Process images in batch
+        
+        Args:
+            event: Menu event
+            skip_existing: If True, only process images without descriptions (default, safe)
+                          If False, reprocess all images (show warning first)
+        """
         if not self.workspace or not self.workspace.items:
             show_warning(self, "No images in workspace")
             return
@@ -1551,6 +1571,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if not BatchProcessingWorker:
             show_error(self, "Batch processing worker not available")
             return
+        
+        # Phase 5: Warn about redescribing all
+        if not skip_existing:
+            result = ask_yes_no(
+                self,
+                "Redescribe ALL images?\n\n"
+                "This will REPLACE existing descriptions with new ones.\n"
+                "This action cannot be undone.\n\n"
+                "Continue?"
+            )
+            if not result:
+                return
         
         # Show processing options dialog with cached models
         if ProcessingOptionsDialog:
@@ -1568,11 +1600,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'model': self.config.get('default_model', 'moondream'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
-                'skip_existing': False
             }
         
+        # Phase 5: Use skip_existing parameter instead of options
         # Get files to process
-        if options.get('skip_existing', False):
+        if skip_existing:
             to_process = [item.file_path for item in self.workspace.items.values() 
                          if not item.descriptions]
         else:
@@ -1612,7 +1644,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('custom_prompt', ''),
             None,  # detection_settings
             None,  # prompt_config_path
-            options.get('skip_existing', False)
+            skip_existing  # Phase 5: Use parameter instead of options
         )
         self.batch_worker.start()
         
