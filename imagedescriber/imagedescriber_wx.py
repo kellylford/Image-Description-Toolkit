@@ -1596,9 +1596,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.display_image_info(self.current_image_item)
     
     def on_process_single(self, event):
-        """Process single selected image"""
+        """Process single selected image or extract video frames"""
         if not self.current_image_item:
             show_warning(self, "No image selected")
+            return
+        
+        # If video, show extraction dialog instead
+        if self.current_image_item.item_type == "video":
+            self.on_extract_video(event)
             return
         
         if not ProcessingWorker:
