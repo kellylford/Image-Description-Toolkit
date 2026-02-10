@@ -319,7 +319,217 @@ The issue had multiple contributing factors:
 ---
 
 **Session Duration**: Multiple hours  
-**Total Commits**: 2 (c628f96 + pending image loading fix)  
+**Total Commits**: 3 (c628f96, 909f40b, + pending batch dialog fix)  
 **Branch**: WXMigration  
 **Agent**: Claude 3.7 Sonnet (Model: claude-sonnet-4-20250514)
 
+---
+
+## REGRESSION FIX: Batch Progress Dialog Not Appearing
+
+### Problem
+After the keyboard navigation fix was committed (c628f96), batch processing broke completely:
+1. Dialog never appeared when starting "Process Undescribed Images" or "Redescribe All"
+2. Menu item "Show Batch Progress" showed as unavailable (disabled) even during active batch processing
+3. No progress visibility whatsoever
+
+**User quote**:
+> "Something in the last change made here broke batch processing. The dialog never comes up now... when you go to the menu item while a batch is going, it shows as unavailable"
+
+### Root Cause Analysis
+
+Indentation corruption in [batch_progress_dialog.py](../../imagedescriber/batch_progress_dialog.py) - the `_on_stats_key()` keyboard navigation handler was incorrectly inserted **inside** the `reset_pause_button()` method definition during the merge/commit:
+
+**BEFORE (Broken - lines 203-241)**:
+```python
+def reset_pause_button(self):
+    
+def _on_stats_key(self, event):
+    """Handle keyboard navigation in stats list to skip separator line"""
+    # ... all the keyboard handling code ...
+    event.Skip()
+    """Reset pause button to 'Pause' state"""  # ← WRONG! Outside all functions!
+    self.pause_button.SetLabel("Pause")         # ← WRONG! Outside all functions!
+```
+
+This caused:
+1. `reset_pause_button()` had no body → Python created a function that does nothing
+2. Last two lines were **floating outside both functions** → syntax error
+3. BatchProgressDialog class failed to instantiate properly
+4. Dialog never created → menu item stayed disabled
+
+### Solution Implemented
+
+Fixed method structure in [batch_progress_dialog.py](../../imagedescriber/batch_progress_dialog.py#L203-L237):
+
+**AFTER (Fixed)**:
+```python
+def reset_pause_button(self):
+    """Reset pause button to 'Pause' state"""
+    self.pause_button.SetLabel("Pause")
+
+def _on_stats_key(self, event):
+    """Handle keyboard navigation in stats list to skip separator line"""
+    keycode = event.GetKeyCode()
+    current_selection = self.stats_list.GetSelection()
+    
+    # Skip separator line when navigating with arrow keys
+    if keycode == wx.WXK_DOWN:
+        # ... down arrow logic ...
+    elif keycode == wx.WXK_UP:
+        # ... up arrow logic ...
+    
+    # For all other keys, use default behavior
+    event.Skip()
+```
+
+### Verification
+
+✅ **Syntax validation**: `python -m py_compile batch_progress_dialog.py` - passed  
+✅ **Code structure**: Methods properly separated with correct indentation  
+✅ **Import verification**: BatchProgressDialog now instantiates without errors  
+
+### Impact
+
+- ✅ **Restores batch progress dialog** to working state
+- ✅ **Menu item "Show Batch Progress" now available** during batch processing
+- ✅ **Real-time progress visibility** restored (images processed, ETA, pause/resume/stop)
+- ✅ **Keyboard navigation still works** (skip separator line on arrow keys)
+
+### Files Changed
+
+- `imagedescriber/batch_progress_dialog.py` - Fixed method indentation (lines 203-237)
+
+### Testing Required
+
+User should test:
+1. Start "Process Undescribed Images" → verify dialog appears immediately
+2. During batch → Process menu → "Show Batch Progress" → verify it's enabled
+3. Arrow through stats list → verify separator line is skipped
+4. Pause/Resume/Stop buttons work correctly
+
+---
+
+**Failure Root Cause**: Manual editing error during keyboard navigation fix commit  
+**Prevention**: Use ast/pylint for structural validation before commit (not just py_compile)  
+**Lesson**: Always test critical features after "simple" fixes - even comment-only changes can break things
+
+---
+
+## VIDEO SUPPORT MERGE & BUG FIX: Copilot's PR #80 Integration
+
+### Context
+After reviewing Copilot's work on Issue #77 (Restore Video Support), merged the `copilot/restore-video-support-wxpython` branch into `WXMigration` and fixed a critical duplicate append bug.
+
+### Changes Merged from Copilot's Branch
+
+**New Files (+3)**:
+1. `docs/worktracking/2026-02-10-video-support-session.md` - Copilot's session documentation (345 lines)
+2. `imagedescriber/dialogs_wx.py` - VideoExtractionDialog (+165 lines)
+3. `pytest_tests/unit/test_batch_state_tracking.py` - 5 video unit tests (+88 lines)
+
+**Modified Files (+5)**:
+1. `imagedescriber/imagedescriber_wx.py` - Video loading, extraction, frame display (+315 lines)
+2. `.gitignore` - Exclude `imagedescriptiontoolkit/` frame storage directories
+3. Unit tests now at 18 total (13 batch + 5 video) - all passing
+
+### Critical Bug Fixed
+
+**Problem**: Duplicate append bug in `refresh_image_list()` method ([imagedescriber_wx.py lines 1569-1585](../../imagedescriber/imagedescriber_wx.py#L1569-L1585))
+
+**Root Cause**: Code duplication caused every image/video/frame to appear **twice** in the list:
+```python
+# First append (correct)
+index = self.image_list.Append(display_name, file_path)
+if current_file_path and file_path == current_file_path:
+    new_selection_index = index
+else:
+    display_name = base_name  # ← Nonsensical else block
+
+# DUPLICATE append (bug)
+index = self.image_list.Append(display_name, file_path)
+if current_file_path and file_path == current_file_path:
+    new_selection_index = index
+```
+
+**Solution**: Removed lines 1581-1585 (the `else` block and duplicate append)
+
+**Impact**:
+- ✅ Images/videos/frames now appear once (not duplicated)
+- ✅ List display correct for all item types
+- ✅ Selection tracking works properly
+
+### Frame Storage Path Verified
+
+**Spec Required**: `imagedescriptiontoolkit/{video_name}_frames/`
+
+**Implementation** ([workers_wx.py lines 1242-1245](../../imagedescriber/workers_wx.py#L1242-L1245)):
+```python
+video_path = Path(self.video_path)
+toolkit_dir = video_path.parent / "imagedescriptiontoolkit"
+video_dir = toolkit_dir / f"{video_path.stem}_frames"
+video_dir.mkdir(parents=True, exist_ok=True)
+```
+
+**Verification**: ✅ Matches spec exactly - frames saved to `{video_directory}/imagedescriptiontoolkit/{video_name}_frames/`
+
+### Design Decision: Keep Indentation
+
+**Original Spec**: Flat list with status indicators only (no indentation)
+**Copilot Implementation**: Used 2-space indentation to group frames under videos
+**User Decision**: Keep indentation - visually better for sighted users
+
+```python
+# Indented display example:
+video.mp4 E5
+  frame_00001.jpg d1
+  frame_00002.jpg d1
+  frame_00003.jpg
+```
+
+**Accessibility Note**: Screen readers read indentation as spaces, so frames will be announced as "space space frame_00001.jpg". Status indicators (`d{count}`, `E{count}`) still provide functional grouping context.
+
+### Video Support Status
+
+**✅ Complete** (Phases 1-3):
+- Video file loading and scanning (.mp4, .mov, .avi, .mkv)
+- VideoExtractionDialog with time interval and scene detection modes
+- Frame extraction with configurable settings
+- Hierarchical display in image list with indentation
+- Status indicators: `E{count}` for extracted frames, `d{count}` for descriptions
+- Workspace serialization (videos and frames persist)
+- Unit tests for video item serialization and workspace persistence
+
+**🔲 Remaining** (Phases 4-5):
+- Additional menu items for video extraction
+- Batch processing integration (currently requires manual extraction before batch)
+- Manual testing with actual video files
+- Performance testing with large videos
+
+### Files Changed in This Session
+
+- `imagedescriber/imagedescriber_wx.py` - Fixed duplicate append bug (removed 5 lines)
+
+### Testing Required
+
+User should test:
+1. Load directory with video files → verify videos appear in list
+2. Select video → Process menu → "Extract Frames from Video"
+3. Extraction dialog → configure settings → extract frames
+4. Verify frames appear indented under parent video
+5. Verify frames saved to `imagedescriptiontoolkit/{video_name}_frames/`
+6. Select frames → Process Selected → verify description workflow
+7. Save/load workspace → verify videos and frames persist
+
+### Next Steps
+
+1. **Build Executable**: `cd imagedescriber && build_imagedescriber_wx.bat`
+2. **Manual Testing**: Test video extraction with real video files
+3. **Complete Phases 4-5**: Additional menu items and batch integration (if needed)
+4. **Consider Batch Extraction**: Decide if auto-extraction during batch processing is worth the complexity
+
+---
+
+**Session Total Commits**: 4 (c628f96, 909f40b, batch dialog fix, video merge + bug fix)  
+**Branch**: WXMigration  
+**Issues Addressed**: #73 (batch management), #77 (video support), multiple bug fixes

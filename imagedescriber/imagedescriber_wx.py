@@ -1579,14 +1579,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Track if this is the previously selected item
             if current_file_path and file_path == current_file_path:
                 new_selection_index = index
-            else:
-                display_name = base_name
-            
-            index = self.image_list.Append(display_name, file_path)  # Store file_path as client data
-            
-            # Track if this is the previously selected item
-            if current_file_path and file_path == current_file_path:
-                new_selection_index = index
         
         # RESTORE FOCUS: Select the same item after refresh
         if new_selection_index != wx.NOT_FOUND:

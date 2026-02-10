@@ -201,6 +201,8 @@ class BatchProgressDialog(wx.Dialog):
                 self.parent_window.on_stop_batch()
     
     def reset_pause_button(self):
+        """Reset pause button to 'Pause' state"""
+        self.pause_button.SetLabel("Pause")
     
     def _on_stats_key(self, event):
         """Handle keyboard navigation in stats list to skip separator line"""
@@ -232,5 +234,3 @@ class BatchProgressDialog(wx.Dialog):
         
         # For all other keys, use default behavior
         event.Skip()
-        """Reset pause button to 'Pause' state"""
-        self.pause_button.SetLabel("Pause")
