@@ -924,6 +924,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         info = f"Selected: {file_path.name}"
         if desc_count > 0:
             info += f" ({desc_count} description{'s' if desc_count != 1 else ''})"
+        
+        # Phase 6: Display error message if failed
+        if hasattr(image_item, 'processing_state') and image_item.processing_state == "failed":
+            if hasattr(image_item, 'processing_error') and image_item.processing_error:
+                info += f"\n\n⚠️ Processing Failed: {image_item.processing_error}"
+        
         self.image_info_label.SetLabel(info)
         
         # Populate descriptions list with accessible pattern
@@ -1465,6 +1471,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # 2. Processing indicator (P)
             if file_path in self.processing_items:
                 prefix_parts.append("P")
+            # Phase 6: Batch processing state indicators
+            elif hasattr(item, 'processing_state') and item.processing_state:
+                if item.processing_state == "paused":
+                    prefix_parts.append("!")  # Paused
+                elif item.processing_state == "failed":
+                    prefix_parts.append("X")  # Failed
+                elif item.processing_state == "pending":
+                    prefix_parts.append(".")  # Pending
             
             # 3. Video extraction status
             if item.item_type == "video" and hasattr(item, 'extracted_frames') and item.extracted_frames:
