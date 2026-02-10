@@ -165,6 +165,7 @@ if getattr(sys, 'frozen', False):
         ApiKeyDialog,
         ProcessingOptionsDialog,
         ImageDetailDialog,
+        VideoExtractionDialog,
     )
     from workers_wx import (
         ProcessingWorker,
@@ -193,6 +194,7 @@ else:
             ApiKeyDialog,
             ProcessingOptionsDialog,
             ImageDetailDialog,
+            VideoExtractionDialog,
         )
         from .workers_wx import (
             ProcessingWorker,
@@ -220,6 +222,7 @@ else:
             ApiKeyDialog,
             ProcessingOptionsDialog,
             ImageDetailDialog,
+            VideoExtractionDialog,
         )
         from workers_wx import (
             ProcessingWorker,
@@ -1414,21 +1417,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Add directory to workspace
             self.workspace.add_directory(str(dir_path))
             
-            # Find all images
+            # Find all images and videos
             images_found = []
+            videos_found = []
             
             if recursive:
-                # Recursive search
+                # Recursive search - images
                 for ext in self.image_extensions:
                     images_found.extend(dir_path.rglob(f"*{ext}"))
                     images_found.extend(dir_path.rglob(f"*{ext.upper()}"))
+                # Recursive search - videos
+                for ext in self.video_extensions:
+                    videos_found.extend(dir_path.rglob(f"*{ext}"))
+                    videos_found.extend(dir_path.rglob(f"*{ext.upper()}"))
             else:
-                # Non-recursive
+                # Non-recursive - images
                 for ext in self.image_extensions:
                     images_found.extend(dir_path.glob(f"*{ext}"))
                     images_found.extend(dir_path.glob(f"*{ext.upper()}"))
+                # Non-recursive - videos
+                for ext in self.video_extensions:
+                    videos_found.extend(dir_path.glob(f"*{ext}"))
+                    videos_found.extend(dir_path.glob(f"*{ext.upper()}"))
             
-            # Add to workspace
+            # Add images to workspace
             added_count = 0
             for image_path in sorted(images_found):
                 image_path_str = str(image_path)
@@ -1437,19 +1449,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     self.workspace.add_item(item)
                     added_count += 1
             
+            # Add videos to workspace
+            video_count = 0
+            for video_path in sorted(videos_found):
+                video_path_str = str(video_path)
+                if video_path_str not in self.workspace.items:
+                    item = ImageItem(video_path_str, "video")
+                    self.workspace.add_item(item)
+                    video_count += 1
+                    added_count += 1
+            
             # Update UI
             self.refresh_image_list()
             self.mark_modified()
             
             action = "Added" if append else "Loaded"
-            self.SetStatusText(f"{action} {added_count} images from {dir_path.name}", 0)
-            self.SetStatusText(f"{len(self.workspace.items)} total images", 1)
+            if video_count > 0:
+                self.SetStatusText(f"{action} {added_count - video_count} images, {video_count} videos from {dir_path.name}", 0)
+            else:
+                self.SetStatusText(f"{action} {added_count} images from {dir_path.name}", 0)
+            self.SetStatusText(f"{len(self.workspace.items)} total items", 1)
             
         except Exception as e:
             show_error(self, f"Error loading directory:\n{e}")
     
     def refresh_image_list(self):
-        """Refresh the image list display"""
+        """Refresh the image list display with videos and extracted frames grouped"""
         # PRESERVE FOCUS: Remember currently selected item before refresh
         current_selection = self.image_list.GetSelection()
         current_file_path = None
@@ -1460,9 +1485,46 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         new_selection_index = wx.NOT_FOUND
         
-        for file_path in sorted(self.workspace.items.keys()):
-            item = self.workspace.items[file_path]
+        # Separate items into categories
+        videos = []
+        frames = {}  # parent_video -> list of frames
+        regular_images = []
+        
+        for file_path, item in self.workspace.items.items():
+            if item.item_type == "video":
+                videos.append((file_path, item))
+            elif item.item_type == "extracted_frame":
+                parent = item.parent_video
+                if parent not in frames:
+                    frames[parent] = []
+                frames[parent].append((file_path, item))
+            else:
+                regular_images.append((file_path, item))
+        
+        # Sort all categories
+        videos.sort(key=lambda x: x[0])
+        regular_images.sort(key=lambda x: x[0])
+        for parent in frames:
+            frames[parent].sort(key=lambda x: x[0])
+        
+        # Add items to list: videos with their frames, then regular images
+        items_to_display = []
+        
+        # Add videos and their frames
+        for file_path, item in videos:
+            items_to_display.append((file_path, item, 0))  # indent level 0
             
+            # Add extracted frames immediately after parent video
+            if file_path in frames:
+                for frame_path, frame_item in frames[file_path]:
+                    items_to_display.append((frame_path, frame_item, 1))  # indent level 1
+        
+        # Add regular images
+        for file_path, item in regular_images:
+            items_to_display.append((file_path, item, 0))  # indent level 0
+        
+        # Display all items
+        for file_path, item, indent_level in items_to_display:
             # Apply filters
             if self.current_filter == "described":
                 if not item.descriptions:
@@ -1496,10 +1558,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 frame_count = len(item.extracted_frames)
                 prefix_parts.append(f"E{frame_count}")
             
-            # Combine prefix and display name
+            # Combine prefix and display name with indentation
+            indent = "  " * indent_level  # Two spaces per level
             if prefix_parts:
                 prefix = "".join(prefix_parts)
-                display_name = f"{prefix} {base_name}"
+                display_name = f"{indent}{prefix} {base_name}"
+            else:
+                display_name = f"{indent}{base_name}"
+            
+            index = self.image_list.Append(display_name, file_path)  # Store file_path as client data
+            
+            # Track if this is the previously selected item
+            if current_file_path and file_path == current_file_path:
+                new_selection_index = index
             else:
                 display_name = base_name
             
@@ -1628,12 +1699,52 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             }
         
         # Phase 5: Use skip_existing parameter instead of options
-        # Get files to process
-        if skip_existing:
-            to_process = [item.file_path for item in self.workspace.items.values() 
-                         if not item.descriptions]
-        else:
-            to_process = [item.file_path for item in self.workspace.items.values()]
+        # Get files to process - handle videos separately
+        images_to_process = []
+        videos_to_extract = []
+        
+        for item in self.workspace.items.values():
+            if item.item_type == "video":
+                # Check if video needs extraction
+                if not hasattr(item, 'extracted_frames') or not item.extracted_frames:
+                    videos_to_extract.append(item.file_path)
+            elif skip_existing:
+                if not item.descriptions:
+                    images_to_process.append(item.file_path)
+            else:
+                images_to_process.append(item.file_path)
+        
+        # If we have videos to extract, handle them first
+        if videos_to_extract:
+            # Auto-extract videos using default config
+            show_info(self, 
+                f"Found {len(videos_to_extract)} video(s) without extracted frames.\n\n"
+                f"Videos will be automatically extracted (5 second intervals) before processing.\n\n"
+                f"You can extract videos manually with custom settings via Process → Extract Video Frames."
+            )
+            
+            # Extract videos with default settings
+            for video_path in videos_to_extract:
+                default_config = {
+                    "extraction_mode": "time_interval",
+                    "time_interval_seconds": 5.0,
+                    "start_time_seconds": 0,
+                    "end_time_seconds": None,
+                    "max_frames_per_video": 100
+                }
+                
+                # TODO: This should be done asynchronously, but for now we'll skip auto-extraction
+                # and let user extract manually
+                pass
+            
+            show_warning(self, 
+                f"Videos require manual extraction.\n\n"
+                f"Use Process → Extract Video Frames to extract frames from videos,\n"
+                f"then run Process All Undescribed again."
+            )
+            return
+        
+        to_process = images_to_process
         
         if not to_process:
             show_info(self, "All images already have descriptions")
@@ -2166,7 +2277,44 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
     
     def on_workflow_complete(self, event):
-        """Handle workflow completion"""
+        """Handle workflow completion (including video extraction)"""
+        # Check if this was a video extraction
+        if hasattr(self, 'last_extraction_settings') and self.last_extraction_settings:
+            settings = self.last_extraction_settings
+            video_path = settings['video_path']
+            
+            # Get list of extracted frames from output directory
+            output_dir = Path(event.output_dir)
+            extracted_frames = sorted([str(f) for f in output_dir.glob("*.jpg")])
+            
+            if extracted_frames:
+                # Update parent video item
+                if video_path in self.workspace.items:
+                    video_item = self.workspace.items[video_path]
+                    video_item.extracted_frames = extracted_frames
+                    
+                    # Add extracted frames as individual items
+                    for frame_path in extracted_frames:
+                        if frame_path not in self.workspace.items:
+                            frame_item = ImageItem(frame_path, "extracted_frame")
+                            frame_item.parent_video = video_path
+                            self.workspace.add_item(frame_item)
+                    
+                    self.mark_modified()
+                    self.refresh_image_list()
+                    
+                    # If auto-process is enabled, start batch processing
+                    if settings['process_after']:
+                        self.auto_process_extracted_frames(extracted_frames)
+                    else:
+                        show_info(self, f"Extracted {len(extracted_frames)} frames from video.\n\nFrames have been added to the workspace.")
+                
+                self.SetStatusText(f"Extracted {len(extracted_frames)} frames", 0)
+            
+            # Clear extraction settings
+            self.last_extraction_settings = None
+            return
+        
         # Phase 3: Clear batch state on successful completion
         if self.workspace.batch_state:
             self.workspace.batch_state = None
@@ -2417,31 +2565,134 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Video processing not available (OpenCV not installed)")
             return
         
-        # Select video file
-        file_path = open_file_dialog(
-            self,
-            "Select Video File",
-            None,
-            "Video files (*.mp4;*.mov;*.avi;*.mkv)|*.mp4;*.mov;*.avi;*.mkv|All files (*.*)|*.*"
-        )
+        # Check if we have a selected video in the workspace
+        selected_video = None
+        if self.current_image_item and self.current_image_item.item_type == "video":
+            selected_video = self.current_image_item.file_path
         
-        if not file_path:
+        # If no video selected, or want to process a different video
+        if not selected_video:
+            # Select video file
+            file_path = open_file_dialog(
+                self,
+                "Select Video File",
+                "Video files (*.mp4;*.mov;*.avi;*.mkv)|*.mp4;*.mov;*.avi;*.mkv|All files (*.*)|*.*",
+                "",
+                ""
+            )
+            
+            if not file_path:
+                return
+            
+            selected_video = file_path
+            
+            # Add video to workspace if not already present
+            if selected_video not in self.workspace.items:
+                item = ImageItem(selected_video, "video")
+                self.workspace.add_item(item)
+                self.refresh_image_list()
+                self.mark_modified()
+        
+        # Show extraction dialog
+        dialog = VideoExtractionDialog(self, selected_video)
+        if dialog.ShowModal() != wx.ID_OK:
+            dialog.Destroy()
             return
         
-        # Get extraction settings (simplified - using defaults)
+        settings = dialog.get_settings()
+        process_after = settings.pop('process_after_extraction')
+        dialog.Destroy()
+        
+        # Add defaults for extractor
         extraction_config = {
-            "extraction_mode": "time_interval",
-            "time_interval_seconds": 5,
             "start_time_seconds": 0,
             "end_time_seconds": None,
-            "max_frames_per_video": 100
+            "max_frames_per_video": 100,
+            **settings
+        }
+        
+        # Store settings for potential auto-processing
+        self.last_extraction_settings = {
+            'video_path': selected_video,
+            'process_after': process_after,
+            'extraction_config': extraction_config
         }
         
         # Start extraction worker
-        worker = VideoProcessingWorker(self, file_path, extraction_config)
+        worker = VideoProcessingWorker(self, selected_video, extraction_config)
         worker.start()
         
-        self.SetStatusText(f"Extracting frames from: {Path(file_path).name}...", 0)
+        self.SetStatusText(f"Extracting frames from: {Path(selected_video).name}...", 0)
+    
+    def auto_process_extracted_frames(self, frame_paths: List[str]):
+        """Auto-process extracted frames using default settings
+        
+        Args:
+            frame_paths: List of extracted frame file paths
+        """
+        if not ProcessingOptionsDialog:
+            show_error(self, "Processing dialog not available")
+            return
+        
+        # Show processing options dialog
+        dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+        if dialog.ShowModal() != wx.ID_OK:
+            dialog.Destroy()
+            show_info(self, f"Extraction complete! {len(frame_paths)} frames added to workspace.\n\nYou can process them later with 'Process All Undescribed'.")
+            return
+        
+        options = dialog.get_config()
+        dialog.Destroy()
+        
+        # Start batch processing for frames
+        from shared.wx_common import find_config_file
+        prompt_config_path = find_config_file('image_describer_config.json')
+        
+        # Mark frames as pending for batch processing
+        for i, frame_path in enumerate(frame_paths):
+            if frame_path in self.workspace.items:
+                frame_item = self.workspace.items[frame_path]
+                frame_item.processing_state = "pending"
+                frame_item.batch_queue_position = i
+        
+        # Create batch state
+        self.workspace.batch_state = {
+            "provider": options['provider'],
+            "model": options['model'],
+            "prompt_style": options.get('prompt_style', 'default'),
+            "custom_prompt": options.get('custom_prompt'),
+            "detection_settings": options.get('detection_settings'),
+            "total_queued": len(frame_paths),
+            "started": datetime.now().isoformat()
+        }
+        
+        # Start batch worker
+        self.batch_worker = BatchProcessingWorker(
+            parent_window=self,
+            file_paths=frame_paths,
+            provider=options['provider'],
+            model=options['model'],
+            prompt_style=options.get('prompt_style', 'default'),
+            custom_prompt=options.get('custom_prompt'),
+            detection_settings=options.get('detection_settings'),
+            prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
+            skip_existing=True
+        )
+        self.batch_worker.start()
+        
+        # Show progress dialog
+        if BatchProgressDialog:
+            self.batch_progress_dialog = BatchProgressDialog(self, len(frame_paths))
+            self.batch_progress_dialog.Show()
+            # Enable "Show Batch Progress" menu item
+            if hasattr(self, 'show_batch_progress_item'):
+                self.show_batch_progress_item.Enable(True)
+        
+        # Initialize timing
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+        
+        self.SetStatusText(f"Processing {len(frame_paths)} extracted frames...", 0)
     
     def on_description_complete(self, event):
         """Handle description completion from worker thread (legacy)"""
