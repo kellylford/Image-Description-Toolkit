@@ -1714,33 +1714,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             else:
                 images_to_process.append(item.file_path)
         
-        # If we have videos to extract, handle them first
+        # If we have videos to extract, prompt user to extract them first
         if videos_to_extract:
-            # Auto-extract videos using default config
+            video_names = "\n".join([f"  • {Path(v).name}" for v in videos_to_extract[:5]])
+            if len(videos_to_extract) > 5:
+                video_names += f"\n  ... and {len(videos_to_extract) - 5} more"
+            
             show_info(self, 
-                f"Found {len(videos_to_extract)} video(s) without extracted frames.\n\n"
-                f"Videos will be automatically extracted (5 second intervals) before processing.\n\n"
-                f"You can extract videos manually with custom settings via Process → Extract Video Frames."
-            )
-            
-            # Extract videos with default settings
-            for video_path in videos_to_extract:
-                default_config = {
-                    "extraction_mode": "time_interval",
-                    "time_interval_seconds": 5.0,
-                    "start_time_seconds": 0,
-                    "end_time_seconds": None,
-                    "max_frames_per_video": 100
-                }
-                
-                # TODO: This should be done asynchronously, but for now we'll skip auto-extraction
-                # and let user extract manually
-                pass
-            
-            show_warning(self, 
-                f"Videos require manual extraction.\n\n"
-                f"Use Process → Extract Video Frames to extract frames from videos,\n"
-                f"then run Process All Undescribed again."
+                f"Found {len(videos_to_extract)} video(s) without extracted frames:\n\n"
+                f"{video_names}\n\n"
+                f"Extract frames first:\n"
+                f"  1. Select a video in the list\n"
+                f"  2. Process → Extract Video Frames\n"
+                f"  3. Configure extraction settings\n"
+                f"  4. Run Process All Undescribed again\n\n"
+                f"Tip: Check 'Process frames automatically' in the extraction dialog\n"
+                f"to describe frames immediately after extraction."
             )
             return
         
