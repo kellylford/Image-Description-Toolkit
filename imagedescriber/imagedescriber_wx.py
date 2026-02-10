@@ -3196,35 +3196,61 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         if wx.TheClipboard.Open():
             try:
-                if wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP)):
+                bitmap = None
+                
+                # Try multiple clipboard formats (in order of preference)
+                # 1. Try DIB format first (Device Independent Bitmap - common on Windows)
+                if wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_DIB)):
                     data = wx.BitmapDataObject()
                     if wx.TheClipboard.GetData(data):
-                        # Get the bitmap
                         bitmap = data.GetBitmap()
+                
+                # 2. Try standard bitmap format
+                if not bitmap and wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP)):
+                    data = wx.BitmapDataObject()
+                    if wx.TheClipboard.GetData(data):
+                        bitmap = data.GetBitmap()
+                
+                # 3. Try file list (if user copied a file)
+                if not bitmap and wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_FILENAME)):
+                    file_data = wx.FileDataObject()
+                    if wx.TheClipboard.GetData(file_data):
+                        filenames = file_data.GetFilenames()
+                        if filenames:
+                            # Use the first file if it's an image
+                            first_file = Path(filenames[0])
+                            if first_file.suffix.lower() in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic'}:
+                                # Add the file directly instead of creating a copy
+                                item = ImageItem(str(first_file))
+                                self.workspace.add_item(item)
+                                self.mark_modified()
+                                self.refresh_image_list()
+                                self.SetStatusText(f"Pasted image from clipboard: {first_file.name}", 0)
+                                wx.TheClipboard.Close()
+                                return
+                
+                if bitmap:
+                    # Convert to image
+                    image = bitmap.ConvertToImage()
+                    
+                    # Save to temporary file
+                    import tempfile
+                    import datetime
+                    
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    temp_path = Path(tempfile.gettempdir()) / f"clipboard_image_{timestamp}.png"
+                    
+                    if image.SaveFile(str(temp_path), wx.BITMAP_TYPE_PNG):
+                        # Add to workspace
+                        item = ImageItem(str(temp_path))
+                        item.display_name = f"Clipboard_{timestamp}"
+                        self.workspace.add_item(item)
                         
-                        # Convert to image
-                        image = bitmap.ConvertToImage()
-                        
-                        # Save to temporary file
-                        import tempfile
-                        import datetime
-                        
-                        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                        temp_path = Path(tempfile.gettempdir()) / f"clipboard_image_{timestamp}.png"
-                        
-                        if image.SaveFile(str(temp_path), wx.BITMAP_TYPE_PNG):
-                            # Add to workspace
-                            item = ImageItem(str(temp_path))
-                            item.display_name = f"Clipboard_{timestamp}"
-                            self.workspace.add_item(item)
-                            
-                            self.mark_modified()
-                            self.refresh_image_list()
-                            self.SetStatusText(f"Pasted image from clipboard: {item.display_name}", 0)
-                        else:
-                            show_error(self, "Failed to save clipboard image")
+                        self.mark_modified()
+                        self.refresh_image_list()
+                        self.SetStatusText(f"Pasted image from clipboard: {item.display_name}", 0)
                     else:
-                        show_warning(self, "No image data in clipboard")
+                        show_error(self, "Failed to save clipboard image")
                 else:
                     show_warning(self, "Clipboard does not contain an image")
             finally:
