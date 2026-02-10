@@ -296,6 +296,7 @@ class ViewerPanel(wx.Panel):
     def load_from_directory(self, directory):
         """Load data from a workflow directory"""
         self.current_dir = Path(directory)
+        self.workflow_name = self.current_dir.name  # Store workflow name for title
         self.live_checkbox.Enable(True)
         
         # Find descriptions file
@@ -312,12 +313,16 @@ class ViewerPanel(wx.Panel):
                 break
         
         if not desc_file:
-            wx.MessageBox(f"No descriptions found in {directory}", "Error", wx.ICON_ERROR)
+            # Allow opening workflow even without descriptions - user can use live mode or refresh
+            self.entries = []
+            self.refresh_list()
+            self.update_title()
             return
             
         # Parse
         self.entries = WorkflowParser.parse_file(desc_file)
         self.refresh_list()
+        self.update_title()
         
     def load_from_workspace(self, workspace):
         """Load data from an active ImageWorkspace object (Flattening)"""
@@ -380,6 +385,9 @@ class ViewerPanel(wx.Panel):
             self.on_selection_changed(None)
         else:
             self.clear_details()
+        
+        # Update title bar after refresh
+        self.update_title()
 
     def on_selection_changed(self, event):
         """Handle selection"""
@@ -572,6 +580,9 @@ class ViewerPanel(wx.Panel):
             if self.monitor_thread:
                 self.monitor_thread.stop()
                 self.monitor_thread = None
+        
+        # Update title to show/hide (Live) suffix
+        self.update_title()
 
     def on_live_update_event(self, event):
         """Handle background thread update"""
@@ -581,6 +592,7 @@ class ViewerPanel(wx.Panel):
             self.load_from_directory(self.current_dir)
             if sel != wx.NOT_FOUND and sel < self.desc_list.GetCount():
                 self.desc_list.SetSelection(sel)
+            # Title is updated in load_from_directory via refresh_list
 
     def on_list_key(self, event):
         """Keyboard navigation support"""
@@ -608,4 +620,78 @@ class ViewerPanel(wx.Panel):
             if wx.TheClipboard.Open():
                 wx.TheClipboard.SetData(wx.TextDataObject(text))
                 wx.TheClipboard.Close()
+    
+    def get_workflow_progress(self):
+        """Get workflow progress using the existing progress file mechanism.
+        Returns (described_count, total_images) tuple.
+        """
+        if not self.current_dir:
+            return 0, 0
+        
+        # Count described images from progress file (same as idt workflow uses)
+        progress_file = self.current_dir / "logs" / "image_describer_progress.txt"
+        described_count = 0
+        
+        if progress_file.exists():
+            try:
+                with open(progress_file, 'r', encoding='utf-8') as f:
+                    # Each line is a completed image path
+                    described_count = len([line.strip() for line in f if line.strip()])
+            except Exception:
+                # Fallback to counting entries from descriptions
+                described_count = len(self.entries)
+        else:
+            # No progress file yet - use entries count
+            described_count = len(self.entries)
+        
+        # Count total images from input_images directory
+        input_dir = self.current_dir / "input_images"
+        total_images = 0
+        
+        if input_dir.exists():
+            try:
+                # Simple count of files in input_images (recursive for extracted frames)
+                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic'}
+                total_images = sum(1 for item in input_dir.rglob('*') 
+                                 if item.is_file() and item.suffix.lower() in image_extensions)
+            except Exception:
+                # If rglob fails, use simpler count
+                try:
+                    total_images = sum(1 for item in input_dir.iterdir() 
+                                     if item.is_file() and item.suffix.lower() in image_extensions)
+                except Exception:
+                    pass
+        
+        return described_count, total_images
+    
+    def update_title(self):
+        """Update the main window title with progress information"""
+        if not self.main_window:
+            return
+        
+        if not self.current_dir:
+            # Workspace mode - no progress to show
+            return
+        
+        # Use existing progress file mechanism (same as idt workflow)
+        described_count, total_images = self.get_workflow_progress()
+        
+        # Calculate percentage (integer)
+        if total_images > 0:
+            progress_percent = int(described_count * 100 / total_images)
+        else:
+            progress_percent = 0
+        
+        # Build title
+        workflow_display = self.workflow_name or "Workflow"
+        title = f"{progress_percent}%, {described_count} of {total_images} images described - {workflow_display}"
+        
+        # Add (Live) suffix if monitoring
+        if self.is_live:
+            title += " (Live)"
+        
+        try:
+            self.main_window.SetTitle(title)
+        except Exception:
+            pass
 
