@@ -4,11 +4,90 @@
 
 ## Overview
 
-The ImageDescriber debug build creates an executable with console window output enabled, making it easy to diagnose silent failures, crashes, and other issues that are hard to debug in the standard windowed application.
+ImageDescriber offers two debugging approaches:
+
+1. **--debug flag** (For end users) - Enhanced file logging, no console window
+2. **Debug build** (For developers) - Live console output, full visibility
+
+This guide covers both approaches and when to use each.
+
+## Quick Start: --debug Flag (Recommended for Users)
+
+If you're experiencing issues, start by enabling debug logging:
+
+```batch
+ImageDescriber.exe --debug
+```
+
+This creates a verbose debug log at:
+```
+%USERPROFILE%\imagedescriber_verbose_debug.log
+```
+
+**Advantages:**
+- No rebuild required
+- Professional UI (no console window)
+- Detailed logging for troubleshooting
+- Easy to share log files when reporting issues
+
+**Usage:**
+```batch
+# Default location
+ImageDescriber.exe --debug
+
+# Custom log location
+ImageDescriber.exe --debug --debug-file C:\Temp\my_debug.log
+
+# With workspace path and debug mode
+ImageDescriber.exe --debug C:\MyWorkspace
+
+# Viewer mode with debug logging
+ImageDescriber.exe --debug --viewer
+```
+
+### Debug Log Output Format
+
+The verbose debug log includes:
+
+```
+============================================================
+DEBUG MODE ENABLED
+Verbose logging to: C:\Users\YourName\imagedescriber_verbose_debug.log
+ImageDescriber version: 4.1.0
+Python: 3.12.8 (tags/v3.12.8:2dc476b, Dec  3 2024, 19:30:04) [MSC v.1942 64 bit (AMD64)]
+wxPython: 4.2.2 msw (phoenix) wxWidgets 3.2.6
+Frozen mode: True
+============================================================
+2026-02-11 14:32:15,123 - INFO - __main__:4120 - Starting ImageDescriber
+2026-02-11 14:32:15,234 - DEBUG - workers_wx:1210 - VideoProcessingWorker.run() started for \\server\IMG_3136.MOV
+2026-02-11 14:32:15,345 - DEBUG - workers_wx:1220 - Extraction config: {'extraction_mode': 'time_interval', 'time_interval_seconds': 5.0}
+2026-02-11 14:32:16,456 - INFO - workers_wx:1223 - _extract_frames() completed: 12 frames extracted
+2026-02-11 14:32:16,567 - ERROR - imagedescriber_wx:2179 - FATAL ERROR: TypeError: update_progress() got unexpected keyword
+2026-02-11 14:32:16,678 - ERROR - imagedescriber_wx:2180 - Traceback (most recent call last):...
+```
+
+Each line shows:
+- **Timestamp**: When the event occurred
+- **Level**: DEBUG, INFO, WARNING, ERROR
+- **Module**: Which file the log came from
+- **Line number**: Exact location in code
+- **Message**: What happened
+
+## Comparison: --debug Flag vs Debug Build
+
+| Feature | --debug Flag | Debug Build |
+|---------|-------------|-------------|
+| **Rebuild required** | ❌ No | ✅ Yes (~2-3 min) |
+| **Console window** | ❌ No | ✅ Yes |
+| **Live output** | ❌ No (file only) | ✅ Yes (console) |
+| **Detailed logs** | ✅ Yes | ✅ Yes |
+| **Professional appearance** | ✅ Yes | ❌ No (console visible) |
+| **Best for** | End users, bug reports | Developers, active debugging |
+| **When to use** | Troubleshooting issues | Development, live debugging |
 
 ## When to Use Debug Build
 
-Use the debug build when you encounter:
+Use the debug build (developers/contributors only) when you need:
 - Silent failures (UI appears but nothing happens)
 - Progress dialog freezes or doesn't update
 - Crashes with no error message
@@ -111,11 +190,11 @@ This immediately shows:
 
 ## Log Files
 
-Even with the debug build, log files are still written:
+Log files are created when using the --debug flag:
 
-### Main Log
+### Verbose Debug Log (--debug flag)
 ```
-%USERPROFILE%\imagedescriber_geocoding_debug.log
+%USERPROFILE%\imagedescriber_verbose_debug.log
 ```
 
 Contains:
@@ -123,6 +202,7 @@ Contains:
 - Timestamped entries
 - Function call sequences
 - Configuration loading details
+- Startup banner with version info
 
 ### Crash Log
 ```

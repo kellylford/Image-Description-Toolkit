@@ -1,10 +1,10 @@
 # Image Description Toolkit (IDT) - User Guide
 
 ## Overview
-The Image Description Toolkit (IDT) is a comprehensive, AI-driven suite for generating natural language descriptions from images and videos. It provides **two main applications** to fit different workflows:
+The Image Description Toolkit (IDT) is a comprehensive, AI-driven suite for generating natural language descriptions from images and videos. It provides **two applications** to fit different workflows:
 
-- **📋 Command Line Interface (CLI)** - Powerful batch processing with `idt.exe`
-- **🖼️ GUI ImageDescriber** - Interactive, user-friendly desktop application with integrated viewer, prompt editor, and configuration manager
+- **📋 Command Line Interface (CLI) - `idt.exe`** - Powerful batch processing for automation and large collections
+- **🖼️ GUI ImageDescriber - `imagedescriber.exe`** - Interactive desktop application with integrated viewer, prompt editor, and configuration manager
 
 IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as standalone Windows executables—**no Python installation required**.
 
@@ -24,8 +24,7 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
 11. [Analysis Tools](#11-analysis-tools)
 12. [Cloud Provider Setup](#12-cloud-provider-setup)
 13. [Performance Tips](#13-performance-tips)
-14. [Batch Files Reference](#14-batch-files-reference)
-15. [Troubleshooting](#15-troubleshooting)
+14. [Troubleshooting](#14-troubleshooting)
 
 ---
 
@@ -36,9 +35,9 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
    - **Windows:** `ImageDescriptionToolkit_Setup_v[VERSION].exe`
    - **macOS:** `IDT-[VERSION].pkg` or `IDT-[VERSION].dmg`
 2. Run the installer - it installs to `C:\IDT\` by default (Windows)
-3. You'll find two main applications:
+3. You'll find two applications in the installation folder:
    - `idt.exe` - Command line interface for batch processing
-   - `imagedescriber.exe` - GUI application with integrated viewer, prompt editor, and configuration manager
+   - `imagedescriber.exe` - GUI application with integrated viewer
 
 ### Step 2: Install Ollama (for local models)
 **Ollama is recommended for most users** - it's free, private, and runs locally.
@@ -71,7 +70,7 @@ ollama list
 
 ## 2. IDT Applications Overview
 
-IDT provides two main applications, each designed for different use cases:
+IDT provides two applications, each designed for different use cases:
 
 ### 📋 Command Line Interface (CLI) - `idt.exe`
 **Best for:** Batch processing, automation, advanced workflows, integration with scripts
@@ -95,15 +94,14 @@ IDT provides two main applications, each designed for different use cases:
 - Process All Undescribed from Processing menu
 - Visual model and prompt selection
 - Interactive provider setup (Ollama/OpenAI/Claude)
+- **Switch to Viewer mode** to browse all workflow results with live monitoring
 - **Integrated Tools menu:**
   - **Edit Prompts** - Manage custom prompt styles
-  - **Configure Settings** - Set default provider and API keys
+  - **Configure Settings** - Set default provider, model, and API keys
 - Immediate feedback and results
 - Perfect for learning and experimentation
 
 **When to use:** Processing directories of images, testing prompts/models, browsing results, visual learners, monitoring active workflows
-
-**Note:** Viewer mode is fully integrated into ImageDescriber - no separate application needed!
 
 ---
 
@@ -140,17 +138,17 @@ IDT provides two main applications, each designed for different use cases:
    - Click on any image to view its descriptions
    - Edit descriptions if needed
    - Export to HTML using **File → Export to HTML**
-   - Or switch to **File → Switch to Viewer** to browse all workflows
+   - Or switch to **Viewer mode** using **File → Switch to Viewer** to browse all workflows
 
 **That's it!** You've successfully described your first batch of images.
 
 ### Tips for GUI Users
 
+- **View All Results:** Use **File → Switch to Viewer** to see all workflow results in one place with live monitoring
 - **Configure Prompts:** Use **Tools → Edit Prompts** to customize description styles
 - **Configure Settings:** Use **Tools → Configure IDT** to set default provider and API keys
 - **Save Workspace:** Use **File → Save Workspace** to preserve your work
 - **Monitor Progress:** The title bar shows completion percentage (e.g., "45%, 9 of 20 images described")
-- **Browse Results:** Use **File → Switch to Viewer** to see all workflow results in one place
 
 ---
 
@@ -184,10 +182,6 @@ IDT provides two main applications, each designed for different use cases:
      - Selecting a prompt style
      - Running the workflow or saving the command
 
-5. **View Results**
-   - After completion, the viewer will automatically launch
-   - Browse your descriptions in the HTML report
-
 **That's it!** Your images are described and ready to view.
 
 ### Option 2: Direct Command (For Experienced Users)
@@ -205,7 +199,7 @@ This runs the full workflow with default settings. Results appear in the `Descri
 
 ## 5. GUI ImageDescriber Application
 
-The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual interface for describing images in batch or individually.
+The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual interface for describing images in batch or individually, with an integrated viewer mode for browsing all workflow results.
 
 ### Quick Start
 
@@ -215,13 +209,14 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 4. **Select Model & Prompt:** Choose from available options
 5. **Process:** Use Processing → Process All Undescribed and watch progress!
 
-### Main Interface
+### Main Interface (Workspace Mode)
 
 **Image Panel (Left):**
 - List of all images in the workspace
 - Shows processing state (✓ described, • pending, ! paused)
 - Click to select and view
 - Supports all major formats (JPG, PNG, HEIC, videos)
+- **Sorted chronologically** by EXIF date (oldest first)
 
 **Description Panel (Right):**
 - View all descriptions for selected image
@@ -249,7 +244,7 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 - **Load Workspace** - Open saved .idt project
 - **Save/Save As** - Preserve workspace state
 - **Export to HTML** - Generate web-viewable results
-- **Switch to Viewer** - Browse all workflow results
+- **Switch to Viewer** - Browse all workflow results with live monitoring
 - **Switch to Workspace** - Return to processing mode
 
 **Processing Menu:**
@@ -259,11 +254,11 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 - **Resume Batch** - Continue paused workflow
 
 **Tools Menu:**
-- **Edit Prompts** - Opens integrated prompt editor dialog
+- **Edit Prompts** - Opens prompt editor dialog
   - Manage custom prompt styles
   - Add, edit, duplicate, or delete prompts
   - Set default prompt style
-- **Configure IDT** - Opens integrated configuration dialog
+- **Configure IDT** - Opens configuration dialog
   - Set default AI provider and model
   - Manage API keys for cloud services
   - Configure workflow settings
@@ -276,43 +271,32 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 
 ### Viewer Mode
 
-ImageDescriber includes an integrated **Viewer Mode** for browsing all workflow results:
+ImageDescriber's integrated **Viewer Mode** lets you browse all workflow results in one place:
 
 1. **Switch Modes:** Use **File → Switch to Viewer**
 2. **Select Workflow:** Choose from all completed and active workflows
-3. **Browse Images:** See all images and their descriptions
+3. **Browse Images:** See all images and their descriptions chronologically
 4. **Live Monitoring:** Enable to watch active workflows in real-time
 5. **Search/Filter:** Find specific images or descriptions
 6. **Copy/Export:** Copy descriptions or export results
 
 **Viewer Features:**
 - Browse all workflow directories in one interface
-- Real-time monitoring of active processing  
+- Real-time monitoring of active processing with progress in title bar (e.g., "75%, 810 of 1077 images described (Live)")
 - Search across all descriptions
 - View image metadata and EXIF data
 - Copy descriptions to clipboard
 - Access HTML reports
 - Filter by workflow, date, or model
+- Images displayed in chronological order by EXIF date
 
 **Switching Back:** Use **File → Switch to Workspace** to return to processing mode.
 
-### Advanced Features
+### Video Processing
 - Drag and drop video files into workspace
 - Automatically extract frames
 - Describe each frame individually
 - Nested display in image list
-
-**Settings & Preferences:**
-- Remember last used provider and model
-- Custom prompt styles via Tools menu
-- API key management via Tools menu
-- Auto-save workspace on changes
-
-**Integration:**
-- Export results to HTML for sharing
-- Save/load .idt workspace files
-- Compatible with CLI workflow outputs
-- Seamlessly switch between workspace and viewer modes
 
 ### Use Cases
 
@@ -324,118 +308,14 @@ ImageDescriber includes an integrated **Viewer Mode** for browsing all workflow 
 - ✅ Demonstrating capabilities to others
 - ✅ Learning how different providers/models work
 - ✅ Managing small to medium image collections (1-1000 images)
+- ✅ Browsing all workflow results in one place
+- ✅ Monitoring active workflows in real-time
 
 **When to use CLI instead:**
 - Processing thousands of images
 - Automated workflows and scripting
 - Headless server environments
 - Need for advanced export/analysis tools
-
----
-
-## 6. Understanding Workflow Runs & Naming
-**Use Effective Techniques:**
-- Be specific about what to include/exclude
-- Use action words ("describe", "analyze", "identify")
-- Set the desired tone (formal, casual, technical)
-- Specify output length or structure
-
-**Test Iteratively:**
-- Start with simple prompts and refine
-- Test with diverse image types
-- Compare results across different models
-- Gather feedback from end users
-
-### Use Cases
-
-**Perfect for:**
-- ✅ Creating and managing custom prompt styles
-- ✅ Editing the default prompt for your workflow
-- ✅ Organizing multiple prompt variations for different image types
-- ✅ Configuring AI provider defaults (Ollama/OpenAI/Claude)
-- ✅ Managing API keys for cloud providers
-- ✅ Setting up the configuration before using CLI or GUI tools
-
-**Note:** The Prompt Editor does NOT test prompts or generate descriptions. Use the GUI ImageDescriber application to test how prompts work with actual images.
-
----
-
-## 5. Getting Started: CLI Golden Path
-
-### Option 1: Interactive Guided Setup (Recommended for Beginners)
-
-**The easiest way to get started!** The `guideme` command walks you through every step:
-
-```bash
-idt guideme
-
-# Advanced: Pass workflow options for special cases
-idt guideme --timeout 180              # For large/slow models (any value in seconds)
-idt guideme --preserve-descriptions    # Skip already-described images
-```
-
-This wizard will:
-1. ✅ Help you select a provider (Ollama/OpenAI/Claude)
-2. ✅ Check for installed models or help set up API keys
-3. ✅ Validate your image directory
-4. ✅ Let you name your workflow run
-5. ✅ Choose a prompt style
-6. ✅ Show you the command before running
-7. ✅ Run the workflow or save the command for later
-8. ✅ **Automatically launch the viewer to watch progress in real-time!**
-
-**Perfect for:**
-- First-time users
-- Testing different models
-- Learning the command options
-- Setting up cloud providers
-- Watching your workflow progress live as images are processed
-
-**💡 Pro Tip:** If you're using large vision models (like Qwen) that take longer to process each image, add `--timeout <seconds>` with an appropriate value (e.g., 180, 300, or higher) to avoid timeouts.
-
-### Option 2: Simplified Direct Commands ⭐ NEW
-
-**Super simple syntax for common tasks:**
-
-```bash
-# Describe images in a local folder
-idt workflow photos
-idt workflow C:\MyImages
-
-# Download and describe images from a website  
-idt workflow example.com
-idt workflow mywebsite.com
-idt workflow https://portfolio.com
-
-# With live progress updates
-idt workflow gallery.com --progress-status
-idt workflow photos --progress-status --view-results
-```
-
-**🌟 What's Smart About This:**
-- **Auto-detection**: Recognizes websites vs local directories  
-- **Smart steps**: Uses `download,describe,html` for websites, full pipeline for local files
-- **No complex options**: Just specify what you want to process
-- **Protocol auto-add**: `example.com` becomes `https://example.com` automatically
-
-### Option 3: Advanced Direct Commands
-
-For power users who want full control:
-
-1. Put some images in a directory (e.g., `C:\Photos\`)
-2. Open a terminal in the IDT folder
-3. Run:
-   ```bash
-   idt workflow C:\Photos
-   ```
-
-That's it! Results appear in `Descriptions/workflow_[timestamp]/`
-
-**After completion**, you'll be prompted:
-```
-Would you like to view the results in the viewer? (y/n):
-```
-Type `y` to automatically open the viewer and browse your results!
 
 ---
 
@@ -505,6 +385,12 @@ By default, IDT uses the `narrative` style:
 
 ### Changing Prompt Styles
 
+**Via GUI ImageDescriber:**
+1. Click **Tools → Edit Prompts**
+2. Browse available prompts
+3. Set default style or create new ones
+
+**Via CLI:**
 Add `--prompt-style STYLE_NAME` to any command:
 
 ```bash
@@ -560,41 +446,6 @@ Provide a clear paragraph without speculation.
 3. Check results across different models
 4. Refine prompt text based on output quality
 
-### Prompt Design Tips
-
-**Structure Your Prompts:**
-```
-1. Context setting: "Analyze this image..."
-2. Specific instructions: "Focus on colors, composition..."
-3. Output format: "Provide a detailed paragraph..."
-4. Constraints: "Avoid interpretation, stick to visible elements..."
-```
-
-**Effective Techniques:**
-- Use action words ("describe", "analyze", "identify")
-- Set the desired tone (formal, casual, technical)
-- Specify output length or structure
-- Be clear about what NOT to include
-
-**Common Use Cases:**
-- **Accessibility (alt text):** Short, functional descriptions
-- **SEO (web images):** Keyword-rich, searchable text
-- **Archives:** Detailed, factual documentation
-- **Social media:** Engaging, conversational language
-- **Technical docs:** Precise specifications and details
-
-### Advanced: Manual Config Editing
-
-You can also directly edit `scripts/image_describer_config.json`:
-
-```json
-{
-  "prompt_variations": {
-    "your_style_name": "Your custom prompt text here..."
-  }
-}
-```
-
 ---
 
 ## 8. Advanced CLI Usage & Commands
@@ -611,9 +462,6 @@ idt guideme
 
 # Run workflow
 idt workflow <image_directory> [options]
-
-# Launch results viewer (GUI)
-idt viewer [directory]
 
 # List available prompt styles
 idt prompt-list [--verbose]
@@ -660,8 +508,7 @@ Options:
   --recursive              Process subdirectories
   --max-files N            Limit number of files (for testing)
   --resume                 Resume interrupted workflow
-  --batch                  Non-interactive mode (skip prompts - for sequential runs)
-  --view-results           Auto-launch viewer to monitor progress
+  --batch                  Non-interactive mode (skip prompts)
 ```
 
 **Examples:**
@@ -691,23 +538,15 @@ idt workflow C:\Photos --resume
 # Non-interactive mode (for running multiple workflows sequentially)
 idt workflow C:\Photos --batch --name batch1
 idt workflow C:\More_Photos --batch --name batch2
-
-# Launch viewer automatically to watch progress
-idt workflow C:\Photos --view-results --name live_monitoring
-
-# Web download workflows ⭐ NEW
-idt workflow --url "https://example.com/gallery" --steps download,describe,html
-idt workflow --url "https://portfolio.com" --max-images 20 --provider openai
-idt workflow --url "https://site.com/photos" --steps download,describe --name web_gallery
 ```
 
 ---
 
-## 9. Web Image Downloads ⭐ NEW
+## 9. Web Image Downloads
 
-IDT can now download images directly from web pages, making it easy to process online galleries, portfolios, or any webpage containing images.
+IDT can download images directly from web pages, making it easy to process online galleries, portfolios, or any webpage containing images.
 
-### Simplified Usage ⭐ UPDATED
+### Simplified Usage
 
 **Just specify the website directly** - IDT automatically detects URLs and sets up the right workflow:
 
@@ -718,20 +557,8 @@ idt workflow mywebsite.com
 idt workflow https://portfolio.com
 
 # With options
-idt workflow gallery.com --max-images 20 --progress-status
+idt workflow gallery.com --max-images 20
 idt workflow --download https://site.com/photos --provider openai --model gpt-4o
-```
-
-### Advanced Usage
-
-For explicit control, use the `--download` flag:
-
-```bash
-# Explicit download syntax
-idt workflow --download "https://example.com/gallery"
-
-# With custom workflow name
-idt workflow artgallery.com --name "gallery_analysis" --view-results
 ```
 
 ### How It Works
@@ -746,21 +573,19 @@ idt workflow artgallery.com --name "gallery_analysis" --view-results
 
 - `--download URL` - Explicitly download images from this web page
 - `--max-images N` - Limit the total number of images downloaded
-- `--min-size SIZE` - *(Reserved for future use)* Filter images by minimum file size
 - `--progress-status` - Show live download and processing progress
 
 ### Use Cases
 
-- **Portfolio Analysis**: `idt workflow artistsite.com --progress-status`
+- **Portfolio Analysis**: `idt workflow artistsite.com`
 - **Product Catalogs**: `idt workflow shop.com --max-images 50 --provider openai`
 - **Gallery Documentation**: `idt workflow gallery.com --name "art_analysis"`
-- **Research**: `idt workflow research-site.edu --view-results`
 
 **Note**: Always respect website terms of service and robots.txt when downloading images.
 
 ---
 
-## 10. Metadata Extraction & Geocoding ⭐ NEW
+## 10. Metadata Extraction & Geocoding
 
 IDT can automatically extract and include rich metadata from your images, adding context about **where and when** photos were taken.
 
@@ -808,25 +633,6 @@ idt workflow C:\Photos --geocode
 # Adds "Austin, TX" instead of just coordinates
 ```
 
-**Custom geocoding cache:**
-```bash
-idt workflow C:\Photos --geocode --geocode-cache my_cache.json
-# Stores geocoded locations for faster subsequent runs
-```
-
-### Interactive Wizard with Metadata
-
-The `idt guideme` wizard includes metadata configuration:
-
-```bash
-idt guideme
-```
-
-You'll be prompted:
-1. **Enable metadata extraction?** [Y/n] - Extracts photo data
-2. **Enable geocoding?** [y/N] - Converts GPS to city/state (requires internet)
-3. **Geocoding cache location?** - Where to save geocoded results
-
 ### How Geocoding Works
 
 **Geocoding** converts raw GPS coordinates (30.2672, -97.7431) into readable locations (Austin, TX).
@@ -837,83 +643,6 @@ You'll be prompted:
 - Results are **cached** to minimize API calls
 - Respects **1-second delay** between requests (Nominatim policy)
 - Works offline after locations are cached
-
-**Example workflow:**
-```bash
-# First run: Downloads location data from OpenStreetMap
-idt workflow C:\VacationPhotos --geocode
-
-# Subsequent runs: Uses cached data (instant, no internet needed)
-idt workflow C:\VacationPhotos --geocode
-```
-
-### Viewing Metadata
-
-**Viewer Application:**
-- Location/date prefix shown in **blue, bold text** with 📍 icon
-- Full metadata visible in description text file
-
-**ImageDescriber GUI:**
-- Right-click image → **Properties**
-- Shows: Location & Date, Camera Information, Photo Settings
-
-**HTML Reports:**
-- Location/date prefix highlighted at top of each description
-- Full metadata in "Details" section (when using `--full` flag)
-
-### Configuration
-
-**Edit metadata settings in `image_describer_config.json`:**
-
-```json
-{
-  "metadata": {
-    "enabled": true,
-    "include_location_prefix": true,
-    "geocoding": {
-      "enabled": false,
-      "user_agent": "IDT/3.0 (+https://github.com/kellylford/Image-Description-Toolkit)",
-      "delay_seconds": 1.0,
-      "cache_file": "geocode_cache.json"
-    }
-  }
-}
-```
-
-**Or use IDTConfigure GUI:**
-1. Run `idtconfigure.exe`
-2. Settings Menu → **Metadata Settings**
-3. Adjust: metadata_enabled, geocoding_enabled, cache_file, etc.
-
-### Example Scenarios
-
-**Scenario 1: Travel Photos with Location Context**
-```bash
-idt workflow C:\Europe2025 --geocode --name europe_trip
-# Descriptions: "Paris, France Jun 15, 2025: The Eiffel Tower..."
-```
-
-**Scenario 2: Event Photography (Date Only)**
-```bash
-idt workflow C:\Wedding --metadata
-# Descriptions: "May 12, 2025: The bride and groom..."
-# (No GPS data in studio photos, shows date only)
-```
-
-**Scenario 3: Privacy-Conscious (No Metadata)**
-```bash
-idt workflow C:\PersonalPhotos --no-metadata
-# Clean descriptions without location/date information
-```
-
-**Scenario 4: Large Collection with Geocoding**
-```bash
-# Initial run builds geocoding cache
-idt workflow C:\10000Photos --geocode --geocode-cache worldwide_cache.json
-
-# Reuse cache for other collections
-idt workflow C:\MorePhotos --geocode --geocode-cache worldwide_cache.json
-```
 
 ---
 
@@ -954,16 +683,9 @@ idt combinedescriptions --output results.tsv --format tsv --sort date
 
 # Custom output location with alphabetical sorting
 idt combinedescriptions --output C:\Exports\my_descriptions.csv --sort name
-
-# Combine multiple workflow runs (sorted by date)
-idt combinedescriptions --input-dir Descriptions --sort date
 ```
 
-**💡 New in v3.0:** Images are now sorted by their **actual photo dates** (from EXIF data) instead of filename. This means your vacation photos appear in the order you took them, not alphabetically! Use `--sort name` for the old alphabetical behavior.
-
 **💡 Pro Tip:** After ANY workflow run, immediately run `combinedescriptions` to get a nice Excel-ready file. Perfect for sharing or archiving!
-
-**📊 Screen Reader Tip:** If you ran only one workflow, `combinedescriptions` creates a great easy-to-read CSV that opens perfectly in Excel with screen readers. Each row is one image with its description and metadata.
 
 ### Workflow Statistics
 
@@ -1006,181 +728,9 @@ Output saved to: `analysis/results/content_analysis_[timestamp].txt`
 - Vocabulary diversity
 - Quality indicators
 
-### Analysis Output Location
-
-All analysis results go to:
-```
-analysis/results/
-├── combineddescriptions.csv          # Default combined export (date-sorted)
-├── combined_descriptions.csv         # Legacy filename (if specified)
-├── workflow_stats_[timestamp].json   # Performance statistics
-└── content_analysis_[timestamp].txt  # Content quality analysis
-```
-
-**📁 File Organization:** The analysis tools create timestamped files to avoid overwriting previous analyses, except for `combineddescriptions.csv` which is the "current" export file.
-
 ---
 
-## 12. Results Viewer (Real-Time Monitoring)
-
-The **Results Viewer** is a GUI application that lets you browse, search, and monitor your workflow results in real-time.
-
-### Automatic Launch
-
-The viewer launches automatically in two scenarios:
-
-#### 1. Using `guideme` (Recommended)
-When you run a workflow through the interactive wizard:
-```bash
-idt guideme
-```
-The viewer **opens immediately** when the workflow starts, letting you watch progress in real-time as each image is processed!
-
-#### 2. After Direct Workflow Completion
-When you run `idt workflow` directly, you'll be prompted after successful completion:
-```
-Would you like to view the results in the viewer? (y/n): y
-```
-Type `y` and the viewer opens instantly.
-
-### Manual Launch
-
-You can also launch the viewer manually anytime:
-
-```bash
-# Open viewer with directory browser
-idt viewer
-
-# Browse Results button shows all available workflows
-# - Lists all workflows with metadata
-# - Keyboard navigation (arrows, Enter)
-# - Single tab stop for accessibility
-
-# Open specific workflow output
-idt viewer C:\IDT\Descriptions\workflow_vacation_photos
-
-# Or double-click the auto-generated launcher
-# (found in each workflow directory)
-Descriptions\workflow_*/view_results.bat
-```
-
-### Viewer Features
-
-**Real-Time Monitoring:**
-- Live updates as images are processed
-- Progress tracking (shown in window title: "75%, 810 of 1077 images described (Live)")
-- Automatic refresh when new descriptions appear
-
-**Browse & Search:**
-- Navigate through all processed images
-- View descriptions alongside images
-- Image date displayed (when photo was taken)
-- Copy descriptions to clipboard
-- Search and filter results
-
-**Browse Results Dialog:**
-- Browse all available workflows with one click
-- See workflow metadata at a glance (Name, Prompt, Images, Model, Provider, Date)
-- Keyboard accessible with single tab stop
-- Auto-detects common workflow locations
-
-**Workflow Information:**
-- View metadata (model used, prompt style, etc.)
-- See processing statistics in window title (always visible)
-- Check completion status (100%, 64 of 64 images described)
-- Human-friendly date/time formatting (3/25/2025 7:35P)
-
-### Reusable Launcher
-
-Every workflow automatically creates a `view_results.bat` file in its output directory:
-```
-Descriptions/
-└── workflow_vacation_photos/
-    ├── images/
-    ├── image_descriptions.txt
-    ├── index.html
-    ├── logs/
-    └── view_results.bat  ← Double-click to reopen results anytime!
-```
-
-**Benefits:**
-- ✅ Quick access to view past results
-- ✅ No need to remember viewer commands
-- ✅ Create shortcuts or pin to Start menu
-- ✅ Share with others to view your workflow outputs
-
-### Viewer Modes
-
-The viewer automatically detects two modes:
-
-**HTML Mode** (Completed workflows):
-- Full HTML report with thumbnails
-- Complete navigation
-- Static, finalized results
-
-**Live Mode** (In-progress workflows):
-- Real-time updates as descriptions are generated
-- Progress indicators
-- Auto-refresh on new content
-
----
-
-### 11.1 Command Window Progress and Status Log (Video + Convert + Describe)
-
-When running workflows from the command line, IDT provides concise, screen-reader-friendly progress and a human-readable status log:
-
-- Video extraction (video → frames):
-   - In-progress: "[ACTIVE] Video extraction in progress: X/Y videos (Z%)"
-   - Complete:    "[DONE] Video extraction complete (Y videos)"
-   - Progress file: `<workflow_dir>/logs/video_extraction_progress.txt`
-
-- Convert step (HEIC to JPG):
-   - In-progress: "[ACTIVE] Image conversion in progress: X/Y HEIC to JPG (Z%)"
-   - Complete:    "[DONE] Image conversion complete (Y HEIC to JPG)"
-   - Progress file: `<workflow_dir>/logs/convert_images_progress.txt`
-
-- Describe step (image descriptions):
-   - In-progress: "[ACTIVE] Image description in progress: X/Y (Z%)"
-   - Complete:    "[DONE] Image description complete (Y descriptions)"
-   - Progress file: `<workflow_dir>/logs/image_describer_progress.txt`
-
-- Aggregated status:
-   - Human-readable summary at `<workflow_dir>/logs/status.log`
-   - Updated every ~10 seconds while steps are running
-
-Notes:
-- Progress files are created when running via the workflow (which passes a `--log-dir` to child processes). Running converters directly without `--log-dir` won’t create progress files.
-
-### Monitoring Status Log in Real-Time
-
-While a workflow is running, you can monitor the status log in a separate terminal window. This is useful for checking progress without switching to the main workflow window.
-
-**From Windows Command Prompt (CMD):**
-
-```cmd
-REM Watch status log with 10-second refresh
-:loop
-cls
-type Descriptions\workflow_*\logs\status.log
-timeout /t 10 /nobreak > nul
-goto loop
-```
-
-Or as a one-liner you can paste directly:
-
-```cmd
-for /L %i in (1,0,2) do @(cls & type Descriptions\workflow_*\logs\status.log & timeout /t 10 /nobreak > nul)
-```
-
-**Tips:**
-- Replace `workflow_*` with your specific workflow directory name if the wildcard doesn't work
-- Press Ctrl+C to stop monitoring
-- The status log updates every ~10 seconds during active processing
-
----
-
-
-## 13. Cloud Provider Setup
+## 12. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
 
@@ -1232,7 +782,7 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 
 ---
 
-## 14. Performance Tips
+## 13. Performance Tips
 
 ### Adjusting Timeout Settings
 
@@ -1259,94 +809,9 @@ idt workflow C:\Photos --timeout 300
 - ☁️ **Decrease** when using fast cloud Ollama instances
 - 🚀 **Keep default** for most local GPU setups with 7B models
 
-**Symptoms of timeout too low:**
-- Frequent "Request timed out after X seconds" errors
-- Works for some images but fails on complex ones
-- Model is processing but gets interrupted
-
-**Symptoms of timeout too high:**
-- Long waits when actual errors occur
-- Hangs on genuinely failed requests
-
 ---
 
-## 15. Batch Files Reference
-
-The `bat/` folder contains pre-configured batch files for quick model testing.
-
-### Ollama Batch Files
-
-```bash
-# Recommended models
-bat\run_ollama_moondream.bat C:\Photos
-bat\run_ollama_llava7b.bat C:\Photos
-bat\run_ollama_llava13b.bat C:\Photos
-bat\run_ollama_llama32vision.bat C:\Photos
-
-# Specialized models
-bat\run_ollama_bakllava.bat C:\Photos
-bat\run_ollama_minicpmv.bat C:\Photos
-bat\run_ollama_qwen2.5vl.bat C:\Photos
-```
-
-### Cloud Provider Batch Files
-
-```bash
-# OpenAI
-bat\run_openai_gpt4o.bat C:\Photos
-bat\run_openai_gpt4o_mini.bat C:\Photos
-
-# Claude
-bat\run_claude_opus4.bat C:\Photos
-bat\run_claude_sonnet45.bat C:\Photos
-bat\run_claude_haiku35.bat C:\Photos
-```
-
-### Setup Batch Files
-
-```bash
-# API Key Management
-bat\setup_openai_key.bat          # Set up OpenAI API key
-bat\setup_claude_key.bat          # Set up Claude API key
-bat\remove_openai_key.bat         # Remove OpenAI key
-bat\remove_claude_key.bat         # Remove Claude key
-
-# Model Management
-bat\install_ollama.bat            # Install Ollama
-bat\install_vision_models.bat    # Download recommended models
-```
-
-### Testing Batch Files
-
-```bash
-# Test all cloud models
-bat\allcloudtest.bat C:\Photos
-
-# Test all Ollama models
-bat\allmodeltest.bat C:\Photos
-```
-
-### ⚠️ Important Note About Batch Files
-
-**Batch files do NOT support the `--name` parameter!**
-
-The batch files are simple wrappers that call the workflow with specific models. They don't pass custom run names.
-
-**To use custom names, use the `idt` command directly:**
-
-```bash
-# Instead of this:
-bat\run_ollama_llava7b.bat C:\Photos
-
-# Do this if you want a custom name:
-idt workflow C:\Photos --model llava:7b --name my_custom_name
-```
-
-**Or use `idt guideme` which supports naming through the wizard.**
-
----
-
-## 16. Troubleshooting
+## 14. Troubleshooting
 
 ### Common Issues
 
@@ -1378,32 +843,7 @@ ollama list            # Verify it's installed
 2. Check that it contains supported formats: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.tiff`, `.webp`, `.heic`, `.heif`
 3. Use `--recursive` to include subdirectories
 
-#### Workflow output in wrong location
-**Solution:**
-- Use `--output-dir` to specify where outputs should go
-- Default is `Descriptions/` in the current directory
-- Or use `idt guideme` which sets this automatically
-
-#### Applications won't run
-**Solution:**
-1. Make sure you extracted ALL files from the zip
-2. Check that required folders exist next to the executables:
-   - `scripts/` folder (required by all applications)
-   - `imagedescriber/` folder (for GUI ImageDescriber)
-   - `prompt_editor/` folder (for Prompt Editor)
-   - `viewer/` folder (for Results Viewer)
-3. Run from Command Prompt or PowerShell, not by double-clicking
-4. Try each application individually to isolate the issue
-
-#### GUI applications show errors or don't start
-**Solution:**
-1. Check that all required folders were extracted
-2. Verify Ollama is running if using local models: `ollama list`
-3. For cloud providers, verify API keys are set correctly
-4. Try the CLI version first: `idt guideme` to test basic functionality
-5. Check Windows Event Viewer for detailed error messages
-
-#### Silent failures or "nothing happens" after clicking Process All
+#### Silent failures or "nothing happens" in ImageDescriber
 **Problem:** Progress dialog appears but doesn't update, or processing appears to start but freezes.
 
 **Solution:**
@@ -1412,7 +852,7 @@ ollama list            # Verify it's installed
    
    Close ImageDescriber and restart with the `--debug` flag:
    ```batch
-   ImageDescriber.exe --debug
+   imagedescriber.exe --debug
    ```
    
    This creates a detailed log file at:
@@ -1469,7 +909,7 @@ ollama list            # Verify it's installed
    # Try CLI wizard first
    idt guideme
    
-   # Test GUI ImageDescriber (includes viewer mode)
+   # Test GUI ImageDescriber
    imagedescriber.exe
    ```
 
@@ -1485,11 +925,12 @@ ollama list            # Verify it's installed
 
 **GUI Application:**
 ```bash
-# GUI ImageDescriber - Visual interface with integrated viewer
+# ImageDescriber - Visual interface with integrated viewer mode
 imagedescriber.exe
 ```
 
-**CLI Application:**
+**CLI Commands:**
+```bash
 # Interactive wizard (start here!)
 idt guideme
 
@@ -1508,12 +949,6 @@ idt workflow C:\Photos --prompt-style artistic --name art_analysis
 # Export to CSV (after any run)
 idt combinedescriptions
 
-# View results in GUI (or use auto-prompt after workflow!)
-idt viewer
-
-# Launch viewer for specific workflow
-idt viewer C:\IDT\Descriptions\workflow_photos
-
 # Check installed models
 idt check-models
 
@@ -1523,105 +958,29 @@ idt help
 
 ### Application Use Cases
 
-**🖼️ Use GUI ImageDescriber when:**
-- Processing individual images or small batches
-- Learning different models and prompts
-- Need visual feedback and drag-drop interface
-- Testing settings before large CLI workflows
-
-**📝 Use Prompt Editor when:**
-- Editing or creating custom prompt styles
-- Managing prompt variations in config file
-- Configuring default AI provider and model
-- Setting up API keys for cloud providers
-- Preparing configuration before using CLI or GUI
-
-**📋 Use CLI (idt.exe) when:**
-- Processing hundreds or thousands of images
-- Need automation and batch scripts
-- Using advanced workflow features
-- Production environments and repeated tasks
-
-**📊 Use Results Viewer when:**
-- Browsing completed workflow results
-- Monitoring active workflows in real-time
-- Searching and filtering descriptions
-- Sharing results with others
-
-###�️ Use ImageDescriber GUI when:**
+**🖼️ Use ImageDescriber GUI when:**
 - Processing directories of images visually
 - Testing different models and prompts
 - Want immediate visual feedback
 - Prefer point-and-click interface
 - Browsing workflow results in viewer mode
 - Monitoring active workflows in real-time
+- Managing small to medium image collections (1-1000 images)
 
 **📋 Use CLI (idt.exe) when:**
 - Processing hundreds or thousands of images
 - Need automation and batch scripts
 - Using advanced workflow features
 - Production environments and repeated tasks
+- Headless server environments
 
 ### File Locations
 
-- **CLI Executable:** `idt.exe`
-- **GUI ImageDescriber:** `imagedescriber.exe` (includes integrated viewer)
-- File and full Path
-- Optional EXIF metadata block (Photo Date, Location, Camera, Settings)
-- Provider, Model, and Prompt Style
-- Description
-- Timestamp
-- Meta suffix (new)
-- Separator line
-
-### Meta suffix (new)
-
-At the end of each entry, IDT appends a compact, parseable one-line suffix that surfaces the most useful original capture data for downstream tools:
-
-- Format: `Meta: date=M/D/YYYY H:MMP; location=City, ST; coords=LAT,LON`
-- Example: `Meta: date=3/25/2025 7:35P; location=Austin, TX; coords=30.267200,-97.743100`
-- Only the fields available for a given image are included.
-- If EXIF has no date, file modified time is used as a fallback.
-- If GPS is missing but City/State/Country are present, `location=` is included without `coords=`.
-
-### Date/time format standard
-
-All dates shown in the new Meta suffix (and Photo Date when available) follow the project standard:
-
-- M/D/YYYY H:MMP (no leading zeros on month/day/hour, A/P suffix)
-- Examples: `3/25/2025 7:35P`, `10/16/2025 8:03A`
-
-This keeps dates consistent across the CLI, the GUI viewer, and analysis tools.
-
-### Backward compatibility
-
-- The existing multi-line metadata block remains unchanged and continues to appear near the top of each entry when metadata is enabled.
-- The new Meta suffix is additive and appears after the Timestamp line, before the separator.
-- No existing scripts need to change; new consumers can parse the Meta line for quick access to original date/location.
-
-### Example entry
-
-```
-File: IMG_1234.JPG
-Path: C:/Photos/IMG_1234.JPG
-Photo Date: 3/25/2025 7:35P
-Location: GPS: 30.267200, -97.743100, Altitude: 165.0m
-Camera: Apple iPhone 14 Pro, Lens: iPhone 14 Pro back triple camera 6.86mm f/1.78
-Settings: Iso: 100, Aperture: f/1.8, Shutter Speed: 1/120s, Focal Length: 7mm
-Provider: ollama
-Model: moondream
-Prompt Style: detailed
-Description: A person on a bridge at sunset...
-Timestamp: 2025-10-26 17:22:03
-Meta: date=3/25/2025 7:35P; location=Austin, TX; coords=30.267200,-97.743100
---------------------------------------------------------------------------------
-```
-
----
-
-## Further Resources
-
-- **GitHub:** https://github.com/kellylford/Image-Description-Toolkit
+- **CLI Executable:** `C:\IDT\idt.exe`
+- **GUI ImageDescriber:** `C:\IDT\imagedescriber.exe`
+- **Config Files:** `C:\IDT\scripts\*.json`
+- **Workflow Outputs:** `C:\IDT\Descriptions\workflow_*/`
+- **Analysis Results:** `C:\IDT\analysis\results\`
 
 ---
 

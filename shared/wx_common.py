@@ -669,13 +669,13 @@ def show_about_dialog(parent, app_name: str, version: str,
                      description: str, developers: List[str] = None,
                      website: str = ""):
     """
-    Show a standardized About dialog.
+    Show a standardized About dialog using HTML for screen reader accessibility.
     
     Args:
         parent: Parent window
         app_name: Application name
         version: Version string
-        description: App description
+        description: App description (supports newlines)
         developers: List of developer names
         website: Website URL
         
@@ -685,22 +685,70 @@ def show_about_dialog(parent, app_name: str, version: str,
                          developers=["John Doe"],
                          website="https://example.com")
     """
-    info = wx.adv.AboutDialogInfo()
-    info.SetName(app_name)
-    info.SetVersion(version)
-    info.SetDescription(description)
+    import wx.html
     
+    # Create dialog
+    dlg = wx.Dialog(parent, title=f"About {app_name}", 
+                    style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+    dlg.SetSize((500, 400))
+    
+    # Create HTML window for content
+    html_window = wx.html.HtmlWindow(dlg, style=wx.html.HW_SCROLLBAR_AUTO)
+    html_window.SetStandardFonts()
+    
+    # Build HTML content with semantic structure for screen readers
+    html_content = f"""
+    <html>
+    <body>
+        <h1>{app_name}</h1>
+        <p><strong>Version:</strong> {version}</p>
+        """
+    
+    # Add description (convert newlines to HTML)
+    if description:
+        # Replace bullet points and newlines with HTML
+        desc_html = description.replace('\n\n', '</p><p>')
+        desc_html = desc_html.replace('\n• ', '<br>• ')
+        desc_html = desc_html.replace('\n', '<br>')
+        html_content += f"<p>{desc_html}</p>"
+    
+    # Add developers if provided
     if developers:
+        html_content += "<p><strong>Developed by:</strong><br>"
         for dev in developers:
-            info.AddDeveloper(dev)
+            html_content += f"{dev}<br>"
+        html_content += "</p>"
     
+    # Add website if provided
     if website:
-        info.SetWebSite(website)
+        html_content += f'<p><strong>Website:</strong> <a href="{website}">{website}</a></p>'
     
-    # Add standard items
-    info.SetLicence("Licensed under the terms of the project license.")
+    # Add license info
+    html_content += """
+        <p><strong>License:</strong> Licensed under the terms of the project license.</p>
+    </body>
+    </html>
+    """
     
-    wx.adv.AboutBox(info)
+    html_window.SetPage(html_content)
+    
+    # Create OK button
+    ok_btn = wx.Button(dlg, wx.ID_OK, "OK")
+    ok_btn.SetDefault()
+    
+    # Layout
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(html_window, 1, wx.ALL | wx.EXPAND, 10)
+    sizer.Add(ok_btn, 0, wx.ALL | wx.ALIGN_CENTER, 10)
+    
+    dlg.SetSizer(sizer)
+    
+    # Set focus to OK button for keyboard access
+    wx.CallAfter(ok_btn.SetFocus)
+    
+    # Show modal
+    dlg.ShowModal()
+    dlg.Destroy()
 
 
 # ==================== UTILITIES ====================

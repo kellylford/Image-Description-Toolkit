@@ -17,19 +17,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-# Setup debug logging to file
-debug_log_path = Path.home() / 'imagedescriber_geocoding_debug.log'
-logging.basicConfig(
-    filename=str(debug_log_path),
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filemode='a'
-)
-logging.info("="*60)
-logging.info("ImageDescriber worker thread started")
-logging.info(f"Debug log: {debug_log_path}")
-logging.info("="*60)
-
+# Logger instance - configuration is done in imagedescriber_wx.py main()
+# Use --debug flag to enable verbose file logging
 logger = logging.getLogger(__name__)
 
 import wx

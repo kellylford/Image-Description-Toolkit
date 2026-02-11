@@ -70,8 +70,9 @@ try:
         get_app_version,
         DescriptionListBox,  # NEW: Accessible listbox for descriptions with full text in screen readers
     )
+    from shared.exif_utils import extract_exif_datetime
 except ImportError as e:
-    print(f"ERROR: Could not import shared.wx_common: {e}")
+    print(f"ERROR: Could not import shared utilities: {e}")
     print("This is a critical error. ImageDescriber cannot function without shared utilities.")
     sys.exit(1)
 
@@ -322,16 +323,8 @@ def format_image_metadata(metadata: dict) -> list:
     return lines
 
 
-# Configure logging
+# Logger instance - configuration is done in main() when --debug flag is used
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('imagedescriber_debug.log'),
-        logging.StreamHandler()
-    ]
-)
 
 
 class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
@@ -1829,30 +1822,45 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             else:
                 regular_images.append((file_path, item))
         
-        # Sort all categories
-        videos.sort(key=lambda x: x[0])
-        regular_images.sort(key=lambda x: x[0])
+        # Helper function to get datetime for sorting (EXIF date with fallback to mtime)
+        def get_sort_date(file_path):
+            """Get datetime for sorting: DateTimeOriginal → DateTimeDigitized → DateTime → mtime"""
+            try:
+                dt = extract_exif_datetime(file_path)
+                if dt:
+                    return dt
+                # Fallback to epoch if extraction fails
+                return datetime.fromtimestamp(0)
+            except Exception:
+                # Last resort: epoch time
+                return datetime.fromtimestamp(0)
+        
+        # Sort all categories by EXIF date (oldest first)
+        videos.sort(key=lambda x: get_sort_date(x[0]))
+        regular_images.sort(key=lambda x: get_sort_date(x[0]))
         for parent in frames:
+            # Sort frames by their timestamp in filename (video_5.00s.jpg)
+            # This keeps them in extraction order
             frames[parent].sort(key=lambda x: x[0])
         
-        # Add items to list: videos with their frames, then regular images
-        items_to_display = []
+        # Merge videos and regular images in chronological order
+        all_items = []
         
-        # Add videos and their frames
-        for file_path, item in videos:
-            items_to_display.append((file_path, item, 0))  # indent level 0
+        # Combine and sort videos + regular images together by date
+        mixed_items = videos + regular_images
+        mixed_items.sort(key=lambda x: get_sort_date(x[0]))
+        
+        # Build display list: insert extracted frames right after their parent videos
+        for file_path, item in mixed_items:
+            all_items.append((file_path, item, 0))  # indent level 0
             
-            # Add extracted frames immediately after parent video
-            if file_path in frames:
+            # If this is a video with extracted frames, insert them immediately after
+            if item.item_type == "video" and file_path in frames:
                 for frame_path, frame_item in frames[file_path]:
-                    items_to_display.append((frame_path, frame_item, 1))  # indent level 1
-        
-        # Add regular images
-        for file_path, item in regular_images:
-            items_to_display.append((file_path, item, 0))  # indent level 0
+                    all_items.append((frame_path, frame_item, 1))  # indent level 1
         
         # Display all items
-        for file_path, item, indent_level in items_to_display:
+        for file_path, item, indent_level in all_items:
             # Apply filters
             if self.current_filter == "described":
                 if not item.descriptions:
@@ -2878,7 +2886,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Update window title to reflect processing status (removes "Processing" when failed)
         self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
         
+        # Ensure main window has focus before showing error dialog
+        self.Raise()
+        self.SetFocus()
         show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{event.error}")
+        # Restore focus after dialog
+        self.SetFocus()
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
     
     def on_workflow_complete(self, event):
@@ -2938,7 +2951,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if settings['process_after']:
                         self.auto_process_extracted_frames(extracted_frames)
                     else:
+                        # Ensure main window has focus before showing dialog
+                        self.Raise()
+                        self.SetFocus()
                         show_info(self, f"Extracted {len(extracted_frames)} frames from video.\n\nFrames have been added to the workspace.")
+                        # Restore focus after dialog
+                        self.SetFocus()
                 
                 self.SetStatusText(f"Extracted {len(extracted_frames)} frames", 0)
             
@@ -2972,13 +2990,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
         
+        # Ensure main window has focus before showing completion dialog
+        self.Raise()
+        self.SetFocus()
+        
         show_info(self, f"Workflow complete!\n{event.input_dir}")
+        
+        # Restore focus to main window after dialog dismissal
+        self.SetFocus()
+        
         self.SetStatusText("Workflow complete", 0)
         self.refresh_image_list()
     
     def on_workflow_failed(self, event):
         """Handle workflow failures"""
+        # Ensure main window has focus before showing error dialog
+        self.Raise()
+        self.SetFocus()
         show_error(self, f"Workflow failed:\n{event.error}")
+        # Restore focus after dialog
+        self.SetFocus()
         self.SetStatusText("Workflow failed", 0)
     
     # Phase 3: Batch control handlers
@@ -3078,7 +3109,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.show_batch_progress_item.Enable(False)
         
         self.SetStatusText("Batch processing stopped", 0)
+        # Ensure main window has focus before showing dialog
+        self.Raise()
+        self.SetFocus()
         show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
+        # Restore focus after dialog
+        self.SetFocus()
     
     # Phase 4: Resume functionality
     def prompt_resume_batch(self):
@@ -3296,7 +3332,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
         if dialog.ShowModal() != wx.ID_OK:
             dialog.Destroy()
+            # Ensure main window has focus before showing dialog
+            self.Raise()
+            self.SetFocus()
             show_info(self, f"Extraction complete! {len(frame_paths)} frames added to workspace.\n\nYou can process them later with 'Process All Undescribed'.")
+            # Restore focus after dialog
+            self.SetFocus()
             return
         
         options = dialog.get_config()
@@ -3777,17 +3818,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Show completion message
         if failed_count == 0:
             msg = f"Successfully converted {converted_count} HEIC file(s) to JPEG"
+            # Ensure main window has focus before showing dialog
+            self.Raise()
+            self.SetFocus()
             show_info(self, msg)
+            # Restore focus after dialog
+            self.SetFocus()
             self.SetStatusText(msg, 0)
         else:
             msg = f"Converted {converted_count} file(s), {failed_count} failed"
+            # Ensure main window has focus before showing dialog
+            self.Raise()
+            self.SetFocus()
             show_warning(self, msg + f"\n\nFailed files:\n" + "\n".join(event.failed_files))
+            # Restore focus after dialog
+            self.SetFocus()
             self.SetStatusText(msg, 0)
     
     def on_conversion_failed(self, event):
         """Handle HEIC conversion failure"""
         error_msg = f"HEIC conversion failed: {event.error}"
+        # Ensure main window has focus before showing error dialog
+        self.Raise()
+        self.SetFocus()
         show_error(self, error_msg)
+        # Restore focus after dialog
+        self.SetFocus()
         self.SetStatusText("Conversion failed", 0)
     
     # Descriptions menu handlers
@@ -4066,21 +4122,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             show_error(self, f"Could not open user guide:\n{e}")
     
-    def on_about(self):
-        """Show about dialog"""
-        show_about_dialog(
-            self,
-            "ImageDescriber",
-            get_app_version(),
-            "AI-Powered Image Description GUI\n\n"
-            "Features:\n"
-            "• Document-based workspace\n"
-            "• Individual and batch processing\n"
-            "• Multiple AI providers (Ollama, OpenAI, Claude)\n"
-            "• Video frame extraction\n"
-            "• HEIC conversion\n"
-            "• Full keyboard accessibility"
-        )
+    def on_about(self, event=None):
+        """Show about dialog with version and feature information"""
+        try:
+            show_about_dialog(
+                self,
+                "ImageDescriber",
+                get_app_version(),
+                "AI-Powered Image Description GUI\n\n"
+                "Features:\n"
+                "• Document-based workspace for project management\n"
+                "• Individual and batch image processing\n"
+                "• Multiple AI providers (Ollama, OpenAI, Claude)\n"
+                "• Video frame extraction with nested display\n"
+                "• HEIC image conversion support\n"
+                "• Integrated viewer mode for browsing workflow results\n"
+                "• Integrated prompt editor and configuration manager",
+                developers=["Kelly Ford"],
+                website="https://github.com/kellylford/Image-Description-Toolkit"
+            )
+        except Exception as e:
+            logging.error(f"Error showing About dialog: {e}", exc_info=True)
+            show_error(self, f"Could not show About dialog:\n{e}")
     
     def on_close(self, event):
         """Handle application close"""
@@ -4098,17 +4161,47 @@ def main():
     """Main application entry point"""
     import argparse
     
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Image Describer Tool")
+    parser.add_argument('path', nargs='?', help="Directory or workspace to load")
+    parser.add_argument('--viewer', action='store_true', help="Start in viewer mode")
+    parser.add_argument('--debug', action='store_true', 
+                       help='Enable verbose debug logging to file')
+    parser.add_argument('--debug-file', 
+                       default=str(Path.home() / 'imagedescriber_verbose_debug.log'),
+                       help='Debug output file location (default: %(default)s)')
+    args = parser.parse_args()
+    
+    # Configure enhanced logging if --debug flag is set
+    if args.debug:
+        # Reconfigure logging with DEBUG level and screen reader-friendly format
+        # Format: LEVEL - message - (module:line) - (timestamp)
+        # Screen reader friendly: reads important info first, technical details last
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(levelname)s - %(message)s - (%(name)s:%(lineno)d) - (%(asctime)s)',
+            handlers=[
+                logging.FileHandler(args.debug_file, mode='a', encoding='utf-8'),
+                logging.StreamHandler(sys.stderr)  # Also to stderr (visible in console build)
+            ],
+            force=True  # Override any existing configuration
+        )
+        logger = logging.getLogger(__name__)
+        logger.info("="*60)
+        logger.info("DEBUG MODE ENABLED")
+        logger.info(f"Verbose logging to: {args.debug_file}")
+        logger.info(f"ImageDescriber version: {get_app_version() if get_app_version else 'unknown'}")
+        logger.info(f"Python: {sys.version}")
+        logger.info(f"wxPython: {wx.version()}")
+        logger.info(f"Frozen mode: {getattr(sys, 'frozen', False)}")
+        logger.info("="*60)
+    
     # Log standardized build banner at startup
     if log_build_banner:
         try:
             log_build_banner()
         except Exception:
             pass
-
-    parser = argparse.ArgumentParser(description="Image Describer Tool")
-    parser.add_argument('path', nargs='?', help="Directory or workspace to load")
-    parser.add_argument('--viewer', action='store_true', help="Start in viewer mode")
-    args = parser.parse_args()
 
     app = wx.App()
     frame = ImageDescriberFrame()

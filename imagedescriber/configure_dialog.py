@@ -93,6 +93,15 @@ class ApiKeyEditDialog(wx.Dialog):
         # Bind OK to validation
         ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
         
+        # Set focus to appropriate field for keyboard accessibility
+        # If editing existing key, focus on key field; if new, focus on provider
+        if self.provider:
+            # Editing existing - focus on API key field
+            wx.CallAfter(self.key_text.SetFocus)
+        else:
+            # Adding new - focus on provider choice
+            wx.CallAfter(self.provider_choice.SetFocus)
+        
     def on_ok(self, event):
         """Validate input before accepting"""
         provider = self.provider_choice.GetStringSelection()
@@ -233,6 +242,10 @@ class SettingEditDialog(wx.Dialog):
         
         panel.SetSizer(sizer)
         self.Fit()
+        
+        # Set focus to the editor control for keyboard accessibility
+        # Delay focus setting to ensure dialog is fully displayed
+        wx.CallAfter(self.editor.SetFocus)
     
     def GetValue(self):
         """Get the new value from the editor"""
@@ -603,6 +616,18 @@ class ConfigureDialog(wx.Dialog):
         main_sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 5)
         
         panel.SetSizer(main_sizer)
+        
+        # Set focus to first tab's settings list for keyboard accessibility
+        # Delay to ensure dialog is fully displayed
+        wx.CallAfter(self._set_initial_focus)
+    
+    def _set_initial_focus(self):
+        """Set focus to the first settings list in the first tab"""
+        # Get first category
+        first_category = list(self.settings_metadata.keys())[0]
+        widgets = self.category_widgets.get(first_category)
+        if widgets and 'settings_list' in widgets:
+            widgets['settings_list'].SetFocus()
     
     def create_category_tab(self, parent, category: str) -> wx.Panel:
         """Create a tab panel for a specific category"""

@@ -155,9 +155,39 @@ idt viewer --open                    # Directory picker
 ```bash
 # Launch methods
 imagedescriber.exe                   # Main GUI interface
+imagedescriber.exe [path]            # Load directory or workspace file
+imagedescriber.exe --viewer          # Start in viewer mode
+imagedescriber.exe --debug           # Enable verbose debug logging
 
 # Via IDT CLI  
 idt imagedescriber                   # Same as imagedescriber.exe
+```
+
+**Command-line Options:**
+- `path` - Directory to load or `.idt` workspace file
+- `--viewer` - Start in viewer mode (browse existing results)
+- `--debug` - Enable verbose debug logging to file (for troubleshooting)
+- `--debug-file <path>` - Custom debug log location (default: `%USERPROFILE%\imagedescriber_verbose_debug.log`)
+
+**Examples:**
+```bash
+# Normal launch
+imagedescriber.exe
+
+# Load a workspace
+imagedescriber.exe C:\MyProject\workspace.idt
+
+# Load directory
+imagedescriber.exe C:\Photos\Vacation
+
+# Start in viewer mode
+imagedescriber.exe --viewer C:\idt\Descriptions
+
+# Enable debug logging (for troubleshooting)
+imagedescriber.exe --debug
+
+# Debug with custom log location
+imagedescriber.exe --debug --debug-file C:\Logs\debug.log
 ```
 
 **Features:**
