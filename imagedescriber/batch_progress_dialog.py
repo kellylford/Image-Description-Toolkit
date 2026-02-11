@@ -123,19 +123,26 @@ class BatchProgressDialog(wx.Dialog):
         self.SetSizer(dialog_sizer)
     
     def update_progress(self, current: int, total: int, 
-                       file_path: str, avg_time: float):
+                       file_path: str = None, avg_time: float = 0.0,
+                       image_name: str = None, provider: str = None, model: str = None):
         """Update progress display
         
         Args:
             current: Current image number (1-based)
             total: Total number of images
-            file_path: Path to current image being processed
-            avg_time: Average processing time per image in seconds
+            file_path: Path to current image being processed (optional)
+            avg_time: Average processing time per image in seconds (optional)
+            image_name: Display name override (for video extraction, optional)
+            provider: AI provider name (for video extraction, optional)
+            model: AI model name (for video extraction, optional)
         """
         # Update stats list (including current image as last item)
         self.stats_list.Clear()
-        self.stats_list.Append(f"Images Processed: {current} / {total}")
-        self.stats_list.Append(f"Average Processing Time: {avg_time:.1f} seconds")
+        self.stats_list.Append(f"Items Processed: {current} / {total}")
+        
+        # Show average time only if available (not during video extraction)
+        if avg_time > 0:
+            self.stats_list.Append(f"Average Processing Time: {avg_time:.1f} seconds")
         
         # Calculate estimated time remaining
         if avg_time > 0 and current < total:
@@ -159,9 +166,17 @@ class BatchProgressDialog(wx.Dialog):
         # Track separator index for keyboard navigation
         self.separator_index = self.stats_list.GetCount() - 1
         
-        # Add current image as last item (keyboard-navigable)
-        filename = Path(file_path).name
-        self.stats_list.Append(f"Current Image: {filename}")
+        # Add current image/video being processed
+        if image_name:
+            # Video extraction or custom name
+            self.stats_list.Append(f"Current: {image_name}")
+            if provider and model:
+                self.stats_list.Append(f"Provider: {provider}")
+                self.stats_list.Append(f"Model: {model}")
+        elif file_path:
+            # Regular image processing
+            filename = Path(file_path).name
+            self.stats_list.Append(f"Current Image: {filename}")
         
         # Update progress bar
         percentage = int((current / total) * 100) if total > 0 else 0

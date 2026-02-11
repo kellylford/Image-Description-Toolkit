@@ -12,8 +12,10 @@ import time
 import json
 import tempfile
 import logging
+import traceback
 from pathlib import Path
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 # Setup debug logging to file
 debug_log_path = Path.home() / 'imagedescriber_geocoding_debug.log'
@@ -1099,58 +1101,90 @@ class BatchProcessingWorker(threading.Thread):
     
     def run(self):
         """Process all images sequentially"""
-        total = len(self.file_paths)
-        completed = 0
-        failed = 0
-        
-        for i, file_path in enumerate(self.file_paths, 1):
-            # Phase 2: Check if stopped
-            if self._stop_event.is_set():
-                break
+        try:
+            total = len(self.file_paths)
+            completed = 0
+            failed = 0
             
-            # Phase 2: Wait if paused (blocks here until resume)
-            self._pause_event.wait()
+            for i, file_path in enumerate(self.file_paths, 1):
+                # Phase 2: Check if stopped
+                if self._stop_event.is_set():
+                    break
+                
+                # Phase 2: Wait if paused (blocks here until resume)
+                self._pause_event.wait()
+                
+                # Phase 2: Double-check stop after unpause
+                if self._stop_event.is_set():
+                    break
+                
+                # Post progress with current/total counts (add offset for continuing from video extraction)
+                current_progress = i + self.progress_offset
+                total_progress = total + self.progress_offset
+                evt = ProgressUpdateEventData(
+                    file_path=file_path,
+                    message=f"Processing {i}/{total}: {Path(file_path).name}",
+                    current=current_progress,
+                    total=total_progress
+                )
+                wx.PostEvent(self.parent_window, evt)
+                
+                # Create worker for this image
+                worker = ProcessingWorker(
+                    self.parent_window,
+                    file_path,
+                    self.provider,
+                    self.model,
+                    self.prompt_style,
+                    self.custom_prompt,
+                    self.detection_settings,
+                    self.prompt_config_path
+                )
+                
+                # Run synchronously and wait
+                worker.start()
+                worker.join()  # Wait for completion
+                
+                # Track completion (events are posted by ProcessingWorker)
+                completed += 1
             
-            # Phase 2: Double-check stop after unpause
-            if self._stop_event.is_set():
-                break
-            
-            # Post progress with current/total counts (add offset for continuing from video extraction)
-            current_progress = i + self.progress_offset
-            total_progress = total + self.progress_offset
-            evt = ProgressUpdateEventData(
-                file_path=file_path,
-                message=f"Processing {i}/{total}: {Path(file_path).name}",
-                current=current_progress,
-                total=total_progress
+            # Post final completion
+            evt = WorkflowCompleteEventData(
+                input_dir=f"{completed}/{total} images",
+                output_dir=""
             )
             wx.PostEvent(self.parent_window, evt)
             
-            # Create worker for this image
-            worker = ProcessingWorker(
-                self.parent_window,
-                file_path,
-                self.provider,
-                self.model,
-                self.prompt_style,
-                self.custom_prompt,
-                self.detection_settings,
-                self.prompt_config_path
-            )
+        except Exception as e:
+            # Comprehensive error logging for debugging frozen executables
+            error_msg = f"FATAL ERROR in BatchProcessingWorker: {type(e).__name__}: {e}"
+            tb_str = traceback.format_exc()
             
-            # Run synchronously and wait
-            worker.start()
-            worker.join()  # Wait for completion
+            print(f"\n{'='*60}", flush=True)
+            print(error_msg, flush=True)
+            print(tb_str, flush=True)
+            print('='*60, flush=True)
             
-            # Track completion (events are posted by ProcessingWorker)
-            completed += 1
-        
-        # Post final completion
-        evt = WorkflowCompleteEventData(
-            input_dir=f"{completed}/{total} images",
-            output_dir=""
-        )
-        wx.PostEvent(self.parent_window, evt)
+            logger.error(error_msg, exc_info=True)
+            
+            # Write to dedicated crash log
+            try:
+                crash_log = Path.home() / 'imagedescriber_crash.log'
+                with open(crash_log, 'a', encoding='utf-8') as f:
+                    f.write(f"\n{'='*60}\n")
+                    f.write(f"{datetime.now().isoformat()} - BatchProcessingWorker crash\n")
+                    f.write(f"Processing {len(self.file_paths)} files\n")
+                    f.write(f"Provider: {self.provider}, Model: {self.model}\n")
+                    f.write(f"Error: {error_msg}\n")
+                    f.write(f"Traceback:\n{tb_str}\n")
+                    f.write('='*60 + '\n')
+                logger.info(f"Crash details written to {crash_log}")
+            except Exception as log_error:
+                logger.error(f"Failed to write crash log: {log_error}")
+            
+            # Post failure event
+            evt = WorkflowFailedEventData(error=f"Batch processing failed: {str(e)}")
+            wx.PostEvent(self.parent_window, evt)
     
     def pause(self):
         """Pause batch processing after current image completes"""
@@ -1243,8 +1277,31 @@ class VideoProcessingWorker(threading.Thread):
                 wx.PostEvent(self.parent_window, evt)
                 
         except Exception as e:
-            print(f"ERROR in VideoProcessingWorker: {e}", flush=True)
-            logger.error(f"Video processing failed: {str(e)}", exc_info=True)
+            # Comprehensive error logging for debugging frozen executables
+            error_msg = f"FATAL ERROR in VideoProcessingWorker: {type(e).__name__}: {e}"
+            tb_str = traceback.format_exc()
+            
+            print(f"\n{'='*60}", flush=True)
+            print(error_msg, flush=True)
+            print(tb_str, flush=True)
+            print('='*60, flush=True)
+            
+            logger.error(error_msg, exc_info=True)
+            
+            # Write to dedicated crash log for frozen executable debugging
+            try:
+                crash_log = Path.home() / 'imagedescriber_crash.log'
+                with open(crash_log, 'a', encoding='utf-8') as f:
+                    f.write(f"\n{'='*60}\n")
+                    f.write(f"{datetime.now().isoformat()} - VideoProcessingWorker crash\n")
+                    f.write(f"Video: {self.video_path}\n")
+                    f.write(f"Error: {error_msg}\n")
+                    f.write(f"Traceback:\n{tb_str}\n")
+                    f.write('='*60 + '\n')
+                logger.info(f"Crash details written to {crash_log}")
+            except Exception as log_error:
+                logger.error(f"Failed to write crash log: {log_error}")
+            
             evt = WorkflowFailedEventData(error=f"Video processing failed: {str(e)}")
             wx.PostEvent(self.parent_window, evt)
     
@@ -1350,8 +1407,11 @@ class VideoProcessingWorker(threading.Thread):
             if not ret:
                 break
             
-            # Save frame
-            frame_filename = f"{video_stem}_frame_{extract_count:04d}.jpg"
+            # Calculate timestamp (matches CLI convention)
+            timestamp = frame_num / fps
+            
+            # Save frame with timestamp in filename (matches CLI: video_0.00s.jpg)
+            frame_filename = f"{video_stem}_{timestamp:.2f}s.jpg"
             frame_path = output_dir / frame_filename
             cv2.imwrite(str(frame_path), frame)
             extracted_paths.append(str(frame_path))
@@ -1399,8 +1459,11 @@ class VideoProcessingWorker(threading.Thread):
                 if (mean_diff > threshold and 
                     frame_num - last_extract_frame >= min_frame_gap):
                     
-                    # Save frame
-                    frame_filename = f"{video_stem}_scene_{extract_count:04d}.jpg"
+                    # Calculate timestamp (matches CLI convention)
+                    timestamp = frame_num / fps
+                    
+                    # Save frame with scene number and timestamp (matches CLI: video_scene_0001_5.23s.jpg)
+                    frame_filename = f"{video_stem}_scene_{extract_count:04d}_{timestamp:.2f}s.jpg"
                     frame_path = output_dir / frame_filename
                     cv2.imwrite(str(frame_path), frame)
                     extracted_paths.append(str(frame_path))

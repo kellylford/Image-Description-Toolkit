@@ -10,6 +10,7 @@ ChatHistory.txt
 # Personal/local batch files
 run_analysis_to_results.bat
 tools/kelly_*.bat
+*_debug.bat  # Debug build scripts (console mode enabled)
 
 # Workflow output directories
 wf_*/

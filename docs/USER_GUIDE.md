@@ -1403,6 +1403,41 @@ ollama list            # Verify it's installed
 4. Try the CLI version first: `idt guideme` to test basic functionality
 5. Check Windows Event Viewer for detailed error messages
 
+#### Silent failures or "nothing happens" after clicking Process All
+**Problem:** Progress dialog appears but doesn't update, or processing appears to start but freezes.
+
+**Solution:**
+
+1. **Check the log files** (useful when reporting issues):
+   
+   **Main log** (all operations):
+   ```
+   %USERPROFILE%\imagedescriber_geocoding_debug.log
+   ```
+   Example: `C:\Users\YourName\imagedescriber_geocoding_debug.log`
+   
+   **Crash log** (errors and exceptions):
+   ```
+   %USERPROFILE%\imagedescriber_crash.log
+   ```
+   Example: `C:\Users\YourName\imagedescriber_crash.log`
+
+2. **What to look for in logs:**
+   - `ERROR` or `FATAL` lines showing what failed
+   - Missing dependencies (e.g., "No module named 'cv2'")
+   - File permission errors
+   - API connection failures
+
+3. **Common fixes:**
+   - Restart the application
+   - Verify your workspace directory is accessible
+   - Check that source files haven't been moved/deleted
+   - For API providers, verify your API key is valid
+
+4. **Report the issue:**
+   - Include relevant error messages from the log files
+   - GitHub Issues: https://github.com/kellylford/Image-Description-Toolkit/issues
+
 ### Getting Help
 
 1. **Check the command help:**
