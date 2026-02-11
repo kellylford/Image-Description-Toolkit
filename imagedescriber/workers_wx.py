@@ -28,6 +28,8 @@ logging.info("ImageDescriber worker thread started")
 logging.info(f"Debug log: {debug_log_path}")
 logging.info("="*60)
 
+logger = logging.getLogger(__name__)
+
 import wx
 import wx.lib.newevent
 
@@ -1206,11 +1208,20 @@ class VideoProcessingWorker(threading.Thread):
     
     def run(self):
         """Extract frames from video"""
+        print(f"VideoProcessingWorker.run() STARTED for {Path(self.video_path).name}", flush=True)
+        logger.info(f"VideoProcessingWorker.run() started for {self.video_path}")
+        logger.debug(f"Extraction config: {self.extraction_config}")
+        
         try:
+            print(f"Posting progress message...", flush=True)
             self._post_progress(f"Extracting frames from: {Path(self.video_path).name}")
+            logger.debug("Starting _extract_frames()")
             
+            print(f"Calling _extract_frames()...", flush=True)
             # Extract frames and get video metadata
             extracted_frames, video_metadata = self._extract_frames()
+            print(f"_extract_frames() returned {len(extracted_frames)} frames", flush=True)
+            logger.info(f"_extract_frames() completed: {len(extracted_frames)} frames extracted")
             
             if extracted_frames:
                 self._post_progress(f"Extracted {len(extracted_frames)} frames")
@@ -1220,12 +1231,20 @@ class VideoProcessingWorker(threading.Thread):
                 )
                 # Attach video metadata to event
                 evt.video_metadata = video_metadata
+                print(f"Posting WorkflowCompleteEventData...", flush=True)
+                logger.debug(f"Posting WorkflowCompleteEventData to parent window")
                 wx.PostEvent(self.parent_window, evt)
+                print(f"WorkflowCompleteEventData posted", flush=True)
+                logger.debug("WorkflowCompleteEventData posted successfully")
             else:
+                print(f"WARNING: No frames extracted!", flush=True)
+                logger.warning("No frames were extracted from video")
                 evt = WorkflowFailedEventData(error="No frames were extracted from video")
                 wx.PostEvent(self.parent_window, evt)
                 
         except Exception as e:
+            print(f"ERROR in VideoProcessingWorker: {e}", flush=True)
+            logger.error(f"Video processing failed: {str(e)}", exc_info=True)
             evt = WorkflowFailedEventData(error=f"Video processing failed: {str(e)}")
             wx.PostEvent(self.parent_window, evt)
     

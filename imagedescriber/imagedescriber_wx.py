@@ -322,6 +322,18 @@ def format_image_metadata(metadata: dict) -> list:
     return lines
 
 
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('imagedescriber_debug.log'),
+        logging.StreamHandler()
+    ]
+)
+
+
 class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     """Main application window for ImageDescriber"""
     
@@ -347,6 +359,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Phase 3: Batch processing management
         self.batch_worker: Optional[BatchProcessingWorker] = None  # Store worker reference
+        self.video_worker = None  # Store VideoProcessingWorker reference to prevent GC
         self.batch_progress_dialog: Optional[BatchProgressDialog] = None  # Progress dialog
         self.batch_start_time: Optional[float] = None  # For avg time calculation
         self.batch_processing_times: List[float] = []  # Track times per image
@@ -1976,6 +1989,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing: If True, only process images without descriptions (default, safe)
                           If False, reprocess all images (show warning first)
         """
+        print("="*60, flush=True)
+        print(f"on_process_all CALLED - skip_existing={skip_existing}", flush=True)
+        print(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}", flush=True)
+        print("="*60, flush=True)
+        
         if not self.workspace or not self.workspace.items:
             show_warning(self, "No images in workspace")
             return
@@ -2019,24 +2037,42 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         images_to_process = []
         videos_to_extract = []
         
+        print(f"Scanning {len(self.workspace.items)} workspace items...", flush=True)
+        
         for item in self.workspace.items.values():
+            print(f"  Item: {Path(item.file_path).name}, type={item.item_type}, has_desc={bool(item.descriptions)}", flush=True)
             if item.item_type == "video":
                 # Check if video needs extraction
                 if not hasattr(item, 'extracted_frames') or not item.extracted_frames:
+                    print(f"    -> Adding to videos_to_extract", flush=True)
                     videos_to_extract.append(item.file_path)
+                else:
+                    print(f"    -> Video already has {len(item.extracted_frames)} frames", flush=True)
             elif skip_existing:
                 if not item.descriptions:
+                    print(f"    -> Adding to images_to_process (no descriptions)", flush=True)
                     images_to_process.append(item.file_path)
+                else:
+                    print(f"    -> Skipping (has descriptions)", flush=True)
             else:
+                print(f"    -> Adding to images_to_process (redescribe all)", flush=True)
                 images_to_process.append(item.file_path)
+        
+        print(f"Result: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process", flush=True)
         
         # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
+            print(f"BRANCH: Starting video extraction flow", flush=True)
+            logger.info(f"Starting batch video extraction: {len(videos_to_extract)} videos, {len(images_to_process)} images")
+            logger.debug(f"Videos to extract: {videos_to_extract}")
+            
             # Show progress dialog immediately
             total_items = len(videos_to_extract) + len(images_to_process)
+            logger.debug(f"Creating progress dialog with {total_items} total items")
             if BatchProgressDialog:
                 self.batch_progress_dialog = BatchProgressDialog(self, total_items)
                 self.batch_progress_dialog.Show()
+                logger.debug("Progress dialog shown")
                 if hasattr(self, 'show_batch_progress_item'):
                     self.show_batch_progress_item.Enable(True)
             
@@ -2050,10 +2086,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self._extracted_video_count = 0
             
             # Start extracting first video
+            print(f"About to call _extract_next_video_in_batch()...", flush=True)
+            logger.debug("Calling _extract_next_video_in_batch() to start extraction")
             self._extract_next_video_in_batch()
+            print(f"Returned from _extract_next_video_in_batch()", flush=True)
+            logger.debug("Returned from _extract_next_video_in_batch(), waiting for background thread")
             return  # Will continue in video extraction event handler
         
         # No videos to extract, proceed directly to image processing
+        print(f"BRANCH: No videos to extract, proceeding to image processing", flush=True)
         to_process = images_to_process
         
         if not to_process:
@@ -2115,14 +2156,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def _extract_next_video_in_batch(self):
         """Extract next video in batch processing queue"""
+        print(f"_extract_next_video_in_batch: count={self._extracted_video_count}, total={len(self._videos_to_extract)}", flush=True)
+        logger.debug(f"_extract_next_video_in_batch called: count={self._extracted_video_count}, total={len(self._videos_to_extract)}")
+        
         if self._extracted_video_count >= len(self._videos_to_extract):
             # All videos extracted, proceed to image processing
+            print(f"All videos extracted, moving to image processing", flush=True)
+            logger.info("All videos extracted, proceeding to image processing")
             self._start_batch_image_processing()
             return
         
         # Get next video
         video_path = self._videos_to_extract[self._extracted_video_count]
         video_name = Path(video_path).name
+        print(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}", flush=True)
+        logger.info(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}")
         
         # Update progress
         video_num = self._extracted_video_count + 1
@@ -2163,13 +2211,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 "end_time_seconds": None
             }
         
+        # Check if cv2 is available before starting extraction
+        if not cv2:
+            error_msg = ("OpenCV (cv2) is not installed.\n\n"
+                        "Video frame extraction requires OpenCV.\n"
+                        "Please install it with: pip install opencv-python")
+            logger.error("cv2 not available for video extraction")
+            show_error(self, error_msg)
+            # Clean up batch state
+            self._batch_video_extraction = False
+            if self.batch_progress_dialog:
+                self.batch_progress_dialog.Close()
+                self.batch_progress_dialog = None
+            return
+        
         # Mark this as a batch video extraction
         self._batch_video_extraction = True
+        logger.debug(f"Set _batch_video_extraction=True, starting VideoProcessingWorker for {video_path}")
+        logger.debug(f"Extraction config: {extraction_config}")
         
         # Start video extraction worker
         from workers_wx import VideoProcessingWorker
-        worker = VideoProcessingWorker(self, video_path, extraction_config)
-        worker.start()
+        self.video_worker = VideoProcessingWorker(self, video_path, extraction_config)
+        logger.debug("Starting VideoProcessingWorker thread...")
+        self.video_worker.start()
+        logger.debug("VideoProcessingWorker thread started (non-blocking)")
     
     def _complete_batch_video_extraction(self, video_path, extracted_frames, video_metadata):
         """Handle completion of one video in batch extraction"""
@@ -2817,11 +2883,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_workflow_complete(self, event):
         """Handle workflow completion (including video extraction)"""
+        logger.debug(f"on_workflow_complete called: input_dir={event.input_dir}, output_dir={event.output_dir}")
+        logger.debug(f"_batch_video_extraction={getattr(self, '_batch_video_extraction', False)}")
+        
         # Check if this is part of batch video extraction
         if hasattr(self, '_batch_video_extraction') and self._batch_video_extraction:
+            logger.info("Detected batch video extraction completion")
             # Get extracted frames from output directory
             output_dir = Path(event.output_dir)
             extracted_frames = sorted([str(f) for f in output_dir.glob("*.jpg")])
+            logger.debug(f"Found {len(extracted_frames)} extracted frames in {output_dir}")
             
             # Get video metadata from event if available
             video_metadata = event.video_metadata if hasattr(event, 'video_metadata') else None
@@ -2830,6 +2901,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             video_path = event.input_dir
             
             # Complete this video and move to next
+            logger.debug(f"Calling _complete_batch_video_extraction for {video_path}")
             self._complete_batch_video_extraction(video_path, extracted_frames, video_metadata)
             return
         
@@ -3124,6 +3196,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Video processing not available (OpenCV not installed)")
             return
         
+        # Check if cv2 is available
+        if not cv2:
+            error_msg = ("OpenCV (cv2) is not installed.\n\n"
+                        "Video frame extraction requires OpenCV.\n"
+                        "Please install it with: pip install opencv-python")
+            show_error(self, error_msg)
+            return
+        
         # Check if we have a selected video in the workspace
         selected_video = None
         if self.current_image_item and self.current_image_item.item_type == "video":
@@ -3197,8 +3277,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         }
         
         # Start extraction worker
-        worker = VideoProcessingWorker(self, selected_video, extraction_config)
-        worker.start()
+        self.video_worker = VideoProcessingWorker(self, selected_video, extraction_config)
+        self.video_worker.start()
         
         self.SetStatusText(f"Extracting frames from: {Path(selected_video).name}...", 0)
     
