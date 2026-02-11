@@ -62,13 +62,17 @@ class ImageItem:
     """Represents an image or video in the workspace"""
     def __init__(self, file_path: str, item_type: str = "image"):
         self.file_path = file_path
-        self.item_type = item_type  # "image", "video", "extracted_frame"
+        self.item_type = item_type  # "image", "video", "extracted_frame", "downloaded_image"
         self.descriptions: List[ImageDescription] = []
         self.batch_marked = False
         self.parent_video = None  # For extracted frames
         self.extracted_frames: List[str] = []  # For videos
         self.display_name = ""  # Custom display name for this version
         self.video_metadata: Optional[dict] = None  # Video metadata (fps, duration, total_frames)
+        
+        # Download metadata (for downloaded images)
+        self.download_url: Optional[str] = None  # Source URL for downloaded images
+        self.download_timestamp: Optional[str] = None  # ISO format timestamp
         
         # Batch processing state tracking (Phase 1: Batch Management)
         self.processing_state: Optional[str] = None  # None, "pending", "processing", "completed", "failed", "paused"
@@ -91,6 +95,9 @@ class ImageItem:
             "extracted_frames": self.extracted_frames,
             "display_name": self.display_name,
             "video_metadata": self.video_metadata,
+            # Download metadata
+            "download_url": self.download_url,
+            "download_timestamp": self.download_timestamp,
             # Batch processing state (Phase 1: Batch Management)
             "processing_state": self.processing_state,
             "processing_error": self.processing_error,
@@ -106,6 +113,9 @@ class ImageItem:
         item.extracted_frames = data.get("extracted_frames", [])
         item.display_name = data.get("display_name", "")
         item.video_metadata = data.get("video_metadata", None)
+        # Download metadata - backward compatible defaults
+        item.download_url = data.get("download_url", None)
+        item.download_timestamp = data.get("download_timestamp", None)
         # Batch processing state (Phase 1: Batch Management) - backward compatible defaults
         item.processing_state = data.get("processing_state", None)
         item.processing_error = data.get("processing_error", None)

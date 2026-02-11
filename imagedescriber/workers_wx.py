@@ -42,6 +42,15 @@ try:
 except ImportError:
     load_json_config = None
 
+# Import web image downloader for URL downloads
+try:
+    from web_image_downloader import WebImageDownloader
+except ImportError:
+    try:
+        from scripts.web_image_downloader import WebImageDownloader
+    except ImportError:
+        WebImageDownloader = None
+
 # Import AI providers
 try:
     from .ai_providers import get_available_providers
@@ -1556,3 +1565,110 @@ class HEICConversionWorker(threading.Thread):
     def stop(self):
         """Request worker to stop"""
         self._stop_event.set()
+
+
+class DownloadProcessingWorker(threading.Thread):
+    """
+    Worker thread for downloading images from URLs.
+    
+    Uses WebImageDownloader to fetch images from web pages and stores them
+    in the workspace's downloaded_images/ directory.
+    """
+    
+    def __init__(self, parent_window, url: str, workspace_dir: Path, settings: dict):
+        """
+        Initialize download worker.
+        
+        Args:
+            parent_window: Parent window for event posting
+            url: URL to download images from
+            workspace_dir: Workspace directory (base path)
+            settings: Download settings dict with keys:
+                - min_width: Minimum image width
+                - min_height: Minimum image height
+                - max_images: Maximum images to download (None for unlimited)
+                - auto_add: Whether to auto-add to workspace
+        """
+        super().__init__(daemon=True)
+        self.parent_window = parent_window
+        self.url = url
+        self.workspace_dir = workspace_dir
+        self.settings = settings
+        self.output_dir = workspace_dir / "downloaded_images"
+    
+    def run(self):
+        """Run the download process."""
+        try:
+            # Create output directory
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Starting image download from: {self.url}")
+            logger.info(f"Output directory: {self.output_dir}")
+            
+            # Check if WebImageDownloader is available
+            if WebImageDownloader is None:
+                error_msg = "WebImageDownloader not available. Missing BeautifulSoup4 library."
+                logger.error(error_msg)
+                evt = WorkflowFailedEventData(error=error_msg)
+                wx.PostEvent(self.parent_window, evt)
+                return
+            
+            # Create downloader instance
+            downloader = WebImageDownloader(
+                url=self.url,
+                output_dir=self.output_dir,
+                min_width=self.settings.get('min_width', 0),
+                min_height=self.settings.get('min_height', 0),
+                max_images=self.settings.get('max_images', None),
+                progress_callback=self._post_progress,
+                verbose=True
+            )
+            
+            # Download images
+            downloaded_count, failed_count = downloader.download()
+            
+            logger.info(f"Download complete: {downloaded_count} images downloaded, {failed_count} failed")
+            
+            # Post completion event
+            evt = WorkflowCompleteEventData(
+                input_dir=str(self.url),
+                output_dir=str(self.output_dir),
+                step_name="download",
+                files_processed=downloaded_count
+            )
+            wx.PostEvent(self.parent_window, evt)
+            
+        except Exception as e:
+            logger.error(f"Download error: {e}", exc_info=True)
+            
+            # Write crash log
+            try:
+                crash_log_path = Path.home() / "imagedescriber_crash.log"
+                with open(crash_log_path, 'a', encoding='utf-8') as f:
+                    f.write(f"\n{'='*80}\n")
+                    f.write(f"Download Worker Crash: {datetime.now().isoformat()}\n")
+                    f.write(f"URL: {self.url}\n")
+                    f.write(f"{'='*80}\n")
+                    f.write(traceback.format_exc())
+                    f.write(f"\n{'='*80}\n\n")
+                logger.error(f"Crash log written to: {crash_log_path}")
+            except Exception as log_err:
+                logger.error(f"Could not write crash log: {log_err}")
+            
+            # Post failure event
+            evt = WorkflowFailedEventData(error=str(e))
+            wx.PostEvent(self.parent_window, evt)
+    
+    def _post_progress(self, current: int, total: int, status: str):
+        """
+        Post progress update to main window.
+        
+        Args:
+            current: Current image number
+            total: Total images found
+            status: Status message
+        """
+        try:
+            evt = ProgressUpdateEventData(message=f"{status} ({current}/{total})")
+            wx.PostEvent(self.parent_window, evt)
+        except Exception as e:
+            logger.warning(f"Could not post progress update: {e}")

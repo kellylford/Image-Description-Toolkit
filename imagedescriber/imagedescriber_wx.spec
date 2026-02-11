@@ -37,6 +37,7 @@ a = Analysis(
         'imagedescriber.viewer_components', # Viewer components
         'imagedescriber.prompt_editor_dialog',
         'imagedescriber.configure_dialog',
+        'imagedescriber.download_dialog',  # URL download dialog
         'imagedescriber.batch_progress_dialog',  # Phase 3: Batch progress dialog
         'ai_providers',
         'data_models',
@@ -45,27 +46,35 @@ a = Analysis(
         'chat_window_wx',  # Chat with Image feature
         'prompt_editor_dialog',  # Integrated PromptEditor
         'configure_dialog',  # Integrated IDTConfigure
+        'download_dialog',  # URL download dialog (frozen mode)
         'batch_progress_dialog',  # Phase 3: Batch progress dialog (frozen mode)
         'scripts.metadata_extractor',
         'scripts.versioning',
         'scripts.config_loader',
         'scripts.descriptions_to_html',  # HTML export functionality
+        'scripts.web_image_downloader',  # URL image downloader
         'models.provider_configs',
         'models.claude_models',  # Central Claude model configuration
         'models.openai_models',  # Central OpenAI model configuration
         'models.model_options',
         'metadata_extractor',
+        'web_image_downloader',  # URL image downloader (frozen mode)
         'ollama',
         'openai',
         'anthropic',
         'cv2',
         'PIL',
         'pillow_heif',
-        'requests',  # Required for geocoding
+        'requests',  # Required for geocoding and URL downloads
         'urllib3',  # Dependency of requests
         'charset_normalizer',  # Dependency of requests
         'certifi',  # Dependency of requests
         'idna',  # Dependency of requests
+        'bs4',  # BeautifulSoup4 for URL downloads
+        'bs4.builder',
+        'bs4.builder._htmlparser',
+        'bs4.builder._lxml',
+        'soupsieve',  # BeautifulSoup dependency
     ],
     hookspath=[],
     hooksconfig={},

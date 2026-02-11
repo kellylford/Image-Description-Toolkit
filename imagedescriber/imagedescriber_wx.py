@@ -103,6 +103,11 @@ try:
 except ImportError:
     ConfigureDialog = None
 
+try:
+    from download_dialog import DownloadSettingsDialog
+except ImportError:
+    DownloadSettingsDialog = None
+
 # Phase 3: Import batch progress dialog
 try:
     from batch_progress_dialog import BatchProgressDialog
@@ -921,6 +926,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         load_dir_item = file_menu.Append(wx.ID_ANY, "&Load Directory\tCtrl+L")
         self.Bind(wx.EVT_MENU, self.on_load_directory, load_dir_item)
+        
+        load_url_item = file_menu.Append(wx.ID_ANY, "Load Images From &URL...\tCtrl+U")
+        self.Bind(wx.EVT_MENU, self.on_load_from_url, load_url_item)
 
         import_workflow_item = file_menu.Append(wx.ID_ANY, "&Import Workflow (to Workspace)...")
         self.Bind(wx.EVT_MENU, self.on_import_workflow, import_workflow_item)
@@ -1713,6 +1721,57 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             show_error(self, f"Error loading directory:\n{str(e)}")
     
+    def on_load_from_url(self, event=None):
+        """Load images from a URL"""
+        from workers_wx import WebImageDownloader, DownloadProcessingWorker
+        
+        # Check if WebImageDownloader is available
+        if WebImageDownloader is None:
+            show_error(self, "URL download functionality not available.\n"
+                              "Missing required libraries (BeautifulSoup4).")
+            return
+        
+        # Check if dialog is available
+        if DownloadSettingsDialog is None:
+            show_error(self, "Download settings dialog not available.")
+            return
+        
+        # Show settings dialog
+        dialog = DownloadSettingsDialog(self)
+        if dialog.ShowModal() != wx.ID_OK:
+            dialog.Destroy()
+            return
+        
+        settings = dialog.get_settings()
+        dialog.Destroy()
+        
+        # Get workspace directory
+        workspace_dir = self.get_workspace_directory()
+        
+        # Store settings for workflow completion handler
+        self.current_download_settings = settings
+        
+        # Show progress dialog
+        if BatchProgressDialog:
+            self.batch_progress_dialog = BatchProgressDialog(
+                self,
+                title="Downloading Images",
+                total_images=settings.get('max_images', 100) if settings.get('max_images') else 100
+            )
+            self.batch_progress_dialog.Show()
+        
+        # Start worker thread (store as instance variable to prevent GC)
+        self.download_worker = DownloadProcessingWorker(
+            self, 
+            settings['url'], 
+            workspace_dir,
+            settings
+        )
+        self.download_worker.start()
+        
+        # Show progress in status bar
+        self.SetStatusText(f"Downloading images from {settings['url']}...", 0)
+    
     def load_directory(self, dir_path, recursive=False, append=False):
         """Load images from directory
         
@@ -1898,13 +1957,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 frame_count = len(item.extracted_frames)
                 prefix_parts.append(f"E{frame_count}")
             
+            # 4. Item type icon indicator
+            type_icon = ""
+            if item.item_type == "downloaded_image":
+                type_icon = "🌐 "  # Web globe for downloaded images
+            elif item.item_type == "extracted_frame":
+                type_icon = "▶ "  # Play icon for video frames
+            elif item.item_type == "video":
+                type_icon = "📹 "  # Camera icon for videos
+            
             # Combine prefix and display name with indentation
             indent = "  " * indent_level  # Two spaces per level
             if prefix_parts:
                 prefix = "".join(prefix_parts)
-                display_name = f"{indent}{prefix} {base_name}"
+                display_name = f"{indent}{type_icon}{prefix} {base_name}"
             else:
-                display_name = f"{indent}{base_name}"
+                display_name = f"{indent}{type_icon}{base_name}"
             
             index = self.image_list.Append(display_name, file_path)  # Store file_path as client data
             
@@ -2895,9 +2963,55 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
     
     def on_workflow_complete(self, event):
-        """Handle workflow completion (including video extraction)"""
+        """Handle workflow completion (including video extraction and downloads)"""
         logger.debug(f"on_workflow_complete called: input_dir={event.input_dir}, output_dir={event.output_dir}")
         logger.debug(f"_batch_video_extraction={getattr(self, '_batch_video_extraction', False)}")
+        
+        # Check if this is a download completion
+        if hasattr(event, 'step_name') and event.step_name == "download":
+            logger.info("Detected download completion")
+            output_dir = Path(event.output_dir)
+            
+            # Close progress dialog
+            if self.batch_progress_dialog:
+                self.batch_progress_dialog.Close()
+                self.batch_progress_dialog = None
+            
+            # Get all downloaded images
+            valid_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'}
+            downloaded_images = sorted([
+                f for f in output_dir.glob("*.*")
+                if f.suffix.lower() in valid_extensions
+            ])
+            
+            logger.debug(f"Found {len(downloaded_images)} downloaded images in {output_dir}")
+            
+            # Add to workspace if auto-add enabled
+            if hasattr(self, 'current_download_settings') and self.current_download_settings.get('auto_add', True):
+                for img_path in downloaded_images:
+                    item = ImageItem(str(img_path), "downloaded_image")
+                    item.download_url = event.input_dir  # Store source URL
+                    item.download_timestamp = datetime.now().isoformat()
+                    self.workspace.add_item(item)
+                
+                self.mark_modified()
+                self.refresh_image_list()
+            
+            # Clear download settings and worker
+            if hasattr(self, 'current_download_settings'):
+                del self.current_download_settings
+            if hasattr(self, 'download_worker'):
+                self.download_worker = None
+            
+            # Show completion message
+            self.Raise()
+            self.SetFocus()
+            show_info(self, f"Downloaded {len(downloaded_images)} images from URL.\n\n"
+                           f"Images saved to: {output_dir}")
+            self.SetFocus()
+            
+            self.SetStatusText(f"Download complete: {len(downloaded_images)} images added", 0)
+            return
         
         # Check if this is part of batch video extraction
         if hasattr(self, '_batch_video_extraction') and self._batch_video_extraction:

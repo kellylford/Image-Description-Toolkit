@@ -6,7 +6,9 @@ The Image Description Toolkit (IDT) is a comprehensive, AI-driven suite for gene
 - **📋 Command Line Interface (CLI) - `idt.exe`** - Powerful batch processing for automation and large collections
 - **🖼️ GUI ImageDescriber - `imagedescriber.exe`** - Interactive desktop application with integrated viewer, prompt editor, and configuration manager
 
-IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as standalone Windows executables—**no Python installation required**.
+IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as a standalone Windows program—**no Python installation required**.
+
+Note: Ollama must be installed with Ollama models downloaded to use Ollama as an AI option. Visit http://ollama.ai.
 
 ---
 
@@ -76,7 +78,7 @@ IDT provides two applications, each designed for different use cases:
 **Best for:** Batch processing, automation, advanced workflows, integration with scripts
 
 **Key Features:**
-- Process hundreds or thousands of images at once
+- Process thousands of images at once
 - Powerful workflow automation with resume capability
 - Advanced analysis and export tools
 - Integration with batch scripts and automation
@@ -116,7 +118,7 @@ IDT provides two applications, each designed for different use cases:
    - Default installation location: `C:\IDT\`
 
 2. **Launch ImageDescriber**
-   - Double-click `imagedescriber.exe` from the installation folder
+   - Activate `imagedescriber.exe` from the installation folder
    - Or use the Start Menu shortcut
 
 3. **Choose a Directory of Images**
