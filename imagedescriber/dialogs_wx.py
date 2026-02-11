@@ -127,13 +127,13 @@ class DirectorySelectionDialog(wx.Dialog):
         set_accessible_name(self.recursive_cb, "Search subdirectories recursively")
         options_sizer.Add(self.recursive_cb, 0, wx.ALL, 5)
         
-        self.add_to_existing_cb = wx.CheckBox(self, label="&Add to existing workspace")
-        set_accessible_name(self.add_to_existing_cb, "Add to existing workspace")
+        self.add_to_existing_cb = wx.CheckBox(self, label="&Add to current workspace (keep existing images)")
+        set_accessible_name(self.add_to_existing_cb, "Add to current workspace, keep existing images")
         if existing_directories:
-            tip = "Add to existing directories:\n" + "\n".join([Path(d).name for d in existing_directories[:5]])
+            tip = "Keep current images and add new directory.\n\nCurrent directories:\n" + "\n".join([Path(d).name for d in existing_directories[:5]])
             self.add_to_existing_cb.SetToolTip(tip)
         else:
-            self.add_to_existing_cb.SetToolTip("No existing directories in workspace")
+            self.add_to_existing_cb.SetToolTip("No existing directories in current workspace")
             self.add_to_existing_cb.Enable(False)
         self.add_to_existing_cb.Bind(wx.EVT_CHECKBOX, self.on_add_to_existing_changed)
         options_sizer.Add(self.add_to_existing_cb, 0, wx.ALL, 5)

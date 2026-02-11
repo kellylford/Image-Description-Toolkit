@@ -79,6 +79,7 @@ WorkflowCompleteEvent, EVT_WORKFLOW_COMPLETE = wx.lib.newevent.NewEvent()
 WorkflowFailedEvent, EVT_WORKFLOW_FAILED = wx.lib.newevent.NewEvent()
 ConversionCompleteEvent, EVT_CONVERSION_COMPLETE = wx.lib.newevent.NewEvent()
 ConversionFailedEvent, EVT_CONVERSION_FAILED = wx.lib.newevent.NewEvent()
+DirectoryLoadingCompleteEvent, EVT_DIRECTORY_LOADING_COMPLETE = wx.lib.newevent.NewEvent()
 
 # Chat-specific event types
 ChatUpdateEvent, EVT_CHAT_UPDATE = wx.lib.newevent.NewEvent()
@@ -131,6 +132,16 @@ class WorkflowFailedEventData(WorkflowFailedEvent):
     def __init__(self, error):
         WorkflowFailedEvent.__init__(self)
         self.error = error
+
+
+class DirectoryLoadingCompleteEventData(DirectoryLoadingCompleteEvent):
+    """Event data for directory loading completion"""
+    def __init__(self, items, dir_path, added_count, video_count):
+        DirectoryLoadingCompleteEvent.__init__(self)
+        self.items = items  # List of ImageItem objects
+        self.dir_path = dir_path  # Directory that was loaded
+        self.added_count = added_count  # Total items added
+        self.video_count = video_count  # Number of videos
 
 
 class ProcessingWorker(threading.Thread):
@@ -1672,6 +1683,131 @@ class DownloadProcessingWorker(threading.Thread):
             evt = ProgressUpdateEventData(
                 file_path="",  # No specific file path for download progress
                 message=status,
+                current=current,
+                total=total
+            )
+            wx.PostEvent(self.parent_window, evt)
+        except Exception as e:
+            logger.warning(f"Could not post progress update: {e}")
+
+
+class DirectoryLoadingWorker(threading.Thread):
+    """Worker thread for loading images from a directory with progress updates
+    
+    Scans directory for images/videos, reads EXIF data, creates ImageItem objects,
+    and posts progress updates to avoid blocking the UI during long operations.
+    
+    Events:
+        ProgressUpdateEvent: Progress during file scanning and EXIF reading
+        DirectoryLoadingCompleteEvent: Completion with all loaded items
+    """
+    
+    def __init__(self, parent_window, dir_path: Path, recursive: bool, 
+                 image_extensions: list, video_extensions: list):
+        """Initialize directory loading worker
+        
+        Args:
+            parent_window: wxWindow to receive events
+            dir_path: Path to directory to scan
+            recursive: If True, search subdirectories
+            image_extensions: List of image file extensions to scan for
+            video_extensions: List of video file extensions to scan for
+        """
+        super().__init__(daemon=True)
+        self.parent_window = parent_window
+        self.dir_path = Path(dir_path)
+        self.recursive = recursive
+        self.image_extensions = image_extensions
+        self.video_extensions = video_extensions
+        logger.info(f"DirectoryLoadingWorker initialized: {dir_path}, recursive={recursive}")
+    
+    def run(self):
+        """Scan directory and load all images/videos"""
+        try:
+            from data_models import ImageItem
+            
+            logger.info(f"Starting directory scan: {self.dir_path}")
+            
+            # Step 1: Find all files
+            self._post_progress(0, 0, f"Scanning directory: {self.dir_path.name}...")
+            
+            images_found = []
+            videos_found = []
+            
+            if self.recursive:
+                # Recursive search - images
+                for ext in self.image_extensions:
+                    images_found.extend(self.dir_path.rglob(f"*{ext}"))
+                    images_found.extend(self.dir_path.rglob(f"*{ext.upper()}"))
+                # Recursive search - videos
+                for ext in self.video_extensions:
+                    videos_found.extend(self.dir_path.rglob(f"*{ext}"))
+                    videos_found.extend(self.dir_path.rglob(f"*{ext.upper()}"))
+            else:
+                # Non-recursive - images
+                for ext in self.image_extensions:
+                    images_found.extend(self.dir_path.glob(f"*{ext}"))
+                    images_found.extend(self.dir_path.glob(f"*{ext.upper()}"))
+                # Non-recursive - videos
+                for ext in self.video_extensions:
+                    videos_found.extend(self.dir_path.glob(f"*{ext}"))
+                    videos_found.extend(self.dir_path.glob(f"*{ext.upper()}"))
+            
+            total_files = len(images_found) + len(videos_found)
+            logger.info(f"Found {len(images_found)} images, {len(videos_found)} videos")
+            
+            # Step 2: Process images (read EXIF data)
+            items = []
+            current = 0
+            
+            for image_path in sorted(images_found):
+                current += 1
+                self._post_progress(current, total_files, 
+                                  f"Loading image {current}/{total_files}: {image_path.name}")
+                
+                try:
+                    item = ImageItem(str(image_path), "image")
+                    items.append(item)
+                except Exception as e:
+                    logger.warning(f"Error creating item for {image_path}: {e}")
+            
+            # Step 3: Process videos (read metadata if possible)
+            video_count = 0
+            for video_path in sorted(videos_found):
+                current += 1
+                video_count += 1
+                self._post_progress(current, total_files,
+                                  f"Loading video {current}/{total_files}: {video_path.name}")
+                
+                try:
+                    item = ImageItem(str(video_path), "video")
+                    # Video metadata will be loaded by main thread if needed
+                    items.append(item)
+                except Exception as e:
+                    logger.warning(f"Error creating item for {video_path}: {e}")
+            
+            # Post completion event
+            logger.info(f"Directory loading complete: {len(items)} items")
+            evt = DirectoryLoadingCompleteEventData(
+                items=items,
+                dir_path=str(self.dir_path),
+                added_count=len(items),
+                video_count=video_count
+            )
+            wx.PostEvent(self.parent_window, evt)
+            
+        except Exception as e:
+            logger.error(f"Directory loading failed: {e}\n{traceback.format_exc()}")
+            # Post failure event
+            evt = WorkflowFailedEventData(error=f"Failed to load directory: {str(e)}")
+            wx.PostEvent(self.parent_window, evt)
+    
+    def _post_progress(self, current: int, total: int, message: str):
+        """Post progress update to main window"""
+        try:
+            evt = ProgressUpdateEventData(
+                file_path="",  # No specific file during directory scan
+                message=message,
                 current=current,
                 total=total
             )

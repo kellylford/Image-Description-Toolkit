@@ -216,6 +216,7 @@ else:
             WorkflowProcessWorker,
             VideoProcessingWorker,
             HEICConversionWorker,
+            DirectoryLoadingWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -223,6 +224,7 @@ else:
             EVT_WORKFLOW_FAILED,
             EVT_CONVERSION_COMPLETE,
             EVT_CONVERSION_FAILED,
+            EVT_DIRECTORY_LOADING_COMPLETE,
         )
     except ImportError as e_rel:
         print(f"[DEBUG] Relative import failed, trying absolute: {e_rel}")
@@ -248,6 +250,7 @@ else:
             WorkflowProcessWorker,
             VideoProcessingWorker,
             HEICConversionWorker,
+            DirectoryLoadingWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -255,6 +258,7 @@ else:
             EVT_WORKFLOW_FAILED,
             EVT_CONVERSION_COMPLETE,
             EVT_CONVERSION_FAILED,
+            EVT_DIRECTORY_LOADING_COMPLETE,
         )
 
 # Import provider capabilities
@@ -423,6 +427,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.Bind(EVT_CONVERSION_COMPLETE, self.on_conversion_complete)
         if EVT_CONVERSION_FAILED:
             self.Bind(EVT_CONVERSION_FAILED, self.on_conversion_failed)
+        if EVT_DIRECTORY_LOADING_COMPLETE:
+            self.Bind(EVT_DIRECTORY_LOADING_COMPLETE, self.on_directory_loading_complete)
         
         # Bind keyboard events for single-key shortcuts (matching Qt6 behavior)
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
@@ -1835,7 +1841,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.SetStatusText(f"Downloading images from {settings['url']}...", 0)
     
     def load_directory(self, dir_path, recursive=False, append=False):
-        """Load images from directory
+        """Load images from directory using background worker
         
         Args:
             dir_path: Path to directory
@@ -1855,62 +1861,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Add directory to workspace
             self.workspace.add_directory(str(dir_path))
             
-            # Find all images and videos
-            images_found = []
-            videos_found = []
+            # Create and show progress dialog
+            self.batch_progress_dialog = BatchProgressDialog(
+                self,
+                "Loading Images",
+                f"Scanning {dir_path.name}...",
+                can_pause=False
+            )
+            self.batch_progress_dialog.Show()
             
-            if recursive:
-                # Recursive search - images
-                for ext in self.image_extensions:
-                    images_found.extend(dir_path.rglob(f"*{ext}"))
-                    images_found.extend(dir_path.rglob(f"*{ext.upper()}"))
-                # Recursive search - videos
-                for ext in self.video_extensions:
-                    videos_found.extend(dir_path.rglob(f"*{ext}"))
-                    videos_found.extend(dir_path.rglob(f"*{ext.upper()}"))
-            else:
-                # Non-recursive - images
-                for ext in self.image_extensions:
-                    images_found.extend(dir_path.glob(f"*{ext}"))
-                    images_found.extend(dir_path.glob(f"*{ext.upper()}"))
-                # Non-recursive - videos
-                for ext in self.video_extensions:
-                    videos_found.extend(dir_path.glob(f"*{ext}"))
-                    videos_found.extend(dir_path.glob(f"*{ext.upper()}"))
+            # Start directory loading worker
+            self.directory_loading_worker = DirectoryLoadingWorker(
+                self,
+                dir_path,
+                recursive,
+                self.image_extensions,
+                self.video_extensions
+            )
+            self.directory_loading_worker.start()
             
-            # Add images to workspace
-            added_count = 0
-            for image_path in sorted(images_found):
-                image_path_str = str(image_path)
-                if image_path_str not in self.workspace.items:
-                    item = ImageItem(image_path_str, "image")
-                    self.workspace.add_item(item)
-                    added_count += 1
+            # Status bar update
+            search_type = "recursive" if recursive else "non-recursive"
+            self.SetStatusText(f"Loading images ({search_type}) from {dir_path.name}...", 0)
             
-            # Add videos to workspace
-            video_count = 0
-            for video_path in sorted(videos_found):
-                video_path_str = str(video_path)
-                if video_path_str not in self.workspace.items:
-                    item = ImageItem(video_path_str, "video")
-                    # Get video metadata (duration, fps, frame count)
-                    metadata = self.get_video_metadata(video_path_str)
-                    if metadata:
-                        item.video_metadata = metadata
-                    self.workspace.add_item(item)
-                    video_count += 1
-                    added_count += 1
+            logger.info(f"Started directory loading worker for {dir_path} (recursive={recursive}, append={append})")
             
-            # Update UI
-            self.refresh_image_list()
-            self.mark_modified()
-            
-            action = "Added" if append else "Loaded"
-            if video_count > 0:
-                self.SetStatusText(f"{action} {added_count - video_count} images, {video_count} videos from {dir_path.name}", 0)
-            else:
-                self.SetStatusText(f"{action} {added_count} images from {dir_path.name}", 0)
-            self.SetStatusText(f"{len(self.workspace.items)} total items", 1)
+        except Exception as e:
+            logger.error(f"Failed to start directory loading: {e}", exc_info=True)
+            show_error(self, f"Failed to load directory:\n{str(e)}")
+            # Clean up progress dialog if it was created
+            if self.batch_progress_dialog:
+                self.batch_progress_dialog.Close()
+                self.batch_progress_dialog = None
+
             
         except Exception as e:
             show_error(self, f"Error loading directory:\n{e}")
@@ -2121,21 +2104,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing: If True, only process images without descriptions (default, safe)
                           If False, reprocess all images (show warning first)
         """
-        print("="*60, flush=True)
-        print(f"on_process_all CALLED - skip_existing={skip_existing}", flush=True)
-        print(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}", flush=True)
-        print("="*60, flush=True)
+        logger.info("="*60)
+        logger.info(f"on_process_all CALLED - skip_existing={skip_existing}")
+        logger.info(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}")
+        logger.info("="*60)
         
         if not self.workspace or not self.workspace.items:
+            logger.warning("No images in workspace - showing warning")
             show_warning(self, "No images in workspace")
             return
         
         if not BatchProcessingWorker:
+            logger.error("BatchProcessingWorker not available")
             show_error(self, "Batch processing worker not available")
             return
         
         # Check if we're in an Untitled workspace - prompt to save first
         if is_untitled_workspace(self.workspace_file.stem):
+            logger.info(f"Untitled workspace detected: {self.workspace_file.stem}")
             # Inform user they need to save first
             result = wx.MessageBox(
                 "Batch processing requires a named workspace.\n\n"
@@ -2214,32 +2200,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         images_to_process = []
         videos_to_extract = []
         
-        print(f"Scanning {len(self.workspace.items)} workspace items...", flush=True)
+        logger.debug(f"Scanning {len(self.workspace.items)} workspace items...")
         
         for item in self.workspace.items.values():
-            print(f"  Item: {Path(item.file_path).name}, type={item.item_type}, has_desc={bool(item.descriptions)}", flush=True)
+            logger.debug(f"  Item: {Path(item.file_path).name}, type={item.item_type}, has_desc={bool(item.descriptions)}")
             if item.item_type == "video":
                 # Check if video needs extraction
                 if not hasattr(item, 'extracted_frames') or not item.extracted_frames:
-                    print(f"    -> Adding to videos_to_extract", flush=True)
+                    logger.debug(f"    -> Adding to videos_to_extract")
                     videos_to_extract.append(item.file_path)
                 else:
-                    print(f"    -> Video already has {len(item.extracted_frames)} frames", flush=True)
+                    logger.debug(f"    -> Video already has {len(item.extracted_frames)} frames")
             elif skip_existing:
                 if not item.descriptions:
-                    print(f"    -> Adding to images_to_process (no descriptions)", flush=True)
+                    logger.debug(f"    -> Adding to images_to_process (no descriptions)")
                     images_to_process.append(item.file_path)
                 else:
-                    print(f"    -> Skipping (has descriptions)", flush=True)
+                    logger.debug(f"    -> Skipping (has descriptions)")
             else:
-                print(f"    -> Adding to images_to_process (redescribe all)", flush=True)
+                logger.debug(f"    -> Adding to images_to_process (redescribe all)")
                 images_to_process.append(item.file_path)
         
-        print(f"Result: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process", flush=True)
+        logger.info(f"Result: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process")
         
         # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
-            print(f"BRANCH: Starting video extraction flow", flush=True)
+            logger.info(f"BRANCH: Starting video extraction flow")
             logger.info(f"Starting batch video extraction: {len(videos_to_extract)} videos, {len(images_to_process)} images")
             logger.debug(f"Videos to extract: {videos_to_extract}")
             
@@ -2263,15 +2249,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self._extracted_video_count = 0
             
             # Start extracting first video
-            print(f"About to call _extract_next_video_in_batch()...", flush=True)
+            logger.debug("About to call _extract_next_video_in_batch()...")
             logger.debug("Calling _extract_next_video_in_batch() to start extraction")
             self._extract_next_video_in_batch()
-            print(f"Returned from _extract_next_video_in_batch()", flush=True)
+            logger.debug("Returned from _extract_next_video_in_batch()")
             logger.debug("Returned from _extract_next_video_in_batch(), waiting for background thread")
             return  # Will continue in video extraction event handler
         
         # No videos to extract, proceed directly to image processing
-        print(f"BRANCH: No videos to extract, proceeding to image processing", flush=True)
+        logger.info(f"BRANCH: No videos to extract, proceeding to image processing")
         to_process = images_to_process
         
         if not to_process:
@@ -2333,12 +2319,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def _extract_next_video_in_batch(self):
         """Extract next video in batch processing queue"""
-        print(f"_extract_next_video_in_batch: count={self._extracted_video_count}, total={len(self._videos_to_extract)}", flush=True)
+        logger.debug(f"_extract_next_video_in_batch: count={self._extracted_video_count}, total={len(self._videos_to_extract)}")
         logger.debug(f"_extract_next_video_in_batch called: count={self._extracted_video_count}, total={len(self._videos_to_extract)}")
         
         if self._extracted_video_count >= len(self._videos_to_extract):
             # All videos extracted, proceed to image processing
-            print(f"All videos extracted, moving to image processing", flush=True)
+            logger.info(f"All videos extracted, moving to image processing")
             logger.info("All videos extracted, proceeding to image processing")
             self._start_batch_image_processing()
             return
@@ -2346,7 +2332,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Get next video
         video_path = self._videos_to_extract[self._extracted_video_count]
         video_name = Path(video_path).name
-        print(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}", flush=True)
+        logger.info(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}")
         logger.info(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}")
         
         # Update progress
@@ -3365,6 +3351,38 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Restore focus to image list after dialog
         self.image_list.SetFocus()
         self.SetStatusText("Workflow failed", 0)
+    
+    def on_directory_loading_complete(self, event):
+        """Handle directory loading completion from background worker"""
+        logger.debug(f"on_directory_loading_complete: {event.added_count} images, {event.video_count} videos from {event.dir_path}")
+        
+        # Close progress dialog (auto-dismiss for directory loading)
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.Close()
+            self.batch_progress_dialog = None
+        
+        # Clear worker reference
+        if hasattr(self, 'directory_loading_worker'):
+            self.directory_loading_worker = None
+        
+        # Add items to workspace
+        for item in event.items:
+            if item.file_path not in self.workspace.items:
+                self.workspace.add_item(item)
+        
+        # Update UI
+        self.refresh_image_list()
+        self.mark_modified()
+        
+        # Update status bar
+        dir_name = Path(event.dir_path).name
+        if event.video_count > 0:
+            self.SetStatusText(f"Loaded {event.added_count - event.video_count} images, {event.video_count} videos from {dir_name}", 0)
+        else:
+            self.SetStatusText(f"Loaded {event.added_count} images from {dir_name}", 0)
+        self.SetStatusText(f"{len(self.workspace.items)} total items", 1)
+        
+        logger.info(f"Directory loading complete: {event.added_count} items added from {dir_name}")
     
     # Phase 3: Batch control handlers
     def on_pause_batch(self):
