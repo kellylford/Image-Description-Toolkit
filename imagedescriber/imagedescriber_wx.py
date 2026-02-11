@@ -166,6 +166,10 @@ if getattr(sys, 'frozen', False):
         get_available_providers, get_all_providers
     )
     from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
+    from workspace_manager import (
+        get_default_workspaces_root, get_next_untitled_name, create_workspace_structure,
+        is_untitled_workspace, get_workspace_files_directory, propose_workspace_name_from_url
+    )
     from dialogs_wx import (
         DirectorySelectionDialog,
         ApiKeyDialog,
@@ -195,6 +199,10 @@ else:
             get_available_providers, get_all_providers
         )
         from .data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
+        from .workspace_manager import (
+            get_default_workspaces_root, get_next_untitled_name, create_workspace_structure,
+            is_untitled_workspace, get_workspace_files_directory, propose_workspace_name_from_url
+        )
         from .dialogs_wx import (
             DirectorySelectionDialog,
             ApiKeyDialog,
@@ -223,6 +231,10 @@ else:
             get_available_providers, get_all_providers
         )
         from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
+        from workspace_manager import (
+            get_default_workspaces_root, get_next_untitled_name, create_workspace_structure,
+            is_untitled_workspace, get_workspace_files_directory, propose_workspace_name_from_url
+        )
         from dialogs_wx import (
             DirectorySelectionDialog,
             ApiKeyDialog,
@@ -344,10 +356,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         )
         ModifiedStateMixin.__init__(self)
         
+        # Create Untitled workspace on startup
+        untitled_name = get_next_untitled_name()
+        workspace_file, workspace_data_dir = create_workspace_structure(untitled_name)
+        
         # Application state
         self.workspace = ImageWorkspace(new_workspace=True)
-        self.current_directory = None
-        self.workspace_file = None
+        self.workspace.directory_path = str(workspace_data_dir)
+        self.workspace.directory_paths = [str(workspace_data_dir)]
+        self.current_directory = workspace_data_dir
+        self.workspace_file = workspace_file
         self.processing_thread = None
         self.current_image_item = None
         self.current_filter = "all"  # View filter: all, described, undescribed
@@ -410,7 +428,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
         
         # Update window title
-        self.update_window_title("ImageDescriber", "Untitled")
+        self.update_window_title("ImageDescriber", untitled_name)
+        
+        # Save initial workspace structure
+        wx.CallAfter(self.save_workspace, self.workspace_file)
         
         # Log startup banner
         if log_build_banner:
@@ -500,21 +521,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return None
     
     def get_workspace_directory(self) -> Path:
-        """Get the workspace data directory for extracted frames, etc.
+        """Get the workspace data directory for extracted frames, downloaded images, etc.
         
         Returns the directory structure:
-        - If workspace saved: {workspace_dir}/{workspace_stem}_workspace/
-        - If unsaved: {home}/ImageDescriber_Workspaces/untitled_workspace/
+        ~/Documents/WorkSpaceFiles/{workspace_name}/
         """
         if self.workspace_file:
-            # Use workspace file location and name
-            ws_path = Path(self.workspace_file)
-            ws_name = ws_path.stem  # e.g., "my_project" from "my_project.idw"
-            workspace_dir = ws_path.parent / f"{ws_name}_workspace"
+            # Use new workspace structure in WorkSpaceFiles
+            workspace_dir = get_workspace_files_directory(Path(self.workspace_file))
         else:
-            # Use temp location for unsaved workspace
-            workspaces_root = Path.home() / "ImageDescriber_Workspaces"
-            workspace_dir = workspaces_root / "untitled_workspace"
+            # Fallback (shouldn't happen with new Untitled workspace pattern)
+            from workspace_manager import get_workspace_files_root
+            workspace_dir = get_workspace_files_root() / "untitled_workspace"
         
         workspace_dir.mkdir(parents=True, exist_ok=True)
         return workspace_dir
@@ -1251,6 +1269,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     created_date = desc.created.split('T')[0] if 'T' in desc.created else desc.created
                     metadata_lines.append(f"Created: {created_date}")
                 
+                # Add download source info if available
+                if hasattr(image_item, 'download_url') and image_item.download_url:
+                    metadata_lines.append("\n--- Download Source ---")
+                    metadata_lines.append(f"URL: {image_item.download_url}")
+                    if hasattr(image_item, 'download_timestamp') and image_item.download_timestamp:
+                        download_date = image_item.download_timestamp.split('T')[0] if 'T' in image_item.download_timestamp else image_item.download_timestamp
+                        metadata_lines.append(f"Downloaded: {download_date}")
+                
                 # Add image metadata (GPS, EXIF, etc.) if available
                 if desc.metadata:
                     image_metadata_lines = format_image_metadata(desc.metadata)
@@ -1293,6 +1319,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if first_desc.created:
                 created_date = first_desc.created.split('T')[0] if 'T' in first_desc.created else first_desc.created
                 metadata_lines.append(f"Created: {created_date}")
+            
+            # Add download source info if available
+            if hasattr(image_item, 'download_url') and image_item.download_url:
+                metadata_lines.append("\n--- Download Source ---")
+                metadata_lines.append(f"URL: {image_item.download_url}")
+                if hasattr(image_item, 'download_timestamp') and image_item.download_timestamp:
+                    download_date = image_item.download_timestamp.split('T')[0] if 'T' in image_item.download_timestamp else image_item.download_timestamp
+                    metadata_lines.append(f"Downloaded: {download_date}")
             
             # Add image metadata (GPS, EXIF, etc.) if available
             if first_desc.metadata:
@@ -1745,6 +1779,35 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         settings = dialog.get_settings()
         dialog.Destroy()
         
+        # Check if we're in an Untitled workspace - prompt to save first
+        if is_untitled_workspace(self.workspace_file.stem):
+            # Propose a name based on the URL
+            proposed_name = propose_workspace_name_from_url(settings['url'])
+            
+            # Show save dialog
+            save_dialog = wx.FileDialog(
+                self,
+                message=f"Save workspace before downloading from {settings['url']}",
+                defaultDir=str(get_default_workspaces_root()),
+                defaultFile=f"{proposed_name}.idw",
+                wildcard="IDT Workspace (*.idw)|*.idw",
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+            )
+            
+            if save_dialog.ShowModal() == wx.ID_OK:
+                new_path = Path(save_dialog.GetPath())
+                save_dialog.Destroy()
+                
+                # Rename workspace before proceeding
+                new_name = new_path.stem
+                if not self.rename_workspace(new_name):
+                    show_error(self, "Failed to rename workspace. Download cancelled.")
+                    return
+            else:
+                save_dialog.Destroy()
+                # User cancelled - abort download
+                return
+        
         # Get workspace directory
         workspace_dir = self.get_workspace_directory()
         
@@ -1755,7 +1818,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if BatchProgressDialog:
             self.batch_progress_dialog = BatchProgressDialog(
                 self,
-                title="Downloading Images",
                 total_images=settings.get('max_images', 100) if settings.get('max_images') else 100
             )
             self.batch_progress_dialog.Show()
@@ -1957,14 +2019,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 frame_count = len(item.extracted_frames)
                 prefix_parts.append(f"E{frame_count}")
             
-            # 4. Item type icon indicator
+            # 4. Item type icon indicator (removed for screen reader accessibility)
             type_icon = ""
-            if item.item_type == "downloaded_image":
-                type_icon = "🌐 "  # Web globe for downloaded images
-            elif item.item_type == "extracted_frame":
-                type_icon = "▶ "  # Play icon for video frames
-            elif item.item_type == "video":
-                type_icon = "📹 "  # Camera icon for videos
             
             # Combine prefix and display name with indentation
             indent = "  " * indent_level  # Two spaces per level
@@ -2077,6 +2133,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if not BatchProcessingWorker:
             show_error(self, "Batch processing worker not available")
             return
+        
+        # Check if we're in an Untitled workspace - prompt to save first
+        if is_untitled_workspace(self.workspace_file.stem):
+            # Propose a name based on workspace content
+            proposed_name = self._propose_workspace_name_from_content()
+            
+            # Show save dialog
+            save_dialog = wx.FileDialog(
+                self,
+                message="Save workspace before batch processing",
+                defaultDir=str(get_default_workspaces_root()),
+                defaultFile=f"{proposed_name}.idw",
+                wildcard="IDT Workspace (*.idw)|*.idw",
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+            )
+            
+            if save_dialog.ShowModal() == wx.ID_OK:
+                new_path = Path(save_dialog.GetPath())
+                save_dialog.Destroy()
+                
+                # Rename workspace before proceeding
+                new_name = new_path.stem
+                if not self.rename_workspace(new_name):
+                    show_error(self, "Failed to rename workspace. Processing cancelled.")
+                    return
+            else:
+                save_dialog.Destroy()
+                # User cancelled - abort processing
+                return
+        
+        # Auto-save before batch processing
+        if self.workspace_modified:
+            self.save_workspace(str(self.workspace_file))
         
         # Phase 5: Warn about redescribing all
         if not skip_existing:
@@ -2533,11 +2622,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_save_workspace_as(self, event):
         """Save workspace to new file"""
-        default_dir = ""
-        default_file = "untitled.idw"
-        if self.workspace_file:
-            default_dir = str(Path(self.workspace_file).parent)
-            default_file = Path(self.workspace_file).name
+        # Use default workspaces directory
+        default_dir = str(get_default_workspaces_root())
+        
+        # Propose a sensible default name
+        if is_untitled_workspace(self.workspace_file.stem):
+            default_file = f"{self._propose_workspace_name_from_content()}.idw"
+        else:
+            default_file = self.workspace_file.name
 
         file_path = save_file_dialog(
             self,
@@ -2548,7 +2640,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         )
 
         if file_path:
-            self.save_workspace(file_path)
+            new_path = Path(file_path)
+            new_name = new_path.stem
+            
+            # If name changed, use rename (moves data directory too)
+            if new_name != self.workspace_file.stem:
+                self.rename_workspace(new_name)
+            else:
+                # Same name, different location - just save
+                self.save_workspace(str(new_path))
 
     def on_save_workspace(self, event):
         """Save current workspace"""
@@ -2636,6 +2736,117 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
         except Exception as e:
             show_error(self, f"Error saving workspace:\n{e}")
+    
+    def rename_workspace(self, new_name: str) -> bool:
+        """Rename workspace and its data directory
+        
+        Args:
+            new_name: New workspace name (without .idw extension)
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            old_idw_path = self.workspace_file
+            old_name = old_idw_path.stem
+            
+            # Create new paths
+            new_idw_path = old_idw_path.parent / f"{new_name}.idw"
+            old_data_dir = get_workspace_files_directory(old_idw_path)
+            new_data_dir = old_data_dir.parent / new_name
+            
+            # Rename data directory first
+            if old_data_dir.exists():
+                old_data_dir.rename(new_data_dir)
+            
+            # Update all internal file paths in workspace items
+            for item in self.workspace.items.values():
+                item_path = Path(item.file_path)
+                
+                # Check if path is inside workspace data directory
+                try:
+                    relative = item_path.relative_to(old_data_dir)
+                    # Update to new data directory
+                    new_path = new_data_dir / relative
+                    item.file_path = str(new_path)
+                except ValueError:
+                    # Path is external, keep as-is
+                    pass
+                
+                # Update extracted_frames paths if they exist
+                if hasattr(item, 'extracted_frames') and item.extracted_frames:
+                    updated_frames = []
+                    for frame_path in item.extracted_frames:
+                        frame_path_obj = Path(frame_path)
+                        try:
+                            relative = frame_path_obj.relative_to(old_data_dir)
+                            new_frame_path = new_data_dir / relative
+                            updated_frames.append(str(new_frame_path))
+                        except ValueError:
+                            # External path, keep as-is
+                            updated_frames.append(frame_path)
+                    item.extracted_frames = updated_frames
+            
+            # Update workspace directory paths
+            updated_dir_paths = []
+            for dp in self.workspace.directory_paths:
+                try:
+                    dp_path = Path(dp)
+                    relative = dp_path.relative_to(old_data_dir)
+                    new_path = new_data_dir / relative
+                    updated_dir_paths.append(str(new_path))
+                except ValueError:
+                    # External path, keep as-is
+                    updated_dir_paths.append(dp)
+            self.workspace.directory_paths = updated_dir_paths
+            
+            # Save workspace with current settings to new name
+            self.save_workspace(str(new_idw_path))
+            
+            # Delete old IDW file
+            if old_idw_path.exists() and old_idw_path != new_idw_path:
+                old_idw_path.unlink()
+            
+            # Update instance variables
+            self.workspace_file = new_idw_path
+            self.current_directory = new_data_dir
+            
+            # Update window title
+            self.update_window_title("ImageDescriber", f"{new_name}.idw")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error renaming workspace: {e}")
+            show_error(self, f"Error renaming workspace:\n{e}")
+            return False
+    
+    def _propose_workspace_name_from_content(self) -> str:
+        """Propose a workspace name based on content
+        
+        Returns:
+            str: Proposed workspace name
+        """
+        # Try to find most representative content
+        
+        # Option 1: If there are directory paths, use the first one
+        if self.workspace.directory_paths:
+            dir_path = Path(self.workspace.directory_paths[0])
+            return f"{dir_path.name}_{datetime.now().strftime('%Y%m%d')}"
+        
+        # Option 2: If there are videos, use the first video name
+        videos = [item for item in self.workspace.items.values() if item.item_type == "video"]
+        if videos:
+            video_name = Path(videos[0].file_path).stem
+            return f"{video_name}_{datetime.now().strftime('%Y%m%d')}"
+        
+        # Option 3: If downloaded images, propose download_date
+        downloads = [item for item in self.workspace.items.values() 
+                    if hasattr(item, 'download_url') and item.download_url]
+        if downloads:
+            return f"downloads_{datetime.now().strftime('%Y%m%d')}"
+        
+        # Fallback: workspace_date
+        return f"workspace_{datetime.now().strftime('%Y%m%d')}"
     
     def on_export_descriptions(self, event):
         """Export all descriptions to text or HTML file (like CLI output)"""
@@ -2986,16 +3197,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             logger.debug(f"Found {len(downloaded_images)} downloaded images in {output_dir}")
             
-            # Add to workspace if auto-add enabled
-            if hasattr(self, 'current_download_settings') and self.current_download_settings.get('auto_add', True):
-                for img_path in downloaded_images:
-                    item = ImageItem(str(img_path), "downloaded_image")
-                    item.download_url = event.input_dir  # Store source URL
-                    item.download_timestamp = datetime.now().isoformat()
-                    self.workspace.add_item(item)
-                
-                self.mark_modified()
-                self.refresh_image_list()
+            # Add all downloaded images to workspace (always add)
+            for img_path in downloaded_images:
+                item = ImageItem(str(img_path), "downloaded_image")
+                item.download_url = event.input_dir  # Store source URL
+                item.download_timestamp = datetime.now().isoformat()
+                self.workspace.add_item(item)
+            
+            self.mark_modified()
+            self.refresh_image_list()
+            
+            # Check if auto-processing is enabled
+            process_after = False
+            if hasattr(self, 'current_download_settings'):
+                process_after = self.current_download_settings.get('process_after', False)
             
             # Clear download settings and worker
             if hasattr(self, 'current_download_settings'):
@@ -3003,12 +3218,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if hasattr(self, 'download_worker'):
                 self.download_worker = None
             
-            # Show completion message
-            self.Raise()
-            self.SetFocus()
-            show_info(self, f"Downloaded {len(downloaded_images)} images from URL.\n\n"
-                           f"Images saved to: {output_dir}")
-            self.SetFocus()
+            # If auto-process enabled, start batch processing
+            if process_after and downloaded_images:
+                # Use default settings for auto-processing (don't show dialog)
+                self.auto_process_downloaded_images([str(img) for img in downloaded_images])
+            else:
+                # Show completion message only if not auto-processing
+                self.Raise()
+                self.SetFocus()
+                show_info(self, f"Downloaded {len(downloaded_images)} images from URL.\n\n"
+                               f"Images saved to: {output_dir}")
+                self.SetFocus()
             
             self.SetStatusText(f"Download complete: {len(downloaded_images)} images added", 0)
             return
@@ -3431,6 +3651,90 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.video_worker.start()
         
         self.SetStatusText(f"Extracting frames from: {Path(selected_video).name}...", 0)
+    
+    def auto_process_downloaded_images(self, image_paths: List[str]):
+        """Auto-process downloaded images using default settings (no dialog)
+        
+        Args:
+            image_paths: List of downloaded image file paths
+        """
+        # Use default settings from config
+        options = {
+            'provider': self.config.get('default_provider', 'ollama'),
+            'model': self.config.get('default_model', 'moondream'),
+            'prompt_style': self.config.get('default_prompt_style', 'narrative'),
+            'custom_prompt': '',
+            'skip_existing': True
+        }
+        
+        logger.info(f"Auto-processing {len(image_paths)} downloaded images with defaults: {options['provider']}/{options['model']}")
+        
+        # Mark images as pending for batch processing
+        for i, img_path in enumerate(image_paths):
+            if img_path in self.workspace.items:
+                img_item = self.workspace.items[img_path]
+                img_item.processing_state = "pending"
+                img_item.batch_queue_position = i
+        
+        # Create batch state
+        self.workspace.batch_state = {
+            "provider": options['provider'],
+            "model": options['model'],
+            "prompt_style": options['prompt_style'],
+            "custom_prompt": options.get('custom_prompt'),
+            "detection_settings": None,
+            "total_queued": len(image_paths),
+            "started": datetime.now().isoformat()
+        }
+        
+        # Prepare images for processing
+        to_process = []
+        for img_path in image_paths:
+            if img_path in self.workspace.items:
+                img_item = self.workspace.items[img_path]
+                # Skip if already has descriptions and skip_existing is True
+                if options.get('skip_existing', True) and img_item.descriptions:
+                    logger.debug(f"Skipping {Path(img_path).name} - already has description")
+                    continue
+                to_process.append(img_path)
+        
+        if not to_process:
+            logger.info("No images to process (all already described)")
+            show_info(self, "All downloaded images already have descriptions!")
+            return
+        
+        # Show batch progress dialog
+        if BatchProgressDialog:
+            self.batch_progress_dialog = BatchProgressDialog(self, total_images=len(to_process))
+            self.batch_progress_dialog.Show()
+        
+        # Get API key for the provider
+        api_key = self.get_api_key_for_provider(options['provider'])
+        
+        # Start batch processing worker
+        self.batch_worker = BatchProcessingWorker(
+            self,
+            to_process,
+            options['provider'],
+            options['model'],
+            options['prompt_style'],
+            options.get('custom_prompt', ''),
+            None,  # detection_settings
+            None,  # prompt_config_path
+            options.get('skip_existing', True),
+            progress_offset=0
+        )
+        self.batch_worker.start()
+        
+        # Initialize timing
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+        
+        # Save workspace
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
+        
+        self.SetStatusText(f"Processing {len(to_process)} downloaded images...", 0)
     
     def auto_process_extracted_frames(self, frame_paths: List[str]):
         """Auto-process extracted frames using default settings
@@ -4230,7 +4534,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_user_guide(self, event):
         """Open user guide in web browser"""
-        user_guide_url = "https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE.md"
+        user_guide_url = "https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE_V4.md"
         try:
             webbrowser.open(user_guide_url)
         except Exception as e:
@@ -4262,6 +4566,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_close(self, event):
         """Handle application close"""
         if self.confirm_unsaved_changes():
+            # Clean up empty Untitled workspaces before closing
+            if is_untitled_workspace(self.workspace_file.stem):
+                # Check if workspace is empty (no items or only empty directories)
+                if not self.workspace.items or len(self.workspace.items) == 0:
+                    try:
+                        # Delete workspace data directory
+                        data_dir = get_workspace_files_directory(self.workspace_file)
+                        if data_dir.exists():
+                            import shutil
+                            shutil.rmtree(data_dir)
+                        
+                        # Delete IDW file
+                        if self.workspace_file.exists():
+                            self.workspace_file.unlink()
+                            
+                        logger.info(f"Cleaned up empty Untitled workspace: {self.workspace_file.name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to clean up Untitled workspace: {e}")
+            
             self.Destroy()
         elif event.CanVeto():
             event.Veto()

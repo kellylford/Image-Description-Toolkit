@@ -1878,6 +1878,10 @@ class WorkflowOrchestrator:
             if self.workflow_name:
                 cmd.extend(["--workflow-name", self.workflow_name])
             
+            # Add source URL if available (for downloaded images)
+            if self.url:
+                cmd.extend(["--source-url", self.url])
+            
             # Add metadata configuration
             # Note: The config file controls metadata by default; we update it dynamically before running
             # This allows the workflow to control metadata settings
@@ -3470,7 +3474,9 @@ Viewing Results:
             # Save custom config paths for resume (only if non-default)
             "config_workflow": args.config_workflow if args.config_workflow != "workflow_config.json" else None,
             "config_image_describer": args.config_image_describer,
-            "config_video": args.config_video
+            "config_video": args.config_video,
+            # Add source URL if this was a web download
+            "source_url": url if url else None
         }
         
         # Launch viewer if requested (before workflow starts for real-time monitoring)

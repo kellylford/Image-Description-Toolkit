@@ -88,12 +88,12 @@ class DownloadSettingsDialog(wx.Dialog):
         
         settings_box.Add(max_sizer, 0, wx.ALL, 10)
         
-        # Auto-add checkbox
-        self.auto_add = wx.CheckBox(panel, 
-                                    label="&Add downloaded images to workspace automatically",
-                                    name="Auto-add checkbox")
-        self.auto_add.SetValue(True)
-        settings_box.Add(self.auto_add, 0, wx.ALL, 10)
+        # Process after download checkbox
+        self.process_after = wx.CheckBox(panel,
+                                        label="&Process images after download",
+                                        name="Process after download checkbox")
+        self.process_after.SetValue(True)
+        settings_box.Add(self.process_after, 0, wx.ALL, 10)
         
         main_sizer.Add(settings_box, 0, wx.ALL | wx.EXPAND, 10)
         
@@ -167,7 +167,7 @@ class DownloadSettingsDialog(wx.Dialog):
         Get download settings from dialog.
         
         Returns:
-            dict with keys: url, min_width, min_height, max_images, auto_add
+            dict with keys: url, min_width, min_height, max_images, process_after
         """
         max_imgs = self.max_images.GetValue()
         if max_imgs == -1:
@@ -178,5 +178,5 @@ class DownloadSettingsDialog(wx.Dialog):
             'min_width': self.min_width.GetValue(),
             'min_height': self.min_height.GetValue(),
             'max_images': max_imgs,
-            'auto_add': self.auto_add.GetValue()
+            'process_after': self.process_after.GetValue()
         }

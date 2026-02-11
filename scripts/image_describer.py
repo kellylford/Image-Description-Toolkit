@@ -156,7 +156,7 @@ class ImageDescriber:
                  enable_compression: bool = True, batch_delay: float = 2.0, 
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
-                 log_dir: str = None, workflow_name: str = None, timeout: int = 90):
+                 log_dir: str = None, workflow_name: str = None, timeout: int = 90, source_url: str = None):
         """
         Initialize the ImageDescriber
         
@@ -173,6 +173,7 @@ class ImageDescriber:
             log_dir: Directory where log files and progress tracking are stored
             workflow_name: Name of the workflow (for window title display)
             timeout: Timeout in seconds for Ollama API requests (default: 90)
+            source_url: Source URL if images were downloaded from the web
         """
         # Load configuration first
         self.config = self.load_config(config_file)
@@ -217,6 +218,7 @@ class ImageDescriber:
         self.api_key = api_key
         self.workflow_name = workflow_name  # Workflow name for window title
         self.timeout = timeout  # Timeout for Ollama requests
+        self.source_url = source_url  # Source URL if downloaded from web
         # Notice flags (avoid repeating log spam)
         self._geocode_notice_logged = False
         
@@ -656,6 +658,9 @@ class ImageDescriber:
             f"Prompt Style: {self.prompt_style}",
             f"Timestamp: {timestamp}",
         ]
+        # Add source URL if available (for downloaded images)
+        if self.source_url:
+            lines.append(f"Source URL: {self.source_url}")
         # Optional compact metadata suffix (for human skim); main metadata block inclusion can be added later
         if metadata and self.config.get('output_format', {}).get('include_metadata', True):
             suffix = self._build_meta_suffix(image_path, metadata)
@@ -2196,6 +2201,11 @@ Configuration:
         type=str,
         help="Workflow name (displayed in window title for identification)"
     )
+    parser.add_argument(
+        "--source-url",
+        type=str,
+        help="Source URL if images were downloaded from the web (for attribution)"
+    )
     
     args = parser.parse_args()
     
@@ -2272,7 +2282,8 @@ Configuration:
         api_key=api_key,
         log_dir=args.log_dir,
         workflow_name=args.workflow_name,
-        timeout=args.timeout
+        timeout=args.timeout,
+        source_url=args.source_url
     )
     
     # Override metadata extraction if disabled via command line

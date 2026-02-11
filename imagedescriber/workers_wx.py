@@ -1631,10 +1631,11 @@ class DownloadProcessingWorker(threading.Thread):
             # Post completion event
             evt = WorkflowCompleteEventData(
                 input_dir=str(self.url),
-                output_dir=str(self.output_dir),
-                step_name="download",
-                files_processed=downloaded_count
+                output_dir=str(self.output_dir)
             )
+            # Add download-specific attributes
+            evt.step_name = "download"
+            evt.files_processed = downloaded_count
             wx.PostEvent(self.parent_window, evt)
             
         except Exception as e:
@@ -1668,7 +1669,12 @@ class DownloadProcessingWorker(threading.Thread):
             status: Status message
         """
         try:
-            evt = ProgressUpdateEventData(message=f"{status} ({current}/{total})")
+            evt = ProgressUpdateEventData(
+                file_path="",  # No specific file path for download progress
+                message=status,
+                current=current,
+                total=total
+            )
             wx.PostEvent(self.parent_window, evt)
         except Exception as e:
             logger.warning(f"Could not post progress update: {e}")
