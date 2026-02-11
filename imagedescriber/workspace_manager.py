@@ -4,8 +4,8 @@ Workspace Manager for ImageDescriber
 
 Handles workspace directory structure, naming, and file management.
 Default structure:
-  ~/Documents/workspaces/           - IDW workspace files
-  ~/Documents/WorkSpaceFiles/       - Actual image/data files
+  ~/Documents/ImageDescriptionToolkit/workspaces/           - IDW workspace files
+  ~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/       - Actual image/data files
 """
 
 import sys
@@ -23,16 +23,16 @@ def get_default_workspaces_root() -> Path:
         Path to workspaces directory (where .idw files are saved)
     """
     if sys.platform == 'win32':
-        # Windows: ~\Documents\workspaces
-        return Path.home() / "Documents" / "workspaces"
+        # Windows: ~\Documents\ImageDescriptionToolkit\workspaces
+        return Path.home() / "Documents" / "ImageDescriptionToolkit" / "workspaces"
     elif sys.platform == 'darwin':
-        # macOS: ~/Documents/workspaces
-        return Path.home() / "Documents" / "workspaces"
+        # macOS: ~/Documents/ImageDescriptionToolkit/workspaces
+        return Path.home() / "Documents" / "ImageDescriptionToolkit" / "workspaces"
     else:
-        # Linux: ~/Documents/workspaces or ~/.local/share/IDT/workspaces
+        # Linux: ~/Documents/ImageDescriptionToolkit/workspaces or ~/.local/share/IDT/workspaces
         docs = Path.home() / "Documents"
         if docs.exists():
-            return docs / "workspaces"
+            return docs / "ImageDescriptionToolkit" / "workspaces"
         return Path.home() / ".local" / "share" / "IDT" / "workspaces"
 
 
@@ -100,13 +100,13 @@ def get_next_untitled_name(workspace_root: Optional[Path] = None) -> str:
 
 def propose_workspace_name_from_url(url: str) -> str:
     """
-    Generate workspace name from URL.
+    Generate workspace name from URL with timestamp.
     
     Args:
         url: URL to generate name from
     
     Returns:
-        Sanitized workspace name (e.g., "nytimes_20260211")
+        Sanitized workspace name (e.g., "nytimes_20260211_143025")
     """
     from urllib.parse import urlparse
     
@@ -121,8 +121,8 @@ def propose_workspace_name_from_url(url: str) -> str:
     safe_name = re.sub(r'[^\w\-]', '_', domain)
     safe_name = safe_name.strip('_')
     
-    # Add date suffix for uniqueness
-    timestamp = datetime.now().strftime("%Y%m%d")
+    # Add date and time suffix for uniqueness (allows multiple downloads per day)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     return f"{safe_name}_{timestamp}"
 

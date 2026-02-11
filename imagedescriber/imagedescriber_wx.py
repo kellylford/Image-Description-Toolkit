@@ -2136,6 +2136,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Check if we're in an Untitled workspace - prompt to save first
         if is_untitled_workspace(self.workspace_file.stem):
+            # Inform user they need to save first
+            result = wx.MessageBox(
+                "Batch processing requires a named workspace.\n\n"
+                "Your current workspace is 'Untitled' and must be saved with a name before processing.\n\n"
+                "Would you like to save the workspace now?",
+                "Save Workspace Required",
+                wx.YES_NO | wx.ICON_QUESTION
+            )
+            
+            if result != wx.YES:
+                return
+            
             # Propose a name based on workspace content
             proposed_name = self._propose_workspace_name_from_content()
             
@@ -2160,11 +2172,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     return
             else:
                 save_dialog.Destroy()
-                # User cancelled - abort processing
+                # User cancelled the file dialog
                 return
         
         # Auto-save before batch processing
-        if self.workspace_modified:
+        if self.modified:
             self.save_workspace(str(self.workspace_file))
         
         # Phase 5: Warn about redescribing all
@@ -3224,11 +3236,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.auto_process_downloaded_images([str(img) for img in downloaded_images])
             else:
                 # Show completion message only if not auto-processing
+                # Reset window title to normal (download complete, no processing)
+                doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+                self.update_window_title("ImageDescriber", doc_name)
+                
                 self.Raise()
                 self.SetFocus()
                 show_info(self, f"Downloaded {len(downloaded_images)} images from URL.\n\n"
                                f"Images saved to: {output_dir}")
-                self.SetFocus()
+                self.image_list.SetFocus()
             
             self.SetStatusText(f"Download complete: {len(downloaded_images)} images added", 0)
             return
@@ -3289,8 +3305,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         self.Raise()
                         self.SetFocus()
                         show_info(self, f"Extracted {len(extracted_frames)} frames from video.\n\nFrames have been added to the workspace.")
-                        # Restore focus after dialog
-                        self.SetFocus()
+                        # Restore focus to image list after dialog
+                        self.image_list.SetFocus()
                 
                 self.SetStatusText(f"Extracted {len(extracted_frames)} frames", 0)
             
@@ -3320,6 +3336,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if hasattr(self, 'show_batch_progress_item'):
             self.show_batch_progress_item.Enable(False)
         
+        # Reset window title to normal (remove processing percentage)
+        doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+        self.update_window_title("ImageDescriber", doc_name)
+        
         # Save workspace
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
@@ -3330,8 +3350,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         show_info(self, f"Workflow complete!\n{event.input_dir}")
         
-        # Restore focus to main window after dialog dismissal
-        self.SetFocus()
+        # Restore focus to image list after dialog dismissal
+        self.image_list.SetFocus()
         
         self.SetStatusText("Workflow complete", 0)
         self.refresh_image_list()
@@ -3342,8 +3362,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.Raise()
         self.SetFocus()
         show_error(self, f"Workflow failed:\n{event.error}")
-        # Restore focus after dialog
-        self.SetFocus()
+        # Restore focus to image list after dialog
+        self.image_list.SetFocus()
         self.SetStatusText("Workflow failed", 0)
     
     # Phase 3: Batch control handlers
@@ -3442,13 +3462,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if hasattr(self, 'show_batch_progress_item'):
             self.show_batch_progress_item.Enable(False)
         
+        # Reset window title to normal
+        doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+        self.update_window_title("ImageDescriber", doc_name)
+        
         self.SetStatusText("Batch processing stopped", 0)
         # Ensure main window has focus before showing dialog
         self.Raise()
         self.SetFocus()
         show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
-        # Restore focus after dialog
-        self.SetFocus()
+        # Restore focus to image list after dialog
+        self.image_list.SetFocus()
     
     # Phase 4: Resume functionality
     def prompt_resume_batch(self):
@@ -4609,29 +4633,40 @@ def main():
                        help='Debug output file location (default: %(default)s)')
     args = parser.parse_args()
     
-    # Configure enhanced logging if --debug flag is set
-    if args.debug:
-        # Reconfigure logging with DEBUG level and screen reader-friendly format
-        # Format: LEVEL - message - (module:line) - (timestamp)
-        # Screen reader friendly: reads important info first, technical details last
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(levelname)s - %(message)s - (%(name)s:%(lineno)d) - (%(asctime)s)',
-            handlers=[
-                logging.FileHandler(args.debug_file, mode='a', encoding='utf-8'),
-                logging.StreamHandler(sys.stderr)  # Also to stderr (visible in console build)
-            ],
-            force=True  # Override any existing configuration
-        )
-        logger = logging.getLogger(__name__)
-        logger.info("="*60)
-        logger.info("DEBUG MODE ENABLED")
-        logger.info(f"Verbose logging to: {args.debug_file}")
-        logger.info(f"ImageDescriber version: {get_app_version() if get_app_version else 'unknown'}")
-        logger.info(f"Python: {sys.version}")
-        logger.info(f"wxPython: {wx.version()}")
-        logger.info(f"Frozen mode: {getattr(sys, 'frozen', False)}")
-        logger.info("="*60)
+    # Check for debug mode via command-line flag OR environment variable
+    debug_mode = args.debug or os.environ.get('IDT_DEBUG', '').lower() in ('1', 'true', 'yes')
+    
+    # Always configure logging (basic by default, verbose if debug enabled)
+    log_file = Path.home() / 'imagedescriber.log'
+    log_level = logging.DEBUG if debug_mode else logging.INFO
+    
+    if debug_mode:
+        # Verbose debug logging
+        log_file = Path(args.debug_file)
+        log_format = '%(levelname)s - %(message)s - (%(name)s:%(lineno)d) - (%(asctime)s)'
+    else:
+        # Standard logging (less verbose)
+        log_format = '%(asctime)s - %(levelname)s - %(message)s'
+    
+    logging.basicConfig(
+        level=log_level,
+        format=log_format,
+        handlers=[
+            logging.FileHandler(log_file, mode='a', encoding='utf-8'),
+            logging.StreamHandler(sys.stderr)  # Also to stderr (visible in console)
+        ],
+        force=True  # Override any existing configuration
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info("="*60)
+    logger.info(f"ImageDescriber Starting - {'DEBUG MODE' if debug_mode else 'NORMAL MODE'}")
+    logger.info(f"Log file: {log_file}")
+    logger.info(f"Version: {get_app_version() if get_app_version else 'unknown'}")
+    logger.info(f"Python: {sys.version}")
+    logger.info(f"wxPython: {wx.version()}")
+    logger.info(f"Frozen mode: {getattr(sys, 'frozen', False)}")
+    logger.info("="*60)
     
     # Log standardized build banner at startup
     if log_build_banner:

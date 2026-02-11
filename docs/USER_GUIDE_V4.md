@@ -146,6 +146,14 @@ IDT provides two applications, each designed for different use cases:
 
 ### Tips for GUI Users
 
+- **Workspace Locations:**
+  - Workspace files (.idw): `~/Documents/ImageDescriptionToolkit/workspaces/`
+  - Image data: `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/{workspace_name}/`
+  - Downloaded images go to: `{workspace_data}/downloaded_images/`
+  - Extracted video frames: `{workspace_data}/extracted_frames/`
+- **Untitled Workspaces:** App automatically creates numbered Untitled workspaces (Untitled, Untitled 1, etc.)
+  - Empty Untitled workspaces are cleaned up when you close the app
+  - You'll be prompted to save before batch operations
 - **View All Results:** Use **File → Switch to Viewer** to see all workflow results in one place with live monitoring
 - **Configure Prompts:** Use **Tools → Edit Prompts** to customize description styles
 - **Configure Settings:** Use **Tools → Configure IDT** to set default provider and API keys
@@ -206,12 +214,23 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 ### Quick Start
 
 1. **Launch:** Double-click `imagedescriber.exe` or run from command line
+   - App automatically creates an "Untitled" workspace in `~/Documents/ImageDescriptionToolkit/workspaces/`
 2. **Load Directory:** File → Load Directory to add images to workspace
 3. **Setup Provider:** Choose Ollama (local) or cloud provider (OpenAI/Claude) from tabs
 4. **Select Model & Prompt:** Choose from available options
-5. **Process:** Use Processing → Process All Undescribed and watch progress!
+5. **Process:** Click Processing → Process All Undescribed
+   - You'll be prompted to save the workspace with a meaningful name
+   - Suggested name is based on your content (e.g., "vacation_photos_20260211")
+   - Processing begins automatically after saving
 
 ### Main Interface (Workspace Mode)
+
+**Workspace Management:**
+- **Automatic Untitled Workspace:** App opens with an "Untitled" workspace ready to use
+- **Default Location:** Workspaces saved to `~/Documents/ImageDescriptionToolkit/workspaces/` (.idw files)
+- **Data Storage:** Image data stored in `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/{workspace_name}/`
+- **Smart Naming:** Sequential naming (Untitled, Untitled 1, Untitled 2) avoids conflicts
+- **Auto-Save Prompts:** Before batch operations (Process All, URL downloads), you'll be prompted to save if workspace is still Untitled
 
 **Image Panel (Left):**
 - List of all images in the workspace
@@ -241,10 +260,12 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 ### Menu Features
 
 **File Menu:**
-- **New Workspace** - Start fresh project
-- **Load Directory** - Add images from folder
-- **Load Workspace** - Open saved .idt project
-- **Save/Save As** - Preserve workspace state
+- **New Workspace** - Start fresh project (creates new Untitled workspace)
+- **Load Directory** - Add images from folder to current workspace
+- **Load from URL** - Download images from a webpage (prompts to save workspace first if Untitled)
+- **Load Workspace** - Open saved .idw project
+- **Save/Save As** - Rename and preserve workspace state
+  - **Note:** Save As renames the workspace AND moves the data directory automatically
 - **Export to HTML** - Generate web-viewable results
 - **Switch to Viewer** - Browse all workflow results with live monitoring
 - **Switch to Workspace** - Return to processing mode
@@ -252,6 +273,9 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 **Processing Menu:**
 - **Process Selected Image** - Describe current image
 - **Process All Undescribed** - Batch process all pending images
+  - **Save Prompt:** If workspace is still Untitled, you'll be prompted to save it first
+  - **Auto-Save:** Workspace is automatically saved before processing begins
+  - **Smart Naming:** Suggested names based on content (directory names, video names, dates)
 - **Pause Batch** - Temporarily stop processing
 - **Resume Batch** - Continue paused workflow
 
@@ -299,6 +323,42 @@ ImageDescriber's integrated **Viewer Mode** lets you browse all workflow results
 - Automatically extract frames
 - Describe each frame individually
 - Nested display in image list
+
+### Workspace Management
+
+**Understanding Workspaces:**
+A workspace is a project file (.idw) that tracks your images, descriptions, and settings. ImageDescriber uses a two-part structure:
+- **Workspace File (.idw):** Lives in `~/Documents/ImageDescriptionToolkit/workspaces/` - this is what you save/load
+- **Data Directory:** Lives in `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/{workspace_name}/` - contains actual image files
+
+**Automatic Untitled Workspaces:**
+- App automatically creates an "Untitled" workspace when you launch
+- If "Untitled" already exists, creates "Untitled 1", "Untitled 2", etc.
+- Empty Untitled workspaces are deleted automatically when you close the app
+- You keep working right away - no "create new workspace" step needed
+
+**When You're Prompted to Save:**
+Before batch operations (Process All, URL downloads), you'll see a save dialog if your workspace is still "Untitled":
+1. **Smart Naming:** Suggested name based on your content:
+   - Loading directory "vacation_photos" → suggests "vacation_photos_20260211"
+   - Downloading from "nytimes.com" → suggests "nytimes_20260211_143025" (includes time for uniqueness)
+   - Processing videos → suggests "{video_name}_20260211"
+2. **Accept or Customize:** Use the suggested name or type your own
+3. **Automatic Move:** Both the .idw file AND data directory are renamed together
+4. **Processing Begins:** Your batch operation starts immediately after saving
+
+**How Save As Works:**
+- **File → Save As** lets you rename your workspace anytime
+- The .idw file is renamed in `~/Documents/ImageDescriptionToolkit/workspaces/`
+- The data directory is renamed in `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/`
+- All internal file paths are updated automatically
+- External files (from other locations) remain linked correctly
+
+**Best Practices:**
+- ✅ Use descriptive names when prompted (easier to find later)
+- ✅ Let the auto-save handle things before batch operations
+- ✅ Use Viewer mode to browse all your saved workspaces
+- ✅ Export important results to HTML for sharing
 
 ### Use Cases
 
@@ -548,7 +608,35 @@ idt workflow C:\More_Photos --batch --name batch2
 
 IDT can download images directly from web pages, making it easy to process online galleries, portfolios, or any webpage containing images.
 
-### Simplified Usage
+### GUI Web Downloads (ImageDescriber)
+
+**Using the Download from URL feature:**
+
+1. **Open Download Dialog:** Click **File → Load from URL**
+2. **Enter URL:** Type or paste the webpage URL (e.g., `https://gallery.com`)
+3. **Configure Settings:**
+   - **Minimum Width/Height:** Filter out small images (thumbnails, icons)
+   - **Maximum Images:** Limit total downloads (useful for large galleries)
+   - **Process After Download:** Automatically describe images after downloading
+4. **Save Workspace Prompt:**
+   - If your workspace is still "Untitled", you'll be prompted to save it first
+   - Suggested name is extracted from the URL with timestamp (e.g., "nytimes_20260211_143025")
+   - Timestamp ensures uniqueness for multiple downloads from same site
+   - Downloaded images go to a properly named directory
+5. **Watch Progress:** Progress bar shows download status
+6. **Review Results:** Downloaded images appear in workspace automatically
+
+**Where Downloads Go:**
+- Images saved to: `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/{workspace_name}/downloaded_images/`
+- Each image's source URL is tracked in metadata
+- URL appears in exported descriptions and HTML reports
+
+**Auto-Processing:**
+- Enable "Process after download" to automatically describe images
+- Uses default AI provider and prompt settings
+- Progress shown in real-time with completion notification
+
+### CLI Web Downloads
 
 **Just specify the website directly** - IDT automatically detects URLs and sets up the right workflow:
 

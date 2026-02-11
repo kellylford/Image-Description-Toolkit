@@ -9,18 +9,18 @@ Implemented comprehensive Untitled workspace architecture for ImageDescriber GUI
 **File:** `imagedescriber/workspace_manager.py` (NEW - 220 lines)
 
 **Key Functions:**
-- `get_default_workspaces_root()` - Platform-specific default workspace directory (~/Documents/workspaces/)
-- `get_workspace_files_root()` - Returns WorkSpaceFiles directory (~/Documents/WorkSpaceFiles/)
+- `get_default_workspaces_root()` - Platform-specific default workspace directory (~/Documents/ImageDescriptionToolkit/workspaces/)
+- `get_workspace_files_root()` - Returns WorkSpaceFiles directory (~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/)
 - `get_next_untitled_name()` - Finds next available Untitled, Untitled 1, Untitled 2, etc.
-- `propose_workspace_name_from_url(url)` - Generates workspace name from URL (e.g., "nytimes_20260211")
+- `propose_workspace_name_from_url(url)` - Generates workspace name from URL (e.g., "nytimes_20260211_143025")
 - `create_workspace_structure(name)` - Creates IDW file + data directory
 - `is_untitled_workspace(name)` - Checks if workspace name is Untitled variant
 - `get_workspace_files_directory(idw_path)` - Maps IDW file to data directory
 
 **Cross-Platform Support:**
-- Windows: `~\Documents\workspaces\` and `~\Documents\WorkSpaceFiles\`
-- macOS: `~/Documents/workspaces/` and `~/Documents/WorkSpaceFiles/`
-- Linux: `~/Documents/` or `~/.local/share/IDT/`
+- Windows: `~\Documents\ImageDescriptionToolkit\workspaces\` and `~\Documents\ImageDescriptionToolkit\WorkSpaceFiles\`
+- macOS: `~/Documents/ImageDescriptionToolkit/workspaces/` and `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/`
+- Linux: `~/Documents/ImageDescriptionToolkit/` or `~/.local/share/IDT/`
 
 ### 2Download Dialog Simplified
 **File:** `imagedescriber/download_dialog.py`
@@ -83,7 +83,7 @@ Implemented comprehensive Untitled workspace architecture for ImageDescriber GUI
 
 #### Workspace Directory Resolution
 - Updated `get_workspace_directory()` to use `get_workspace_files_directory()`
-- Now uses: `~/Documents/WorkSpaceFiles/{workspace_name}/`
+- Now uses: `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/{workspace_name}/`
 - Removed old pattern: `{workspace_stem}_workspace/`
 
 #### Download Completion Handler
@@ -113,17 +113,18 @@ Implemented comprehensive Untitled workspace architecture for ImageDescriber GUI
 
 ```
 ~/Documents/
-├── workspaces/              # IDW workspace files
-│   ├── Untitled.idw
-│   ├── Untitled 1.idw
-│   └── nytimes_20260211.idw
-└── WorkSpaceFiles/          # Actual image files
-    ├── Untitled/
-    │   ├── downloaded_images/
-    │   └── extracted_frames/
-    ├── Untitled 1/
-    └── nytimes_20260211/
-        └── downloaded_images/
+└── ImageDescriptionToolkit/     # Parent folder for all IDT data
+    ├── workspaces/              # IDW workspace files
+    │   ├── Untitled.idw
+    │   ├── Untitled 1.idw
+    │   └── nytimes_20260211_143025.idw
+    └── WorkSpaceFiles/          # Actual image files
+        ├── Untitled/
+        │   ├── downloaded_images/
+        │   └── extracted_frames/
+        ├── Untitled 1/
+        └── nytimes_20260211_143025/
+            └── downloaded_images/
 ```
 
 ## Key Design Decisions
@@ -144,9 +145,10 @@ Implemented comprehensive Untitled workspace architecture for ImageDescriber GUI
 - Cleanup happens automatically on close if empty
 
 ### 4. Default Directories
-- `~/Documents/workspaces/` - User-accessible workspace files (.idw)
-- `~/Documents/WorkSpaceFiles/` - Hidden from typical browsing
+- `~/Documents/ImageDescriptionToolkit/workspaces/` - User-accessible workspace files (.idw)
+- `~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/` - Image data and working files
 - Separates "what I work with" from "working data"
+- All IDT data in one parent folder (ImageDescriptionToolkit)
 
 ### 5. Auto-Save Before Batch Operations
 - Prevents orphaned files

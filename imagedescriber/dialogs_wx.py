@@ -135,38 +135,40 @@ class DirectorySelectionDialog(wx.Dialog):
         else:
             self.add_to_existing_cb.SetToolTip("No existing directories in workspace")
             self.add_to_existing_cb.Enable(False)
+        self.add_to_existing_cb.Bind(wx.EVT_CHECKBOX, self.on_add_to_existing_changed)
         options_sizer.Add(self.add_to_existing_cb, 0, wx.ALL, 5)
         
         main_sizer.Add(options_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
         # Existing directories display
+        self.existing_sizer = None  # Store reference for show/hide
+        self.existing_list = None  # Store listbox reference
         if existing_directories:
             existing_box = wx.StaticBox(
                 self,
                 label=f"Current Workspace Directories ({len(existing_directories)})"
             )
-            existing_sizer = wx.StaticBoxSizer(existing_box, wx.VERTICAL)
+            self.existing_sizer = wx.StaticBoxSizer(existing_box, wx.VERTICAL)
             
-            # Use scrolled window for many directories
-            scroll = wx.ScrolledWindow(self, size=(-1, 150))
-            scroll.SetScrollRate(5, 5)
-            scroll_sizer = wx.BoxSizer(wx.VERTICAL)
+            # Use accessible ListBox instead of ScrolledWindow with StaticText
+            # This allows screen readers to read each directory name properly
+            self.existing_list = wx.ListBox(
+                self,
+                size=(-1, 150),
+                name="Current workspace directories",
+                style=wx.LB_SINGLE | wx.LB_NEEDED_SB
+            )
             
-            for directory in existing_directories[:10]:  # Show up to 10
-                dir_label = wx.StaticText(scroll, label=str(Path(directory).name))
-                dir_label.SetToolTip(str(directory))
-                scroll_sizer.Add(dir_label, 0, wx.ALL, 2)
+            # Add directory names to listbox
+            for directory in existing_directories:
+                self.existing_list.Append(str(Path(directory).name), directory)
             
-            if len(existing_directories) > 10:
-                more_label = wx.StaticText(
-                    scroll,
-                    label=f"... and {len(existing_directories) - 10} more"
-                )
-                scroll_sizer.Add(more_label, 0, wx.ALL, 2)
+            self.existing_sizer.Add(self.existing_list, 1, wx.EXPAND | wx.ALL, 5)
+            main_sizer.Add(self.existing_sizer, 1, wx.ALL | wx.EXPAND, 10)
             
-            scroll.SetSizer(scroll_sizer)
-            existing_sizer.Add(scroll, 1, wx.EXPAND | wx.ALL, 5)
-            main_sizer.Add(existing_sizer, 1, wx.ALL | wx.EXPAND, 10)
+            # Initially hide the existing directories list
+            self.existing_sizer.ShowItems(False)
+            self.existing_list.Show(False)
         
         # Dialog buttons
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
@@ -190,6 +192,15 @@ class DirectorySelectionDialog(wx.Dialog):
             self.dir_label.SetLabel(str(Path(dir_path).name))
             self.dir_label.SetToolTip(dir_path)
             self.update_ok_button()
+    
+    def on_add_to_existing_changed(self, event):
+        """Handle add to existing checkbox state change"""
+        if self.existing_sizer and self.existing_list:
+            # Show/hide existing directories list based on checkbox state
+            show = self.add_to_existing_cb.GetValue()
+            self.existing_sizer.ShowItems(show)
+            self.existing_list.Show(show)
+            self.Layout()
     
     def update_ok_button(self):
         """Enable/disable OK button based on selection"""
