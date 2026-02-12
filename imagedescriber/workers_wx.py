@@ -85,6 +85,12 @@ ChatUpdateEvent, EVT_CHAT_UPDATE = wx.lib.newevent.NewEvent()
 ChatCompleteEvent, EVT_CHAT_COMPLETE = wx.lib.newevent.NewEvent()
 ChatErrorEvent, EVT_CHAT_ERROR = wx.lib.newevent.NewEvent()
 
+# Directory scanning event types (for async file loading)
+FilesDiscoveredEvent, EVT_FILES_DISCOVERED = wx.lib.newevent.NewEvent()
+ScanProgressEvent, EVT_SCAN_PROGRESS = wx.lib.newevent.NewEvent()
+ScanCompleteEvent, EVT_SCAN_COMPLETE = wx.lib.newevent.NewEvent()
+ScanFailedEvent, EVT_SCAN_FAILED = wx.lib.newevent.NewEvent()
+
 
 # Custom event classes that properly store attributes
 class ProcessingCompleteEventData(ProcessingCompleteEvent):
@@ -130,6 +136,38 @@ class WorkflowFailedEventData(WorkflowFailedEvent):
     """Event data for workflow failure"""
     def __init__(self, error):
         WorkflowFailedEvent.__init__(self)
+        self.error = error
+
+
+class FilesDiscoveredEventData(FilesDiscoveredEvent):
+    """Event data for file discovery during directory scan"""
+    def __init__(self, files, batch_number, total_batches):
+        FilesDiscoveredEvent.__init__(self)
+        self.files = files  # List of Path objects
+        self.batch_number = batch_number  # Current batch number
+        self.total_batches = total_batches  # Total batches (may be estimate)
+
+
+class ScanProgressEventData(ScanProgressEvent):
+    """Event data for scan progress updates"""
+    def __init__(self, message, files_found):
+        ScanProgressEvent.__init__(self)
+        self.message = message
+        self.files_found = files_found
+
+
+class ScanCompleteEventData(ScanCompleteEvent):
+    """Event data for scan completion"""
+    def __init__(self, total_files, elapsed_time):
+        ScanCompleteEvent.__init__(self)
+        self.total_files = total_files
+        self.elapsed_time = elapsed_time
+
+
+class ScanFailedEventData(ScanFailedEvent):
+    """Event data for scan failure"""
+    def __init__(self, error):
+        ScanFailedEvent.__init__(self)
         self.error = error
 
 
@@ -1678,3 +1716,133 @@ class DownloadProcessingWorker(threading.Thread):
             wx.PostEvent(self.parent_window, evt)
         except Exception as e:
             logger.warning(f"Could not post progress update: {e}")
+
+
+class DirectoryScanWorker(threading.Thread):
+    """Worker thread for async directory scanning with progressive updates
+    
+    Scans directory for images/videos in background, emitting batches of discovered files
+    as they're found. Critical for network share performance where synchronous scanning
+    can take minutes for directories with thousands of files.
+    
+    Events:
+        FilesDiscoveredEvent: Batch of files discovered (sent periodically during scan)
+        ScanProgressEvent: Progress updates with file count
+        ScanCompleteEvent: Scan finished with total count and time
+        ScanFailedEvent: Error during scanning
+    """
+    
+    # Supported image and video extensions
+    IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.tiff', '.tif'}
+    VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.m4v', '.webm', '.flv', '.wmv'}
+    
+    def __init__(self, parent_window, directory_path: Path, batch_size: int = 50, recursive: bool = True):
+        """Initialize directory scanner
+        
+        Args:
+            parent_window: wxWindow to receive events
+            directory_path: Path object for directory to scan
+            batch_size: Number of files to collect before sending batch event (default 50)
+            recursive: Whether to scan subdirectories (default True)
+        """
+        super().__init__(daemon=True)
+        self.parent_window = parent_window
+        self.directory_path = Path(directory_path)
+        self.batch_size = batch_size
+        self.recursive = recursive
+        self._stop_flag = False
+        
+    def stop(self):
+        """Request worker to stop scanning"""
+        self._stop_flag = True
+    
+    def run(self):
+        """Execute directory scan in background thread"""
+        start_time = time.time()
+        all_files = []
+        batch = []
+        batch_number = 0
+        
+        try:
+            # Post initial progress
+            self._post_progress("Starting directory scan...", 0)
+            
+            # Determine scan pattern
+            if self.recursive:
+                scan_pattern = '**/*'
+            else:
+                scan_pattern = '*'
+            
+            # Scan directory
+            for file_path in self.directory_path.glob(scan_pattern):
+                # Check stop flag
+                if self._stop_flag:
+                    logger.info("Directory scan stopped by user")
+                    return
+                
+                # Skip directories
+                if file_path.is_dir():
+                    continue
+                
+                # Check if file is image or video
+                if file_path.suffix.lower() in self.IMAGE_EXTENSIONS or file_path.suffix.lower() in self.VIDEO_EXTENSIONS:
+                    batch.append(file_path)
+                    all_files.append(file_path)
+                    
+                    # Send batch when full
+                    if len(batch) >= self.batch_size:
+                        batch_number += 1
+                        self._post_batch(batch, batch_number, all_files)
+                        
+                        # Post progress update
+                        self._post_progress(f"Found {len(all_files)} files...", len(all_files))
+                        
+                        # Clear batch for next iteration
+                        batch = []
+            
+            # Send final batch (if any)
+            if batch:
+                batch_number += 1
+                self._post_batch(batch, batch_number, all_files)
+            
+            # Calculate elapsed time
+            elapsed = time.time() - start_time
+            
+            # Post completion event
+            logger.info(f"Directory scan complete: {len(all_files)} files in {elapsed:.2f}s")
+            evt = ScanCompleteEventData(
+                total_files=len(all_files),
+                elapsed_time=elapsed
+            )
+            wx.PostEvent(self.parent_window, evt)
+            
+        except Exception as e:
+            logger.error(f"Directory scan error: {e}", exc_info=True)
+            evt = ScanFailedEventData(error=str(e))
+            wx.PostEvent(self.parent_window, evt)
+    
+    def _post_batch(self, batch, batch_number, all_files):
+        """Post batch of discovered files to main window"""
+        try:
+            # Estimate total batches (may change as scan progresses)
+            total_batches = (len(all_files) // self.batch_size) + 1
+            
+            evt = FilesDiscoveredEventData(
+                files=batch.copy(),  # Copy to avoid reference issues
+                batch_number=batch_number,
+                total_batches=total_batches
+            )
+            wx.PostEvent(self.parent_window, evt)
+        except Exception as e:
+            logger.warning(f"Could not post files discovered event: {e}")
+    
+    def _post_progress(self, message, files_found):
+        """Post progress update to main window"""
+        try:
+            evt = ScanProgressEventData(
+                message=message,
+                files_found=files_found
+            )
+            wx.PostEvent(self.parent_window, evt)
+        except Exception as e:
+            logger.warning(f"Could not post scan progress: {e}")

@@ -79,6 +79,11 @@ class ImageItem:
         self.processing_error: Optional[str] = None  # Error message if failed
         self.batch_queue_position: Optional[int] = None  # Order in queue for resume
         
+        # Performance optimization: Cache EXIF datetime and file mtime to avoid repeated extraction
+        # This is critical for network share access where repeated reads are 10-100x slower
+        self.exif_datetime: Optional[str] = None  # Cached EXIF datetime (ISO format) from DateTimeOriginal→DateTimeDigitized→DateTime
+        self.file_mtime: Optional[float] = None  # Cached file modification time (fallback for sorting)
+        
     def add_description(self, description: ImageDescription):
         self.descriptions.append(description)
     
@@ -101,7 +106,10 @@ class ImageItem:
             # Batch processing state (Phase 1: Batch Management)
             "processing_state": self.processing_state,
             "processing_error": self.processing_error,
-            "batch_queue_position": self.batch_queue_position
+            "batch_queue_position": self.batch_queue_position,
+            # Performance optimization caches
+            "exif_datetime": self.exif_datetime,
+            "file_mtime": self.file_mtime
         }
     
     @classmethod
@@ -120,6 +128,9 @@ class ImageItem:
         item.processing_state = data.get("processing_state", None)
         item.processing_error = data.get("processing_error", None)
         item.batch_queue_position = data.get("batch_queue_position", None)
+        # Performance optimization caches - backward compatible defaults
+        item.exif_datetime = data.get("exif_datetime", None)
+        item.file_mtime = data.get("file_mtime", None)
         return item
 
 
