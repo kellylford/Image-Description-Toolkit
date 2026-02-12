@@ -1959,9 +1959,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Helper function to get datetime for sorting (EXIF date with fallback to mtime)
         # PERFORMANCE: Use cached dates from ImageItem to avoid repeated EXIF extraction over network shares
         def get_sort_date(file_path):
-            """Get datetime for sorting: cached exif_datetime → extract if missing → mtime fallback"""
+            """Get datetime for sorting: cached exif_datetime → cached mtime → extract if missing → epoch fallback
+            
+            CRITICAL FOR PERFORMANCE: During initial load from network share, SKIP EXIF extraction!
+            Use mtime for initial sort (instant), then extract EXIF in background later.
+            """
             try:
-                # Check if we have cached EXIF datetime in the workspace item
+                # Check if we have cached data in the workspace item
                 if file_path in self.workspace.items:
                     item = self.workspace.items[file_path]
                     
@@ -1970,25 +1974,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         try:
                             return datetime.fromisoformat(item.exif_datetime)
                         except Exception:
-                            pass  # Invalid cached date, proceed to extraction
+                            pass  # Invalid cached date, proceed to mtime
                     
-                    # If no cache, extract and cache for next time
-                    dt = extract_exif_datetime(file_path)
-                    if dt:
-                        # Cache the extracted datetime for future refreshes
-                        item.exif_datetime = dt.isoformat()
-                        return dt
-                    
-                    # Use cached mtime if available
+                    # Use cached mtime (fast - already extracted during scan)
                     if item.file_mtime:
                         return datetime.fromtimestamp(item.file_mtime)
-                
-                # Fallback: extract fresh (for items not in workspace yet)
-                dt = extract_exif_datetime(file_path)
-                if dt:
-                    return dt
                     
-                # Last resort: epoch time
+                    # SKIP EXIF extraction during initial load of 1000+ files!
+                    # It takes minutes over network shares. Just use epoch for now.
+                    # We can add a background task later to extract EXIF and re-sort.
+                
+                # Last resort: epoch time (sorts to beginning)
                 return datetime.fromtimestamp(0)
             except Exception:
                 # Last resort: epoch time
@@ -3461,7 +3457,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     # Directory scan event handlers (for async file loading performance)
     def on_files_discovered(self, event):
-        """Handle batch of files discovered during async directory scan"""
+        """Handle batch of files discovered during async directory scan
+        
+        PERFORMANCE CRITICAL: This is called for every batch of 50 files.
+        We must NOT do expensive I/O here (EXIF extraction, video metadata).
+        Just add files to workspace with minimal metadata (mtime only).
+        Actual EXIF extraction happens lazily in refresh_image_list's get_sort_date().
+        """
         # Add discovered files to workspace
         for file_path in event.files:
             file_path_str = str(file_path)
@@ -3472,34 +3474,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 else:
                     item_type = "image"
                 
-                # Create item
+                # Create item with MINIMAL metadata (no network I/O!)
                 item = ImageItem(file_path_str, item_type)
                 
-                # Cache EXIF datetime for performance (critical for network shares)
-                try:
-                    exif_dt = extract_exif_datetime(file_path_str)
-                    if exif_dt:
-                        item.exif_datetime = exif_dt.isoformat()
-                except Exception:
-                    pass  # Failed to extract EXIF, will use mtime as fallback
-                
-                # Cache file mtime as fallback for sorting
+                # ONLY cache file mtime (already available from directory scan, no extra I/O)
                 try:
                     item.file_mtime = file_path.stat().st_mtime
                 except Exception:
                     pass
                 
-                # For videos, extract metadata if not too slow
-                # (We may want to defer this to lazy loading later)
-                if item_type == "video":
-                    metadata = self.get_video_metadata(file_path_str)
-                    if metadata:
-                        item.video_metadata = metadata
+                # DO NOT extract EXIF here - that's 1183 network reads!
+                # DO NOT extract video metadata here - that's minutes of cv2.VideoCapture!
+                # Let refresh_image_list's get_sort_date() extract lazily when needed
                 
                 self.workspace.add_item(item)
         
-        # Refresh UI to show new files
-        self.refresh_image_list()
+        # DO NOT call refresh_image_list() here - that would re-sort ALL files for EVERY batch!
+        # With 1183 files in 24 batches, that's O(n²) = tens of thousands of operations
+        # Just update status bar to show progress
+        self.SetStatusText(f"Found {len(self.workspace.items)} files...", 0)
         
     def on_scan_progress(self, event):
         """Handle directory scan progress updates"""
@@ -3511,6 +3504,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Handle directory scan completion"""
         total_files = event.total_files
         elapsed = event.elapsed_time
+        
+        # NOW refresh UI once with all files (this will trigger EXIF extraction as needed)
+        self.refresh_image_list()
         
         # Update status bar
         self.SetStatusText(f"Loaded {total_files} files in {elapsed:.1f}s", 0)
