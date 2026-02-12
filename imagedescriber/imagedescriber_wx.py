@@ -183,6 +183,7 @@ if getattr(sys, 'frozen', False):
         WorkflowProcessWorker,
         VideoProcessingWorker,
         HEICConversionWorker,
+        DirectoryScanWorker,
         EVT_PROGRESS_UPDATE,
         EVT_PROCESSING_COMPLETE,
         EVT_PROCESSING_FAILED,
@@ -190,6 +191,10 @@ if getattr(sys, 'frozen', False):
         EVT_WORKFLOW_FAILED,
         EVT_CONVERSION_COMPLETE,
         EVT_CONVERSION_FAILED,
+        EVT_FILES_DISCOVERED,
+        EVT_SCAN_PROGRESS,
+        EVT_SCAN_COMPLETE,
+        EVT_SCAN_FAILED,
     )
 else:
     # Development: try relative imports first, fall back to absolute
@@ -216,6 +221,7 @@ else:
             WorkflowProcessWorker,
             VideoProcessingWorker,
             HEICConversionWorker,
+            DirectoryScanWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -223,6 +229,10 @@ else:
             EVT_WORKFLOW_FAILED,
             EVT_CONVERSION_COMPLETE,
             EVT_CONVERSION_FAILED,
+            EVT_FILES_DISCOVERED,
+            EVT_SCAN_PROGRESS,
+            EVT_SCAN_COMPLETE,
+            EVT_SCAN_FAILED,
         )
     except ImportError as e_rel:
         print(f"[DEBUG] Relative import failed, trying absolute: {e_rel}")
@@ -248,6 +258,7 @@ else:
             WorkflowProcessWorker,
             VideoProcessingWorker,
             HEICConversionWorker,
+            DirectoryScanWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -255,6 +266,10 @@ else:
             EVT_WORKFLOW_FAILED,
             EVT_CONVERSION_COMPLETE,
             EVT_CONVERSION_FAILED,
+            EVT_FILES_DISCOVERED,
+            EVT_SCAN_PROGRESS,
+            EVT_SCAN_COMPLETE,
+            EVT_SCAN_FAILED,
         )
 
 # Import provider capabilities
@@ -372,6 +387,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.batch_worker: Optional[BatchProcessingWorker] = None  # Store worker reference
         self.video_worker = None  # Store VideoProcessingWorker reference to prevent GC
         self.download_worker = None  # Store DownloadProcessingWorker reference to prevent GC
+        self.scan_worker: Optional[DirectoryScanWorker] = None  # Store DirectoryScanWorker reference for async file loading
         self.followup_worker = None  # Store ProcessingWorker reference for follow-up questions
         self.batch_progress_dialog: Optional[BatchProgressDialog] = None  # Progress dialog
         self.batch_start_time: Optional[float] = None  # For avg time calculation
@@ -420,6 +436,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.Bind(EVT_CONVERSION_COMPLETE, self.on_conversion_complete)
         if EVT_CONVERSION_FAILED:
             self.Bind(EVT_CONVERSION_FAILED, self.on_conversion_failed)
+        if EVT_FILES_DISCOVERED:
+            self.Bind(EVT_FILES_DISCOVERED, self.on_files_discovered)
+        if EVT_SCAN_PROGRESS:
+            self.Bind(EVT_SCAN_PROGRESS, self.on_scan_progress)
+        if EVT_SCAN_COMPLETE:
+            self.Bind(EVT_SCAN_COMPLETE, self.on_scan_complete)
+        if EVT_SCAN_FAILED:
+            self.Bind(EVT_SCAN_FAILED, self.on_scan_failed)
         
         # Bind keyboard events for single-key shortcuts (matching Qt6 behavior)
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
@@ -1855,7 +1879,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.SetStatusText(f"Downloading images from {settings['url']}...", 0)
     
     def load_directory(self, dir_path, recursive=False, append=False):
-        """Load images from directory
+        """Load images from directory using async scanning for network share performance
         
         Args:
             dir_path: Path to directory
@@ -1868,6 +1892,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 show_error(self, f"Directory not found: {dir_path}")
                 return
             
+            # Stop any existing scan
+            if self.scan_worker:
+                self.scan_worker.stop()
+                self.scan_worker = None
+            
             # Create new workspace if not appending
             if not append:
                 self.workspace = ImageWorkspace(new_workspace=True)
@@ -1875,62 +1904,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Add directory to workspace
             self.workspace.add_directory(str(dir_path))
             
-            # Find all images and videos
-            images_found = []
-            videos_found = []
+            # Update status bar to show scanning in progress
+            self.SetStatusText(f"Scanning {dir_path.name}...", 0)
+            self.SetStatusText("0 files found", 1)
             
-            if recursive:
-                # Recursive search - images
-                for ext in self.image_extensions:
-                    images_found.extend(dir_path.rglob(f"*{ext}"))
-                    images_found.extend(dir_path.rglob(f"*{ext.upper()}"))
-                # Recursive search - videos
-                for ext in self.video_extensions:
-                    videos_found.extend(dir_path.rglob(f"*{ext}"))
-                    videos_found.extend(dir_path.rglob(f"*{ext.upper()}"))
-            else:
-                # Non-recursive - images
-                for ext in self.image_extensions:
-                    images_found.extend(dir_path.glob(f"*{ext}"))
-                    images_found.extend(dir_path.glob(f"*{ext.upper()}"))
-                # Non-recursive - videos
-                for ext in self.video_extensions:
-                    videos_found.extend(dir_path.glob(f"*{ext}"))
-                    videos_found.extend(dir_path.glob(f"*{ext.upper()}"))
+            # Start async directory scan
+            self.scan_worker = DirectoryScanWorker(
+                parent_window=self,
+                directory_path=dir_path,
+                batch_size=50,  # Send files in batches of 50
+                recursive=recursive
+            )
+            self.scan_worker.start()
             
-            # Add images to workspace
-            added_count = 0
-            for image_path in sorted(images_found):
-                image_path_str = str(image_path)
-                if image_path_str not in self.workspace.items:
-                    item = ImageItem(image_path_str, "image")
-                    self.workspace.add_item(item)
-                    added_count += 1
-            
-            # Add videos to workspace
-            video_count = 0
-            for video_path in sorted(videos_found):
-                video_path_str = str(video_path)
-                if video_path_str not in self.workspace.items:
-                    item = ImageItem(video_path_str, "video")
-                    # Get video metadata (duration, fps, frame count)
-                    metadata = self.get_video_metadata(video_path_str)
-                    if metadata:
-                        item.video_metadata = metadata
-                    self.workspace.add_item(item)
-                    video_count += 1
-                    added_count += 1
-            
-            # Update UI
-            self.refresh_image_list()
-            self.mark_modified()
-            
-            action = "Added" if append else "Loaded"
-            if video_count > 0:
-                self.SetStatusText(f"{action} {added_count - video_count} images, {video_count} videos from {dir_path.name}", 0)
-            else:
-                self.SetStatusText(f"{action} {added_count} images from {dir_path.name}", 0)
-            self.SetStatusText(f"{len(self.workspace.items)} total items", 1)
+            # Note: Actual file loading happens in on_files_discovered event handler
+            # UI updates will be progressive as batches arrive
             
         except Exception as e:
             show_error(self, f"Error loading directory:\n{e}")
@@ -1969,13 +1957,34 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 regular_images.append((file_path, item))
         
         # Helper function to get datetime for sorting (EXIF date with fallback to mtime)
+        # PERFORMANCE: Use cached dates from ImageItem to avoid repeated EXIF extraction over network shares
         def get_sort_date(file_path):
-            """Get datetime for sorting: DateTimeOriginal → DateTimeDigitized → DateTime → mtime"""
+            """Get datetime for sorting: cached exif_datetime → cached mtime → extract if missing → epoch fallback
+            
+            CRITICAL FOR PERFORMANCE: During initial load from network share, SKIP EXIF extraction!
+            Use mtime for initial sort (instant), then extract EXIF in background later.
+            """
             try:
-                dt = extract_exif_datetime(file_path)
-                if dt:
-                    return dt
-                # Fallback to epoch if extraction fails
+                # Check if we have cached data in the workspace item
+                if file_path in self.workspace.items:
+                    item = self.workspace.items[file_path]
+                    
+                    # Try cached EXIF datetime first (fastest - no I/O)
+                    if item.exif_datetime:
+                        try:
+                            return datetime.fromisoformat(item.exif_datetime)
+                        except Exception:
+                            pass  # Invalid cached date, proceed to mtime
+                    
+                    # Use cached mtime (fast - already extracted during scan)
+                    if item.file_mtime:
+                        return datetime.fromtimestamp(item.file_mtime)
+                    
+                    # SKIP EXIF extraction during initial load of 1000+ files!
+                    # It takes minutes over network shares. Just use epoch for now.
+                    # We can add a background task later to extract EXIF and re-sort.
+                
+                # Last resort: epoch time (sorts to beginning)
                 return datetime.fromtimestamp(0)
             except Exception:
                 # Last resort: epoch time
@@ -3445,6 +3454,79 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Restore focus to image list after dialog
         self.image_list.SetFocus()
         self.SetStatusText("Workflow failed", 0)
+    
+    # Directory scan event handlers (for async file loading performance)
+    def on_files_discovered(self, event):
+        """Handle batch of files discovered during async directory scan
+        
+        PERFORMANCE CRITICAL: This is called for every batch of 50 files.
+        We must NOT do expensive I/O here (EXIF extraction, video metadata).
+        Just add files to workspace with minimal metadata (mtime only).
+        Actual EXIF extraction happens lazily in refresh_image_list's get_sort_date().
+        """
+        # Add discovered files to workspace
+        for file_path in event.files:
+            file_path_str = str(file_path)
+            if file_path_str not in self.workspace.items:
+                # Determine item type
+                if file_path.suffix.lower() in self.video_extensions:
+                    item_type = "video"
+                else:
+                    item_type = "image"
+                
+                # Create item with MINIMAL metadata (no network I/O!)
+                item = ImageItem(file_path_str, item_type)
+                
+                # ONLY cache file mtime (already available from directory scan, no extra I/O)
+                try:
+                    item.file_mtime = file_path.stat().st_mtime
+                except Exception:
+                    pass
+                
+                # DO NOT extract EXIF here - that's 1183 network reads!
+                # DO NOT extract video metadata here - that's minutes of cv2.VideoCapture!
+                # Let refresh_image_list's get_sort_date() extract lazily when needed
+                
+                self.workspace.add_item(item)
+        
+        # DO NOT call refresh_image_list() here - that would re-sort ALL files for EVERY batch!
+        # With 1183 files in 24 batches, that's O(n²) = tens of thousands of operations
+        # Just update status bar to show progress
+        self.SetStatusText(f"Found {len(self.workspace.items)} files...", 0)
+        
+    def on_scan_progress(self, event):
+        """Handle directory scan progress updates"""
+        # Update status bar with scan progress
+        self.SetStatusText(event.message, 0)
+        self.SetStatusText(f"{event.files_found} files found", 1)
+        
+    def on_scan_complete(self, event):
+        """Handle directory scan completion"""
+        total_files = event.total_files
+        elapsed = event.elapsed_time
+        
+        # NOW refresh UI once with all files (this will trigger EXIF extraction as needed)
+        self.refresh_image_list()
+        
+        # Update status bar
+        self.SetStatusText(f"Loaded {total_files} files in {elapsed:.1f}s", 0)
+        self.SetStatusText(f"{len(self.workspace.items)} total items", 1)
+        
+        # Mark workspace as modified
+        self.mark_modified()
+        
+        # Clear scan worker reference
+        self.scan_worker = None
+        
+        logger.info(f"Directory scan complete: {total_files} files in {elapsed:.2f}s")
+        
+    def on_scan_failed(self, event):
+        """Handle directory scan failure"""
+        show_error(self, f"Error scanning directory:\n{event.error}")
+        self.SetStatusText("Directory scan failed", 0)
+        
+        # Clear scan worker reference
+        self.scan_worker = None
     
     # Phase 3: Batch control handlers
     def on_pause_batch(self):
