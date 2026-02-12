@@ -79,6 +79,9 @@ class ImageItem:
         self.processing_error: Optional[str] = None  # Error message if failed
         self.batch_queue_position: Optional[int] = None  # Order in queue for resume
         
+        # Cached EXIF sort date (ISO string) to avoid re-reading files on every refresh
+        self.cached_sort_date: Optional[str] = None
+        
     def add_description(self, description: ImageDescription):
         self.descriptions.append(description)
     
@@ -101,7 +104,9 @@ class ImageItem:
             # Batch processing state (Phase 1: Batch Management)
             "processing_state": self.processing_state,
             "processing_error": self.processing_error,
-            "batch_queue_position": self.batch_queue_position
+            "batch_queue_position": self.batch_queue_position,
+            # Cached sort date to avoid re-reading EXIF on every refresh
+            "cached_sort_date": self.cached_sort_date
         }
     
     @classmethod
@@ -120,6 +125,8 @@ class ImageItem:
         item.processing_state = data.get("processing_state", None)
         item.processing_error = data.get("processing_error", None)
         item.batch_queue_position = data.get("batch_queue_position", None)
+        # Cached sort date - backward compatible
+        item.cached_sort_date = data.get("cached_sort_date", None)
         return item
 
 
@@ -271,6 +278,14 @@ class ImageWorkspace:
     def add_item(self, item: ImageItem):
         self.items[item.file_path] = item
         self.mark_modified()
+    
+    def add_items(self, items: list):
+        """Add multiple items at once, calling mark_modified only once"""
+        for item in items:
+            if item.file_path not in self.items:
+                self.items[item.file_path] = item
+        if items:
+            self.mark_modified()
     
     def remove_item(self, file_path: str):
         if file_path in self.items:

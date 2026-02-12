@@ -71,6 +71,12 @@ except ImportError:
     except ImportError:
         pass
 
+# Import shared EXIF utilities for sort date caching
+try:
+    from shared.exif_utils import extract_exif_datetime
+except ImportError:
+    extract_exif_datetime = None
+
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
 ProcessingCompleteEvent, EVT_PROCESSING_COMPLETE = wx.lib.newevent.NewEvent()
@@ -1767,6 +1773,15 @@ class DirectoryLoadingWorker(threading.Thread):
                 
                 try:
                     item = ImageItem(str(image_path), "image")
+                    # Pre-cache EXIF sort date in background thread to avoid
+                    # re-reading files on every refresh_image_list() call
+                    if extract_exif_datetime is not None:
+                        try:
+                            dt = extract_exif_datetime(str(image_path))
+                            if dt:
+                                item.cached_sort_date = dt.isoformat()
+                        except Exception:
+                            pass
                     items.append(item)
                 except Exception as e:
                     logger.warning(f"Error creating item for {image_path}: {e}")
@@ -1781,6 +1796,14 @@ class DirectoryLoadingWorker(threading.Thread):
                 
                 try:
                     item = ImageItem(str(video_path), "video")
+                    # Pre-cache sort date for videos (uses file mtime as fallback)
+                    if extract_exif_datetime is not None:
+                        try:
+                            dt = extract_exif_datetime(str(video_path))
+                            if dt:
+                                item.cached_sort_date = dt.isoformat()
+                        except Exception:
+                            pass
                     # Video metadata will be loaded by main thread if needed
                     items.append(item)
                 except Exception as e:

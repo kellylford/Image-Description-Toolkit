@@ -1893,10 +1893,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if self.batch_progress_dialog:
                 self.batch_progress_dialog.Close()
                 self.batch_progress_dialog = None
-
-            
-        except Exception as e:
-            show_error(self, f"Error loading directory:\n{e}")
     
     def refresh_image_list(self):
         """Refresh the image list display with videos and extracted frames grouped"""
@@ -1906,133 +1902,142 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if current_selection != wx.NOT_FOUND:
             current_file_path = self.image_list.GetClientData(current_selection)
         
-        self.image_list.Clear()
-        
-        new_selection_index = wx.NOT_FOUND
-        
-        # Separate items into categories
-        videos = []
-        frames = {}  # parent_video -> list of frames
-        regular_images = []
-        
-        for file_path, item in self.workspace.items.items():
-            if item.item_type == "video":
-                videos.append((file_path, item))
-            elif item.item_type == "extracted_frame":
-                parent = item.parent_video
-                if parent not in frames:
-                    frames[parent] = []
-                frames[parent].append((file_path, item))
-            else:
-                regular_images.append((file_path, item))
-        
-        # Helper function to get datetime for sorting (EXIF date with fallback to mtime)
-        def get_sort_date(file_path):
-            """Get datetime for sorting: DateTimeOriginal → DateTimeDigitized → DateTime → mtime"""
-            try:
-                dt = extract_exif_datetime(file_path)
-                if dt:
-                    return dt
-                # Fallback to epoch if extraction fails
-                return datetime.fromtimestamp(0)
-            except Exception:
-                # Last resort: epoch time
-                return datetime.fromtimestamp(0)
-        
-        # Sort all categories by EXIF date (oldest first)
-        videos.sort(key=lambda x: get_sort_date(x[0]))
-        regular_images.sort(key=lambda x: get_sort_date(x[0]))
-        for parent in frames:
-            # Sort frames by their timestamp in filename (video_5.00s.jpg)
-            # This keeps them in extraction order
-            frames[parent].sort(key=lambda x: x[0])
-        
-        # Merge videos and regular images in chronological order
-        all_items = []
-        
-        # Combine and sort videos + regular images together by date
-        mixed_items = videos + regular_images
-        mixed_items.sort(key=lambda x: get_sort_date(x[0]))
-        
-        # Build display list: insert extracted frames right after their parent videos
-        for file_path, item in mixed_items:
-            all_items.append((file_path, item, 0))  # indent level 0
+        # Freeze the list to prevent event cascading during batch updates
+        # (prevents on_image_selected firing for each Append, avoiding preview loads)
+        self.image_list.Freeze()
+        try:
+            self.image_list.Clear()
             
-            # If this is a video with extracted frames, insert them immediately after
-            if item.item_type == "video" and file_path in frames:
-                for frame_path, frame_item in frames[file_path]:
-                    all_items.append((frame_path, frame_item, 1))  # indent level 1
-        
-        # Display all items
-        for file_path, item, indent_level in all_items:
-            # Apply filters
-            if self.current_filter == "described":
-                if not item.descriptions:
-                    continue
-            elif self.current_filter == "undescribed":
-                if item.descriptions:
-                    continue
-            elif self.current_filter == "videos":
-                # Show videos and their extracted frames only
-                if item.item_type not in ["video", "extracted_frame"]:
-                    continue
+            new_selection_index = wx.NOT_FOUND
             
-            base_name = Path(file_path).name
-            prefix_parts = []
+            # Separate items into categories
+            videos = []
+            frames = {}  # parent_video -> list of frames
+            regular_images = []
             
-            # 1. Description count
-            desc_count = len(item.descriptions)
-            if desc_count > 0:
-                prefix_parts.append(f"d{desc_count}")
+            for file_path, item in self.workspace.items.items():
+                if item.item_type == "video":
+                    videos.append((file_path, item))
+                elif item.item_type == "extracted_frame":
+                    parent = item.parent_video
+                    if parent not in frames:
+                        frames[parent] = []
+                    frames[parent].append((file_path, item))
+                else:
+                    regular_images.append((file_path, item))
             
-            # 2. Processing indicator (P)
-            if file_path in self.processing_items:
-                prefix_parts.append("P")
-            # Phase 6: Batch processing state indicators
-            elif hasattr(item, 'processing_state') and item.processing_state:
-                if item.processing_state == "paused":
-                    prefix_parts.append("!")  # Paused
-                elif item.processing_state == "failed":
-                    prefix_parts.append("X")  # Failed
-                elif item.processing_state == "pending":
-                    prefix_parts.append(".")  # Pending
+            # Helper: get cached sort date from item, with lazy caching fallback
+            def get_sort_date(file_path, item=None):
+                """Get datetime for sorting using cached value when available"""
+                # Use cached sort date if available (pre-computed by worker thread)
+                if item and item.cached_sort_date:
+                    try:
+                        return datetime.fromisoformat(item.cached_sort_date)
+                    except (ValueError, TypeError):
+                        pass
+                # Fallback: read from file and cache the result
+                try:
+                    dt = extract_exif_datetime(file_path)
+                    if dt:
+                        # Cache for future refreshes
+                        if item:
+                            item.cached_sort_date = dt.isoformat()
+                        return dt
+                    return datetime.fromtimestamp(0)
+                except Exception:
+                    return datetime.fromtimestamp(0)
             
-            # 3. Video extraction status
-            if item.item_type == "video" and hasattr(item, 'extracted_frames') and item.extracted_frames:
-                frame_count = len(item.extracted_frames)
-                prefix_parts.append(f"E{frame_count}")
+            # Combine videos + regular images and sort once by date
+            mixed_items = videos + regular_images
+            mixed_items.sort(key=lambda x: get_sort_date(x[0], x[1]))
             
-            # 4. Item type icon indicator (removed for screen reader accessibility)
-            type_icon = ""
+            for parent in frames:
+                # Sort frames by their timestamp in filename (video_5.00s.jpg)
+                frames[parent].sort(key=lambda x: x[0])
             
-            # Combine prefix and display name with indentation
-            indent = "  " * indent_level  # Two spaces per level
-            if prefix_parts:
-                prefix = "".join(prefix_parts)
-                display_name = f"{indent}{type_icon}{prefix} {base_name}"
-            else:
-                display_name = f"{indent}{type_icon}{base_name}"
+            # Build display list: insert extracted frames right after their parent videos
+            all_items = []
+            for file_path, item in mixed_items:
+                all_items.append((file_path, item, 0))  # indent level 0
+                
+                # If this is a video with extracted frames, insert them immediately after
+                if item.item_type == "video" and file_path in frames:
+                    for frame_path, frame_item in frames[file_path]:
+                        all_items.append((frame_path, frame_item, 1))  # indent level 1
             
-            index = self.image_list.Append(display_name, file_path)  # Store file_path as client data
+            # Display all items
+            for file_path, item, indent_level in all_items:
+                # Apply filters
+                if self.current_filter == "described":
+                    if not item.descriptions:
+                        continue
+                elif self.current_filter == "undescribed":
+                    if item.descriptions:
+                        continue
+                elif self.current_filter == "videos":
+                    # Show videos and their extracted frames only
+                    if item.item_type not in ["video", "extracted_frame"]:
+                        continue
+                
+                base_name = Path(file_path).name
+                prefix_parts = []
+                
+                # 1. Description count
+                desc_count = len(item.descriptions)
+                if desc_count > 0:
+                    prefix_parts.append(f"d{desc_count}")
+                
+                # 2. Processing indicator (P)
+                if file_path in self.processing_items:
+                    prefix_parts.append("P")
+                # Phase 6: Batch processing state indicators
+                elif hasattr(item, 'processing_state') and item.processing_state:
+                    if item.processing_state == "paused":
+                        prefix_parts.append("!")  # Paused
+                    elif item.processing_state == "failed":
+                        prefix_parts.append("X")  # Failed
+                    elif item.processing_state == "pending":
+                        prefix_parts.append(".")  # Pending
+                
+                # 3. Video extraction status
+                if item.item_type == "video" and hasattr(item, 'extracted_frames') and item.extracted_frames:
+                    frame_count = len(item.extracted_frames)
+                    prefix_parts.append(f"E{frame_count}")
+                
+                # 4. Item type icon indicator (removed for screen reader accessibility)
+                type_icon = ""
+                
+                # Combine prefix and display name with indentation
+                indent = "  " * indent_level  # Two spaces per level
+                if prefix_parts:
+                    prefix = "".join(prefix_parts)
+                    display_name = f"{indent}{type_icon}{prefix} {base_name}"
+                else:
+                    display_name = f"{indent}{type_icon}{base_name}"
+                
+                index = self.image_list.Append(display_name, file_path)  # Store file_path as client data
+                
+                # Track if this is the previously selected item
+                if current_file_path and file_path == current_file_path:
+                    new_selection_index = index
             
-            # Track if this is the previously selected item
-            if current_file_path and file_path == current_file_path:
-                new_selection_index = index
-        
-        # RESTORE FOCUS: Select the same item after refresh
-        if new_selection_index != wx.NOT_FOUND:
-            self.image_list.SetSelection(new_selection_index)
-            # Ensure it's visible
-            self.image_list.EnsureVisible(new_selection_index)
-        elif self.image_list.GetCount() > 0:
-            # No previous selection - select first item (e.g., after loading directory)
-            self.image_list.SetSelection(0)
-            self.image_list.EnsureVisible(0)
-            # Trigger selection event to update display
-            first_file_path = self.image_list.GetClientData(0)
-            if first_file_path and first_file_path in self.workspace.items:
-                self.current_image_item = self.workspace.items[first_file_path]
-                self.display_image_info(self.current_image_item)
+            # RESTORE FOCUS: Select the same item after refresh
+            if new_selection_index != wx.NOT_FOUND:
+                self.image_list.SetSelection(new_selection_index)
+                # Ensure it's visible
+                self.image_list.EnsureVisible(new_selection_index)
+            elif self.image_list.GetCount() > 0:
+                # No previous selection - select first item (e.g., after loading directory)
+                self.image_list.SetSelection(0)
+                self.image_list.EnsureVisible(0)
+                # Trigger selection event to update display
+                first_file_path = self.image_list.GetClientData(0)
+                if first_file_path and first_file_path in self.workspace.items:
+                    self.current_image_item = self.workspace.items[first_file_path]
+                    self.display_image_info(self.current_image_item)
+        finally:
+            # Always thaw, even if an exception occurs
+            self.image_list.Thaw()
     
     def on_process_single(self, event):
         """Process single selected image or extract video frames"""
@@ -3365,10 +3370,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if hasattr(self, 'directory_loading_worker'):
             self.directory_loading_worker = None
         
-        # Add items to workspace
-        for item in event.items:
-            if item.file_path not in self.workspace.items:
-                self.workspace.add_item(item)
+        # Add items to workspace (bulk add - single mark_modified() call)
+        self.workspace.add_items(event.items)
         
         # Update UI
         self.refresh_image_list()
