@@ -77,7 +77,7 @@ c:\idt\images\
 **Use the automated script** to generate descriptions for all provider/model/prompt combinations:
 
 ```batch
-cd c:\Users\kelly\GitHub\Image-Description-Toolkit\tools\ImageGallery
+cd C:\Path\To\Image-Description-Toolkit\tools\ImageGallery
 generate_all_gallery_data.bat c:\idt\images
 ```
 
@@ -122,7 +122,7 @@ Each workflow directory contains:
 
 **Run the consolidation script:**
 ```batch
-cd c:\Users\kelly\GitHub\Image-Description-Toolkit\tools\ImageGallery
+cd C:\Path\To\Image-Description-Toolkit\tools\ImageGallery
 python consolidate_gallery_data.py
 ```
 
@@ -206,7 +206,7 @@ ImageGallery/
 ### 3.2 Copy Images to Gallery Directory
 
 ```batch
-cd c:\Users\kelly\GitHub\Image-Description-Toolkit\tools\ImageGallery
+cd C:\Path\To\Image-Description-Toolkit\tools\ImageGallery
 
 REM Create images directory if it doesn't exist
 mkdir images
@@ -226,7 +226,7 @@ start index.html
 
 **OR use Python's built-in web server:**
 ```batch
-cd c:\Users\kelly\GitHub\Image-Description-Toolkit\tools\ImageGallery
+cd C:\Path\To\Image-Description-Toolkit\tools\ImageGallery
 python -m http.server 8000
 ```
 Then open: http://localhost:8000

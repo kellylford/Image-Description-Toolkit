@@ -283,7 +283,7 @@ class FollowupQuestionDialog(wx.Dialog):
     """Dialog for asking follow-up questions with model selection"""
     
     def __init__(self, parent, original_provider: str, original_model: str, 
-                 description_preview: str, config: dict):
+                 description_preview: str, config: dict, cached_ollama_models=None):
         super().__init__(
             parent,
             title="Ask Follow-up Question",
@@ -293,6 +293,7 @@ class FollowupQuestionDialog(wx.Dialog):
         self.original_provider = original_provider
         self.original_model = original_model
         self.config = config
+        self.cached_ollama_models = cached_ollama_models  # Use cached models to avoid blocking
         self.question = ""
         self.selected_provider = original_provider
         self.selected_model = original_model
@@ -393,7 +394,7 @@ class FollowupQuestionDialog(wx.Dialog):
         self.populate_models()
     
     def populate_models(self):
-        """Populate model combobox based on selected provider"""
+        """Populate model combobox based on selected provider - uses cached models to avoid blocking UI"""
         provider = self.provider_choice.GetStringSelection()
         
         # Save current value
@@ -404,21 +405,12 @@ class FollowupQuestionDialog(wx.Dialog):
         
         try:
             if provider == "ollama":
-                # Try to get Ollama models
-                try:
-                    from ai_providers import get_available_providers
-                    providers = get_available_providers()
-                    if 'ollama' in providers:
-                        models = providers['ollama'].get_available_models()
-                        if models:
-                            for model in models:
-                                self.model_combo.Append(model)
-                except Exception:
-                    # Fallback to common models
-                    pass
-                
-                # If no models loaded or original model not in list, add common defaults
-                if self.model_combo.GetCount() == 0:
+                # CRITICAL: Use cached models if available (passed from main app) to avoid blocking UI
+                if self.cached_ollama_models:
+                    for model in self.cached_ollama_models:
+                        self.model_combo.Append(model)
+                else:
+                    # Fallback to common defaults (don't fetch live - would block UI)
                     common_models = ["moondream", "llava", "llama3.2-vision"]
                     for model in common_models:
                         self.model_combo.Append(model)

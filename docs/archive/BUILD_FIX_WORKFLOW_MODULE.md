@@ -11,7 +11,7 @@
 When running the built executable `ImageDescriptionToolkit.exe`, users encountered this error:
 
 ```
-C:\Users\kelly\OneDrive\idt>ImageDescriptionToolkit.exe workflow --provider ollama --model gemma3
+~/your_secure_location/idt>ImageDescriptionToolkit.exe workflow --provider ollama --model gemma3
 
 Traceback (most recent call last):
 File "idt_cli.py", line 180, in <module>

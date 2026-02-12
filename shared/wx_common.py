@@ -470,6 +470,14 @@ class ModifiedStateMixin:
         if parent is None:
             parent = self
         
+        # CRITICAL FIX: Force parent window to front before showing dialog
+        # This prevents the dialog from being hidden behind STAY_ON_TOP windows
+        try:
+            parent.Raise()
+            parent.SetFocus()
+        except Exception:
+            pass  # Ignore if parent doesn't support these methods
+        
         result = ask_yes_no_cancel(
             parent,
             "You have unsaved changes. Save before closing?",

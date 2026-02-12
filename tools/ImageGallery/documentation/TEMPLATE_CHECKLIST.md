@@ -271,7 +271,7 @@ Upload entire `webdeploy/` folder contents:
 
 ```bash
 # Extract clean template from git
-cd /c/Users/kelly/GitHub/Image-Description-Toolkit/tools/ImageGallery
+cd /path/to/Image-Description-Toolkit/tools/ImageGallery
 git show 6de91fb:tools/ImageGallery/index.html > CLEAN_TEMPLATE.html
 
 # Or use current root file (if kept in sync with 6de91fb)

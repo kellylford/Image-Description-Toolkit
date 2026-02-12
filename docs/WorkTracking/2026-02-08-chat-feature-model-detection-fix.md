@@ -234,7 +234,7 @@ build_chat_test.bat
 
 **1. Commit Changes**
 ```bash
-cd c:\Users\kelly\GitHub\Image-Description-Toolkit
+cd C:\Path\To\Image-Description-Toolkit
 git add imagedescriber/chat_window_wx.py imagedescriber/imagedescriber_wx.py imagedescriber/build_chat_test.bat
 git commit -m "Fix chat feature to use dynamic model detection instead of hardcoded models"
 ```

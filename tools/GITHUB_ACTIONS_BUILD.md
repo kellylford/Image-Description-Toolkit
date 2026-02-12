@@ -121,7 +121,7 @@ If artifacts aren't uploaded:
 If GitHub Actions isn't working, you can still build locally:
 ```bash
 # On Windows machine:
-cd C:\Users\kelly\GitHub\Image-Description-Toolkit
+cd C:\Path\To\Image-Description-Toolkit
 releaseitall.bat
 ```
 
@@ -194,4 +194,4 @@ For comparison, local build process:
 - `builditall.bat` - Build all executables
 - `packageitall.bat` - Package into ZIP files
 - `releaseitall.bat` - Complete build + package workflow
-- `tools/kelly_release_and_install.bat` - Personal workflow (git-ignored)
+- `tools/your_personal_workflow.bat (git-ignored)` - Personal workflow (git-ignored)

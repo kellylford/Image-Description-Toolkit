@@ -143,7 +143,7 @@ Success rate:   83.3%
 
 **Deployment Command:**
 ```batch
-copy C:\Users\kelly\GitHub\Image-Description-Toolkit\idt\dist\idt.exe C:\idt\idt.exe
+copy C:\Path\To\Image-Description-Toolkit\idt\dist\idt.exe C:\idt\idt.exe
 ```
 
 ## Known Limitations

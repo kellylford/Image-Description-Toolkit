@@ -34,7 +34,7 @@ class BatchProgressDialog(wx.Dialog):
             self,
             parent,
             title="Batch Processing Progress",
-            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER  # Modeless, resizable
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.STAY_ON_TOP  # Modeless, resizable, always visible
         )
         
         self.parent_window = parent

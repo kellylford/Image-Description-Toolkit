@@ -245,7 +245,7 @@ Provider defaults (lowest priority)
 ### New Files
 
 ```
-c:\Users\kelly\GitHub\Image-Description-Toolkit\
+C:\Path\To\Image-Description-Toolkit\
 ├── check_models.py                          # ← NEW: Model status checker
 ├── manage_models.py                         # ← NEW: Model installer/manager
 └── docs/

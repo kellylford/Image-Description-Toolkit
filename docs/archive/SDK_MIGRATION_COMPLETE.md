@@ -151,7 +151,7 @@ TOKEN USAGE SUMMARY:
 - ✅ Token usage tracking (54 tokens for test image)
 - ✅ Automatic retry logic (built-in)
 
-**API Keys:** Tested with keys from `c:\users\kelly\onedrive\` (not committed to repo)
+**API Keys:** Tested with keys from `~/your_secure_location/` (not committed to repo)
 
 ---
 
@@ -377,7 +377,7 @@ class ImageDescription:
 - ✅ Token usage tracking (54 tokens for test image)
 - ✅ Automatic retry logic (built-in)
 
-**API Keys:** Tested with keys from `c:\users\kelly\onedrive\` (not committed to repo)
+**API Keys:** Tested with keys from `~/your_secure_location/` (not committed to repo)
 
 ### Cloud Provider Batch Testing ✅ COMPLETE
 
@@ -425,8 +425,8 @@ class ImageDescription:
    ```
 
 **Testing (not committed):**
-- OpenAI: `c:\users\kelly\onedrive\openai.txt`
-- Claude: `c:\users\kelly\onedrive\claude.txt`
+- OpenAI: `~/your_secure_location/openai.txt`
+- Claude: `~/your_secure_location/claude.txt`
 
 ---
 

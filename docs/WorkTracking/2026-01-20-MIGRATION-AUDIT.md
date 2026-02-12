@@ -157,14 +157,14 @@ except ImportError:
 
 1. **Rebuild Production Executable**
    ```bash
-   cd /c/Users/kelly/GitHub/Image-Description-Toolkit/idt
+   cd /path/to/Image-Description-Toolkit/idt
    ./build_idt.bat
    copy dist\idt.exe C:\idt\idt.exe
    ```
 
 2. **Rebuild All GUI Apps**
    ```bash
-   cd /c/Users/kelly/GitHub/Image-Description-Toolkit
+   cd /path/to/Image-Description-Toolkit
    ./BuildAndRelease/WinBuilds/builditall_wx.bat
    ```
 
@@ -276,7 +276,7 @@ The WXMigration branch introduced **significant regressions** due to:
 ### Rebuild Everything
 ```bash
 # Navigate to repo
-cd /c/Users/kelly/GitHub/Image-Description-Toolkit
+cd /path/to/Image-Description-Toolkit
 
 # Build IDT CLI
 cd idt

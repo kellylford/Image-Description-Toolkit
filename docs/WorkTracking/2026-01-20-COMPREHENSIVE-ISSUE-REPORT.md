@@ -86,7 +86,7 @@ pip install Pillow
 ```
 dev_results_list:
   Scanning for workflow results in: 
-    C:\Users\kelly\GitHub\Image-Description-Toolkit\scripts\Descriptions
+    C:\Path\To\Image-Description-Toolkit\scripts\Descriptions
   Error: Directory does not exist
 ```
 
@@ -94,7 +94,7 @@ dev_results_list:
 ```
 frozen_results_list:
   Scanning for workflow results in:
-    C:\Users\kelly\GitHub\Image-Description-Toolkit\Descriptions
+    C:\Path\To\Image-Description-Toolkit\Descriptions
   Error: Directory does not exist
 ```
 

@@ -20,7 +20,7 @@
    - Build script: `idt/build_idt.bat` works correctly
 
 2. **❌ main Branch Cannot Build**
-   - Error: `'C:\Users\kelly\GitHub\Image-Description-Toolkit\idt\build_idt.bat' is not recognized`
+   - Error: `'C:\Path\To\Image-Description-Toolkit\idt\build_idt.bat' is not recognized`
    - Reason: main branch may not have `idt/` directory structure or build scripts
    - Cannot complete behavioral comparison without working main build
 

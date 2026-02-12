@@ -73,10 +73,10 @@ You can create custom config files anywhere and reference them with command-line
 
 ```bash
 # Custom configs in your user directory
-c:\users\kelly\myconfigs\
-├── kelly_workflow.json
-├── kellys_description_config.json
-└── kellys_video_config.json
+c:\users\yourusername\myconfigs\
+├── custom_workflow.json
+├── my_description_config.json
+└── my_video_config.json
 
 # Custom configs in project directories
 d:\projects\vacation2024\

@@ -260,24 +260,58 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 ### Menu Features
 
 **File Menu:**
-- **New Workspace** - Start fresh project (creates new Untitled workspace)
-- **Load Directory** - Add images from folder to current workspace
-- **Load from URL** - Download images from a webpage (prompts to save workspace first if Untitled)
-- **Load Workspace** - Open saved .idw project
-- **Save/Save As** - Rename and preserve workspace state
-  - **Note:** Save As renames the workspace AND moves the data directory automatically
-- **Export to HTML** - Generate web-viewable results
-- **Switch to Viewer** - Browse all workflow results with live monitoring
-- **Switch to Workspace** - Return to processing mode
+- **New Workspace** - Start a fresh project (creates new unnamed workspace)
+- **Open Workspace** - Load a previously saved `.idw` workspace project
+- **Save Workspace** - Save the current workspace with its current name
+- **Save Workspace As...** - Rename and/or relocate the workspace (also moves the data directory)
+- **Load Directory** - Add images from a folder to the current workspace
+- **Load Images From URL...** - Download images from a webpage into the workspace
+- **Import Workflow (to Workspace)...** - Import completed workflow results as a workspace (brings existing descriptions into editor)
+- **Export Descriptions...** - Export all descriptions to formats like CSV, Excel, or HTML
+- **Open Workflow Result (Viewer Mode)...** - Switch to Viewer to browse a completed workflow
+- **Exit** - Close the application
 
-**Processing Menu:**
-- **Process Selected Image** - Describe current image
-- **Process All Undescribed** - Batch process all pending images
-  - **Save Prompt:** If workspace is still Untitled, you'll be prompted to save it first
-  - **Auto-Save:** Workspace is automatically saved before processing begins
-  - **Smart Naming:** Suggested names based on content (directory names, video names, dates)
-- **Pause Batch** - Temporarily stop processing
-- **Resume Batch** - Continue paused workflow
+**Edit Menu:**
+- **Cut** - Remove selected description and copy to clipboard
+- **Copy** - Copy selected description to clipboard without deleting
+- **Paste** - Paste clipboard content into description field
+- **Select All** - Select all text in the current description field
+
+**Process Menu:**
+- **Process Current Image** - Describe only the selected image using the configured AI model
+- **Process Undescribed Images** - Batch process only images without descriptions (safe default - won't duplicate existing descriptions)
+- **Redescribe All Images** - Batch process ALL images again (adds new descriptions without removing old ones)
+  - **Note:** This creates additional descriptions for each image; use "Show All Descriptions" to view or delete unwanted ones
+- **Show Batch Progress** - Display the batch processing progress dialog (visible during active batch processing)
+- **Refresh AI Models** - Reload the list of available AI models (useful if you added new local models)
+- **Chat with AI Model** - Open an interactive chat window to have a conversation with the AI model
+- **Convert HEIC Files...** - Convert HEIC/HEIF images (iPhone) to JPG format, preserving metadata
+- **Extract Video Frames...** - Extract frames from video files at configurable intervals
+- **Rename Item** - Rename the selected image or video file (preserves descriptions and metadata)
+
+
+**Descriptions Menu:**
+- **Add Manual Description** - Manually type a description for the selected image
+- **Ask Followup Question** - Ask the AI model for clarification or more details about this image
+  - **How Followup Questions Work:** Followup questions are designed to ask for clarification or additional details about the image itself. You can use the same AI model that created the original description, or switch to a different one. Only your question is sent to the AI model—the original description is available in the dialog for your reference if you want to copy it, but the AI will review the image directly so including the previous description would only slow down the response without improving quality.
+  - **Model Selection:** You can choose a different provider or model for your followup than was used for the original description
+  - **Performance Tip:** Followup questions are fastest when asking for specific details (e.g., "describe the colors in detail", "what is the person wearing?") rather than asking for a completely new description
+- **Edit Description** - Modify an existing description for the selected image
+- **Delete Description** - Remove a description (keep at least one)
+- **Copy Description** - Copy the selected description to clipboard
+- **Copy Image Path** - Copy the full file path to clipboard
+- **Show All Descriptions** - View all descriptions for the selected image in one dialog
+
+**View Menu:**
+- **Application Mode** - Switch between Editor and Viewer modes
+  - **Editor Mode:** Process images and manage descriptions (current mode)
+  - **Viewer Mode:** Browse and analyze completed workflows
+- **Filter Options** - Display only items matching selected criteria
+  - **All Items:** Show all images, videos, and imported items
+  - **Described Only:** Show only items with at least one description
+  - **Undescribed Only:** Show items still needing descriptions
+  - **Videos Only:** Show only extracted video frames
+- **Show Image Previews** - Toggle thumbnail previews in the main panel (useful on slow systems)
 
 **Tools Menu:**
 - **Edit Prompts** - Opens prompt editor dialog

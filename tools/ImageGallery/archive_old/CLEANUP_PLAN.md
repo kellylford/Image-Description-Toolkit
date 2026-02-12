@@ -140,7 +140,7 @@ ImageGallery/
 #!/bin/bash
 # cleanup_galleries.sh
 
-cd /c/Users/kelly/GitHub/Image-Description-Toolkit/tools/ImageGallery
+cd /path/to/Image-Description-Toolkit/tools/ImageGallery
 
 echo "🧹 ImageGallery Cleanup Script"
 echo "This will delete 4.2GB of redundant files"

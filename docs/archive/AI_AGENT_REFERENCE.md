@@ -586,7 +586,7 @@ if "%PROCESSOR_ARCHITECTURE%"=="AMD64" set ARCH=amd64
 **Historical Issue** (Fixed Oct 2025):
 ```batch
 # OLD BROKEN:
-set PYTHON=C:/Users/kelly/GitHub/Image-Description-Toolkit/.venv/Scripts/python.exe
+set PYTHON=C:/Path/To/Image-Description-Toolkit/.venv/Scripts/python.exe
 
 # NEW FIXED:
 # Use active venv's python (no hardcoded path)

@@ -134,11 +134,11 @@ echo "claude.txt" >> .gitignore
 **External Storage (Best Practice):**
 ```bash
 # Store keys outside repository
-c:\users\kelly\onedrive\openai.txt
-c:\users\kelly\onedrive\claude.txt
+~/your_secure_location/openai.txt
+~/your_secure_location/claude.txt
 
 # Reference with --api-key-file flag
-python scripts/image_describer.py photos/ --provider openai --api-key-file c:\users\kelly\onedrive\openai.txt
+python scripts/image_describer.py photos/ --provider openai --api-key-file ~/your_secure_location/openai.txt
 ```
 
 #### Option 3: Command Line (Not Recommended)

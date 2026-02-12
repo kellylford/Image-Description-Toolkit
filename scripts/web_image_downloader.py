@@ -302,6 +302,7 @@ class WebImageDownloader:
             # Download images
             successful = 0
             failed = 0
+            url_mapping = {}  # Map filename to original URL
             
             for i, img_url in enumerate(image_urls, 1):
                 # Check if we've reached max images
@@ -321,6 +322,9 @@ class WebImageDownloader:
                 
                 if result:
                     successful += 1
+                    # Store URL mapping (filename to original URL)
+                    if result:  # result is a Path object
+                        url_mapping[result.name] = img_url
                 else:
                     failed += 1
                 
@@ -337,6 +341,17 @@ class WebImageDownloader:
                     time.sleep(0.5)
             
             self.logger.info(f"Download complete: {successful} successful, {failed} failed/skipped")
+            
+            # Save URL mapping to JSON file for ImageDescriber to use
+            if url_mapping:
+                try:
+                    mapping_file = self.output_dir / 'url_mapping.json'
+                    with open(mapping_file, 'w', encoding='utf-8') as f:
+                        json.dump(url_mapping, f, indent=2, ensure_ascii=False)
+                    self.logger.info(f"Saved URL mapping with {len(url_mapping)} entries")
+                except Exception as e:
+                    self.logger.warning(f"Could not save URL mapping: {e}")
+            
             return successful, failed
             
         except requests.exceptions.RequestException as e:

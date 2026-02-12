@@ -249,7 +249,7 @@ To verify the changes work correctly:
 
 ```bash
 # Test tool 1
-cd /c/Users/kelly/GitHub/Image-Description-Toolkit
+cd /path/to/Image-Description-Toolkit
 python tools/analyze_workflow_naming.py
 # Should use ~/idt/descriptions/hold as default
 

@@ -775,7 +775,7 @@ Some models respond better to certain phrasing:
 
 **Solution:** Rebuild executables after code changes:
 ```bash
-cd /c/Users/kelly/GitHub/Image-Description-Toolkit
+cd /path/to/Image-Description-Toolkit
 ./build_idt.bat
 cp dist/idt/idt.exe /c/idt/
 ```

@@ -356,16 +356,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         )
         ModifiedStateMixin.__init__(self)
         
-        # Create Untitled workspace on startup
-        untitled_name = get_next_untitled_name()
-        workspace_file, workspace_data_dir = create_workspace_structure(untitled_name)
-        
-        # Application state
-        self.workspace = ImageWorkspace(new_workspace=True)
-        self.workspace.directory_path = str(workspace_data_dir)
-        self.workspace.directory_paths = [str(workspace_data_dir)]
-        self.current_directory = workspace_data_dir
-        self.workspace_file = workspace_file
+        # Application state - start with no workspace (old behavior)
+        # Workspace will be created when user loads directory, opens file, or explicitly creates new
+        self.workspace = None
+        self.workspace_file = None
+        self.current_directory = None
         self.processing_thread = None
         self.current_image_item = None
         self.current_filter = "all"  # View filter: all, described, undescribed
@@ -376,6 +371,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Phase 3: Batch processing management
         self.batch_worker: Optional[BatchProcessingWorker] = None  # Store worker reference
         self.video_worker = None  # Store VideoProcessingWorker reference to prevent GC
+        self.download_worker = None  # Store DownloadProcessingWorker reference to prevent GC
+        self.followup_worker = None  # Store ProcessingWorker reference for follow-up questions
         self.batch_progress_dialog: Optional[BatchProgressDialog] = None  # Progress dialog
         self.batch_start_time: Optional[float] = None  # For avg time calculation
         self.batch_processing_times: List[float] = []  # Track times per image
@@ -427,11 +424,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Bind keyboard events for single-key shortcuts (matching Qt6 behavior)
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
         
-        # Update window title
-        self.update_window_title("ImageDescriber", untitled_name)
+        # Update window title (no document name since no workspace yet)
+        self.update_window_title("ImageDescriber", "")
         
-        # Save initial workspace structure
-        wx.CallAfter(self.save_workspace, self.workspace_file)
+        # Note: No initial workspace to save - user will create/open one
         
         # Log startup banner
         if log_build_banner:
@@ -1418,6 +1414,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     created_date = selected_desc.created.split('T')[0] if 'T' in selected_desc.created else selected_desc.created
                     metadata_lines.append(f"Created: {created_date}")
                 
+                # Add download source info if available (for downloaded images)
+                if hasattr(self.current_image_item, 'download_url') and self.current_image_item.download_url:
+                    metadata_lines.append("\n--- Download Source ---")
+                    metadata_lines.append(f"URL: {self.current_image_item.download_url}")
+                    if hasattr(self.current_image_item, 'download_timestamp') and self.current_image_item.download_timestamp:
+                        download_date = self.current_image_item.download_timestamp.split('T')[0] if 'T' in self.current_image_item.download_timestamp else self.current_image_item.download_timestamp
+                        metadata_lines.append(f"Downloaded: {download_date}")
+                
                 # Add image metadata (GPS, EXIF, etc.) if available
                 if selected_desc.metadata:
                     image_metadata_lines = format_image_metadata(selected_desc.metadata)
@@ -1779,8 +1783,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         settings = dialog.get_settings()
         dialog.Destroy()
         
-        # Check if we're in an Untitled workspace - prompt to save first
-        if is_untitled_workspace(self.workspace_file.stem):
+        # Check if we need to create/save workspace first (None or Untitled)  
+        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
             # Propose a name based on the URL
             proposed_name = propose_workspace_name_from_url(settings['url'])
             
@@ -1798,11 +1802,27 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 new_path = Path(save_dialog.GetPath())
                 save_dialog.Destroy()
                 
-                # Rename workspace before proceeding
+                # Create/rename workspace depending on current state
                 new_name = new_path.stem
-                if not self.rename_workspace(new_name):
-                    show_error(self, "Failed to rename workspace. Download cancelled.")
-                    return
+                
+                if self.workspace_file:
+                    # Rename existing Untitled workspace
+                    if not self.rename_workspace(new_name):
+                        show_error(self, "Failed to rename workspace. Download cancelled.")
+                        return
+                else:
+                    # Create new workspace structure (no previous workspace)
+                    workspace_file, workspace_data_dir = create_workspace_structure(new_name)
+                    self.workspace_file = workspace_file
+                    # Create workspace object if it doesn't exist
+                    if not self.workspace:
+                        self.workspace = ImageWorkspace(new_workspace=True)
+                    self.workspace.directory_path = str(workspace_data_dir)
+                    self.workspace.directory_paths = [str(workspace_data_dir)]
+                    self.current_directory = workspace_data_dir
+                    # Save workspace to new file
+                    self.save_workspace(self.workspace_file)
+                    self.update_window_title("ImageDescriber", new_name)
             else:
                 save_dialog.Destroy()
                 # User cancelled - abort download
@@ -1917,6 +1937,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def refresh_image_list(self):
         """Refresh the image list display with videos and extracted frames grouped"""
+        # Guard against no workspace
+        if not self.workspace or not self.workspace.items:
+            self.image_list.Clear()
+            return
+        
         # PRESERVE FOCUS: Remember currently selected item before refresh
         current_selection = self.image_list.GetSelection()
         current_file_path = None
@@ -2134,12 +2159,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Batch processing worker not available")
             return
         
-        # Check if we're in an Untitled workspace - prompt to save first
-        if is_untitled_workspace(self.workspace_file.stem):
+        # Check if we need to create a workspace first (None) or if it's Untitled - prompt to save/name
+        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
             # Inform user they need to save first
             result = wx.MessageBox(
                 "Batch processing requires a named workspace.\n\n"
-                "Your current workspace is 'Untitled' and must be saved with a name before processing.\n\n"
+                "Please save your workspace with a descriptive name before processing.\n\n"
                 "Would you like to save the workspace now?",
                 "Save Workspace Required",
                 wx.YES_NO | wx.ICON_QUESTION
@@ -2165,11 +2190,27 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 new_path = Path(save_dialog.GetPath())
                 save_dialog.Destroy()
                 
-                # Rename workspace before proceeding
+                # Create/rename workspace depending on current state
                 new_name = new_path.stem
-                if not self.rename_workspace(new_name):
-                    show_error(self, "Failed to rename workspace. Processing cancelled.")
-                    return
+                
+                if self.workspace_file:
+                    # Rename existing Untitled workspace
+                    if not self.rename_workspace(new_name):
+                        show_error(self, "Failed to rename workspace. Processing cancelled.")
+                        return
+                else:
+                    # Create new workspace structure (no previous workspace)
+                    workspace_file, workspace_data_dir = create_workspace_structure(new_name)
+                    self.workspace_file = workspace_file
+                    # Create workspace object if it doesn't exist
+                    if not self.workspace:
+                        self.workspace = ImageWorkspace(new_workspace=True)
+                    self.workspace.directory_path = str(workspace_data_dir)
+                    self.workspace.directory_paths = [str(workspace_data_dir)]
+                    self.current_directory = workspace_data_dir
+                    # Save workspace to new file
+                    self.save_workspace(self.workspace_file)
+                    self.update_window_title("ImageDescriber", new_name)
             else:
                 save_dialog.Destroy()
                 # User cancelled the file dialog
@@ -2311,23 +2352,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing,  # Phase 5: Use parameter instead of options
             progress_offset=0  # No offset when processing without video extraction
         )
-        self.batch_worker.start()
-        
-        # Phase 3: Show progress dialog
-        if BatchProgressDialog:
-            self.batch_progress_dialog = BatchProgressDialog(self, len(to_process))
-            self.batch_progress_dialog.Show()
-            # Enable "Show Batch Progress" menu item
-            if hasattr(self, 'show_batch_progress_item'):
-                self.show_batch_progress_item.Enable(True)
         
         # Phase 3: Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []
         
-        # Save workspace (preserves batch_state)
+        # Save workspace BEFORE showing dialog to avoid focus issues
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
+        
+        # Phase 3: Show progress dialog (AFTER save to maintain focus)
+        if BatchProgressDialog:
+            self.batch_progress_dialog = BatchProgressDialog(self, len(to_process))
+            self.batch_progress_dialog.Show()
+            self.batch_progress_dialog.Raise()  # Ensure it's on top after save
+            # Enable "Show Batch Progress" menu item
+            if hasattr(self, 'show_batch_progress_item'):
+                self.show_batch_progress_item.Enable(True)
+        
+        # Start worker thread AFTER dialog is shown
+        self.batch_worker.start()
         
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
     
@@ -2638,7 +2682,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         default_dir = str(get_default_workspaces_root())
         
         # Propose a sensible default name
-        if is_untitled_workspace(self.workspace_file.stem):
+        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
             default_file = f"{self._propose_workspace_name_from_content()}.idw"
         else:
             default_file = self.workspace_file.name
@@ -2655,8 +2699,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             new_path = Path(file_path)
             new_name = new_path.stem
             
-            # If name changed, use rename (moves data directory too)
-            if new_name != self.workspace_file.stem:
+            # If name changed (or creating new), use rename/create (moves data directory too)
+            if not self.workspace_file:
+                # Create new workspace structure
+                workspace_file, workspace_data_dir = create_workspace_structure(new_name)
+                self.workspace_file = workspace_file
+                # Create workspace object if it doesn't exist
+                if not self.workspace:
+                    self.workspace = ImageWorkspace(new_workspace=True)
+                self.workspace.directory_path = str(workspace_data_dir)
+                self.workspace.directory_paths = [str(workspace_data_dir)]
+                self.current_directory = workspace_data_dir
+                self.save_workspace(str(new_path))
+            elif new_name != self.workspace_file.stem:
                 self.rename_workspace(new_name)
             else:
                 # Same name, different location - just save
@@ -3115,8 +3170,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             avg_time = (sum(self.batch_processing_times) / len(self.batch_processing_times)
                        if self.batch_processing_times else 0.0)
             
-            # Phase 3: Update progress dialog
-            if self.batch_progress_dialog and self.batch_progress:
+            # Phase 3: Update progress dialog (with defensive checks)
+            if (self.batch_progress_dialog and 
+                self.batch_progress and 
+                not self.batch_progress_dialog.IsBeingDeleted()):
                 self.batch_progress_dialog.update_progress(
                     current=self.batch_progress['current'],
                     total=self.batch_progress['total'],
@@ -3154,6 +3211,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Update window title to reflect processing status (removes "Processing" when done)
             self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
             
+            # Clear follow-up worker reference if this was a follow-up question
+            if event.prompt_style == 'followup':
+                self.followup_worker = None
+            
             # Update display if this is the current image
             if self.current_image_item == image_item:
                 self.display_image_info(image_item)
@@ -3177,12 +3238,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Update window title to reflect processing status (removes "Processing" when failed)
         self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
         
-        # Ensure main window has focus before showing error dialog
-        self.Raise()
-        self.SetFocus()
+        # Clear follow-up worker reference if it was running
+        if self.followup_worker and not self.followup_worker.is_alive():
+            self.followup_worker = None
+        
+        # Show error dialog (don't raise main window to avoid hiding batch progress dialog)
         show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{event.error}")
-        # Restore focus after dialog
-        self.SetFocus()
+        
+        # Re-raise batch progress dialog if it exists and is shown
+        if self.batch_progress_dialog and self.batch_progress_dialog.IsShown():
+            self.batch_progress_dialog.Raise()
+        
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
     
     def on_workflow_complete(self, event):
@@ -3209,15 +3275,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             logger.debug(f"Found {len(downloaded_images)} downloaded images in {output_dir}")
             
+            # Load URL mapping if available (created by WebImageDownloader)
+            url_mapping = {}
+            mapping_file = output_dir / 'url_mapping.json'
+            if mapping_file.exists():
+                try:
+                    with open(mapping_file, 'r', encoding='utf-8') as f:
+                        url_mapping = json.load(f)
+                    logger.debug(f"Loaded URL mapping with {len(url_mapping)} entries")
+                except Exception as e:
+                    logger.warning(f"Could not load URL mapping: {e}")
+            
             # Add all downloaded images to workspace (always add)
             for img_path in downloaded_images:
                 item = ImageItem(str(img_path), "downloaded_image")
-                item.download_url = event.input_dir  # Store source URL
+                # Set download URL - use specific URL from mapping if available, else base URL
+                filename = img_path.name
+                item.download_url = url_mapping.get(filename, event.input_dir)
                 item.download_timestamp = datetime.now().isoformat()
                 self.workspace.add_item(item)
             
             self.mark_modified()
             self.refresh_image_list()
+            
+            # CRITICAL: Save workspace immediately to persist download_url metadata
+            if self.workspace_file:
+                self.save_workspace(self.workspace_file)
             
             # Check if auto-processing is enabled
             process_after = False
@@ -3236,12 +3319,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.auto_process_downloaded_images([str(img) for img in downloaded_images])
             else:
                 # Show completion message only if not auto-processing
+                # CRITICAL: Clear processing items in case any are lingering from downloads
+                self.processing_items.clear()
                 # Reset window title to normal (download complete, no processing)
                 doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
                 self.update_window_title("ImageDescriber", doc_name)
                 
-                self.Raise()
-                self.SetFocus()
                 show_info(self, f"Downloaded {len(downloaded_images)} images from URL.\n\n"
                                f"Images saved to: {output_dir}")
                 self.image_list.SetFocus()
@@ -3301,9 +3384,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if settings['process_after']:
                         self.auto_process_extracted_frames(extracted_frames)
                     else:
-                        # Ensure main window has focus before showing dialog
-                        self.Raise()
-                        self.SetFocus()
                         show_info(self, f"Extracted {len(extracted_frames)} frames from video.\n\nFrames have been added to the workspace.")
                         # Restore focus to image list after dialog
                         self.image_list.SetFocus()
@@ -3336,6 +3416,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if hasattr(self, 'show_batch_progress_item'):
             self.show_batch_progress_item.Enable(False)
         
+        # CRITICAL: Clear processing items before updating title to prevent "Processing..." being stuck
+        self.processing_items.clear()
+        
         # Reset window title to normal (remove processing percentage)
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
         self.update_window_title("ImageDescriber", doc_name)
@@ -3344,10 +3427,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
         
-        # Ensure main window has focus before showing completion dialog
-        self.Raise()
-        self.SetFocus()
-        
+        # Show completion dialog
         show_info(self, f"Workflow complete!\n{event.input_dir}")
         
         # Restore focus to image list after dialog dismissal
@@ -3462,14 +3542,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if hasattr(self, 'show_batch_progress_item'):
             self.show_batch_progress_item.Enable(False)
         
+        # CRITICAL: Clear processing items before updating title to prevent "Processing..." being stuck
+        self.processing_items.clear()
+        
         # Reset window title to normal
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
         self.update_window_title("ImageDescriber", doc_name)
         
         self.SetStatusText("Batch processing stopped", 0)
-        # Ensure main window has focus before showing dialog
-        self.Raise()
-        self.SetFocus()
         show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
         # Restore focus to image list after dialog
         self.image_list.SetFocus()
@@ -4014,7 +4094,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             original_provider,
             original_model,
             existing_desc[:300] + ("..." if len(existing_desc) > 300 else ""),
-            self.config
+            self.config,
+            cached_ollama_models=self.cached_ollama_models
         )
         
         if dlg.ShowModal() == wx.ID_OK:
@@ -4022,25 +4103,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             question = values['question']
             
             if question:
-                # Create prompt with context
-                context_prompt = f"Previous description: {existing_desc}\n\nFollowup question: {question}"
+                # PERFORMANCE: Use ONLY the question as the custom prompt
+                # DO NOT include the full previous description in the prompt text
+                # The AI model can see the image, and adding 300+ words of text context
+                # causes dramatic slowdown (especially in vision-language models like LLaVa)
+                # Example: moondream + question = 16 sec, but llava + full_description + question = 216 sec!
+                # The model answers better when it's asked the question directly about what it sees.
+                custom_prompt = question
                 
                 self.SetStatusText(f"Processing followup with {values['provider']}/{values['model']}...", 0)
                 
                 # Process with AI using selected model
                 api_key = self.get_api_key_for_provider(values['provider'])
-                worker = ProcessingWorker(
+                # CRITICAL: Store worker as instance variable to prevent GC and manage threading
+                # This matches how batch_worker, download_worker, and video_worker are stored
+                self.followup_worker = ProcessingWorker(
                     self,
                     self.current_image_item.file_path,
                     values['provider'],
                     values['model'],
                     'followup',
-                    context_prompt,
+                    custom_prompt,  # Just the question, not full description
                     None,
                     None,
                     api_key  # API key for cloud providers
                 )
-                worker.start()
+                self.followup_worker.start()
         
         dlg.Destroy()
     
@@ -4589,9 +4677,56 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_close(self, event):
         """Handle application close"""
+        logger.info("Application close requested")
+        
+        # CRITICAL FIX: Close batch progress dialog first (it has wx.STAY_ON_TOP)
+        # This ensures the unsaved changes dialog won't be hidden behind it
+        if self.batch_progress_dialog:
+            logger.info("Closing batch progress dialog before exit")
+            try:
+                self.batch_progress_dialog.Close()
+                self.batch_progress_dialog = None
+            except Exception as e:
+                logger.warning(f"Failed to close batch progress dialog: {e}")
+        
+        # Stop all background workers
+        workers_stopped = []
+        if self.batch_worker and self.batch_worker.is_alive():
+            logger.info("Stopping batch processing worker")
+            self.batch_worker.stop()
+            workers_stopped.append("batch")
+        
+        if self.video_worker and self.video_worker.is_alive():
+            logger.info("Stopping video processing worker")
+            # Video worker uses stop_event
+            if hasattr(self.video_worker, '_stop_event'):
+                self.video_worker._stop_event.set()
+            workers_stopped.append("video")
+        
+        if self.download_worker and self.download_worker.is_alive():
+            logger.info("Stopping download worker")
+            if hasattr(self.download_worker, 'stop'):
+                self.download_worker.stop()
+            workers_stopped.append("download")
+        
+        if self.followup_worker and self.followup_worker.is_alive():
+            logger.info("Stopping followup worker")
+            workers_stopped.append("followup")
+        
+        if workers_stopped:
+            logger.info(f"Stopped workers: {', '.join(workers_stopped)}")
+        
+        # Bring window to front and focus before showing dialog
+        self.Raise()
+        self.SetFocus()
+        
+        # Show unsaved changes confirmation
+        logger.info("Checking for unsaved changes")
         if self.confirm_unsaved_changes():
-            # Clean up empty Untitled workspaces before closing
-            if is_untitled_workspace(self.workspace_file.stem):
+            logger.info("User confirmed close - cleaning up and destroying window")
+            
+            # Clean up empty Untitled workspaces before closing (if any)
+            if self.workspace_file and is_untitled_workspace(self.workspace_file.stem):
                 # Check if workspace is empty (no items or only empty directories)
                 if not self.workspace.items or len(self.workspace.items) == 0:
                     try:
@@ -4609,9 +4744,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     except Exception as e:
                         logger.warning(f"Failed to clean up Untitled workspace: {e}")
             
+            # Force destroy the window
+            logger.info("Calling Destroy()")
             self.Destroy()
-        elif event.CanVeto():
-            event.Veto()
+            logger.info("Destroy() completed")
+        else:
+            logger.info("User cancelled close")
+            if event.CanVeto():
+                event.Veto()
+            else:
+                logger.warning("Event cannot be vetoed but user cancelled - forcing close anyway")
+                self.Destroy()
     
     def on_save(self, event):
         """Wrapper for ModifiedStateMixin"""
@@ -4644,10 +4787,10 @@ def main():
         if debug_mode:
             log_file = exe_dir / Path(args.debug_file).name
     else:
-        # Development mode - use current directory
-        log_file = Path('imagedescriber.log')
+        # Development mode - use current working directory explicitly
+        log_file = Path.cwd() / 'imagedescriber.log'
         if debug_mode:
-            log_file = Path(args.debug_file)
+            log_file = Path.cwd() / Path(args.debug_file).name
     
     # Configure logging
     log_level = logging.DEBUG if debug_mode else logging.INFO
