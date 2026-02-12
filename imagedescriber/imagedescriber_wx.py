@@ -4636,27 +4636,40 @@ def main():
     # Check for debug mode via command-line flag OR environment variable
     debug_mode = args.debug or os.environ.get('IDT_DEBUG', '').lower() in ('1', 'true', 'yes')
     
-    # Always configure logging (basic by default, verbose if debug enabled)
-    log_file = Path.home() / 'imagedescriber.log'
+    # Determine log file location - executable directory for frozen, CWD for dev
+    if getattr(sys, 'frozen', False):
+        # Frozen executable - put log next to the .exe
+        exe_dir = Path(sys.executable).parent
+        log_file = exe_dir / 'imagedescriber.log'
+        if debug_mode:
+            log_file = exe_dir / Path(args.debug_file).name
+    else:
+        # Development mode - use current directory
+        log_file = Path('imagedescriber.log')
+        if debug_mode:
+            log_file = Path(args.debug_file)
+    
+    # Configure logging
     log_level = logging.DEBUG if debug_mode else logging.INFO
     
     if debug_mode:
-        # Verbose debug logging
-        log_file = Path(args.debug_file)
         log_format = '%(levelname)s - %(message)s - (%(name)s:%(lineno)d) - (%(asctime)s)'
     else:
-        # Standard logging (less verbose)
         log_format = '%(asctime)s - %(levelname)s - %(message)s'
     
-    logging.basicConfig(
-        level=log_level,
-        format=log_format,
-        handlers=[
-            logging.FileHandler(log_file, mode='a', encoding='utf-8'),
-            logging.StreamHandler(sys.stderr)  # Also to stderr (visible in console)
-        ],
-        force=True  # Override any existing configuration
-    )
+    try:
+        logging.basicConfig(
+            level=log_level,
+            format=log_format,
+            handlers=[
+                logging.FileHandler(str(log_file), mode='a', encoding='utf-8'),
+                logging.StreamHandler(sys.stderr)
+            ],
+            force=True
+        )
+    except Exception as e:
+        # If logging setup fails, at least print to stderr
+        print(f"ERROR: Failed to configure logging to {log_file}: {e}", file=sys.stderr)
     
     logger = logging.getLogger(__name__)
     logger.info("="*60)
@@ -4706,11 +4719,23 @@ if __name__ == "__main__":
         import traceback
         error_msg = f"CRITICAL ERROR: {e}\n\n{traceback.format_exc()}"
         print(error_msg, file=sys.stderr)
+        
+        crash_log_path = "crash_log.txt"
         try:
-            with open("crash_log.txt", "w") as f:
+            with open(crash_log_path, "w") as f:
                 f.write(error_msg)
-            print("Error logged to crash_log.txt")
+            print(f"Error logged to {crash_log_path}")
         except:
             print("Could not write crash log")
         
-        input("Application crashed. Press Enter to exit...")
+        # Show error dialog for GUI mode (don't use input() - breaks windowed executables)
+        try:
+            import wx
+            app = wx.App()
+            wx.MessageBox(
+                f"Application crashed. Error logged to {crash_log_path}\n\n{str(e)}", 
+                "Critical Error", 
+                wx.OK | wx.ICON_ERROR
+            )
+        except:
+            pass  # If wx fails too, just exit
