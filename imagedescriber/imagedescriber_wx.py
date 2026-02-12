@@ -1037,6 +1037,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.show_batch_progress_item.Enable(False)  # Disabled by default
         self.Bind(wx.EVT_MENU, self.on_show_batch_progress, self.show_batch_progress_item)
         
+        # Stop All Processing menu item (emergency stop for all active workers)
+        stop_all_item = process_menu.Append(
+            wx.ID_ANY,
+            "Stop All &Processing",
+            "Stop all active processing operations (cannot be resumed)"
+        )
+        self.Bind(wx.EVT_MENU, self.on_stop_all_processing, stop_all_item)
+        
         process_menu.AppendSeparator()
         
         refresh_models_item = process_menu.Append(wx.ID_ANY, "Refresh AI &Models")
@@ -2613,6 +2621,42 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if not self.confirm_unsaved_changes():
             return
         
+        # CRITICAL FIX: Stop and clean up existing workers before creating new workspace
+        if self.batch_worker:
+            if hasattr(self.batch_worker, 'is_alive') and self.batch_worker.is_alive():
+                self.batch_worker.stop()
+            self.batch_worker = None
+        
+        if self.video_worker:
+            if hasattr(self.video_worker, 'is_alive') and self.video_worker.is_alive():
+                if hasattr(self.video_worker, '_stop_event'):
+                    self.video_worker._stop_event.set()
+            self.video_worker = None
+        
+        if self.download_worker:
+            if hasattr(self.download_worker, 'is_alive') and self.download_worker.is_alive():
+                if hasattr(self.download_worker, 'stop'):
+                    self.download_worker.stop()
+            self.download_worker = None
+        
+        if self.scan_worker:
+            if hasattr(self.scan_worker, 'is_alive') and self.scan_worker.is_alive():
+                if hasattr(self.scan_worker, 'stop'):
+                    self.scan_worker.stop()
+            self.scan_worker = None
+        
+        if self.followup_worker:
+            if hasattr(self.followup_worker, 'is_alive') and self.followup_worker.is_alive():
+                self.followup_worker = None
+        
+        # Close batch progress dialog if open
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.Close()
+            self.batch_progress_dialog = None
+        
+        # Clear processing items
+        self.processing_items.clear()
+        
         # Create new workspace
         self.workspace = ImageWorkspace(new_workspace=True)
         self.workspace_file = None
@@ -2655,6 +2699,42 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def load_workspace(self, file_path):
         """Load workspace from file"""
         try:
+            # CRITICAL FIX: Stop and clean up existing workers before loading new workspace
+            if self.batch_worker:
+                if hasattr(self.batch_worker, 'is_alive') and self.batch_worker.is_alive():
+                    self.batch_worker.stop()
+                self.batch_worker = None
+            
+            if self.video_worker:
+                if hasattr(self.video_worker, 'is_alive') and self.video_worker.is_alive():
+                    if hasattr(self.video_worker, '_stop_event'):
+                        self.video_worker._stop_event.set()
+                self.video_worker = None
+            
+            if self.download_worker:
+                if hasattr(self.download_worker, 'is_alive') and self.download_worker.is_alive():
+                    if hasattr(self.download_worker, 'stop'):
+                        self.download_worker.stop()
+                self.download_worker = None
+            
+            if self.scan_worker:
+                if hasattr(self.scan_worker, 'is_alive') and self.scan_worker.is_alive():
+                    if hasattr(self.scan_worker, 'stop'):
+                        self.scan_worker.stop()
+                self.scan_worker = None
+            
+            if self.followup_worker:
+                if hasattr(self.followup_worker, 'is_alive') and self.followup_worker.is_alive():
+                    self.followup_worker = None
+            
+            # Close batch progress dialog if open
+            if self.batch_progress_dialog:
+                self.batch_progress_dialog.Close()
+                self.batch_progress_dialog = None
+            
+            # Clear processing items
+            self.processing_items.clear()
+            
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
@@ -2681,9 +2761,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 wx.CallAfter(self.prompt_resume_batch)
             
         except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error loading workspace {file_path}: {e}", exc_info=True)
             show_error(self, f"Error loading workspace - Invalid JSON format:\n\nLine {e.lineno}, Column {e.colno}\n{e.msg}\n\nThe workspace file may be corrupted. Try opening it in a text editor to fix the JSON syntax error.")
+        except ValueError as e:
+            logger.error(f"ValueError loading workspace {file_path}: {e}", exc_info=True)
+            show_error(self, f"Error loading workspace:\n\n{e}\n\nThe workspace file may contain malformed data.")
         except Exception as e:
-            show_error(self, f"Error loading workspace:\n{e}")
+            logger.error(f"Unexpected error loading workspace {file_path}: {e}", exc_info=True)
+            import traceback
+            tb = traceback.format_exc()
+            show_error(self, f"Error loading workspace:\n{e}\n\nFull traceback logged to imagedescriber.log")
     
     def on_save_workspace_as(self, event):
         """Save workspace to new file"""
@@ -3590,6 +3677,112 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             # No dialog - shouldn't happen if menu item is properly disabled
             show_info(self, "No batch processing is currently running.")
+    
+    def on_stop_all_processing(self, event):
+        """Stop all active processing operations
+        
+        This is a nuclear option that stops all worker threads:
+        - Batch processing
+        - Video extraction
+        - Download operations
+        - Directory scanning
+        - Follow-up questions
+        
+        Note: This cannot be resumed. Progress is not saved.
+        """
+        # Count active workers
+        active_workers = []
+        if self.batch_worker and self.batch_worker.is_alive():
+            active_workers.append("Batch Processing")
+        if self.video_worker and self.video_worker.is_alive():
+            active_workers.append("Video Extraction")
+        if self.download_worker and hasattr(self.download_worker, 'is_alive') and self.download_worker.is_alive():
+            active_workers.append("Image Download")
+        if self.scan_worker and self.scan_worker.is_alive():
+            active_workers.append("Directory Scan")
+        if self.followup_worker and self.followup_worker.is_alive():
+            active_workers.append("Follow-up Question")
+        
+        if not active_workers:
+            show_info(self, "No active processing operations to stop.")
+            return
+        
+        # Confirm with user
+        worker_list = "\n".join(f"  • {w}" for w in active_workers)
+        result = ask_yes_no(
+            self,
+            f"Stop all active processing?\n\n"
+            f"Active operations:\n{worker_list}\n\n"
+            f"Warning: This cannot be resumed. Progress will be lost."
+        )
+        
+        if not result:
+            return
+        
+        # Stop all active workers
+        stopped_count = 0
+        
+        if self.batch_worker and self.batch_worker.is_alive():
+            try:
+                self.batch_worker.stop()
+                stopped_count += 1
+                logger.info("Stopped batch processing worker")
+            except Exception as e:
+                logger.error(f"Error stopping batch worker: {e}")
+        
+        if self.video_worker and self.video_worker.is_alive():
+            try:
+                # Video worker may not have stop method, just set reference to None
+                # Thread is daemon so it will be cleaned up
+                self.video_worker = None
+                stopped_count += 1
+                logger.info("Stopped video extraction worker")
+            except Exception as e:
+                logger.error(f"Error stopping video worker: {e}")
+        
+        if self.download_worker and hasattr(self.download_worker, 'is_alive') and self.download_worker.is_alive():
+            try:
+                if hasattr(self.download_worker, 'stop'):
+                    self.download_worker.stop()
+                else:
+                    self.download_worker = None
+                stopped_count += 1
+                logger.info("Stopped download worker")
+            except Exception as e:
+                logger.error(f"Error stopping download worker: {e}")
+        
+        if self.scan_worker and self.scan_worker.is_alive():
+            try:
+                # Scan worker is daemon, just clear reference
+                self.scan_worker = None
+                stopped_count += 1
+                logger.info("Stopped directory scan worker")
+            except Exception as e:
+                logger.error(f"Error stopping scan worker: {e}")
+        
+        if self.followup_worker and self.followup_worker.is_alive():
+            try:
+                # Follow-up worker is daemon, just clear reference
+                self.followup_worker = None
+                stopped_count += 1
+                logger.info("Stopped follow-up question worker")
+            except Exception as e:
+                logger.error(f"Error stopping followup worker: {e}")
+        
+        # Hide progress dialog if visible
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.Hide()
+        
+        # Clear processing state
+        self.processing_items.clear()
+        self.batch_progress = None
+        
+        # Update UI
+        self.SetStatusText(f"Stopped {stopped_count} processing operation(s)", 0)
+        show_info(self, f"Stopped {stopped_count} processing operation(s).\n\nProgress was not saved.")
+        
+        # Refresh display
+        self.refresh_image_list()
     
     def on_stop_batch(self):
         """Stop batch processing permanently"""
@@ -4773,70 +4966,107 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Stop all background workers
         workers_stopped = []
-        if self.batch_worker and self.batch_worker.is_alive():
-            logger.info("Stopping batch processing worker")
-            self.batch_worker.stop()
-            workers_stopped.append("batch")
-        
-        if self.video_worker and self.video_worker.is_alive():
-            logger.info("Stopping video processing worker")
-            # Video worker uses stop_event
-            if hasattr(self.video_worker, '_stop_event'):
-                self.video_worker._stop_event.set()
-            workers_stopped.append("video")
-        
-        if self.download_worker and self.download_worker.is_alive():
-            logger.info("Stopping download worker")
-            if hasattr(self.download_worker, 'stop'):
-                self.download_worker.stop()
-            workers_stopped.append("download")
-        
-        if self.followup_worker and self.followup_worker.is_alive():
-            logger.info("Stopping followup worker")
-            workers_stopped.append("followup")
+        try:
+            if self.batch_worker:
+                if hasattr(self.batch_worker, 'is_alive') and self.batch_worker.is_alive():
+                    logger.info("Stopping batch processing worker")
+                    self.batch_worker.stop()
+                    workers_stopped.append("batch")
+                self.batch_worker = None
+            
+            if self.video_worker:
+                if hasattr(self.video_worker, 'is_alive') and self.video_worker.is_alive():
+                    logger.info("Stopping video processing worker")
+                    if hasattr(self.video_worker, '_stop_event'):
+                        self.video_worker._stop_event.set()
+                    workers_stopped.append("video")
+                self.video_worker = None
+            
+            if self.download_worker:
+                if hasattr(self.download_worker, 'is_alive') and self.download_worker.is_alive():
+                    logger.info("Stopping download worker")
+                    if hasattr(self.download_worker, 'stop'):
+                        self.download_worker.stop()
+                    workers_stopped.append("download")
+                self.download_worker = None
+            
+            if self.followup_worker:
+                if hasattr(self.followup_worker, 'is_alive') and self.followup_worker.is_alive():
+                    logger.info("Stopping followup worker")
+                    workers_stopped.append("followup")
+                self.followup_worker = None
+            
+            if self.scan_worker:
+                if hasattr(self.scan_worker, 'is_alive') and self.scan_worker.is_alive():
+                    logger.info("Stopping scan worker")
+                    if hasattr(self.scan_worker, 'stop'):
+                        self.scan_worker.stop()
+                    workers_stopped.append("scan")
+                self.scan_worker = None
+        except Exception as e:
+            logger.error(f"Error stopping workers: {e}")
         
         if workers_stopped:
             logger.info(f"Stopped workers: {', '.join(workers_stopped)}")
         
         # Bring window to front and focus before showing dialog
-        self.Raise()
-        self.SetFocus()
+        try:
+            self.Raise()
+            self.SetFocus()
+        except Exception as e:
+            logger.warning(f"Failed to raise/focus window: {e}")
         
         # Show unsaved changes confirmation
         logger.info("Checking for unsaved changes")
-        if self.confirm_unsaved_changes():
+        try:
+            should_close = self.confirm_unsaved_changes(parent=self)
+        except Exception as e:
+            logger.error(f"Error in confirm_unsaved_changes: {e}")
+            should_close = True  # Default to closing if dialog fails
+        
+        if should_close:
             logger.info("User confirmed close - cleaning up and destroying window")
             
             # Clean up empty Untitled workspaces before closing (if any)
-            if self.workspace_file and is_untitled_workspace(self.workspace_file.stem):
-                # Check if workspace is empty (no items or only empty directories)
-                if not self.workspace.items or len(self.workspace.items) == 0:
-                    try:
-                        # Delete workspace data directory
-                        data_dir = get_workspace_files_directory(self.workspace_file)
-                        if data_dir.exists():
-                            import shutil
-                            shutil.rmtree(data_dir)
-                        
-                        # Delete IDW file
-                        if self.workspace_file.exists():
-                            self.workspace_file.unlink()
+            try:
+                if self.workspace_file and is_untitled_workspace(self.workspace_file.stem):
+                    # Check if workspace is empty (no items or only empty directories)
+                    if not self.workspace.items or len(self.workspace.items) == 0:
+                        try:
+                            # Delete workspace data directory
+                            data_dir = get_workspace_files_directory(self.workspace_file)
+                            if data_dir.exists():
+                                import shutil
+                                shutil.rmtree(data_dir)
                             
-                        logger.info(f"Cleaned up empty Untitled workspace: {self.workspace_file.name}")
-                    except Exception as e:
-                        logger.warning(f"Failed to clean up Untitled workspace: {e}")
+                            # Delete IDW file
+                            if self.workspace_file.exists():
+                                self.workspace_file.unlink()
+                                
+                            logger.info(f"Cleaned up empty Untitled workspace: {self.workspace_file.name}")
+                        except Exception as e:
+                            logger.warning(f"Failed to clean up Untitled workspace: {e}")
+            except Exception as e:
+                logger.warning(f"Error during cleanup: {e}")
             
             # Force destroy the window
             logger.info("Calling Destroy()")
-            self.Destroy()
-            logger.info("Destroy() completed")
+            try:
+                self.Destroy()
+                logger.info("Destroy() completed")
+            except Exception as e:
+                logger.error(f"Error calling Destroy(): {e}")
+                # If Destroy() fails, try forcing close
+                try:
+                    wx.GetApp().ExitMainLoop()
+                except Exception:
+                    pass
         else:
             logger.info("User cancelled close")
-            if event.CanVeto():
+            if event and hasattr(event, 'CanVeto') and event.CanVeto():
                 event.Veto()
             else:
-                logger.warning("Event cannot be vetoed but user cancelled - forcing close anyway")
-                self.Destroy()
+                logger.warning("Event cannot be vetoed, forcing close anyway")
     
     def on_save(self, event):
         """Wrapper for ModifiedStateMixin"""

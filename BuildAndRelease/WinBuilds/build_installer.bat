@@ -15,9 +15,20 @@ echo ================================================
 echo Building Image Description Toolkit Installer
 echo ================================================
 echo.
+echo Current directory: %CD%
+echo Script directory: %~dp0
+echo.
 
-REM Change to BuildAndRelease directory
+REM Change to the script's directory (BuildAndRelease\WinBuilds)
 cd /d "%~dp0"
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Failed to change to script directory
+    pause
+    exit /b 1
+)
+
+echo Changed to: %CD%
+echo.
 
 REM Read version from VERSION file
 set VERSION=unknown
@@ -83,6 +94,8 @@ if %MISSING_FILES%==1 (
 echo All required files found.
 echo.
 echo Compiling installer...
+echo Command: "%INNO_PATH%" installer.iss
+echo.
 "%INNO_PATH%" installer.iss
 
 if %ERRORLEVEL% EQU 0 (
@@ -91,7 +104,7 @@ if %ERRORLEVEL% EQU 0 (
     echo SUCCESS: Installer created successfully!
     echo ================================================
     echo.
-    echo Output: dist\ImageDescriptionToolkit_Setup_v%VERSION%.exe
+    echo Output: dist_all\ImageDescriptionToolkit_Setup_v%VERSION%.exe
     echo.
     echo The installer includes:
     echo   - idt.exe (CLI)
@@ -99,10 +112,14 @@ if %ERRORLEVEL% EQU 0 (
     echo   - Configuration files
     echo   - Documentation
     echo.
+    pause
     exit /b 0
 ) else (
     echo.
+    echo ================================================
     echo ERROR: Installer compilation failed!
+    echo Error code: %ERRORLEVEL%
+    echo ================================================
     echo.
     pause
     exit /b 1

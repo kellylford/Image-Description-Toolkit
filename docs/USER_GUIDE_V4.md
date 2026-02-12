@@ -8,7 +8,7 @@ The Image Description Toolkit (IDT) is a comprehensive, AI-driven suite for gene
 
 IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as a standalone Windows program—**no Python installation required**.
 
-Note: Ollama must be installed with Ollama models downloaded to use Ollama as an AI option. Visit http://ollama.ai.
+**Note:** Ollama must be installed with Ollama models downloaded to use Ollama as an AI option. The Windows installer can automatically install Ollama for you (via winget), or you can install it manually from [ollama.ai](http://ollama.ai).
 
 ---
 
@@ -35,14 +35,18 @@ Note: Ollama must be installed with Ollama models downloaded to use Ollama as an
 ### Step 1: Download & Install
 1. Download the latest installer from [GitHub Releases](https://github.com/kellylford/Image-Description-Toolkit/releases)
    - **Windows:** `ImageDescriptionToolkit_Setup_v[VERSION].exe`
-   - **macOS:** `IDT-[VERSION].pkg` or `IDT-[VERSION].dmg`
+   - **macOS (coming soon):** `IDT-[VERSION].pkg` or `IDT-[VERSION].dmg`
 2. Run the installer - it installs to `C:\IDT\` by default (Windows)
+   - **Windows installer can automatically install Ollama for you!** If winget is available on your system, you'll see a checkbox to "Install Ollama (local AI models) via winget" during installation
+   - If you don't install Ollama during setup, you can install it manually later (see Step 2)
 3. You'll find two applications in the installation folder:
    - `idt.exe` - Command line interface for batch processing
    - `imagedescriber.exe` - GUI application with integrated viewer
 
 ### Step 2: Install Ollama (for local models)
 **Ollama is recommended for most users** - it's free, private, and runs locally.
+
+**If you didn't install Ollama during IDT setup:**
 
 1. Download Ollama from [https://ollama.ai/download/windows](https://ollama.ai/download/windows)
    - **Or** install via winget: `winget install Ollama.Ollama`

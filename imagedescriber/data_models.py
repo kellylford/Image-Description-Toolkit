@@ -6,9 +6,13 @@ images, descriptions, and workspaces.
 """
 
 import time
+import logging
 from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 # Constants
 WORKSPACE_VERSION = "3.0"
@@ -114,6 +118,13 @@ class ImageItem:
     
     @classmethod
     def from_dict(cls, data: dict):
+        if data is None:
+            raise ValueError("Cannot create ImageItem from None data")
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected dict for ImageItem data, got {type(data).__name__}")
+        if "file_path" not in data:
+            raise ValueError("ImageItem data missing required 'file_path' field")
+        
         item = cls(data["file_path"], data.get("item_type", "image"))
         item.descriptions = [ImageDescription.from_dict(d) for d in data.get("descriptions", [])]
         item.batch_marked = data.get("batch_marked", False)
@@ -311,6 +322,11 @@ class ImageWorkspace:
     
     @classmethod
     def from_dict(cls, data: dict):
+        if data is None:
+            raise ValueError("Cannot create ImageWorkspace from None data")
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected dict for ImageWorkspace data, got {type(data).__name__}")
+        
         workspace = cls()
         workspace.version = data.get("version", WORKSPACE_VERSION)
         workspace.directory_path = data.get("directory_path", "")
@@ -318,8 +334,20 @@ class ImageWorkspace:
         # Ensure backward compatibility
         if workspace.directory_path and workspace.directory_path not in workspace.directory_paths:
             workspace.directory_paths.append(workspace.directory_path)
-        workspace.items = {path: ImageItem.from_dict(item_data) 
-                          for path, item_data in data.get("items", {}).items()}
+        
+        # Load items with error handling for malformed data
+        items_data = data.get("items", {})
+        workspace.items = {}
+        for path, item_data in items_data.items():
+            try:
+                if item_data is not None:
+                    workspace.items[path] = ImageItem.from_dict(item_data)
+                else:
+                    logger.warning(f"Skipping item with None data: {path}")
+            except Exception as e:
+                logger.error(f"Failed to load item {path}: {e}")
+                # Skip this item but continue loading others
+        
         workspace.chat_sessions = data.get("chat_sessions", {})  # Load chat sessions
         workspace.imported_workflow_dir = data.get("imported_workflow_dir", None)  # Load workflow dir
         workspace.cached_ollama_models = data.get("cached_ollama_models", None)  # Load cached models

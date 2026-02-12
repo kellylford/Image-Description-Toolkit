@@ -41,43 +41,34 @@ DirExistsWarning=no
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "addtopath"; Description: "Add to PATH (allows running 'idt' from any command prompt)"; GroupDescription: "System Integration:"; Flags: unchecked
-
-[Files]
-; Main I DT CLI executable
-Source: "dist_all\bin\idt.exe"; DestDir: "{app}"; Flags: ignoreversion
-
-; GUI Applications
-; Note: Viewer is now integrated into ImageDescriber as "Viewer Mode" tab
-Source: "dist_all\bin\ImageDescriber.exe"; DestDir: "{app}"; Flags: ignoreversion
-; Note: PromptEditor and Configure are now integrated into ImageDescriber (Tools menu)
-
-; Configuration files (from scripts directory)
-Source: "..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
-; Note: scripts\prompts folder is no longer present; omit to avoid build failure
-
-; Shared utilities
-Source: "..\..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
-
-; Documentation
-Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-
-[Icons]
-Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit && echo Type 'idt --help' for usage"; IconFilename: "{app}\{#MyAppExeName}"
-Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Comment: "Batch image processing (Viewer Mode tab + Tools menu includes Prompt Editor and Configure)"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Tasks: desktopicon
-
 [Code]
 const
   EnvironmentKey = 'Environment';
 
 var
   OllamaPage: TOutputMsgWizardPage;
+  WingetAvailable: Boolean;
+
+function IsWingetAvailable: Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec('cmd.exe', '/c winget --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+  if Result then
+    Log('Winget availability check: True')
+  else
+    Log('Winget availability check: False');
+end;
+
+function ShouldShowOllamaInstallTask: Boolean;
+begin
+  Result := IsWingetAvailable();
+end;
+
+function ShouldShowOllamaWebsiteLink: Boolean;
+begin
+  Result := not IsWingetAvailable();
+end;
 
 procedure EnvAddPath(Path: string);
 var
@@ -107,18 +98,40 @@ begin
 end;
 
 procedure InitializeWizard;
+var
+  OllamaMessage: string;
 begin
+  // Check if winget is available on this system
+  WingetAvailable := IsWingetAvailable();
+  
+  // Customize message based on winget availability
+  if WingetAvailable then
+  begin
+    OllamaMessage := 'Image Description Toolkit requires Ollama to use local AI models.' + #13#10 + #13#10 +
+      'You can install Ollama automatically using the checkbox on the next page,' + #13#10 +
+      'or install it manually later:' + #13#10 +
+      '1. Visit https://ollama.com' + #13#10 +
+      '2. Download and install Ollama' + #13#10 +
+      '3. Run: ollama pull moondream';
+  end
+  else
+  begin
+    OllamaMessage := 'Image Description Toolkit requires Ollama to use local AI models.' + #13#10 + #13#10 +
+      'If you don''t have Ollama installed yet:' + #13#10 +
+      '1. Visit https://ollama.com' + #13#10 +
+      '2. Download and install Ollama' + #13#10 +
+      '3. Run: ollama pull moondream' + #13#10 + #13#10 +
+      'You can install Ollama now or after installing IDT.';
+  end;
+  
   OllamaPage := CreateOutputMsgPage(wpSelectTasks,
     'Ollama Required', 'AI Model Server Installation',
-    'Image Description Toolkit requires Ollama to use local AI models.' + #13#10 + #13#10 +
-    'If you don''t have Ollama installed yet:' + #13#10 +
-    '1. Visit https://ollama.com' + #13#10 +
-    '2. Download and install Ollama' + #13#10 +
-    '3. Run: ollama pull moondream' + #13#10 + #13#10 +
-    'You can install Ollama now or after installing IDT.');
+    OllamaMessage);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -129,6 +142,24 @@ begin
     // Add to PATH if selected
     if WizardIsTaskSelected('addtopath') then
       EnvAddPath(ExpandConstant('{app}'));
+    
+    // Install Ollama via winget if selected
+    if WizardIsTaskSelected('installollama') then
+    begin
+      Log('Installing Ollama via winget...');
+      if Exec('cmd.exe', '/c winget install Ollama.Ollama --silent --accept-package-agreements --accept-source-agreements', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+      begin
+        if ResultCode = 0 then
+          Log('Ollama installed successfully')
+        else
+          Log('Ollama installation returned code: ' + IntToStr(ResultCode));
+      end
+      else
+      begin
+        Log('Failed to execute winget command');
+        MsgBox('Failed to install Ollama automatically. Please install manually from ollama.com', mbError, MB_OK);
+      end;
+    end;
   end;
 end;
 
@@ -160,8 +191,40 @@ begin
   end;
 end;
 
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "addtopath"; Description: "Add to PATH (allows running 'idt' from any command prompt)"; GroupDescription: "System Integration:"; Flags: unchecked
+Name: "installollama"; Description: "Install Ollama (local AI models) via winget"; GroupDescription: "Dependencies:"; Flags: unchecked; Check: ShouldShowOllamaInstallTask
+
+[Files]
+; Main I DT CLI executable
+Source: "dist_all\bin\idt.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+; GUI Applications
+; Note: Viewer is now integrated into ImageDescriber as "Viewer Mode" tab
+Source: "dist_all\bin\ImageDescriber.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Note: PromptEditor and Configure are now integrated into ImageDescriber (Tools menu)
+
+; Configuration files (from scripts directory)
+Source: "..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
+; Note: scripts\prompts folder is no longer present; omit to avoid build failure
+
+; Shared utilities
+Source: "..\..\shared\*.py"; DestDir: "{app}\shared"; Flags: ignoreversion
+
+; Documentation
+Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+
+[Icons]
+Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit && echo Type 'idt --help' for usage"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Comment: "Batch image processing (Viewer Mode tab + Tools menu includes Prompt Editor and Configure)"
+Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+
 [Run]
 Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent
 Filename: "{app}\ImageDescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent unchecked
-Filename: "https://ollama.com"; Description: "Open Ollama website to download (if not installed)"; Flags: shellexec postinstall skipifsilent unchecked
+Filename: "https://ollama.com"; Description: "Open Ollama website to download (if not installed)"; Flags: shellexec postinstall skipifsilent unchecked; Check: ShouldShowOllamaWebsiteLink
 Filename: "{app}\docs"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked
