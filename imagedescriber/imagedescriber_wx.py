@@ -2173,16 +2173,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logger.warning("No workspace or no items in workspace - showing warning")
             show_warning(self, "No images in workspace")
             return
-    
-    def on_process_undescribed(self, event):
-        """Menu handler: Process only undescribed images"""
-        logger.info("on_process_undescribed menu handler called")
-        self.on_process_all(event, skip_existing=True)
-    
-    def on_redescribe_all(self, event):
-        """Menu handler: Redescribe all images"""
-        logger.info("on_redescribe_all menu handler called")
-        self.on_process_all(event, skip_existing=False)
         
         if not BatchProcessingWorker:
             show_error(self, "Batch processing worker not available")
@@ -2600,6 +2590,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.save_workspace(self.workspace_file)
         
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
+    
+    def on_process_undescribed(self, event):
+        """Menu handler: Process only undescribed images"""
+        logger.info("on_process_undescribed menu handler called")
+        self.on_process_all(event, skip_existing=True)
+    
+    def on_redescribe_all(self, event):
+        """Menu handler: Redescribe all images"""
+        logger.info("on_redescribe_all menu handler called")
+        self.on_process_all(event, skip_existing=False)
     
     def on_save_description(self, event):
         """Save edited description"""
