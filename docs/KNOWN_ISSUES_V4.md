@@ -43,6 +43,28 @@
 
 ---
 
+#### CMD Line Prompt to View Results Does Not Work
+**Status:** Open - [Issue #86](https://github.com/kellylford/Image-Description-Toolkit/issues/86)
+
+**Symptom:** The CMD IDT tool has a prompt to view the results of a run when it is finished. This bat file does not work currently.
+
+**Impact:** Users cannot view results directly from the command line completion prompt.
+
+**Current Workaround:** Open ImageDescriber and use the Results Viewer option on the File menu, or navigate to the workflow directory directly and view the HTML reports directory or the descriptions directory. Workflow directories are found inside a folder named Descriptions inside the `c:\idt` folder.
+
+---
+
+#### Ollama Install Leaves Ollama UI Open
+**Status:** Open - [Issue #87](https://github.com/kellylford/Image-Description-Toolkit/issues/87)
+
+**Symptom:** As a part of installing Ollama, the main Ollama window will be opened.
+
+**Impact:** Users see an unexpected window after Ollama installation during setup.
+
+**Current Workaround:** You can safely close it with Alt+F4.
+
+---
+
 ## Hints and Best Practices
 
 ### Workspace Management

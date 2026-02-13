@@ -26,7 +26,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile={#LicensePath}
 OutputDir=dist_all
-OutputBaseFilename=ImageDescriptionToolkit_Setup_v{#MyAppVersion}
+OutputBaseFilename=ImageDescriptionToolkitSetupv4.0.0Beta1
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -150,7 +150,24 @@ begin
       if Exec('cmd.exe', '/c winget install Ollama.Ollama --silent --accept-package-agreements --accept-source-agreements', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
       begin
         if ResultCode = 0 then
-          Log('Ollama installed successfully')
+        begin
+          Log('Ollama installed successfully');
+          
+          // Pull moondream model after successful Ollama installation
+          Log('Pulling moondream model...');
+          if Exec('cmd.exe', '/c ollama pull moondream', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+          begin
+            if ResultCode = 0 then
+              Log('Moondream model pulled successfully')
+            else
+              Log('Moondream model pull returned code: ' + IntToStr(ResultCode));
+          end
+          else
+          begin
+            Log('Failed to execute ollama pull command');
+            MsgBox('Ollama installed but failed to pull moondream model. You can pull it manually by running: ollama pull moondream', mbInformation, MB_OK);
+          end;
+        end
         else
           Log('Ollama installation returned code: ' + IntToStr(ResultCode));
       end
@@ -194,7 +211,7 @@ end;
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "addtopath"; Description: "Add to PATH (allows running 'idt' from any command prompt)"; GroupDescription: "System Integration:"; Flags: unchecked
-Name: "installollama"; Description: "Install Ollama (local AI models) via winget"; GroupDescription: "Dependencies:"; Flags: unchecked; Check: ShouldShowOllamaInstallTask
+Name: "installollama"; Description: "Install Ollama and moondream model via winget"; GroupDescription: "Dependencies:"; Flags: unchecked; Check: ShouldShowOllamaInstallTask
 
 [Files]
 ; Main I DT CLI executable
