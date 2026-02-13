@@ -2169,17 +2169,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         print(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}", flush=True)
         print("="*60, flush=True)
         
+        logger.info("CHECKPOINT 1: Checking workspace existence")
         if not self.workspace or not self.workspace.items:
             logger.warning("No workspace or no items in workspace - showing warning")
             show_warning(self, "No images in workspace")
             return
+        logger.info("CHECKPOINT 1 PASSED: Workspace exists with items")
         
+        logger.info("CHECKPOINT 2: Checking BatchProcessingWorker availability")
         if not BatchProcessingWorker:
+            logger.error("BatchProcessingWorker is None!")
             show_error(self, "Batch processing worker not available")
             return
+        logger.info("CHECKPOINT 2 PASSED: BatchProcessingWorker available")
         
         # Check if we need to create a workspace first (None) or if it's Untitled - prompt to save/name
+        logger.info(f"CHECKPOINT 3: Checking workspace file status - workspace_file={self.workspace_file}")
         if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
+            logger.info("CHECKPOINT 3: Workspace is None or Untitled - showing save dialog")
             # Inform user they need to save first
             result = wx.MessageBox(
                 "Batch processing requires a named workspace.\n\n"
@@ -2234,13 +2241,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 save_dialog.Destroy()
                 # User cancelled the file dialog
                 return
+        logger.info("CHECKPOINT 3 PASSED: Workspace file is valid (not None/Untitled)")
         
         # Auto-save before batch processing
+        logger.info(f"CHECKPOINT 4: Auto-save check - modified={self.modified}")
         if self.modified:
+            logger.info("Workspace modified - auto-saving")
             self.save_workspace(str(self.workspace_file))
+        logger.info("CHECKPOINT 4 PASSED: Auto-save complete")
         
         # Phase 5: Warn about redescribing all
+        logger.info(f"CHECKPOINT 5: Checking skip_existing={skip_existing}")
         if not skip_existing:
+            logger.info("skip_existing=False - showing redescribe warning dialog")
             result = ask_yes_no(
                 self,
                 "Redescribe ALL images?\n\n"
@@ -2250,17 +2263,27 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             )
             if not result:
                 return
+        logger.info("CHECKPOINT 5 PASSED: Skip existing check complete")
         
         # Show processing options dialog with cached models
+        logger.info(f"CHECKPOINT 6: About to show ProcessingOptionsDialog - ProcessingOptionsDialog={ProcessingOptionsDialog}")
         if ProcessingOptionsDialog:
+            logger.info("Creating ProcessingOptionsDialog instance")
             dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
-            if dialog.ShowModal() != wx.ID_OK:
+            logger.info("Calling ProcessingOptionsDialog.ShowModal() - THIS MAY BLOCK")
+            result = dialog.ShowModal()
+            logger.info(f"ProcessingOptionsDialog returned result={result}")
+            if result != wx.ID_OK:
+                logger.info("User cancelled ProcessingOptionsDialog")
                 dialog.Destroy()
                 return
             
+            logger.info("Getting config from dialog")
             options = dialog.get_config()
             dialog.Destroy()
+            logger.info(f"CHECKPOINT 6 PASSED: Dialog completed successfully - options={options}")
         else:
+            logger.warning("ProcessingOptionsDialog is None - using defaults")
             # Use defaults
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
@@ -2269,12 +2292,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'custom_prompt': '',
             }
         
+        logger.info("CHECKPOINT 7: Starting to scan workspace items for processing")
         # Phase 5: Use skip_existing parameter instead of options
         # Get files to process - handle videos separately
         images_to_process = []
         videos_to_extract = []
         
         print(f"Scanning {len(self.workspace.items)} workspace items...", flush=True)
+        logger.info(f"Scanning {len(self.workspace.items)} workspace items...")
         
         for item in self.workspace.items.values():
             print(f"  Item: {Path(item.file_path).name}, type={item.item_type}, has_desc={bool(item.descriptions)}", flush=True)
