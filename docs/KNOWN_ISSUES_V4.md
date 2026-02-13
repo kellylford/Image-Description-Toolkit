@@ -1,8 +1,10 @@
 # Known Issues and Hints - Version 4.x
 
+**For the latest issues and updates, see the [v4beta issues on GitHub](https://github.com/kellylford/Image-Description-Toolkit/issues?q=is:open+label:v4beta).**
+
 ## Known Issues
 
-### Accessibility
+
 
 #### Processing UI Changes Do Not Announce Automatically
 **Status:** Open - [Issue #83](https://github.com/kellylford/Image-Description-Toolkit/issues/83)
@@ -16,8 +18,6 @@
 **Current Workaround:** Use the arrow keys to review the dialog text and status updates.
 
 ---
-
-### User Interface
 
 #### No Setting to Set Image Preview On/Off Permanently
 **Status:** Open - [Issue #84](https://github.com/kellylford/Image-Description-Toolkit/issues/84)
@@ -106,7 +106,7 @@ When processing workspaces containing videos, frames will be extracted automatic
 #### Ollama Model Caching
 The first time you open the Processing Options dialog, Ollama models are fetched and cached in the workspace. Subsequent opens are instant.
 
-**Tip:** Use Tools → Refresh Ollama Models to update the cache if you install new models.
+**Tip:** Use Process→ Refresh Ollama Models to update the cache if you install new models.
 
 ---
 
@@ -117,17 +117,15 @@ The first time you open the Processing Options dialog, Ollama models are fetched
 
 ---
 
-### Accessibility
-
 #### Screen Reader Support
 - Image list uses arrow keys for navigation
 - Full description text is announced by screen readers (not truncated)
 - Batch progress shows "Last Description" for context
-- All dialogs are keyboard accessible
+
 
 **Tip:** Use single-key shortcuts for common actions:
-- `D` - Describe current image
-- `P` - Process all undescribed
+
+- `p` - Process image
 - `R` - Redescribe all
 - `S` - Stop batch processing
 
@@ -141,7 +139,7 @@ The Windows installer can automatically install Ollama via winget if:
 - winget (Windows Package Manager) is available
 - You check the "Install Ollama via winget" option
 
-**Note:** If winget is not available, you'll see an option to visit the Ollama website instead.
+**Note:** If winget is not available, you'll have an option to visit the Ollama website instead.
 
 ---
 
@@ -167,16 +165,6 @@ The Windows installer can automatically install Ollama via winget if:
 2. Are there any images in the workspace?
 3. Is Ollama running? (Check system tray or run `ollama list`)
 4. Try Process → Stop All Processing first to clear any stuck workers
-
----
-
-### Video Extraction Fails
-
-**Check:**
-1. Is OpenCV installed? Run: `pip install opencv-python`
-2. Is the video file corrupted? Try opening in VLC
-3. Check extraction config in Tools → Configure
-4. Some exotic codecs may not be supported
 
 ---
 
@@ -225,8 +213,7 @@ The Windows installer can automatically install Ollama via winget if:
 - `Ctrl+S` - Save Workspace
 - `Ctrl+Shift+S` - Stop All Processing
 - `Ctrl+W` - Close Workspace
-- `D` - Describe Image
-- `P` - Process All Undescribed
+- `p` - Process image
 - `R` - Redescribe All
 - `S` - Stop Batch Processing
 - `Delete` - Remove Image from Workspace
@@ -250,10 +237,10 @@ The Windows installer can automatically install Ollama via winget if:
 
 #### For Selective Processing
 1. Use filters to view "Undescribed" items only
-2. Process individual images one at a time with `D` key
+2. Process individual images one at a time with `p` key
 3. Or use "Process All Undescribed" to batch the remainder
 
 ---
 
 *Last Updated: February 13, 2026*
-*Document Version: 2.0*
+*Document Version: 1.0*

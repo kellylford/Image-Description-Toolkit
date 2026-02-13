@@ -3,8 +3,8 @@
 ## Overview
 The Image Description Toolkit (IDT) is a comprehensive, AI-driven suite for generating natural language descriptions from images and videos. It provides **two applications** to fit different workflows:
 
-- **📋 Command Line Interface (CLI) - `idt.exe`** - Powerful batch processing for automation and large collections
-- **🖼️ GUI ImageDescriber - `imagedescriber.exe`** - Interactive desktop application with integrated viewer, prompt editor, and configuration manager
+- **Command Line Interface (CLI) - `idt.exe`** - Powerful batch processing for automation and large collections
+- **GUI ImageDescriber - `imagedescriber.exe`** - Interactive desktop application with integrated viewer, prompt editor, and configuration manager
 
 IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is distributed as a standalone Windows program—**no Python installation required**.
 
@@ -78,7 +78,7 @@ ollama list
 
 IDT provides two applications, each designed for different use cases:
 
-### 📋 Command Line Interface (CLI) - `idt.exe`
+### Command Line Interface (CLI) - `idt.exe`
 **Best for:** Batch processing, automation, advanced workflows, integration with scripts
 
 **Key Features:**
@@ -91,7 +91,7 @@ IDT provides two applications, each designed for different use cases:
 
 **When to use:** Large image collections, repeated workflows, production environments, automation
 
-### 🖼️ GUI ImageDescriber - `imagedescriber.exe`
+### GUI ImageDescriber - `imagedescriber.exe`
 **Best for:** Individual images, quick testing, visual workflow, beginners
 
 **Key Features:**
@@ -238,7 +238,7 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 
 **Image Panel (Left):**
 - List of all images in the workspace
-- Shows processing state (✓ described, • pending, ! paused)
+- Shows processing state (described, pending, paused)
 - Click to select and view
 - Supports all major formats (JPG, PNG, HEIC, videos)
 - **Sorted chronologically** by EXIF date (oldest first)
@@ -331,7 +331,6 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 
 **Help Menu:**
 - **User Guide** - Opens this guide on GitHub
-- **Report an Issue** - Opens GitHub issue creation page to report bugs or suggest features
 - **About** - Version and feature information
 
 ### Viewer Mode
@@ -394,23 +393,23 @@ Before batch operations (Process All, URL downloads), you'll see a save dialog i
 - External files (from other locations) remain linked correctly
 
 **Best Practices:**
-- ✅ Use descriptive names when prompted (easier to find later)
-- ✅ Let the auto-save handle things before batch operations
-- ✅ Use Viewer mode to browse all your saved workspaces
-- ✅ Export important results to HTML for sharing
+- Use descriptive names when prompted (easier to find later)
+- Let the auto-save handle things before batch operations
+- Use Viewer mode to browse all your saved workspaces
+- Export important results to HTML for sharing
 
 ### Use Cases
 
 **Perfect for:**
-- ✅ Processing directories of photos for organization
-- ✅ Batch describing family photo collections
-- ✅ Testing new models or prompts on sample images
-- ✅ Visual users who prefer GUI interfaces
-- ✅ Demonstrating capabilities to others
-- ✅ Learning how different providers/models work
-- ✅ Managing small to medium image collections (1-1000 images)
-- ✅ Browsing all workflow results in one place
-- ✅ Monitoring active workflows in real-time
+- Processing directories of photos for organization
+- Batch describing family photo collections
+- Testing new models or prompts on sample images
+- Visual users who prefer GUI interfaces
+- Demonstrating capabilities to others
+- Learning how different providers/models work
+- Managing small to medium image collections (1-1000 images)
+- Browsing all workflow results in one place
+- Monitoring active workflows in real-time
 
 **When to use CLI instead:**
 - Processing thousands of images
@@ -450,10 +449,10 @@ Descriptions/workflow_family_vacation_2025/
 ```
 
 **Benefits of custom naming:**
-- ✅ Easier to find specific runs
-- ✅ Organize by project, date, or category
-- ✅ Better for comparing multiple runs
-- ✅ More meaningful in analysis reports
+- Easier to find specific runs
+- Organize by project, date, or category
+- Better for comparing multiple runs
+- More meaningful in analysis reports
 
 **Naming tips:**
 - Use descriptive names: `summer_trip_photos`, `product_catalog_jan`
@@ -551,7 +550,7 @@ Provide a clear paragraph without speculation.
 
 ## 8. Advanced CLI Usage & Commands
 
-> **📖 Complete Reference:** For comprehensive documentation of all CLI commands with detailed options and examples, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
+> **Complete Reference:** For comprehensive documentation of all CLI commands with detailed options and examples, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
 
 ### IDT Command Reference
 
@@ -692,11 +691,11 @@ idt workflow --download https://site.com/photos --provider openai --model gpt-4o
 
 ### How It Works
 
-1. **🌐 URL Detection**: IDT automatically recognizes websites vs local directories
-2. **🔄 Smart Steps**: Automatically uses `download,describe,html` steps for websites  
-3. **📥 Download Step**: Fetches the webpage, parses HTML, downloads all images found
-4. **🔍 Duplicate Detection**: Images are checked for duplicates using content hashing
-5. **🤖 AI Processing**: Downloaded images are described by your chosen AI model
+1. **URL Detection**: IDT automatically recognizes websites vs local directories
+2. **Smart Steps**: Automatically uses `download,describe,html` steps for websites  
+3. **Download Step**: Fetches the webpage, parses HTML, downloads all images found
+4. **Duplicate Detection**: Images are checked for duplicates using content hashing
+5. **AI Processing**: Downloaded images are described by your chosen AI model
 
 ### Command Options
 
@@ -721,11 +720,11 @@ IDT can automatically extract and include rich metadata from your images, adding
 ### What is Metadata?
 
 Metadata extraction pulls information from your image files including:
-- **📅 Photo Date & Time** - When the photo was actually taken
-- **📍 GPS Coordinates** - Where the photo was taken (latitude/longitude)
-- **📷 Camera Information** - Device make/model, lens details
-- **⚙️ Photo Settings** - ISO, aperture, shutter speed, focal length
-- **🗺️ Location Names** - City, state, country (via geocoding)
+- **Photo Date & Time** - When the photo was actually taken
+- **GPS Coordinates** - Where the photo was taken (latitude/longitude)
+- **Camera Information** - Device make/model, lens details
+- **Photo Settings** - ISO, aperture, shutter speed, focal length
+- **Location Names** - City, state, country (via geocoding)
 
 ### Description Format with Metadata
 
@@ -788,12 +787,12 @@ idt combinedescriptions
 ```
 
 By default, this:
-- ✅ Finds your most recent workflow run
-- ✅ **Sorts images chronologically (oldest to newest using EXIF dates)**
-- ✅ Exports to `analysis/results/combined_descriptions.csv`
-- ✅ Includes all descriptions with metadata
-- ✅ Opens beautifully in Excel
-- ✅ Works great with screen readers
+- Finds your most recent workflow run
+- **Sorts images chronologically (oldest to newest using EXIF dates)**
+- Exports to `analysis/results/combined_descriptions.csv`
+- Includes all descriptions with metadata
+- Opens beautifully in Excel
+- Works great with screen readers
 
 **Options:**
 
@@ -814,7 +813,7 @@ idt combinedescriptions --output results.tsv --format tsv --sort date
 idt combinedescriptions --output C:\Exports\my_descriptions.csv --sort name
 ```
 
-**💡 Pro Tip:** After ANY workflow run, immediately run `combinedescriptions` to get a nice Excel-ready file. Perfect for sharing or archiving!
+**Pro Tip:** After ANY workflow run, immediately run `combinedescriptions` to get a nice Excel-ready file. Perfect for sharing or archiving!
 
 ### Workflow Statistics
 
@@ -907,7 +906,7 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 - **OpenAI:** Pay per image analyzed (~$0.01-0.10 per image depending on model)
 - **Claude:** Pay per image analyzed (~$0.01-0.15 per image depending on model)
 
-💡 **Tip:** Test with Ollama first, then use cloud providers for production or higher quality needs.
+**Tip:** Test with Ollama first, then use cloud providers for production or higher quality needs.
 
 ---
 
@@ -932,11 +931,11 @@ idt workflow C:\Photos --timeout 300
 ```
 
 **When to adjust timeout:**
-- ⏱️ **Increase** if you see frequent timeout errors
-- ⚡ **Increase** when using large models (13B, 34B parameters)
-- 🐌 **Increase** on older hardware or CPU-only systems
-- ☁️ **Decrease** when using fast cloud Ollama instances
-- 🚀 **Keep default** for most local GPU setups with 7B models
+- **Increase** if you see frequent timeout errors
+- **Increase** when using large models (13B, 34B parameters)
+- **Increase** on older hardware or CPU-only systems
+- **Decrease** when using fast cloud Ollama instances
+- **Keep default** for most local GPU setups with 7B models
 
 ---
 
@@ -1042,9 +1041,8 @@ ollama list            # Verify it's installed
    imagedescriber.exe
    ```
 
-4. **Report Issues:**
-   - **ImageDescriber GUI:** Use **Help → Report an Issue** menu to open GitHub issue page
-   - **Direct Link:** https://github.com/kellylford/Image-Description-Toolkit/issues
+4. **GitHub Issues:**
+   - Report bugs: https://github.com/kellylford/Image-Description-Toolkit/issues
    - Search existing issues first
 
 ---
@@ -1088,7 +1086,7 @@ idt help
 
 ### Application Use Cases
 
-**🖼️ Use ImageDescriber GUI when:**
+**Use ImageDescriber GUI when:**
 - Processing directories of images visually
 - Testing different models and prompts
 - Want immediate visual feedback
@@ -1097,7 +1095,7 @@ idt help
 - Monitoring active workflows in real-time
 - Managing small to medium image collections (1-1000 images)
 
-**📋 Use CLI (idt.exe) when:**
+**Use CLI (idt.exe) when:**
 - Processing hundreds or thousands of images
 - Need automation and batch scripts
 - Using advanced workflow features
@@ -1117,9 +1115,8 @@ idt help
 ## Support
 
 For help, bug reports, or feature requests:
-- � **GUI Users:** Use **Help → Report an Issue** menu in ImageDescriber
-- 📧 **GitHub Issues:** https://github.com/kellylford/Image-Description-Toolkit/issues
-- 📖 **Documentation:** `docs/` folder
-- 💬 **CLI Help:** Use `idt guideme` for step-by-step assistance
+- GitHub Issues: https://github.com/kellylford/Image-Description-Toolkit/issues
+- Documentation: `docs/` folder
+- Use `idt guideme` for step-by-step assistance
 
-**Happy describing!** 🎉
+**Happy describing!**
