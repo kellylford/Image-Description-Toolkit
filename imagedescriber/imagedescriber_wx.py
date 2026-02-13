@@ -392,8 +392,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.batch_progress_dialog: Optional[BatchProgressDialog] = None  # Progress dialog
         self.batch_start_time: Optional[float] = None  # For avg time calculation
         self.batch_processing_times: List[float] = []  # Track times per image
-        self.last_completed_image: Optional[str] = None  # Last image that was described (for progress dialog)
-        self.last_completed_description: Optional[str] = None  # Last description generated (for progress dialog)
+        self.last_completed_image: Optional[str] = None  # Last image described (for progress dialog)
+        self.last_completed_description: Optional[str] = None  # Last description (for progress dialog)
         
         # Batch video extraction state
         self._batch_video_extraction = False  # Flag for batch video extraction mode
@@ -2367,8 +2367,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Phase 3: Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []
-        self.last_completed_image = None
-        self.last_completed_description = None
         
         # Save workspace BEFORE showing dialog to avoid focus issues
         if self.workspace_file:
@@ -2578,8 +2576,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []
-        self.last_completed_image = None
-        self.last_completed_description = None
         
         # Save workspace
         if self.workspace_file:
@@ -3189,13 +3185,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if (self.batch_progress_dialog and 
                 self.batch_progress and 
                 not self.batch_progress_dialog.IsBeingDeleted()):
+                # Pass last completed description if available
                 self.batch_progress_dialog.update_progress(
                     current=self.batch_progress['current'],
                     total=self.batch_progress['total'],
                     file_path=self.batch_progress['file_path'],
                     avg_time=avg_time,
-                    last_image=self.last_completed_image,
-                    last_description=self.last_completed_description
+                    last_image=getattr(self, 'last_completed_image', None),
+                    last_description=getattr(self, 'last_completed_description', None)
                 )
         else:
             self.batch_progress = None
@@ -3218,9 +3215,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             )
             image_item.add_description(desc)
             
-            # Track last completed description for progress dialog display
-            self.last_completed_image = Path(event.file_path).name
-            self.last_completed_description = event.description
+            # Track last completed for progress dialog (with safe error handling)
+            try:
+                self.last_completed_image = Path(event.file_path).name
+                self.last_completed_description = event.description
+            except Exception:
+                pass  # Don't let this break the main processing flow
             
             # Phase 3: Set processing state to completed
             image_item.processing_state = "completed"
@@ -3755,8 +3755,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []
-        self.last_completed_image = None
-        self.last_completed_description = None
         
         self.SetStatusText(f"Resuming batch: {len(file_paths)} images remaining...", 0)
     
@@ -3929,8 +3927,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []
-        self.last_completed_image = None
-        self.last_completed_description = None
         
         # Save workspace
         if self.workspace_file:
@@ -4010,8 +4006,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []
-        self.last_completed_image = None
-        self.last_completed_description = None
         
         self.SetStatusText(f"Processing {len(frame_paths)} extracted frames...", 0)
     
