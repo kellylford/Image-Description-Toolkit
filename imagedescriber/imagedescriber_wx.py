@@ -2705,7 +2705,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             # Create workspace from data
             self.workspace = ImageWorkspace.from_dict(data)
-            self.workspace_file = file_path
+            self.workspace_file = Path(file_path)  # Convert to Path object
             self.workspace.saved = True
             
             # Load cached Ollama models from workspace
@@ -2793,7 +2793,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 old_ws_dir = None
             
             # Update workspace file path BEFORE getting new directory
-            self.workspace_file = file_path
+            self.workspace_file = Path(file_path)  # Convert to Path object
             new_ws_dir = self.get_workspace_directory()
             
             # Move extracted frames if workspace location changed
@@ -4924,12 +4924,12 @@ def main():
     if getattr(sys, 'frozen', False):
         # Frozen executable - put log next to the .exe
         exe_dir = Path(sys.executable).parent
-        log_file = exe_dir / 'imagedescriber.log'
+        log_file = exe_dir / 'ImageDescriber.log'
         if debug_mode:
             log_file = exe_dir / Path(args.debug_file).name
     else:
         # Development mode - use current working directory explicitly
-        log_file = Path.cwd() / 'imagedescriber.log'
+        log_file = Path.cwd() / 'ImageDescriber.log'
         if debug_mode:
             log_file = Path.cwd() / Path(args.debug_file).name
     

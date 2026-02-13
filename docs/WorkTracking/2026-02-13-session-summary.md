@@ -182,7 +182,7 @@ Created comprehensive testing guide:
 - `C:\Users\kelly\Documents\ImageDescriptionToolkit\workspaces\09_20260213.idw`
 
 **Log File Location:**
-- `C:\idt\imagedescriber.log`
+- `C:\idt\ImageDescriber.log`
 
 **Network Shares:**
 - Images stored on `\\ford\home\Photos\MobileBackup\iPhone\2025\11\`

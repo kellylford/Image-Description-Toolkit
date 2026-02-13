@@ -91,7 +91,7 @@
 
 After completing Test #3, check the log file for diagnostic information:
 
-**Log Location:** `C:\idt\imagedescriber.log`
+**Log Location:** `C:\idt\ImageDescriber.log`
 
 **Look For:**
 ```
@@ -157,7 +157,7 @@ Workspace file: C:\Users\kelly\Documents\ImageDescriptionToolkit\workspaces\11_2
 ## If Issues Persist
 
 ### Check Log File
-Review `C:\idt\imagedescriber.log` for:
+Review `C:\idt\ImageDescriber.log` for:
 - Error messages
 - Missing log entries (indicates handlers not firing)
 - Exception tracebacks
@@ -175,7 +175,7 @@ Check console for print statements (these won't show in normal double-click laun
 If either issue persists, please provide:
 1. Steps to reproduce
 2. Expected vs actual behavior
-3. Relevant portion of log file (`C:\idt\imagedescriber.log`)
+3. Relevant portion of log file (`C:\idt\ImageDescriber.log`)
 4. Any error dialogs or warnings shown
 5. Build number (shown in log file header)
 
