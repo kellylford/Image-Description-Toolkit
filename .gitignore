@@ -31,6 +31,7 @@ __pycache__/
 venv/
 env/
 ENV/
+.winenv/
 
 # IDE files
 .vscode/
@@ -66,6 +67,8 @@ test_config.json
 build/
 dist/
 *.egg-info/
+idt/
+BuildAndRelease/WinBuilds/
 
 # Local development build counter (preserve across git pulls)
 build/BUILD_TRACKER.json
@@ -120,6 +123,9 @@ viewer/viewer_releases/staging/
 imagedescriber/imagedescriber_releases/staging/
 prompt_editor/prompt_editor_releases/staging/
 # Note: dist/ and build/ already covered by general patterns above
+
+# wxPython migration files (development in wxmigration branch only)
+imagedescriber/imagedescriber_wx.py
 
 
 # Cache files (user-specific data, should not be committed)
