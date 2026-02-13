@@ -1019,14 +1019,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "Process &Undescribed Images",
             "Process only images without descriptions (safe default)"
         )
-        self.Bind(wx.EVT_MENU, lambda e: self.on_process_all(e, skip_existing=True), process_undesc_item)
+        self.Bind(wx.EVT_MENU, self.on_process_undescribed, process_undesc_item)
         
         redescribe_all_item = process_menu.Append(
             wx.ID_ANY,
             "&Redescribe All Images",
             "Process ALL images again (adds new descriptions)"
         )
-        self.Bind(wx.EVT_MENU, lambda e: self.on_process_all(e, skip_existing=False), redescribe_all_item)
+        self.Bind(wx.EVT_MENU, self.on_redescribe_all, redescribe_all_item)
         
         process_menu.AppendSeparator()
         
@@ -2157,14 +2157,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing: If True, only process images without descriptions (default, safe)
                           If False, reprocess all images (show warning first)
         """
+        logger.info("="*60)
+        logger.info(f"on_process_all CALLED - skip_existing={skip_existing}")
+        logger.info(f"Event type: {type(event)}, Event object: {event}")
+        logger.info(f"Workspace: {self.workspace}")
+        logger.info(f"Workspace items: {len(self.workspace.items) if self.workspace else 'None'}")
+        logger.info(f"Workspace file: {self.workspace_file}")
+        logger.info("="*60)
         print("="*60, flush=True)
         print(f"on_process_all CALLED - skip_existing={skip_existing}", flush=True)
         print(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}", flush=True)
         print("="*60, flush=True)
         
         if not self.workspace or not self.workspace.items:
+            logger.warning("No workspace or no items in workspace - showing warning")
             show_warning(self, "No images in workspace")
             return
+    
+    def on_process_undescribed(self, event):
+        """Menu handler: Process only undescribed images"""
+        logger.info("on_process_undescribed menu handler called")
+        self.on_process_all(event, skip_existing=True)
+    
+    def on_redescribe_all(self, event):
+        """Menu handler: Redescribe all images"""
+        logger.info("on_redescribe_all menu handler called")
+        self.on_process_all(event, skip_existing=False)
         
         if not BatchProcessingWorker:
             show_error(self, "Batch processing worker not available")
@@ -2905,6 +2923,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             str: Proposed workspace name
         """
         # Try to find most representative content
+        
+        # Handle empty workspace (no workspace object yet)
+        if not self.workspace or not self.workspace.items:
+            return f"workspace_{datetime.now().strftime('%Y%m%d')}"
         
         # Option 1: If there are directory paths, use the first one
         if self.workspace.directory_paths:
