@@ -1249,7 +1249,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Add video metadata for videos
         if image_item.item_type == "video":
             metadata_parts = []
-            if hasattr(image_item, 'video_metadata'):
+            if hasattr(image_item, 'video_metadata') and image_item.video_metadata is not None:
                 meta = image_item.video_metadata
                 if meta.get('duration'):
                     duration_mins = int(meta['duration'] // 60)
@@ -1816,7 +1816,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dialog.Destroy()
         
         # Check if we need to create/save workspace first (None or Untitled)  
-        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
+        if not self.workspace_file or is_untitled_workspace(Path(self.workspace_file).stem):
             # Propose a name based on the URL
             proposed_name = propose_workspace_name_from_url(settings['url'])
             
@@ -2163,21 +2163,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing: If True, only process images without descriptions (default, safe)
                           If False, reprocess all images (show warning first)
         """
-        print("="*60, flush=True)
-        print(f"on_process_all CALLED - skip_existing={skip_existing}", flush=True)
-        print(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}", flush=True)
-        print("="*60, flush=True)
+        logger.info("="*60)
+        logger.info(f"on_process_all CALLED - skip_existing={skip_existing}")
+        logger.info(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}")
+        logger.info("="*60)
         
         if not self.workspace or not self.workspace.items:
+            logger.warning("No images in workspace - showing warning")
             show_warning(self, "No images in workspace")
             return
         
         if not BatchProcessingWorker:
+            logger.error("BatchProcessingWorker not available")
             show_error(self, "Batch processing worker not available")
             return
         
+        logger.info(f"Workspace file: {self.workspace_file}")
+        
         # Check if we need to create a workspace first (None) or if it's Untitled - prompt to save/name
-        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
+        if not self.workspace_file or is_untitled_workspace(Path(self.workspace_file).stem):
             # Inform user they need to save first
             result = wx.MessageBox(
                 "Batch processing requires a named workspace.\n\n"
@@ -2272,32 +2276,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         images_to_process = []
         videos_to_extract = []
         
-        print(f"Scanning {len(self.workspace.items)} workspace items...", flush=True)
+        logger.info(f"Scanning {len(self.workspace.items)} workspace items...")
         
         for item in self.workspace.items.values():
-            print(f"  Item: {Path(item.file_path).name}, type={item.item_type}, has_desc={bool(item.descriptions)}", flush=True)
+            logger.debug(f"  Item: {Path(item.file_path).name}, type={item.item_type}, has_desc={bool(item.descriptions)}")
             if item.item_type == "video":
                 # Check if video needs extraction
                 if not hasattr(item, 'extracted_frames') or not item.extracted_frames:
-                    print(f"    -> Adding to videos_to_extract", flush=True)
+                    logger.debug(f"    -> Adding to videos_to_extract")
                     videos_to_extract.append(item.file_path)
                 else:
-                    print(f"    -> Video already has {len(item.extracted_frames)} frames", flush=True)
+                    logger.debug(f"    -> Video already has {len(item.extracted_frames)} frames")
             elif skip_existing:
                 if not item.descriptions:
-                    print(f"    -> Adding to images_to_process (no descriptions)", flush=True)
+                    logger.debug(f"    -> Adding to images_to_process (no descriptions)")
                     images_to_process.append(item.file_path)
                 else:
-                    print(f"    -> Skipping (has descriptions)", flush=True)
+                    logger.debug(f"    -> Skipping (has descriptions)")
             else:
-                print(f"    -> Adding to images_to_process (redescribe all)", flush=True)
+                logger.debug(f"    -> Adding to images_to_process (redescribe all)")
                 images_to_process.append(item.file_path)
         
-        print(f"Result: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process", flush=True)
+        logger.info(f"Result: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process")
         
         # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
-            print(f"BRANCH: Starting video extraction flow", flush=True)
+            logger.info(f"BRANCH: Starting video extraction flow")
             logger.info(f"Starting batch video extraction: {len(videos_to_extract)} videos, {len(images_to_process)} images")
             logger.debug(f"Videos to extract: {videos_to_extract}")
             
@@ -2321,18 +2325,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self._extracted_video_count = 0
             
             # Start extracting first video
-            print(f"About to call _extract_next_video_in_batch()...", flush=True)
+            logger.info(f"About to call _extract_next_video_in_batch()...")
             logger.debug("Calling _extract_next_video_in_batch() to start extraction")
             self._extract_next_video_in_batch()
-            print(f"Returned from _extract_next_video_in_batch()", flush=True)
+            logger.info(f"Returned from _extract_next_video_in_batch()")
             logger.debug("Returned from _extract_next_video_in_batch(), waiting for background thread")
             return  # Will continue in video extraction event handler
         
         # No videos to extract, proceed directly to image processing
-        print(f"BRANCH: No videos to extract, proceeding to image processing", flush=True)
+        logger.info(f"BRANCH: No videos to extract, proceeding to image processing")
         to_process = images_to_process
         
+        logger.info(f"Images to process: {len(to_process)}")
         if not to_process:
+            logger.info("All images already have descriptions")
             show_info(self, "All images already have descriptions")
             return
         
@@ -2394,12 +2400,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def _extract_next_video_in_batch(self):
         """Extract next video in batch processing queue"""
-        print(f"_extract_next_video_in_batch: count={self._extracted_video_count}, total={len(self._videos_to_extract)}", flush=True)
+        logger.info(f"_extract_next_video_in_batch: count={self._extracted_video_count}, total={len(self._videos_to_extract)}")
         logger.debug(f"_extract_next_video_in_batch called: count={self._extracted_video_count}, total={len(self._videos_to_extract)}")
         
         if self._extracted_video_count >= len(self._videos_to_extract):
             # All videos extracted, proceed to image processing
-            print(f"All videos extracted, moving to image processing", flush=True)
+            logger.info(f"All videos extracted, moving to image processing")
             logger.info("All videos extracted, proceeding to image processing")
             self._start_batch_image_processing()
             return
@@ -2407,7 +2413,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Get next video
         video_path = self._videos_to_extract[self._extracted_video_count]
         video_name = Path(video_path).name
-        print(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}", flush=True)
         logger.info(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}")
         
         # Update progress
@@ -2778,10 +2783,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         default_dir = str(get_default_workspaces_root())
         
         # Propose a sensible default name
-        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
+        if not self.workspace_file or is_untitled_workspace(Path(self.workspace_file).stem):
             default_file = f"{self._propose_workspace_name_from_content()}.idw"
         else:
-            default_file = self.workspace_file.name
+            default_file = Path(self.workspace_file).name
 
         file_path = save_file_dialog(
             self,
@@ -2807,7 +2812,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.workspace.directory_paths = [str(workspace_data_dir)]
                 self.current_directory = workspace_data_dir
                 self.save_workspace(str(new_path))
-            elif new_name != self.workspace_file.stem:
+            elif new_name != Path(self.workspace_file).stem:
                 self.rename_workspace(new_name)
             else:
                 # Same name, different location - just save
@@ -5029,7 +5034,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             # Clean up empty Untitled workspaces before closing (if any)
             try:
-                if self.workspace_file and is_untitled_workspace(self.workspace_file.stem):
+                if self.workspace_file and is_untitled_workspace(Path(self.workspace_file).stem):
                     # Check if workspace is empty (no items or only empty directories)
                     if not self.workspace.items or len(self.workspace.items) == 0:
                         try:
@@ -5040,10 +5045,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                                 shutil.rmtree(data_dir)
                             
                             # Delete IDW file
-                            if self.workspace_file.exists():
-                                self.workspace_file.unlink()
+                            workspace_path = Path(self.workspace_file)
+                            if workspace_path.exists():
+                                workspace_path.unlink()
                                 
-                            logger.info(f"Cleaned up empty Untitled workspace: {self.workspace_file.name}")
+                            logger.info(f"Cleaned up empty Untitled workspace: {workspace_path.name}")
                         except Exception as e:
                             logger.warning(f"Failed to clean up Untitled workspace: {e}")
             except Exception as e:
