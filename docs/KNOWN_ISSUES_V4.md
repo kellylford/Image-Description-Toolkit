@@ -2,50 +2,33 @@
 
 ## Known Issues
 
-### Batch Processing
+### Accessibility
 
-#### "Process All Undescribed" Does Nothing After Stopping/Reloading
-**Status:** Fixed in 4.0.0Beta1+
+#### Processing UI Changes Do Not Announce Automatically
+**Status:** Open - [Issue #83](https://github.com/kellylford/Image-Description-Toolkit/issues/83)
 
-**Symptom:** After stopping batch processing and reloading a workspace, the "Process All Undescribed" menu command appears to do nothing.
+**Symptom:** When the processing UI (such as batch processing dialog) appears, changes such as the number of images processed do not announce automatically with a screen reader.
 
-**Cause:** Worker threads were not being properly cleaned up when loading workspaces, leaving stopped workers in memory that blocked new operations.
+**Impact:** Screen reader users must manually navigate the dialog using arrow keys to know the current processing status, reducing the real-time feedback experience.
 
-**Solution:** Fixed in latest builds. When loading or creating workspaces, all background workers are now stopped and cleared.
+**Proposed Solution:** Add a setting to announce these changes automatically and a checkbox in the processing UI to enable/disable auto-announcements per session.
 
-**Workaround (older builds):** Use File → New Session (Ctrl+N) to clear worker state, then reload your workspace.
-
----
-
-#### Application Won't Close (Alt+F4 or File → Quit)
-**Status:** Fixed in 4.0.0Beta1+
-
-**Symptom:** Pressing Alt+F4 or selecting File → Quit does nothing. The application remains open.
-
-**Cause:** Worker cleanup during close was failing silently, preventing the window from destroying. Also related to batch progress dialog staying on top.
-
-**Solution:** Fixed in latest builds. Enhanced error handling in close handler with fallback mechanisms.
-
-**Workaround (older builds):** Use File → New Session (Ctrl+N) first, then Alt+F4 will work.
+**Current Workaround:** Use the arrow keys to review the dialog text and status updates.
 
 ---
 
-### Installation
+### User Interface
 
-#### Installer Build Errors with Inno Setup
-**Status:** Resolved
+#### No Setting to Set Image Preview On/Off Permanently
+**Status:** Open - [Issue #84](https://github.com/kellylford/Image-Description-Toolkit/issues/84)
 
-**Symptom:** Build fails with "Invalid prototype for 'ShouldShowOllamaInstallTask'" or "Unknown identifier 'BoolToStr'"
+**Symptom:** The View menu has a setting to show preview images or not. The app is more speedy with image previews disabled, but there is no way to make this setting permanent. When you close the app and reopen it, you have to turn image previews off again.
 
-**Cause:** Inno Setup Pascal Script has specific requirements:
-- Check functions for Tasks/Run sections must be parameterless
-- BoolToStr function doesn't exist in Pascal Script
-- [Code] section must come before sections that reference functions
+**Impact:** Users who prefer performance over previews must manually disable them every session.
 
-**Solution:** 
-- Check functions now use: `function ShouldShowOllamaInstallTask: Boolean;` (no parameters)
-- Use if/else instead of BoolToStr for boolean-to-string conversion
-- [Code] section properly ordered before [Tasks] section
+**Proposed Solution:** Save the image preview state in the `.idw` workspace file (per-workspace preference) and/or in application settings (global preference).
+
+**Current Workaround:** Manually disable image previews via View menu each time the application is opened.
 
 ---
 
@@ -154,26 +137,6 @@ The Windows installer can automatically install Ollama via winget if:
 
 ---
 
-### Alt+F4 Won't Close Application
-
-**Try:**
-1. File → New Session (Ctrl+N) - this clears worker state
-2. Then Alt+F4 or File → Quit should work
-3. If still stuck, check Task Manager for hung processes
-
-**Note:** Fixed in 4.0.0Beta1+ - if you're still experiencing this, please update.
-
----
-
-### "Last Description" Not Showing in Batch Progress
-
-**Check:**
-- Make sure you're using the latest build (feature added in 4.0.0Beta1)
-- The description appears after the first image completes processing
-- Use arrow keys in the stats list to navigate if using screen reader
-
----
-
 ### Video Extraction Fails
 
 **Check:**
@@ -207,14 +170,17 @@ The Windows installer can automatically install Ollama via winget if:
 
 ## Version History
 
-### 4.0.0Beta1
-- **Fixed:** Batch processing blocked after workspace reload
-- **Fixed:** Alt+F4 not closing application
+### 4.0.0Beta1 (February 2026)
+- **Fixed:** Batch processing blocked after workspace reload (worker cleanup issue)
+- **Fixed:** Alt+F4 not closing application (worker cleanup during close)
+- **Fixed:** Process All hang when loading workspace from file (Path object conversion)
+- **Fixed:** Exit command freeze in broken state
 - **Fixed:** Worker cleanup during workspace transitions
 - **Added:** Automatic Ollama installation via winget (Windows)
-- **Added:** "Last Description" display in batch progress
+- **Added:** "Last Description" display in batch progress dialog
 - **Added:** Stop All Processing command (Ctrl+Shift+S)
 - **Enhanced:** Error handling in close/cleanup operations
+- **Enhanced:** Log file naming standardized (ImageDescriber.log)
 
 ---
 
@@ -256,5 +222,5 @@ The Windows installer can automatically install Ollama via winget if:
 
 ---
 
-*Last Updated: February 12, 2026*
-*Document Version: 1.0*
+*Last Updated: February 13, 2026*
+*Document Version: 2.0*
