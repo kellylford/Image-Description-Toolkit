@@ -1158,6 +1158,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         user_guide_item = help_menu.Append(wx.ID_ANY, "&User Guide...")
         self.Bind(wx.EVT_MENU, self.on_user_guide, user_guide_item)
         
+        report_issue_item = help_menu.Append(wx.ID_ANY, "&Report an Issue...")
+        self.Bind(wx.EVT_MENU, self.on_report_issue, report_issue_item)
+        
         help_menu.AppendSeparator()
         
         about_item = help_menu.Append(wx.ID_ABOUT, "&About")
@@ -4792,6 +4795,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             webbrowser.open(user_guide_url)
         except Exception as e:
             show_error(self, f"Could not open user guide:\n{e}")
+    
+    def on_report_issue(self, event):
+        """Open GitHub new issue page in web browser"""
+        new_issue_url = "https://github.com/kellylford/Image-Description-Toolkit/issues/new"
+        try:
+            webbrowser.open(new_issue_url)
+        except Exception as e:
+            show_error(self, f"Could not open issue page:\n{e}")
     
     def on_about(self, event=None):
         """Show about dialog with version and feature information"""

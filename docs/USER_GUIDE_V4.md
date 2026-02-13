@@ -331,6 +331,7 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 
 **Help Menu:**
 - **User Guide** - Opens this guide on GitHub
+- **Report an Issue** - Opens GitHub issue creation page to report bugs or suggest features
 - **About** - Version and feature information
 
 ### Viewer Mode
@@ -1041,8 +1042,9 @@ ollama list            # Verify it's installed
    imagedescriber.exe
    ```
 
-4. **GitHub Issues:**
-   - Report bugs: https://github.com/kellylford/Image-Description-Toolkit/issues
+4. **Report Issues:**
+   - **ImageDescriber GUI:** Use **Help → Report an Issue** menu to open GitHub issue page
+   - **Direct Link:** https://github.com/kellylford/Image-Description-Toolkit/issues
    - Search existing issues first
 
 ---
@@ -1115,8 +1117,9 @@ idt help
 ## Support
 
 For help, bug reports, or feature requests:
-- 📧 GitHub Issues: https://github.com/kellylford/Image-Description-Toolkit/issues
-- 📖 Documentation: `docs/` folder
-- 💬 Use `idt guideme` for step-by-step assistance
+- � **GUI Users:** Use **Help → Report an Issue** menu in ImageDescriber
+- 📧 **GitHub Issues:** https://github.com/kellylford/Image-Description-Toolkit/issues
+- 📖 **Documentation:** `docs/` folder
+- 💬 **CLI Help:** Use `idt guideme` for step-by-step assistance
 
 **Happy describing!** 🎉
