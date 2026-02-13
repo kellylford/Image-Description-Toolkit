@@ -32,6 +32,17 @@
 
 ---
 
+#### Opening Results Viewer Launches Separate Window Instance
+**Status:** Open - [Issue #85](https://github.com/kellylford/Image-Description-Toolkit/issues/85)
+
+**Symptom:** When you use the File menu option for opening the Results Viewer to view results from an IDT workflow, a new application window and instance of Viewer opens. This isn't immediately obvious to users.
+
+**Impact:** Users may not realize a new window has opened and think the application is unresponsive or the action failed.
+
+**Current Workaround:** Use Alt+Tab to switch back to the original ImageDescriber window. You can also use Alt+F4 to exit the Results Viewer instance without any consequence to the running IDT workflow or any work you are doing in ImageDescriber.
+
+---
+
 ## Hints and Best Practices
 
 ### Workspace Management
