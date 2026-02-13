@@ -125,7 +125,7 @@ class BatchProgressDialog(wx.Dialog):
     def update_progress(self, current: int, total: int, 
                        file_path: str = None, avg_time: float = 0.0,
                        image_name: str = None, provider: str = None, model: str = None,
-                       description: str = None):
+                       last_image: str = None, last_description: str = None):
         """Update progress display
         
         Args:
@@ -136,7 +136,8 @@ class BatchProgressDialog(wx.Dialog):
             image_name: Display name override (for video extraction, optional)
             provider: AI provider name (for video extraction, optional)
             model: AI model name (for video extraction, optional)
-            description: Last generated description (optional, unclipped for screen readers)
+            last_image: Last image that was described (optional)
+            last_description: Full description text of last image (optional, not clipped)
         """
         # Update stats list (including current image as last item)
         self.stats_list.Clear()
@@ -165,10 +166,13 @@ class BatchProgressDialog(wx.Dialog):
         
         # Add separator line
         self.stats_list.Append("─" * 40)
-        # Track separator indices for keyboard navigation
-        if not hasattr(self, 'separator_indices'):
-            self.separator_indices = []
-        self.separator_indices = [self.stats_list.GetCount() - 1]
+        # Track separator index for keyboard navigation
+        self.separator_index = self.stats_list.GetCount() - 1
+        
+        # Add last completed description (if available)
+        if last_image and last_description:
+            self.stats_list.Append(f"Last Image Described: {last_image}")
+            self.stats_list.Append(f"Last Description: {last_description}")
         
         # Add current image/video being processed
         if image_name:
@@ -181,19 +185,6 @@ class BatchProgressDialog(wx.Dialog):
             # Regular image processing
             filename = Path(file_path).name
             self.stats_list.Append(f"Current Image: {filename}")
-        
-        # Add last description if available
-        if description:
-            # Add another separator before description
-            self.stats_list.Append("─" * 40)
-            self.separator_indices.append(self.stats_list.GetCount() - 1)
-            
-            self.stats_list.Append("Last Description:")
-            if file_path:
-                self.stats_list.Append(f"Image: {Path(file_path).name}")
-            elif image_name:
-                self.stats_list.Append(f"Image: {image_name}")
-            self.stats_list.Append(f"Description: {description}")
         
         # Update progress bar
         percentage = int((current / total) * 100) if total > 0 else 0
@@ -237,19 +228,16 @@ class BatchProgressDialog(wx.Dialog):
         self.pause_button.SetLabel("Pause")
     
     def _on_stats_key(self, event):
-        """Handle keyboard navigation in stats list to skip separator lines"""
+        """Handle keyboard navigation in stats list to skip separator line"""
         keycode = event.GetKeyCode()
         current_selection = self.stats_list.GetSelection()
         
-        # Get list of separator indices (defaults to empty list if not set)
-        separator_indices = getattr(self, 'separator_indices', [])
-        
-        # Skip separator lines when navigating with arrow keys
+        # Skip separator line when navigating with arrow keys
         if keycode == wx.WXK_DOWN:
             if current_selection != wx.NOT_FOUND:
                 next_index = current_selection + 1
-                # Skip all separator lines
-                while next_index in separator_indices and next_index < self.stats_list.GetCount() - 1:
+                # Skip separator line if next item is separator
+                if hasattr(self, 'separator_index') and next_index == self.separator_index:
                     next_index += 1
                 # Don't go past last item
                 if next_index < self.stats_list.GetCount():
@@ -259,8 +247,8 @@ class BatchProgressDialog(wx.Dialog):
         elif keycode == wx.WXK_UP:
             if current_selection != wx.NOT_FOUND:
                 prev_index = current_selection - 1
-                # Skip all separator lines
-                while prev_index in separator_indices and prev_index > 0:
+                # Skip separator line if previous item is separator
+                if hasattr(self, 'separator_index') and prev_index == self.separator_index:
                     prev_index -= 1
                 # Don't go before first item
                 if prev_index >= 0:
