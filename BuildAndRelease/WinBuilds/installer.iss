@@ -46,7 +46,6 @@ const
   EnvironmentKey = 'Environment';
 
 var
-  OllamaPage: TOutputMsgWizardPage;
   WingetAvailable: Boolean;
 
 function IsWingetAvailable: Boolean;
@@ -98,35 +97,11 @@ begin
 end;
 
 procedure InitializeWizard;
-var
-  OllamaMessage: string;
 begin
   // Check if winget is available on this system
   WingetAvailable := IsWingetAvailable();
   
-  // Customize message based on winget availability
-  if WingetAvailable then
-  begin
-    OllamaMessage := 'Image Description Toolkit requires Ollama to use local AI models.' + #13#10 + #13#10 +
-      'You can install Ollama automatically using the checkbox on the next page,' + #13#10 +
-      'or install it manually later:' + #13#10 +
-      '1. Visit https://ollama.com' + #13#10 +
-      '2. Download and install Ollama' + #13#10 +
-      '3. Run: ollama pull moondream';
-  end
-  else
-  begin
-    OllamaMessage := 'Image Description Toolkit requires Ollama to use local AI models.' + #13#10 + #13#10 +
-      'If you don''t have Ollama installed yet:' + #13#10 +
-      '1. Visit https://ollama.com' + #13#10 +
-      '2. Download and install Ollama' + #13#10 +
-      '3. Run: ollama pull moondream' + #13#10 + #13#10 +
-      'You can install Ollama now or after installing IDT.';
-  end;
-  
-  OllamaPage := CreateOutputMsgPage(wpSelectTasks,
-    'Ollama Required', 'AI Model Server Installation',
-    OllamaMessage);
+  // Note: Ollama information page removed - checkbox description is sufficient
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -224,7 +199,7 @@ Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Para
 Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent
-Filename: "{app}\ImageDescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\ImageDescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent
 Filename: "https://ollama.com"; Description: "Open Ollama website to download (if not installed)"; Flags: shellexec postinstall skipifsilent unchecked; Check: ShouldShowOllamaWebsiteLink
 Filename: "{app}\docs"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked
