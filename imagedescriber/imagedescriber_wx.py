@@ -4920,13 +4920,22 @@ def main():
     # Check for debug mode via command-line flag OR environment variable
     debug_mode = args.debug or os.environ.get('IDT_DEBUG', '').lower() in ('1', 'true', 'yes')
     
-    # Determine log file location - executable directory for frozen, CWD for dev
+    # Determine log file location - platform-specific for frozen, CWD for dev
     if getattr(sys, 'frozen', False):
-        # Frozen executable - put log next to the .exe
-        exe_dir = Path(sys.executable).parent
-        log_file = exe_dir / 'ImageDescriber.log'
-        if debug_mode:
-            log_file = exe_dir / Path(args.debug_file).name
+        # Frozen executable - platform-specific locations
+        if sys.platform == 'darwin':
+            # macOS: Use standard ~/Library/Logs/AppName/ location
+            log_dir = Path.home() / 'Library' / 'Logs' / 'ImageDescriber'
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / 'ImageDescriber.log'
+            if debug_mode:
+                log_file = log_dir / 'ImageDescriber_debug.log'
+        else:
+            # Windows: Put log next to the .exe (standard Windows practice)
+            exe_dir = Path(sys.executable).parent
+            log_file = exe_dir / 'ImageDescriber.log'
+            if debug_mode:
+                log_file = exe_dir / Path(args.debug_file).name
     else:
         # Development mode - use current working directory explicitly
         log_file = Path.cwd() / 'ImageDescriber.log'
