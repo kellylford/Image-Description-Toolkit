@@ -202,75 +202,75 @@ class SettingEditDialog(wx.Dialog):
             # Create appropriate editor based on setting type
             setting_type = self.setting_info.get("type", "string")
             logger.info("setup_ui: Setting type is %s", setting_type)
-        
-        form_sizer = wx.FlexGridSizer(rows=2, cols=2, vgap=5, hgap=5)
-        form_sizer.AddGrowableCol(1, 1)
-        
-        form_sizer.Add(wx.StaticText(panel, label="Value:"), 0, wx.ALIGN_CENTER_VERTICAL)
-        
-        if setting_type == "bool":
-            self.editor = wx.CheckBox(panel)
-            self.editor.SetValue(bool(self.current_value))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
             
-        elif setting_type == "int":
-            self.editor = wx.SpinCtrl(panel)
+            form_sizer = wx.FlexGridSizer(rows=2, cols=2, vgap=5, hgap=5)
+            form_sizer.AddGrowableCol(1, 1)
+            
+            form_sizer.Add(wx.StaticText(panel, label="Value:"), 0, wx.ALIGN_CENTER_VERTICAL)
+            
+            if setting_type == "bool":
+                self.editor = wx.CheckBox(panel)
+                self.editor.SetValue(bool(self.current_value))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "int":
+                self.editor = wx.SpinCtrl(panel)
+                if "range" in self.setting_info:
+                    self.editor.SetRange(self.setting_info["range"][0], self.setting_info["range"][1])
+                else:
+                    self.editor.SetRange(-999999, 999999)
+                self.editor.SetValue(int(self.current_value or 0))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "float":
+                self.editor = wx.TextCtrl(panel)
+                self.editor.SetValue(str(float(self.current_value or 0.0)))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "int_or_null":
+                self.editor = wx.TextCtrl(panel)
+                # Display empty string for None/null, otherwise the integer value
+                if self.current_value is None:
+                    self.editor.SetValue("")
+                else:
+                    self.editor.SetValue(str(int(self.current_value)))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "choice":
+                self.editor = wx.Choice(panel)
+                choices = self.setting_info.get("choices", [])
+                self.editor.Append(choices)
+                if self.current_value in choices:
+                    self.editor.SetStringSelection(str(self.current_value))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            else:  # string or other
+                self.editor = wx.TextCtrl(panel)
+                self.editor.SetValue(str(self.current_value or ""))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+            
+            logger.info("setup_ui: Editor widget created: %s", type(self.editor).__name__)
+            
+            # Add range/limits info if available
             if "range" in self.setting_info:
-                self.editor.SetRange(self.setting_info["range"][0], self.setting_info["range"][1])
-            else:
-                self.editor.SetRange(-999999, 999999)
-            self.editor.SetValue(int(self.current_value or 0))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+                form_sizer.Add(wx.StaticText(panel, label=""), 0)
+                range_label = wx.StaticText(panel, label=f"Range: {self.setting_info['range'][0]} to {self.setting_info['range'][1]}")
+                form_sizer.Add(range_label, 0)
             
-        elif setting_type == "float":
-            self.editor = wx.TextCtrl(panel)
-            self.editor.SetValue(str(float(self.current_value or 0.0)))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            logger.info("setup_ui: Adding form sizer to main sizer")
+            sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
             
-        elif setting_type == "int_or_null":
-            self.editor = wx.TextCtrl(panel)
-            # Display empty string for None/null, otherwise the integer value
-            if self.current_value is None:
-                self.editor.SetValue("")
-            else:
-                self.editor.SetValue(str(int(self.current_value)))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            logger.info("setup_ui: Creating button sizer")
+            # Buttons
+            btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+            logger.info("setup_ui: Button sizer created, adding to layout")
+            sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
             
-        elif setting_type == "choice":
-            self.editor = wx.Choice(panel)
-            choices = self.setting_info.get("choices", [])
-            self.editor.Append(choices)
-            if self.current_value in choices:
-                self.editor.SetStringSelection(str(self.current_value))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            logger.info("setup_ui: Setting panel sizer and fitting")
+            panel.SetSizer(sizer)
+            self.Fit()
             
-        else:  # string or other
-            self.editor = wx.TextCtrl(panel)
-            self.editor.SetValue(str(self.current_value or ""))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
-        
-        logger.info("setup_ui: Editor widget created: %s", type(self.editor).__name__)
-        
-        # Add range/limits info if available
-        if "range" in self.setting_info:
-            form_sizer.Add(wx.StaticText(panel, label=""), 0)
-            range_label = wx.StaticText(panel, label=f"Range: {self.setting_info['range'][0]} to {self.setting_info['range'][1]}")
-            form_sizer.Add(range_label, 0)
-        
-        logger.info("setup_ui: Adding form sizer to main sizer")
-        sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        
-        logger.info("setup_ui: Creating button sizer")
-        # Buttons
-        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
-        logger.info("setup_ui: Button sizer created, adding to layout")
-        sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        
-        logger.info("setup_ui: Setting panel sizer and fitting")
-        panel.SetSizer(sizer)
-        self.Fit()
-        
-        logger.info("SettingEditDialog.setup_ui completed, editor type: %s", type(self.editor).__name__)
+            logger.info("SettingEditDialog.setup_ui completed, editor type: %s", type(self.editor).__name__)
         except Exception as e:
             logger.error("Exception in setup_ui: %s", e, exc_info=True)
             raise
