@@ -174,26 +174,35 @@ class SettingEditDialog(wx.Dialog):
         self.editor = None
         self._focus_set = False
         
-        self.setup_ui()
+        try:
+            self.setup_ui()
+        except Exception as e:
+            logger.error("Failed in setup_ui: %s", e, exc_info=True)
+            raise
         
         # Bind to show event for reliable focus setting
+        logger.info("SettingEditDialog: Binding EVT_SHOW")
         self.Bind(wx.EVT_SHOW, self._on_show)
         
         logger.info("SettingEditDialog.__init__ completed")
     
     def setup_ui(self):
         """Create the dialog UI"""
-        panel = wx.Panel(self)
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        # Add description
-        if "description" in self.setting_info:
-            desc_text = wx.StaticText(panel, label=self.setting_info["description"])
-            desc_text.Wrap(400)
-            sizer.Add(desc_text, 0, wx.ALL, 10)
-        
-        # Create appropriate editor based on setting type
-        setting_type = self.setting_info.get("type", "string")
+        try:
+            logger.info("setup_ui: Creating panel")
+            panel = wx.Panel(self)
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            
+            # Add description
+            logger.info("setup_ui: Adding description")
+            if "description" in self.setting_info:
+                desc_text = wx.StaticText(panel, label=self.setting_info["description"])
+                desc_text.Wrap(400)
+                sizer.Add(desc_text, 0, wx.ALL, 10)
+            
+            # Create appropriate editor based on setting type
+            setting_type = self.setting_info.get("type", "string")
+            logger.info("setup_ui: Setting type is %s", setting_type)
         
         form_sizer = wx.FlexGridSizer(rows=2, cols=2, vgap=5, hgap=5)
         form_sizer.AddGrowableCol(1, 1)
@@ -241,22 +250,31 @@ class SettingEditDialog(wx.Dialog):
             self.editor.SetValue(str(self.current_value or ""))
             form_sizer.Add(self.editor, 0, wx.EXPAND)
         
+        logger.info("setup_ui: Editor widget created: %s", type(self.editor).__name__)
+        
         # Add range/limits info if available
         if "range" in self.setting_info:
             form_sizer.Add(wx.StaticText(panel, label=""), 0)
             range_label = wx.StaticText(panel, label=f"Range: {self.setting_info['range'][0]} to {self.setting_info['range'][1]}")
             form_sizer.Add(range_label, 0)
         
+        logger.info("setup_ui: Adding form sizer to main sizer")
         sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
         
+        logger.info("setup_ui: Creating button sizer")
         # Buttons
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        logger.info("setup_ui: Button sizer created, adding to layout")
         sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
         
+        logger.info("setup_ui: Setting panel sizer and fitting")
         panel.SetSizer(sizer)
         self.Fit()
         
         logger.info("SettingEditDialog.setup_ui completed, editor type: %s", type(self.editor).__name__)
+        except Exception as e:
+            logger.error("Exception in setup_ui: %s", e, exc_info=True)
+            raise
     
     def _on_show(self, event):
         """Handle dialog show event - set focus when dialog becomes visible"""
