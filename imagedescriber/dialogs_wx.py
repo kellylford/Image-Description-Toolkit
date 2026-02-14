@@ -351,8 +351,10 @@ class FollowupQuestionDialog(wx.Dialog):
         model_label = wx.StaticText(self, label="&Model:")
         model_name_sizer.Add(model_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         
-        self.model_combo = wx.ComboBox(self, style=wx.CB_DROPDOWN)
-        self.model_combo.SetValue(self.original_model)
+        # ACCESSIBILITY FIX: Use wx.Choice instead of wx.ComboBox to avoid macOS VoiceOver crash
+        # wx.ComboBox causes pointer authentication trap in objc_opt_respondsToSelector
+        # when accessibility queries parent hierarchy during selection changes
+        self.model_combo = wx.Choice(self)
         set_accessible_name(self.model_combo, "Model name")
         model_name_sizer.Add(self.model_combo, 1, wx.EXPAND)
         
@@ -394,13 +396,13 @@ class FollowupQuestionDialog(wx.Dialog):
         self.populate_models()
     
     def populate_models(self):
-        """Populate model combobox based on selected provider - uses cached models to avoid blocking UI"""
+        """Populate model choice based on selected provider - uses cached models to avoid blocking UI"""
         provider = self.provider_choice.GetStringSelection()
         
-        # Save current value
-        current_model = self.model_combo.GetValue()
+        # Save current selection
+        current_model = self.model_combo.GetStringSelection()
         
-        # Clear combo
+        # Clear choices
         self.model_combo.Clear()
         
         try:
@@ -428,21 +430,25 @@ class FollowupQuestionDialog(wx.Dialog):
         except Exception as e:
             logger.warning(f"Error populating models: {e}")
         
-        # Restore previous value if it exists in new list, otherwise use first item
+        # Restore previous selection if it exists in new list, otherwise use first item
         if current_model and current_model in [self.model_combo.GetString(i) for i in range(self.model_combo.GetCount())]:
-            self.model_combo.SetValue(current_model)
+            self.model_combo.SetStringSelection(current_model)
         elif self.model_combo.GetCount() > 0:
             self.model_combo.SetSelection(0)
         else:
-            # Fallback to original model
-            self.model_combo.SetValue(self.original_model)
+            # Fallback to original model - try to find and select it
+            try:
+                self.model_combo.Append(self.original_model)
+                self.model_combo.SetStringSelection(self.original_model)
+            except:
+                pass  # Silently ignore if can't set fallback
     
     def get_values(self):
         """Get the question and selected model/provider"""
         return {
             'question': self.question_text.GetValue().strip(),
             'provider': self.provider_choice.GetStringSelection(),
-            'model': self.model_combo.GetValue().strip()
+            'model': self.model_combo.GetStringSelection()
         }
 
 
@@ -550,8 +556,8 @@ class ProcessingOptionsDialog(wx.Dialog):
         model_label = wx.StaticText(panel, label="&Model name:")
         model_sizer.Add(model_label, 0, wx.ALL, 5)
         
-        self.model_combo = wx.ComboBox(panel, style=wx.CB_DROPDOWN)
-        self.model_combo.SetValue(self.config.get('default_model', 'moondream'))
+        # ACCESSIBILITY FIX: Use wx.Choice instead of wx.ComboBox to avoid macOS VoiceOver crash
+        self.model_combo = wx.Choice(panel)
         set_accessible_name(self.model_combo, "Model name")
         model_sizer.Add(self.model_combo, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -624,18 +630,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         """Populate model list based on selected provider"""
         provider = self.provider_choice.GetStringSelection().lower()
         
-        # CRITICAL FIX: Save focus state before clearing combo box
-        # Clearing a ComboBox while it has focus can crash VoiceOver/accessibility
-        # on macOS due to accessibility API trying to query deallocated parent views
-        focused_widget = self.FindFocus()
-        had_focus = (focused_widget == self.model_combo)
-        
-        if had_focus:
-            # Temporarily move focus to a stable control that won't be modified
-            # Use the parent panel to avoid any control that might be in transition
-            self.model_combo.GetParent().SetFocus()
-        
-        # Clear the combo box (safe now that focus is elsewhere)
+        # Clear the model choices (wx.Choice is safe with VoiceOver, no focus workaround needed)
         self.model_combo.Clear()
         
         try:
@@ -661,33 +656,31 @@ class ProcessingOptionsDialog(wx.Dialog):
                     # Set default if in list
                     default_model = self.config.get('default_model', 'moondream')
                     if default_model in models:
-                        self.model_combo.SetValue(default_model)
+                        self.model_combo.SetStringSelection(default_model)
                     elif models:
-                        self.model_combo.SetValue(models[0])
+                        self.model_combo.SetSelection(0)
                 else:
-                    self.model_combo.SetValue("moondream")
+                    self.model_combo.Append("moondream")
+                    self.model_combo.SetSelection(0)
             elif provider == "openai":
                 # Common OpenAI models
                 models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"]
                 for model in models:
                     self.model_combo.Append(model)
-                self.model_combo.SetValue("gpt-4o")
+                self.model_combo.SetStringSelection("gpt-4o")
             elif provider == "claude":
                 # Import the official Claude models list
                 from ai_providers import DEV_CLAUDE_MODELS
                 for model in DEV_CLAUDE_MODELS:
                     self.model_combo.Append(model)
-                self.model_combo.SetValue("claude-3-5-sonnet-20241022")
+                self.model_combo.SetStringSelection("claude-3-5-sonnet-20241022")
         except Exception as e:
             print(f"Error populating models: {e}")
-            self.model_combo.SetValue(self.config.get('default_model', 'moondream'))
-        
-        # Restore focus to model combo if it had focus before
-        # Use CallAfter to ensure combo box is fully populated and stable
-        if had_focus:
-            # Add a small delay to ensure all GUI updates are complete
-            # This prevents accessibility crashes during rapid state changes
-            wx.CallLater(50, self.model_combo.SetFocus)
+            default = self.config.get('default_model', 'moondream')
+            if default not in [self.model_combo.GetString(i) for i in range(self.model_combo.GetCount())]:
+                self.model_combo.Append(default)
+            if default:
+                self.model_combo.SetStringSelection(default)
     
     def load_prompts(self):
         """Load available prompt styles from config file
@@ -748,7 +741,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         return {
             'skip_existing': self.skip_existing_cb.GetValue(),
             'provider': self.provider_choice.GetStringSelection().lower(),
-            'model': self.model_combo.GetValue(),
+            'model': self.model_combo.GetStringSelection(),
             'prompt_style': self.prompt_choice.GetStringSelection(),
             'custom_prompt': self.custom_prompt_input.GetValue(),
         }

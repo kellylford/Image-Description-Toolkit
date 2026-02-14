@@ -101,7 +101,8 @@ class ChatDialog(wx.Dialog):
         model_label.SetMinSize((100, -1))
         model_sizer.Add(model_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
-        self.model_combo = wx.ComboBox(self, style=wx.CB_DROPDOWN)
+        # ACCESSIBILITY FIX: Use wx.Choice instead of wx.ComboBox to avoid macOS VoiceOver crash
+        self.model_combo = wx.Choice(self)
         model_sizer.Add(self.model_combo, 1, wx.ALL | wx.EXPAND, 5)
         
         main_sizer.Add(model_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -156,24 +157,25 @@ class ChatDialog(wx.Dialog):
                     for model in models:
                         self.model_combo.Append(model)
                     # Set first model as default
-                    self.model_combo.SetValue(models[0])
+                    self.model_combo.SetSelection(0)
                 else:
                     # Fallback if no models found
-                    self.model_combo.SetValue('llava:latest')
+                    self.model_combo.Append('llava:latest')
+                    self.model_combo.SetSelection(0)
                     
             elif provider == 'openai':
                 # Common OpenAI models
                 models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4']
                 for model in models:
                     self.model_combo.Append(model)
-                self.model_combo.SetValue('gpt-4o')
+                self.model_combo.SetStringSelection('gpt-4o')
                 
             elif provider == 'claude':
                 # Import the official Claude models list
                 from ai_providers import DEV_CLAUDE_MODELS
                 for model in DEV_CLAUDE_MODELS:
                     self.model_combo.Append(model)
-                self.model_combo.SetValue('claude-3-5-sonnet-20241022')
+                self.model_combo.SetStringSelection('claude-3-5-sonnet-20241022')
                 
             elif provider == 'huggingface':
                 # HuggingFace models
@@ -181,17 +183,20 @@ class ChatDialog(wx.Dialog):
                 for model in models:
                     self.model_combo.Append(model)
                 if models:
-                    self.model_combo.SetValue(models[0])
+                    self.model_combo.SetSelection(0)
                     
         except Exception as e:
             print(f"Error populating models for {provider}: {e}")
             # Set a reasonable fallback
             if provider == 'ollama':
-                self.model_combo.SetValue('llava:latest')
+                self.model_combo.Append('llava:latest')
+                self.model_combo.SetSelection(0)
             elif provider == 'openai':
-                self.model_combo.SetValue('gpt-4o')
+                self.model_combo.Append('gpt-4o')
+                self.model_combo.SetSelection(0)
             elif provider == 'claude':
-                self.model_combo.SetValue('claude-3-5-sonnet-20241022')
+                self.model_combo.Append('claude-3-5-sonnet-20241022')
+                self.model_combo.SetSelection(0)
         
     def get_selections(self) -> Dict[str, str]:
         """Get selected provider and model
@@ -201,7 +206,7 @@ class ChatDialog(wx.Dialog):
         """
         return {
             'provider': self.provider_choice.GetStringSelection().lower(),
-            'model': self.model_combo.GetValue()
+            'model': self.model_combo.GetStringSelection()
         }
 
 
@@ -765,7 +770,12 @@ class ChatWindow(wx.Dialog):
                 break
         
         # Try to select current model
-        chat_dialog.model_combo.SetValue(self.model)
+        if self.model:
+            # Find the model in the list
+            for i in range(chat_dialog.model_combo.GetCount()):
+                if chat_dialog.model_combo.GetString(i) == self.model:
+                    chat_dialog.model_combo.SetSelection(i)
+                    break
         
         if chat_dialog.ShowModal() == wx.ID_OK:
             selections = chat_dialog.get_selections()

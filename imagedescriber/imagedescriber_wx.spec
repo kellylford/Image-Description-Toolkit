@@ -85,6 +85,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+# onefile mode (PyInstaller warns it's deprecated with .app bundles, but it works)
 exe = EXE(
     pyz,
     a.scripts,
@@ -104,4 +105,12 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+# macOS .app bundle
+app = BUNDLE(
+    exe,
+    name='ImageDescriber.app',
+    icon=None,
+    bundle_identifier='com.imagedescriber.app',
 )
