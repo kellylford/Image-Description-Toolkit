@@ -1159,6 +1159,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         tools_menu.AppendSeparator()
         
+        # Ollama installation helper
+        install_ollama_item = tools_menu.Append(wx.ID_ANY, "Install &Ollama...")
+        self.Bind(wx.EVT_MENU, self.on_install_ollama, install_ollama_item)
+        
+        tools_menu.AppendSeparator()
+        
         export_config_item = tools_menu.Append(wx.ID_ANY, "E&xport Configuration...")
         self.Bind(wx.EVT_MENU, self.on_export_configuration, export_config_item)
         
@@ -4691,6 +4697,133 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
         except Exception as e:
             show_error(self, f"Error launching Configure Settings:\\n{e}")
+    
+    def on_install_ollama(self, event):
+        """Help user install Ollama if not already present"""
+        import webbrowser
+        
+        try:
+            # Check if Ollama is available
+            from ai_providers import get_available_providers
+            providers = get_available_providers()
+            
+            if 'ollama' in providers:
+                ollama_provider = providers['ollama']
+                if ollama_provider.is_available():
+                    # Ollama is running
+                    msg = (
+                        "✓ Ollama is already installed and running!\n\n"
+                        "You can pull models using:\n"
+                        "  ollama pull moondream\n"
+                        "  ollama pull llava\n"
+                        "  ollama pull llama3.2-vision\n\n"
+                        "Or use Process → Refresh AI Models to see what's available."
+                    )
+                    from shared.wx_common import show_info
+                    show_info(self, "Ollama Status", msg)
+                    return
+            
+            # Ollama not detected - offer installation help
+            if sys.platform == 'darwin':
+                # macOS
+                msg = (
+                    "Ollama is not currently installed or running.\n\n"
+                    "Installation Options:\n\n"
+                    "1. Download from Website (Recommended)\n"
+                    "   • Opens browser to ollama.ai/download\n"
+                    "   • Download and install manually\n\n"
+                    "2. Quick Install via Terminal\n"
+                    "   • Copies command to clipboard\n"
+                    "   • Paste into Terminal and press Enter\n\n"
+                    "Which method would you prefer?"
+                )
+                
+                dlg = wx.MessageDialog(
+                    self,
+                    msg,
+                    "Install Ollama",
+                    wx.YES_NO | wx.CANCEL | wx.ICON_QUESTION
+                )
+                dlg.SetYesNoCancelLabels("&Download from Website", "&Copy Terminal Command", "Cancel")
+                
+                result = dlg.ShowModal()
+                dlg.Destroy()
+                
+                if result == wx.ID_YES:
+                    # Open download page
+                    webbrowser.open('https://ollama.ai/download')
+                    from shared.wx_common import show_info
+                    show_info(self, "Opening Browser",
+                             "Opening ollama.ai download page.\n\n"
+                             "After installing, run: ollama pull moondream")
+                elif result == wx.ID_NO:
+                    # Copy command to clipboard
+                    install_cmd = "curl -fsSL https://ollama.ai/install.sh | sh"
+                    if wx.TheClipboard.Open():
+                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
+                        wx.TheClipboard.Close()
+                        from shared.wx_common import show_info
+                        show_info(self, "Command Copied",
+                                 f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
+                                 "1. Open Terminal\n"
+                                 "2. Paste (Cmd+V) and press Enter\n"
+                                 "3. After install: ollama pull moondream")
+            
+            elif sys.platform == 'win32':
+                # Windows
+                msg = (
+                    "Ollama is not currently installed or running.\n\n"
+                    "Installation Options:\n\n"
+                    "1. Download from Website (Recommended)\n"
+                    "   • Opens browser to ollama.ai/download\n"
+                    "   • Download and install manually\n\n"
+                    "2. Quick Install via Command Prompt\n"
+                    "   • Copies winget command to clipboard\n"
+                    "   • Paste into Command Prompt\n\n"
+                    "Which method would you prefer?"
+                )
+                
+                dlg = wx.MessageDialog(
+                    self,
+                    msg,
+                    "Install Ollama",
+                    wx.YES_NO | wx.CANCEL | wx.ICON_QUESTION
+                )
+                dlg.SetYesNoCancelLabels("&Download from Website", "&Copy winget Command", "Cancel")
+                
+                result = dlg.ShowModal()
+                dlg.Destroy()
+                
+                if result == wx.ID_YES:
+                    # Open download page
+                    webbrowser.open('https://ollama.ai/download')
+                    from shared.wx_common import show_info
+                    show_info(self, "Opening Browser",
+                             "Opening ollama.ai download page.\n\n"
+                             "After installing, run: ollama pull moondream")
+                elif result == wx.ID_NO:
+                    # Copy command to clipboard
+                    install_cmd = "winget install ollama"
+                    if wx.TheClipboard.Open():
+                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
+                        wx.TheClipboard.Close()
+                        from shared.wx_common import show_info
+                        show_info(self, "Command Copied",
+                                 f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
+                                 "1. Open Command Prompt or PowerShell\n"
+                                 "2. Paste (Ctrl+V) and press Enter\n"
+                                 "3. After install: ollama pull moondream")
+            
+            else:
+                # Linux or other
+                from shared.wx_common import show_info
+                show_info(self, "Install Ollama",
+                         "Please visit https://ollama.ai/download for installation instructions.")
+                webbrowser.open('https://ollama.ai/download')
+        
+        except Exception as e:
+            from shared.wx_common import show_error
+            show_error(self, f"Error checking Ollama status:\n{e}")
     
     def on_export_configuration(self, event):
         """Export all configuration files as backup"""
