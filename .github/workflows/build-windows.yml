@@ -46,10 +46,3 @@ jobs:
         name: imagedescriber-windows
         path: imagedescriber/dist/ImageDescriber.exe
         retention-days: 30
-    
-    - name: Upload Viewer executable
-      uses: actions/upload-artifact@v4
-      with:
-        name: viewer-windows
-        path: viewer/dist/Viewer.exe
-        retention-days: 30
