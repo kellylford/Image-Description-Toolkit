@@ -2,9 +2,9 @@ name: Build Windows Executables
 
 on:
   push:
-    branches: [ WXMigration ]
+    branches: [ wxdevelopment ]
   pull_request:
-    branches: [ WXMigration ]
+    branches: [ wxdevelopment ]
   workflow_dispatch:  # Also allow manual trigger
 
 jobs:
