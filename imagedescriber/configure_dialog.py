@@ -190,14 +190,14 @@ class SettingEditDialog(wx.Dialog):
         try:
             logger.info("setup_ui: Creating panel")
             panel = wx.Panel(self)
-            sizer = wx.BoxSizer(wx.VERTICAL)
+            panel_sizer = wx.BoxSizer(wx.VERTICAL)
             
             # Add description
             logger.info("setup_ui: Adding description")
             if "description" in self.setting_info:
                 desc_text = wx.StaticText(panel, label=self.setting_info["description"])
                 desc_text.Wrap(400)
-                sizer.Add(desc_text, 0, wx.ALL, 10)
+                panel_sizer.Add(desc_text, 0, wx.ALL, 10)
             
             # Create appropriate editor based on setting type
             setting_type = self.setting_info.get("type", "string")
@@ -257,17 +257,23 @@ class SettingEditDialog(wx.Dialog):
                 range_label = wx.StaticText(panel, label=f"Range: {self.setting_info['range'][0]} to {self.setting_info['range'][1]}")
                 form_sizer.Add(range_label, 0)
             
-            logger.info("setup_ui: Adding form sizer to main sizer")
-            sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
+            logger.info("setup_ui: Adding form sizer to panel sizer")
+            panel_sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
+            panel.SetSizer(panel_sizer)
             
-            logger.info("setup_ui: Creating button sizer")
-            # Buttons
+            logger.info("setup_ui: Creating button sizer (as dialog children)")
+            # Buttons - CreateButtonSizer creates buttons as children of the DIALOG, not panel
             btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
-            logger.info("setup_ui: Button sizer created, adding to layout")
-            sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
+            logger.info("setup_ui: Button sizer created")
             
-            logger.info("setup_ui: Setting panel sizer and fitting")
-            panel.SetSizer(sizer)
+            # Dialog-level sizer (manages panel + buttons)
+            logger.info("setup_ui: Creating dialog-level sizer")
+            dialog_sizer = wx.BoxSizer(wx.VERTICAL)
+            dialog_sizer.Add(panel, 1, wx.EXPAND)
+            dialog_sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
+            
+            logger.info("setup_ui: Setting dialog sizer and fitting")
+            self.SetSizer(dialog_sizer)
             self.Fit()
             
             logger.info("SettingEditDialog.setup_ui completed, editor type: %s", type(self.editor).__name__)
