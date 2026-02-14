@@ -11,36 +11,29 @@ source .venv/bin/activate
 # Run PyInstaller
 pyinstaller imagedescriber_wx.spec --clean --noconfirm
 
-# macOS code signing fix - remove conflicting signatures and re-sign
+# macOS code signing fix - remove conflicting signatures
 echo "Fixing macOS code signatures..."
 
-# Remove all existing signatures from frameworks and libraries
-echo "  Removing existing signatures..."
-find dist/ImageDescriber.app/Contents/Frameworks -type f \( -name "*.so" -o -name "*.dylib" -o -name "Python*" \) 2>/dev/null | while read lib; do
+# Critical: Find and remove signature from Python framework (has python.org TeamID)
+echo "  Removing Python.framework signatures..."
+find dist/ImageDescriber.app/Contents/Frameworks -type f -name "Python" 2>/dev/null | while read pylib; do
+    echo "    Removing signature from: $pylib"
+    codesign --remove-signature "$pylib" 2>/dev/null || true
+done
+
+# Remove signatures from all other libraries
+echo "  Removing signatures from libraries..."
+find dist/ImageDescriber.app/Contents/Frameworks -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | while read lib; do
     codesign --remove-signature "$lib" 2>/dev/null || true
 done
 
 # Remove signature from the executable itself  
 codesign --remove-signature dist/ImageDescriber.app/Contents/MacOS/ImageDescriber 2>/dev/null || true
 
-# Ad-hoc sign all frameworks and libraries individually first
-echo "  Signing frameworks and libraries..."
-find dist/ImageDescriber.app/Contents/Frameworks -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | while read lib; do
-    codesign --force --sign - "$lib" 2>/dev/null || true
-done
+# Remove signature from the app bundle
+codesign --remove-signature dist/ImageDescriber.app 2>/dev/null || true
 
-# Sign any Python framework if present
-find dist/ImageDescriber.app/Contents/Frameworks -type f -name "Python*" 2>/dev/null | while read pylib; do
-    codesign --force --sign - "$pylib" 2>/dev/null || true
-done
-
-# Finally, sign the entire app bundle with --deep to catch anything missed
-echo "  Signing app bundle..."
-codesign --force --deep --sign - dist/ImageDescriber.app
-
-# Verify the signature
-echo "  Verifying signature..."
-codesign --verify --deep --strict --verbose=2 dist/ImageDescriber.app 2>&1 || echo "Warning: Signature verification had warnings (may still work)"
+echo "  All signatures removed. App will run unsigned (macOS will quarantine but allow after confirmation)"
 
 echo "========================================"
 echo "Build complete!"

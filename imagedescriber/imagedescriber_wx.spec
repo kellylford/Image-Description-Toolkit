@@ -110,10 +110,27 @@ exe = EXE(
     entitlements_file=None,
 )
 
+# Read version from VERSION file
+version_file = project_root / 'VERSION'
+version = '4.0.0'  # Fallback
+if version_file.exists():
+    version_text = version_file.read_text().strip()
+    # Extract just the version number (e.g., "4.0.0Beta1 bld050" -> "4.0.0")
+    version = version_text.split()[0].rstrip('Beta1234567890')
+    if not version:
+        version = '4.0.0'
+
 # macOS .app bundle
 app = BUNDLE(
     exe,
     name='ImageDescriber.app',
     icon=None,
     bundle_identifier='com.imagedescriber.app',
+    version=version,
+    info_plist={
+        'CFBundleShortVersionString': version,
+        'CFBundleVersion': version_text if version_file.exists() else version,
+        'NSPrincipalClass': 'NSApplication',
+        'NSHighResolutionCapable': 'True',
+    },
 )

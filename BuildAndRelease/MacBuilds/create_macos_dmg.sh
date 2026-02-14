@@ -117,10 +117,23 @@ if [ "$SIGN_CODE" = "1" ]; then
     for APP in "$DMG_STAGING/IDT"/*.app; do
         if [ -d "$APP" ]; then
             APP_NAME=$(basename "$APP")
-            echo "  Signing $APP_NAME..."
-            # Remove any existing signature first (PyInstaller adds one)
+            echo "  Preparing $APP_NAME for signing..."
+            
+            # Critical: Remove Python.framework signature (has python.org Team ID)
+            find "$APP/Contents/Frameworks" -type f -name "Python" 2>/dev/null | while read pylib; do
+                echo "    Removing Python.framework signature"
+                codesign --remove-signature "$pylib" 2>/dev/null || true
+            done
+            
+            # Remove all other signatures
+            find "$APP/Contents/Frameworks" -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | while read lib; do
+                codesign --remove-signature "$lib" 2>/dev/null || true
+            done
+            codesign --remove-signature "$APP/Contents/MacOS"/* 2>/dev/null || true
             codesign --remove-signature "$APP" 2>/dev/null || true
-            # Sign with our Developer ID
+            
+            # Now sign with our Developer ID
+            echo "  Signing $APP_NAME with Developer ID..."
             codesign --force --deep \
                 --options runtime \
                 --timestamp \
@@ -145,6 +158,11 @@ if [ "$SIGN_CODE" = "1" ]; then
     fi
     
     echo "✓ All applications signed"
+    echo ""
+else
+    echo ""
+    echo "⚠️  Code signing disabled - apps will be unsigned"
+    echo "   Users will need to right-click → Open first time"
     echo ""
 fi
 
