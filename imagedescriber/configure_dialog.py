@@ -165,12 +165,21 @@ class SettingEditDialog(wx.Dialog):
     def __init__(self, parent, setting_name: str, current_value: Any, setting_info: Dict[str, Any]):
         super().__init__(parent, title=f"Edit: {setting_name}", size=(450, 250))
         
+        logger.info("SettingEditDialog.__init__ started for: %s", setting_name)
+        
         self.setting_name = setting_name
         self.current_value = current_value
         self.setting_info = setting_info
         self.new_value = None
+        self.editor = None
+        self._focus_set = False
         
         self.setup_ui()
+        
+        # Bind to show event for reliable focus setting
+        self.Bind(wx.EVT_SHOW, self._on_show)
+        
+        logger.info("SettingEditDialog.__init__ completed")
     
     def setup_ui(self):
         """Create the dialog UI"""
@@ -247,9 +256,26 @@ class SettingEditDialog(wx.Dialog):
         panel.SetSizer(sizer)
         self.Fit()
         
-        # Set focus to the editor control for keyboard accessibility
-        # Delay focus setting to ensure dialog is fully displayed
-        wx.CallAfter(self.editor.SetFocus)
+        logger.info("SettingEditDialog.setup_ui completed, editor type: %s", type(self.editor).__name__)
+    
+    def _on_show(self, event):
+        """Handle dialog show event - set focus when dialog becomes visible"""
+        event.Skip()  # Allow normal processing
+        
+        if not self._focus_set and self.editor:
+            logger.info("SettingEditDialog shown, setting focus to editor")
+            # Use CallAfter to ensure the dialog is fully rendered
+            wx.CallAfter(self._set_editor_focus)
+    
+    def _set_editor_focus(self):
+        """Set focus to the editor control"""
+        if self.editor and not self._focus_set:
+            try:
+                self.editor.SetFocus()
+                self._focus_set = True
+                logger.info("Focus set to editor successfully")
+            except Exception as e:
+                logger.error("Failed to set focus to editor: %s", e)
     
     def GetValue(self):
         """Get the new value from the editor"""
@@ -870,10 +896,15 @@ class ConfigureDialog(wx.Dialog):
         
         current_value = self.get_setting_value(setting_info)
         
-        # Open edit dialog (it manages its own focus via wx.CallAfter)
+        # Open edit dialog (it manages its own focus via EVT_SHOW)
         dialog = SettingEditDialog(self, setting_name, current_value, setting_info)
         dialog.CentreOnParent()
-        if dialog.ShowModal() == wx.ID_OK:
+        
+        logger.info("Calling ShowModal() for SettingEditDialog")
+        result = dialog.ShowModal()
+        logger.info("ShowModal() returned: %s", "OK" if result == wx.ID_OK else "CANCEL")
+        
+        if result == wx.ID_OK:
             # Update the value
             new_value = dialog.GetValue()
             self.set_setting_value(setting_info, new_value)
