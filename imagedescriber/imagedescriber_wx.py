@@ -4546,6 +4546,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if ask_yes_no(self, "Delete the most recent description?"):
             self.current_image_item.descriptions.pop()
             self.mark_modified()
+            self.refresh_image_list()  # Update "d" indicator in image list
             self.display_image_info(self.current_image_item)
             self.SetStatusText("Description deleted", 0)
     
