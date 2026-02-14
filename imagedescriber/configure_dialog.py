@@ -26,7 +26,6 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 import wx
-import wx.lib.masked as masked
 
 
 logger = logging.getLogger(__name__)
