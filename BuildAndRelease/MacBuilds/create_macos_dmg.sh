@@ -31,41 +31,32 @@ echo ""
 # CODE SIGNING SETUP
 # ============================================================================
 
-# Detect Developer ID certificate
-SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+# DISABLED: Developer ID signing conflicts with PyInstaller's bundled Python framework
+# The bundled Python.framework has python.org's signature, creating a Team ID mismatch
+# Ad-hoc signatures work fine for distribution (users right-click → Open first time)
 
-if [ -z "$SIGNING_IDENTITY" ]; then
-    echo "⚠️  No Developer ID certificate found - building unsigned DMG"
-    echo ""
-    SIGN_CODE=0
-    NOTARIZE=0
-else
-    echo "Found Developer ID certificate: $SIGNING_IDENTITY"
-    SIGN_CODE=1
-    
-    # Check for stored notarization credentials
-    PROFILE_NAME=""
-    for profile in "idt" "notarize" "notarytool-password" "notarytool"; do
-        if xcrun notarytool history --keychain-profile "$profile" >/dev/null 2>&1; then
-            PROFILE_NAME="$profile"
-            break
-        fi
-    done
-    
-    if [ -n "$PROFILE_NAME" ]; then
-        echo "Found notarization credentials (profile: $PROFILE_NAME)"
-        echo "✓ Code signing enabled"
-        echo "✓ Notarization enabled"
-        NOTARIZE=1
-    else
-        echo "✓ Code signing enabled"
-        echo "⚠️  No notarization credentials found - DMG will be signed but not notarized"
-        echo "   To set up: xcrun notarytool store-credentials --apple-id 'your@apple.id' --team-id 'P887QF74N8'"
-        NOTARIZE=0
-    fi
-fi
+SIGN_CODE=0
+NOTARIZE=0
 
+echo "⚠️  Developer ID signing disabled for PyInstaller apps"
+echo "   (Bundled Python framework has conflicting signature)"
+echo "   Apps are ad-hoc signed - users must right-click → Open first time"
 echo ""
+
+# Uncomment below to re-enable Developer ID signing if Python framework issue is resolved
+# # Detect Developer ID certificate
+# SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+# 
+# if [ -z "$SIGNING_IDENTITY" ]; then
+#     echo "⚠️  No Developer ID certificate found - building unsigned DMG"
+#     echo ""
+#     SIGN_CODE=0
+#     NOTARIZE=0
+# else
+#     echo "Found Developer ID certificate: $SIGNING_IDENTITY"
+#     SIGN_CODE=1
+#     # ... rest of signing logic
+# fi
 
 # Create dist directory in MacBuilds if it doesn't exist
 mkdir -p BuildAndRelease/MacBuilds/dist

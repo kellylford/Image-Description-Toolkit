@@ -184,6 +184,7 @@ if getattr(sys, 'frozen', False):
         VideoProcessingWorker,
         HEICConversionWorker,
         DirectoryScanWorker,
+        SaveWorkspaceWorker,
         EVT_PROGRESS_UPDATE,
         EVT_PROCESSING_COMPLETE,
         EVT_PROCESSING_FAILED,
@@ -195,6 +196,8 @@ if getattr(sys, 'frozen', False):
         EVT_SCAN_PROGRESS,
         EVT_SCAN_COMPLETE,
         EVT_SCAN_FAILED,
+        EVT_WORKSPACE_SAVE_COMPLETE,
+        EVT_WORKSPACE_SAVE_FAILED,
     )
 else:
     # Development: try relative imports first, fall back to absolute
@@ -222,6 +225,7 @@ else:
             VideoProcessingWorker,
             HEICConversionWorker,
             DirectoryScanWorker,
+            SaveWorkspaceWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -233,6 +237,8 @@ else:
             EVT_SCAN_PROGRESS,
             EVT_SCAN_COMPLETE,
             EVT_SCAN_FAILED,
+            EVT_WORKSPACE_SAVE_COMPLETE,
+            EVT_WORKSPACE_SAVE_FAILED,
         )
     except ImportError as e_rel:
         print(f"[DEBUG] Relative import failed, trying absolute: {e_rel}")
@@ -446,6 +452,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.Bind(EVT_SCAN_COMPLETE, self.on_scan_complete)
         if EVT_SCAN_FAILED:
             self.Bind(EVT_SCAN_FAILED, self.on_scan_failed)
+        if EVT_WORKSPACE_SAVE_COMPLETE:
+            self.Bind(EVT_WORKSPACE_SAVE_COMPLETE, self.on_workspace_save_complete)
+        if EVT_WORKSPACE_SAVE_FAILED:
+            self.Bind(EVT_WORKSPACE_SAVE_FAILED, self.on_workspace_save_failed)
         
         # Bind keyboard events for single-key shortcuts (matching Qt6 behavior)
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
@@ -2782,7 +2792,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.on_save_workspace_as(event)
     
     def save_workspace(self, file_path):
-        """Save workspace to file"""
+        """Save workspace to file (runs in background thread)"""
         try:
             # Check if workspace location changed (for moving extracted frames)
             old_workspace_file = self.workspace_file
@@ -2799,67 +2809,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.workspace_file = Path(file_path)  # Convert to Path object
             new_ws_dir = self.get_workspace_directory()
             
-            # Move extracted frames if workspace location changed
-            if workspace_changed and old_ws_dir and old_ws_dir.exists():
-                old_extracted_frames = old_ws_dir / "extracted_frames"
-                new_extracted_frames = new_ws_dir / "extracted_frames"
-                
-                if old_extracted_frames.exists():
-                    # Move the entire extracted_frames directory
-                    import shutil
-                    if new_extracted_frames.exists():
-                        shutil.rmtree(new_extracted_frames)
-                    shutil.move(str(old_extracted_frames), str(new_extracted_frames))
-                    
-                    # Update all extracted_frame item paths
-                    for item in self.workspace.items.values():
-                        if item.item_type == "extracted_frame":
-                            old_path = Path(item.file_path)
-                            # Reconstruct path in new location
-                            relative_to_old = old_path.relative_to(old_extracted_frames)
-                            new_path = new_extracted_frames / relative_to_old
-                            item.file_path = str(new_path)
-                        
-                        # Update extracted_frames list for video items
-                        if hasattr(item, 'extracted_frames') and item.extracted_frames:
-                            updated_frames = []
-                            for frame_path in item.extracted_frames:
-                                old_frame_path = Path(frame_path)
-                                try:
-                                    relative_to_old = old_frame_path.relative_to(old_extracted_frames)
-                                    new_frame_path = new_extracted_frames / relative_to_old
-                                    updated_frames.append(str(new_frame_path))
-                                except ValueError:
-                                    # Path not relative to old location, keep as-is
-                                    updated_frames.append(frame_path)
-                            item.extracted_frames = updated_frames
-                    
-                    # Clean up old workspace directory if empty
-                    try:
-                        if old_ws_dir.exists() and not any(old_ws_dir.iterdir()):
-                            old_ws_dir.rmdir()
-                    except:
-                        pass  # Ignore cleanup errors
-            
-            # Update workspace metadata
+            # Update workspace metadata (must happen on main thread before worker starts)
             self.workspace.file_path = file_path
             self.workspace.modified = datetime.now().isoformat()
             
             # Sync cached models to workspace
             self.workspace.cached_ollama_models = self.cached_ollama_models
             
-            # Save to file with proper JSON encoding
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.workspace.to_dict(), f, indent=2, ensure_ascii=False, default=str)
+            # Show saving status
+            self.SetStatusText(f"Saving workspace: {Path(file_path).name}...", 0)
             
-            self.workspace.saved = True
-            self.clear_modified()
-            
-            self.update_window_title("ImageDescriber", Path(file_path).name)
-            self.SetStatusText(f"Workspace saved: {Path(file_path).name}", 0)
+            # Start background save worker
+            self.save_workspace_worker = SaveWorkspaceWorker(
+                self,
+                workspace_data=self.workspace.to_dict(),
+                file_path=file_path,
+                old_ws_dir=old_ws_dir,
+                new_ws_dir=new_ws_dir,
+                workspace_items=self.workspace.items
+            )
+            self.save_workspace_worker.start()
             
         except Exception as e:
-            show_error(self, f"Error saving workspace:\n{e}")
+            show_error(self, f"Error preparing workspace save:\n{e}")
+            self.SetStatusText("Error saving workspace", 0)
     
     def rename_workspace(self, new_name: str) -> bool:
         """Rename workspace and its data directory
@@ -3589,6 +3562,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Clear scan worker reference
         self.scan_worker = None
+    
+    def on_workspace_save_complete(self, event):
+        """Handle successful workspace save completion"""
+        # Update UI state (must run on main thread)
+        self.workspace.saved = True
+        self.clear_modified()
+        self.update_window_title("ImageDescriber", Path(event.file_path).name)
+        self.SetStatusText(f"Workspace saved: {Path(event.file_path).name}", 0)
+        logger.info(f"Workspace saved successfully: {event.file_path}")
+    
+    def on_workspace_save_failed(self, event):
+        """Handle workspace save failure"""
+        self.SetStatusText(f"Error saving workspace", 0)
+        logger.error(f"Workspace save failed: {event.error}")
+        show_error(self, f"Error saving workspace:\n{event.error}")
     
     # Phase 3: Batch control handlers
     def on_pause_batch(self):

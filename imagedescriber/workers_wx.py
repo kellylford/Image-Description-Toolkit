@@ -91,6 +91,10 @@ ScanProgressEvent, EVT_SCAN_PROGRESS = wx.lib.newevent.NewEvent()
 ScanCompleteEvent, EVT_SCAN_COMPLETE = wx.lib.newevent.NewEvent()
 ScanFailedEvent, EVT_SCAN_FAILED = wx.lib.newevent.NewEvent()
 
+# Workspace save event types
+WorkspaceSaveCompleteEvent, EVT_WORKSPACE_SAVE_COMPLETE = wx.lib.newevent.NewEvent()
+WorkspaceSaveFailedEvent, EVT_WORKSPACE_SAVE_FAILED = wx.lib.newevent.NewEvent()
+
 
 # Custom event classes that properly store attributes
 class ProcessingCompleteEventData(ProcessingCompleteEvent):
@@ -1846,3 +1850,102 @@ class DirectoryScanWorker(threading.Thread):
             wx.PostEvent(self.parent_window, evt)
         except Exception as e:
             logger.warning(f"Could not post scan progress: {e}")
+
+
+class SaveWorkspaceWorker(threading.Thread):
+    """Worker thread for saving workspace to .idw file
+    
+    Performs workspace save operation in background to prevent UI freeze
+    during large workspace saves or file moves.
+    
+    Events:
+        WorkspaceSaveCompleteEvent: Save completed successfully
+        WorkspaceSaveFailedEvent: Save failed with error
+    """
+    
+    def __init__(self, parent_window, workspace, file_path, 
+                 old_workspace_file=None, workspace_changed=False,
+                 old_ws_dir=None, new_ws_dir=None,
+                 cached_ollama_models=None):
+        """Initialize workspace save worker
+        
+        Args:
+            parent_window: wxWindow to receive events
+            workspace: Workspace object to save
+            file_path: Path to save workspace file
+            old_workspace_file: Previous workspace file path (for rename/move)
+            workspace_changed: Whether workspace location changed
+            old_ws_dir: Old workspace data directory (for     """Worker thread for saving workspace tor    
+    Performs workspace save operation in backgroca   d_    during large workspace saves or file moves.
+    
+    Events:
+            
+    Events:
+        WorkspaceSaveCompletedo    p        Woow        WorkspaceSaveFailedEvent: Save failed with error
+    "il    """
+    
+    def __init__(self, parent_window, workfi    
+      self.workspace_changed = workspace_changed
+        self.old_ws_                 old_ws_dir=None, new_ws_dir=None,
+             lf.cached_ollama_models = cached_ollama_models or []
+         """Initialize workspace save workerxi        
+        Args:
+            parent_un       
+             ec            workspace: Workspace object to save
+    ry            file_path: Path to save workspace               old_workspace_file: Previous workspacn             workspace_changed: Whether workspace location changed
+           d_        xists():
+                old_extracted_frames = self.old_ws_dir / "extracted_frames"
+                new_extracted_frames = self.new_ws_dir / "extracted_frames"
+         
+      
+                if old_extracted_frames.exists():
+                    # Move the entire ext   te          ir    Events:          Wo      "il    """
+    
+    def __init__(self, parent_window, workfi    
+      self.workspace_changed = wor      
+    def ut   mo      self.workspace_changed = workew_extracted_f        self.old_ws_                 old_ws_di                lf.cached_ollama_models = cached_ollama_models or []
+   in         """Initialize workspace save workerxi        
+        Ait        Args:
+            parent_un       
+                        =              ec                  ry            file_path: Path to save workspace                       d_        xists():
+                old_extracted_frames = self.old_ws_dir / "extracted_frames"
+                new_extracted_frames = self.new_ws_dir / "extra                  old_extracteth                new_extracted_frames = self.new_ws_dir / "extracted_frames e         
+      
+                if old_extracted_frames.exists():
+       em      
+ ct     ames') and item.extracted_frames:
+                      
+    def __init__(self, parent_window, workfi    
+      self.workspace_changed = wor      
+ s:           self.workspace_changed = wor      
+    deth(frame_path)
+                               in         """Initialize workspace save workerxi        
+        Ait        Args:
+            parent_un       
+                        =              ec                  ry  d_        Ait        Args:
+            parent_un       
+                  parent_un  st                        =                    old_extracted_frames = self.old_ws_dir / "extracted_frames"
+                new_extracted_frames = self.new_ws_dir / "extra                         new_extracted_frames = self.new_ws_dir / "extra            i      
+                if old_extracted_frames.exists():
+       em      
+ ct     ames') and item.extracted_frames:
+                      
+    def __init__(self, parent_window, wor.o     _d       em      
+ ct     ames') and item.extracte)) ct     ames')                        
+    def __init__(      def __init__(xcept:      self.workspace_changed = wor      
+ s:    e s:           self.workspace_changed =  w    deth(frame_path)
+                          le                   at        Ait        Args:
+            parent_un       
+                        =                     parent_un  s                         =   s            parent_un       
+                  parent_un  st                s = self.cache                  parent_un 
+                new_extracted_frames = self.new_ws_dir / "extra                         new_extracted_frames = self.new_ws_dir / "extr                  if old_extracted_frames.exists():
+       em      
+ ctdefault=str)
+            
+            self.workspace.saved = True
+            
+            # Post success event
+            evt = Worksp ct     ames')eE             h=self.file_path)
+               def __init__(selfre ct     ames') and item.extracte)) ct     ames')                      def __init__(      def __init__(xcept:  e}", exc_info=True)
+          s:    e s:           self.workspace_changed =  w    deth(frame_path)
+                             self.parent_window, evt)
