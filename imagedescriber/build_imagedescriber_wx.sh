@@ -11,7 +11,7 @@ source .venv/bin/activate
 # Run PyInstaller
 pyinstaller imagedescriber_wx.spec --clean --noconfirm
 
-# macOS code signing fix - remove conflicting signatures
+# macOS code signing fix - remove conflicting signatures and re-sign
 echo "Fixing macOS code signatures..."
 
 # Critical: Find and remove signature from Python framework (has python.org TeamID)
@@ -33,7 +33,21 @@ codesign --remove-signature dist/ImageDescriber.app/Contents/MacOS/ImageDescribe
 # Remove signature from the app bundle
 codesign --remove-signature dist/ImageDescriber.app 2>/dev/null || true
 
-echo "  All signatures removed. App will run unsigned (macOS will quarantine but allow after confirmation)"
+# Now ad-hoc sign everything (required on modern macOS)
+echo "  Ad-hoc signing Python.framework..."
+find dist/ImageDescriber.app/Contents/Frameworks -type f -name "Python" 2>/dev/null | while read pylib; do
+    codesign --force --sign - "$pylib" 2>/dev/null || true
+done
+
+echo "  Ad-hoc signing libraries..."
+find dist/ImageDescriber.app/Contents/Frameworks -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | while read lib; do
+    codesign --force --sign - "$lib" 2>/dev/null || true
+done
+
+echo "  Ad-hoc signing app bundle..."
+codesign --force --deep --sign - dist/ImageDescriber.app
+
+echo "  ✓ App signed with ad-hoc signature (allows local development)"
 
 echo "========================================"
 echo "Build complete!"
