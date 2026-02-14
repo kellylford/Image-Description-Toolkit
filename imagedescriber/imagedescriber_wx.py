@@ -4659,24 +4659,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             dialog.ShowModal()
             dialog.Destroy()
             
+            # Reload configuration to pick up any changes made in the dialog
+            self.load_config()
+            
             # Refresh cached data after editing
             self.cached_ollama_models = None  # Force reload on next use
-            
-            # Verify config file is readable after editing
-            try:
-                from shared.wx_common import find_config_file
-                config_path = find_config_file('image_describer_config.json')
-                if config_path and config_path.exists():
-                    import json
-                    with open(config_path, 'r', encoding='utf-8') as f:
-                        cfg = json.load(f)
-                    prompts = cfg.get('prompt_variations', {})
-                    default = cfg.get('default_prompt_style', 'N/A')
-                    logging.info(f"Config verified after prompt edit: {len(prompts)} prompts, default={default}")
-                else:
-                    logging.warning("Config file not found after prompt editor closed")
-            except Exception as verify_error:
-                logging.error(f"Failed to verify config after prompt edit: {verify_error}")
             
         except Exception as e:
             show_error(self, f"Error launching Prompt Editor:\n{e}")
@@ -4695,6 +4682,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             dialog = ConfigureDialog(self, cached_ollama_models=self.cached_ollama_models)
             dialog.ShowModal()
             dialog.Destroy()
+            
+            # Reload configuration to pick up any changes made in the dialog
+            self.load_config()
             
             # Refresh cached settings after editing
             self.cached_ollama_models = None  # Force reload on next use
