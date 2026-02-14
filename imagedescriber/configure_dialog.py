@@ -21,11 +21,14 @@ Features:
 import sys
 import json
 import os
+import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 import wx
-import wx.lib.masked as masked
+
+
+logger = logging.getLogger(__name__)
 
 
 class ApiKeyEditDialog(wx.Dialog):
@@ -161,91 +164,141 @@ class SettingEditDialog(wx.Dialog):
     def __init__(self, parent, setting_name: str, current_value: Any, setting_info: Dict[str, Any]):
         super().__init__(parent, title=f"Edit: {setting_name}", size=(450, 250))
         
+        logger.info("SettingEditDialog.__init__ started for: %s", setting_name)
+        
         self.setting_name = setting_name
         self.current_value = current_value
         self.setting_info = setting_info
         self.new_value = None
+        self.editor = None
+        self._focus_set = False
         
-        self.setup_ui()
+        try:
+            self.setup_ui()
+        except Exception as e:
+            logger.error("Failed in setup_ui: %s", e, exc_info=True)
+            raise
+        
+        # Bind to show event for reliable focus setting
+        logger.info("SettingEditDialog: Binding EVT_SHOW")
+        self.Bind(wx.EVT_SHOW, self._on_show)
+        
+        logger.info("SettingEditDialog.__init__ completed")
     
     def setup_ui(self):
         """Create the dialog UI"""
-        panel = wx.Panel(self)
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        # Add description
-        if "description" in self.setting_info:
-            desc_text = wx.StaticText(panel, label=self.setting_info["description"])
-            desc_text.Wrap(400)
-            sizer.Add(desc_text, 0, wx.ALL, 10)
-        
-        # Create appropriate editor based on setting type
-        setting_type = self.setting_info.get("type", "string")
-        
-        form_sizer = wx.FlexGridSizer(rows=2, cols=2, vgap=5, hgap=5)
-        form_sizer.AddGrowableCol(1, 1)
-        
-        form_sizer.Add(wx.StaticText(panel, label="Value:"), 0, wx.ALIGN_CENTER_VERTICAL)
-        
-        if setting_type == "bool":
-            self.editor = wx.CheckBox(panel)
-            self.editor.SetValue(bool(self.current_value))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+        try:
+            logger.info("setup_ui: Creating panel")
+            panel = wx.Panel(self)
+            panel_sizer = wx.BoxSizer(wx.VERTICAL)
             
-        elif setting_type == "int":
-            self.editor = wx.SpinCtrl(panel)
+            # Add description
+            logger.info("setup_ui: Adding description")
+            if "description" in self.setting_info:
+                desc_text = wx.StaticText(panel, label=self.setting_info["description"])
+                desc_text.Wrap(400)
+                panel_sizer.Add(desc_text, 0, wx.ALL, 10)
+            
+            # Create appropriate editor based on setting type
+            setting_type = self.setting_info.get("type", "string")
+            logger.info("setup_ui: Setting type is %s", setting_type)
+            
+            form_sizer = wx.FlexGridSizer(rows=2, cols=2, vgap=5, hgap=5)
+            form_sizer.AddGrowableCol(1, 1)
+            
+            form_sizer.Add(wx.StaticText(panel, label="Value:"), 0, wx.ALIGN_CENTER_VERTICAL)
+            
+            if setting_type == "bool":
+                self.editor = wx.CheckBox(panel)
+                self.editor.SetValue(bool(self.current_value))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "int":
+                self.editor = wx.SpinCtrl(panel)
+                if "range" in self.setting_info:
+                    self.editor.SetRange(self.setting_info["range"][0], self.setting_info["range"][1])
+                else:
+                    self.editor.SetRange(-999999, 999999)
+                self.editor.SetValue(int(self.current_value or 0))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "float":
+                self.editor = wx.TextCtrl(panel)
+                self.editor.SetValue(str(float(self.current_value or 0.0)))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "int_or_null":
+                self.editor = wx.TextCtrl(panel)
+                # Display empty string for None/null, otherwise the integer value
+                if self.current_value is None:
+                    self.editor.SetValue("")
+                else:
+                    self.editor.SetValue(str(int(self.current_value)))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            elif setting_type == "choice":
+                self.editor = wx.Choice(panel)
+                choices = self.setting_info.get("choices", [])
+                self.editor.Append(choices)
+                if self.current_value in choices:
+                    self.editor.SetStringSelection(str(self.current_value))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+                
+            else:  # string or other
+                self.editor = wx.TextCtrl(panel)
+                self.editor.SetValue(str(self.current_value or ""))
+                form_sizer.Add(self.editor, 0, wx.EXPAND)
+            
+            logger.info("setup_ui: Editor widget created: %s", type(self.editor).__name__)
+            
+            # Add range/limits info if available
             if "range" in self.setting_info:
-                self.editor.SetRange(self.setting_info["range"][0], self.setting_info["range"][1])
-            else:
-                self.editor.SetRange(-999999, 999999)
-            self.editor.SetValue(int(self.current_value or 0))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+                form_sizer.Add(wx.StaticText(panel, label=""), 0)
+                range_label = wx.StaticText(panel, label=f"Range: {self.setting_info['range'][0]} to {self.setting_info['range'][1]}")
+                form_sizer.Add(range_label, 0)
             
-        elif setting_type == "float":
-            self.editor = wx.TextCtrl(panel)
-            self.editor.SetValue(str(float(self.current_value or 0.0)))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            logger.info("setup_ui: Adding form sizer to panel sizer")
+            panel_sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
+            panel.SetSizer(panel_sizer)
             
-        elif setting_type == "int_or_null":
-            self.editor = wx.TextCtrl(panel)
-            # Display empty string for None/null, otherwise the integer value
-            if self.current_value is None:
-                self.editor.SetValue("")
-            else:
-                self.editor.SetValue(str(int(self.current_value)))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            logger.info("setup_ui: Creating button sizer (as dialog children)")
+            # Buttons - CreateButtonSizer creates buttons as children of the DIALOG, not panel
+            btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+            logger.info("setup_ui: Button sizer created")
             
-        elif setting_type == "choice":
-            self.editor = wx.Choice(panel)
-            choices = self.setting_info.get("choices", [])
-            self.editor.Append(choices)
-            if self.current_value in choices:
-                self.editor.SetStringSelection(str(self.current_value))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            # Dialog-level sizer (manages panel + buttons)
+            logger.info("setup_ui: Creating dialog-level sizer")
+            dialog_sizer = wx.BoxSizer(wx.VERTICAL)
+            dialog_sizer.Add(panel, 1, wx.EXPAND)
+            dialog_sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
             
-        else:  # string or other
-            self.editor = wx.TextCtrl(panel)
-            self.editor.SetValue(str(self.current_value or ""))
-            form_sizer.Add(self.editor, 0, wx.EXPAND)
+            logger.info("setup_ui: Setting dialog sizer and fitting")
+            self.SetSizer(dialog_sizer)
+            self.Fit()
+            
+            logger.info("SettingEditDialog.setup_ui completed, editor type: %s", type(self.editor).__name__)
+        except Exception as e:
+            logger.error("Exception in setup_ui: %s", e, exc_info=True)
+            raise
+    
+    def _on_show(self, event):
+        """Handle dialog show event - set focus when dialog becomes visible"""
+        event.Skip()  # Allow normal processing
         
-        # Add range/limits info if available
-        if "range" in self.setting_info:
-            form_sizer.Add(wx.StaticText(panel, label=""), 0)
-            range_label = wx.StaticText(panel, label=f"Range: {self.setting_info['range'][0]} to {self.setting_info['range'][1]}")
-            form_sizer.Add(range_label, 0)
-        
-        sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        
-        # Buttons
-        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
-        sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        
-        panel.SetSizer(sizer)
-        self.Fit()
-        
-        # Set focus to the editor control for keyboard accessibility
-        # Delay focus setting to ensure dialog is fully displayed
-        wx.CallAfter(self.editor.SetFocus)
+        if not self._focus_set and self.editor:
+            logger.info("SettingEditDialog shown, setting focus to editor")
+            # Use CallAfter to ensure the dialog is fully rendered
+            wx.CallAfter(self._set_editor_focus)
+    
+    def _set_editor_focus(self):
+        """Set focus to the editor control"""
+        if self.editor and not self._focus_set:
+            try:
+                self.editor.SetFocus()
+                self._focus_set = True
+                logger.info("Focus set to editor successfully")
+            except Exception as e:
+                logger.error("Failed to set focus to editor: %s", e)
     
     def GetValue(self):
         """Get the new value from the editor"""
@@ -279,6 +332,8 @@ class ConfigureDialog(wx.Dialog):
     
     def __init__(self, parent):
         super().__init__(parent, title="IDT Configure - Configuration Manager", size=(900, 650))
+
+        logger.info("Configure dialog opened")
         
         # Find config files
         self.scripts_dir = self.find_scripts_directory()
@@ -304,6 +359,8 @@ class ConfigureDialog(wx.Dialog):
         
         # UI setup
         self.init_ui()
+
+        logger.info("Configure dialog UI initialized")
         
         # Bind close event
         self.Bind(wx.EVT_CLOSE, self.on_dialog_close)
@@ -628,6 +685,27 @@ class ConfigureDialog(wx.Dialog):
         widgets = self.category_widgets.get(first_category)
         if widgets and 'settings_list' in widgets:
             widgets['settings_list'].SetFocus()
+
+    def _is_activate_key(self, event: wx.KeyEvent) -> bool:
+        """Return True for keys that should activate the selected setting."""
+        key = event.GetKeyCode()
+        return key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, wx.WXK_SPACE)
+
+    def _on_change_button_key(self, category: str, event: wx.KeyEvent):
+        """Allow Enter/Space to activate the Change Setting button."""
+        if self._is_activate_key(event):
+            logger.info("Change Setting activated via button key: category=%s", category)
+            self.change_setting(category, event)
+            return
+        event.Skip()
+
+    def _on_settings_list_key(self, category: str, event: wx.KeyEvent):
+        """Open the edit dialog from the settings list with Enter/Space."""
+        if self._is_activate_key(event):
+            logger.info("Change Setting activated via settings list key: category=%s", category)
+            self.change_setting(category, event)
+            return
+        event.Skip()
     
     def create_category_tab(self, parent, category: str) -> wx.Panel:
         """Create a tab panel for a specific category"""
@@ -640,12 +718,14 @@ class ConfigureDialog(wx.Dialog):
         
         settings_list = wx.ListBox(left_box, style=wx.LB_SINGLE | wx.LB_NEEDED_SB, name=f"{category} settings")
         settings_list.Bind(wx.EVT_LISTBOX, lambda e: self.on_setting_selected(category, e))
+        settings_list.Bind(wx.EVT_KEY_DOWN, lambda e: self._on_settings_list_key(category, e))
         left_sizer.Add(settings_list, 1, wx.EXPAND | wx.ALL, 5)
         
         # Change button
         change_button = wx.Button(left_box, label="Change Setting")
         change_button.Enable(False)
         change_button.Bind(wx.EVT_BUTTON, lambda e: self.change_setting(category, e))
+        change_button.Bind(wx.EVT_KEY_DOWN, lambda e: self._on_change_button_key(category, e))
         left_sizer.Add(change_button, 0, wx.EXPAND | wx.ALL, 5)
         
         sizer.Add(left_sizer, 1, wx.EXPAND | wx.ALL, 5)
@@ -666,7 +746,8 @@ class ConfigureDialog(wx.Dialog):
             'panel': panel,
             'settings_list': settings_list,
             'change_button': change_button,
-            'explanation_text': explanation_text
+            'explanation_text': explanation_text,
+            'last_setting_name': None
         }
         
         # Populate the settings list
@@ -756,6 +837,7 @@ class ConfigureDialog(wx.Dialog):
             return
         
         setting_name = settings_list.GetClientData(selection)
+        widgets['last_setting_name'] = setting_name
         setting_info = self.settings_metadata[category][setting_name]
         
         # Show explanation with range/choices info
@@ -811,22 +893,41 @@ class ConfigureDialog(wx.Dialog):
         """Open dialog to change the selected setting in a category"""
         widgets = self.category_widgets.get(category)
         if not widgets:
+            logger.warning("Change Setting requested but category widgets missing: %s", category)
             return
         
         settings_list = widgets['settings_list']
         
         selection = settings_list.GetSelection()
         if selection == wx.NOT_FOUND:
-            return
+            setting_name = widgets.get('last_setting_name')
+            if not setting_name:
+                logger.warning("Change Setting requested with no selection: %s", category)
+                return
+            # Recover selection index for updates if focus cleared the listbox selection.
+            for index in range(settings_list.GetCount()):
+                if settings_list.GetClientData(index) == setting_name:
+                    selection = index
+                    break
+        else:
+            setting_name = settings_list.GetClientData(selection)
+            widgets['last_setting_name'] = setting_name
         
-        setting_name = settings_list.GetClientData(selection)
         setting_info = self.settings_metadata[category][setting_name]
+
+        logger.info("Opening SettingEditDialog: category=%s setting=%s", category, setting_name)
         
         current_value = self.get_setting_value(setting_info)
         
-        # Open edit dialog
+        # Open edit dialog (it manages its own focus via EVT_SHOW)
         dialog = SettingEditDialog(self, setting_name, current_value, setting_info)
-        if dialog.ShowModal() == wx.ID_OK:
+        dialog.CentreOnParent()
+        
+        logger.info("Calling ShowModal() for SettingEditDialog")
+        result = dialog.ShowModal()
+        logger.info("ShowModal() returned: %s", "OK" if result == wx.ID_OK else "CANCEL")
+        
+        if result == wx.ID_OK:
             # Update the value
             new_value = dialog.GetValue()
             self.set_setting_value(setting_info, new_value)

@@ -1,0 +1,66 @@
+name: Build Windows Executables
+
+on:
+  push:
+    branches: [ WXMigration ]
+  pull_request:
+    branches: [ WXMigration ]
+  workflow_dispatch:  # Also allow manual trigger
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Build all Windows apps
+      run: |
+        cd BuildAndRelease/WinBuilds
+        ./builditall_wx.bat
+      shell: cmd
+    
+    - name: Package for installer
+      run: |
+        cd BuildAndRelease/WinBuilds
+        ./package_all_windows.bat
+      shell: cmd
+    
+    - name: Build installer with Inno Setup
+      run: |
+        choco install innosetup -y
+        cd BuildAndRelease/WinBuilds
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+      shell: pwsh
+    
+    - name: Upload Windows Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: idt-installer-windows
+        path: BuildAndRelease/WinBuilds/dist_all/*.exe
+        retention-days: 30
+    
+    - name: Upload IDT executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: idt-windows
+        path: idt/dist/idt.exe
+        retention-days: 30
+    
+    - name: Upload ImageDescriber executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: imagedescriber-windows
+        path: imagedescriber/dist/ImageDescriber.exe
+        retention-days: 30

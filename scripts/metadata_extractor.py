@@ -447,6 +447,7 @@ class NominatimGeocoder:
                 'lon': longitude,
                 'format': 'json',
                 'addressdetails': 1,
+                'accept-language': 'en',  # Request English names
             }
             headers = {
                 'User-Agent': self.user_agent
