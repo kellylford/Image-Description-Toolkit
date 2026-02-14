@@ -21,11 +21,15 @@ Features:
 import sys
 import json
 import os
+import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 import wx
 import wx.lib.masked as masked
+
+
+logger = logging.getLogger(__name__)
 
 
 class ApiKeyEditDialog(wx.Dialog):
@@ -279,6 +283,8 @@ class ConfigureDialog(wx.Dialog):
     
     def __init__(self, parent):
         super().__init__(parent, title="IDT Configure - Configuration Manager", size=(900, 650))
+
+        logger.info("Configure dialog opened")
         
         # Find config files
         self.scripts_dir = self.find_scripts_directory()
@@ -304,6 +310,8 @@ class ConfigureDialog(wx.Dialog):
         
         # UI setup
         self.init_ui()
+
+        logger.info("Configure dialog UI initialized")
         
         # Bind close event
         self.Bind(wx.EVT_CLOSE, self.on_dialog_close)
@@ -628,6 +636,27 @@ class ConfigureDialog(wx.Dialog):
         widgets = self.category_widgets.get(first_category)
         if widgets and 'settings_list' in widgets:
             widgets['settings_list'].SetFocus()
+
+    def _is_activate_key(self, event: wx.KeyEvent) -> bool:
+        """Return True for keys that should activate the selected setting."""
+        key = event.GetKeyCode()
+        return key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, wx.WXK_SPACE)
+
+    def _on_change_button_key(self, category: str, event: wx.KeyEvent):
+        """Allow Enter/Space to activate the Change Setting button."""
+        if self._is_activate_key(event):
+            logger.info("Change Setting activated via button key: category=%s", category)
+            self.change_setting(category, event)
+            return
+        event.Skip()
+
+    def _on_settings_list_key(self, category: str, event: wx.KeyEvent):
+        """Open the edit dialog from the settings list with Enter/Space."""
+        if self._is_activate_key(event):
+            logger.info("Change Setting activated via settings list key: category=%s", category)
+            self.change_setting(category, event)
+            return
+        event.Skip()
     
     def create_category_tab(self, parent, category: str) -> wx.Panel:
         """Create a tab panel for a specific category"""
@@ -640,12 +669,14 @@ class ConfigureDialog(wx.Dialog):
         
         settings_list = wx.ListBox(left_box, style=wx.LB_SINGLE | wx.LB_NEEDED_SB, name=f"{category} settings")
         settings_list.Bind(wx.EVT_LISTBOX, lambda e: self.on_setting_selected(category, e))
+        settings_list.Bind(wx.EVT_KEY_DOWN, lambda e: self._on_settings_list_key(category, e))
         left_sizer.Add(settings_list, 1, wx.EXPAND | wx.ALL, 5)
         
         # Change button
         change_button = wx.Button(left_box, label="Change Setting")
         change_button.Enable(False)
         change_button.Bind(wx.EVT_BUTTON, lambda e: self.change_setting(category, e))
+        change_button.Bind(wx.EVT_KEY_DOWN, lambda e: self._on_change_button_key(category, e))
         left_sizer.Add(change_button, 0, wx.EXPAND | wx.ALL, 5)
         
         sizer.Add(left_sizer, 1, wx.EXPAND | wx.ALL, 5)
@@ -666,7 +697,8 @@ class ConfigureDialog(wx.Dialog):
             'panel': panel,
             'settings_list': settings_list,
             'change_button': change_button,
-            'explanation_text': explanation_text
+            'explanation_text': explanation_text,
+            'last_setting_name': None
         }
         
         # Populate the settings list
@@ -756,6 +788,7 @@ class ConfigureDialog(wx.Dialog):
             return
         
         setting_name = settings_list.GetClientData(selection)
+        widgets['last_setting_name'] = setting_name
         setting_info = self.settings_metadata[category][setting_name]
         
         # Show explanation with range/choices info
@@ -811,21 +844,37 @@ class ConfigureDialog(wx.Dialog):
         """Open dialog to change the selected setting in a category"""
         widgets = self.category_widgets.get(category)
         if not widgets:
+            logger.warning("Change Setting requested but category widgets missing: %s", category)
             return
         
         settings_list = widgets['settings_list']
         
         selection = settings_list.GetSelection()
         if selection == wx.NOT_FOUND:
-            return
+            setting_name = widgets.get('last_setting_name')
+            if not setting_name:
+                logger.warning("Change Setting requested with no selection: %s", category)
+                return
+            # Recover selection index for updates if focus cleared the listbox selection.
+            for index in range(settings_list.GetCount()):
+                if settings_list.GetClientData(index) == setting_name:
+                    selection = index
+                    break
+        else:
+            setting_name = settings_list.GetClientData(selection)
+            widgets['last_setting_name'] = setting_name
         
-        setting_name = settings_list.GetClientData(selection)
         setting_info = self.settings_metadata[category][setting_name]
+
+        logger.info("Opening SettingEditDialog: category=%s setting=%s", category, setting_name)
         
         current_value = self.get_setting_value(setting_info)
         
         # Open edit dialog
         dialog = SettingEditDialog(self, setting_name, current_value, setting_info)
+        dialog.CentreOnParent()
+        dialog.Raise()
+        dialog.SetFocus()
         if dialog.ShowModal() == wx.ID_OK:
             # Update the value
             new_value = dialog.GetValue()

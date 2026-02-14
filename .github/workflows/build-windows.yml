@@ -2,12 +2,6 @@ name: Build Windows Executables
 
 on:
   workflow_dispatch:  # Manual trigger
-  push:
-    branches:
-      - WXMigration
-      - main
-    tags:
-      - 'v*'
 
 jobs:
   build-windows:
