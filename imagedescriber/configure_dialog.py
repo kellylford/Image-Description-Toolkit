@@ -870,11 +870,9 @@ class ConfigureDialog(wx.Dialog):
         
         current_value = self.get_setting_value(setting_info)
         
-        # Open edit dialog
+        # Open edit dialog (it manages its own focus via wx.CallAfter)
         dialog = SettingEditDialog(self, setting_name, current_value, setting_info)
         dialog.CentreOnParent()
-        dialog.Raise()
-        dialog.SetFocus()
         if dialog.ShowModal() == wx.ID_OK:
             # Update the value
             new_value = dialog.GetValue()
