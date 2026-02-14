@@ -974,20 +974,36 @@ class DescriptionListBox(wx.ListBox):
                 - 'description' (str): Full description text (100-500+ chars typical)
                 - Other keys are optional metadata (model, prompt_style, etc.)
             truncate_at: Character count at which to truncate display (default: 100)
+                        On macOS, truncation is disabled because wx.Accessible
+                        doesn't work with VoiceOver - full text is needed for
+                        screen reader accessibility.
         """
         self.Clear()
         self.descriptions_data = descriptions_list
         
-        # Add items with truncated text for visual display
+        # Platform detection: macOS needs full text for VoiceOver accessibility
+        # wx.Accessible only works on Windows
+        is_macos = sys.platform == 'darwin'
+        
+        # Add items
         for entry in descriptions_list:
             description = entry.get('description', '')
-            # Truncate for visual display, keep full text in data
-            truncated = (description[:truncate_at] + "..." 
-                        if len(description) > truncate_at 
-                        else description)
-            self.Append(truncated)
+            
+            if is_macos:
+                # macOS: No truncation - VoiceOver needs actual ListBox text
+                # wx.Accessible doesn't work on macOS, so full text must be in the list
+                display_text = description
+            else:
+                # Windows/Other: Truncate for visual display
+                # wx.Accessible provides full text to screen readers
+                display_text = (description[:truncate_at] + "..." 
+                               if len(description) > truncate_at 
+                               else description)
+            
+            self.Append(display_text)
         
-        # Create custom accessible that provides full text to screen readers
+        # Create custom accessible for Windows screen readers
+        # (No effect on macOS, but harmless to set)
         self.custom_accessible = AccessibleDescriptionListBox(self, self.descriptions_data)
         self.SetAccessible(self.custom_accessible)
     
