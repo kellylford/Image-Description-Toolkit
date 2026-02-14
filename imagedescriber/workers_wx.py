@@ -1853,99 +1853,86 @@ class DirectoryScanWorker(threading.Thread):
 
 
 class SaveWorkspaceWorker(threading.Thread):
-    """Worker thread for saving workspace to .idw file
+    """Worker thread for saving workspace to file in background"""
     
-    Performs workspace save operation in background to prevent UI freeze
-    during large workspace saves or file moves.
-    
-    Events:
-        WorkspaceSaveCompleteEvent: Save completed successfully
-        WorkspaceSaveFailedEvent: Save failed with error
-    """
-    
-    def __init__(self, parent_window, workspace, file_path, 
-                 old_workspace_file=None, workspace_changed=False,
-                 old_ws_dir=None, new_ws_dir=None,
-                 cached_ollama_models=None):
+    def __init__(self, parent_window, workspace_data, file_path, 
+                 old_ws_dir, new_ws_dir, workspace_items):
         """Initialize workspace save worker
         
         Args:
-            parent_window: wxWindow to receive events
-            workspace: Workspace object to save
+            parent_window: Parent window to post events to
+            workspace_data: Workspace dictionary to save
             file_path: Path to save workspace file
-            old_workspace_file: Previous workspace file path (for rename/move)
-            workspace_changed: Whether workspace location changed
-            old_ws_dir: Old workspace data directory (for     """Worker thread for saving workspace tor    
-    Performs workspace save operation in backgroca   d_    during large workspace saves or file moves.
-    
-    Events:
+            old_ws_dir: Old workspace directory (or None)
+            new_ws_dir: New workspace directory
+            workspace_items: Dictionary of workspace items
+        """
+        super().__init__(daemon=True)
+        self.parent_window = parent_window
+        self.workspace_data = workspace_data
+        self.file_path = file_path
+        self.old_ws_dir = old_ws_dir
+        self.new_ws_dir = new_ws_dir
+        self.workspace_items = workspace_items
+        
+    def run(self):
+        """Save workspace in background thread"""
+        try:
+            import json
+            import shutil
+            from pathlib import Path
             
-    Events:
-        WorkspaceSaveCompletedo    p        Woow        WorkspaceSaveFailedEvent: Save failed with error
-    "il    """
-    
-    def __init__(self, parent_window, workfi    
-      self.workspace_changed = workspace_changed
-        self.old_ws_                 old_ws_dir=None, new_ws_dir=None,
-             lf.cached_ollama_models = cached_ollama_models or []
-         """Initialize workspace save workerxi        
-        Args:
-            parent_un       
-             ec            workspace: Workspace object to save
-    ry            file_path: Path to save workspace               old_workspace_file: Previous workspacn             workspace_changed: Whether workspace location changed
-           d_        xists():
+            # Move extracted frames if workspace location changed
+            workspace_changed = self.old_ws_dir is not None
+            if workspace_changed and self.old_ws_dir and self.old_ws_dir.exists():
                 old_extracted_frames = self.old_ws_dir / "extracted_frames"
                 new_extracted_frames = self.new_ws_dir / "extracted_frames"
-         
-      
+                
                 if old_extracted_frames.exists():
-                    # Move the entire ext   te          ir    Events:          Wo      "il    """
-    
-    def __init__(self, parent_window, workfi    
-      self.workspace_changed = wor      
-    def ut   mo      self.workspace_changed = workew_extracted_f        self.old_ws_                 old_ws_di                lf.cached_ollama_models = cached_ollama_models or []
-   in         """Initialize workspace save workerxi        
-        Ait        Args:
-            parent_un       
-                        =              ec                  ry            file_path: Path to save workspace                       d_        xists():
-                old_extracted_frames = self.old_ws_dir / "extracted_frames"
-                new_extracted_frames = self.new_ws_dir / "extra                  old_extracteth                new_extracted_frames = self.new_ws_dir / "extracted_frames e         
-      
-                if old_extracted_frames.exists():
-       em      
- ct     ames') and item.extracted_frames:
-                      
-    def __init__(self, parent_window, workfi    
-      self.workspace_changed = wor      
- s:           self.workspace_changed = wor      
-    deth(frame_path)
-                               in         """Initialize workspace save workerxi        
-        Ait        Args:
-            parent_un       
-                        =              ec                  ry  d_        Ait        Args:
-            parent_un       
-                  parent_un  st                        =                    old_extracted_frames = self.old_ws_dir / "extracted_frames"
-                new_extracted_frames = self.new_ws_dir / "extra                         new_extracted_frames = self.new_ws_dir / "extra            i      
-                if old_extracted_frames.exists():
-       em      
- ct     ames') and item.extracted_frames:
-                      
-    def __init__(self, parent_window, wor.o     _d       em      
- ct     ames') and item.extracte)) ct     ames')                        
-    def __init__(      def __init__(xcept:      self.workspace_changed = wor      
- s:    e s:           self.workspace_changed =  w    deth(frame_path)
-                          le                   at        Ait        Args:
-            parent_un       
-                        =                     parent_un  s                         =   s            parent_un       
-                  parent_un  st                s = self.cache                  parent_un 
-                new_extracted_frames = self.new_ws_dir / "extra                         new_extracted_frames = self.new_ws_dir / "extr                  if old_extracted_frames.exists():
-       em      
- ctdefault=str)
+                    # Move the entire extracted_frames directory
+                    if new_extracted_frames.exists():
+                        shutil.rmtree(new_extracted_frames)
+                    shutil.move(str(old_extracted_frames), str(new_extracted_frames))
+                    
+                    # Update all extracted_frame item paths
+                    for item in self.workspace_items.values():
+                        if item.item_type == "extracted_frame":
+                            old_path = Path(item.file_path)
+                            # Reconstruct path in new location
+                            relative_to_old = old_path.relative_to(old_extracted_frames)
+                            new_path = new_extracted_frames / relative_to_old
+                            item.file_path = str(new_path)
+                        
+                        # Update extracted_frames list for video items
+                        if hasattr(item, 'extracted_frames') and item.extracted_frames:
+                            updated_frames = []
+                            for frame_path in item.extracted_frames:
+                                old_frame_path = Path(frame_path)
+                                try:
+                                    relative_to_old = old_frame_path.relative_to(old_extracted_frames)
+                                    new_frame_path = new_extracted_frames / relative_to_old
+                                    updated_frames.append(str(new_frame_path))
+                                except ValueError:
+                                    # Path not relative to old location, keep as-is
+                                    updated_frames.append(frame_path)
+                            item.extracted_frames = updated_frames
+                    
+                    # Clean up old workspace directory if empty
+                    try:
+                        if self.old_ws_dir.exists() and not any(self.old_ws_dir.iterdir()):
+                            self.old_ws_dir.rmdir()
+                    except:
+                        pass  # Ignore cleanup errors
             
-            self.workspace.saved = True
+            # Save to file with proper JSON encoding
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.workspace_data, f, indent=2, ensure_ascii=False, default=str)
             
             # Post success event
-            evt = Worksp ct     ames')eE             h=self.file_path)
-               def __init__(selfre ct     ames') and item.extracte)) ct     ames')                      def __init__(      def __init__(xcept:  e}", exc_info=True)
-          s:    e s:           self.workspace_changed =  w    deth(frame_path)
-                             self.parent_window, evt)
+            evt = WorkspaceSaveCompleteEvent(file_path=self.file_path)
+            wx.PostEvent(self.parent_window, evt)
+            
+        except Exception as e:
+            logger.error(f"Workspace save failed: {e}", exc_info=True)
+            evt = WorkspaceSaveFailedEvent(error=str(e))
+            wx.PostEvent(self.parent_window, evt)
