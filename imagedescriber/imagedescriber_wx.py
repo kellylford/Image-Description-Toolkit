@@ -1149,7 +1149,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         edit_prompts_item = tools_menu.Append(wx.ID_ANY, "Edit &Prompts...\tCtrl+P")
         self.Bind(wx.EVT_MENU, self.on_edit_prompts, edit_prompts_item)
         
-        configure_item = tools_menu.Append(wx.ID_ANY, "&Configure Settings...\tCtrl+Shift+C")
+        # Configure Settings - use platform-specific menu ID and accelerator
+        # On macOS, wxID_PREFERENCES automatically moves to app menu with Cmd+,
+        if sys.platform == 'darwin':
+            configure_item = tools_menu.Append(wx.ID_PREFERENCES, "&Preferences...\tCmd+,")
+        else:
+            configure_item = tools_menu.Append(wx.ID_ANY, "&Configure Settings...\tCtrl+Shift+C")
         self.Bind(wx.EVT_MENU, self.on_configure_settings, configure_item)
         
         tools_menu.AppendSeparator()
@@ -4796,10 +4801,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_about(self, event=None):
         """Show about dialog with version and feature information"""
         try:
+            version = get_app_version()
+            logging.info(f"About dialog - version retrieved: {version}")
+            
             show_about_dialog(
                 self,
                 "ImageDescriber",
-                get_app_version(),
+                version,
                 "AI-Powered Image Description GUI\n\n"
                 "Features:\n"
                 "• Document-based workspace for project management\n"
