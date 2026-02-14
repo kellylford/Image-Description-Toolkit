@@ -33,6 +33,26 @@ jobs:
         ./builditall_wx.bat
       shell: cmd
     
+    - name: Package for installer
+      run: |
+        cd BuildAndRelease/WinBuilds
+        ./package_all_windows.bat
+      shell: cmd
+    
+    - name: Build installer with Inno Setup
+      run: |
+        choco install innosetup -y
+        cd BuildAndRelease/WinBuilds
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+      shell: pwsh
+    
+    - name: Upload Windows Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: idt-installer-windows
+        path: BuildAndRelease/WinBuilds/dist_all/*.exe
+        retention-days: 30
+    
     - name: Upload IDT executable
       uses: actions/upload-artifact@v4
       with:
