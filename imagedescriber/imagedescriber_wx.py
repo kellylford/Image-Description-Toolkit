@@ -4688,7 +4688,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
         
         try:
-            dialog = ConfigureDialog(self)
+            # Ensure we have fresh model list
+            if self.cached_ollama_models is None:
+                self.refresh_ai_models_silent()
+            
+            dialog = ConfigureDialog(self, cached_ollama_models=self.cached_ollama_models)
             dialog.ShowModal()
             dialog.Destroy()
             
@@ -4696,7 +4700,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.cached_ollama_models = None  # Force reload on next use
             
         except Exception as e:
-            show_error(self, f"Error launching Configure Settings:\n{e}")
+            show_error(self, f"Error launching Configure Settings:\\n{e}")
     
     def on_export_configuration(self, event):
         """Export all configuration files as backup"""

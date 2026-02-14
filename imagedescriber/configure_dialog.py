@@ -240,8 +240,19 @@ class SettingEditDialog(wx.Dialog):
                 self.editor = wx.Choice(panel)
                 choices = self.setting_info.get("choices", [])
                 self.editor.Append(choices)
-                if self.current_value in choices:
-                    self.editor.SetStringSelection(str(self.current_value))
+                
+                # Handle current value - if it's not in the list, add it as first option
+                if self.current_value:
+                    if self.current_value in choices:
+                        self.editor.SetStringSelection(str(self.current_value))
+                    else:
+                        # Add current value as first choice (user may have custom model)
+                        self.editor.Insert(f"{self.current_value} (current)", 0)
+                        self.editor.SetSelection(0)
+                elif choices:
+                    # No current value, select first choice
+                    self.editor.SetSelection(0)
+                    
                 form_sizer.Add(self.editor, 0, wx.EXPAND)
                 
             else:  # string or other
@@ -322,7 +333,11 @@ class SettingEditDialog(wx.Dialog):
             except ValueError:
                 return None
         elif setting_type == "choice":
-            return self.editor.GetStringSelection()
+            value = self.editor.GetStringSelection()
+            # Strip " (current)" suffix if present (added for custom values)
+            if value.endswith(" (current)"):
+                value = value[:-10]  # Remove " (current)"
+            return value
         else:
             return self.editor.GetValue()
 
@@ -330,10 +345,13 @@ class SettingEditDialog(wx.Dialog):
 class ConfigureDialog(wx.Dialog):
     """Dialog for managing IDT configuration settings"""
     
-    def __init__(self, parent):
+    def __init__(self, parent, cached_ollama_models=None):
         super().__init__(parent, title="IDT Configure - Configuration Manager", size=(900, 650))
 
         logger.info("Configure dialog opened")
+        
+        # Cache of Ollama models for choice list population
+        self.cached_ollama_models = cached_ollama_models
         
         # Find config files
         self.scripts_dir = self.find_scripts_directory()
@@ -365,6 +383,27 @@ class ConfigureDialog(wx.Dialog):
         # Bind close event
         self.Bind(wx.EVT_CLOSE, self.on_dialog_close)
     
+    def _get_ollama_models(self) -> List[str]:
+        """Get list of available Ollama models for choice list"""
+        # Use cached models if provided
+        if self.cached_ollama_models is not None and len(self.cached_ollama_models) > 0:
+            return self.cached_ollama_models
+        
+        # Try to detect models if no cache provided
+        try:
+            from ai_providers import get_available_providers
+            providers = get_available_providers()
+            if 'ollama' in providers:
+                ollama_provider = providers['ollama']
+                models = ollama_provider.get_available_models()
+                if models:
+                    return models
+        except Exception as e:
+            logger.warning(f"Could not detect Ollama models: {e}")
+        
+        # Fallback to common models if detection fails
+        return ["moondream", "moondream:latest", "llama3.2-vision", "llava"]
+    
     def find_scripts_directory(self) -> Path:
         """Find the scripts directory containing config files"""
         # Try relative to executable
@@ -389,13 +428,17 @@ class ConfigureDialog(wx.Dialog):
     
     def build_settings_metadata(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """Build metadata for all settings organized by category"""
+        # Get available Ollama models for default_model choice list
+        ollama_models = self._get_ollama_models()
+        
         return {
             "AI Model Settings": {
                 "default_model": {
                     "file": "image_describer",
                     "path": ["default_model"],
-                    "type": "string",
-                    "description": "Default Ollama model to use for image descriptions. Examples: moondream:latest, llama3.2-vision, llava"
+                    "type": "choice",
+                    "choices": ollama_models,
+                    "description": "Default Ollama model to use for image descriptions. Select from detected models or refresh models from Process menu."
                 },
                 "temperature": {
                     "file": "image_describer",
