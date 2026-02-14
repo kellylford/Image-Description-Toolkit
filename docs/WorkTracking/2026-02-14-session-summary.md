@@ -234,3 +234,140 @@ This follows the same pattern already used in:
 - **FollowupDialog** (accepts cached_ollama_models parameter)
 
 Ensures consistency across all model selection UIs in ImageDescriber.
+---
+
+## Session 3: Config Reload Bug Fix (CRITICAL)
+
+### Problem Identified
+User reported: "I changed the default model to llava and then went to process a batch of images. the model shown that was going to be used was still moondream."
+
+**Root Cause Analysis**:
+- Configure dialog successfully saved changes to `image_describer_config.json` 
+- But `self.config` in ImageDescriberFrame was NOT reloaded after dialog closed
+- ProcessingOptionsDialog received stale in-memory config copy
+- User's changes wouldn't take effect until app restart
+
+**Impact**: ALL configuration changes were broken:
+- Changing default_model ❌
+- Changing default_prompt_style ❌  
+- Editing custom prompts ❌
+- Changing any AI model settings ❌
+- Changes to temperature, max_tokens, etc. ❌
+
+### Solution Implemented
+
+**File Changed**: [imagedescriber/imagedescriber_wx.py](imagedescriber/imagedescriber_wx.py)
+
+#### 1. Added Config Reload After Configure Dialog
+```python
+def on_configure_settings(self, event):
+    # ... existing code ...
+    dialog.ShowModal()
+    dialog.Destroy()
+    
+    # ✅ NEW: Reload configuration to pick up changes
+    self.load_config()
+    
+    # Refresh cached settings after editing
+    self.cached_ollama_models = None
+```
+
+#### 2. Added Config Reload After Prompt Editor
+```python
+def on_edit_prompts(self, event):
+    # ... existing code ...
+    dialog.ShowModal()
+    dialog.Destroy()
+    
+    # ✅ NEW: Reload configuration to pick up changes
+    self.load_config()
+    
+    # Refresh cached data after editing
+    self.cached_ollama_models = None
+```
+
+#### 3. Simplified Code
+- Removed redundant manual config verification in `on_edit_prompts()`
+- `load_config()` already handles file reading and validation
+- Reduced code complexity by 10 lines
+
+### How load_config() Works
+
+From [imagedescriber_wx.py line 496](imagedescriber/imagedescriber_wx.py#L496):
+```python
+def load_config(self):
+    """Load application configuration"""
+    try:
+        self.config_file = find_config_file('image_describer_config.json')
+        with open(self.config_file, 'r', encoding='utf-8') as f:
+            self.config = json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load config: {e}")
+        self.config = {
+            'default_provider': 'ollama',
+            'default_model': 'moondream',
+            'default_prompt_style': 'narrative'
+        }
+```
+
+### Build & Testing
+
+**Build Status**: ✅ Successful  
+**Commit**: 8c2f573  
+**Message**: "Fix config not reloading after Configure/Prompt dialogs close - Call load_config() to pick up changes immediately"
+
+### Testing Instructions
+
+**Test Case 1: Default Model Change**
+1. Open ImageDescriber
+2. Open Configure (macOS: ImageDescriber → Preferences, Cmd+,)
+3. Navigate to "AI Model Settings" → "default_model"
+4. Change from "moondream" to "llava"
+5. Click OK to save
+6. Open Process → Batch Processing
+7. ✅ Verify default model is now "llava" (not moondream)
+
+**Test Case 2: Prompt Style Change**
+1. Open Configure → "Prompt Styles" → "default_prompt_style"  
+2. Change from "narrative" to "detailed"
+3. Save and close
+4. Open Process → Batch Processing
+5. ✅ Verify default prompt style is "detailed"
+
+**Test Case 3: Custom Prompt Edit**
+1. Open Tools → Edit Prompts
+2. Edit an existing prompt or add new one
+3. Save and close
+4. Open Process → Batch Processing → Custom Prompt tab
+5. ✅ Verify changes are visible immediately
+
+### Before vs After
+
+**Before (Broken)**:
+```
+User: Change default_model to llava → Save
+App: Writes to config file ✅
+App: self.config still has moondream ❌
+ProcessingDialog: Shows moondream ❌
+Result: Change ignored until restart ❌
+```
+
+**After (Fixed)**:
+```
+User: Change default_model to llava → Save  
+App: Writes to config file ✅
+App: Calls load_config() → self.config updated ✅
+ProcessingDialog: Shows llava ✅
+Result: Change applies immediately ✅
+```
+
+### Why This Was Critical
+
+This bug affected **every single configuration change** in the app:
+- AI model settings (temperature, max_tokens, etc.)
+- Default model and prompt style
+- API keys for OpenAI/Claude
+- Custom prompts
+- Processing options
+
+Users would think settings saved but they had no effect. Very confusing UX. Now all changes apply immediately without requiring app restart.
