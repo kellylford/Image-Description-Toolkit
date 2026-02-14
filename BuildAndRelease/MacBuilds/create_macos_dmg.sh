@@ -95,15 +95,26 @@ DMG_STAGING="BuildAndRelease/MacBuilds/dmg_staging"
 rm -rf "$DMG_STAGING"
 mkdir -p "$DMG_STAGING"
 
-# Copy GUI applications
-echo "Copying GUI applications..."
-cp -R "imagedescriber/dist/ImageDescriber.app" "$DMG_STAGING/"
+# Create IDT folder to contain all applications and CLI tool
+echo "Creating IDT folder structure..."
+mkdir -p "$DMG_STAGING/IDT"
 
-# Sign GUI applications if code signing is enabled
+# Copy GUI applications into IDT folder
+echo "Copying GUI applications..."
+# Use ditto instead of cp to preserve extended attributes and code signatures
+ditto "imagedescriber/dist/ImageDescriber.app" "$DMG_STAGING/IDT/ImageDescriber.app"
+
+# Copy CLI tool directly into IDT folder
+echo "Copying CLI tool..."
+# Use ditto to preserve code signatures and extended attributes
+ditto "idt/dist/idt" "$DMG_STAGING/IDT/idt"
+chmod +x "$DMG_STAGING/IDT/idt"
+
+# Sign applications if code signing is enabled
 if [ "$SIGN_CODE" = "1" ]; then
     echo ""
     echo "Signing applications..."
-    for APP in "$DMG_STAGING"/*.app; do
+    for APP in "$DMG_STAGING/IDT"/*.app; do
         if [ -d "$APP" ]; then
             APP_NAME=$(basename "$APP")
             echo "  Signing $APP_NAME..."
@@ -118,45 +129,36 @@ if [ "$SIGN_CODE" = "1" ]; then
             codesign --verify --verbose "$APP"
         fi
     done
-    echo "✓ All applications signed"
-    echo ""
-fi
-
-# Create CLI Tools folder
-echo "Creating CLI Tools folder..."
-mkdir -p "$DMG_STAGING/CLI Tools"
-cp "idt/dist/idt" "$DMG_STAGING/CLI Tools/idt"
-chmod +x "$DMG_STAGING/CLI Tools/idt"
-
-# Sign CLI if code signing is enabled
-if [ "$SIGN_CODE" = "1" ]; then
-    echo "Signing CLI tool..."
-    # Remove existing signature first
-    codesign --remove-signature "$DMG_STAGING/CLI Tools/idt" 2>/dev/null || true
+    
+    # Sign CLI tool
+    echo "  Signing idt CLI..."
+    codesign --remove-signature "$DMG_STAGING/IDT/idt" 2>/dev/null || true
     if codesign --force \
         --options runtime \
         --timestamp \
         --sign "$SIGNING_IDENTITY" \
-        "$DMG_STAGING/CLI Tools/idt" 2>/dev/null; then
-        codesign --verify --verbose "$DMG_STAGING/CLI Tools/idt"
-        echo "✓ CLI tool signed"
+        "$DMG_STAGING/IDT/idt" 2>/dev/null; then
+        codesign --verify --verbose "$DMG_STAGING/IDT/idt"
+        echo "  ✓ CLI tool signed"
     else
-        echo "⚠️  CLI tool signing failed"
+        echo "  ⚠️  CLI tool signing failed"
     fi
+    
+    echo "✓ All applications signed"
     echo ""
 fi
 
-# Create install script for CLI tool
-cat > "$DMG_STAGING/CLI Tools/INSTALL_CLI.sh" << 'EOF'
+# Create install script for CLI tool (optional - for users who want it in PATH)
+cat > "$DMG_STAGING/IDT/INSTALL_CLI_TO_PATH.sh" << 'EOF'
 #!/bin/bash
-# Install idt CLI tool to /usr/local/bin
-echo "Installing idt CLI tool..."
+# Install idt CLI tool to /usr/local/bin (adds to PATH)
+echo "Installing idt CLI tool to /usr/local/bin..."
 sudo cp "$(dirname "$0")/idt" /usr/local/bin/idt
 sudo chmod +x /usr/local/bin/idt
-echo "Installed idt to /usr/local/bin/idt"
-echo "You can now run: idt --help"
+echo "✓ Installed idt to /usr/local/bin/idt"
+echo "You can now run 'idt --help' from any directory"
 EOF
-chmod +x "$DMG_STAGING/CLI Tools/INSTALL_CLI.sh"
+chmod +x "$DMG_STAGING/IDT/INSTALL_CLI_TO_PATH.sh"
 
 # Create README
 cat > "$DMG_STAGING/README.txt" << EOF
@@ -165,24 +167,33 @@ Image Description Toolkit v${VERSION}
 
 INSTALLATION INSTRUCTIONS:
 
-GUI Application:
-  Drag ImageDescriber.app to your Applications folder (or anywhere you like)
+  1. Drag the IDT folder to your Applications folder (or anywhere you prefer)
+  
+  That's it! All applications, the CLI tool, and their config/log files 
+  will stay organized inside the IDT folder.
 
-CLI Tool:
-  1. Open the "CLI Tools" folder
-  2. Run INSTALL_CLI.sh (it will ask for your password)
-  OR
-  3. Manually copy 'idt' to /usr/local/bin/
+USING THE CLI FROM ANY DIRECTORY (OPTIONAL):
 
-WHAT'S INCLUDED:
+  To use 'idt' command from Terminal anywhere:
+  1. Open the IDT folder in Applications
+  2. Run INSTALL_CLI_TO_PATH.sh (it will ask for your password)
+  
+  This creates a link from /usr/local/bin/idt to ~/Applications/IDT/idt
+
+WHAT'S INCLUDED IN THE IDT FOLDER:
 
   ImageDescriber.app  - Batch process images with AI descriptions
                         Includes integrated:
+                        • Editor Mode (batch processing)
                         • Viewer Mode (monitor workflows)
                         • Prompt Editor (Tools → Edit Prompts)
                         • Configuration Manager (Tools → Configure Settings)
 
-  idt (CLI)          - Command-line interface for all features
+  idt                - Command-line interface for all features
+                        Can be run directly: ~/Applications/IDT/idt --help
+
+  Config & Logs      - All configuration files and logs stay in this folder
+                        Keeps your Applications folder clean and organized
 
 ACCESSIBILITY:
 
@@ -198,11 +209,11 @@ REQUIREMENTS:
 
 GETTING STARTED:
 
-  1. Drag ImageDescriber.app to Applications folder
-  2. Run INSTALL_CLI.sh from "CLI Tools" folder
-  3. Open ImageDescriber and switch to Viewer Mode tab to browse workflows
-  4. Use Editor Mode for batch processing
-  5. Run 'idt --help' in Terminal for CLI options
+  1. Drag IDT folder to Applications
+  2. Open Applications/IDT/ImageDescriber.app
+  3. Switch to Viewer Mode tab to browse existing workflows
+  4. Use Editor Mode for batch processing of images
+  5. Run ~/Applications/IDT/idt --help for CLI options
 
 For documentation and support, see the project repository.
 EOF
