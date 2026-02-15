@@ -204,6 +204,31 @@ def create_view_results_bat(output_dir: Path):
         pass
 
 
+def check_api_key_in_config(provider):
+    """Check if API key exists in config file"""
+    try:
+        config, config_path, source = load_json_config('image_describer_config.json')
+        if config:
+            api_keys = config.get('api_keys', {})
+            # Check various capitalizations (config file uses 'OpenAI' and 'claude')
+            # Check exact provider name first, then common variations
+            key_variations = [
+                provider,  # As-is
+                provider.lower(),  # lowercase (claude)
+                provider.upper(),  # UPPERCASE (OPENAI)
+                provider.capitalize(),  # Capitalized (Openai)
+                'OpenAI' if provider.lower() == 'openai' else None,  # Special case for OpenAI
+                'claude' if provider.lower() == 'claude' else None,   # Special case for claude
+            ]
+            
+            for key_name in key_variations:
+                if key_name and key_name in api_keys and api_keys[key_name]:
+                    return str(config_path), api_keys[key_name]
+    except Exception:
+        pass
+    return None, None
+
+
 def check_api_key_file(provider):
     """Check if API key file exists"""
     key_files = {
@@ -221,6 +246,23 @@ def setup_api_key(provider):
     """Guide user through API key setup"""
     print(f"\n{provider.upper()} requires an API key.")
     
+    # Check config file first
+    config_path, config_key = check_api_key_in_config(provider)
+    if config_key:
+        # Mask the key for display (show first 8 and last 4 chars)
+        masked_key = config_key[:8] + "..." + config_key[-4:] if len(config_key) > 12 else "***"
+        print(f"Found API key in config file: {config_path}")
+        print(f"  Key: {masked_key}")
+        use_config = get_choice("Use this key?", ["Yes", "No, use a different key"], allow_back=True)
+        if use_config == 'EXIT':
+            return None
+        if use_config == 'BACK':
+            return 'BACK'
+        if use_config == "Yes":
+            # Return special marker to indicate config file should be used
+            return "USE_CONFIG"
+    
+    # Check for standalone key files
     existing_file = check_api_key_file(provider)
     if existing_file:
         print(f"Found existing API key file: {existing_file}")
@@ -462,16 +504,24 @@ def guided_workflow(custom_config_path=None):
     elif provider == 'openai':
         # Import from central configuration for consistency
         try:
+            # Add project root to path for imports
+            project_root = Path(__file__).parent.parent
+            if str(project_root) not in sys.path:
+                sys.path.insert(0, str(project_root))
+            
             from models.openai_models import get_openai_models, format_openai_model_for_display
             model_ids = get_openai_models()
             openai_models = [format_openai_model_for_display(m) for m in model_ids]
-        except ImportError:
+        except ImportError as e:
             # Fallback if models package not available
+            print(f"Note: Could not load full model list ({e}), using fallback")
             openai_models = [
-                "gpt-4o (best quality, higher cost)",
-                "gpt-4o-mini (good quality, lower cost)"
+                "gpt-4o (recommended - best balance)",
+                "gpt-4o-mini (fast and affordable)",
+                "gpt-5 (latest with reasoning)",
+                "gpt-5-mini (budget friendly GPT-5)"
             ]
-        print("Available OpenAI models:")
+        print("\nAvailable OpenAI models:")
         model_choice = get_choice("Select a model", openai_models, default=1, allow_back=True)
         if model_choice == 'EXIT':
             print("Exiting...")
@@ -485,18 +535,24 @@ def guided_workflow(custom_config_path=None):
     elif provider == 'claude':
         # Import from central configuration for consistency
         try:
+            # Add project root to path for imports
+            project_root = Path(__file__).parent.parent
+            if str(project_root) not in sys.path:
+                sys.path.insert(0, str(project_root))
+            
             from models.claude_models import get_claude_models, format_claude_model_for_display
             model_ids = get_claude_models()
             claude_models = [format_claude_model_for_display(m) for m in model_ids]
-        except ImportError:
+        except ImportError as e:
             # Fallback if models package not available
+            print(f"Note: Could not load full model list ({e}), using fallback")
             claude_models = [
                 "claude-opus-4-6 (most intelligent, agents and coding)",
                 "claude-sonnet-4-5-20250929 (best balance, recommended)",
                 "claude-haiku-4-5-20251001 (fastest)",
                 "claude-3-5-haiku-20241022 (most affordable)"
             ]
-        print("Available Claude models:")
+        print("\nAvailable Claude models:")
         model_choice = get_choice("Select a model", claude_models, default=1, allow_back=True)
         if model_choice == 'EXIT':
             print("Exiting...")
@@ -713,7 +769,8 @@ def guided_workflow(custom_config_path=None):
     cmd_parts.extend(["--model", model])
     cmd_parts.extend(["--output-dir", "Descriptions"])  # Default output directory
     
-    if api_key_file:
+    # Only pass --api-key-file if it's an actual file path (not "USE_CONFIG")
+    if api_key_file and api_key_file != "USE_CONFIG":
         cmd_parts.extend(["--api-key-file", api_key_file])
     
     if workflow_name:
@@ -780,7 +837,8 @@ def guided_workflow(custom_config_path=None):
         cmd_parts.extend(["--model", model])
         cmd_parts.extend(["--output-dir", output_dir])
         
-        if api_key_file:
+        # Only pass --api-key-file if it's an actual file path (not "USE_CONFIG")
+        if api_key_file and api_key_file != "USE_CONFIG":
             cmd_parts.extend(["--api-key-file", api_key_file])
         
         if workflow_name:
@@ -816,7 +874,8 @@ def guided_workflow(custom_config_path=None):
             
             # Build arguments for workflow
             workflow_args = [img_dir, "--provider", provider, "--model", model, "--output-dir", output_dir]
-            if api_key_file:
+            # Only pass --api-key-file if it's an actual file path (not "USE_CONFIG")
+            if api_key_file and api_key_file != "USE_CONFIG":
                 workflow_args.extend(["--api-key-file", api_key_file])
             if workflow_name:
                 workflow_args.extend(["--name", workflow_name])

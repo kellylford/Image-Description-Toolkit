@@ -1,0 +1,366 @@
+{
+  "case_number": "05757486",
+  "created": "2026-02-15T19:07:54.473839+00:00",
+  "sdk_version": "2.16.0",
+  "model_tested": "gpt-5-nano-2025-08-07",
+  "summary": {
+    "total_examples_captured": 3,
+    "failed_examples": 2,
+    "successful_examples": 1,
+    "temperature_0_test": {
+      "attempts": 0,
+      "empty_count": 0,
+      "success_count": 0,
+      "empty_rate_percent": 0
+    }
+  },
+  "examples": [
+    {
+      "example_type": "FAILED (existing capture)",
+      "data": {
+        "case_number": "05757486",
+        "capture_date": "2026-02-15 18:47:39 UTC",
+        "attempt_number": 8,
+        "test_image": "testimages/red_square.jpg",
+        "sdk_version": "2.16.0",
+        "request_payload": {
+          "model": "gpt-5-nano-2025-08-07",
+          "max_completion_tokens": 1000,
+          "temperature": "NOT SET (model default)",
+          "top_p": "NOT SET",
+          "tools": "NOT SET",
+          "functions": "NOT SET",
+          "response_format": "NOT SET",
+          "images_included": "YES (base64 encoded)",
+          "prompt": "Provide a detailed description of this image.",
+          "image_data_length": 4172
+        },
+        "response_headers": {
+          "date": "Sun, 15 Feb 2026 18:47:39 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "connection": "keep-alive",
+          "access-control-expose-headers": "X-Request-ID",
+          "openai-organization": "user-REDACTED",
+          "openai-processing-ms": "9593",
+          "openai-project": "proj_REDACTED",
+          "openai-version": "2020-10-01",
+          "server": "cloudflare",
+          "x-ratelimit-limit-input-images": "50000",
+          "x-ratelimit-limit-requests": "500",
+          "x-ratelimit-limit-tokens": "200000",
+          "x-ratelimit-remaining-input-images": "49999",
+          "x-ratelimit-remaining-requests": "499",
+          "x-ratelimit-remaining-tokens": "199221",
+          "x-ratelimit-reset-input-images": "1ms",
+          "x-ratelimit-reset-requests": "120ms",
+          "x-ratelimit-reset-tokens": "233ms",
+          "x-request-id": "req_3849368524cb4723bff31ab1a17fe345",
+          "x-openai-proxy-wasm": "v0.1",
+          "cf-cache-status": "DYNAMIC",
+          "x-content-type-options": "nosniff",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "content-encoding": "gzip",
+          "cf-ray": "9ce6f953ddf65da7-ORD",
+          "alt-svc": "h3=\":443\"; ma=86400"
+        },
+        "x_request_id": "req_3849368524cb4723bff31ab1a17fe345",
+        "raw_response_body": {
+          "id": "chatcmpl-D9bRRC7ZECT7dKAn7xc68b0toPPaU",
+          "object": "chat.completion",
+          "created": 1771181249,
+          "model": "gpt-5-nano-2025-08-07",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "",
+                "refusal": null,
+                "annotations": []
+              },
+              "finish_reason": "length"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 269,
+            "completion_tokens": 1000,
+            "total_tokens": 1269,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1000,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "service_tier": "default",
+          "system_fingerprint": null
+        },
+        "parsed_fields": {
+          "response_id": "chatcmpl-D9bRRC7ZECT7dKAn7xc68b0toPPaU",
+          "model": "gpt-5-nano-2025-08-07",
+          "finish_reason": "length",
+          "usage": {
+            "prompt_tokens": 269,
+            "completion_tokens": 1000,
+            "total_tokens": 1269,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1000,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "content_length": 0,
+          "content_is_empty": true,
+          "message_fields": [
+            "role",
+            "content",
+            "refusal",
+            "annotations"
+          ],
+          "has_tool_calls": false,
+          "has_function_call": false
+        }
+      }
+    },
+    {
+      "example_type": "FAILED (additional)",
+      "data": {
+        "test_image": "blue_circle.jpg",
+        "capture_timestamp_utc": "2026-02-15T19:07:45.820651+00:00",
+        "timing": {
+          "request_sent_utc": "2026-02-15T19:07:38.548760+00:00",
+          "response_received_utc": "2026-02-15T19:07:45.820005+00:00",
+          "request_sent_formatted": "2026-02-15 19:07:38.548 UTC",
+          "response_received_formatted": "2026-02-15 19:07:45.820 UTC"
+        },
+        "raw_http_request_json": {
+          "model": "gpt-5-nano-2025-08-07",
+          "max_completion_tokens": 1000,
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Describe this image in detail."
+                },
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "data:image/jpeg;base64,<BASE64_IMAGE_DATA_11200_CHARS>"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "response_headers": {
+          "x-request-id": "req_251623de8c844dac8de90cda02ff78cc",
+          "date": "Sun, 15 Feb 2026 19:07:45 GMT",
+          "openai-processing-ms": "6828",
+          "openai-organization": "user-REDACTED",
+          "openai-version": "2020-10-01",
+          "_all_headers": {
+            "date": "Sun, 15 Feb 2026 19:07:45 GMT",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "connection": "keep-alive",
+            "access-control-expose-headers": "X-Request-ID",
+            "openai-organization": "user-REDACTED",
+            "openai-processing-ms": "6828",
+            "openai-project": "proj_REDACTED",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "x-ratelimit-limit-input-images": "50000",
+            "x-ratelimit-limit-requests": "500",
+            "x-ratelimit-limit-tokens": "200000",
+            "x-ratelimit-remaining-input-images": "49999",
+            "x-ratelimit-remaining-requests": "499",
+            "x-ratelimit-remaining-tokens": "199225",
+            "x-ratelimit-reset-input-images": "1ms",
+            "x-ratelimit-reset-requests": "120ms",
+            "x-ratelimit-reset-tokens": "232ms",
+            "x-request-id": "req_251623de8c844dac8de90cda02ff78cc",
+            "x-openai-proxy-wasm": "v0.1",
+            "cf-cache-status": "DYNAMIC",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "content-encoding": "gzip",
+            "cf-ray": "9ce716de2e2361ff-ORD",
+            "alt-svc": "h3=\":443\"; ma=86400"
+          }
+        },
+        "raw_http_response_body": {
+          "id": "chatcmpl-D9bkwNDSlLoaFbR1f73tZa3i7alw3",
+          "object": "chat.completion",
+          "created": 1771182458,
+          "model": "gpt-5-nano-2025-08-07",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "",
+                "refusal": null,
+                "annotations": []
+              },
+              "finish_reason": "length"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 267,
+            "completion_tokens": 1000,
+            "total_tokens": 1267,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1000,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "service_tier": "default",
+          "system_fingerprint": null
+        },
+        "summary": {
+          "response_id": "chatcmpl-D9bkwNDSlLoaFbR1f73tZa3i7alw3",
+          "model": "gpt-5-nano-2025-08-07",
+          "is_empty": true,
+          "content_length": 0,
+          "finish_reason": "length",
+          "completion_tokens": 1000,
+          "reasoning_tokens": 1000,
+          "temperature_used": "NOT SET (model default)"
+        }
+      }
+    },
+    {
+      "example_type": "SUCCESSFUL",
+      "data": {
+        "test_image": "red_square.jpg",
+        "capture_timestamp_utc": "2026-02-15T19:07:52.172731+00:00",
+        "timing": {
+          "request_sent_utc": "2026-02-15T19:07:45.821248+00:00",
+          "response_received_utc": "2026-02-15T19:07:52.171777+00:00",
+          "request_sent_formatted": "2026-02-15 19:07:45.821 UTC",
+          "response_received_formatted": "2026-02-15 19:07:52.171 UTC"
+        },
+        "raw_http_request_json": {
+          "model": "gpt-5-nano-2025-08-07",
+          "max_completion_tokens": 1000,
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Describe this image in detail."
+                },
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "data:image/jpeg;base64,<BASE64_IMAGE_DATA_4172_CHARS>"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "response_headers": {
+          "x-request-id": "req_afe5664ec4e54d2a85d33ee3d1b4e560",
+          "date": "Sun, 15 Feb 2026 19:07:52 GMT",
+          "openai-processing-ms": "6207",
+          "openai-organization": "user-REDACTED",
+          "openai-version": "2020-10-01",
+          "_all_headers": {
+            "date": "Sun, 15 Feb 2026 19:07:52 GMT",
+            "content-type": "application/json",
+            "transfer-encoding": "chunked",
+            "connection": "keep-alive",
+            "access-control-expose-headers": "X-Request-ID",
+            "openai-organization": "user-REDACTED",
+            "openai-processing-ms": "6207",
+            "openai-project": "proj_REDACTED",
+            "openai-version": "2020-10-01",
+            "server": "cloudflare",
+            "x-ratelimit-limit-input-images": "50000",
+            "x-ratelimit-limit-requests": "500",
+            "x-ratelimit-limit-tokens": "200000",
+            "x-ratelimit-remaining-input-images": "49999",
+            "x-ratelimit-remaining-requests": "499",
+            "x-ratelimit-remaining-tokens": "199225",
+            "x-ratelimit-reset-input-images": "1ms",
+            "x-ratelimit-reset-requests": "120ms",
+            "x-ratelimit-reset-tokens": "232ms",
+            "x-request-id": "req_afe5664ec4e54d2a85d33ee3d1b4e560",
+            "x-openai-proxy-wasm": "v0.1",
+            "cf-cache-status": "DYNAMIC",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+            "content-encoding": "gzip",
+            "cf-ray": "9ce7170b8df661ff-ORD",
+            "alt-svc": "h3=\":443\"; ma=86400"
+          }
+        },
+        "raw_http_response_body": {
+          "id": "chatcmpl-D9bl41o5SeUDh1EjMgd0NrTwJhF9c",
+          "object": "chat.completion",
+          "created": 1771182466,
+          "model": "gpt-5-nano-2025-08-07",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "- The image is a solid, uniform red square that fills the entire frame.\n- There are no shapes, textures, gradients, or visible details \u2014 just a flat field of color.\n- The red is bright and highly saturated, with clean, straight edges at the borders.\n- If translated to color values, it resembles pure red (approximately RGB 255, 0, 0; hex #FF0000; HSV/HSL hue around 0\u00b0, 100% saturation, ~50% lightness).",
+                "refusal": null,
+                "annotations": []
+              },
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 267,
+            "completion_tokens": 752,
+            "total_tokens": 1019,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 640,
+              "audio_tokens": 0,
+              "accepted_prediction_tokens": 0,
+              "rejected_prediction_tokens": 0
+            }
+          },
+          "service_tier": "default",
+          "system_fingerprint": null
+        },
+        "summary": {
+          "response_id": "chatcmpl-D9bl41o5SeUDh1EjMgd0NrTwJhF9c",
+          "model": "gpt-5-nano-2025-08-07",
+          "is_empty": false,
+          "content_length": 404,
+          "finish_reason": "stop",
+          "completion_tokens": 752,
+          "reasoning_tokens": 640,
+          "temperature_used": "NOT SET (model default)"
+        }
+      }
+    }
+  ]
+}

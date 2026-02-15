@@ -1,0 +1,182 @@
+OpenAI Support Case 05757486 - A/B Test Results
+===============================================
+Date: February 15, 2026
+Customer: Kelly Ford
+Organization: org-REDACTED
+
+EXECUTIVE SUMMARY - CRITICAL FINDINGS
+=====================================
+Your suggestion to reduce max_completion_tokens has made the problem DRAMATICALLY WORSE:
+
+Baseline (max=1000): 27-40% empty response rate
+Test 1 (max=200):    100% empty response rate (10/10 attempts)
+Test 2 (max=300):    100% empty response rate (10/10 attempts)
+
+Instead of reducing empty responses, lowering the token limit resulted in the model
+exhausting the ENTIRE budget on reasoning tokens with ZERO content output in every
+single attempt.
+
+This suggests the problem is NOT about token limits - it appears to be a fundamental
+issue with how gpt-5-nano-2025-08-07 allocates tokens between reasoning and content
+generation.
+
+DETAILED TEST RESULTS
+=====================
+
+TEST 1: max_completion_tokens=200
+----------------------------------
+Configuration:
+  model: gpt-5-nano-2025-08-07
+  max_completion_tokens: 200
+  temperature: 1 (only accepted value for this model)
+  All other parameters: SDK defaults
+
+Results:
+  Total attempts: 10
+  Successful: 0
+  Empty responses: 10
+  Empty rate: 100.0%
+
+Pattern observed in ALL 10 attempts:
+  - finish_reason: "length"
+  - reasoning_tokens: 200
+  - content: "" (empty string)
+  - content_length: 0
+
+Example (Attempt 1):
+  Timestamp: 2026-02-15T19:21:29.437800+00:00
+  x-request-id: req_ad2ca0c0af0c4cdabc1bda5c23c5368c
+  Response ID: chatcmpl-D9byM5S5cwX74jUgrDBZupJPCm8as
+  openai-processing-ms: 1930
+  
+  Response structure:
+  {
+    "finish_reason": "length",
+    "completion_tokens": 200,
+    "reasoning_tokens": 200,
+    "prompt_tokens": [varies by image],
+    "content": ""
+  }
+
+TEST 2: max_completion_tokens=300
+----------------------------------
+Configuration:
+  model: gpt-5-nano-2025-08-07
+  max_completion_tokens: 300
+  temperature: 1 (only accepted value for this model)
+  All other parameters: SDK defaults
+
+Results:
+  Total attempts: 10
+  Successful: 0
+  Empty responses: 10
+  Empty rate: 100.0%
+
+Pattern observed in ALL 10 attempts:
+  - finish_reason: "length"
+  - reasoning_tokens: 300
+  - content: "" (empty string)
+  - content_length: 0
+
+Example (Attempt 1):
+  Timestamp: 2026-02-15T19:22:03.290269+00:00
+  x-request-id: req_7334072ced694b8a92163481f5335d7b
+  Response ID: chatcmpl-D9bytWuy5MJna3iJdZ5Szg8gjVS8c
+  openai-processing-ms: 3721
+  
+  Response structure:
+  {
+    "finish_reason": "length",
+    "completion_tokens": 300,
+    "reasoning_tokens": 300,
+    "prompt_tokens": [varies by image],
+    "content": ""
+  }
+
+TEST 3: All parameters explicit (max=1000) - INTERRUPTED
+---------------------------------------------------------
+Note: Test 3 was interrupted after 9 attempts. Configuration was:
+  model: gpt-5-nano-2025-08-07
+  max_completion_tokens: 1000
+  temperature: 1
+  top_p: 1
+  n: 1
+  stream: False
+  presence_penalty: 0
+  frequency_penalty: 0
+
+Partial results (9 of 10 attempts completed) suggest a mixed pattern
+with some successful responses when all parameters are explicitly set.
+
+SAMPLE x-request-id VALUES
+===========================
+Test 1 (max=200):
+  - req_ad2ca0c0af0c4cdabc1bda5c23c5368c
+  - Additional IDs available if needed
+
+Test 2 (max=300):
+  - req_7334072ced694b8a92163481f5335d7b
+  - Additional IDs available if needed
+
+TECHNICAL ANALYSIS
+==================
+
+1. Token Allocation Issue:
+   The model appears to have a systematic problem with token budget allocation.
+   When given a SMALLER budget (200 or 300 tokens), it consumes the ENTIRE
+   amount for reasoning and produces zero content output, every time.
+
+2. Finish Reason Pattern:
+   All empty responses show finish_reason="length", indicating the model
+   believes it has exhausted its token budget. However, this occurs even
+   when only 200-300 tokens are used, suggesting the model is not properly
+   reserving tokens for content generation.
+
+3. Comparison with Baseline:
+   Our production workload with max_completion_tokens=1000 shows 27-40%
+   empty responses. Reducing to 200 or 300 tokens increases this to 100%.
+   This is the OPPOSITE of what would be expected if the issue were simply
+   about token limits.
+
+4. Temperature=0 Still Impossible:
+   As confirmed in your previous response, temperature=0 is not accepted
+   by gpt-5-nano-2025-08-07. All tests used temperature=1 (the only
+   accepted value). This constraint eliminates one potential workaround.
+
+REPRODUCTION DETAILS
+====================
+Test images: Simple geometric shapes (red_square.jpg, blue_circle.jpg)
+Prompt: "Describe this image in detail"
+SDK: OpenAI Python SDK 2.16.0
+Python: 3.14.3
+Platform: macOS
+
+All raw request/response data captured but output file creation was
+interrupted. Terminal output contains complete diagnostic data for all
+20 completed attempts (10 for Test 1, 10 for Test 2).
+
+IMPACT ON PRODUCTION
+=====================
+This issue is blocking production use of gpt-5-nano-2025-08-07:
+- Current failure rate: 27-40% with max=1000 tokens
+- Cannot reduce token limit as workaround (makes it worse)
+- Cannot use temperature=0 as workaround (not supported)
+- 900 images failed in recent batch processing job
+- No viable workaround identified
+
+RECOMMENDED NEXT STEPS
+=======================
+1. Engineering investigation into token allocation logic
+2. Why does the model exhaust entire budget on reasoning with no content?
+3. Is there a minimum required max_completion_tokens value?
+4. Should reasoning tokens be counted separately from content tokens?
+5. Can you reproduce 100% failure rate with max=200/300 in your testing?
+
+I can provide additional diagnostic data, raw API responses, or run
+further tests as needed. I have full API request/response logging for
+all 20+ attempts.
+
+--
+Kelly Ford
+Organization: org-REDACTED
+Support Case: 05757486

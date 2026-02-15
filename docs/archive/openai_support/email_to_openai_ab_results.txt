@@ -1,0 +1,84 @@
+Subject: Re: Case 05757486 - A/B Test Results: Token Limits Make Problem WORSE
+
+Hi OpenAI Support Team,
+
+I completed the requested A/B tests for gpt-5-nano-2025-08-07 empty response issue (case 05757486). The results reveal a critical finding that contradicts the expected behavior.
+
+SHOCKING RESULTS
+================
+
+Your suggestion to reduce max_completion_tokens has made the problem DRAMATICALLY WORSE:
+
+• Baseline (max=1000 tokens): 27-40% empty response rate
+• Test 1 (max=200 tokens): 100% empty response rate (10/10 attempts) ❌
+• Test 2 (max=300 tokens): 100% empty response rate (10/10 attempts) ❌
+
+Instead of reducing failures, lowering the token limit caused the model to exhaust the ENTIRE budget on reasoning tokens with ZERO content output in every single attempt.
+
+DETAILED TEST RESULTS
+=====================
+
+Test 1: max_completion_tokens=200
+----------------------------------
+• Attempts: 10/10 failed (100% empty)
+• Pattern: ALL responses show finish_reason="length", reasoning_tokens=200, content=""
+• Sample x-request-id: req_ad2ca0c0af0c4cdabc1bda5c23c5368c
+• Timestamp: 2026-02-15T19:21:29Z
+• Processing time: 1.9-5.5 seconds per request
+
+Test 2: max_completion_tokens=300
+----------------------------------
+• Attempts: 10/10 failed (100% empty)
+• Pattern: ALL responses show finish_reason="length", reasoning_tokens=300, content=""
+• Sample x-request-id: req_7334072ced694b8a92163481f5335d7b
+• Timestamp: 2026-02-15T19:22:03Z
+• Processing time: 2.1-5.4 seconds per request
+
+Test 3: All params explicit (max=1000) - PARTIAL
+-------------------------------------------------
+Note: Test 3 was interrupted after 9 attempts, but partial results suggest explicitly setting ALL parameters (temperature=1, top_p=1, n=1, stream=False, presence_penalty=0, frequency_penalty=0) may reduce but not eliminate the issue.
+
+KEY OBSERVATIONS
+================
+
+1. LOWER token limits produce HIGHER failure rates (opposite of expected)
+2. Model consumes entire reduced budget on reasoning with zero output
+3. All empty responses show finish_reason="length" at exact token limit
+4. Temperature=0 remains impossible (only temperature=1 accepted)
+
+TECHNICAL IMPLICATIONS
+======================
+
+This suggests the problem is NOT about token limits—it appears to be a fundamental issue with how gpt-5-nano-2025-08-07 allocates tokens between reasoning and content generation. The model seems unable to properly reserve tokens for output when working within a constrained budget.
+
+When given 200-300 tokens, it spends ALL on internal reasoning and produces zero output. When given 1000 tokens, it sometimes (60-73% of the time) manages to balance reasoning and output successfully.
+
+PRODUCTION IMPACT
+=================
+
+• Cannot use lower token limits as workaround (makes it worse)
+• Cannot use temperature=0 as workaround (not supported by model)
+• 900 images failed in recent batch (27.8% failure rate)
+• No viable workaround identified
+• Blocking production use of gpt-5-nano-2025-08-07
+
+RECOMMENDED NEXT STEPS
+======================
+
+1. Engineering investigation into token allocation logic
+2. Can you reproduce 100% failure with max=200/300 in your testing?
+3. Is there a minimum recommended max_completion_tokens for this model?
+4. Should reasoning tokens be counted separately from content generation budget?
+5. Is this a known issue with a fix in development?
+
+I can provide raw API request/response logs, complete diagnostic data, or run additional tests as needed. All test data has been captured with full headers and timestamps.
+
+Please escalate to engineering team for investigation.
+
+Best regards,
+Kelly Ford
+Organization: org-REDACTED
+Support Case: 05757486
+
+---
+Attachment: Complete test results with x-request-ids, timestamps, and response patterns
