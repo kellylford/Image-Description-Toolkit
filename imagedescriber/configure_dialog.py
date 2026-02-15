@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 import wx
+import platform
 
 
 logger = logging.getLogger(__name__)
@@ -384,10 +385,10 @@ class ConfigureDialog(wx.Dialog):
         self.Bind(wx.EVT_CLOSE, self.on_dialog_close)
     
     def _get_ollama_models(self) -> List[str]:
-        """Get list of available Ollama models for choice list"""
+        """Get list of available Ollama models for choice list (sorted alphabetically)"""
         # Use cached models if provided
         if self.cached_ollama_models is not None and len(self.cached_ollama_models) > 0:
-            return self.cached_ollama_models
+            return sorted(self.cached_ollama_models)
         
         # Try to detect models if no cache provided
         try:
@@ -397,12 +398,12 @@ class ConfigureDialog(wx.Dialog):
                 ollama_provider = providers['ollama']
                 models = ollama_provider.get_available_models()
                 if models:
-                    return models
+                    return sorted(models)
         except Exception as e:
             logger.warning(f"Could not detect Ollama models: {e}")
         
         # Fallback to common models if detection fails
-        return ["moondream", "moondream:latest", "llama3.2-vision", "llava"]
+        return sorted(["moondream", "moondream:latest", "llama3.2-vision", "llava"])
     
     def find_scripts_directory(self) -> Path:
         """Find the scripts directory containing config files"""
@@ -433,12 +434,19 @@ class ConfigureDialog(wx.Dialog):
         
         return {
             "AI Model Settings": {
+                "default_provider": {
+                    "file": "image_describer",
+                    "path": ["default_provider"],
+                    "type": "choice",
+                    "choices": ["ollama", "openai", "claude"],
+                    "description": "Default AI provider to use when processing images. Ollama runs locally, OpenAI and Claude require API keys."
+                },
                 "default_model": {
                     "file": "image_describer",
                     "path": ["default_model"],
                     "type": "choice",
                     "choices": ollama_models,
-                    "description": "Default Ollama model to use for image descriptions. Select from detected models or refresh models from Process menu."
+                    "description": "Default Ollama model to use for image descriptions. Select from detected models or refresh models from Process menu. This is used when default_provider is set to 'ollama'."
                 },
                 "temperature": {
                     "file": "image_describer",
@@ -698,7 +706,11 @@ class ConfigureDialog(wx.Dialog):
         main_sizer.Add(header, 0, wx.ALIGN_CENTER | wx.ALL, 10)
         
         # Create notebook with tabs for each category
-        self.notebook = wx.Notebook(panel, name="Configuration categories")
+        # wx.WANTS_CHARS allows the notebook to receive keyboard focus in tab order
+        self.notebook = wx.Notebook(panel, style=wx.NB_TOP | wx.WANTS_CHARS, name="Configuration categories")
+        
+        # Bind keyboard events for tab-accessible navigation
+        self.notebook.Bind(wx.EVT_CHAR_HOOK, self.on_notebook_char)
         
         # Create a tab for each category
         for category in self.settings_metadata.keys():
@@ -720,6 +732,59 @@ class ConfigureDialog(wx.Dialog):
         # Set focus to first tab's settings list for keyboard accessibility
         # Delay to ensure dialog is fully displayed
         wx.CallAfter(self._set_initial_focus)
+    
+    def on_notebook_char(self, event):
+        """Handle keyboard navigation for notebook tabs
+        
+        When notebook has focus, allow:
+        - Left/Right arrows to switch tabs
+        - Cmd+Shift+[ and Cmd+Shift+] to switch tabs (macOS standard)
+        - Enter/Space to move focus to content of current tab
+        """
+        keycode = event.GetKeyCode()
+        current_page = self.notebook.GetSelection()
+        page_count = self.notebook.GetPageCount()
+        
+        # Arrow keys to switch tabs
+        if keycode == wx.WXK_LEFT or keycode == wx.WXK_UP:
+            new_page = (current_page - 1) % page_count
+            self.notebook.SetSelection(new_page)
+            event.Skip()  # Allow VoiceOver to announce the change
+            return
+        
+        elif keycode == wx.WXK_RIGHT or keycode == wx.WXK_DOWN:
+            new_page = (current_page + 1) % page_count
+            self.notebook.SetSelection(new_page)
+            event.Skip()  # Allow VoiceOver to announce the change
+            return
+        
+        # Cmd+Shift+[ and Cmd+Shift+] (macOS standard for previous/next tab)
+        elif event.CmdDown() and event.ShiftDown():
+            if keycode == ord('['):
+                new_page = (current_page - 1) % page_count
+                self.notebook.SetSelection(new_page)
+                return
+            elif keycode == ord(']'):
+                new_page = (current_page + 1) % page_count
+                self.notebook.SetSelection(new_page)
+                return
+        
+        # Enter or Space to move focus into current tab's content
+        elif keycode in (wx.WXK_RETURN, wx.WXK_SPACE):
+            # Move focus to first control in current tab
+            current_tab = self.notebook.GetPage(current_page)
+            if current_tab:
+                # Find first focusable child
+                children = current_tab.GetChildren()
+                for child in children:
+                    if isinstance(child, (wx.ListBox, wx.Button, wx.TextCtrl, wx.Choice)):
+                        child.SetFocus()
+                        return
+            event.Skip()
+            return
+        
+        # Let other keys pass through
+        event.Skip()
     
     def _set_initial_focus(self):
         """Set focus to the first settings list in the first tab"""
@@ -1000,6 +1065,25 @@ class ConfigureDialog(wx.Dialog):
             show_error(self, f"Error saving configurations:\n{str(e)}")
             return False
     
+    def _save_image_describer_config(self):
+        """Save just the image_describer config file
+        
+        Used for immediate persistence of API key changes.
+        """
+        try:
+            config = self.configs.get("image_describer", {})
+            path = self.config_files["image_describer"]
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+            
+            # Reload API keys in providers after saving
+            self._reload_provider_api_keys()
+            
+            return True
+        except Exception as e:
+            show_error(self, f"Error saving image_describer configuration:\n{str(e)}")
+            return False
+    
     def _reload_provider_api_keys(self):
         """Reload API keys from config into provider instances
         
@@ -1108,14 +1192,19 @@ class ConfigureDialog(wx.Dialog):
         config = self.configs.get("image_describer", {})
         api_keys = config.get("api_keys", {})
         
-        # Add each key to the list
+        # Add each key to the list (skip "description" field)
         for provider, key in api_keys.items():
+            # Skip metadata fields like "description"
+            if provider == "description":
+                continue
+            
             # Show provider and masked key
-            masked_key = key[:8] + "..." + key[-4:] if len(key) > 12 else "***"
-            display_text = f"{provider}: {masked_key}"
-            index = self.api_keys_list.Append(display_text)
-            # Store full provider name as client data
-            self.api_keys_list.SetClientData(index, provider)
+            if isinstance(key, str):  # Make sure it's actually a key string
+                masked_key = key[:8] + "..." + key[-4:] if len(key) > 12 else "***"
+                display_text = f"{provider}: {masked_key}"
+                index = self.api_keys_list.Append(display_text)
+                # Store full provider name as client data
+                self.api_keys_list.SetClientData(index, provider)
     
     def on_api_key_selected(self, event):
         """Handle API key selection"""
@@ -1140,6 +1229,9 @@ class ConfigureDialog(wx.Dialog):
             
             # Add the new key
             config["api_keys"][provider] = api_key
+            
+            # Save to disk immediately
+            self._save_image_describer_config()
             
             # Reload the list
             self.load_api_keys()
@@ -1171,6 +1263,9 @@ class ConfigureDialog(wx.Dialog):
             # Update with new key
             config["api_keys"][new_provider] = new_key
             
+            # Save to disk immediately
+            self._save_image_describer_config()
+            
             # Reload the list
             self.load_api_keys()
         
@@ -1196,6 +1291,9 @@ class ConfigureDialog(wx.Dialog):
         # Delete the key
         if provider in api_keys:
             del api_keys[provider]
+        
+        # Save to disk immediately
+        self._save_image_describer_config()
         
         # Reload the list
         self.load_api_keys()

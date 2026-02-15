@@ -22,7 +22,7 @@ class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
                  created: str = "", custom_prompt: str = "", provider: str = "", detection_data: List[dict] = None,
-                 metadata: Dict[str, any] = None):
+                 metadata: Dict[str, any] = None, finish_reason: str = "", completion_tokens: int = 0, response_id: str = ""):
         self.text = text
         self.model = model
         self.prompt_style = prompt_style
@@ -32,9 +32,14 @@ class ImageDescription:
         self.detection_data = detection_data or []  # List of detected objects with bounding boxes
         self.metadata = metadata or {}  # EXIF metadata: datetime, location (GPS), camera info
         self.id = f"{int(time.time() * 1000)}"  # Unique ID
+        
+        # Additional diagnostic fields for debugging empty responses (Issue #91)
+        self.finish_reason = finish_reason  # API finish_reason (e.g., "stop", "length", "content_filter")
+        self.completion_tokens = completion_tokens  # Number of tokens in response
+        self.response_id = response_id  # API response ID for support debugging
     
     def to_dict(self) -> dict:
-        return {
+        result = {
             "id": self.id,
             "text": self.text,
             "model": self.model,
@@ -45,6 +50,16 @@ class ImageDescription:
             "detection_data": self.detection_data,
             "metadata": self.metadata
         }
+        
+        # Include diagnostic fields if present (for debugging empty responses)
+        if self.finish_reason:
+            result["finish_reason"] = self.finish_reason
+        if self.completion_tokens is not None:
+            result["completion_tokens"] = self.completion_tokens
+        if self.response_id:
+            result["response_id"] = self.response_id
+        
+        return result
     
     @classmethod
     def from_dict(cls, data: dict):
@@ -56,7 +71,10 @@ class ImageDescription:
             custom_prompt=data.get("custom_prompt", ""),
             provider=data.get("provider", ""),
             detection_data=data.get("detection_data", []),
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
+            finish_reason=data.get("finish_reason", ""),
+            completion_tokens=data.get("completion_tokens", 0),
+            response_id=data.get("response_id", "")
         )
         desc.id = data.get("id", desc.id)
         return desc
@@ -172,6 +190,7 @@ class ImageWorkspace:
         #     "started": "2026-02-09T14:30:00"
         # }
         self.batch_state: Optional[dict] = None
+        self.load_failures: List[tuple] = []  # Track items that failed to load from workspace file
         
     def add_directory(self, directory_path: str):
         """Add a directory to the workspace"""
@@ -338,14 +357,18 @@ class ImageWorkspace:
         # Load items with error handling for malformed data
         items_data = data.get("items", {})
         workspace.items = {}
+        failed_items = []  # Track failures for user notification
+        
         for path, item_data in items_data.items():
             try:
                 if item_data is not None:
                     workspace.items[path] = ImageItem.from_dict(item_data)
                 else:
                     logger.warning(f"Skipping item with None data: {path}")
+                    failed_items.append((path, "Item data is None"))
             except Exception as e:
-                logger.error(f"Failed to load item {path}: {e}")
+                logger.error(f"Failed to load item {path}: {e}", exc_info=True)
+                failed_items.append((path, str(e)))
                 # Skip this item but continue loading others
         
         workspace.chat_sessions = data.get("chat_sessions", {})  # Load chat sessions
@@ -355,4 +378,11 @@ class ImageWorkspace:
         workspace.created = data.get("created", workspace.created)
         workspace.modified = data.get("modified", workspace.modified)
         workspace.saved = True
+        
+        # Store failed items for reporting
+        workspace.load_failures = failed_items
+        
+        if failed_items:
+            logger.warning(f"Workspace loaded with {len(failed_items)} failed items out of {len(items_data)} total")
+        
         return workspace

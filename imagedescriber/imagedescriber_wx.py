@@ -1150,12 +1150,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.Bind(wx.EVT_MENU, self.on_edit_prompts, edit_prompts_item)
         
         # Configure Settings - use platform-specific menu ID and accelerator
-        # On macOS, wxID_PREFERENCES automatically moves to app menu with Cmd+,
+        # On macOS, wx.ID_PREFERENCES automatically gets Cmd+, and moves to app menu
+        # Don't specify accelerator text - the system handles it and VoiceOver reads it correctly
         if sys.platform == 'darwin':
-            configure_item = tools_menu.Append(wx.ID_PREFERENCES, "&Preferences...\tCmd+,")
+            configure_item = tools_menu.Append(wx.ID_PREFERENCES, "&Preferences...")
         else:
             configure_item = tools_menu.Append(wx.ID_ANY, "&Configure Settings...\tCtrl+Shift+C")
-        self.Bind(wx.EVT_MENU, self.on_configure_settings, configure_item)
+        self.Bind(wx.EVT_MENU, self.on_configure_settings,configure_item)
         
         tools_menu.AppendSeparator()
         
@@ -1170,6 +1171,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         import_config_item = tools_menu.Append(wx.ID_ANY, "&Import Configuration...")
         self.Bind(wx.EVT_MENU, self.on_import_configuration, import_config_item)
+        
+        tools_menu.AppendSeparator()
+        
+        # AI Info submenu
+        ai_info_menu = wx.Menu()
+        
+        ollama_models_item = ai_info_menu.Append(wx.ID_ANY, "&Ollama Models...")
+        self.Bind(wx.EVT_MENU, self.on_ollama_models_info, ollama_models_item)
+        
+        openai_usage_item = ai_info_menu.Append(wx.ID_ANY, "&OpenAI Usage Dashboard...")
+        self.Bind(wx.EVT_MENU, self.on_openai_usage_info, openai_usage_item)
+        
+        claude_usage_item = ai_info_menu.Append(wx.ID_ANY, "&Claude Usage Dashboard...")
+        self.Bind(wx.EVT_MENU, self.on_claude_usage_info, claude_usage_item)
+        
+        tools_menu.AppendSubMenu(ai_info_menu, "AI &Info")
         
         menubar.Append(tools_menu, "&Tools")
         
@@ -1951,6 +1968,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def refresh_image_list(self):
         """Refresh the image list display with videos and extracted frames grouped"""
+        # PERFORMANCE DIAGNOSTIC: Track how long this takes
+        start_time = time.time()
+        
         # Guard against no workspace
         if not self.workspace or not self.workspace.items:
             self.image_list.Clear()
@@ -2110,6 +2130,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if first_file_path and first_file_path in self.workspace.items:
                 self.current_image_item = self.workspace.items[first_file_path]
                 self.display_image_info(self.current_image_item)
+        
+        # PERFORMANCE DIAGNOSTIC: Log refresh time for large lists
+        elapsed = time.time() - start_time
+        if elapsed > 0.5 or (self.workspace and len(self.workspace.items) > 100):
+            logger.info(f"refresh_image_list took {elapsed:.2f}s for {len(self.workspace.items) if self.workspace else 0} items")
     
     def on_process_single(self, event):
         """Process single selected image or extract video frames"""
@@ -2724,6 +2749,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def load_workspace(self, file_path):
         """Load workspace from file"""
         try:
+            logger.info(f"Loading workspace from: {file_path}")
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
@@ -2745,13 +2771,36 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.SetStatusText(f"{count} images", 1)
             self.clear_modified()
             
+            # Check for failed items during loading
+            if hasattr(self.workspace, 'load_failures') and self.workspace.load_failures:
+                failed_count = len(self.workspace.load_failures)
+                total_attempted = count + failed_count
+                logger.warning(f"Workspace loaded with {failed_count} failures")
+                
+                # Show warning dialog
+                failure_details = "\n".join([f"  • {Path(path).name}: {error}" for path, error in self.workspace.load_failures[:5]])
+                if failed_count > 5:
+                    failure_details += f"\n  ... and {failed_count - 5} more"
+                
+                show_warning(self, 
+                    f"Workspace loaded with {failed_count} items that could not be restored (out of {total_attempted} total).\n\n"
+                    f"Loaded successfully: {count}\n"
+                    f"Failed to load: {failed_count}\n\n"
+                    f"Failed items (check log for details):\n{failure_details}\n\n"
+                    f"The workspace is functional but some items were skipped.",
+                    "Partial Workspace Load")
+            else:
+                logger.info(f"Workspace loaded successfully: {count} items")
+            
             # Phase 4: Check for resumable batch
             if self.workspace.batch_state:
                 wx.CallAfter(self.prompt_resume_batch)
             
         except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error loading workspace: {e}", exc_info=True)
             show_error(self, f"Error loading workspace - Invalid JSON format:\n\nLine {e.lineno}, Column {e.colno}\n{e.msg}\n\nThe workspace file may be corrupted. Try opening it in a text editor to fix the JSON syntax error.")
         except Exception as e:
+            logger.error(f"Error loading workspace: {e}", exc_info=True)
             show_error(self, f"Error loading workspace:\n{e}")
     
     def on_save_workspace_as(self, event):
@@ -3201,9 +3250,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
             self.SetTitle(f"{progress_percent}%, {event.current} of {event.total} - ImageDescriber - {doc_name}")
             
+            # DIAGNOSTIC: Log every 10th image for performance monitoring
+            if event.current % 10 == 0:
+                logger.info(f"Progress: {event.current}/{event.total} ({progress_percent}%) - {Path(event.file_path).name}")
+            
             # Mark current image being processed with "P"
             self.processing_items[event.file_path] = {'provider': '', 'model': ''}
-            self.refresh_image_list()
+            
+            # PERFORMANCE FIX: Don't rebuild entire list on every progress update
+            # Only refresh every 50 images or when user switches back to window
+            # The list will refresh when processing completes via on_worker_complete
+            if event.current % 50 == 0:
+                self.refresh_image_list()
             
             # Phase 3: Track processing time for this image
             if self.batch_start_time:
@@ -3239,13 +3297,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Find the image item and add description
         if event.file_path in self.workspace.items:
             image_item = self.workspace.items[event.file_path]
+            
+            # Extract diagnostic fields from metadata (Issue #91: debugging empty responses)
+            metadata = getattr(event, 'metadata', {})
             desc = ImageDescription(
                 text=event.description,
                 model=event.model,
                 prompt_style=event.prompt_style,
                 custom_prompt=event.custom_prompt,
                 provider=event.provider,
-                metadata=getattr(event, 'metadata', {})
+                metadata=metadata,
+                finish_reason=metadata.get('finish_reason', ''),
+                completion_tokens=metadata.get('completion_tokens', 0),
+                response_id=metadata.get('response_id', '')
             )
             image_item.add_description(desc)
             
@@ -3297,14 +3361,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.followup_worker and not self.followup_worker.is_alive():
             self.followup_worker = None
         
+        # Enhanced error message for provider unavailability
+        error_msg = event.error
+        if "not available" in error_msg.lower():
+            # Extract provider name if present
+            provider_name = None
+            for prov in ["openai", "claude", "ollama", "huggingface"]:
+                if prov in error_msg.lower():
+                    provider_name = prov
+                    break
+            
+            if provider_name in ["openai", "claude"]:
+                error_msg += f"\n\nPossible reasons:\n" \
+                           f"• API key not configured\n" \
+                           f"• API key invalid or expired\n" \
+                           f"• SDK not installed\n\n" \
+                           f"To fix: Tools → Configure Settings → API Keys tab"
+        
         # Show error dialog (don't raise main window to avoid hiding batch progress dialog)
-        show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{event.error}")
+        show_error(self, f"Processing failed for {Path(event.file_path).name}:\n{error_msg}")
         
         # Re-raise batch progress dialog if it exists and is shown
         if self.batch_progress_dialog and self.batch_progress_dialog.IsShown():
             self.batch_progress_dialog.Raise()
+        else:
+            # Return focus to image list for keyboard navigation
+            wx.CallAfter(self._restore_focus_after_error)
         
         self.SetStatusText(f"Error: {Path(event.file_path).name}", 0)
+    
+    def _restore_focus_after_error(self):
+        """Restore keyboard focus to image list after error dialog"""
+        if self.image_list:
+            self.image_list.SetFocus()
     
     def on_workflow_complete(self, event):
         """Handle workflow completion (including video extraction and downloads)"""
@@ -4916,6 +5005,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             webbrowser.open(user_guide_url)
         except Exception as e:
             show_error(self, f"Could not open user guide:\n{e}")
+    
+    def on_ollama_models_info(self, event):
+        """Open Ollama models page in web browser"""
+        url = "https://ollama.ai/models"
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            show_error(self, f"Could not open Ollama models page:\n{e}")
+    
+    def on_openai_usage_info(self, event):
+        """Open OpenAI usage dashboard in web browser"""
+        url = "https://platform.openai.com/usage"
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            show_error(self, f"Could not open OpenAI usage dashboard:\n{e}")
+    
+    def on_claude_usage_info(self, event):
+        """Open Claude/Anthropic usage dashboard in web browser"""
+        url = "https://console.anthropic.com/settings/cost"
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            show_error(self, f"Could not open Claude usage dashboard:\n{e}")
     
     def on_report_issue(self, event):
         """Open GitHub new issue page in web browser"""

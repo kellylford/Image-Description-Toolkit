@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any
 
 import wx
+import platform
 
 # Add project root to sys.path for shared module imports
 # Works in both development mode (running script) and frozen mode (PyInstaller exe)
@@ -409,23 +410,26 @@ class FollowupQuestionDialog(wx.Dialog):
             if provider == "ollama":
                 # CRITICAL: Use cached models if available (passed from main app) to avoid blocking UI
                 if self.cached_ollama_models:
-                    for model in self.cached_ollama_models:
+                    # Sort models alphabetically for easier navigation
+                    for model in sorted(self.cached_ollama_models):
                         self.model_combo.Append(model)
                 else:
                     # Fallback to common defaults (don't fetch live - would block UI)
-                    common_models = ["moondream", "llava", "llama3.2-vision"]
+                    common_models = sorted(["moondream", "llava", "llama3.2-vision"])
                     for model in common_models:
                         self.model_combo.Append(model)
                         
             elif provider == "openai":
-                models = ["gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "chatgpt-4o-latest", "gpt-4-turbo"]
+                # OpenAI vision-capable models (in preference order: best first)
+                # As of 2026: GPT-5 series, gpt-4o, and gpt-4-turbo models support vision
+                models = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-pro", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "chatgpt-4o-latest", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4-turbo"]
                 for model in models:
                     self.model_combo.Append(model)
                     
             elif provider == "claude":
-                # Import the official Claude models list
-                from ai_providers import DEV_CLAUDE_MODELS
-                for model in DEV_CLAUDE_MODELS:
+                # Import the official Claude models list (smart sorted: haiku->sonnet->opus)
+                from ai_providers import DEV_CLAUDE_MODELS, sort_claude_models
+                for model in sort_claude_models(DEV_CLAUDE_MODELS):
                     self.model_combo.Append(model)
         except Exception as e:
             logger.warning(f"Error populating models: {e}")
@@ -472,10 +476,9 @@ class ProcessingOptionsDialog(wx.Dialog):
         """Initialize the dialog UI"""
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        # Create notebook for tabs with keyboard navigation support
+        # Create notebook for tabs
         self.notebook = wx.Notebook(self, style=wx.NB_TOP)
         set_accessible_name(self.notebook, "Processing options tabs")
-        set_accessible_description(self.notebook, "Use left and right arrow keys to navigate between tabs")
         
         # General tab
         general_panel = self.create_general_panel(self.notebook)
@@ -542,7 +545,10 @@ class ProcessingOptionsDialog(wx.Dialog):
         provider_sizer.Add(provider_label, 0, wx.ALL, 5)
         
         self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude"])
-        self.provider_choice.SetSelection(0)
+        # Set from default_provider in config (case-insensitive match)
+        default_provider = self.config.get('default_provider', 'ollama').lower()
+        provider_map = {'ollama': 0, 'openai': 1, 'claude': 2}
+        self.provider_choice.SetSelection(provider_map.get(default_provider, 0))
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
         provider_sizer.Add(self.provider_choice, 0, wx.ALL | wx.EXPAND, 5)
@@ -651,7 +657,8 @@ class ProcessingOptionsDialog(wx.Dialog):
                         self.cached_ollama_models = models
                 
                 if models:
-                    for model in models:
+                    # Sort models alphabetically for easier navigation
+                    for model in sorted(models):
                         self.model_combo.Append(model)
                     # Set default if in list
                     default_model = self.config.get('default_model', 'moondream')
@@ -663,17 +670,21 @@ class ProcessingOptionsDialog(wx.Dialog):
                     self.model_combo.Append("moondream")
                     self.model_combo.SetSelection(0)
             elif provider == "openai":
-                # Common OpenAI models
-                models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"]
+                # OpenAI vision-capable models (in preference order: best first)
+                # As of 2026: GPT-5 series, gpt-4o, and gpt-4-turbo support vision
+                # Plain gpt-4 is excluded (text-only, no vision support)
+                models = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-pro", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4-turbo"]
                 for model in models:
                     self.model_combo.Append(model)
                 self.model_combo.SetStringSelection("gpt-4o")
             elif provider == "claude":
-                # Import the official Claude models list
-                from ai_providers import DEV_CLAUDE_MODELS
-                for model in DEV_CLAUDE_MODELS:
+                # Import the official Claude models list (smart sorted: haiku->sonnet->opus)
+                from ai_providers import sort_claude_models
+                for model in sort_claude_models(DEV_CLAUDE_MODELS):
                     self.model_combo.Append(model)
-                self.model_combo.SetStringSelection("claude-3-5-sonnet-20241022")
+                # Select first model if available
+                if self.model_combo.GetCount() > 0:
+                    self.model_combo.SetSelection(0)
         except Exception as e:
             print(f"Error populating models: {e}")
             default = self.config.get('default_model', 'moondream')
@@ -766,10 +777,9 @@ class ImageDetailDialog(wx.Dialog):
         """Initialize the dialog UI"""
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        # Create notebook for tabs with keyboard navigation support
+        # Create notebook for tabs
         self.detail_notebook = wx.Notebook(self, style=wx.NB_TOP)
         set_accessible_name(self.detail_notebook, "Image detail tabs")
-        set_accessible_description(self.detail_notebook, "Use left and right arrow keys to navigate between tabs")
         
         # Details tab
         details_panel = self.create_details_panel(self.detail_notebook)

@@ -17,6 +17,15 @@ from typing import List, Dict, Optional
 from pathlib import Path
 import platform
 import subprocess
+import logging
+
+# Import PIL for image processing (PNG to JPEG conversion)
+try:
+    from PIL import Image
+    import io
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 # Add project root to sys.path for shared module imports
 # Works in both development mode (running script) and frozen mode (PyInstaller exe)
@@ -84,18 +93,27 @@ DEV_OLLAMA_CLOUD_MODELS = [
 try:
     from models.openai_models import OPENAI_MODELS as DEV_OPENAI_MODELS
 except ImportError:
-    # Fallback if models package not available
+    # Fallback if models package not available (vision-capable models only as of 2026)
     DEV_OPENAI_MODELS = [
+        "gpt-5.2",
+        "gpt-5.2-pro",
+        "gpt-5.1",
+        "gpt-5",
+        "gpt-5-pro",
+        "gpt-5-mini",
+        "gpt-5-nano",
         "o1",
         "o1-mini",
         "o1-preview",
         "gpt-4o",
         "gpt-4o-mini",
         "chatgpt-4o-latest",
+        "gpt-4.1",
+        "gpt-4.1-mini",
+        "gpt-4.1-nano",
         "gpt-4-turbo",
-        "gpt-4-turbo-preview",
-        "gpt-4",
-        "gpt-4-vision-preview"
+        "gpt-4-turbo-preview"
+        # NOTE: gpt-4 and gpt-4-vision-preview excluded (no vision support / deprecated)
     ]
 
 # Import Claude models from central configuration
@@ -110,6 +128,45 @@ except ImportError:
         "claude-haiku-4-5-20251001",
         "claude-3-5-haiku-20241022"
     ]
+
+
+def sort_claude_models(models: List[str]) -> List[str]:
+    """
+    Sort Claude models by tier (haiku -> sonnet -> opus) then by version.
+    
+    This puts cheaper models first and groups by capability tier,
+    making it easier for users to find the right model for their budget.
+    """
+    def get_sort_key(model: str) -> tuple:
+        # Extract tier and version from model name
+        # Examples: claude-haiku-4-5-20251001, claude-3-5-sonnet-20241022
+        lower = model.lower()
+        
+        # Determine tier (lower number = shown first)
+        if 'haiku' in lower:
+            tier = 0
+        elif 'sonnet' in lower:
+            tier = 1
+        elif 'opus' in lower:
+            tier = 2
+        else:
+            tier = 3  # Unknown tier goes last
+        
+        # Extract version numbers for sorting within tier
+        # claude-haiku-4-5 -> (4, 5)
+        # claude-3-5-haiku -> (3, 5)
+        import re
+        version_match = re.search(r'(\d+)[-.](\d+)', model)
+        if version_match:
+            major = int(version_match.group(1))
+            minor = int(version_match.group(2))
+        else:
+            major, minor = 0, 0
+        
+        # Sort by tier first, then by version descending (newer first)
+        return (tier, -major, -minor, model)
+    
+    return sorted(models, key=get_sort_key)
 
 
 def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):
@@ -226,6 +283,7 @@ class OllamaProvider(AIProvider):
         self._models_cache = None
         self._models_cache_time = 0
         self._cache_duration = 30  # Cache for 30 seconds
+        self.last_usage = None  # Token usage tracking (similar to OpenAI/Claude)
     
     def get_provider_name(self) -> str:
         return "Ollama"
@@ -242,14 +300,14 @@ class OllamaProvider(AIProvider):
         """Get list of available Ollama models (local only, excludes cloud models)"""
         # DEVELOPMENT MODE: Return hardcoded models for faster testing
         if DEV_MODE_HARDCODED_MODELS:
-            return DEV_OLLAMA_MODELS.copy()
+            return sorted(DEV_OLLAMA_MODELS.copy())
         
         # ORIGINAL DETECTION CODE (preserved for when dev mode is disabled)
         # Check cache first
         current_time = time.time()
         if (self._models_cache is not None and 
             current_time - self._models_cache_time < self._cache_duration):
-            return self._models_cache
+            return sorted(self._models_cache)
             
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=10)
@@ -257,7 +315,7 @@ class OllamaProvider(AIProvider):
                 data = response.json()
                 all_models = [model['name'] for model in data.get('models', [])]
                 # Filter out cloud models (those ending with '-cloud')
-                local_models = [model for model in all_models if not model.endswith('-cloud')]
+                local_models = sorted([model for model in all_models if not model.endswith('-cloud')])
                 
                 # Update cache
                 self._models_cache = local_models
@@ -291,7 +349,18 @@ class OllamaProvider(AIProvider):
             )
             
             if response.status_code == 200:
-                return response.json().get('response', 'No description generated')
+                result = response.json()
+                
+                # Extract token usage if available (for cost/performance tracking)
+                if 'prompt_eval_count' in result or 'eval_count' in result:
+                    self.last_usage = {
+                        'prompt_tokens': result.get('prompt_eval_count', 0),
+                        'completion_tokens': result.get('eval_count', 0),
+                        'total_tokens': result.get('prompt_eval_count', 0) + result.get('eval_count', 0),
+                        'model': model
+                    }
+                
+                return result.get('response', 'No description generated')
             else:
                 # Enhanced error logging for Ollama HTTP errors
                 from datetime import datetime
@@ -356,6 +425,10 @@ class OllamaProvider(AIProvider):
                 print(f"  Warning: Could not write to error log: {log_error}")
             
             return f"Error generating description: {str(e)} - ({timestamp})"
+    
+    def get_last_token_usage(self) -> Optional[Dict]:
+        """Return token usage from last API call (if available)"""
+        return self.last_usage
 
 
 class OpenAIProvider(AIProvider):
@@ -389,7 +462,10 @@ class OpenAIProvider(AIProvider):
     
     def _load_api_key_from_config(self) -> Optional[str]:
         """Load API key with robust fallback for frozen executables"""
+        import sys  # Ensure sys is available in this scope
+        
         # 1. Try standard config_loader import
+        load_json_config = None
         try:
             # Import config_loader if available
             try:
@@ -398,7 +474,7 @@ class OpenAIProvider(AIProvider):
                 try:
                     from scripts.config_loader import load_json_config
                 except ImportError:
-                     load_json_config = None
+                    load_json_config = None
 
             if load_json_config:
                 config, _, _ = load_json_config('image_describer_config.json')
@@ -408,7 +484,7 @@ class OpenAIProvider(AIProvider):
                         if key in api_keys and api_keys[key]:
                             return api_keys[key].strip()
         except Exception as e:
-            print(f"DEBUG: OpenAI config_loader failed: {e}")
+            pass  # Silently continue to fallback
 
         # 2. Manual Fallback
         try:
@@ -482,6 +558,7 @@ class OpenAIProvider(AIProvider):
         """Get list of available OpenAI models"""
         # DEVELOPMENT MODE: Return hardcoded models for faster testing
         if DEV_MODE_HARDCODED_MODELS:
+            # Return in defined order (newest/best first) without sorting
             return DEV_OPENAI_MODELS.copy() if self.is_available() else []
         
         # ORIGINAL DETECTION CODE (preserved for when dev mode is disabled)
@@ -491,16 +568,20 @@ class OpenAIProvider(AIProvider):
         try:
             # Use SDK to list models
             models_response = self.client.models.list()
+            # Filter for vision-capable models only
+            # As of 2026: gpt-5.x, gpt-4o, gpt-4.1, gpt-4-turbo, o1 support vision
+            # Plain gpt-4 does NOT support vision
             vision_models = [
                 model.id for model in models_response.data
-                if 'vision' in model.id or model.id.startswith('gpt-4')
+                if ('gpt-5' in model.id or 'gpt-4o' in model.id or 'gpt-4.1' in model.id or 'gpt-4-turbo' in model.id or model.id.startswith('o1'))
             ]
-            return sorted(vision_models)
+            # Return in API order (usually newest first)
+            return vision_models
         except:
             pass
         
-        # Fallback to known vision models
-        return ['gpt-4-vision-preview', 'gpt-4o', 'gpt-4o-mini']
+        # Fallback to known vision models (in preference order)
+        return ['gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4-turbo']
     
     @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
@@ -509,14 +590,56 @@ class OpenAIProvider(AIProvider):
             return "Error: OpenAI API key not configured or SDK not installed"
         
         try:
-            # Read and encode image
-            with open(image_path, 'rb') as image_file:
-                image_data = base64.b64encode(image_file.read()).decode('utf-8')
+            # Convert PNG to JPEG if needed (PNG failure rate is 59% vs 26% for JPG)
+            # This reduces token footprint and may help avoid nano-tier compute limits
+            image_data = None
+            file_ext = Path(image_path).suffix.lower()
+            
+            if file_ext == '.png' and HAS_PIL:
+                # Convert PNG → JPEG (85% quality, max 1600px)
+                try:
+                    img = Image.open(image_path)
+                    
+                    # Convert RGBA to RGB (remove alpha channel)
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                        img = background
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Resize if too large (max dimension 1600px)
+                    max_dim = 1600
+                    if max(img.size) > max_dim:
+                        img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                    
+                    # Save as JPEG to bytes
+                    buffer = io.BytesIO()
+                    img.save(buffer, format='JPEG', quality=85, optimize=True)
+                    image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"Converted PNG to JPEG: {image_path}")
+                except Exception as e:
+                    # Fallback to original file if conversion fails
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"PNG conversion failed for {image_path}: {e}")
+                    image_data = None
+            
+            # If not converted or conversion failed, read original file
+            if image_data is None:
+                with open(image_path, 'rb') as image_file:
+                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
             
             # Use official SDK - handles retry logic, rate limits, and errors automatically
-            # Build request parameters
+            # Build request parameters with optimized settings
             request_params = {
                 "model": model,
+                # NOTE: gpt-5-nano does NOT support custom temperature (only default=1)
+                # ChatGPT recommended temperature=0.2 but this causes 400 error:
+                # "Unsupported value: 'temperature' does not support 0.2 with this model."
                 "messages": [
                     {
                         "role": "user",
@@ -535,22 +658,64 @@ class OpenAIProvider(AIProvider):
             
             # GPT-5 and newer models (o1, o3, gpt-5) use max_completion_tokens instead of max_tokens
             # Older models (GPT-4, GPT-3.5) use max_tokens
+            # Reduced from 1000 → 300 (typical responses are 50-150 tokens)
+            # ChatGPT theory: large max_tokens triggers nano-tier compute limits
             if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
-                request_params["max_completion_tokens"] = 1000
+                request_params["max_completion_tokens"] = 300
             else:
-                request_params["max_tokens"] = 1000
+                request_params["max_tokens"] = 300
             
             response = self.client.chat.completions.create(**request_params)
+            
+            # Extract response details for comprehensive logging
+            content = response.choices[0].message.content or ""
+            finish_reason = response.choices[0].finish_reason
+            response_id = response.id
+            
+            # DEBUG: Log raw response structure for debugging empty responses (Issue #91)
+            logger = logging.getLogger(__name__)
+            logger.debug(
+                f"RAW RESPONSE | "
+                f"id={response_id} | "
+                f"model={response.model} | "
+                f"choices[0].message.content={repr(content[:100] if content else content)} | "
+                f"choices[0].message.role={response.choices[0].message.role} | "
+                f"choices[0].finish_reason={finish_reason} | "
+                f"usage.prompt_tokens={response.usage.prompt_tokens} | "
+                f"usage.completion_tokens={response.usage.completion_tokens}"
+            )
             
             # Store token usage for cost tracking and logging
             self.last_usage = {
                 'prompt_tokens': response.usage.prompt_tokens,
                 'completion_tokens': response.usage.completion_tokens,
                 'total_tokens': response.usage.total_tokens,
-                'model': model
+                'model': model,
+                'finish_reason': finish_reason,
+                'response_id': response_id
             }
             
-            return response.choices[0].message.content
+            # Log empty responses for debugging (Issue #91: 28% empty response rate with gpt-5-nano)
+            logger = logging.getLogger(__name__)
+            if not content.strip():
+                logger.warning(
+                    f"EMPTY RESPONSE from {model} | "
+                    f"finish_reason={finish_reason} | "
+                    f"completion_tokens={response.usage.completion_tokens} | "
+                    f"prompt_tokens={response.usage.prompt_tokens} | "
+                    f"response_id={response_id} | "
+                    f"image={image_path}"
+                )
+            else:
+                # Log successful responses at debug level
+                logger.debug(
+                    f"Success: {model} | "
+                    f"finish_reason={finish_reason} | "
+                    f"completion_tokens={response.usage.completion_tokens} | "
+                    f"response_id={response_id}"
+                )
+            
+            return content
                 
         except Exception as e:
             # Enhanced error logging with detailed diagnostics
@@ -658,7 +823,10 @@ class ClaudeProvider(AIProvider):
     
     def _load_api_key_from_config(self) -> Optional[str]:
         """Load API key with robust fallback for frozen executables"""
+        import sys  # Ensure sys is available in this scope
+        
         # 1. Try standard config_loader import
+        load_json_config = None
         try:
             # Import config_loader if available
             try:
@@ -667,7 +835,7 @@ class ClaudeProvider(AIProvider):
                 try:
                     from scripts.config_loader import load_json_config
                 except ImportError:
-                     load_json_config = None
+                    load_json_config = None
 
             if load_json_config:
                 config, p, s = load_json_config('image_describer_config.json')
@@ -675,10 +843,9 @@ class ClaudeProvider(AIProvider):
                     api_keys = config.get('api_keys', {})
                     for key in ['Claude', 'claude', 'CLAUDE']:
                         if key in api_keys and api_keys[key]:
-                            # print(f"DEBUG: Found Claude key using load_json_config from {s}")
                             return api_keys[key].strip()
         except Exception as e:
-            print(f"DEBUG: config_loader failed: {e}")
+            pass  # Silently continue to fallback
 
         # 2. Manual Fallback: Search for JSON file directly
         # This bypasses import issues in frozen builds
@@ -763,7 +930,8 @@ class ClaudeProvider(AIProvider):
         """Get list of available Claude models"""
         # DEVELOPMENT MODE: Return hardcoded models for faster testing
         if DEV_MODE_HARDCODED_MODELS:
-            return DEV_CLAUDE_MODELS.copy() if self.is_available() else []
+            # Use smart sorting: haiku -> sonnet -> opus (cheapest to most expensive)
+            return sort_claude_models(DEV_CLAUDE_MODELS.copy()) if self.is_available() else []
         
         # ORIGINAL DETECTION CODE (preserved for when dev mode is disabled)
         if not self.is_available():
@@ -771,7 +939,8 @@ class ClaudeProvider(AIProvider):
         
         # Claude doesn't have a models endpoint, so we return the known models
         # All Claude models support vision natively
-        return DEV_CLAUDE_MODELS.copy()
+        # Sort by tier and version for easier selection
+        return sort_claude_models(DEV_CLAUDE_MODELS.copy())
     
     @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:

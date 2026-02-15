@@ -115,6 +115,8 @@
   },
   "default_provider": "ollama",
   "api_keys": {
-    "description": "API keys for cloud AI providers. Managed via Tools → Configure Settings → API Keys tab."
+    "description": "API keys for cloud AI providers. Managed via Tools → Configure Settings → API Keys tab.",
+    "OpenAI": "",
+    "claude": ""
   }
 }

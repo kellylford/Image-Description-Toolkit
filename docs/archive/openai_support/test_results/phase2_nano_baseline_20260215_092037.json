@@ -1,0 +1,1335 @@
+[
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/mcp_video-17099_singular_display/mcp_video-17099_singular_display_29.85s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y5KwHs5DWQ7NduxWFPYdLCm4pFR",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.764773845672607
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-15558_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6237912178039551
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17262_singular_display/video-17262_singular_display_114.98s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y5W0fKBerCdOJKmjDdhWL8UG3xj",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.209248781204224
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/IMG_4143.HEIC",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 1.0378897190093994
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-17387_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 1.051030158996582
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-14584_singular_display/video-14584_singular_display_5.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y5jsIqRVWQuUwQTwMf7SU601Ywi",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 10.668209314346313
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-16994_singular_display/video-16994_singular_display_4.97s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y5u39GsqxIY9m1Fl3h3hwz3fGX9",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.645350933074951
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-15535_singular_display/video-15535_singular_display_74.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y65bEYAjsTnOJxxJSs7CPxsAwv9",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.825706005096436
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-12818_singular_display/video-12818_singular_display_30.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y6FK8PQmOuUIyGLMy6WguA3t5aJ",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 10.25925588607788
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-17162_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.838263750076294
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/mcp_photo-17065_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.8419570922851562
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11185_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.5582811832427979
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-14619_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.71346116065979
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-16246_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 1.0209827423095703
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17949_singular_display/video-17949_singular_display_30.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y6ZD0kagg8nX0714o6qlEFI2BX8",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.9613618850708
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17262_singular_display/video-17262_singular_display_59.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y6kd3HQuHu1XDO5AmE78oHnrqWs",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.584160089492798
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-12348_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7193851470947266
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-13289_singular_display/video-13289_singular_display_84.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y6uwO5ZCAJrAa0jniPtsYIKh6re",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 7.976545095443726
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-15535_singular_display/video-15535_singular_display_124.98s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y74T7zZe3h7YVlKMQYOFX1C4bef",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.46985673904419
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-16732_singular_display/video-16732_singular_display_10.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y7Dtx1WeeKGH7nsQ7JCR3c3X377",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.616282224655151
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11820_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7606790065765381
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-19493_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.8643779754638672
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11928_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7101180553436279
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/od_photo-12933_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6201372146606445
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-20764_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6645660400390625
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-10954_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.681196928024292
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-14280_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7184052467346191
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-16669_singular_display/video-16669_singular_display_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y7ZNBHOvvMpA1jcmbYDcgjKhZHP",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 7.64310622215271
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11424_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6579790115356445
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/mcp_video-17102_singular_display/mcp_video-17102_singular_display_24.86s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y7jc3OkFyiJI7LXyfoQpD3zfwKB",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 7.564856767654419
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/od_photo-11871_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.8441751003265381
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/od_photo-18340_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.637200117111206
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-14819_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6263208389282227
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-20805_singular_display/video-20805_singular_display_34.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y7x2vAFqlajc4HgsKESd8Sj3Zlq",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.215150117874146
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-14295_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.5485949516296387
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/IMG_4029.HEIC",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7163703441619873
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17264_singular_display/video-17264_singular_display_74.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y89v7XOcHOGyuT1UMtYbVFqB3YF",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.438995122909546
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-12515_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.838054895401001
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-11944_singular_display/video-11944_singular_display_5.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y8LfLoHZ6VXK6HqfI3E3TgPyXCG",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.571213006973267
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-20805_singular_display/video-20805_singular_display_119.97s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y8WkZD20oZNROccDV14UxC0AdBK",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.411051034927368
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-16653_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.5099339485168457
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/od_video-11926_singular_display/od_video-11926_singular_display_119.92s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2258,
+      "total_tokens": 3258,
+      "response_id": "chatcmpl-D9Y8hy6xjE2REUZm1ji6g4KS0ntrP",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 10.442778825759888
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-12818_singular_display/video-12818_singular_display_114.98s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y8t59dHNLPYvRBLRfXujikdaDPq",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 11.647122859954834
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-13289_singular_display/video-13289_singular_display_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y95KNgveKpjQCqGJDHqmgsUZ8C5",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.407272338867188
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17264_singular_display/video-17264_singular_display_79.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y9G1Kp1iiEezf7sFNM96P4RqBF1",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.916635274887085
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-19506_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7960236072540283
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-15535_singular_display/video-15535_singular_display_94.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9Y9R9IYke3VnRa45JKTNMVk7JRnG",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.87161111831665
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-12816_singular_display/video-12816_singular_display_49.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9Y9bwXsWZAzc4tl8kANymQ12FGPp",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.85239291191101
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-12340_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.83860182762146
+  },
+  {
+    "status": "success",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/IMG_3376/IMG_3376_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "The image reads like a quiet, unnamed moment suspended between night and dawn. Across the canvas, darkness pools in the left corner and slowly softens into a cool blue-gray toward the right. There are no edges or shapes to cling to\u2014only a smooth, fog-like gradient that seems to breathe. The light is pale and almost fragile, as if a distant horizon is just out of reach, waiting to reveal itself. It feels cool and hushed, like the air before morning fully arrives, inviting the imagination to drift through a tranquil, empty space.",
+      "text_length": 533,
+      "finish_reason": "stop",
+      "completion_tokens": 952,
+      "prompt_tokens": 2192,
+      "total_tokens": 3144,
+      "response_id": "chatcmpl-D9Y9nHyeJTzlACLuXuFrMp4Vmty8S",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 7.751918077468872
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/od_video-11926_singular_display/od_video-11926_singular_display_69.95s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2258,
+      "total_tokens": 3258,
+      "response_id": "chatcmpl-D9Y9wJlQhTCSFNsID86o4BE60NXcO",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.862680912017822
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-20805_singular_display/video-20805_singular_display_20.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9YA7hcE1Kjo92wyfjLw1JJofrl8u",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 4.157877206802368
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17228_singular_display/video-17228_singular_display_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YAD0LRobIhQcl4zTvkCUjSGBxhE",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 7.662220001220703
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/IMG_4084.HEIC",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 2.201874256134033
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-19445_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 1.0488231182098389
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/od_video-11920_singular_display/od_video-11920_singular_display_29.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2258,
+      "total_tokens": 3258,
+      "response_id": "chatcmpl-D9YARqFgnqK9fujAseBmE2eejuRZl",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.424348831176758
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11204_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6284568309783936
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/od_photo-20697_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6160666942596436
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11546_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6584110260009766
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-18378_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.42644786834716797
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/IMG_4032/IMG_4032_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YAg5FBttmOywJbnn3YOV8M0WUID",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.705657720565796
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-14647_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.748600959777832
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-12448_singular_display/video-12448_singular_display_15.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2309,
+      "total_tokens": 3309,
+      "response_id": "chatcmpl-D9YAsIB8tOUhaxb4JkYJlpyOulZ8j",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.843631029129028
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-12816_singular_display/video-12816_singular_display_34.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YB3ciUKwNomioFAmtd3nYjY9XTd",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.4478759765625
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-19114_singular_display/video-19114_singular_display_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YBDonCpfLbcmdknoiCGRLGKV6Dh",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 7.601906061172485
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/IMG_4033/IMG_4033_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YBL8lFUW9Z1eV7jxlDnlRKHQBFB",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.233125686645508
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-18432_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6325178146362305
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-12435_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6378889083862305
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/od_video-11926_singular_display/od_video-11926_singular_display_104.93s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2258,
+      "total_tokens": 3258,
+      "response_id": "chatcmpl-D9YBZzIy7KLXeAE7LjktBjPgFXGBp",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.620930194854736
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-17672_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6324300765991211
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-13995_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.43418002128601074
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-16370_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.8383231163024902
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-17942_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7760739326477051
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/IMG_4047/IMG_4047_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YBpvUqVq21t54ABZyHVnE2mgtA7",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 9.575176000595093
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/IMG_4088.HEIC",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 1.0904731750488281
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-10913_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7884659767150879
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/od_photo-20746_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6866979598999023
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-18418_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.37036895751953125
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11456_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.5402669906616211
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-12833_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6502740383148193
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/IMG_4013.MOV",
+    "image_extension": ".mov",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 1.0654008388519287
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-12816_singular_display/video-12816_singular_display_20.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YCCLRTVQxs5k605PKc7quhmTfuh",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 8.694438934326172
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-14080_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6311612129211426
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-19750_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6918761730194092
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-11762_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.5480482578277588
+  },
+  {
+    "status": "success",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17004_singular_display/video-17004_singular_display_20.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "Under a flawless blue sky, a sunlit carnival hums to life. In the foreground, two women walk side by side, their backs to us as they move into the crowd. One wears a flowing black dress, her blond hair catching the light and spilling over her shoulders, a small black purse swinging at her side. Beside her, another woman in a deep burgundy dress strolls along, her wavy hair tumbling down her back and a delicate bracelet glinting on her wrist. A navy parasol trimmed with white lace shields them from the bright day, its edge brushing the air with a soft shadow.\n\nBeyond them, the fairground bursts with color: banners fluttering, pennants snapping, stalls dressed in bright stripes, and the distant glow of rides peeking over the heads of a busy crowd. People drift along the path, some pausing at a booth, others soaking in the warmth and the promise of treats or thrills just ahead. The scene feels alive with summer\u2014the laughter, the chatter, and the electric thrill of a day spent at the fair.",
+      "text_length": 1000,
+      "finish_reason": "stop",
+      "completion_tokens": 803,
+      "prompt_tokens": 2242,
+      "total_tokens": 3045,
+      "response_id": "chatcmpl-D9YCRbOANxynOUlae7s6ZpLMi5eSs",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 7.155919075012207
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-16480_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.9795758724212646
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17226_singular_display/video-17226_singular_display_5.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9YCbBfo8EzBeWmNt2JBN56tdecOM",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 5.855098009109497
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/IMG_4017/IMG_4017_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YCijiDTxwLKDA1nZsTz648bfiIV",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 5.879111051559448
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/mcp_video-13282_singular_display/mcp_video-13282_singular_display_0.00s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2192,
+      "total_tokens": 3192,
+      "response_id": "chatcmpl-D9YCpTTrengwLYRrfO5zSruhr4cLX",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 5.1864540576934814
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-16322_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6496171951293945
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-19762_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.4563779830932617
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/od_photo-14060_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.4069380760192871
+  },
+  {
+    "status": "empty",
+    "image_path": "/Users/kellyford/Documents/ImageDescriptionToolkit/WorkSpaceFiles/EuropeNano509_20260214/extracted_frames/video-17264_singular_display/video-17264_singular_display_44.99s.jpg",
+    "image_extension": ".jpg",
+    "model": "gpt-5-nano-2025-08-07",
+    "parameters": {
+      "max_tokens": 1000,
+      "png_converted": false
+    },
+    "response": {
+      "text": "",
+      "text_length": 0,
+      "finish_reason": "length",
+      "completion_tokens": 1000,
+      "prompt_tokens": 2242,
+      "total_tokens": 3242,
+      "response_id": "chatcmpl-D9YCzfKIIo9pjXUmAH54uiPWyKYN8",
+      "model_returned": "gpt-5-nano-2025-08-07"
+    },
+    "processing_time": 5.103419065475464
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-18391_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6449790000915527
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-20304_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.6352291107177734
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-13355_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.839594841003418
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/IMG_4012.HEIC",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.39769601821899414
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-13246_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.7967331409454346
+  },
+  {
+    "status": "error",
+    "image_path": "/Volumes/home/Photos/MobileBackup/iPhone/2025/09/photo-15023_singular_display_fullPicture.heic",
+    "image_extension": ".heic",
+    "model": "gpt-5-nano-2025-08-07",
+    "error": "Error code: 400 - {'error': {'message': \"You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].\", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_format'}}",
+    "processing_time": 0.699951171875
+  }
+]

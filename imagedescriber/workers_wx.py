@@ -258,6 +258,16 @@ class ProcessingWorker(threading.Thread):
             processing_duration = time.time() - start_time
             metadata['processing_time_seconds'] = round(processing_duration, 2)
             
+            # Extract diagnostic info from provider (for debugging empty responses - Issue #91)
+            if hasattr(provider_obj, 'last_usage') and provider_obj.last_usage:
+                usage = provider_obj.last_usage
+                if 'finish_reason' in usage:
+                    metadata['finish_reason'] = usage['finish_reason']
+                if 'completion_tokens' in usage:
+                    metadata['completion_tokens'] = usage['completion_tokens']
+                if 'response_id' in usage:
+                    metadata['response_id'] = usage['response_id']
+            
             # Add location byline if geocoding data is available
             description = self._add_location_byline(description, metadata)
             
@@ -364,6 +374,10 @@ class ProcessingWorker(threading.Thread):
             pass
         return config
     
+    # Class-level provider cache for single-image mode (reduces initialization overhead)
+    _provider_cache = {}
+    _cache_lock = None  # Will be initialized on first use
+    
     def _process_with_ai(self, image_path: str, prompt: str, api_key: Optional[str] = None) -> tuple:
         """Process image with selected AI provider
         
@@ -378,13 +392,21 @@ class ProcessingWorker(threading.Thread):
         if not get_available_providers:
             raise Exception("AI providers module not available")
         
-        # Get available providers
-        providers = get_available_providers()
-        
-        if self.provider not in providers:
-            raise Exception(f"Provider '{self.provider}' not available")
-        
-        provider = providers[self.provider]
+        # Use cached provider if available (reduces connection overhead for single-image mode)
+        cache_key = f"{self.provider}_{self.model}_{api_key or ''}"
+        if cache_key in ProcessingWorker._provider_cache:
+            provider = ProcessingWorker._provider_cache[cache_key]
+        else:
+            # Get fresh provider instance
+            providers = get_available_providers()
+            
+            if self.provider not in providers:
+                raise Exception(f"Provider '{self.provider}' not available")
+            
+            provider = providers[self.provider]
+            
+            # Cache for future use (improves single-image performance)
+            ProcessingWorker._provider_cache[cache_key] = provider
         
         # Inject API key if provided and provider supports it
         if api_key and hasattr(provider, 'api_key'):
@@ -410,21 +432,44 @@ class ProcessingWorker(threading.Thread):
             # Check file size and resize if too large
             # Claude has 5MB limit, target 3.75MB to account for base64 encoding overhead
             max_size = 3.75 * 1024 * 1024  # 3.75MB
+            temp_image_path = None
+            
             if len(image_data) > max_size:
+                # Resize and save to temporary file
                 image_data = self._resize_image_data(image_data, max_size)
-            
-            # Process with the selected provider
-            if self.provider == "object_detection" and self.detection_settings:
-                description = provider.describe_image(image_path, prompt, self.model, 
-                                                     yolo_settings=self.detection_settings)
-            elif self.provider in ["grounding_dino", "grounding_dino_hybrid"] and self.detection_settings:
-                description = provider.describe_image(image_path, prompt, self.model, 
-                                                     **self.detection_settings)
+                
+                # Create temp file with optimized image
+                temp_dir = Path(tempfile.gettempdir())
+                temp_image_path = temp_dir / f"temp_optimized_{int(time.time())}_{Path(image_path).stem}.jpg"
+                with open(temp_image_path, 'wb') as f:
+                    f.write(image_data)
+                
+                # Use temp file path for processing
+                processing_path = str(temp_image_path)
             else:
-                description = provider.describe_image(image_path, prompt, self.model)
+                # Use original file path
+                processing_path = image_path
             
-            # Return both description and provider instance for token usage tracking
-            return (description, provider)
+            try:
+                # Process with the selected provider
+                if self.provider == "object_detection" and self.detection_settings:
+                    description = provider.describe_image(processing_path, prompt, self.model, 
+                                                         yolo_settings=self.detection_settings)
+                elif self.provider in ["grounding_dino", "grounding_dino_hybrid"] and self.detection_settings:
+                    description = provider.describe_image(processing_path, prompt, self.model, 
+                                                         **self.detection_settings)
+                else:
+                    description = provider.describe_image(processing_path, prompt, self.model)
+                
+                # Return both description and provider instance for token usage tracking
+                return (description, provider)
+            finally:
+                # Clean up temp file if created
+                if temp_image_path and temp_image_path.exists():
+                    try:
+                        temp_image_path.unlink()
+                    except Exception as e:
+                        logging.warning(f"Could not delete temp file {temp_image_path}: {e}")
                 
         except Exception as e:
             raise Exception(f"AI processing failed: {str(e)}")

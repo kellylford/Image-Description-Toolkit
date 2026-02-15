@@ -347,20 +347,22 @@ class ImageDescriber:
                 
             elif self.provider_name == "openai":
                 logger.info("Initializing OpenAI provider...")
-                if not self.api_key:
-                    raise ValueError("OpenAI provider requires an API key. Use --api-key-file option.")
-                # Pass api_key to constructor so client initializes correctly
+                # Provider will try: explicit api_key → config file → env var → api key file
+                # So we can pass None and let it fallback through the chain
                 provider = OpenAIProvider(api_key=self.api_key)
+                if not provider.is_available():
+                    raise ValueError("OpenAI provider requires an API key. Provide via --api-key-file, config file (image_describer_config.json), or OPENAI_API_KEY environment variable.")
                 return provider
                 
             elif self.provider_name == "claude":
                 logger.info("Initializing Claude provider...")
-                if not self.api_key:
-                    raise ValueError("Claude provider requires an API key. Use --api-key-file option.")
-                # Pass api_key to constructor so client initializes correctly
+                # Provider will try: explicit api_key → config file → env var → api key file
+                # So we can pass None and let it fallback through the chain
                 provider = ClaudeProvider(api_key=self.api_key)
                 logger.info(f"Claude provider initialized. API key set: {bool(provider.api_key)}, Client available: {bool(provider.client)}, Is available: {provider.is_available()}")
                 print(f"INFO: Claude provider - API key set: {bool(provider.api_key)}, Client: {bool(provider.client)}, Available: {provider.is_available()}")
+                if not provider.is_available():
+                    raise ValueError("Claude provider requires an API key. Provide via --api-key-file, config file (image_describer_config.json), or ANTHROPIC_API_KEY environment variable.")
                 return provider
                 
             elif self.provider_name == "huggingface":
@@ -2020,8 +2022,12 @@ def main():
         print("             Requires: Ollama running locally")
         print()
         print("openai       - OpenAI cloud models")
-        print("             Models: gpt-4o, gpt-4o-mini, gpt-4-vision-preview")
-        print("             Requires: API key (--api-key-file or OPENAI_API_KEY)")
+        print("             Models: gpt-5.2, gpt-5, gpt-4o, gpt-4o-mini, etc.")
+        print("             Requires: API key via --api-key-file, config file, or OPENAI_API_KEY")
+        print()
+        print("claude       - Anthropic Claude models")
+        print("             Models: claude-opus-4-6, claude-sonnet-4-5, claude-haiku-4-5, etc.")
+        print("             Requires: API key via --api-key-file, config file, or ANTHROPIC_API_KEY")
         print()
         print("copilot      - Copilot+ PC NPU acceleration (experimental)")
         print("             Models: florence-2")
@@ -2115,7 +2121,7 @@ Configuration:
     parser.add_argument(
         "--api-key-file",
         type=str,
-        help="Path to file containing API key for cloud providers (OpenAI, Claude)"
+        help="Path to file containing API key for cloud providers. Optional if key is in config file (image_describer_config.json) or environment variable"
     )
     parser.add_argument(
         "--recursive",
@@ -2265,9 +2271,9 @@ Configuration:
         if api_key:
             logger.info(f"Using API key from environment variable {env_var}")
         else:
-            logger.error(f"Provider '{args.provider}' requires an API key.")
-            logger.error(f"Provide it via --api-key-file or set {env_var} environment variable")
-            sys.exit(1)
+            logger.warning(f"Provider '{args.provider}' requires an API key.")
+            logger.warning(f"Provide it via --api-key-file, config file (image_describer_config.json), or {env_var} environment variable")
+            logger.warning(f"Note: Provider will attempt to load from config file automatically")
     
     # Create ImageDescriber instance with memory optimization
     describer = ImageDescriber(

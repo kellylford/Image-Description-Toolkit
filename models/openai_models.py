@@ -21,34 +21,71 @@ from typing import List, Dict, Any
 # Only includes models with vision capabilities for image description tasks
 OPENAI_MODELS = [
     # ====================
-    # O1 SERIES (Latest reasoning models - 2024)
+    # GPT-5 SERIES (Latest - 2025/2026)
     # ====================
-    "o1",                               # Latest reasoning model
+    "gpt-5.2",                          # Latest flagship for coding and agentic tasks
+                                        # $1.75 input / $14 output per MTok
+                                        # Supports vision (Image input only)
+    
+    "gpt-5.2-pro",                      # Premium tier GPT-5.2
+                                        # Higher capability for complex tasks
+    
+    "gpt-5.1",                          # Mid-tier GPT-5 reasoning model
+                                        # Balanced performance between 5.2 and 5
+                                        # Supports vision (Image input only)
+    
+    "gpt-5",                            # Standard GPT-5 reasoning model
+                                        # $1.25 input / $10 output per MTok
+                                        # Supports vision (Image input only)
+    
+    "gpt-5-pro",                        # Premium tier GPT-5
+                                        # Higher capability for complex tasks
+    
+    "gpt-5-mini",                       # Faster, cost-efficient GPT-5
+                                        # $0.25 input / $2 output per MTok
+                                        # Supports vision (Image input only)
+    
+    "gpt-5-nano",                       # Ultra-budget GPT-5
+                                        # Most affordable GPT-5 tier
+                                        # Supports vision (Image input only)
+    
+    # ====================
+    # O1 SERIES (Reasoning models - 2024)
+    # ====================
+    "o1",                               # Previous o-series reasoning model
     "o1-mini",                          # Smaller reasoning model
     "o1-preview",                       # Preview of o1 capabilities
     
     # ====================
     # GPT-4o SERIES (Omni - multimodal, 2024)
     # ====================
-    "gpt-4o",                           # Latest GPT-4 Omni (RECOMMENDED)
+    "gpt-4o",                           # GPT-4 Omni (RECOMMENDED for non-reasoning tasks)
                                         # Fast, multimodal, 128K context
     
-    "gpt-4o-mini",                      # Smaller, faster, more affordable
+    "gpt-4o-mini",                      # Smaller, faster, most affordable
                                         # Great for most image description tasks
     
     "chatgpt-4o-latest",                # Latest ChatGPT model
     
     # ====================
+    # GPT-4.1 SERIES (Enhanced, 2025)
+    # ====================
+    "gpt-4.1",                          # GPT-4.1 standard
+    "gpt-4.1-mini",                     # Smaller GPT-4.1
+    "gpt-4.1-nano",                     # Ultra-budget GPT-4.1
+    
+    # ====================
     # GPT-4 TURBO (Enhanced GPT-4, 2023-2024)
     # ====================
-    "gpt-4-turbo",                      # Latest GPT-4 Turbo with vision
+    "gpt-4-turbo",                      # GPT-4 Turbo with vision (older)
     "gpt-4-turbo-preview",              # Preview version
     
     # ====================
     # GPT-4 (Original, 2023)
     # ====================
-    "gpt-4",                            # Original GPT-4
-    "gpt-4-vision-preview"              # GPT-4 with vision (legacy)
+    # NOTE: Plain "gpt-4" does NOT support images (text-only)
+    # gpt-4-vision-preview is deprecated/removed as of 2026
+    # Use gpt-4o, gpt-5 series, or gpt-4-turbo for vision tasks
 ]
 
 # Recommended models for different use cases

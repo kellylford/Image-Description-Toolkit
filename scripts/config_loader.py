@@ -59,7 +59,6 @@ def resolve_config(
         p = Path(cfg_dir) / filename
         if _exists_file(p):
             # Log when using IDT_CONFIG_DIR to help with troubleshooting
-            import sys
             print(f"INFO: Using config from IDT_CONFIG_DIR environment variable", file=sys.stderr)
             print(f"      Location: {p}", file=sys.stderr)
             print(f"      To change: Windows: setx IDT_CONFIG_DIR \"\"", file=sys.stderr)
