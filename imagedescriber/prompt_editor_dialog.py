@@ -75,7 +75,8 @@ try:
     from imagedescriber.ai_providers import (
         OllamaProvider,
         OpenAIProvider,
-        ClaudeProvider
+        ClaudeProvider,
+        DEV_CLAUDE_MODELS
     )
     AI_PROVIDERS_AVAILABLE = True
 except ImportError as e:
@@ -390,12 +391,8 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 ]
                 
             elif provider == "claude":
-                # Claude models
-                available_models = [
-                    "claude-sonnet-4-5-20250929",
-                    "claude-opus-4-1-20250805",
-                    "claude-haiku-4-5-20251001"
-                ]
+                # Claude models - sourced from central registry via ai_providers
+                available_models = list(DEV_CLAUDE_MODELS) if AI_PROVIDERS_AVAILABLE else []
             else:
                 available_models = []
             

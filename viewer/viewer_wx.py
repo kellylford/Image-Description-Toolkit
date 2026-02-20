@@ -547,8 +547,8 @@ class RedescribeWorkflowDialog(wx.Dialog):
                 self.model_choice.Append("gpt-4o")
                 self.model_choice.Append("gpt-4o-mini")
             elif prov_key == "claude":
+                self.model_choice.Append("claude-opus-4-6")
                 self.model_choice.Append("claude-sonnet-4-5-20250929")
-                self.model_choice.Append("claude-3-5-sonnet-20241022")
                 self.model_choice.Append("claude-haiku-4-5-20251001")
         if self.model_choice.GetCount() > 0:
             self.model_choice.SetSelection(0)

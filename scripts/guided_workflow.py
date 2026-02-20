@@ -494,7 +494,6 @@ def guided_workflow(custom_config_path=None):
                 "claude-opus-4-6 (most intelligent, agents and coding)",
                 "claude-sonnet-4-5-20250929 (best balance, recommended)",
                 "claude-haiku-4-5-20251001 (fastest)",
-                "claude-3-5-haiku-20241022 (most affordable)"
             ]
         print("Available Claude models:")
         model_choice = get_choice("Select a model", claude_models, default=1, allow_back=True)

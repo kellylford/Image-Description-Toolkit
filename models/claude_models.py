@@ -2,13 +2,16 @@
 Claude Models Configuration - Single Source of Truth
 
 This file defines all available Claude models across the toolkit.
-ALL components (IDT CLI, ImageDescriber GUI, etc.) MUST import from this file.
+ALL components (IDT CLI, ImageDescriber GUI, scripts, etc.) MUST import from
+this file. Do NOT hardcode Claude model IDs in other files.
 
-Last updated: 2026-02-09
-Source: https://platform.claude.com/docs/en/docs/about-claude/models
+Last updated: 2026-02-20
+Source: https://www.anthropic.com/pricing
 
 NOTE: Claude doesn't provide an API to list models dynamically, so we maintain
-this hardcoded list and update it when new models are released.
+this hardcoded list and update it when new models are released or deprecated.
+For current pricing, see the Anthropic pricing page — we store relative cost
+tiers ($ / $$ / $$$) here rather than exact figures that change frequently.
 """
 
 from typing import List, Dict, Any
@@ -65,7 +68,9 @@ CLAUDE_RECOMMENDED = {
     "most_affordable": "claude-haiku-4-5-20251001"
 }
 
-# Model metadata for display in UIs
+# Model metadata for display in UIs.
+# cost: "$" = cheapest, "$$" = mid-range, "$$$" = most expensive
+# For exact pricing see https://www.anthropic.com/pricing
 CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
     "claude-opus-4-6": {
         "name": "Claude Opus 4.6",
@@ -75,8 +80,7 @@ CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
         "max_output": 128000,
         "supports_vision": True,
         "supports_adaptive_thinking": True,
-        "pricing_input_mtok": 5.0,
-        "pricing_output_mtok": 25.0,
+        "cost": "$$$",
         "recommended": True
     },
     "claude-sonnet-4-5-20250929": {
@@ -87,8 +91,7 @@ CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
         "max_output": 64000,
         "supports_vision": True,
         "supports_adaptive_thinking": False,
-        "pricing_input_mtok": 3.0,
-        "pricing_output_mtok": 15.0,
+        "cost": "$$",
         "recommended": True
     },
     "claude-haiku-4-5-20251001": {
@@ -99,22 +102,42 @@ CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
         "max_output": 64000,
         "supports_vision": True,
         "supports_adaptive_thinking": False,
-        "pricing_input_mtok": 1.0,
-        "pricing_output_mtok": 5.0,
+        "cost": "$",
         "recommended": True
     },
-    "claude-3-5-haiku-20241022": {
-        "name": "Claude Haiku 3.5",
-        "description": "DEPRECATED - Returns 404. Use claude-haiku-4-5-20251001 instead.",
-        "generation": "3.5",
+    "claude-opus-4-1-20250805": {
+        "name": "Claude Opus 4.1",
+        "description": "High intelligence (legacy, prefer claude-opus-4-6)",
+        "generation": "4.1",
         "context_window": 200000,
-        "max_output": 8192,
+        "max_output": 32000,
         "supports_vision": True,
         "supports_adaptive_thinking": False,
-        "pricing_input_mtok": 0.8,
-        "pricing_output_mtok": 4.0,
+        "cost": "$$$",
         "recommended": False
-    }
+    },
+    "claude-opus-4-20250514": {
+        "name": "Claude Opus 4.0",
+        "description": "Original 4th generation high intelligence (legacy)",
+        "generation": "4.0",
+        "context_window": 200000,
+        "max_output": 32000,
+        "supports_vision": True,
+        "supports_adaptive_thinking": False,
+        "cost": "$$$",
+        "recommended": False
+    },
+    "claude-sonnet-4-20250514": {
+        "name": "Claude Sonnet 4.0",
+        "description": "Original 4th generation balanced performance (legacy)",
+        "generation": "4.0",
+        "context_window": 200000,
+        "max_output": 64000,
+        "supports_vision": True,
+        "supports_adaptive_thinking": False,
+        "cost": "$$",
+        "recommended": False
+    },
 }
 
 
@@ -131,26 +154,22 @@ def get_claude_models() -> List[str]:
 def get_recommended_claude_models() -> List[str]:
     """
     Get recommended Claude models for image description tasks.
-    
+
     Returns:
-        List of recommended model IDs
+        List of recommended model IDs (from CLAUDE_MODELS, preserving order)
     """
-    return [
-        "claude-opus-4-6",
-        "claude-sonnet-4-5-20250929",
-        "claude-haiku-4-5-20251001"
-    ]
+    return [m for m in CLAUDE_MODELS if CLAUDE_MODEL_METADATA.get(m, {}).get("recommended", False)]
 
 
 def get_claude_model_info(model_id: str) -> Dict[str, Any]:
     """
     Get metadata for a specific Claude model.
-    
+
     Args:
         model_id: Claude model ID
-        
+
     Returns:
-        Dictionary of model metadata, or basic info if not found
+        Dictionary of model metadata, or basic info if model is not in the registry
     """
     return CLAUDE_MODEL_METADATA.get(model_id, {
         "name": model_id,
