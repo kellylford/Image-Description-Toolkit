@@ -41,23 +41,13 @@ CLAUDE_MODELS = [
     "claude-opus-4-20250514",           # High intelligence (legacy)
     "claude-sonnet-4-20250514",         # Balanced performance (legacy)
     
-    # ====================
-    # CLAUDE 3.x SERIES
-    # ====================
-    
-    # Claude 3.7 - Feb 2025
-    "claude-3-7-sonnet-20250219",       # Fast and capable
-    
-    # Claude 3.5 - Popular choices (Oct-Nov 2024)
-    "claude-3-5-sonnet-20241022",       # Great for most tasks
-    # claude-3-5-haiku-20241022 REMOVED: Returns 404 as of Feb 2026 - use claude-haiku-4-5-20251001
-    
-    # Claude 3.0 - Original 3rd generation (Feb-Mar 2024)
-    "claude-3-opus-20240229",           # High intelligence
-    "claude-3-sonnet-20240229",         # Balanced
-    # claude-3-haiku-20240307 REMOVED: Deprecated by Anthropic, shutting down April 2026
-    
-    # NOTE: All Claude 3+ models support vision. Claude 2.x excluded (no vision support)
+    # CLAUDE 3.x SERIES - ALL REMOVED
+    # claude-3-7-sonnet-20250219 - deprecated by Anthropic
+    # claude-3-5-sonnet-20241022 - deprecated by Anthropic
+    # claude-3-5-haiku-20241022 - returns 404 as of Feb 2026
+    # claude-3-opus-20240229    - deprecated by Anthropic
+    # claude-3-sonnet-20240229  - deprecated by Anthropic
+    # claude-3-haiku-20240307   - shutting down April 19, 2026
 ]
 
 # Model aliases (some models have shorter aliases)

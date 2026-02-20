@@ -212,25 +212,7 @@ MODEL_METADATA = {
         "cost": "$$$",
         "tags": ["vision", "cloud", "accurate"]
     },
-    "claude-3-7-sonnet-20250219": {
-        "provider": "claude",
-        "description": "Claude 3.7 Sonnet",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$$",
-        "tags": ["vision", "cloud"]
-    },
-    "claude-3-5-haiku-20241022": {
-        "provider": "claude",
-        "description": "Claude 3.5 Haiku - DEPRECATED (returns 404)",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$",
-        "tags": ["vision", "cloud", "fast"]
-    },
-    # claude-3-haiku-20240307 REMOVED: Deprecated by Anthropic, shutting down April 2026
+    # All Claude 3.x models removed - deprecated by Anthropic (Feb-Apr 2026)
     
     # HuggingFace Models (Florence-2)
     "microsoft/Florence-2-base": {
