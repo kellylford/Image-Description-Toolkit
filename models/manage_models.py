@@ -167,6 +167,15 @@ MODEL_METADATA = {
     },
     
     # Claude (Anthropic) Models
+    "claude-haiku-4-5-20251001": {
+        "provider": "claude",
+        "description": "Claude Haiku 4.5 - Fastest, cheapest",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": True,
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast", "recommended"]
+    },
     "claude-sonnet-4-5-20250929": {
         "provider": "claude",
         "description": "Claude Sonnet 4.5 - Latest, most capable",
@@ -214,12 +223,12 @@ MODEL_METADATA = {
     },
     "claude-3-5-haiku-20241022": {
         "provider": "claude",
-        "description": "Claude 3.5 Haiku - Fastest, cheapest",
+        "description": "Claude 3.5 Haiku - DEPRECATED (returns 404)",
         "size": "Cloud-based",
         "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": True,
+        "recommended": False,
         "cost": "$",
-        "tags": ["vision", "cloud", "fast", "recommended"]
+        "tags": ["vision", "cloud", "fast"]
     },
     "claude-3-haiku-20240307": {
         "provider": "claude",

@@ -394,7 +394,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 available_models = [
                     "claude-sonnet-4-5-20250929",
                     "claude-opus-4-1-20250805",
-                    "claude-3-5-haiku-20241022"
+                    "claude-haiku-4-5-20251001"
                 ]
             else:
                 available_models = []

@@ -50,7 +50,7 @@ CLAUDE_MODELS = [
     
     # Claude 3.5 - Popular choices (Oct-Nov 2024)
     "claude-3-5-sonnet-20241022",       # Great for most tasks
-    "claude-3-5-haiku-20241022",        # Fast and affordable
+    # claude-3-5-haiku-20241022 REMOVED: Returns 404 as of Feb 2026 - use claude-haiku-4-5-20251001
     
     # Claude 3.0 - Original 3rd generation (Feb-Mar 2024)
     "claude-3-opus-20240229",           # High intelligence
@@ -72,7 +72,7 @@ CLAUDE_RECOMMENDED = {
     "best_overall": "claude-opus-4-6",
     "best_balance": "claude-sonnet-4-5-20250929",
     "fastest": "claude-haiku-4-5-20251001",
-    "most_affordable": "claude-3-5-haiku-20241022"
+    "most_affordable": "claude-haiku-4-5-20251001"
 }
 
 # Model metadata for display in UIs
@@ -115,7 +115,7 @@ CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
     },
     "claude-3-5-haiku-20241022": {
         "name": "Claude Haiku 3.5",
-        "description": "Fast and affordable (most economical)",
+        "description": "DEPRECATED - Returns 404. Use claude-haiku-4-5-20251001 instead.",
         "generation": "3.5",
         "context_window": 200000,
         "max_output": 8192,
@@ -123,7 +123,7 @@ CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
         "supports_adaptive_thinking": False,
         "pricing_input_mtok": 0.8,
         "pricing_output_mtok": 4.0,
-        "recommended": True
+        "recommended": False
     }
 }
 
@@ -148,8 +148,7 @@ def get_recommended_claude_models() -> List[str]:
     return [
         "claude-opus-4-6",
         "claude-sonnet-4-5-20250929",
-        "claude-haiku-4-5-20251001",
-        "claude-3-5-haiku-20241022"
+        "claude-haiku-4-5-20251001"
     ]
 
 
