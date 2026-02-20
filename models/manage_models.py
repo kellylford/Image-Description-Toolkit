@@ -230,15 +230,7 @@ MODEL_METADATA = {
         "cost": "$",
         "tags": ["vision", "cloud", "fast"]
     },
-    "claude-3-haiku-20240307": {
-        "provider": "claude",
-        "description": "Claude 3.0 Haiku - Budget option",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$",
-        "tags": ["vision", "cloud", "fast"]
-    },
+    # claude-3-haiku-20240307 REMOVED: Deprecated by Anthropic, shutting down April 2026
     
     # HuggingFace Models (Florence-2)
     "microsoft/Florence-2-base": {

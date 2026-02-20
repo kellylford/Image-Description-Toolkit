@@ -55,7 +55,7 @@ CLAUDE_MODELS = [
     # Claude 3.0 - Original 3rd generation (Feb-Mar 2024)
     "claude-3-opus-20240229",           # High intelligence
     "claude-3-sonnet-20240229",         # Balanced
-    "claude-3-haiku-20240307",          # Fast and compact
+    # claude-3-haiku-20240307 REMOVED: Deprecated by Anthropic, shutting down April 2026
     
     # NOTE: All Claude 3+ models support vision. Claude 2.x excluded (no vision support)
 ]
