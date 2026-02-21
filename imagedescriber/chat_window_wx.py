@@ -171,10 +171,11 @@ class ChatDialog(wx.Dialog):
                 self.model_combo.SetStringSelection('gpt-4o')
                 
             elif provider == 'claude':
-                # Import the official Claude models list
-                from ai_providers import DEV_CLAUDE_MODELS
+                # Import the official Claude models list with friendly display names
+                from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
                 for model in DEV_CLAUDE_MODELS:
-                    self.model_combo.Append(model)
+                    display = CLAUDE_MODEL_METADATA.get(model, {}).get('name', model)
+                    self.model_combo.Append(display, model)  # client data = API ID
                 # Set to first available model (list is ordered by recommendation)
                 if self.model_combo.GetCount() > 0:
                     self.model_combo.SetSelection(0)
@@ -197,21 +198,26 @@ class ChatDialog(wx.Dialog):
                 self.model_combo.Append('gpt-4o')
                 self.model_combo.SetSelection(0)
             elif provider == 'claude':
-                # Use first model from official Claude models list
-                from ai_providers import DEV_CLAUDE_MODELS
+                # Use first model from official Claude models list with friendly display name
+                from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
                 if DEV_CLAUDE_MODELS:
-                    self.model_combo.Append(DEV_CLAUDE_MODELS[0])
+                    api_id = DEV_CLAUDE_MODELS[0]
+                    display = CLAUDE_MODEL_METADATA.get(api_id, {}).get('name', api_id)
+                    self.model_combo.Append(display, api_id)
                     self.model_combo.SetSelection(0)
         
     def get_selections(self) -> Dict[str, str]:
-        """Get selected provider and model
-        
-        Returns:
-            Dictionary with 'provider' and 'model' keys
-        """
+        """Get selected provider and model.
+        Returns the API model ID (client data for Claude models), not the friendly display name."""
+        selection = self.model_combo.GetSelection()
+        if selection != wx.NOT_FOUND:
+            client_data = self.model_combo.GetClientData(selection)
+            model = client_data if client_data is not None else self.model_combo.GetStringSelection()
+        else:
+            model = self.model_combo.GetStringSelection()
         return {
             'provider': self.provider_choice.GetStringSelection().lower(),
-            'model': self.model_combo.GetStringSelection()
+            'model': model
         }
 
 

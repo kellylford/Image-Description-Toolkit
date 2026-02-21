@@ -325,10 +325,19 @@ class FollowupQuestionDialog(wx.Dialog):
         model_box = wx.StaticBox(self, label="AI Model for Follow-up")
         model_sizer = wx.StaticBoxSizer(model_box, wx.VERTICAL)
         
-        # Show original model
+        # Show original model with friendly display name for Claude models
+        try:
+            from ai_providers import format_claude_model_for_display
+            original_model_display = (
+                format_claude_model_for_display(self.original_model)
+                if self.original_provider.lower() == 'claude'
+                else self.original_model
+            )
+        except Exception:
+            original_model_display = self.original_model
         original_label = wx.StaticText(
             self,
-            label=f"Original: {self.original_provider.title()} - {self.original_model}"
+            label=f"Original: {self.original_provider.title()} - {original_model_display}"
         )
         original_label.SetFont(original_label.GetFont().MakeItalic())
         model_sizer.Add(original_label, 0, wx.ALL, 5)
@@ -423,10 +432,11 @@ class FollowupQuestionDialog(wx.Dialog):
                     self.model_combo.Append(model)
                     
             elif provider == "claude":
-                # Import the official Claude models list
-                from ai_providers import DEV_CLAUDE_MODELS
+                # Import the official Claude models list with friendly display names
+                from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
                 for model in DEV_CLAUDE_MODELS:
-                    self.model_combo.Append(model)
+                    display = CLAUDE_MODEL_METADATA.get(model, {}).get("name", model)
+                    self.model_combo.Append(display, model)  # client data = API ID
         except Exception as e:
             logger.warning(f"Error populating models: {e}")
         
@@ -438,17 +448,26 @@ class FollowupQuestionDialog(wx.Dialog):
         else:
             # Fallback to original model - try to find and select it
             try:
-                self.model_combo.Append(self.original_model)
-                self.model_combo.SetStringSelection(self.original_model)
+                from ai_providers import CLAUDE_MODEL_METADATA
+                display = CLAUDE_MODEL_METADATA.get(self.original_model, {}).get("name", self.original_model)
+                self.model_combo.Append(display, self.original_model)
+                self.model_combo.SetSelection(0)
             except:
                 pass  # Silently ignore if can't set fallback
     
     def get_values(self):
-        """Get the question and selected model/provider"""
+        """Get the question and selected model/provider.
+        Returns the API model ID (client data), not the friendly display name."""
+        selection = self.model_combo.GetSelection()
+        if selection != wx.NOT_FOUND:
+            client_data = self.model_combo.GetClientData(selection)
+            model = client_data if client_data is not None else self.model_combo.GetStringSelection()
+        else:
+            model = self.model_combo.GetStringSelection()
         return {
             'question': self.question_text.GetValue().strip(),
             'provider': self.provider_choice.GetStringSelection(),
-            'model': self.model_combo.GetStringSelection()
+            'model': model
         }
 
 
@@ -669,10 +688,11 @@ class ProcessingOptionsDialog(wx.Dialog):
                     self.model_combo.Append(model)
                 self.model_combo.SetStringSelection("gpt-4o")
             elif provider == "claude":
-                # Import the official Claude models list
-                from ai_providers import DEV_CLAUDE_MODELS
+                # Import the official Claude models list with friendly display names
+                from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
                 for model in DEV_CLAUDE_MODELS:
-                    self.model_combo.Append(model)
+                    display = CLAUDE_MODEL_METADATA.get(model, {}).get("name", model)
+                    self.model_combo.Append(display, model)  # client data = API ID
                 # Set to first available model (list is ordered by recommendation)
                 if self.model_combo.GetCount() > 0:
                     self.model_combo.SetSelection(0)
@@ -739,11 +759,18 @@ class ProcessingOptionsDialog(wx.Dialog):
                 logger.debug(f"Default prompt '{default_style}' not found, using first item")
     
     def get_config(self):
-        """Get the configured options"""
+        """Get the configured options.
+        Returns the API model ID (client data for Claude models), not the friendly display name."""
+        selection = self.model_combo.GetSelection()
+        if selection != wx.NOT_FOUND:
+            client_data = self.model_combo.GetClientData(selection)
+            model = client_data if client_data is not None else self.model_combo.GetStringSelection()
+        else:
+            model = self.model_combo.GetStringSelection()
         return {
             'skip_existing': self.skip_existing_cb.GetValue(),
             'provider': self.provider_choice.GetStringSelection().lower(),
-            'model': self.model_combo.GetStringSelection(),
+            'model': model,
             'prompt_style': self.prompt_choice.GetStringSelection(),
             'custom_prompt': self.custom_prompt_input.GetValue(),
         }

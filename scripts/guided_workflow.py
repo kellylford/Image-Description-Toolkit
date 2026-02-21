@@ -524,14 +524,17 @@ def guided_workflow(custom_config_path=None):
         try:
             from models.claude_models import get_claude_models, format_claude_model_for_display
             model_ids = get_claude_models()
-            claude_models = [format_claude_model_for_display(m) for m in model_ids]
+            # Build a mapping of friendly display name → API ID
+            claude_model_map = {format_claude_model_for_display(m): m for m in model_ids}
+            claude_models = list(claude_model_map.keys())
         except ImportError:
             # Fallback if models package not available
-            claude_models = [
-                "claude-opus-4-6 (most intelligent, agents and coding)",
-                "claude-sonnet-4-5-20250929 (best balance, recommended)",
-                "claude-haiku-4-5-20251001 (fastest)",
-            ]
+            claude_model_map = {
+                "Claude Opus 4.6": "claude-opus-4-6",
+                "Claude Sonnet 4.5": "claude-sonnet-4-5-20250929",
+                "Claude Haiku 4.5": "claude-haiku-4-5-20251001",
+            }
+            claude_models = list(claude_model_map.keys())
         print("Available Claude models:")
         model_choice = get_choice("Select a model", claude_models, default=1, allow_back=True)
         if model_choice == 'EXIT':
@@ -540,8 +543,8 @@ def guided_workflow(custom_config_path=None):
         if model_choice == 'BACK':
             # Go back to provider selection - restart function
             return guided_workflow()
-        # Extract just the model name (before the space/parenthesis)
-        model = model_choice.split()[0]
+        # Map the friendly display name back to the actual API ID
+        model = claude_model_map.get(model_choice, model_choice)
     
     elif provider == 'huggingface':
         # Check if HuggingFace provider is available

@@ -76,11 +76,13 @@ try:
         OllamaProvider,
         OpenAIProvider,
         ClaudeProvider,
-        DEV_CLAUDE_MODELS
+        DEV_CLAUDE_MODELS,
+        CLAUDE_MODEL_METADATA,
     )
     AI_PROVIDERS_AVAILABLE = True
 except ImportError as e:
     AI_PROVIDERS_AVAILABLE = False
+    CLAUDE_MODEL_METADATA = {}
     print(f"Warning: AI providers not available: {e}")
 
 
@@ -406,16 +408,23 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             
             # Add models to combo box
             for model_name in available_models:
-                # Check if we have info about this model in config
-                model_info = self.config_data.get('available_models', {}).get(model_name, {})
-                description = model_info.get('description', '')
-                recommended = model_info.get('recommended', False)
-                
-                display_text = f"{model_name}"
-                if recommended:
-                    display_text += " (Recommended)"
-                if description:
-                    display_text += f" - {description}"
+                # For Claude models, prefer friendly names from CLAUDE_MODEL_METADATA
+                claude_meta = CLAUDE_MODEL_METADATA.get(model_name, {})
+                if claude_meta.get('name'):
+                    # Use friendly display name (e.g. "Claude Sonnet 4.5")
+                    display_text = claude_meta['name']
+                    description = claude_meta.get('description', '')
+                    recommended = claude_meta.get('recommended', False)
+                else:
+                    # Fallback: look in config_data (used for Ollama/OpenAI)
+                    model_info = self.config_data.get('available_models', {}).get(model_name, {})
+                    description = model_info.get('description', '')
+                    recommended = model_info.get('recommended', False)
+                    display_text = f"{model_name}"
+                    if recommended:
+                        display_text += " (Recommended)"
+                    if description:
+                        display_text += f" - {description}"
                 
                 self.default_model_combo.Append(display_text, model_name)
             

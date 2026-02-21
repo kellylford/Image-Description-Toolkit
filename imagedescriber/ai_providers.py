@@ -101,14 +101,34 @@ except ImportError:
 # Import Claude models from central configuration
 # IMPORTANT: DO NOT define models here - use models/claude_models.py as single source of truth
 try:
-    from models.claude_models import CLAUDE_MODELS as DEV_CLAUDE_MODELS
+    from models.claude_models import (
+        CLAUDE_MODELS as DEV_CLAUDE_MODELS,
+        CLAUDE_MODEL_METADATA,
+        get_claude_model_info,
+        format_claude_model_for_display,
+        get_claude_api_id_from_display,
+    )
 except ImportError:
     # Fallback if models package not available
     DEV_CLAUDE_MODELS = [
         "claude-opus-4-6",
         "claude-sonnet-4-5-20250929",
-        "claude-haiku-4-5-20251001"
+        "claude-haiku-4-5-20251001",
     ]
+    CLAUDE_MODEL_METADATA = {
+        "claude-opus-4-6":           {"name": "Claude Opus 4.6"},
+        "claude-sonnet-4-5-20250929": {"name": "Claude Sonnet 4.5"},
+        "claude-haiku-4-5-20251001":  {"name": "Claude Haiku 4.5"},
+    }
+    def get_claude_model_info(model_id: str):
+        return CLAUDE_MODEL_METADATA.get(model_id, {"name": model_id})
+    def format_claude_model_for_display(model_id: str, include_description: bool = False) -> str:
+        return CLAUDE_MODEL_METADATA.get(model_id, {}).get("name", model_id)
+    def get_claude_api_id_from_display(display_name_or_id: str) -> str:
+        for api_id, meta in CLAUDE_MODEL_METADATA.items():
+            if meta.get("name") == display_name_or_id:
+                return api_id
+        return display_name_or_id
 
 
 def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):
