@@ -23,11 +23,14 @@ CLAUDE_MODELS = [
     # CLAUDE 4.x SERIES (Latest - 2025)
     # ====================
     
-    # Claude 4.6 - Latest generation (May 2025)
+    # Claude 4.6 - Latest generation (2025)
     "claude-opus-4-6",                  # Most intelligent - agents, complex coding, adaptive thinking
                                         # $5 input / $25 output per MTok
                                         # 200K context (1M beta), 128K max output
-    
+    "claude-sonnet-4-6",                # Best balance of speed and intelligence
+                                        # $3 input / $15 output per MTok
+                                        # 200K context (1M beta), 64K max output
+
     # Claude 4.5 - Fast and capable (Oct 2024 - Jan 2025)
     "claude-sonnet-4-5-20250929",       # Best balance - speed + intelligence (RECOMMENDED)
                                         # $3 input / $15 output per MTok
@@ -36,26 +39,29 @@ CLAUDE_MODELS = [
     "claude-haiku-4-5-20251001",        # Fastest - near-frontier intelligence
                                         # $1 input / $5 output per MTok
                                         # 200K context, 64K max output
-    
+
+    "claude-opus-4-5-20251101",         # Opus 4.5 (Nov 2025)
+
     # Claude 4.1 - Legacy
     "claude-opus-4-1-20250805",         # High intelligence (legacy, use 4-6 instead)
     
     # Claude 4.0 - Original 4th generation
     "claude-opus-4-20250514",           # High intelligence (legacy)
     "claude-sonnet-4-20250514",         # Balanced performance (legacy)
-    
-    # CLAUDE 3.x SERIES - ALL REMOVED
+
+    # CLAUDE 3.x SERIES
     # claude-3-7-sonnet-20250219 - deprecated by Anthropic
     # claude-3-5-sonnet-20241022 - deprecated by Anthropic
     # claude-3-5-haiku-20241022 - returns 404 as of Feb 2026
     # claude-3-opus-20240229    - deprecated by Anthropic
     # claude-3-sonnet-20240229  - deprecated by Anthropic
-    # claude-3-haiku-20240307   - shutting down April 19, 2026
+    "claude-3-haiku-20240307",          # Shutting down April 19, 2026 - included until then
 ]
 
 # Model aliases (some models have shorter aliases)
 CLAUDE_MODEL_ALIASES = {
     "claude-opus-4-6": "claude-opus-4-6",
+    "claude-sonnet-4-6": "claude-sonnet-4-6",
     "claude-sonnet-4-5": "claude-sonnet-4-5-20250929",
     "claude-haiku-4-5": "claude-haiku-4-5-20251001"
 }
@@ -63,7 +69,7 @@ CLAUDE_MODEL_ALIASES = {
 # Recommended models for different use cases
 CLAUDE_RECOMMENDED = {
     "best_overall": "claude-opus-4-6",
-    "best_balance": "claude-sonnet-4-5-20250929",
+    "best_balance": "claude-sonnet-4-6",
     "fastest": "claude-haiku-4-5-20251001",
     "most_affordable": "claude-haiku-4-5-20251001"
 }
@@ -81,6 +87,17 @@ CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
         "supports_vision": True,
         "supports_adaptive_thinking": True,
         "cost": "$$$",
+        "recommended": True
+    },
+    "claude-sonnet-4-6": {
+        "name": "Claude Sonnet 4.6",
+        "description": "Best combination of speed and intelligence",
+        "generation": "4.6",
+        "context_window": 200000,
+        "max_output": 64000,
+        "supports_vision": True,
+        "supports_adaptive_thinking": True,
+        "cost": "$$",
         "recommended": True
     },
     "claude-sonnet-4-5-20250929": {
@@ -136,6 +153,28 @@ CLAUDE_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
         "supports_vision": True,
         "supports_adaptive_thinking": False,
         "cost": "$$",
+        "recommended": False
+    },
+    "claude-opus-4-5-20251101": {
+        "name": "Claude Opus 4.5",
+        "description": "Powerful model for complex challenges (Nov 2025)",
+        "generation": "4.5",
+        "context_window": 200000,
+        "max_output": 32000,
+        "supports_vision": True,
+        "supports_adaptive_thinking": False,
+        "cost": "$$$",
+        "recommended": False
+    },
+    "claude-3-haiku-20240307": {
+        "name": "Claude Haiku 3",
+        "description": "Claude 3 Haiku (shutting down April 19, 2026)",
+        "generation": "3.0",
+        "context_window": 200000,
+        "max_output": 4096,
+        "supports_vision": True,
+        "supports_adaptive_thinking": False,
+        "cost": "$",
         "recommended": False
     },
 }
