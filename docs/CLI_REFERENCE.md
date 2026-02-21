@@ -1073,12 +1073,50 @@ These options work with most commands:
 ## Environment Variables
 
 ### API Keys
+
+IDT supports **multiple ways** to provide API keys for cloud providers (OpenAI, Claude). Keys are resolved in this priority order:
+
+**1. Command-line argument** (highest priority)
+```bash
+idt workflow photos --provider openai --api-key-file ~/openai.txt
+idt workflow photos --provider claude --api-key-file C:\keys\claude.txt
+```
+
+**2. Configuration file**
+- Location: `image_describer_config.json` (found via `IDT_CONFIG_DIR` or executable directory)
+- Format:
+  ```json
+  {
+    "api_keys": {
+      "OpenAI": "sk-proj-...",
+      "Claude": "sk-ant-..."
+    }
+  }
+  ```
+- Configure via: ImageDescriber GUI → Tools → Configure Settings → API Keys tab
+
+**3. Environment variables**
 ```bash
 # OpenAI
-OPENAI_API_KEY=your_openai_key_here
+export OPENAI_API_KEY=sk-proj-your_key_here
 
 # Anthropic (Claude)
-ANTHROPIC_API_KEY=your_claude_key_here
+export ANTHROPIC_API_KEY=sk-ant-your_key_here
+```
+
+**4. Text file in current directory** (lowest priority)
+- `openai.txt` - OpenAI API key
+- `claude.txt` - Claude API key
+
+**💡 Tip:** For convenience, configure API keys once via ImageDescriber GUI or config file. Then you can omit `--api-key-file` from commands.
+
+**Examples:**
+```bash
+# Using config-stored API key (no --api-key-file needed)
+idt workflow photos --provider openai --model gpt-4o
+
+# Override with specific key file
+idt workflow photos --provider claude --api-key-file ~/production-key.txt
 ```
 
 ### Configuration

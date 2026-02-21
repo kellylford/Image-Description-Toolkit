@@ -175,7 +175,9 @@ class ChatDialog(wx.Dialog):
                 from ai_providers import DEV_CLAUDE_MODELS
                 for model in DEV_CLAUDE_MODELS:
                     self.model_combo.Append(model)
-                self.model_combo.SetStringSelection('claude-3-5-sonnet-20241022')
+                # Set to first available model (list is ordered by recommendation)
+                if self.model_combo.GetCount() > 0:
+                    self.model_combo.SetSelection(0)
                 
             elif provider == 'huggingface':
                 # HuggingFace models
@@ -195,8 +197,11 @@ class ChatDialog(wx.Dialog):
                 self.model_combo.Append('gpt-4o')
                 self.model_combo.SetSelection(0)
             elif provider == 'claude':
-                self.model_combo.Append('claude-3-5-sonnet-20241022')
-                self.model_combo.SetSelection(0)
+                # Use first model from official Claude models list
+                from ai_providers import DEV_CLAUDE_MODELS
+                if DEV_CLAUDE_MODELS:
+                    self.model_combo.Append(DEV_CLAUDE_MODELS[0])
+                    self.model_combo.SetSelection(0)
         
     def get_selections(self) -> Dict[str, str]:
         """Get selected provider and model

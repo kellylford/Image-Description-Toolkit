@@ -217,10 +217,47 @@ def check_api_key_file(provider):
     return None
 
 
+def check_api_key_in_config(provider):
+    """Check if API key exists in image_describer_config.json"""
+    try:
+        # Use config_loader to find config file (handles frozen exe paths)
+        config, config_path, source = load_json_config('image_describer_config.json')
+        if config:
+            api_keys = config.get('api_keys', {})
+            # Check for provider-specific key with various capitalizations
+            key_names = {
+                'openai': ['OpenAI', 'openai', 'OPENAI'],
+                'claude': ['Claude', 'claude', 'CLAUDE']
+            }
+            for key_name in key_names.get(provider, []):
+                if key_name in api_keys and api_keys[key_name]:
+                    return True, config_path
+    except Exception as e:
+        print(f"DEBUG: Error checking config for API key: {e}")
+    
+    return False, None
+
+
 def setup_api_key(provider):
     """Guide user through API key setup"""
     print(f"\n{provider.upper()} requires an API key.")
     
+    # Check for API key in config file FIRST (highest priority)
+    has_config_key, config_path = check_api_key_in_config(provider)
+    if has_config_key:
+        print(f"✓ Found API key for {provider.upper()} in configuration: {config_path}")
+        use_config = get_choice("Use configured API key?", 
+                               ["Yes, use configured key", "No, specify a different source"], 
+                               allow_back=True)
+        if use_config == 'EXIT':
+            return None
+        if use_config == 'BACK':
+            return 'BACK'
+        if use_config == "Yes, use configured key":
+            # Return special marker to indicate using config key (no file needed)
+            return "USE_CONFIG_KEY"
+    
+    # Check for API key .txt file (fallback)
     existing_file = check_api_key_file(provider)
     if existing_file:
         print(f"Found existing API key file: {existing_file}")
@@ -712,7 +749,8 @@ def guided_workflow(custom_config_path=None):
     cmd_parts.extend(["--model", model])
     cmd_parts.extend(["--output-dir", "Descriptions"])  # Default output directory
     
-    if api_key_file:
+    # Add API key file only if a file path was provided (not config-based key)
+    if api_key_file and api_key_file != "USE_CONFIG_KEY":
         cmd_parts.extend(["--api-key-file", api_key_file])
     
     if workflow_name:
@@ -779,7 +817,8 @@ def guided_workflow(custom_config_path=None):
         cmd_parts.extend(["--model", model])
         cmd_parts.extend(["--output-dir", output_dir])
         
-        if api_key_file:
+        # Add API key file only if a file path was provided (not config-based key)
+        if api_key_file and api_key_file != "USE_CONFIG_KEY":
             cmd_parts.extend(["--api-key-file", api_key_file])
         
         if workflow_name:
@@ -815,7 +854,8 @@ def guided_workflow(custom_config_path=None):
             
             # Build arguments for workflow
             workflow_args = [img_dir, "--provider", provider, "--model", model, "--output-dir", output_dir]
-            if api_key_file:
+            # Add API key file only if a file path was provided (not config-based key)
+            if api_key_file and api_key_file != "USE_CONFIG_KEY":
                 workflow_args.extend(["--api-key-file", api_key_file])
             if workflow_name:
                 workflow_args.extend(["--name", workflow_name])

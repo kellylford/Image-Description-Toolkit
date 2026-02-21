@@ -673,7 +673,9 @@ class ProcessingOptionsDialog(wx.Dialog):
                 from ai_providers import DEV_CLAUDE_MODELS
                 for model in DEV_CLAUDE_MODELS:
                     self.model_combo.Append(model)
-                self.model_combo.SetStringSelection("claude-3-5-sonnet-20241022")
+                # Set to first available model (list is ordered by recommendation)
+                if self.model_combo.GetCount() > 0:
+                    self.model_combo.SetSelection(0)
         except Exception as e:
             print(f"Error populating models: {e}")
             default = self.config.get('default_model', 'moondream')
