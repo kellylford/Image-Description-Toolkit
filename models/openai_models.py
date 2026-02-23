@@ -74,28 +74,129 @@ OPENAI_RECOMMENDED = {
     "most_affordable": "gpt-4o-mini"
 }
 
-# Model metadata for display in UIs
+# Model metadata for display in UIs.
+# cost: "$" = cheapest, "$$" = moderate, "$$$" = expensive, "$$$$" = highest
+# For exact pricing see https://openai.com/api/pricing
 OPENAI_MODEL_METADATA: Dict[str, Dict[str, Any]] = {
-    "gpt-4o": {
-        "name": "GPT-4o",
-        "description": "Latest multimodal model",
+
+    # GPT-5 SERIES
+    "gpt-5.2": {
+        "name": "GPT-5.2",
+        "description": "Best available model. Highest quality image descriptions.",
+        "cost": "$$$$",
+        "use_case": "Most detailed results",
         "supports_vision": True,
-        "context_window": 128000,
-        "recommended": True
+        "recommended": False,
     },
-    "gpt-4o-mini": {
-        "name": "GPT-4o Mini",
-        "description": "Fast and affordable",
+    "gpt-5.1": {
+        "name": "GPT-5.1",
+        "description": "High-quality GPT-5 with strong reasoning capabilities.",
+        "cost": "$$$",
+        "use_case": "Complex scenes",
+        "supports_vision": True,
+        "recommended": False,
+    },
+    "gpt-5": {
+        "name": "GPT-5",
+        "description": "Flagship GPT-5 reasoning model. Thorough, deliberate analysis.",
+        "cost": "$$$",
+        "use_case": "Detailed reasoning",
         "supports_vision": True,
         "context_window": 128000,
-        "recommended": True
+        "recommended": False,
+    },
+    "gpt-5-mini": {
+        "name": "GPT-5 Mini",
+        "description": "Faster, efficient GPT-5. Good balance of quality and cost.",
+        "cost": "$$",
+        "use_case": "Good balance",
+        "supports_vision": True,
+        "recommended": False,
+    },
+    "gpt-5-nano": {
+        "name": "GPT-5 Nano",
+        "description": "Fastest GPT-5. May occasionally return empty responses on long outputs.",
+        "cost": "$",
+        "use_case": "Speed over quality",
+        "supports_vision": True,
+        "recommended": False,
+        "notes": "May return empty responses on long outputs; the app retries automatically.",
+    },
+
+    # O-SERIES REASONING
+    "o4-mini": {
+        "name": "O4 Mini",
+        "description": "Fast cost-efficient reasoning. Good for structured, detailed analysis.",
+        "cost": "$$",
+        "use_case": "Reasoning at moderate cost",
+        "supports_vision": True,
+        "recommended": False,
+    },
+    "o3": {
+        "name": "O3",
+        "description": "Powerful reasoning for complex tasks. Slower but very thorough.",
+        "cost": "$$$",
+        "use_case": "Complex analysis",
+        "supports_vision": True,
+        "recommended": False,
     },
     "o1": {
         "name": "O1",
-        "description": "Advanced reasoning",
+        "description": "Original full reasoning model. Careful, deliberate analysis.",
+        "cost": "$$$",
+        "use_case": "Deliberate analysis",
         "supports_vision": True,
-        "recommended": False
-    }
+        "context_window": 128000,
+        "recommended": False,
+    },
+
+    # GPT-4o SERIES
+    "gpt-4o": {
+        "name": "GPT-4o",
+        "description": "Fast, intelligent, flexible. Best choice for most image description tasks.",
+        "cost": "$$",
+        "use_case": "Best general choice",
+        "supports_vision": True,
+        "context_window": 128000,
+        "recommended": True,
+    },
+    "gpt-4o-mini": {
+        "name": "GPT-4o Mini",
+        "description": "Affordable and fast, but charges more image tokens per photo than GPT-4o.",
+        "cost": "$",
+        "use_case": "Quick / budget",
+        "supports_vision": True,
+        "context_window": 128000,
+        "recommended": False,
+        "notes": "Despite the 'mini' label, gpt-4o-mini uses ~25 k image tokens vs gpt-4o's ~865 — "
+                 "making gpt-4o the better value for image tasks.",
+    },
+
+    # GPT-4.1 SERIES
+    "gpt-4.1": {
+        "name": "GPT-4.1",
+        "description": "Latest non-reasoning GPT-4.1. High quality descriptions.",
+        "cost": "$$",
+        "use_case": "High quality",
+        "supports_vision": True,
+        "recommended": False,
+    },
+    "gpt-4.1-mini": {
+        "name": "GPT-4.1 Mini",
+        "description": "Compact GPT-4.1. Good quality at reduced cost.",
+        "cost": "$",
+        "use_case": "Budget quality",
+        "supports_vision": True,
+        "recommended": False,
+    },
+    "gpt-4.1-nano": {
+        "name": "GPT-4.1 Nano",
+        "description": "Ultra-budget GPT-4.1. Fastest and cheapest; less detailed.",
+        "cost": "$",
+        "use_case": "Cheapest option",
+        "supports_vision": True,
+        "recommended": False,
+    },
 }
 
 

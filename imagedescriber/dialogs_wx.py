@@ -280,6 +280,79 @@ class ApiKeyDialog(wx.Dialog):
         return self.file_text.GetValue().strip()
 
 
+# ---------------------------------------------------------------------------
+# Module-level helper — shared by ProcessingOptionsDialog and
+# FollowupQuestionDialog to build the contextual description shown below the
+# model dropdown.
+# ---------------------------------------------------------------------------
+
+def _get_model_description_text(provider: str, model_id: str) -> str:
+    """Return a one-or-two-line guidance string for the selected model.
+
+    Format (paid providers):
+        [★ Recommended | ] <cost tier> | <description>
+        [⚠ <notes>]
+
+    Returns an empty string if metadata is unavailable.
+    """
+    provider = (provider or "").lower()
+
+    if provider == "ollama":
+        if not model_id:
+            return "Local Ollama models have no API cost. Requires Ollama running locally."
+        return f"{model_id} — Local AI model running via Ollama. No API key or cloud cost."
+
+    if provider == "openai":
+        try:
+            from models.openai_models import OPENAI_MODEL_METADATA
+        except ImportError:
+            try:
+                from openai_models import OPENAI_MODEL_METADATA
+            except ImportError:
+                return ""
+        meta = OPENAI_MODEL_METADATA.get(model_id)
+        if not meta:
+            return f"{model_id} — OpenAI model. See openai.com/api/pricing for cost details."
+        parts: list[str] = []
+        if meta.get("recommended"):
+            parts.append("★ Recommended")
+        cost = meta.get("cost", "")
+        if cost:
+            parts.append(cost)
+        desc = meta.get("description", "")
+        if desc:
+            parts.append(desc)
+        line = " | ".join(parts)
+        notes = meta.get("notes", "")
+        if notes:
+            line = (line + "\n⚠ " + notes) if line else ("⚠ " + notes)
+        return line
+
+    if provider == "claude":
+        try:
+            from models.claude_models import CLAUDE_MODEL_METADATA
+        except ImportError:
+            try:
+                from claude_models import CLAUDE_MODEL_METADATA
+            except ImportError:
+                return ""
+        meta = CLAUDE_MODEL_METADATA.get(model_id, {})
+        if not meta:
+            return f"{model_id} — Anthropic Claude model. See anthropic.com/pricing for costs."
+        parts = []
+        if meta.get("recommended"):
+            parts.append("★ Recommended")
+        cost = meta.get("cost", "")
+        if cost:
+            parts.append(cost)
+        desc = meta.get("description", "")
+        if desc:
+            parts.append(desc)
+        return " | ".join(parts)
+
+    return ""
+
+
 class FollowupQuestionDialog(wx.Dialog):
     """Dialog for asking follow-up questions with model selection"""
     
@@ -366,19 +439,31 @@ class FollowupQuestionDialog(wx.Dialog):
         # when accessibility queries parent hierarchy during selection changes
         self.model_combo = wx.Choice(self)
         set_accessible_name(self.model_combo, "Model name")
+        self.model_combo.Bind(wx.EVT_CHOICE, self.on_model_changed)
         model_name_sizer.Add(self.model_combo, 1, wx.EXPAND)
-        
+
         model_sizer.Add(model_name_sizer, 0, wx.ALL | wx.EXPAND, 5)
-        
+
+        # Model description — read-only hint updated whenever provider or model changes
+        self.model_desc_text = wx.TextCtrl(
+            self,
+            style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_NO_VSCROLL | wx.BORDER_NONE,
+            name="Model description and guidance"
+        )
+        self.model_desc_text.SetMinSize((-1, 52))
+        self.model_desc_text.SetBackgroundColour(self.GetBackgroundColour())
+        set_accessible_name(self.model_desc_text, "Model description and guidance")
+        model_sizer.Add(self.model_desc_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 5)
+
         main_sizer.Add(model_sizer, 0, wx.ALL | wx.EXPAND, 10)
-        
+
         # Populate models for current provider
         self.populate_models()
-        
+
         # Question input
         question_box = wx.StaticBox(self, label="Your Follow-up Question")
         question_sizer = wx.StaticBoxSizer(question_box, wx.VERTICAL)
-        
+
         self.question_text = wx.TextCtrl(
             self,
             value="",
@@ -404,6 +489,27 @@ class FollowupQuestionDialog(wx.Dialog):
     def on_provider_changed(self, event):
         """Handle provider change - update available models"""
         self.populate_models()
+        # update_model_description() is called at the end of populate_models()
+
+    def on_model_changed(self, event):
+        """Handle model selection change - refresh description hint"""
+        self.update_model_description()
+
+    def update_model_description(self):
+        """Refresh the description text below the model choice widget."""
+        if not hasattr(self, 'model_desc_text'):
+            return
+        provider = self.provider_choice.GetStringSelection().lower()
+        selection = self.model_combo.GetSelection()
+        model_id = ""
+        if selection != wx.NOT_FOUND:
+            try:
+                client_data = self.model_combo.GetClientData(selection)
+                model_id = client_data if client_data is not None else self.model_combo.GetStringSelection()
+            except Exception:
+                model_id = self.model_combo.GetStringSelection()
+        text = _get_model_description_text(provider, model_id)
+        self.model_desc_text.ChangeValue(text)
     
     def populate_models(self):
         """Populate model choice based on selected provider - uses cached models to avoid blocking UI"""
@@ -460,7 +566,10 @@ class FollowupQuestionDialog(wx.Dialog):
                 self.model_combo.SetSelection(0)
             except:
                 pass  # Silently ignore if can't set fallback
-    
+
+        # Always refresh the description hint after loading models
+        self.update_model_description()
+
     def get_values(self):
         """Get the question and selected model/provider.
         Returns the API model ID (client data), not the friendly display name."""
@@ -590,8 +699,20 @@ class ProcessingOptionsDialog(wx.Dialog):
         # ACCESSIBILITY FIX: Use wx.Choice instead of wx.ComboBox to avoid macOS VoiceOver crash
         self.model_combo = wx.Choice(panel)
         set_accessible_name(self.model_combo, "Model name")
+        self.model_combo.Bind(wx.EVT_CHOICE, self.on_model_changed)
         model_sizer.Add(self.model_combo, 0, wx.ALL | wx.EXPAND, 5)
-        
+
+        # Model description — read-only hint that updates whenever the provider or model changes
+        self.model_desc_text = wx.TextCtrl(
+            panel,
+            style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_NO_VSCROLL | wx.BORDER_NONE,
+            name="Model description and guidance"
+        )
+        self.model_desc_text.SetMinSize((-1, 52))
+        self.model_desc_text.SetBackgroundColour(panel.GetBackgroundColour())
+        set_accessible_name(self.model_desc_text, "Model description and guidance")
+        model_sizer.Add(self.model_desc_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 5)
+
         sizer.Add(model_sizer, 0, wx.ALL | wx.EXPAND, 10)
         
         # Prompt style
@@ -656,6 +777,27 @@ class ProcessingOptionsDialog(wx.Dialog):
     def on_provider_changed(self, event):
         """Handle provider selection change - populate available models"""
         self.populate_models_for_provider()
+        # update_model_description() is invoked at the end of populate_models_for_provider()
+
+    def on_model_changed(self, event):
+        """Handle model selection change - refresh description hint"""
+        self.update_model_description()
+
+    def update_model_description(self):
+        """Refresh the description text below the model choice widget."""
+        if not hasattr(self, 'model_desc_text'):
+            return
+        provider = self.provider_choice.GetStringSelection().lower()
+        selection = self.model_combo.GetSelection()
+        model_id = ""
+        if selection != wx.NOT_FOUND:
+            try:
+                client_data = self.model_combo.GetClientData(selection)
+                model_id = client_data if client_data is not None else self.model_combo.GetStringSelection()
+            except Exception:
+                model_id = self.model_combo.GetStringSelection()
+        text = _get_model_description_text(provider, model_id)
+        self.model_desc_text.ChangeValue(text)
     
     def populate_models_for_provider(self):
         """Populate model list based on selected provider"""
@@ -719,7 +861,10 @@ class ProcessingOptionsDialog(wx.Dialog):
                 self.model_combo.Append(default)
             if default:
                 self.model_combo.SetStringSelection(default)
-    
+
+        # Always refresh the description hint after loading models
+        self.update_model_description()
+
     def load_prompts(self):
         """Load available prompt styles from config file
         
