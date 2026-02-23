@@ -983,14 +983,33 @@ class ImageDescriber:
                         if not success:
                             logger.error(f"Emergency optimization failed! Image may be rejected by {self.provider_name} API")
                 
-                # Call provider's describe_image method with correct signature
+                # Call provider's describe_image method with correct signature.
                 # Providers expect: describe_image(image_path: str, prompt: str, model: str)
-                description = self.provider.describe_image(
-                    image_path=str(image_path),
-                    prompt=prompt,
-                    model=self.model_name
-                )
-                
+                # Retry up to 2 extra times on empty responses (Issue #91: gpt-5-nano
+                # has a ~28% empty-response rate due to token-budget exhaustion).
+                MAX_EMPTY_RETRIES = 2
+                description = None
+                for attempt in range(MAX_EMPTY_RETRIES + 1):
+                    description = self.provider.describe_image(
+                        image_path=str(image_path),
+                        prompt=prompt,
+                        model=self.model_name
+                    )
+                    if description and description.strip():
+                        break
+                    if attempt < MAX_EMPTY_RETRIES:
+                        logger.warning(
+                            f"  [EMPTY-RETRY] Empty response from {self.provider_name}/{self.model_name} "
+                            f"(attempt {attempt + 1}/{MAX_EMPTY_RETRIES + 1}) for {image_path.name} — retrying..."
+                        )
+                        import time as _time
+                        _time.sleep(1.0 * (attempt + 1))
+                    else:
+                        logger.warning(
+                            f"  [EMPTY-RETRY] All {MAX_EMPTY_RETRIES + 1} attempts returned empty "
+                            f"for {image_path.name} — keeping empty result."
+                        )
+
                 if description:
                     logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
                     logger.debug(f"Description content: {repr(description)}")

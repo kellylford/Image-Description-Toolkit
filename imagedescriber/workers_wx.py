@@ -456,16 +456,38 @@ class ProcessingWorker(threading.Thread):
                 processing_path = image_path
             
             try:
-                # Process with the selected provider
-                if self.provider == "object_detection" and self.detection_settings:
-                    description = provider.describe_image(processing_path, prompt, self.model, 
-                                                         yolo_settings=self.detection_settings)
-                elif self.provider in ["grounding_dino", "grounding_dino_hybrid"] and self.detection_settings:
-                    description = provider.describe_image(processing_path, prompt, self.model, 
-                                                         **self.detection_settings)
-                else:
-                    description = provider.describe_image(processing_path, prompt, self.model)
-                
+                # Process with the selected provider.
+                # Retry up to 2 extra times on empty responses (Issue #91: gpt-5-nano
+                # has a ~28% empty-response rate; other models occasionally return empty
+                # with finish_reason=length when the token budget is too tight).
+                MAX_EMPTY_RETRIES = 2
+                for attempt in range(MAX_EMPTY_RETRIES + 1):
+                    if self.provider == "object_detection" and self.detection_settings:
+                        description = provider.describe_image(processing_path, prompt, self.model,
+                                                             yolo_settings=self.detection_settings)
+                    elif self.provider in ["grounding_dino", "grounding_dino_hybrid"] and self.detection_settings:
+                        description = provider.describe_image(processing_path, prompt, self.model,
+                                                             **self.detection_settings)
+                    else:
+                        description = provider.describe_image(processing_path, prompt, self.model)
+
+                    # Accept non-empty results immediately
+                    if description and description.strip():
+                        break
+
+                    # Description is empty — log and retry if attempts remain
+                    if attempt < MAX_EMPTY_RETRIES:
+                        logging.warning(
+                            f"Empty response from {self.provider}/{self.model} "
+                            f"(attempt {attempt + 1}/{MAX_EMPTY_RETRIES + 1}) — retrying..."
+                        )
+                        time.sleep(1.0 * (attempt + 1))  # 1s, then 2s
+                    else:
+                        logging.warning(
+                            f"Empty response from {self.provider}/{self.model} after "
+                            f"{MAX_EMPTY_RETRIES + 1} attempts — giving up."
+                        )
+
                 # Return both description and provider instance for token usage tracking
                 return (description, provider)
             finally:
