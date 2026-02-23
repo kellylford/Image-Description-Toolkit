@@ -160,3 +160,66 @@ Apple Silicon Macs (especially Sequoia) no longer support creating HFS+ disk ima
 | `scripts/config_loader.py` | Added `_MEIPASS/scripts/` search tier, `~/Library/Application Support/IDT/` user config tier |
 | `imagedescriber/configure_dialog.py` | `find_scripts_directory()` → macOS user data dir with bundled-default copy-on-first-run |
 
+---
+
+## Third Session Block — Model Selection Guide + API Fixes
+
+### 11. OpenAI Model Syntax Error + Multiple Fixes ✅ (commit 96c92d4)
+25-file omnibus commit: OpenAI retry logic, Claude fallback, misc fixes.
+
+### 12. Configure Dialog Bug Fixes ✅ (commit fe96af3)
+4 bugs in configure_dialog.py: load_api_keys skips empty entries, keyboard focus, EVT_SET_FOCUS redirect.
+
+### 13. Workspace Save Path Bug + Image Resize Fix ✅ (commit e3d7863)
+- Workspace .idw now saved to canonical `~/Documents/ImageDescriptionToolkit/Workspaces/` path
+- ALL image formats (not just PNG) now resized to ≤1600px JPEG before sending to OpenAI
+
+### 14. Empty-Response Retry (gpt-5-nano) ✅ (commits 00696f2, dd6f901)
+- `workers_wx.py` and `scripts/image_describer.py`: retry up to 2× when response is empty AND `finish_reason='length'`
+- Refined to NOT retry on `finish_reason='stop'` (different failure mode)
+
+### 15. Model Selection Guide ✅ (commit 6b6aa3f)
+**Files**: `models/openai_models.py`, `imagedescriber/dialogs_wx.py`
+
+**Problem**: Both Processing Options (P key) and Follow-up Question dialogs showed bare model IDs with no explanation of what each model does or costs. Users had no way to know which model to pick.
+
+**Solution**:
+- Expanded `OPENAI_MODEL_METADATA` in `models/openai_models.py` from 3 entries to all 13 models. Each entry now has:
+  - `description` — plain-language one-liner
+  - `cost` — `$` / `$$` / `$$$` / `$$$$` tier
+  - `recommended` — bool (only `gpt-4o` is `True`)
+  - `notes` — optional (used for gpt-5-nano empty-response caveat and gpt-4o-mini token cost warning)
+
+- Added `_get_model_description_text(provider, model_id)` module-level helper in `dialogs_wx.py`:
+  - Handles all 3 providers (Ollama, OpenAI, Claude)
+  - Formats: `★ Recommended | $$ | Fast, intelligent, flexible. Best choice for most tasks.`
+  - Two-line for models with notes: adds `⚠ <note>` on second line
+
+- **ProcessingOptionsDialog** (Processing Options, opened with P):
+  - Added read-only `self.model_desc_text` TextCtrl (52px high) inside the Model box, below the model dropdown
+  - Bound `EVT_CHOICE` on `model_combo` → `on_model_changed()` → `update_model_description()`
+  - `populate_models_for_provider()` calls `update_model_description()` on exit (covers provider switches)
+
+- **FollowupQuestionDialog** (Follow-up Question):
+  - Same `model_desc_text` added below model dropdown in the AI Model for Follow-up section
+  - Same binding and `update_model_description()` implementation
+
+**Notable model guidance highlights**:
+- `gpt-4o`: `★ Recommended | $$ | Fast, intelligent, flexible. Best choice for most tasks.`
+- `gpt-4o-mini`: `$ | Affordable and fast — ⚠ Despite the 'mini' label, uses more image tokens than gpt-4o; gpt-4o is typically a better value.`
+- `gpt-5-nano`: `$ | Fastest GPT-5 — ⚠ May return empty responses on long outputs; the app retries automatically.`
+- `claude-opus-4-6`: `★ Recommended | $$$ | Most intelligent model for agents and complex coding`
+- `claude-haiku-4-5`: `★ Recommended | $ | Fastest model with near-frontier intelligence`
+
+**Build verification**: Built ImageDescriber.app: not rebuilt this block (syntax-only changes to dialog layout code; prior build was exit 0)  
+**Runtime testing**: `python -m py_compile models/openai_models.py && python -m py_compile imagedescriber/dialogs_wx.py`  
+**Test results**: Both pass, no errors
+
+---
+
+## Files Modified (Third Session Block)
+
+| File | Change |
+|------|--------|
+| `models/openai_models.py` | `OPENAI_MODEL_METADATA` expanded to all 13 models with description, cost, recommended, notes |
+| `imagedescriber/dialogs_wx.py` | `_get_model_description_text()` helper; model_desc_text in both ProcessingOptionsDialog and FollowupQuestionDialog; on_model_changed / update_model_description methods |
