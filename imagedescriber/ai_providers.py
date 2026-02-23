@@ -605,17 +605,25 @@ class OpenAIProvider(AIProvider):
             return "Error: OpenAI API key not configured or SDK not installed"
         
         try:
-            # Convert PNG to JPEG if needed (PNG failure rate is 59% vs 26% for JPG)
-            # This reduces token footprint and may help avoid nano-tier compute limits
+            # Normalise every image to a resized JPEG before sending to OpenAI.
+            # Reasons:
+            #   - PNG failure rate is 59% vs 26% for JPEG.
+            #   - All full-size images (JPEG, HEIC, PNG …) are resized to ≤1600px to
+            #     keep bandwidth low. The token count is tile-based server-side so the
+            #     resize itself does not change the token bill, but it reduces upload
+            #     time and avoids hitting per-request body-size limits.
+            #   - gpt-4o-mini uses 2,833+5,667 tokens/tile (vs 85+170 for gpt-4o).
+            #     Resizing a large image from ≥2048px to ≤1600px may reduce tile
+            #     count from 9→4, saving ~28k tokens per image with that model.
             image_data = None
             file_ext = Path(image_path).suffix.lower()
             
-            if file_ext == '.png' and HAS_PIL:
-                # Convert PNG → JPEG (85% quality, max 1600px)
+            if HAS_PIL:
+                # Attempt PIL-based conversion/resize for every format
                 try:
                     img = Image.open(image_path)
                     
-                    # Convert RGBA to RGB (remove alpha channel)
+                    # Flatten alpha / convert to RGB
                     if img.mode in ('RGBA', 'LA', 'P'):
                         background = Image.new('RGB', img.size, (255, 255, 255))
                         if img.mode == 'P':
@@ -625,25 +633,27 @@ class OpenAIProvider(AIProvider):
                     elif img.mode != 'RGB':
                         img = img.convert('RGB')
                     
-                    # Resize if too large (max dimension 1600px)
+                    # Resize to ≤1600px on the longest side.  At 1600×1200 a photo
+                    # maps to a 2×2 tile grid (4 tiles) under OpenAI's high-detail
+                    # algorithm, which is the minimum for most landscape photos.
                     max_dim = 1600
                     if max(img.size) > max_dim:
                         img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
                     
-                    # Save as JPEG to bytes
+                    # Encode as JPEG
                     buffer = io.BytesIO()
                     img.save(buffer, format='JPEG', quality=85, optimize=True)
                     image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
                     
                     logger = logging.getLogger(__name__)
-                    logger.info(f"Converted PNG to JPEG: {image_path}")
+                    logger.info(f"Prepared image for OpenAI ({img.size[0]}×{img.size[1]} JPEG, ext={file_ext}): {image_path}")
                 except Exception as e:
-                    # Fallback to original file if conversion fails
+                    # PIL failed (unsupported format, corrupt file, etc.) – fall back to raw read
                     logger = logging.getLogger(__name__)
-                    logger.warning(f"PNG conversion failed for {image_path}: {e}")
+                    logger.warning(f"PIL image preparation failed for {image_path}: {e} — sending raw bytes")
                     image_data = None
             
-            # If not converted or conversion failed, read original file
+            # Fallback: read raw bytes (no PIL available, or PIL failed above)
             if image_data is None:
                 with open(image_path, 'rb') as image_file:
                     image_data = base64.b64encode(image_file.read()).decode('utf-8')

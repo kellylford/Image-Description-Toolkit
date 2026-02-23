@@ -2914,7 +2914,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             # If name changed (or creating new), use rename/create (moves data directory too)
             if not self.workspace_file:
-                # Create new workspace structure
+                # Create new workspace structure in the canonical Workspaces directory.
+                # We use the name from the dialog but always persist the .idw file to
+                # the standard location so "Open Workspace" can find it reliably.
+                # (Previously the .idw was written to wherever the file dialog happened
+                # to be browsed to, e.g. OneDrive, leaving the Workspaces folder empty.)
                 workspace_file, workspace_data_dir = create_workspace_structure(new_name)
                 self.workspace_file = workspace_file
                 # Create workspace object if it doesn't exist
@@ -2923,7 +2927,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.workspace.directory_path = str(workspace_data_dir)
                 self.workspace.directory_paths = [str(workspace_data_dir)]
                 self.current_directory = workspace_data_dir
-                self.save_workspace(str(new_path))
+                # Always save to the canonical workspace_file path, not new_path.
+                # save_workspace() would overwrite self.workspace_file with its
+                # file_path argument, so we must pass the canonical path here.
+                self.save_workspace(str(workspace_file))
             elif new_name != self.workspace_file.stem:
                 self.rename_workspace(new_name)
             else:
