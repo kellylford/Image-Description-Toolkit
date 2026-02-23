@@ -985,10 +985,13 @@ class ImageDescriber:
                 
                 # Call provider's describe_image method with correct signature.
                 # Providers expect: describe_image(image_path: str, prompt: str, model: str)
-                # Retry up to 2 extra times on empty responses (Issue #91: gpt-5-nano
-                # has a ~28% empty-response rate due to token-budget exhaustion).
+                # Retry on empty only when finish_reason='length' (token budget exhausted).
+                # Issue #91: gpt-5-nano has ~28% empty rate due to reasoning token use.
+                # We skip retrying on finish_reason='stop' — it costs money and won't help.
+                # When finish_reason is unavailable (Ollama) we allow one retry.
                 MAX_EMPTY_RETRIES = 2
                 description = None
+                import time as _time
                 for attempt in range(MAX_EMPTY_RETRIES + 1):
                     description = self.provider.describe_image(
                         image_path=str(image_path),
@@ -997,18 +1000,33 @@ class ImageDescriber:
                     )
                     if description and description.strip():
                         break
-                    if attempt < MAX_EMPTY_RETRIES:
+
+                    # Check finish_reason to decide whether retry will help
+                    finish_reason = None
+                    if hasattr(self.provider, 'last_usage') and self.provider.last_usage:
+                        finish_reason = self.provider.last_usage.get('finish_reason')
+
+                    should_retry = (finish_reason == 'length' or finish_reason is None)
+
+                    if should_retry and attempt < MAX_EMPTY_RETRIES:
                         logger.warning(
                             f"  [EMPTY-RETRY] Empty response from {self.provider_name}/{self.model_name} "
+                            f"finish_reason={finish_reason!r} "
                             f"(attempt {attempt + 1}/{MAX_EMPTY_RETRIES + 1}) for {image_path.name} — retrying..."
                         )
-                        import time as _time
                         _time.sleep(1.0 * (attempt + 1))
                     else:
-                        logger.warning(
-                            f"  [EMPTY-RETRY] All {MAX_EMPTY_RETRIES + 1} attempts returned empty "
-                            f"for {image_path.name} — keeping empty result."
-                        )
+                        if not should_retry:
+                            logger.warning(
+                                f"  [EMPTY-RETRY] Empty response finish_reason={finish_reason!r} — "
+                                f"not retrying for {image_path.name} (not a token-budget issue)."
+                            )
+                        else:
+                            logger.warning(
+                                f"  [EMPTY-RETRY] All {MAX_EMPTY_RETRIES + 1} attempts returned empty "
+                                f"for {image_path.name} — keeping empty result."
+                            )
+                        break
 
                 if description:
                     logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")

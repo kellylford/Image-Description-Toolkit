@@ -457,10 +457,14 @@ class ProcessingWorker(threading.Thread):
             
             try:
                 # Process with the selected provider.
-                # Retry up to 2 extra times on empty responses (Issue #91: gpt-5-nano
-                # has a ~28% empty-response rate; other models occasionally return empty
-                # with finish_reason=length when the token budget is too tight).
+                # Retry on empty responses only when the cause is finish_reason='length'
+                # (token budget exhausted — gpt-5-nano Issue #91, ~28% empty rate).
+                # We do NOT retry on finish_reason='stop' with empty content: that is a
+                # different failure mode where a retry costs money but rarely helps.
+                # When finish_reason is unavailable (Ollama, local models) we allow one
+                # retry since we can't distinguish the failure mode.
                 MAX_EMPTY_RETRIES = 2
+                description = ""
                 for attempt in range(MAX_EMPTY_RETRIES + 1):
                     if self.provider == "object_detection" and self.detection_settings:
                         description = provider.describe_image(processing_path, prompt, self.model,
@@ -475,18 +479,34 @@ class ProcessingWorker(threading.Thread):
                     if description and description.strip():
                         break
 
-                    # Description is empty — log and retry if attempts remain
-                    if attempt < MAX_EMPTY_RETRIES:
+                    # Empty — decide whether to retry based on finish_reason
+                    finish_reason = None
+                    if hasattr(provider, 'last_usage') and provider.last_usage:
+                        finish_reason = provider.last_usage.get('finish_reason')
+
+                    # Only retry on 'length' (token exhaustion) or unknown finish reason.
+                    # 'stop' with empty content won't improve on retry.
+                    should_retry = (finish_reason == 'length' or finish_reason is None)
+
+                    if should_retry and attempt < MAX_EMPTY_RETRIES:
                         logging.warning(
                             f"Empty response from {self.provider}/{self.model} "
+                            f"finish_reason={finish_reason!r} "
                             f"(attempt {attempt + 1}/{MAX_EMPTY_RETRIES + 1}) — retrying..."
                         )
                         time.sleep(1.0 * (attempt + 1))  # 1s, then 2s
                     else:
-                        logging.warning(
-                            f"Empty response from {self.provider}/{self.model} after "
-                            f"{MAX_EMPTY_RETRIES + 1} attempts — giving up."
-                        )
+                        if not should_retry:
+                            logging.warning(
+                                f"Empty response from {self.provider}/{self.model} "
+                                f"finish_reason={finish_reason!r} — not retrying (not a token-budget issue)."
+                            )
+                        else:
+                            logging.warning(
+                                f"Empty response from {self.provider}/{self.model} after "
+                                f"{MAX_EMPTY_RETRIES + 1} attempts — giving up."
+                            )
+                        break
 
                 # Return both description and provider instance for token usage tracking
                 return (description, provider)
