@@ -444,14 +444,14 @@ class FollowupQuestionDialog(wx.Dialog):
 
         model_sizer.Add(model_name_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
-        # Model description — read-only hint updated whenever provider or model changes
+        # Model description — read-only hint updated whenever provider or model changes.
+        # Must have a visible border so it appears in the keyboard tab order for VoiceOver.
         self.model_desc_text = wx.TextCtrl(
             self,
-            style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_NO_VSCROLL | wx.BORDER_NONE,
+            style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_NO_VSCROLL,
             name="Model description and guidance"
         )
         self.model_desc_text.SetMinSize((-1, 52))
-        self.model_desc_text.SetBackgroundColour(self.GetBackgroundColour())
         set_accessible_name(self.model_desc_text, "Model description and guidance")
         model_sizer.Add(self.model_desc_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 5)
 
@@ -702,14 +702,14 @@ class ProcessingOptionsDialog(wx.Dialog):
         self.model_combo.Bind(wx.EVT_CHOICE, self.on_model_changed)
         model_sizer.Add(self.model_combo, 0, wx.ALL | wx.EXPAND, 5)
 
-        # Model description — read-only hint that updates whenever the provider or model changes
+        # Model description — read-only hint that updates whenever the provider or model changes.
+        # Must have a visible border so it appears in the keyboard tab order for VoiceOver.
         self.model_desc_text = wx.TextCtrl(
             panel,
-            style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_NO_VSCROLL | wx.BORDER_NONE,
+            style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_NO_VSCROLL,
             name="Model description and guidance"
         )
         self.model_desc_text.SetMinSize((-1, 52))
-        self.model_desc_text.SetBackgroundColour(panel.GetBackgroundColour())
         set_accessible_name(self.model_desc_text, "Model description and guidance")
         model_sizer.Add(self.model_desc_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 5)
 
