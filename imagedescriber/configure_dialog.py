@@ -755,10 +755,11 @@ class ConfigureDialog(wx.Dialog):
         main_sizer.Add(header, 0, wx.ALIGN_CENTER | wx.ALL, 10)
         
         # Create notebook with tabs for each category
-        # wx.WANTS_CHARS allows the notebook to receive keyboard focus in tab order
-        self.notebook = wx.Notebook(panel, style=wx.NB_TOP | wx.WANTS_CHARS, name="Configuration categories")
-        
-        # Bind keyboard events for tab-accessible navigation
+        self.notebook = wx.Notebook(panel, style=wx.NB_TOP, name="Configuration categories")
+
+        # Bind keyboard events for tab-accessible navigation.
+        # EVT_CHAR_HOOK fires for all descendant controls, so on_notebook_char
+        # guards against that by checking which window actually has focus.
         self.notebook.Bind(wx.EVT_CHAR_HOOK, self.on_notebook_char)
         
         # Create a tab for each category
@@ -783,13 +784,25 @@ class ConfigureDialog(wx.Dialog):
         wx.CallAfter(self._set_initial_focus)
     
     def on_notebook_char(self, event):
-        """Handle keyboard navigation for notebook tabs
-        
+        """Handle keyboard navigation for notebook tabs.
+
+        EVT_CHAR_HOOK fires for all descendant windows, so we only intercept
+        when focus is ON the notebook tab bar itself — never when a child
+        control (ListBox, TextCtrl, Button, …) has focus.  This prevents the
+        Right-arrow from switching tabs while the user is navigating a
+        settings list or reading the explanation panel.
+
         When notebook has focus, allow:
         - Left/Right arrows to switch tabs
         - Cmd+Shift+[ and Cmd+Shift+] to switch tabs (macOS standard)
         - Enter/Space to move focus to content of current tab
         """
+        # Guard: only intercept when the notebook tab bar itself is focused
+        focused = wx.Window.FindFocus()
+        if focused is not self.notebook:
+            event.Skip()
+            return
+
         keycode = event.GetKeyCode()
         current_page = self.notebook.GetSelection()
         page_count = self.notebook.GetPageCount()
@@ -893,9 +906,16 @@ class ConfigureDialog(wx.Dialog):
         
         explanation_text = wx.TextCtrl(right_box, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP, name=f"{category} explanation")
         right_sizer.Add(explanation_text, 1, wx.EXPAND | wx.ALL, 5)
-        
+
+        # The explanation panel is display-only. Prevent Tab from landing here
+        # by capturing EVT_SET_FOCUS and immediately moving focus back to the
+        # settings list. This keeps the Tab cycle:  list → Change button → (next tab / OK)
+        def _skip_explanation_focus(evt, sl=settings_list):
+            wx.CallAfter(sl.SetFocus)
+        explanation_text.Bind(wx.EVT_SET_FOCUS, _skip_explanation_focus)
+
         sizer.Add(right_sizer, 1, wx.EXPAND | wx.ALL, 5)
-        
+
         panel.SetSizer(sizer)
         
         # Store references to widgets for later access
@@ -1247,8 +1267,8 @@ class ConfigureDialog(wx.Dialog):
             if provider == "description":
                 continue
             
-            # Show provider and masked key
-            if isinstance(key, str):  # Make sure it's actually a key string
+            # Show provider and masked key — skip blank/placeholder entries
+            if isinstance(key, str) and key.strip():  # Only show non-empty keys
                 masked_key = key[:8] + "..." + key[-4:] if len(key) > 12 else "***"
                 display_text = f"{provider}: {masked_key}"
                 index = self.api_keys_list.Append(display_text)
