@@ -19,14 +19,15 @@ IDT supports both local (Ollama) and cloud (OpenAI, Claude) AI providers, and is
 4. [Quick Start: CLI Golden Path](#4-quick-start-cli-golden-path)
 5. [GUI ImageDescriber Application](#5-gui-imagedescriber-application)
 6. [Understanding Workflow Runs & Naming](#6-understanding-workflow-runs--naming)
-7. [Prompt Customization](#7-prompt-customization)
-8. [Advanced CLI Usage & Commands](#8-advanced-cli-usage--commands)
-9. [Web Image Downloads](#9-web-image-downloads)
-10. [Metadata Extraction & Geocoding](#10-metadata-extraction--geocoding)
-11. [Analysis Tools](#11-analysis-tools)
-12. [Cloud Provider Setup](#12-cloud-provider-setup)
-13. [Performance Tips](#13-performance-tips)
-14. [Troubleshooting](#14-troubleshooting)
+7. [Files & Folders Reference](#7-files--folders-reference)
+8. [Prompt Customization](#8-prompt-customization)
+9. [Advanced CLI Usage & Commands](#9-advanced-cli-usage--commands)
+10. [Web Image Downloads](#10-web-image-downloads)
+11. [Metadata Extraction & Geocoding](#11-metadata-extraction--geocoding)
+12. [Analysis Tools](#12-analysis-tools)
+13. [Cloud Provider Setup](#13-cloud-provider-setup)
+14. [Performance Tips](#14-performance-tips)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -474,7 +475,112 @@ Each run is completely self-contained and independent.
 
 ---
 
-## 7. Prompt Customization
+## 7. Files & Folders Reference
+
+Understanding where IDT stores its files makes it easy to back things up, share results, or troubleshoot. The two apps have different strategies because they serve different workflows.
+
+---
+
+### IDT Command Line (`idt`)
+
+The CLI is designed around wherever **you** are working. It does not move your images and does not create any hidden folders outside of where you run it.
+
+#### Workflow Output
+
+When you run `idt workflow`, output lands in a `Descriptions/` subfolder of your **current working directory**:
+
+```
+<where you ran idt>/
+└── Descriptions/
+    ├── wf_2025-10-11_143022_moondream_narrative/    ← one run
+    │   ├── descriptions.json
+    │   ├── descriptions.html
+    │   └── logs/
+    │       ├── workflow_2025-10-11_143022.log
+    │       └── image_describer_2025-10-11_143022.log
+    ├── wf_2025-10-12_090155_gpt-4o_detailed/        ← another run
+    └── ...
+```
+
+**Tips:**
+- Run `idt` from a consistent location (e.g., your home folder or a dedicated project directory) so all runs accumulate in one place.
+- Use `--output-dir` to override the default `Descriptions/` folder name.
+- Your original images are **never moved or copied** — IDT reads them in place.
+- Each `wf_` folder is fully self-contained; you can delete any run without affecting others.
+
+#### Settings (Configuration Files)
+
+Settings saved via `idt` commands or the Configure dialog are stored in the platform-standard config location, shared by both apps:
+
+| Platform | Config folder |
+|----------|--------------|
+| macOS | `~/Library/Application Support/IDT/` |
+| Windows | `%APPDATA%\IDT\` (e.g., `C:\Users\You\AppData\Roaming\IDT\`) |
+
+Files stored here: `image_describer_config.json`, `workflow_config.json`, `video_frame_extractor_config.json`
+
+---
+
+### ImageDescriber GUI
+
+ImageDescriber keeps all workspace data organized inside your **Documents** folder under a single root:
+
+```
+~/Documents/ImageDescriptionToolkit/
+├── Workspaces/                        ← workspace project files
+│   ├── VacationPhotos.idw
+│   ├── ProductCatalog.idw
+│   └── Untitled.idw
+└── WorkspaceFiles/                    ← image and data files, by workspace
+    ├── VacationPhotos/
+    │   ├── photo1.jpg
+    │   ├── photo2.heic
+    │   └── downloaded_images/
+    ├── ProductCatalog/
+    │   └── ...
+    └── Untitled/
+```
+
+| Folder | What's in it |
+|--------|-------------|
+| `Workspaces/` | `.idw` project files (small — just references and descriptions) |
+| `WorkspaceFiles/<Name>/` | Actual image files, extracted video frames, downloaded images |
+
+**Platform paths:**
+
+| Platform | Root location |
+|----------|--------------|
+| macOS | `~/Documents/ImageDescriptionToolkit/` |
+| Windows | `%USERPROFILE%\Documents\ImageDescriptionToolkit\` |
+
+**About `.idw` files:**
+A workspace file (`.idw`) is a small JSON file containing the list of images in your project, their descriptions, and metadata. It does **not** contain the images themselves — only references to where they live. You can open, share, or back up a workspace file by itself; the images just need to be accessible at their original paths.
+
+#### Settings
+
+Config files are in the same shared location as the CLI:
+
+| Platform | Config folder |
+|----------|--------------|
+| macOS | `~/Library/Application Support/IDT/` |
+| Windows | `%APPDATA%\IDT\` (e.g., `C:\Users\You\AppData\Roaming\IDT\`) |
+
+On first launch after installation, IDT copies the bundled default configs here so your settings persist across upgrades.
+
+---
+
+### Summary Table
+
+| What | Where (macOS) | Where (Windows) |
+|------|--------------|-----------------|
+| **CLI workflow results** | `<cwd>/Descriptions/wf_*/` | `<cwd>\Descriptions\wf_*\` |
+| **GUI workspace files** | `~/Documents/ImageDescriptionToolkit/Workspaces/` | `%USERPROFILE%\Documents\ImageDescriptionToolkit\Workspaces\` |
+| **GUI image/data files** | `~/Documents/ImageDescriptionToolkit/WorkspaceFiles/` | `%USERPROFILE%\Documents\ImageDescriptionToolkit\WorkspaceFiles\` |
+| **Shared settings (both apps)** | `~/Library/Application Support/IDT/` | `%APPDATA%\IDT\` |
+
+---
+
+## 8. Prompt Customization
 
 **Prompt styles control HOW your images are described** - often more important than model selection!
 
@@ -548,7 +654,7 @@ Provide a clear paragraph without speculation.
 
 ---
 
-## 8. Advanced CLI Usage & Commands
+## 9. Advanced CLI Usage & Commands
 
 > **Complete Reference:** For comprehensive documentation of all CLI commands with detailed options and examples, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
 
@@ -642,7 +748,7 @@ idt workflow C:\More_Photos --batch --name batch2
 
 ---
 
-## 9. Web Image Downloads
+## 10. Web Image Downloads
 
 IDT can download images directly from web pages, making it easy to process online galleries, portfolios, or any webpage containing images.
 
@@ -713,7 +819,7 @@ idt workflow --download https://site.com/photos --provider openai --model gpt-4o
 
 ---
 
-## 10. Metadata Extraction & Geocoding
+## 11. Metadata Extraction & Geocoding
 
 IDT can automatically extract and include rich metadata from your images, adding context about **where and when** photos were taken.
 
@@ -774,7 +880,7 @@ idt workflow C:\Photos --geocode
 
 ---
 
-## 11. Analysis Tools
+## 12. Analysis Tools
 
 After running workflows, use these tools to analyze and export results:
 
@@ -858,7 +964,7 @@ Output saved to: `analysis/results/content_analysis_[timestamp].txt`
 
 ---
 
-## 12. Cloud Provider Setup
+## 13. Cloud Provider Setup
 
 ### OpenAI (GPT-4o, GPT-4o-mini)
 
@@ -910,7 +1016,7 @@ idt workflow C:\Photos --provider claude --model claude-opus-4-20250514
 
 ---
 
-## 13. Performance Tips
+## 14. Performance Tips
 
 ### Adjusting Timeout Settings
 
@@ -939,7 +1045,7 @@ idt workflow C:\Photos --timeout 300
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 ### Common Issues
 

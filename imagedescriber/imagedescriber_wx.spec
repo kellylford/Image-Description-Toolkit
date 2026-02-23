@@ -42,6 +42,7 @@ a = Analysis(
         'imagedescriber.configure_dialog',
         'imagedescriber.download_dialog',  # URL download dialog
         'imagedescriber.batch_progress_dialog',  # Phase 3: Batch progress dialog
+        'imagedescriber.workspace_stats_dialog',  # Workspace Statistics dialog
         'ai_providers',
         'data_models',
         'dialogs_wx',
@@ -51,6 +52,7 @@ a = Analysis(
         'configure_dialog',  # Integrated IDTConfigure
         'download_dialog',  # URL download dialog (frozen mode)
         'batch_progress_dialog',  # Phase 3: Batch progress dialog (frozen mode)
+        'workspace_stats_dialog',  # Workspace Statistics dialog (frozen mode)
         'scripts.metadata_extractor',
         'scripts.versioning',
         'scripts.config_loader',

@@ -568,11 +568,12 @@ def guided_workflow(custom_config_path=None):
             # Fallback if models package not available
             print(f"Note: Could not load full model list ({e}), using fallback")
             claude_models = [
-                "claude-opus-4-6 (most intelligent, agents and coding)",
-                "claude-sonnet-4-5-20250929 (best balance, recommended)",
-                "claude-haiku-4-5-20251001 (fastest)",
-                "claude-3-5-haiku-20241022 (most affordable)"
+                "claude-opus-4-6 (most intelligent)",
+                "claude-sonnet-4-6 (best balance)",
+                "claude-sonnet-4-5-20250929 (balanced, fast)",
+                "claude-haiku-4-5-20251001 (fastest, most affordable)",
             ]
+            # Note: claude-3-5-haiku-20241022 returns 404; removed
         print("\nAvailable Claude models:")
         model_choice = get_choice("Select a model", claude_models, default=1, allow_back=True)
         if model_choice == 'EXIT':

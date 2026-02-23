@@ -227,27 +227,124 @@ GETTING STARTED:
 For documentation and support, see the project repository.
 EOF
 
-# Create Applications symlink for easy drag-and-drop
-ln -s /Applications "$DMG_STAGING/Applications"
+# NOTE: The Applications symlink is NOT added to staging here.
+# hdiutil create -srcfolder follows symlinks, so a symlink to /Applications
+# causes it to try to copy the entire protected /Applications directory and fail.
+# Instead we create the symlink directly on the mounted UDRW volume below.
 
-# Create temporary DMG
-echo "Creating temporary DMG..."
+# ============================================================================
+# FINDER CUSTOMIZATION - Background image + icon layout
+# ============================================================================
+
+# Create background image using pure Python (no PIL dependency)
+# Dark charcoal (35, 35, 40) background, 580×360 pixels
+echo "Creating DMG background image..."
+BG_IMAGE="/tmp/idt_dmg_bg_$$.png"
+python3 << PYEOF
+import struct, zlib
+
+w, h = 580, 360
+r, g, b = 35, 35, 40  # dark charcoal
+
+row = b'\x00' + bytes([r, g, b] * w)  # filter byte + RGB pixels
+raw = row * h
+
+def chunk(t, d):
+    c = t + d
+    return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+
+png = (b'\x89PNG\r\n\x1a\n'
+       + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+       + chunk(b'IDAT', zlib.compress(raw, 9))
+       + chunk(b'IEND', b''))
+
+with open('${BG_IMAGE}', 'wb') as f:
+    f.write(png)
+print("Background image created: ${BG_IMAGE}")
+PYEOF
+
+# Detach any stale mount from a previous failed run
+VOLUME_NAME="Image Description Toolkit"
+MOUNT_POINT="/Volumes/${VOLUME_NAME}"
+hdiutil detach "$MOUNT_POINT" 2>/dev/null || true
+
+# ── Step 1: create read-only UDZO from staging (srcfolder works here) ────────
+echo "Creating initial compressed DMG from staging..."
+TEMP_RO="BuildAndRelease/MacBuilds/dist/${DMG_NAME}-ro.dmg"
 TEMP_DMG="BuildAndRelease/MacBuilds/dist/${DMG_NAME}-temp.dmg"
-rm -f "$TEMP_DMG"
+FINAL_DMG="BuildAndRelease/MacBuilds/dist/${DMG_NAME}.dmg"
+rm -f "$TEMP_RO" "$TEMP_DMG" "$FINAL_DMG"
 
 hdiutil create \
     -srcfolder "$DMG_STAGING" \
-    -volname "Image Description Toolkit" \
-    -fs HFS+ \
-    -fsargs "-c c=64,a=16,e=16" \
-    -format UDRW \
-    -size 1500m \
-    "$TEMP_DMG"
+    -volname "${VOLUME_NAME}" \
+    -fs APFS \
+    -format UDZO \
+    -imagekey zlib-level=1 \
+    "$TEMP_RO"
 
-echo "Skipping Finder customization (can be done manually after mounting)..."
+# ── Step 2: convert to read-write UDRW so we can customise it ────────────────
+echo "Converting to writable image for Finder customization..."
+hdiutil convert "$TEMP_RO" -format UDRW -o "$TEMP_DMG"
+rm -f "$TEMP_RO"
 
-# Convert to compressed read-only image immediately
-echo "Compressing DMG..."
+# ── Step 3: mount the writable image ─────────────────────────────────────────
+echo "Mounting writable DMG..."
+hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG"
+sleep 2
+
+if [ ! -d "$MOUNT_POINT" ]; then
+    echo "ERROR: DMG did not mount at: $MOUNT_POINT"
+    rm -f "$TEMP_DMG" "$BG_IMAGE"
+    exit 1
+fi
+
+# ── Step 4: add Applications symlink, hidden background image ───────────────
+echo "Adding Applications symlink..."
+ln -s /Applications "$MOUNT_POINT/Applications"
+
+echo "Copying background image..."
+mkdir -p "$MOUNT_POINT/.background"
+cp "$BG_IMAGE" "$MOUNT_POINT/.background/background.png"
+rm -f "$BG_IMAGE"
+
+# Apply Finder layout via AppleScript:
+#   • Window: 580×360 (bounds 200,100 → 780,460)
+#   • IDT folder:    left  (165, 185)
+#   • Applications:  right (415, 185)
+#   • README.txt:    bottom centre (290, 315)
+echo "Applying Finder layout via AppleScript..."
+osascript << APPLESCRIPT
+tell application "Finder"
+    tell disk "Image Description Toolkit"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set the bounds of container window to {200, 100, 780, 460}
+        set theViewOptions to the icon view options of container window
+        set arrangement of theViewOptions to not arranged
+        set icon size of theViewOptions to 72
+        set background picture of theViewOptions to file ".background:background.png"
+        delay 1
+        set position of item "IDT" of container window to {165, 185}
+        set position of item "Applications" of container window to {415, 185}
+        set position of item "README.txt" of container window to {290, 315}
+        close
+        open
+        update without registering applications
+        delay 2
+    end tell
+end tell
+APPLESCRIPT
+
+# Sync filesystem and detach
+echo "Syncing and unmounting..."
+sync
+hdiutil detach "$MOUNT_POINT" -force
+
+# Convert to compressed read-only DMG
+echo "Compressing DMG (UDZO)..."
 FINAL_DMG="BuildAndRelease/MacBuilds/dist/${DMG_NAME}.dmg"
 rm -f "$FINAL_DMG"
 

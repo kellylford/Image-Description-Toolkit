@@ -393,56 +393,61 @@ class ImageDescriber:
     
     def load_config(self, config_file: str) -> dict:
         """
-        Load configuration from JSON file
-        
+        Load configuration from JSON file.
+
+        Uses config_loader for the full layered resolution (user config dir,
+        bundled _MEIPASS defaults, explicit path, env vars) so this works
+        correctly on both macOS and Windows in dev and frozen modes.
+
         Args:
-            config_file: Path to the JSON configuration file
-            
+            config_file: Filename (e.g. 'image_describer_config.json') or
+                         absolute path.
+
         Returns:
             Dictionary with configuration settings
         """
         try:
+            # If caller passed an absolute path that exists, use it directly.
             config_path = Path(config_file)
-            if not config_path.is_absolute():
-                # In frozen mode (PyInstaller), look for config next to executable first
-                # This allows workflow.py to update the config file and have it used
-                if getattr(sys, 'frozen', False):
-                    # Frozen mode: Check next to executable first
-                    exe_dir = Path(sys.executable).parent
-                    scripts_dir = exe_dir / 'scripts'
-                    if (scripts_dir / config_file).exists():
-                        config_path = scripts_dir / config_file
-                    elif (exe_dir / config_file).exists():
-                        config_path = exe_dir / config_file
-                    else:
-                        # Fallback to bundled config in temp directory
-                        script_dir = Path(__file__).parent
-                        config_path = script_dir / config_file
-                else:
-                    # Normal mode: Look in script directory
-                    script_dir = Path(__file__).parent
-                    config_path = script_dir / config_file
-            
-            if not config_path.exists():
-                logger.warning(f"Config file not found: {config_path}")
-                return self.get_default_config()
-            
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            # Log prompt-related config details
-            prompts = config.get('prompt_variations', {})
-            default_prompt = config.get('default_prompt_style', 'N/A')
-            logger.info(f"Loaded configuration from: {config_path}")
-            logger.debug(f"Config has {len(prompts)} prompts, default={default_prompt}")
-            
-            return config
-            
+            if config_path.is_absolute() and config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                logger.info(f"Loaded configuration from: {config_path}")
+                return config
+
+            # Otherwise delegate to the layered resolver so user-overridden
+            # configs and bundled defaults are found in the right order on
+            # every platform (macOS ~/Library/…, Windows %APPDATA%\…, etc.)
+            try:
+                from config_loader import load_json_config
+                filename = config_path.name  # strip any relative prefix
+                config, resolved_path, source = load_json_config(filename)
+                if config:
+                    logger.info(f"Loaded configuration from: {resolved_path} (source: {source})")
+                    prompts = config.get('prompt_variations', {})
+                    default_prompt = config.get('default_prompt_style', 'N/A')
+                    logger.debug(f"Config has {len(prompts)} prompts, default={default_prompt}")
+                    return config
+            except Exception as cl_err:
+                logger.debug(f"config_loader failed ({cl_err}), falling back to direct path")
+
+            # Last-resort fallback: look in same directory as this script
+            script_dir = Path(__file__).parent
+            fallback = script_dir / config_path.name
+            if fallback.exists():
+                with open(fallback, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                logger.info(f"Loaded configuration from fallback: {fallback}")
+                return config
+
+            logger.warning(f"Config file not found: {config_file}")
+            return self.get_default_config()
+
         except Exception as e:
             logger.error(f"Error loading config file: {e}")
             logger.info("Using default configuration")
             return self.get_default_config()
-    
+
     def get_default_config(self) -> dict:
         """
         Get default configuration if config file is not available

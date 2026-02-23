@@ -406,26 +406,75 @@ class ConfigureDialog(wx.Dialog):
         return sorted(["moondream", "moondream:latest", "llama3.2-vision", "llava"])
     
     def find_scripts_directory(self) -> Path:
-        """Find the scripts directory containing config files"""
-        # Try relative to executable
+        """Find the scripts directory containing config files.
+
+        In frozen (onefile) mode the .app/.exe may be read-only (macOS SIP,
+        Windows Program Files).  We write to the platform-standard user data
+        directory and seed it with bundled defaults on first run.
+
+        macOS  : ~/Library/Application Support/IDT/
+        Windows: %APPDATA%/IDT/
+        Linux  : ~/.config/IDT/
+        """
         if getattr(sys, 'frozen', False):
-            # Running as compiled executable
-            app_dir = Path(sys.executable).parent
+            # --- Frozen mode: write to user-writable location ---
+            import shutil
+            try:
+                from config_loader import get_user_config_dir
+            except ImportError:
+                # Fallback if config_loader not on path yet
+                try:
+                    scripts_path = Path(sys._MEIPASS) / 'scripts'
+                    sys.path.insert(0, str(scripts_path))
+                    from config_loader import get_user_config_dir
+                except Exception:
+                    get_user_config_dir = None  # type: ignore
+
+            if get_user_config_dir is not None:
+                user_dir = get_user_config_dir()
+            else:
+                # Ultimate fallback — should never reach here
+                user_dir = Path.home() / 'IDT'
+
+            user_dir.mkdir(parents=True, exist_ok=True)
+
+            # Copy bundled defaults on first run (don't overwrite existing user configs)
+            bundled_scripts: Optional[Path] = None
+            _meipass = getattr(sys, '_MEIPASS', None)
+            if _meipass:
+                candidate = Path(_meipass) / 'scripts'
+                if candidate.is_dir():
+                    bundled_scripts = candidate
+            if bundled_scripts is None:
+                # Fallback: look next to the executable (onedir layout)
+                candidate = Path(sys.executable).parent / 'scripts'
+                if candidate.is_dir():
+                    bundled_scripts = candidate
+
+            if bundled_scripts:
+                for json_file in bundled_scripts.glob('*.json'):
+                    dest = user_dir / json_file.name
+                    if not dest.exists():
+                        try:
+                            shutil.copy2(json_file, dest)
+                        except Exception:
+                            pass  # Non-fatal; app still works with defaults
+
+            return user_dir
         else:
-            # Running as script
+            # --- Dev mode: project root scripts/ directory ---
             app_dir = Path(__file__).parent.parent
-        
-        scripts_dir = app_dir / "scripts"
-        if scripts_dir.exists():
-            return scripts_dir
-        
-        # Try current directory
-        scripts_dir = Path.cwd() / "scripts"
-        if scripts_dir.exists():
-            return scripts_dir
-        
-        # Default fallback
-        return Path.cwd()
+            scripts_dir = app_dir / "scripts"
+            if scripts_dir.exists():
+                return scripts_dir
+
+            # Try current directory
+            scripts_dir = Path.cwd() / "scripts"
+            if scripts_dir.exists():
+                return scripts_dir
+
+            # Default fallback
+            return Path.cwd()
     
     def build_settings_metadata(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """Build metadata for all settings organized by category"""

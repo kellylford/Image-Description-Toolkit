@@ -4,14 +4,13 @@ OpenAI Models Configuration - Single Source of Truth
 This file defines all available OpenAI models across the toolkit.
 ALL components (IDT CLI, ImageDescriber GUI, etc.) MUST import from this file.
 
-Last updated: 2026-02-09
-Source: https://platform.openai.com/docs/models
+Last updated: 2026-02-23
+Source: https://developers.openai.com/api/docs/models
+Verified: Live API query (client.models.list()) on 2026-02-23
 
-NOTE: OpenAI provides an API to list models dynamically (client.models.list()),
-but we maintain this hardcoded list for:
-1. Better control over which models are shown to users
-2. Consistent ordering and metadata
-3. Filtering out non-vision models from the list
+NOTE: Only models with confirmed image/vision input support via Chat Completions
+are included. Audio-only, TTS, transcription, image-generation, embedding,
+realtime, and codex-only models are excluded.
 """
 
 from typing import List, Dict, Any
@@ -19,73 +18,52 @@ from typing import List, Dict, Any
 # OPENAI MODELS - Single source of truth for all toolkit components
 # Format: Model ID as used in OpenAI API
 # Only includes models with vision capabilities for image description tasks
+# Verified present in live API on 2026-02-23
 OPENAI_MODELS = [
     # ====================
-    # GPT-5 SERIES (Latest - 2025/2026)
+    # GPT-5 SERIES (Frontier - 2025/2026)
     # ====================
-    "gpt-5.2",                          # Latest flagship for coding and agentic tasks
-                                        # $1.75 input / $14 output per MTok
-                                        # Supports vision (Image input only)
-    
-    "gpt-5.2-pro",                      # Premium tier GPT-5.2
-                                        # Higher capability for complex tasks
-    
-    "gpt-5.1",                          # Mid-tier GPT-5 reasoning model
-                                        # Balanced performance between 5.2 and 5
-                                        # Supports vision (Image input only)
-    
-    "gpt-5",                            # Standard GPT-5 reasoning model
-                                        # $1.25 input / $10 output per MTok
-                                        # Supports vision (Image input only)
-    
-    "gpt-5-pro",                        # Premium tier GPT-5
-                                        # Higher capability for complex tasks
-    
-    "gpt-5-mini",                       # Faster, cost-efficient GPT-5
-                                        # $0.25 input / $2 output per MTok
-                                        # Supports vision (Image input only)
-    
-    "gpt-5-nano",                       # Ultra-budget GPT-5
-                                        # Most affordable GPT-5 tier
-                                        # Supports vision (Image input only)
-    
+    "gpt-5.2",          # Best model; vision confirmed via live test 2026-02-23
+    "gpt-5.1",          # Mid-tier GPT-5 reasoning model; vision confirmed
+    "gpt-5",            # Flagship; reasoning tokens—needs max_completion_tokens=1500
+    "gpt-5-mini",       # Faster, cost-efficient GPT-5; vision confirmed
+    "gpt-5-nano",       # Fastest, most affordable GPT-5; vision confirmed
+
     # ====================
-    # O1 SERIES (Reasoning models - 2024)
+    # O-SERIES REASONING MODELS (2024-2025)
     # ====================
-    "o1",                               # Previous o-series reasoning model
-    "o1-mini",                          # Smaller reasoning model
-    "o1-preview",                       # Preview of o1 capabilities
-    
+    "o4-mini",          # Fast cost-efficient reasoning; needs max_completion_tokens=1500
+    "o3",               # Reasoning model for complex tasks; vision confirmed
+    "o1",               # Full o-series reasoning; needs max_completion_tokens=1500
+
     # ====================
-    # GPT-4o SERIES (Omni - multimodal, 2024)
+    # GPT-4o SERIES (Omni - 2024)
     # ====================
-    "gpt-4o",                           # GPT-4 Omni (RECOMMENDED for non-reasoning tasks)
-                                        # Fast, multimodal, 128K context
-    
-    "gpt-4o-mini",                      # Smaller, faster, most affordable
-                                        # Great for most image description tasks
-    
-    "chatgpt-4o-latest",                # Latest ChatGPT model
-    
+    "gpt-4o",           # Fast, intelligent, flexible — RECOMMENDED for most tasks
+    "gpt-4o-mini",      # Affordable, fast — RECOMMENDED for budget use
+
     # ====================
-    # GPT-4.1 SERIES (Enhanced, 2025)
+    # GPT-4.1 SERIES (2025)
     # ====================
-    "gpt-4.1",                          # GPT-4.1 standard
-    "gpt-4.1-mini",                     # Smaller GPT-4.1
-    "gpt-4.1-nano",                     # Ultra-budget GPT-4.1
-    
-    # ====================
-    # GPT-4 TURBO (Enhanced GPT-4, 2023-2024)
-    # ====================
-    "gpt-4-turbo",                      # GPT-4 Turbo with vision (older)
-    "gpt-4-turbo-preview",              # Preview version
-    
-    # ====================
-    # GPT-4 (Original, 2023)
-    # ====================
-    # NOTE: Plain "gpt-4" does NOT support images (text-only)
-    # gpt-4-vision-preview is deprecated/removed as of 2026
-    # Use gpt-4o, gpt-5 series, or gpt-4-turbo for vision tasks
+    "gpt-4.1",          # Smartest non-reasoning model; vision confirmed
+    "gpt-4.1-mini",     # Smaller GPT-4.1; vision confirmed
+    "gpt-4.1-nano",     # Ultra-budget GPT-4.1; vision confirmed
+]
+# Total: 13 verified vision-capable models as of 2026-02-23
+
+_EXCLUDED_MODELS_2026 = [
+    # EXCLUDED (verified 2026-02-23):
+    # gpt-5.2-pro      — HTTP 404, not accessible at this API tier
+    # gpt-5-pro        — HTTP 404, not accessible at this API tier
+    # o3-mini          — returns 'image_url is only supported by certain models'
+    # gpt-4-turbo      — returns 'image_url is only supported by certain models'
+    # o1-mini          — deprecated
+    # o1-preview       — deprecated
+    # o1-pro           — Responses API only, not Chat Completions
+    # o3-pro           — Responses API only
+    # chatgpt-4o-latest — deprecated wrapper, not for API use
+    # gpt-4-turbo-preview — deprecated alias
+    # gpt-4 plain      — no vision support
 ]
 
 # Recommended models for different use cases

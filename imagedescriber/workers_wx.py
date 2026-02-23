@@ -267,6 +267,11 @@ class ProcessingWorker(threading.Thread):
                     metadata['completion_tokens'] = usage['completion_tokens']
                 if 'response_id' in usage:
                     metadata['response_id'] = usage['response_id']
+                # Store full token counts for batch token-usage stats in the progress dialog
+                if 'total_tokens' in usage:
+                    metadata['input_tokens'] = usage.get('prompt_tokens', 0)
+                    metadata['output_tokens'] = usage.get('completion_tokens', 0)
+                    metadata['total_tokens'] = usage.get('total_tokens', 0)
             
             # Add location byline if geocoding data is available
             description = self._add_location_byline(description, metadata)

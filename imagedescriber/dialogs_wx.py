@@ -429,10 +429,12 @@ class FollowupQuestionDialog(wx.Dialog):
                         self.model_combo.Append(model)
                         
             elif provider == "openai":
-                # OpenAI vision-capable models (in preference order: best first)
-                # As of 2026: GPT-5 series, gpt-4o, and gpt-4-turbo models support vision
-                models = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-pro", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "chatgpt-4o-latest", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4-turbo"]
-                for model in models:
+                # Load from canonical list - supports both frozen and dev mode
+                try:
+                    from ai_providers import DEV_OPENAI_MODELS
+                except ImportError:
+                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
+                for model in DEV_OPENAI_MODELS:
                     self.model_combo.Append(model)
                     
             elif provider == "claude":
@@ -464,8 +466,12 @@ class FollowupQuestionDialog(wx.Dialog):
         Returns the API model ID (client data), not the friendly display name."""
         selection = self.model_combo.GetSelection()
         if selection != wx.NOT_FOUND:
-            client_data = self.model_combo.GetClientData(selection)
-            model = client_data if client_data is not None else self.model_combo.GetStringSelection()
+            try:
+                client_data = self.model_combo.GetClientData(selection)
+                model = client_data if client_data is not None else self.model_combo.GetStringSelection()
+            except Exception:
+                # Items added without client data (Ollama, OpenAI) raise a C++ assertion
+                model = self.model_combo.GetStringSelection()
         else:
             model = self.model_combo.GetStringSelection()
         return {
@@ -689,11 +695,12 @@ class ProcessingOptionsDialog(wx.Dialog):
                     self.model_combo.Append("moondream")
                     self.model_combo.SetSelection(0)
             elif provider == "openai":
-                # OpenAI vision-capable models (in preference order: best first)
-                # As of 2026: GPT-5 series, gpt-4o, and gpt-4-turbo support vision
-                # Plain gpt-4 is excluded (text-only, no vision support)
-                models = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-pro", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4-turbo"]
-                for model in models:
+                # Load from canonical list - supports both frozen and dev mode
+                try:
+                    from ai_providers import DEV_OPENAI_MODELS
+                except ImportError:
+                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
+                for model in DEV_OPENAI_MODELS:
                     self.model_combo.Append(model)
                 self.model_combo.SetStringSelection("gpt-4o")
             elif provider == "claude":
@@ -772,8 +779,12 @@ class ProcessingOptionsDialog(wx.Dialog):
         Returns the API model ID (client data for Claude models), not the friendly display name."""
         selection = self.model_combo.GetSelection()
         if selection != wx.NOT_FOUND:
-            client_data = self.model_combo.GetClientData(selection)
-            model = client_data if client_data is not None else self.model_combo.GetStringSelection()
+            try:
+                client_data = self.model_combo.GetClientData(selection)
+                model = client_data if client_data is not None else self.model_combo.GetStringSelection()
+            except Exception:
+                # Items added without client data (Ollama, OpenAI) raise a C++ assertion
+                model = self.model_combo.GetStringSelection()
         else:
             model = self.model_combo.GetStringSelection()
         return {

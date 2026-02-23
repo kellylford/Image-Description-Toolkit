@@ -4,8 +4,8 @@ Workspace Manager for ImageDescriber
 
 Handles workspace directory structure, naming, and file management.
 Default structure:
-  ~/Documents/ImageDescriptionToolkit/workspaces/           - IDW workspace files
-  ~/Documents/ImageDescriptionToolkit/WorkSpaceFiles/       - Actual image/data files
+  ~/Documents/ImageDescriptionToolkit/Workspaces/           - IDW workspace files (.idw)
+  ~/Documents/ImageDescriptionToolkit/WorkspaceFiles/       - Actual image/data files
 """
 
 import sys
@@ -23,17 +23,17 @@ def get_default_workspaces_root() -> Path:
         Path to workspaces directory (where .idw files are saved)
     """
     if sys.platform == 'win32':
-        # Windows: ~\Documents\ImageDescriptionToolkit\workspaces
-        return Path.home() / "Documents" / "ImageDescriptionToolkit" / "workspaces"
+        # Windows: ~\Documents\ImageDescriptionToolkit\Workspaces
+        return Path.home() / "Documents" / "ImageDescriptionToolkit" / "Workspaces"
     elif sys.platform == 'darwin':
-        # macOS: ~/Documents/ImageDescriptionToolkit/workspaces
-        return Path.home() / "Documents" / "ImageDescriptionToolkit" / "workspaces"
+        # macOS: ~/Documents/ImageDescriptionToolkit/Workspaces
+        return Path.home() / "Documents" / "ImageDescriptionToolkit" / "Workspaces"
     else:
-        # Linux: ~/Documents/ImageDescriptionToolkit/workspaces or ~/.local/share/IDT/workspaces
+        # Linux: ~/Documents/ImageDescriptionToolkit/Workspaces or ~/.local/share/IDT/Workspaces
         docs = Path.home() / "Documents"
         if docs.exists():
-            return docs / "ImageDescriptionToolkit" / "workspaces"
-        return Path.home() / ".local" / "share" / "IDT" / "workspaces"
+            return docs / "ImageDescriptionToolkit" / "Workspaces"
+        return Path.home() / ".local" / "share" / "IDT" / "Workspaces"
 
 
 def get_workspace_files_root() -> Path:
@@ -41,9 +41,9 @@ def get_workspace_files_root() -> Path:
     Get workspace files storage root (where images/data are stored).
     
     Returns:
-        Path to WorkSpaceFiles directory
+        Path to WorkspaceFiles directory
     """
-    return get_default_workspaces_root().parent / "WorkSpaceFiles"
+    return get_default_workspaces_root().parent / "WorkspaceFiles"
 
 
 def get_next_untitled_name(workspace_root: Optional[Path] = None) -> str:
@@ -68,7 +68,7 @@ def get_next_untitled_name(workspace_root: Optional[Path] = None) -> str:
         name = file.stem  # Get filename without .idw extension
         existing_untitled.append(name)
     
-    # Also check WorkSpaceFiles directory for Untitled folders
+    # Also check WorkspaceFiles directory for Untitled folders
     files_root = get_workspace_files_root()
     if files_root.exists():
         for folder in files_root.glob("Untitled*"):
@@ -222,13 +222,13 @@ def sanitize_workspace_name(name: str) -> str:
 
 def get_workspace_files_directory(workspace_file_path: Path) -> Path:
     """
-    Get the WorkSpaceFiles directory for a given workspace file.
+    Get the WorkspaceFiles directory for a given workspace file.
     
     Args:
         workspace_file_path: Path to .idw workspace file
     
     Returns:
-        Path to corresponding WorkSpaceFiles directory
+        Path to corresponding WorkspaceFiles directory
     """
     workspace_name = workspace_file_path.stem  # Remove .idw extension
     files_root = get_workspace_files_root()

@@ -135,42 +135,124 @@ MODEL_METADATA = {
         "tags": ["text"]
     },
     
-    # OpenAI Models
-    "gpt-4o": {
+    # OpenAI Models — verified 2026-02-23 via live API test
+    # See models/openai_models.py for full canonical list
+    "gpt-5.2": {
         "provider": "openai",
-        "description": "GPT-4o - Latest multimodal model",
+        "description": "GPT-5.2 - Best model for coding and agentic tasks",
         "size": "Cloud-based",
         "install_command": "Requires API key in openai.txt",
         "recommended": True,
-        "cost": "$$$",
+        "cost": "$$$$",
         "tags": ["vision", "cloud", "accurate", "recommended"]
     },
-    "gpt-4o-mini": {
+    "gpt-5.1": {
         "provider": "openai",
-        "description": "GPT-4o Mini - Faster, cheaper variant",
+        "description": "GPT-5.1 - Mid-tier GPT-5 reasoning model",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "accurate"]
+    },
+    "gpt-5": {
+        "provider": "openai",
+        "description": "GPT-5 - Previous flagship reasoning model",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "accurate"]
+    },
+    "gpt-5-mini": {
+        "provider": "openai",
+        "description": "GPT-5 Mini - Faster, cost-efficient GPT-5",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$",
+        "tags": ["vision", "cloud", "fast"]
+    },
+    "gpt-5-nano": {
+        "provider": "openai",
+        "description": "GPT-5 Nano - Fastest, most affordable GPT-5",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast"]
+    },
+    "o4-mini": {
+        "provider": "openai",
+        "description": "o4-mini - Fast cost-efficient reasoning model",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$",
+        "tags": ["vision", "cloud", "reasoning"]
+    },
+    "o3": {
+        "provider": "openai",
+        "description": "o3 - Reasoning model for complex tasks",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "reasoning"]
+    },
+    "o1": {
+        "provider": "openai",
+        "description": "o1 - Previous o-series reasoning model (slow)",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "reasoning"]
+    },
+    "gpt-4o": {
+        "provider": "openai",
+        "description": "GPT-4o - Fast, intelligent, flexible multimodal model",
         "size": "Cloud-based",
         "install_command": "Requires API key in openai.txt",
         "recommended": True,
         "cost": "$$",
+        "tags": ["vision", "cloud", "accurate", "recommended"]
+    },
+    "gpt-4o-mini": {
+        "provider": "openai",
+        "description": "GPT-4o Mini - Fast and affordable",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": True,
+        "cost": "$",
         "tags": ["vision", "cloud", "fast", "recommended"]
     },
-    "gpt-4-turbo": {
+    "gpt-4.1": {
         "provider": "openai",
-        "description": "GPT-4 Turbo with vision",
+        "description": "GPT-4.1 - Smartest non-reasoning model",
         "size": "Cloud-based",
         "install_command": "Requires API key in openai.txt",
         "recommended": False,
-        "cost": "$$$",
-        "tags": ["vision", "cloud"]
+        "cost": "$$",
+        "tags": ["vision", "cloud", "accurate"]
     },
-    "gpt-4-vision-preview": {
+    "gpt-4.1-mini": {
         "provider": "openai",
-        "description": "GPT-4 Vision (older)",
+        "description": "GPT-4.1 Mini - Smaller GPT-4.1",
         "size": "Cloud-based",
         "install_command": "Requires API key in openai.txt",
         "recommended": False,
-        "cost": "$$$",
-        "tags": ["vision", "cloud"]
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast"]
+    },
+    "gpt-4.1-nano": {
+        "provider": "openai",
+        "description": "GPT-4.1 Nano - Ultra-budget GPT-4.1",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast"]
     },
     
     # Claude (Anthropic) Models - populated dynamically below from models.claude_models

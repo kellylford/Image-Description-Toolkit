@@ -383,14 +383,12 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 available_models = [model.model for model in models_response['models']]
                 
             elif provider == "openai":
-                # OpenAI models - return predefined list
-                available_models = [
-                    "gpt-4o",
-                    "gpt-4o-mini",
-                    "gpt-4-turbo",
-                    "gpt-4-vision-preview",
-                    "gpt-4"
-                ]
+                # Load from canonical list - supports both frozen and dev mode
+                try:
+                    from ai_providers import DEV_OPENAI_MODELS
+                except ImportError:
+                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
+                available_models = list(DEV_OPENAI_MODELS)
                 
             elif provider == "claude":
                 # Claude models - sourced from central registry via ai_providers

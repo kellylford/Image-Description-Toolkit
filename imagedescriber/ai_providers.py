@@ -93,27 +93,23 @@ DEV_OLLAMA_CLOUD_MODELS = [
 try:
     from models.openai_models import OPENAI_MODELS as DEV_OPENAI_MODELS
 except ImportError:
-    # Fallback if models package not available (vision-capable models only as of 2026)
+    # Fallback if models package not available — verified working 2026-02-23
     DEV_OPENAI_MODELS = [
         "gpt-5.2",
-        "gpt-5.2-pro",
         "gpt-5.1",
         "gpt-5",
-        "gpt-5-pro",
         "gpt-5-mini",
         "gpt-5-nano",
+        "o4-mini",
+        "o3",
         "o1",
-        "o1-mini",
-        "o1-preview",
         "gpt-4o",
         "gpt-4o-mini",
-        "chatgpt-4o-latest",
         "gpt-4.1",
         "gpt-4.1-mini",
         "gpt-4.1-nano",
-        "gpt-4-turbo",
-        "gpt-4-turbo-preview"
-        # NOTE: gpt-4 and gpt-4-vision-preview excluded (no vision support / deprecated)
+        # Removed: gpt-5.2-pro, gpt-5-pro (404), o3-mini, gpt-4-turbo (no vision),
+        #          chatgpt-4o-latest (deprecated), o1-mini/o1-preview (deprecated)
     ]
 
 # Import Claude models from central configuration
@@ -590,17 +586,17 @@ class OpenAIProvider(AIProvider):
             # Filter for vision-capable models only
             # As of 2026: gpt-5.x, gpt-4o, gpt-4.1, gpt-4-turbo, o1 support vision
             # Plain gpt-4 does NOT support vision
-            vision_models = [
-                model.id for model in models_response.data
-                if ('gpt-5' in model.id or 'gpt-4o' in model.id or 'gpt-4.1' in model.id or 'gpt-4-turbo' in model.id or model.id.startswith('o1'))
-            ]
-            # Return in API order (usually newest first)
-            return vision_models
+            # Filter to only known-good vision models by matching our canonical list
+            known_good = set(DEV_OPENAI_MODELS)
+            vision_models = [model.id for model in models_response.data if model.id in known_good]
+            # Sort to match our preferred order
+            vision_models.sort(key=lambda m: DEV_OPENAI_MODELS.index(m) if m in DEV_OPENAI_MODELS else 999)
+            return vision_models if vision_models else DEV_OPENAI_MODELS.copy()
         except:
             pass
         
         # Fallback to known vision models (in preference order)
-        return ['gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4-turbo']
+        return DEV_OPENAI_MODELS.copy()
     
     @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
@@ -675,12 +671,18 @@ class OpenAIProvider(AIProvider):
                 ]
             }
             
-            # GPT-5 and newer models (o1, o3, gpt-5) use max_completion_tokens instead of max_tokens
+            # GPT-5 and reasoning models (o1, o3, o4, gpt-5) use max_completion_tokens
             # Older models (GPT-4, GPT-3.5) use max_tokens
-            # Reduced from 1000 → 300 (typical responses are 50-150 tokens)
-            # ChatGPT theory: large max_tokens triggers nano-tier compute limits
-            if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
-                request_params["max_completion_tokens"] = 300
+            #
+            # IMPORTANT: Reasoning models consume tokens internally before producing
+            # visible output. At 300, reasoning models (gpt-5, gpt-5-mini, gpt-5-nano,
+            # o4-mini, o1) exhaust their budget on reasoning and return empty content
+            # with finish_reason=length. Verified 2026-02-23: gpt-5 used 192 reasoning
+            # tokens + 63 visible = 255 total — 300 left no room for visible output.
+            # 1500 gives ~1200 headroom after typical reasoning budgets.
+            if (model.startswith('gpt-5') or model.startswith('o1') or
+                    model.startswith('o3') or model.startswith('o4')):
+                request_params["max_completion_tokens"] = 1500
             else:
                 request_params["max_tokens"] = 300
             

@@ -114,6 +114,12 @@ try:
 except ImportError:
     BatchProgressDialog = None
 
+# Workspace Statistics dialog
+try:
+    from workspace_stats_dialog import WorkspaceStatsDialog
+except ImportError:
+    WorkspaceStatsDialog = None
+
 # Import chat feature components
 try:
     from chat_window_wx import ChatDialog, ChatWindow
@@ -388,6 +394,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.show_image_previews = True  # View option: show/hide image preview panel
         self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
         self.batch_progress = None  # Track batch processing: {current: N, total: M, file_path: "..."}
+        # Throttle list redraws during batch processing - only refresh every N seconds.
+        # Tune LIST_REFRESH_INTERVAL_SECS in on_worker_progress if you want faster/slower feedback.
+        self._last_list_refresh = 0.0
+        # Suppress main-frame list rebuilds while a batch is running; do one full
+        # rebuild when the batch ends (natural completion or user stop). This keeps
+        # the UI fully responsive on large collections (1000+ images).
+        self._batch_active = False
+        # Per-batch token usage accumulation (reset each time a new batch starts)
+        self._token_records = []   # list of {input, output, total, name} dicts
+        # Batch settings shown in the progress dialog Job Settings section
+        self._batch_provider = ''
+        self._batch_model = ''
+        self._batch_prompt = ''
         
         # Phase 3: Batch processing management
         self.batch_worker: Optional[BatchProcessingWorker] = None  # Store worker reference
@@ -556,10 +575,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Get the workspace data directory for extracted frames, downloaded images, etc.
         
         Returns the directory structure:
-        ~/Documents/WorkSpaceFiles/{workspace_name}/
+        ~/Documents/ImageDescriptionToolkit/WorkspaceFiles/{workspace_name}/
         """
         if self.workspace_file:
-            # Use new workspace structure in WorkSpaceFiles
+            # Use new workspace structure in WorkspaceFiles
             workspace_dir = get_workspace_files_directory(Path(self.workspace_file))
         else:
             # Fallback (shouldn't happen with new Untitled workspace pattern)
@@ -985,7 +1004,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
-        
+
+        self.workspace_stats_item = file_menu.Append(wx.ID_ANY, "Workspace &Statistics...\tCtrl+I")
+        self.Bind(wx.EVT_MENU, self.on_workspace_stats, self.workspace_stats_item)
+
         open_workflow_result = file_menu.Append(wx.ID_ANY, "Open &Workflow Result (Viewer Mode)...")
         self.Bind(wx.EVT_MENU, self.on_open_workflow_result, open_workflow_result)
         
@@ -1903,6 +1925,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Show progress dialog
         if BatchProgressDialog:
+            self._batch_active = True
             self.batch_progress_dialog = BatchProgressDialog(
                 self,
                 total_images=settings.get('max_images', 100) if settings.get('max_images') else 100
@@ -1965,7 +1988,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
         except Exception as e:
             show_error(self, f"Error loading directory:\n{e}")
-    
+
+    def _compute_token_stats(self):
+        """Compute aggregate token usage stats from the current batch's records.
+
+        Returns a dict suitable for passing to BatchProgressDialog.update_progress()
+        as the ``token_stats`` keyword argument, or None when no token data has
+        been collected yet (e.g. Ollama without token reporting, or batch not
+        yet started).
+        """
+        if not self._token_records:
+            return None
+        n = len(self._token_records)
+        avg_in = round(sum(r['input'] for r in self._token_records) / n)
+        avg_out = round(sum(r['output'] for r in self._token_records) / n)
+        avg_total = round(sum(r['total'] for r in self._token_records) / n)
+        total = sum(r['total'] for r in self._token_records)
+        peak = max(self._token_records, key=lambda r: r['total'])
+        return {
+            'avg_input': avg_in,
+            'avg_output': avg_out,
+            'avg_total': avg_total,
+            'total': total,
+            'peak_total': peak['total'],
+            'peak_name': peak['name'],
+        }
+
     def refresh_image_list(self):
         """Refresh the image list display with videos and extracted frames grouped"""
         # PERFORMANCE DIAGNOSTIC: Track how long this takes
@@ -2138,6 +2186,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     
     def on_process_single(self, event):
         """Process single selected image or extract video frames"""
+        logger.info("on_process_single CALLED")
+        try:
+            self._on_process_single_impl(event)
+        except Exception as exc:
+            import traceback
+            logger.error(f"on_process_single CRASHED: {exc}\n{traceback.format_exc()}")
+            show_error(self, f"Processing error: {exc}")
+
+    def _on_process_single_impl(self, event):
+        """Internal implementation of on_process_single"""
         if not self.current_image_item:
             show_warning(self, "No image selected")
             return
@@ -2151,13 +2209,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Processing worker not available")
             return
         
+        logger.info(f"ProcessingOptionsDialog={ProcessingOptionsDialog}, config={list(self.config.keys()) if self.config else None}")
         # Show processing options dialog with cached models
         if ProcessingOptionsDialog:
+            logger.info("Creating ProcessingOptionsDialog")
             dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            logger.info("Calling ShowModal")
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
             
+            logger.info("Dialog OK - getting config")
             options = dialog.get_config()
             dialog.Destroy()
         else:
@@ -2381,12 +2443,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             total_items = len(videos_to_extract) + len(images_to_process)
             logger.debug(f"Creating progress dialog with {total_items} total items")
             if BatchProgressDialog:
+                self._batch_active = True
                 self.batch_progress_dialog = BatchProgressDialog(self, total_items)
                 self.batch_progress_dialog.Show()
                 logger.debug("Progress dialog shown")
                 if hasattr(self, 'show_batch_progress_item'):
                     self.show_batch_progress_item.Enable(True)
-            
+                if hasattr(self, 'workspace_stats_item'):
+                    self.workspace_stats_item.Enable(False)
+
             self.SetStatusText(f"Extracting frames from {len(videos_to_extract)} video(s)...", 0)
             
             # Store processing options and queue for after video extraction
@@ -2456,13 +2521,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Phase 3: Show progress dialog (AFTER save to maintain focus)
         if BatchProgressDialog:
-            self.batch_progress_dialog = BatchProgressDialog(self, len(to_process))
+            self._batch_active = True
+            # Capture batch settings before showing dialog so Job Settings section is populated
+            self._token_records = []
+            self._batch_provider = options['provider']
+            self._batch_model = options['model']
+            self._batch_prompt = options.get('prompt_style', '')
+            self.batch_progress_dialog = BatchProgressDialog(
+                self, len(to_process),
+                batch_provider=self._batch_provider,
+                batch_model=self._batch_model,
+                batch_prompt=self._batch_prompt
+            )
             self.batch_progress_dialog.Show()
             self.batch_progress_dialog.Raise()  # Ensure it's on top after save
             # Enable "Show Batch Progress" menu item
             if hasattr(self, 'show_batch_progress_item'):
                 self.show_batch_progress_item.Enable(True)
-        
+            if hasattr(self, 'workspace_stats_item'):
+                self.workspace_stats_item.Enable(False)
+
         # Start worker thread AFTER dialog is shown
         self.batch_worker.start()
         
@@ -2646,13 +2724,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Update progress dialog for image processing (continue from where videos left off)
         if self.batch_progress_dialog:
+            # Update stored batch settings in the dialog for the image-processing phase
+            self._token_records = []
+            self._batch_provider = options['provider']
+            self._batch_model = options['model']
+            self._batch_prompt = options.get('prompt_style', '')
             total_items = len(to_process) + progress_offset
             self.batch_progress_dialog.update_progress(
                 current=progress_offset,
                 total=total_items,
                 image_name="Starting image processing...",
                 provider=options['provider'],
-                model=options['model']
+                model=options['model'],
+                batch_provider=self._batch_provider,
+                batch_model=self._batch_model,
+                batch_prompt=self._batch_prompt
             )
         
         # Initialize timing
@@ -3040,7 +3126,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, f"Successfully exported descriptions to:\n{file_path}")
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
-    
+
+    def on_workspace_stats(self, event):
+        """Show the Workspace Statistics dialog (File → Workspace Statistics)."""
+        if WorkspaceStatsDialog is None:
+            show_warning(self, "Workspace Statistics are not available (module failed to load).")
+            return
+
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No items in workspace.\n\nLoad a directory or workspace file first.")
+            return
+
+        dlg = WorkspaceStatsDialog(self, self.workspace)
+        dlg.ShowModal()
+        dlg.Destroy()
+
     def export_descriptions_to_text(self, output_file: str):
         """Export workspace descriptions to text file in CLI format
         
@@ -3256,12 +3356,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             # Mark current image being processed with "P"
             self.processing_items[event.file_path] = {'provider': '', 'model': ''}
-            
-            # PERFORMANCE FIX: Don't rebuild entire list on every progress update
-            # Only refresh every 50 images or when user switches back to window
-            # The list will refresh when processing completes via on_worker_complete
-            if event.current % 50 == 0:
+
+            # Throttle list redraws: rebuilding a large list on every event causes
+            # visible lag at scale. We refresh immediately on the first image (gives
+            # instant feedback), then at most every LIST_REFRESH_INTERVAL_SECS.
+            # To experiment with this value, search for LIST_REFRESH_INTERVAL_SECS.
+            LIST_REFRESH_INTERVAL_SECS = 5.0
+            _now = time.time()
+            if not self._batch_active and _now - self._last_list_refresh >= LIST_REFRESH_INTERVAL_SECS:
                 self.refresh_image_list()
+                self._last_list_refresh = _now
             
             # Phase 3: Track processing time for this image
             if self.batch_start_time:
@@ -3284,7 +3388,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     file_path=self.batch_progress['file_path'],
                     avg_time=avg_time,
                     last_image=getattr(self, 'last_completed_image', None),
-                    last_description=getattr(self, 'last_completed_description', None)
+                    last_description=getattr(self, 'last_completed_description', None),
+                    token_stats=self._compute_token_stats(),
+                    batch_provider=self._batch_provider,
+                    batch_model=self._batch_model,
+                    batch_prompt=self._batch_prompt
                 )
         else:
             self.batch_progress = None
@@ -3300,6 +3408,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             
             # Extract diagnostic fields from metadata (Issue #91: debugging empty responses)
             metadata = getattr(event, 'metadata', {})
+
+            # Accumulate token usage for the progress dialog Token Usage section
+            in_t = metadata.get('input_tokens', 0)
+            out_t = metadata.get('output_tokens', 0)
+            tot_t = metadata.get('total_tokens', 0)
+            if tot_t > 0:
+                self._token_records.append({
+                    'input': in_t,
+                    'output': out_t,
+                    'total': tot_t,
+                    'name': Path(event.file_path).name
+                })
             desc = ImageDescription(
                 text=event.description,
                 model=event.model,
@@ -3325,7 +3445,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             image_item.processing_error = None  # Clear any previous error
             
             self.mark_modified()
-            self.refresh_image_list()
+            if not self._batch_active:
+                self.refresh_image_list()
             
             # Update window title to reflect processing status (removes "Processing" when done)
             self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
@@ -3352,7 +3473,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             image_item.processing_error = event.error
             self.mark_modified()
         
-        self.refresh_image_list()
+        if not self._batch_active:
+            self.refresh_image_list()
         
         # Update window title to reflect processing status (removes "Processing" when failed)
         self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
@@ -3548,36 +3670,36 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     item.processing_state = None
                     item.batch_queue_position = None
         
-        # Phase 3: Close progress dialog
+        # Keep batch progress dialog open so user can review stats at their own pace
         if self.batch_progress_dialog:
-            self.batch_progress_dialog.Close()
-            self.batch_progress_dialog = None
-        
+            self.batch_progress_dialog.mark_complete(event.input_dir)
+            self.batch_progress_dialog = None  # detach ref; dialog stays visible until user closes it
+
         # Phase 3: Clear worker reference
         self.batch_worker = None
-        
-        # Disable "Show Batch Progress" menu item
+
+        # Disable "Show Batch Progress" menu item; re-enable Workspace Statistics
         if hasattr(self, 'show_batch_progress_item'):
             self.show_batch_progress_item.Enable(False)
-        
+        if hasattr(self, 'workspace_stats_item'):
+            self.workspace_stats_item.Enable(True)
+
         # CRITICAL: Clear processing items before updating title to prevent "Processing..." being stuck
         self.processing_items.clear()
-        
+
         # Reset window title to normal (remove processing percentage)
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
         self.update_window_title("ImageDescriber", doc_name)
-        
+
         # Save workspace
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
-        
-        # Show completion dialog
-        show_info(self, f"Workflow complete!\n{event.input_dir}")
-        
-        # Restore focus to image list after dialog dismissal
+
+        # Return keyboard focus to image list
         self.image_list.SetFocus()
-        
-        self.SetStatusText("Workflow complete", 0)
+
+        self.SetStatusText("Batch complete", 0)
+        self._batch_active = False
         self.refresh_image_list()
     
     def on_workflow_failed(self, event):
@@ -3770,20 +3892,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Clear worker reference
         self.batch_worker = None
         
-        # Disable "Show Batch Progress" menu item
+        # Disable "Show Batch Progress"; re-enable Workspace Statistics
         if hasattr(self, 'show_batch_progress_item'):
             self.show_batch_progress_item.Enable(False)
-        
+        if hasattr(self, 'workspace_stats_item'):
+            self.workspace_stats_item.Enable(True)
+
         # CRITICAL: Clear processing items before updating title to prevent "Processing..." being stuck
         self.processing_items.clear()
-        
+
         # Reset window title to normal
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
         self.update_window_title("ImageDescriber", doc_name)
-        
+
         self.SetStatusText("Batch processing stopped", 0)
         show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
         # Restore focus to image list after dialog
+        self._batch_active = False
+        self.refresh_image_list()
         self.image_list.SetFocus()
     
     # Phase 4: Resume functionality
@@ -3889,11 +4015,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Enable "Show Batch Progress" menu item
             if hasattr(self, 'show_batch_progress_item'):
                 self.show_batch_progress_item.Enable(True)
-        
+            if hasattr(self, 'workspace_stats_item'):
+                self.workspace_stats_item.Enable(False)
+
         # Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []
-        
+
         self.SetStatusText(f"Resuming batch: {len(file_paths)} images remaining...", 0)
     
     def on_extract_video(self, event):
@@ -4140,7 +4268,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Enable "Show Batch Progress" menu item
             if hasattr(self, 'show_batch_progress_item'):
                 self.show_batch_progress_item.Enable(True)
-        
+            if hasattr(self, 'workspace_stats_item'):
+                self.workspace_stats_item.Enable(False)
+
         # Initialize timing
         self.batch_start_time = time.time()
         self.batch_processing_times = []

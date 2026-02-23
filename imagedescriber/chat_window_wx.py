@@ -164,9 +164,12 @@ class ChatDialog(wx.Dialog):
                     self.model_combo.SetSelection(0)
                     
             elif provider == 'openai':
-                # Common OpenAI models
-                models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4']
-                for model in models:
+                # Load from canonical list - supports both frozen and dev mode
+                try:
+                    from ai_providers import DEV_OPENAI_MODELS
+                except ImportError:
+                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
+                for model in DEV_OPENAI_MODELS:
                     self.model_combo.Append(model)
                 self.model_combo.SetStringSelection('gpt-4o')
                 
