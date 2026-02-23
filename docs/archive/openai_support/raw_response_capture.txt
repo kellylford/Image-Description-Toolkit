@@ -1,1 +1,0 @@
-/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python: can't open file '/Users/kellyford/Documents/Image-Description-Toolkit/docs/archive/openai_support/capture_raw_response.py': [Errno 2] No such file or directory
