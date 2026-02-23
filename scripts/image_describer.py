@@ -347,18 +347,30 @@ class ImageDescriber:
                 
             elif self.provider_name == "openai":
                 logger.info("Initializing OpenAI provider...")
-                # Provider will try: explicit api_key → config file → env var → api key file
-                # So we can pass None and let it fallback through the chain
+                # Pass api_key (may be None - provider will check config/env/files)
                 provider = OpenAIProvider(api_key=self.api_key)
                 if not provider.is_available():
-                    raise ValueError("OpenAI provider requires an API key. Provide via --api-key-file, config file (image_describer_config.json), or OPENAI_API_KEY environment variable.")
+                    raise ValueError(
+                        "OpenAI provider requires an API key. Provide via:\n"
+                        "  1. Config file: image_describer_config.json → api_keys.OpenAI\n"
+                        "  2. Command line: --api-key-file /path/to/openai.txt\n"
+                        "  3. Environment: export OPENAI_API_KEY=sk-...\n"
+                        "  4. Text file: openai.txt in current directory"
+                    )
                 return provider
                 
             elif self.provider_name == "claude":
                 logger.info("Initializing Claude provider...")
-                # Provider will try: explicit api_key → config file → env var → api key file
-                # So we can pass None and let it fallback through the chain
+                # Pass api_key (may be None - provider will check config/env/files)
                 provider = ClaudeProvider(api_key=self.api_key)
+                if not provider.is_available():
+                    raise ValueError(
+                        "Claude provider requires an API key. Provide via:\n"
+                        "  1. Config file: image_describer_config.json → api_keys.Claude\n"
+                        "  2. Command line: --api-key-file /path/to/claude.txt\n"
+                        "  3. Environment: export ANTHROPIC_API_KEY=sk-ant-...\n"
+                        "  4. Text file: claude.txt in current directory"
+                    )
                 logger.info(f"Claude provider initialized. API key set: {bool(provider.api_key)}, Client available: {bool(provider.client)}, Is available: {provider.is_available()}")
                 print(f"INFO: Claude provider - API key set: {bool(provider.api_key)}, Client: {bool(provider.client)}, Available: {provider.is_available()}")
                 if not provider.is_available():
@@ -2078,13 +2090,17 @@ Examples:
   python {Path(__file__).name} exportedphotos --prompt-style artistic --model llava:7b
   python {Path(__file__).name} exportedphotos --model llava:13b --prompt-style technical
   
-  # OpenAI
+  # OpenAI (API key from file)
   python {Path(__file__).name} exportedphotos --provider openai --model gpt-4o-mini --api-key-file ~/openai.txt
+  
+  # OpenAI (API key from config)
   python {Path(__file__).name} exportedphotos --provider openai --model gpt-4-vision-preview
   
-  # Claude (Anthropic)
+  # Claude (API key from file)
   python {Path(__file__).name} exportedphotos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file ~/claude.txt
-  python {Path(__file__).name} exportedphotos --provider claude --model claude-3-5-haiku-20241022
+  
+  # Claude (API key from config)
+  python {Path(__file__).name} exportedphotos --provider claude --model claude-haiku-4-5-20251001
   
   # HuggingFace (Local Florence-2 models)
   python {Path(__file__).name} exportedphotos --provider huggingface --model microsoft/Florence-2-base
@@ -2121,7 +2137,9 @@ Configuration:
     parser.add_argument(
         "--api-key-file",
         type=str,
-        help="Path to file containing API key for cloud providers. Optional if key is in config file (image_describer_config.json) or environment variable"
+        help="Path to file containing API key for cloud providers (OpenAI, Claude). "
+             "If not specified, checks config file (image_describer_config.json), "
+             "environment variables (OPENAI_API_KEY/ANTHROPIC_API_KEY), or .txt files."
     )
     parser.add_argument(
         "--recursive",
@@ -2261,6 +2279,8 @@ Configuration:
             sys.exit(1)
     
     # Check for API key in environment variables if not provided via file
+    # Note: If still no API key, the provider will check config file (image_describer_config.json)
+    # and .txt files (openai.txt / claude.txt) during initialization
     if not api_key and args.provider in ["openai", "claude"]:
         if args.provider == "openai":
             env_var = "OPENAI_API_KEY"
@@ -2271,9 +2291,7 @@ Configuration:
         if api_key:
             logger.info(f"Using API key from environment variable {env_var}")
         else:
-            logger.warning(f"Provider '{args.provider}' requires an API key.")
-            logger.warning(f"Provide it via --api-key-file, config file (image_describer_config.json), or {env_var} environment variable")
-            logger.warning(f"Note: Provider will attempt to load from config file automatically")
+            logger.info(f"No API key provided via --api-key-file or {env_var}. Will check config file and .txt files.")
     
     # Create ImageDescriber instance with memory optimization
     describer = ImageDescriber(

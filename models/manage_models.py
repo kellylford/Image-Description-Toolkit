@@ -31,6 +31,13 @@ from typing import Dict, List, Optional
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Import Claude model list from central source so this file never needs
+# to be edited when models are added or deprecated - only claude_models.py does.
+try:
+    from models.claude_models import CLAUDE_MODELS as _CLAUDE_MODEL_IDS, CLAUDE_MODEL_METADATA as _CLAUDE_MODEL_META
+except ImportError:
+    from claude_models import CLAUDE_MODELS as _CLAUDE_MODEL_IDS, CLAUDE_MODEL_METADATA as _CLAUDE_MODEL_META
+
 try:
     from colorama import Fore, Style, init
     init(autoreset=True)
@@ -166,71 +173,9 @@ MODEL_METADATA = {
         "tags": ["vision", "cloud"]
     },
     
-    # Claude (Anthropic) Models
-    "claude-sonnet-4-5-20250929": {
-        "provider": "claude",
-        "description": "Claude Sonnet 4.5 - Latest, most capable",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": True,
-        "cost": "$$",
-        "tags": ["vision", "cloud", "accurate", "recommended"]
-    },
-    "claude-opus-4-1-20250805": {
-        "provider": "claude",
-        "description": "Claude Opus 4.1 - Highest quality",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": True,
-        "cost": "$$$",
-        "tags": ["vision", "cloud", "accurate", "recommended"]
-    },
-    "claude-sonnet-4-20250514": {
-        "provider": "claude",
-        "description": "Claude Sonnet 4.0",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$$",
-        "tags": ["vision", "cloud"]
-    },
-    "claude-opus-4-20250514": {
-        "provider": "claude",
-        "description": "Claude Opus 4.0",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$$$",
-        "tags": ["vision", "cloud", "accurate"]
-    },
-    "claude-3-7-sonnet-20250219": {
-        "provider": "claude",
-        "description": "Claude 3.7 Sonnet",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$$",
-        "tags": ["vision", "cloud"]
-    },
-    "claude-3-5-haiku-20241022": {
-        "provider": "claude",
-        "description": "Claude 3.5 Haiku - Fastest, cheapest",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": True,
-        "cost": "$",
-        "tags": ["vision", "cloud", "fast", "recommended"]
-    },
-    "claude-3-haiku-20240307": {
-        "provider": "claude",
-        "description": "Claude 3.0 Haiku - Budget option",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$",
-        "tags": ["vision", "cloud", "fast"]
-    },
-    
+    # Claude (Anthropic) Models - populated dynamically below from models.claude_models
+    # To add/remove Claude models, edit models/claude_models.py only.
+
     # HuggingFace Models (Florence-2)
     "microsoft/Florence-2-base": {
         "provider": "huggingface",
@@ -253,6 +198,22 @@ MODEL_METADATA = {
         "tags": ["vision", "local", "npu", "accurate", "recommended"]
     },
 }
+
+
+# Populate Claude entries from the central model registry.
+# This runs once at import time so MODEL_METADATA is fully populated before use.
+for _model_id in _CLAUDE_MODEL_IDS:
+    _meta = _CLAUDE_MODEL_META.get(_model_id, {})
+    _recommended = _meta.get("recommended", False)
+    MODEL_METADATA[_model_id] = {
+        "provider": "claude",
+        "description": _meta.get("description", "Claude model"),
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": _recommended,
+        "cost": _meta.get("cost", "$$"),
+        "tags": ["vision", "cloud"] + (["recommended"] if _recommended else []),
+    }
 
 
 def get_installed_ollama_models() -> List[str]:
@@ -494,7 +455,7 @@ def show_recommendations():
     print(f"    Best for: Maximum accuracy, complex images")
     print(f"    Setup: Add OpenAI API key to openai.txt\n")
     
-    print(f"  • {Fore.CYAN}claude-3.5-sonnet{Style.RESET_ALL} - High quality cloud")
+    print(f"  • {Fore.CYAN}claude-sonnet-4-5-20250929{Style.RESET_ALL} - High quality cloud")
     print(f"    Best for: Detailed analysis, complex reasoning")
     print(f"    Setup: Add Anthropic API key to claude.txt\n")
     

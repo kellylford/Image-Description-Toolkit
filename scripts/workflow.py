@@ -2707,13 +2707,17 @@ Examples:
   idt workflow photos --steps describe,html
   idt workflow videos --steps video,describe,html --model llava:7b
   
-  # OpenAI
+  # OpenAI (API key from file)
   idt workflow photos --provider openai --model gpt-4o-mini --api-key-file openai.txt
+  
+  # OpenAI (API key from config)
   idt workflow media --provider openai --model gpt-4o --steps describe,html
   
-  # Claude (Anthropic)
+  # Claude (API key from file)
   idt workflow photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file claude.txt
-  idt workflow media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
+  
+  # Claude (API key from config)
+  idt workflow media --provider claude --model claude-haiku-4-5-20251001 --steps describe,html
   
   # Custom Configuration Files
   idt workflow photos --config-image-describer scripts/my_prompts.json --prompt-style artistic
@@ -2724,10 +2728,11 @@ Resume Examples:
   idt workflow --resume workflow_output_20250919_153443
   idt workflow --resume /path/to/interrupted/workflow
   
-  # ⚠️ Cloud providers require API key when resuming:
+  # Cloud providers: API key from file (explicit)
   idt workflow --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file openai.txt
-  idt workflow --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file claude.txt
-  # See docs/WORKFLOW_RESUME_API_KEY.md for details
+  
+  # Cloud providers: API key from config (uses image_describer_config.json)
+  idt workflow --resume wf_claude_sonnet-4-5_20251005_150328
 
 Redescribe Examples (reuse images with different AI settings):
   # Compare different models on same images (skips video/convert steps)
@@ -2845,7 +2850,9 @@ Viewing Results:
     
     parser.add_argument(
         "--api-key-file",
-        help="Path to file containing API key for cloud providers (OpenAI, Claude, HuggingFace)"
+        help="Path to file containing API key for cloud providers (OpenAI, Claude). "
+             "If not specified, checks config file (image_describer_config.json), "
+             "environment variables (OPENAI_API_KEY/ANTHROPIC_API_KEY), or .txt files."
     )
     
     parser.add_argument(

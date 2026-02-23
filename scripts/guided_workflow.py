@@ -242,6 +242,27 @@ def check_api_key_file(provider):
     return None
 
 
+def check_api_key_in_config(provider):
+    """Check if API key exists in image_describer_config.json"""
+    try:
+        # Use config_loader to find config file (handles frozen exe paths)
+        config, config_path, source = load_json_config('image_describer_config.json')
+        if config:
+            api_keys = config.get('api_keys', {})
+            # Check for provider-specific key with various capitalizations
+            key_names = {
+                'openai': ['OpenAI', 'openai', 'OPENAI'],
+                'claude': ['Claude', 'claude', 'CLAUDE']
+            }
+            for key_name in key_names.get(provider, []):
+                if key_name in api_keys and api_keys[key_name]:
+                    return True, config_path
+    except Exception as e:
+        print(f"DEBUG: Error checking config for API key: {e}")
+    
+    return False, None
+
+
 def setup_api_key(provider):
     """Guide user through API key setup"""
     print(f"\n{provider.upper()} requires an API key.")
@@ -560,8 +581,8 @@ def guided_workflow(custom_config_path=None):
         if model_choice == 'BACK':
             # Go back to provider selection - restart function
             return guided_workflow()
-        # Extract just the model name (before the space/parenthesis)
-        model = model_choice.split()[0]
+        # Map the friendly display name back to the actual API ID
+        model = claude_model_map.get(model_choice, model_choice)
     
     elif provider == 'huggingface':
         # Check if HuggingFace provider is available
