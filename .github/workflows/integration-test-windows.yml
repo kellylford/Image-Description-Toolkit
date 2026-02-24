@@ -1,4 +1,4 @@
-name: Integration Test: Windows (Ollama + moondream)
+name: "Integration Test: Windows (Ollama + moondream)"
 
 # Manual trigger only -- Ollama model pull + inference takes ~20-30 min.
 # Run this when you want to verify the full end-to-end user flow works.
@@ -193,7 +193,7 @@ jobs:
     #  8. Bonus: ImageDescriber launch smoke test                          #
     #     continue-on-error so a runner/GUI issue doesn't fail the core   #
     # ------------------------------------------------------------------ #
-    - name: Smoke test -- ImageDescriber launches without crashing
+    - name: Smoke test - ImageDescriber launches without crashing
       continue-on-error: true
       shell: pwsh
       run: |
