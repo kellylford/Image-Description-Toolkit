@@ -514,6 +514,19 @@ class OpenAIProvider(AIProvider):
                 base_dir = Path(__file__).parent.parent
                 candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
             
+            # Also check the platform user config dir (AppData on Windows,
+            # ~/Library/Application Support/IDT on macOS) — this is where
+            # Configure Settings writes the key in the frozen exe.
+            try:
+                from config_loader import get_user_config_dir
+            except ImportError:
+                try:
+                    from scripts.config_loader import get_user_config_dir
+                except ImportError:
+                    get_user_config_dir = None
+            if get_user_config_dir:
+                candidates.append(get_user_config_dir() / 'image_describer_config.json')
+
             candidates.append(Path.cwd() / 'image_describer_config.json')
             
             for path in candidates:
@@ -901,6 +914,18 @@ class ClaudeProvider(AIProvider):
                 base_dir = Path(__file__).parent.parent
                 candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
             
+            # Also check the platform user config dir (AppData on Windows) —
+            # this is where Configure Settings writes the key in the frozen exe.
+            try:
+                from config_loader import get_user_config_dir
+            except ImportError:
+                try:
+                    from scripts.config_loader import get_user_config_dir
+                except ImportError:
+                    get_user_config_dir = None
+            if get_user_config_dir:
+                candidates.append(get_user_config_dir() / 'image_describer_config.json')
+
             candidates.append(Path.cwd() / 'image_describer_config.json')
             
             for path in candidates:
@@ -911,12 +936,11 @@ class ClaudeProvider(AIProvider):
                             api_keys = data.get('api_keys', {})
                             for k in ['Claude', 'claude', 'CLAUDE']:
                                 if k in api_keys and api_keys[k]:
-                                    print(f"DEBUG: Found Claude key in manual file: {path}")
                                     return api_keys[k].strip()
                     except Exception:
                         continue
-        except Exception as e:
-            print(f"DEBUG: Manual config search failed: {e}")
+        except Exception:
+            pass
 
         return None
     
@@ -934,16 +958,7 @@ class ClaudeProvider(AIProvider):
     
     def is_available(self) -> bool:
         """Check if Claude is available (has API key and SDK)"""
-        available = bool(self.api_key and self.client)
-        if not available:
-            # Debug output to help diagnose issues in frozen builds
-            reasons = []
-            if not self.api_key: reasons.append("No API Key")
-            if not self.client: reasons.append("Client init failed")
-            if not HAS_ANTHROPIC: reasons.append("anthropic module missing")
-            if getattr(sys, 'frozen', False):
-                print(f"DEBUG: Claude unavailable. Reasons: {', '.join(reasons)}")
-        return available
+        return bool(self.api_key and self.client)
     
     def reload_api_key(self, explicit_key: Optional[str] = None):
         """Reload API key from all sources and reinitialize client

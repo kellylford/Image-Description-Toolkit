@@ -423,13 +423,17 @@ class ProcessingWorker(threading.Thread):
         # Inject API key BEFORE availability check so providers initialised
         # without a key (module-level singleton created before a key was saved,
         # or IDT_CONFIG_DIR pointing to a keyless config) work correctly.
-        # Pass the key explicitly to reload_api_key() so it is NOT overwritten
-        # by a re-read of the (possibly keyless) config file.
-        if api_key and hasattr(provider, 'api_key'):
-            if hasattr(provider, 'reload_api_key'):
-                provider.reload_api_key(explicit_key=api_key)
-            else:
-                provider.api_key = api_key
+        #
+        # Always call reload_api_key for cloud providers — even when api_key is
+        # None.  When explicit_key=None, reload_api_key falls back to
+        # _load_api_key_from_config() which uses config_loader and correctly
+        # finds AppData (where Configure Settings writes).  Without this call
+        # the module-level singleton stays unkeyless forever if the main window
+        # config file was the bundled read-only template.
+        if hasattr(provider, 'reload_api_key'):
+            provider.reload_api_key(explicit_key=api_key or None)
+        elif api_key and hasattr(provider, 'api_key'):
+            provider.api_key = api_key
         
         try:
             # Check if it's a HEIC file and convert if needed
