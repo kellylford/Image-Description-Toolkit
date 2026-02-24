@@ -1306,7 +1306,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Add video metadata for videos
         if image_item.item_type == "video":
             metadata_parts = []
-            if hasattr(image_item, 'video_metadata'):
+            if hasattr(image_item, 'video_metadata') and image_item.video_metadata:
                 meta = image_item.video_metadata
                 if meta.get('duration'):
                     duration_mins = int(meta['duration'] // 60)

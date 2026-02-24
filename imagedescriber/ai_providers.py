@@ -548,14 +548,23 @@ class OpenAIProvider(AIProvider):
         """Check if OpenAI is available (has API key and SDK)"""
         return bool(self.api_key and self.client)
     
-    def reload_api_key(self):
+    def reload_api_key(self, explicit_key: Optional[str] = None):
         """Reload API key from all sources and reinitialize client
         
         Call this after API keys are updated via Configure dialog to
         refresh the provider without restarting the application.
+        
+        Args:
+            explicit_key: If provided, use this key directly instead of
+                          re-reading from config.  This prevents a keyless
+                          config file (e.g. via IDT_CONFIG_DIR) from
+                          overwriting a key the caller has already loaded.
         """
-        # Reload API key from all sources
-        self.api_key = self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
+        # Use the explicit key if supplied; otherwise re-read from all sources
+        if explicit_key:
+            self.api_key = explicit_key
+        else:
+            self.api_key = self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
         
         # Reinitialize client if we have a key
         self.client = None
@@ -936,14 +945,23 @@ class ClaudeProvider(AIProvider):
                 print(f"DEBUG: Claude unavailable. Reasons: {', '.join(reasons)}")
         return available
     
-    def reload_api_key(self):
+    def reload_api_key(self, explicit_key: Optional[str] = None):
         """Reload API key from all sources and reinitialize client
         
         Call this after API keys are updated via Configure dialog to
         refresh the provider without restarting the application.
+        
+        Args:
+            explicit_key: If provided, use this key directly instead of
+                          re-reading from config.  This prevents a keyless
+                          config file (e.g. via IDT_CONFIG_DIR) from
+                          overwriting a key the caller has already loaded.
         """
-        # Reload API key from all sources
-        self.api_key = self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
+        # Use the explicit key if supplied; otherwise re-read from all sources
+        if explicit_key:
+            self.api_key = explicit_key
+        else:
+            self.api_key = self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
         
         # Reinitialize client if we have a key
         self.client = None

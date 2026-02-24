@@ -53,12 +53,13 @@ except ImportError:
 
 # Import AI providers
 try:
-    from .ai_providers import get_available_providers
+    from .ai_providers import get_available_providers, get_all_providers
 except ImportError:
     try:
-        from ai_providers import get_available_providers
+        from ai_providers import get_available_providers, get_all_providers
     except ImportError:
         get_available_providers = None
+        get_all_providers = None
 
 # Import metadata extractor and geocoder
 MetadataExtractor = None
@@ -402,23 +403,33 @@ class ProcessingWorker(threading.Thread):
         if cache_key in ProcessingWorker._provider_cache:
             provider = ProcessingWorker._provider_cache[cache_key]
         else:
-            # Get fresh provider instance
-            providers = get_available_providers()
-            
-            if self.provider not in providers:
+            # Use get_all_providers() so we can find cloud providers (OpenAI, Claude)
+            # even when the module-level singleton was initialised before a key was
+            # configured (e.g. IDT_CONFIG_DIR points to a config with no API key).
+            # We inject the caller-supplied key below and reload before any call.
+            all_providers = get_all_providers() if get_all_providers else {}
+            providers = get_available_providers() if get_available_providers else {}
+
+            if self.provider in all_providers:
+                provider = all_providers[self.provider]
+            elif self.provider in providers:
+                provider = providers[self.provider]
+            else:
                 raise Exception(f"Provider '{self.provider}' not available")
-            
-            provider = providers[self.provider]
             
             # Cache for future use (improves single-image performance)
             ProcessingWorker._provider_cache[cache_key] = provider
         
-        # Inject API key if provided and provider supports it
+        # Inject API key BEFORE availability check so providers initialised
+        # without a key (module-level singleton created before a key was saved,
+        # or IDT_CONFIG_DIR pointing to a keyless config) work correctly.
+        # Pass the key explicitly to reload_api_key() so it is NOT overwritten
+        # by a re-read of the (possibly keyless) config file.
         if api_key and hasattr(provider, 'api_key'):
-            provider.api_key = api_key
-            # Reinitialize client if provider has that capability
             if hasattr(provider, 'reload_api_key'):
-                provider.reload_api_key()
+                provider.reload_api_key(explicit_key=api_key)
+            else:
+                provider.api_key = api_key
         
         try:
             # Check if it's a HEIC file and convert if needed
