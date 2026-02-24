@@ -110,26 +110,28 @@ jobs:
         ollama list
 
     # ------------------------------------------------------------------ #
-    #  5. Start ollama serve as a background process                       #
-    #     Start-Process creates an independent process that survives       #
-    #     across subsequent steps.                                         #
+    #  5. Verify Ollama server is running                                  #
+    #     `ollama pull` auto-starts the server as a side effect, so we    #
+    #     just confirm it is listening before running idt.                 #
     # ------------------------------------------------------------------ #
-    - name: Start Ollama server
+    - name: Verify Ollama server is ready
       shell: pwsh
       run: |
-        $proc = Start-Process -FilePath "ollama" -ArgumentList "serve" -NoNewWindow -PassThru
-        Write-Host "ollama serve started (PID $($proc.Id)). Waiting 8 s for initialization..."
-        Start-Sleep -Seconds 8
-        if ($proc.HasExited) {
-          Write-Host "ERROR: ollama serve exited unexpectedly (exit code $($proc.ExitCode))"
-          exit 1
-        }
-        Write-Host "Ollama server is up."
-        try {
-          $r = Invoke-RestMethod -Uri "http://localhost:11434" -TimeoutSec 5
-          Write-Host "API reachable: $r"
-        } catch {
-          Write-Host "API connectivity note: $($_.Exception.Message) (normal if Ollama returns plain text)"
+        Write-Host "Waiting for Ollama server (auto-started by `ollama pull`)..."
+        $maxAttempts = 10
+        for ($i = 1; $i -le $maxAttempts; $i++) {
+          try {
+            $r = Invoke-RestMethod -Uri "http://localhost:11434" -TimeoutSec 3
+            Write-Host "Ollama server is ready (attempt $i)"
+            break
+          } catch {
+            if ($i -eq $maxAttempts) {
+              Write-Host "ERROR: Ollama server did not respond after $maxAttempts attempts"
+              exit 1
+            }
+            Write-Host "Attempt $i/$maxAttempts - waiting 3 s..."
+            Start-Sleep -Seconds 3
+          }
         }
 
     # ------------------------------------------------------------------ #
