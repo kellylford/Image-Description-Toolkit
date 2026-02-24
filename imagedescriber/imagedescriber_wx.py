@@ -54,7 +54,6 @@ import wx.lib.newevent
 # Import shared utilities
 try:
     from shared.wx_common import (
-        find_config_file,
         find_scripts_directory,
         ConfigManager,
         ModifiedStateMixin,
@@ -513,11 +512,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.SetTitle(f"{current_title} - Processing {num_processing} items...")
     
     def load_config(self):
-        """Load application configuration"""
+        """Load application configuration.
+
+        Uses config_loader (not wx_common.find_config_file) so the user-written
+        config in AppData is found before the bundled read-only template in
+        _MEIPASS/scripts/.  wx_common.find_config_file returns _MEIPASS/scripts/
+        first in onefile frozen builds — that copy has no API keys, so any key
+        saved via Configure Settings was previously being silently ignored.
+        """
         try:
-            self.config_file = find_config_file('image_describer_config.json')
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
+            try:
+                from config_loader import load_json_config
+            except ImportError:
+                from scripts.config_loader import load_json_config
+            self.config, self.config_file, _ = load_json_config('image_describer_config.json')
         except Exception as e:
             print(f"Warning: Could not load config: {e}")
             self.config = {
@@ -525,6 +533,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'default_model': 'moondream',
                 'default_prompt_style': 'narrative'
             }
+            self.config_file = None
     
     def get_api_key_for_provider(self, provider: str) -> str:
         """Get API key for a specific provider from config"""
@@ -3992,9 +4001,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         custom_prompt = batch_state.get('custom_prompt')
         detection_settings = batch_state.get('detection_settings')
         
-        # Get prompt config path
-        from shared.wx_common import find_config_file
-        prompt_config_path = find_config_file('image_describer_config.json')
+        # Get prompt config path — use the already-resolved config_file path so we
+        # read custom prompts from AppData (where Configure Settings writes them) not
+        # from the read-only _MEIPASS bundled template.
+        prompt_config_path = self.config_file
         
         # Reset items to pending (from paused)
         for item in to_process_items:
@@ -4233,8 +4243,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dialog.Destroy()
         
         # Start batch processing for frames
-        from shared.wx_common import find_config_file
-        prompt_config_path = find_config_file('image_describer_config.json')
+        # Use already-resolved self.config_file so we read custom prompts from AppData.
+        prompt_config_path = self.config_file
         
         # Mark frames as pending for batch processing
         for i, frame_path in enumerate(frame_paths):
