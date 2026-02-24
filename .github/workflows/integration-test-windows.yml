@@ -1,0 +1,240 @@
+name: Integration Test: Windows (Ollama + moondream)
+
+# Manual trigger only -- Ollama model pull + inference takes ~20-30 min.
+# Run this when you want to verify the full end-to-end user flow works.
+# Public repo = free GitHub Actions minutes on windows-latest.
+on:
+  workflow_dispatch:
+
+jobs:
+  integration-test:
+    runs-on: windows-latest
+    timeout-minutes: 60  # Model pull can be slow on first run
+
+    steps:
+    # ------------------------------------------------------------------ #
+    #  1. Checkout + Python                                                #
+    # ------------------------------------------------------------------ #
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # ------------------------------------------------------------------ #
+    #  2. Build both executables (same bat as the build workflow)          #
+    # ------------------------------------------------------------------ #
+    - name: Build all Windows apps
+      run: |
+        cd BuildAndRelease\WinBuilds
+        call builditall_wx.bat
+      shell: cmd
+
+    - name: Verify build outputs exist
+      shell: pwsh
+      run: |
+        $missing = @()
+        if (-not (Test-Path "idt\dist\idt.exe"))                       { $missing += "idt\dist\idt.exe" }
+        if (-not (Test-Path "imagedescriber\dist\ImageDescriber.exe")) { $missing += "imagedescriber\dist\ImageDescriber.exe" }
+        if ($missing.Count -gt 0) {
+          Write-Host "ERROR: Expected build outputs not found:"
+          $missing | ForEach-Object { Write-Host "  - $_" }
+          exit 1
+        }
+        Write-Host "Build outputs confirmed:"
+        Write-Host "  idt.exe              $(((Get-Item 'idt\dist\idt.exe').Length / 1MB).ToString('0.0')) MB"
+        Write-Host "  ImageDescriber.exe   $(((Get-Item 'imagedescriber\dist\ImageDescriber.exe').Length / 1MB).ToString('0.0')) MB"
+
+    # ------------------------------------------------------------------ #
+    #  3. Install Ollama via winget                                        #
+    # ------------------------------------------------------------------ #
+    - name: Install Ollama via winget
+      shell: pwsh
+      run: |
+        Write-Host "Installing Ollama..."
+        winget install Ollama.Ollama --silent --accept-package-agreements --accept-source-agreements
+
+        # Reload PATH from registry -- winget installs don't update the current shell
+        $machinePath = [System.Environment]::GetEnvironmentVariable('PATH', 'Machine')
+        $userPath    = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
+        $env:PATH    = "$machinePath;$userPath"
+
+        # If `ollama` still isn't found, search common install locations
+        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+          Write-Host "ollama not in refreshed PATH -- searching common install locations..."
+          $candidates = @(
+            "$env:LOCALAPPDATA\Programs\Ollama",
+            "$env:PROGRAMFILES\Ollama",
+            "$env:PROGRAMFILES(X86)\Ollama"
+          )
+          $found = $false
+          foreach ($dir in $candidates) {
+            if (Test-Path "$dir\ollama.exe") {
+              Write-Host "Found at: $dir"
+              Add-Content $env:GITHUB_PATH $dir
+              $env:PATH = "$env:PATH;$dir"
+              $found = $true
+              break
+            }
+          }
+          if (-not $found) {
+            Write-Host "ERROR: Could not locate ollama.exe after install"
+            exit 1
+          }
+        } else {
+          # Already in PATH -- still register the dir via GITHUB_PATH for later steps
+          $ollamaDir = (Get-Command ollama).Source | Split-Path
+          Add-Content $env:GITHUB_PATH $ollamaDir
+        }
+
+        Write-Host "Ollama version:"
+        ollama --version
+
+    # ------------------------------------------------------------------ #
+    #  4. Pull moondream (~1.7 GB -- the default idt workflow model)       #
+    # ------------------------------------------------------------------ #
+    - name: Pull moondream model
+      shell: pwsh
+      run: |
+        Write-Host "Pulling moondream -- may take a few minutes on first run..."
+        ollama pull moondream
+        Write-Host ""
+        Write-Host "--- Installed models ---"
+        ollama list
+
+    # ------------------------------------------------------------------ #
+    #  5. Start ollama serve as a background process                       #
+    #     Start-Process creates an independent process that survives       #
+    #     across subsequent steps.                                         #
+    # ------------------------------------------------------------------ #
+    - name: Start Ollama server
+      shell: pwsh
+      run: |
+        $proc = Start-Process -FilePath "ollama" -ArgumentList "serve" -NoNewWindow -PassThru
+        Write-Host "ollama serve started (PID $($proc.Id)). Waiting 8 s for initialization..."
+        Start-Sleep -Seconds 8
+        if ($proc.HasExited) {
+          Write-Host "ERROR: ollama serve exited unexpectedly (exit code $($proc.ExitCode))"
+          exit 1
+        }
+        Write-Host "Ollama server is up."
+        try {
+          $r = Invoke-RestMethod -Uri "http://localhost:11434" -TimeoutSec 5
+          Write-Host "API reachable: $r"
+        } catch {
+          Write-Host "API connectivity note: $($_.Exception.Message) (normal if Ollama returns plain text)"
+        }
+
+    # ------------------------------------------------------------------ #
+    #  6. Run the real user command                                        #
+    #     testimages/ has blue_circle.jpg and red_square.jpg (committed)  #
+    # ------------------------------------------------------------------ #
+    - name: Run idt workflow with moondream
+      shell: pwsh
+      run: |
+        Write-Host "Running: idt.exe workflow testimages --provider ollama --model moondream"
+        Write-Host ""
+        .\idt\dist\idt.exe workflow testimages --provider ollama --model moondream
+        $exitCode = $LASTEXITCODE
+        Write-Host ""
+        Write-Host "idt workflow exit code: $exitCode"
+        if ($exitCode -ne 0) {
+          Write-Host "ERROR: idt workflow command failed"
+          exit $exitCode
+        }
+
+    # ------------------------------------------------------------------ #
+    #  7. Verify descriptions were actually produced (strict)              #
+    # ------------------------------------------------------------------ #
+    - name: Verify description output
+      shell: pwsh
+      run: |
+        $wfDirs = Get-ChildItem -Directory -Filter "wf_*" | Sort-Object LastWriteTime -Descending
+        if ($wfDirs.Count -eq 0) {
+          Write-Host "ERROR: No workflow output directory (wf_*) was created"
+          exit 1
+        }
+
+        $wfDir = $wfDirs[0].FullName
+        Write-Host "Workflow output directory: $wfDir"
+        Write-Host ""
+        Write-Host "--- Directory contents ---"
+        Get-ChildItem -Path $wfDir -Recurse | ForEach-Object {
+          Write-Host "  $($_.FullName.Replace($wfDir,'').TrimStart('\'))"
+        }
+        Write-Host ""
+
+        $txtFiles = Get-ChildItem -Path $wfDir -Filter "*.txt" -Recurse
+        Write-Host "Description .txt files found: $($txtFiles.Count)"
+
+        if ($txtFiles.Count -lt 2) {
+          Write-Host "ERROR: Expected at least 2 description files (one per test image), found $($txtFiles.Count)"
+          exit 1
+        }
+
+        foreach ($f in $txtFiles) {
+          Write-Host ""
+          Write-Host "=== $($f.Name) ==="
+          Get-Content $f.FullName
+          Write-Host "=========================="
+        }
+
+        Write-Host ""
+        Write-Host "PASS: $($txtFiles.Count) descriptions produced successfully"
+
+    # ------------------------------------------------------------------ #
+    #  8. Bonus: ImageDescriber launch smoke test                          #
+    #     continue-on-error so a runner/GUI issue doesn't fail the core   #
+    # ------------------------------------------------------------------ #
+    - name: Smoke test -- ImageDescriber launches without crashing
+      continue-on-error: true
+      shell: pwsh
+      run: |
+        Write-Host "Launching ImageDescriber.exe (15-second survival test)..."
+        $proc = Start-Process -FilePath ".\imagedescriber\dist\ImageDescriber.exe" -PassThru
+        Start-Sleep -Seconds 15
+
+        if ($proc.HasExited) {
+          Write-Host "FAIL: ImageDescriber.exe exited within 15 seconds (exit code $($proc.ExitCode))"
+          Write-Host "Likely a missing PyInstaller dependency or import error."
+          exit 1
+        }
+
+        Write-Host "PASS: ImageDescriber.exe is still running after 15 seconds (PID $($proc.Id))"
+        $proc.Kill()
+        Write-Host "Process terminated cleanly."
+
+    # ------------------------------------------------------------------ #
+    #  9. Upload artifacts (always -- so you get outputs even on failure)  #
+    # ------------------------------------------------------------------ #
+    - name: Upload idt executable
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: idt-windows
+        path: idt/dist/idt.exe
+        retention-days: 14
+
+    - name: Upload ImageDescriber executable
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: imagedescriber-windows
+        path: imagedescriber/dist/ImageDescriber.exe
+        retention-days: 14
+
+    - name: Upload workflow output (moondream descriptions)
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: workflow-output
+        path: wf_*/
+        retention-days: 14
+        if-no-files-found: warn
