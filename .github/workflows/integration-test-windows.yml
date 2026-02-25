@@ -189,7 +189,8 @@ jobs:
         Write-Host "=============================="
 
         # Require at least one image block in the descriptions file
-        $imageBlocks = ([regex]::Matches($content, '(?m)^--- Image')).Count
+        # The file format uses "File: <name>" headers for each image entry
+        $imageBlocks = ([regex]::Matches($content, '(?m)^File:')).Count
         Write-Host "Image description blocks found: $imageBlocks"
         if ($imageBlocks -lt 1) {
           Write-Host "ERROR: No image descriptions found in image_descriptions.txt"
