@@ -197,14 +197,15 @@ jobs:
           exit 1
         }
 
-        # Verify actual description content -- test images are blue_circle.jpg and red_square.jpg
-        # At least one of those colors should appear in the AI's output
-        $hasBlue  = $content -imatch '\bblue\b'
-        $hasRed   = $content -imatch '\bred\b'
-        $hasColor = $hasBlue -or $hasRed
-        Write-Host "Content check - 'blue' found: $hasBlue | 'red' found: $hasRed"
-        if (-not $hasColor) {
-          Write-Host "ERROR: Description text does not mention 'blue' or 'red' - likely an empty/error response"
+        # Verify actual description content -- test images are outdoor_scene.jpg (sky, grass, tree, sun)
+        # and coffee_desk.jpg (coffee cup, notebook, desk).
+        # At least one meaningful scene word should appear in the AI output.
+        $sceneWords = @('sky','grass','sun','cloud','tree','outdoor','green','coffee','cup','notebook','desk','pen','table','wood')
+        $matched = $sceneWords | Where-Object { $content -imatch "\b$_\b" }
+        Write-Host "Scene words found: $($matched -join ', ')"
+        if ($matched.Count -eq 0) {
+          Write-Host "ERROR: Description text contains none of the expected scene words - likely an empty/error response"
+          Write-Host "Expected one of: $($sceneWords -join ', ')"
           exit 1
         }
 
