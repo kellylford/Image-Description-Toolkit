@@ -196,8 +196,19 @@ jobs:
           exit 1
         }
 
+        # Verify actual description content -- test images are blue_circle.jpg and red_square.jpg
+        # At least one of those colors should appear in the AI's output
+        $hasBlue  = $content -imatch '\bblue\b'
+        $hasRed   = $content -imatch '\bred\b'
+        $hasColor = $hasBlue -or $hasRed
+        Write-Host "Content check - 'blue' found: $hasBlue | 'red' found: $hasRed"
+        if (-not $hasColor) {
+          Write-Host "ERROR: Description text does not mention 'blue' or 'red' - likely an empty/error response"
+          exit 1
+        }
+
         Write-Host ""
-        Write-Host "PASS: $imageBlocks image description(s) produced successfully"
+        Write-Host "PASS: $imageBlocks image description(s) produced with meaningful content"
 
     # ------------------------------------------------------------------ #
     #  8. Bonus: ImageDescriber launch smoke test                          #
