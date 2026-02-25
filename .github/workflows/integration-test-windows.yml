@@ -158,9 +158,12 @@ jobs:
     - name: Verify description output
       shell: pwsh
       run: |
-        $wfDirs = Get-ChildItem -Directory -Filter "wf_*" | Sort-Object LastWriteTime -Descending
+        # idt workflow defaults to --output-dir Descriptions, so wf_* dirs land under Descriptions\
+        $wfDirs = Get-ChildItem -Path "Descriptions" -Directory -Filter "wf_*" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
         if ($wfDirs.Count -eq 0) {
-          Write-Host "ERROR: No workflow output directory (wf_*) was created"
+          Write-Host "ERROR: No workflow output directory found under Descriptions\\"
+          Write-Host "Contents of current directory:"
+          Get-ChildItem -Recurse -Depth 2 | Select-Object FullName
           exit 1
         }
 
@@ -173,23 +176,28 @@ jobs:
         }
         Write-Host ""
 
-        $txtFiles = Get-ChildItem -Path $wfDir -Filter "*.txt" -Recurse
-        Write-Host "Description .txt files found: $($txtFiles.Count)"
-
-        if ($txtFiles.Count -lt 2) {
-          Write-Host "ERROR: Expected at least 2 description files (one per test image), found $($txtFiles.Count)"
+        # Check the combined descriptions file has at least 1 image described
+        $descFile = Get-ChildItem -Path $wfDir -Filter "image_descriptions.txt" -Recurse | Select-Object -First 1
+        if (-not $descFile) {
+          Write-Host "ERROR: image_descriptions.txt not found in output directory"
           exit 1
         }
 
-        foreach ($f in $txtFiles) {
-          Write-Host ""
-          Write-Host "=== $($f.Name) ==="
-          Get-Content $f.FullName
-          Write-Host "=========================="
+        $content = Get-Content $descFile.FullName -Raw
+        Write-Host "=== image_descriptions.txt ==="
+        Write-Host $content
+        Write-Host "=============================="
+
+        # Require at least one image block in the descriptions file
+        $imageBlocks = ([regex]::Matches($content, '(?m)^--- Image')).Count
+        Write-Host "Image description blocks found: $imageBlocks"
+        if ($imageBlocks -lt 1) {
+          Write-Host "ERROR: No image descriptions found in image_descriptions.txt"
+          exit 1
         }
 
         Write-Host ""
-        Write-Host "PASS: $($txtFiles.Count) descriptions produced successfully"
+        Write-Host "PASS: $imageBlocks image description(s) produced successfully"
 
     # ------------------------------------------------------------------ #
     #  8. Bonus: ImageDescriber launch smoke test                          #
@@ -237,6 +245,6 @@ jobs:
       if: always()
       with:
         name: workflow-output
-        path: wf_*/
+        path: Descriptions/wf_*/
         retention-days: 14
         if-no-files-found: warn
