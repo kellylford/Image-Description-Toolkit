@@ -472,7 +472,7 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude", "huggingface"]
+    providers = ["ollama", "openai", "claude", "huggingface", "mlx"]
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
     if provider == 'EXIT':
@@ -620,7 +620,46 @@ def guided_workflow(custom_config_path=None):
             print("Make sure dependencies are installed: pip install transformers torch torchvision einops timm")
             print("\nReturning to provider selection...\n")
             return guided_workflow()
-    
+
+    elif provider == 'mlx':
+        # Check if MLX (Apple Metal) provider is available
+        try:
+            project_root = Path(__file__).parent.parent
+            if str(project_root) not in sys.path:
+                sys.path.insert(0, str(project_root))
+            from imagedescriber.ai_providers import MLXProvider
+            mlx_provider = MLXProvider()
+
+            if not mlx_provider.is_available():
+                print("\n⚠️  MLX provider not available.")
+                print("Requires macOS with Apple Silicon and mlx-vlm:")
+                print("  pip install mlx-vlm")
+                print("\nReturning to provider selection...\n")
+                return guided_workflow()
+
+            # Use hardcoded known-good models (same list as the GUI)
+            mlx_models = [
+                "mlx-community/Qwen2-VL-2B-Instruct-4bit (2B fastest, recommended)",
+                "mlx-community/Qwen2.5-VL-3B-Instruct-4bit (3B, better quality)",
+                "mlx-community/Qwen2.5-VL-7B-Instruct-4bit (7B, best quality, slower)",
+                "mlx-community/llava-1.5-7b-4bit (LLaVA 7B alternative)",
+            ]
+            print("\nAvailable MLX (Metal) models — downloaded from HuggingFace on first use:")
+            model_choice = get_choice("Select a model", mlx_models, default=1, allow_back=True)
+            if model_choice == 'EXIT':
+                print("Exiting...")
+                return
+            if model_choice == 'BACK':
+                return guided_workflow()
+            # Extract the HuggingFace model ID (everything before the first space)
+            model = model_choice.split()[0]
+
+        except ImportError as e:
+            print(f"\n⚠️  Error loading MLX provider: {e}")
+            print("Make sure mlx-vlm is installed: pip install mlx-vlm")
+            print("\nReturning to provider selection...\n")
+            return guided_workflow()
+
     # Step 4: Image Directory
     print_header("Step 4: Image Directory")
     

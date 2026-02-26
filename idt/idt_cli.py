@@ -870,7 +870,14 @@ def main():
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
         return 0
-    
+
+    elif command.startswith('-') and len(command) == 2 and command[1].isalpha():
+        # Python interpreter flags (e.g. -B, -c, -m, -s, -S, -E, -u) passed by
+        # multiprocessing.resource_tracker when it tries to respawn using
+        # sys.executable (which is this frozen binary in frozen mode).
+        # Silently exit — these are not real IDT commands.
+        return 0
+
     else:
         print(f"Error: Unknown command '{command}'")
         print()

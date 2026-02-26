@@ -1603,22 +1603,25 @@ class MLXProvider(AIProvider):
             # ---- load / recall model in unified memory ----
             self._ensure_model_loaded(model)
 
-            # ---- convert to JPEG if needed (MLX requires a JPEG path on disk) ----
+            # ---- resize + convert to JPEG for MLX ----
+            # Always run through _to_jpeg_tempfile so full-resolution camera
+            # JPEGs (4000×3000+) get downscaled before inference.  The method
+            # already caps at max_dim=1024 and is a no-op resize for small images.
             path_obj = Path(image_path)
-            if path_obj.suffix.lower() not in {'.jpg', '.jpeg'}:
-                temp_jpeg = self._to_jpeg_tempfile(image_path)
-                if not temp_jpeg:
-                    return (
-                        f"Error: Could not convert {path_obj.suffix.upper()} "
-                        f"to JPEG for MLX inference"
-                    )
-                use_path = temp_jpeg
-            else:
-                use_path = image_path
+            temp_jpeg = self._to_jpeg_tempfile(image_path)
+            if not temp_jpeg:
+                return (
+                    f"Error: Could not prepare {path_obj.suffix.upper() or 'image'} "
+                    f"for MLX inference"
+                )
+            use_path = temp_jpeg
 
             # ---- format prompt for the model's chat template ----
+            # Prepend English instruction — Qwen2-VL is a Chinese-origin model and
+            # will respond in Chinese unless explicitly told otherwise.
+            english_prompt = f"Please respond in English only. {prompt}"
             formatted_prompt = _mlx_apply_chat_template(
-                self._processor, self._mlx_config, prompt, num_images=1
+                self._processor, self._mlx_config, english_prompt, num_images=1
             )
 
             # ---- run inference on Metal ----

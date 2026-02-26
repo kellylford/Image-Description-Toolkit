@@ -42,6 +42,17 @@ tqdm>=4.60.0           # Progress bars
 pyinstaller>=6.0.0     # For building the executable
 
 # ----------------------------------------------------------------------------
+# OPTIONAL - Apple Metal GPU Inference (macOS Apple Silicon only)
+# ----------------------------------------------------------------------------
+# Enables the Metal / MLX provider for on-device AI descriptions.
+# Install this on macOS with Apple Silicon before building the app:
+#   pip install mlx-vlm
+# It is intentionally excluded from the default requirements because it is
+# macOS-only and has many heavy dependencies (transformers, mlx, etc.).
+# If not installed, the MLX provider will be silently disabled at runtime.
+mlx-vlm>=0.3.0 ; sys_platform == 'darwin'
+
+# ----------------------------------------------------------------------------
 # OPTIONAL - Advanced Features
 # ----------------------------------------------------------------------------
 # Uncomment if you need GroundingDINO object detection:

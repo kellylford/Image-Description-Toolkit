@@ -17,20 +17,27 @@ All paths use ../ prefix since we're building from idt/ subdirectory.
 from PyInstaller.utils.hooks import collect_all
 bs4_datas, bs4_binaries, bs4_hiddenimports = collect_all('bs4')
 
-# Conditionally collect mlx-vlm (macOS Apple Silicon only)
+# Conditionally collect mlx-vlm and mlx (macOS Apple Silicon only)
+# mlx-vlm must be installed in the build venv: pip install mlx-vlm
 import sys as _sys
 if _sys.platform == 'darwin':
     try:
         mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = collect_all('mlx_vlm')
     except Exception:
         mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
+    try:
+        # collect_all('mlx') includes libmlx.dylib (Metal framework) and all mlx submodules
+        mlx_datas, mlx_binaries, mlx_hiddenimports = collect_all('mlx')
+    except Exception:
+        mlx_datas, mlx_binaries, mlx_hiddenimports = [], [], []
 else:
     mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
+    mlx_datas, mlx_binaries, mlx_hiddenimports = [], [], []
 
 a = Analysis(
     ['idt_cli.py'],
     pathex=['..'],  # Add parent directory to import path
-    binaries=bs4_binaries + mlx_vlm_binaries,
+    binaries=bs4_binaries + mlx_vlm_binaries + mlx_binaries,
     datas=[
         # Include ALL scripts files
         ('../scripts/workflow.py', 'scripts'),
@@ -56,11 +63,12 @@ a = Analysis(
         ('../models', 'models'),
         ('../analysis', 'analysis'),
         # Include imagedescriber package for ai_providers
+        ('../imagedescriber/__init__.py', 'imagedescriber'),
         ('../imagedescriber/ai_providers.py', 'imagedescriber'),
         ('../imagedescriber/data_models.py', 'imagedescriber'),
         # Include VERSION file
         ('../VERSION', '.'),
-    ] + bs4_datas + mlx_vlm_datas,
+    ] + bs4_datas + mlx_vlm_datas + mlx_datas,
     hiddenimports=[
         # Scripts modules
         'scripts',
@@ -124,11 +132,33 @@ a = Analysis(
         # MLX / Apple Metal (macOS Apple Silicon only — no-op on Windows)
         'mlx_vlm',
         'mlx',
-    ] + bs4_hiddenimports + mlx_vlm_hiddenimports,
+        'mlx.core',
+        'mlx.nn',
+        'mlx.nn.layers',
+        'transformers',
+        'transformers.models.auto',
+        # Qwen2-VL modules (for mlx-community/Qwen2-VL-2B model)
+        'transformers.models.qwen2_vl',
+        'transformers.models.qwen2_vl.configuration_qwen2_vl',
+        'transformers.models.qwen2_vl.image_processing_qwen2_vl',
+        'transformers.models.qwen2_vl.image_processing_qwen2_vl_fast',
+        'transformers.models.qwen2_vl.modeling_qwen2_vl',
+        'transformers.models.qwen2_vl.processing_qwen2_vl',
+        'transformers.models.qwen2_vl.video_processing_qwen2_vl',
+        # Qwen2.5-VL modules (for mlx-community/Qwen2.5-VL-3B and 7B models)
+        'transformers.models.qwen2_5_vl',
+        'transformers.models.qwen2_5_vl.configuration_qwen2_5_vl',
+        'transformers.models.qwen2_5_vl.modeling_qwen2_5_vl',
+        'transformers.models.qwen2_5_vl.processing_qwen2_5_vl',
+        'huggingface_hub',
+        'safetensors',
+        'sentencepiece',
+        'tokenizers',
+    ] + bs4_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['workflow'],  # Exclude conflicting external workflow package
+    excludes=['workflow', 'setuptools', 'pip'],  # Exclude conflicting/problematic packages
     noarchive=False,
     optimize=0,
 )

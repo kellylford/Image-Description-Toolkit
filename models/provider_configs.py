@@ -108,14 +108,25 @@ PROVIDER_CAPABILITIES: Dict[str, Dict[str, Any]] = {
 def get_provider_capabilities(provider_name: str) -> Dict[str, Any]:
     """
     Get capabilities for a specific provider.
-    
+
+    Lookup is case-insensitive: "mlx", "MLX", and "Mlx" all resolve to the
+    same entry so callers do not need to know the exact key capitalisation.
+
     Args:
         provider_name: Name of the provider
-        
+
     Returns:
         Dictionary of capabilities, or empty dict if provider not found
     """
-    return PROVIDER_CAPABILITIES.get(provider_name, {})
+    # Exact match first (fastest path, preserves behaviour for existing callers)
+    if provider_name in PROVIDER_CAPABILITIES:
+        return PROVIDER_CAPABILITIES[provider_name]
+    # Case-insensitive fallback
+    lower = provider_name.lower()
+    for key, caps in PROVIDER_CAPABILITIES.items():
+        if key.lower() == lower:
+            return caps
+    return {}
 
 
 def supports_prompts(provider_name: str) -> bool:

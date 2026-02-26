@@ -124,3 +124,62 @@ MLX is now a first-class AI provider in IDT:
 - Handles HEIC images natively (converts internally)
 - Gracefully unavailable on Windows/Linux (no crashes, clear error messages)
 - 4 curated models available: Qwen2-VL-2B, Qwen2.5-VL-3B, Qwen2.5-VL-7B (all 4-bit), llava-1.5-7b-4bit
+
+---
+
+## Second Session — Bug Fixes After User Testing (2026-02-26 afternoon)
+
+User tested with real photos (`/Applications/IDT/Descriptions/wf_pictures_brewers...`) and found two critical bugs.
+
+### Bug 1: Chinese output (Qwen2-VL defaults to Chinese)
+**Symptom:** Descriptions returned in Chinese characters  
+**Cause:** Qwen2-VL is a Chinese-origin model. Without explicit English instruction, it defaults to Chinese  
+**Fix** (`imagedescriber/ai_providers.py` `MLXProvider.describe_image()`):
+```python
+english_prompt = f"Please respond in English only. {prompt}"
+formatted_prompt = _mlx_apply_chat_template(
+    self._processor, self._mlx_config, english_prompt, num_images=1
+)
+```
+
+### Bug 2: 300+ seconds per image for full-resolution camera photos
+**Symptom:** 317s and 349s per image vs 8-14s for small test images  
+**Cause:** `_to_jpeg_tempfile()` (which caps at 1024px) was only called for non-JPEG files. Camera photos are `.jpg` extension so they bypassed the resize entirely and went to MLX at full 4000×3000+ resolution  
+**Fix** (`imagedescriber/ai_providers.py`):
+```python
+# Always call _to_jpeg_tempfile — even for .jpg files — to cap resolution
+temp_jpeg = self._to_jpeg_tempfile(image_path)
+```
+
+### Bug 3: `idt guideme` missing MLX option
+**Fix** (`scripts/guided_workflow.py`): Added `'mlx'` to providers list + full `elif provider == 'mlx':` block
+
+### Bug 4: Case mismatch in provider_configs.py
+**Fix** (`models/provider_configs.py`): `get_provider_capabilities()` now does case-insensitive lookup
+
+### Bug 5: `-B` noise in idt output
+**Fix** (`idt/idt_cli.py`): Silent exit for single-char Python interpreter flags passed by `multiprocessing.resource_tracker`
+
+### Additional spec fixes (both `idt/idt.spec` and `imagedescriber/imagedescriber_wx.spec`)
+- Added `collect_all('mlx')` for `libmlx.dylib`
+- All `transformers.models.qwen2_vl.*` and `transformers.models.qwen2_5_vl.*` submodules as hidden imports
+- `imagedescriber/__init__.py` added to idt.spec datas
+
+### Verified test results
+```
+Command: idt image_describer testimages/ --provider mlx --model mlx-community/Qwen2-VL-2B-Instruct-4bit --prompt-style narrative --output-dir /tmp/mlx_test_v3
+Result:  2/2 images, EXIT 0
+Times:   8.79s and 6.33s (vs 317s before fix)
+Output:  English descriptions confirmed ✅
+```
+
+### Installed at session end
+- `/Applications/IDT/idt` — rebuilt 2026-02-26 14:30 ✅
+- `/Applications/ImageDescriber.app` — rebuilt 2026-02-26 14:33 ✅
+
+### Notes for next session
+- GUI app not user-tested yet — CLI test confirms underlying code is correct
+- Memory pressure (exit 137) is normal when running back-to-back MLX batches; wait 30s between runs
+- First image per batch takes ~10-14s (model load); subsequent ~6-8s
+- If new `Could not find ... in transformers.models.qwen2_vl` errors appear, add the missing submodule to hiddenimports in both spec files and rebuild
+- Log location for GUI errors: `~/Library/Logs/ImageDescriber/ImageDescriber.log`
