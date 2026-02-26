@@ -13,6 +13,16 @@ wx_datas, wx_binaries, wx_hiddenimports = collect_all('wx')
 # Collect all OpenCV files (needed for macOS .dylib dependencies)
 cv2_datas, cv2_binaries, cv2_hiddenimports = collect_all('cv2')
 
+# Conditionally collect mlx-vlm (macOS Apple Silicon only)
+import sys as _sys
+if _sys.platform == 'darwin':
+    try:
+        mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = collect_all('mlx_vlm')
+    except Exception:
+        mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
+else:
+    mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
+
 a = Analysis(
     [str(project_root / 'imagedescriber' / 'imagedescriber_wx.py')],
     pathex=[
@@ -22,11 +32,11 @@ a = Analysis(
         str(project_root / 'shared'),
         str(project_root / 'models'),
     ],
-    binaries=wx_binaries + cv2_binaries,
+    binaries=wx_binaries + cv2_binaries + mlx_vlm_binaries,
     datas=[
         (str(project_root / 'scripts' / '*.json'), 'scripts'),
         (str(project_root / 'VERSION'), '.'),
-    ] + wx_datas + cv2_datas,
+    ] + wx_datas + cv2_datas + mlx_vlm_datas,
     hiddenimports=[
         'wx.adv',
         'wx.lib.newevent',
@@ -80,7 +90,10 @@ a = Analysis(
         'bs4.builder._htmlparser',
         'bs4.builder._lxml',
         'soupsieve',  # BeautifulSoup dependency
-    ] + wx_hiddenimports + cv2_hiddenimports,
+        # MLX / Apple Metal (macOS Apple Silicon only — no-op on Windows)
+        'mlx_vlm',
+        'mlx',
+    ] + wx_hiddenimports + cv2_hiddenimports + mlx_vlm_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

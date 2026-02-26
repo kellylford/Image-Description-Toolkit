@@ -88,7 +88,7 @@ class ChatDialog(wx.Dialog):
         provider_label.SetMinSize((100, -1))
         provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
-        self.provider_choice = wx.Choice(self, choices=['Ollama', 'OpenAI', 'Claude', 'HuggingFace'])
+        self.provider_choice = wx.Choice(self, choices=['Ollama', 'OpenAI', 'Claude', 'HuggingFace', 'MLX'])
         self.provider_choice.SetSelection(0)  # Default to Ollama
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         provider_sizer.Add(self.provider_choice, 1, wx.ALL | wx.EXPAND, 5)
@@ -190,7 +190,18 @@ class ChatDialog(wx.Dialog):
                     self.model_combo.Append(model)
                 if models:
                     self.model_combo.SetSelection(0)
-                    
+
+            elif provider == 'mlx':
+                # Apple MLX Metal GPU inference (macOS only) — no API key required
+                try:
+                    from imagedescriber.ai_providers import MLXProvider
+                except ImportError:
+                    from ai_providers import MLXProvider
+                for model in MLXProvider.KNOWN_MODELS:
+                    self.model_combo.Append(model)
+                if MLXProvider.KNOWN_MODELS:
+                    self.model_combo.SetSelection(0)
+
         except Exception as e:
             print(f"Error populating models for {provider}: {e}")
             # Set a reasonable fallback

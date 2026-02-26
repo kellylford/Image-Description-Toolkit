@@ -92,6 +92,15 @@ PROVIDER_CAPABILITIES: Dict[str, Dict[str, Any]] = {
         "is_cloud": False,
         "supports_options": True,
         "description": "NPU-accelerated vision models (DirectML)"
+    },
+    "MLX": {
+        "supports_prompts": True,
+        "supports_custom_prompts": True,
+        "prompt_styles": ["detailed", "technical", "creative", "narrative", "colorful", "accessibility"],
+        "requires_api_key": False,
+        "is_cloud": False,
+        "supports_options": True,
+        "description": "Apple Metal GPU inference on Apple Silicon (macOS only). No API key or cloud cost."
     }
 }
 

@@ -1512,33 +1512,285 @@ class HuggingFaceProvider(AIProvider):
             return f"⚠️ Error generating description with Florence-2: {str(e)}"
 
 
+# ---------------------------------------------------------------------------
+# MLX Provider — Apple Metal inference via mlx-vlm
+# macOS + Apple Silicon only; gracefully unavailable on other platforms.
+# ---------------------------------------------------------------------------
+
+# Module-level import attempt so PyInstaller can bundle the package when present.
+try:
+    import mlx_vlm as _mlx_vlm_module
+    from mlx_vlm import load as _mlx_load, generate as _mlx_generate
+    from mlx_vlm.utils import load_config as _mlx_load_config
+    from mlx_vlm.prompt_utils import apply_chat_template as _mlx_apply_chat_template
+    HAS_MLX_VLM = True
+except ImportError:
+    _mlx_vlm_module = None
+    HAS_MLX_VLM = False
+
+
+class MLXProvider(AIProvider):
+    """Apple Metal (MLX) provider for on-device vision inference.
+
+    Uses mlx-vlm to run Qwen2-VL and compatible models directly on the
+    Apple Silicon GPU via the Metal framework.  No API key required.
+
+    Availability:
+        - macOS with Apple Silicon only
+        - Requires:  pip install mlx-vlm
+
+    Model lifecycle:
+        The loaded model stays in unified memory for the lifetime of this
+        instance (mirrors Ollama's hot-model behaviour).  Switching models
+        triggers a reload; within a batch all calls reuse the same weights.
+
+    HEIC / format handling:
+        MLX requires a JPEG path on disk.  Any non-JPEG input (HEIC, PNG,
+        TIFF …) is converted to a temporary JPEG and cleaned up after each
+        call.  pillow-heif is used automatically when available.
+    """
+
+    # Known-good models from MLX Community Hub (tested with mlx-vlm).
+    # Listed from smallest/fastest to largest/most capable.
+    KNOWN_MODELS: List[str] = [
+        "mlx-community/Qwen2-VL-2B-Instruct-4bit",
+        "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",
+        "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
+        "mlx-community/llava-1.5-7b-4bit",
+    ]
+
+    # Tokens to generate per image — matches production Ollama num_predict setting.
+    MAX_TOKENS = 600
+
+    def __init__(self) -> None:
+        self._model = None
+        self._processor = None
+        self._mlx_config = None
+        self._loaded_model_id: Optional[str] = None
+        self.last_usage: Optional[Dict] = None
+
+    # ------------------------------------------------------------------
+    # AIProvider interface
+    # ------------------------------------------------------------------
+
+    def get_provider_name(self) -> str:
+        return "MLX"
+
+    def is_available(self) -> bool:
+        """MLX is only available on macOS (any version) with mlx-vlm installed."""
+        if platform.system() != "Darwin":
+            return False
+        return HAS_MLX_VLM
+
+    def get_available_models(self) -> List[str]:
+        if not self.is_available():
+            return []
+        return list(self.KNOWN_MODELS)
+
+    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
+        """Run Metal-accelerated vision inference and return a description string."""
+        if not self.is_available():
+            return (
+                "Error: MLX provider not available. "
+                "Requires macOS with Apple Silicon and: pip install mlx-vlm"
+            )
+
+        temp_jpeg: Optional[str] = None
+        try:
+            # ---- apply transformers monkey-patch (safety net for some versions) ----
+            self._patch_transformers_video_bug()
+
+            # ---- load / recall model in unified memory ----
+            self._ensure_model_loaded(model)
+
+            # ---- convert to JPEG if needed (MLX requires a JPEG path on disk) ----
+            path_obj = Path(image_path)
+            if path_obj.suffix.lower() not in {'.jpg', '.jpeg'}:
+                temp_jpeg = self._to_jpeg_tempfile(image_path)
+                if not temp_jpeg:
+                    return (
+                        f"Error: Could not convert {path_obj.suffix.upper()} "
+                        f"to JPEG for MLX inference"
+                    )
+                use_path = temp_jpeg
+            else:
+                use_path = image_path
+
+            # ---- format prompt for the model's chat template ----
+            formatted_prompt = _mlx_apply_chat_template(
+                self._processor, self._mlx_config, prompt, num_images=1
+            )
+
+            # ---- run inference on Metal ----
+            t0 = time.time()
+            output = _mlx_generate(
+                self._model,
+                self._processor,
+                formatted_prompt,
+                image=[use_path],
+                max_tokens=self.MAX_TOKENS,
+                verbose=False,
+            )
+            elapsed = time.time() - t0
+
+            # GenerationResult exposes .text, .generation_tokens, .generation_tps
+            text = getattr(output, 'text', None) or str(output)
+            tokens_out = getattr(output, 'generation_tokens', 0) or 0
+            tps = getattr(output, 'generation_tps', 0.0) or 0.0
+
+            self.last_usage = {
+                'prompt_tokens': 0,          # mlx-vlm does not expose prompt tokens
+                'completion_tokens': tokens_out,
+                'total_tokens': tokens_out,
+                'model': model,
+                'elapsed_s': elapsed,
+                'tokens_per_s': tps,
+                'finish_reason': 'stop',     # assume stop; no length info from mlx-vlm
+            }
+
+            return text.strip() if text else "Error: MLX returned empty response"
+
+        except Exception as exc:
+            import traceback
+            error_type = type(exc).__name__
+            error_msg = str(exc)
+            print(f"[ERROR] MLX inference error — {error_type}: {error_msg}")
+            traceback.print_exc()
+            return f"Error generating description (MLX/{model}): {error_msg}"
+
+        finally:
+            if temp_jpeg:
+                try:
+                    Path(temp_jpeg).unlink()
+                except Exception:
+                    pass
+
+    def get_last_token_usage(self) -> Optional[Dict]:
+        return self.last_usage
+
+    def reload_api_key(self, explicit_key: Optional[str] = None) -> None:
+        """No-op — MLX requires no API key."""
+        pass
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _ensure_model_loaded(self, model_id: str) -> None:
+        """Load model weights into Metal unified memory if not already loaded.
+
+        Subsequent calls with the same model_id are instant (no reload).
+        A model switch triggers a full reload.
+        """
+        if self._loaded_model_id == model_id and self._model is not None:
+            return
+
+        print(f"  [MLX] Loading {model_id} into Metal memory …")
+        t0 = time.time()
+        self._model, self._processor = _mlx_load(model_id)
+        self._mlx_config = _mlx_load_config(model_id)
+        self._loaded_model_id = model_id
+        dt = time.time() - t0
+        print(f"  [MLX] Model ready in {dt:.1f}s (stays in Metal memory until exit)")
+
+    @staticmethod
+    def _patch_transformers_video_bug() -> None:
+        """Work around a transformers bug present in some versions.
+
+        transformers.models.auto.video_processing_auto.video_processor_class_from_name
+        raises TypeError('argument of type NoneType is not iterable') when the
+        extractors mapping is None.  This monkey-patch makes the call safe.
+        The patch is idempotent — applying it multiple times is harmless.
+        """
+        try:
+            import transformers.models.auto.video_processing_auto as _vpa
+            _orig = _vpa.video_processor_class_from_name
+            if getattr(_orig, '_mlx_patched', False):
+                return  # already patched
+
+            def _safe(class_name, extractors=None):
+                try:
+                    return _orig(class_name, extractors)
+                except TypeError:
+                    return None
+
+            _safe._mlx_patched = True
+            _vpa.video_processor_class_from_name = _safe
+        except Exception:
+            pass
+
+    @staticmethod
+    def _to_jpeg_tempfile(image_path: str) -> Optional[str]:
+        """Convert any supported image (incl. HEIC) to a temp JPEG on disk.
+
+        Returns the temp file path, or None on failure.
+        The caller is responsible for unlinking the file when done.
+        """
+        try:
+            # Enable HEIC support when pillow-heif is available
+            try:
+                import pillow_heif
+                pillow_heif.register_heif_opener()
+            except ImportError:
+                pass
+
+            from PIL import Image as _PILImage
+            import tempfile
+
+            max_dim = 1024
+            quality = 85
+
+            with _PILImage.open(image_path) as img:
+                img = img.convert("RGB")
+                w, h = img.size
+                if max(w, h) > max_dim:
+                    scale = max_dim / max(w, h)
+                    img = img.resize((int(w * scale), int(h * scale)), _PILImage.LANCZOS)
+                tmp = tempfile.NamedTemporaryFile(
+                    suffix=".jpg", delete=False, prefix="mlx_idt_"
+                )
+                img.save(tmp, format="JPEG", quality=quality)
+                tmp.close()
+                return tmp.name
+        except Exception as exc:
+            print(f"  [MLX] JPEG conversion failed for {image_path}: {exc}")
+            return None
+
+
+# ---------------------------------------------------------------------------
 # Global provider instances
+# ---------------------------------------------------------------------------
+
 _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
 _huggingface_provider = HuggingFaceProvider()
+_mlx_provider = MLXProvider()
 
 
 def get_available_providers() -> Dict[str, AIProvider]:
     """Get all available AI providers"""
     providers = {}
-    
+
     if _ollama_provider.is_available():
         providers['ollama'] = _ollama_provider
-    
+
     if _ollama_cloud_provider.is_available():
         providers['ollama_cloud'] = _ollama_cloud_provider
-    
+
     if _openai_provider.is_available():
         providers['openai'] = _openai_provider
-    
+
     if _claude_provider.is_available():
         providers['claude'] = _claude_provider
-    
+
     if _huggingface_provider.is_available():
         providers['huggingface'] = _huggingface_provider
-    
+
+    if _mlx_provider.is_available():
+        providers['mlx'] = _mlx_provider
+
     return providers
 
 
@@ -1549,5 +1801,6 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'ollama_cloud': _ollama_cloud_provider,
         'openai': _openai_provider,
         'claude': _claude_provider,
-        'huggingface': _huggingface_provider
+        'huggingface': _huggingface_provider,
+        'mlx': _mlx_provider,
     }

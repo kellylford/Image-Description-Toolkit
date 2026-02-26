@@ -297,6 +297,14 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
     """
     provider = (provider or "").lower()
 
+    if provider == "mlx":
+        return (
+            f"{model_id} — " if model_id else ""
+        ) + (
+            "Metal GPU inference on Apple Silicon. No API key or cloud cost. "
+            "macOS only. Models download once to ~/.cache/huggingface/hub/."
+        )
+
     if provider == "ollama":
         if not model_id:
             return "Local Ollama models have no API cost. Requires Ollama running locally."
@@ -421,7 +429,7 @@ class FollowupQuestionDialog(wx.Dialog):
         provider_label = wx.StaticText(self, label="&Provider:")
         provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         
-        self.provider_choice = wx.Choice(self, choices=["ollama", "openai", "claude"])
+        self.provider_choice = wx.Choice(self, choices=["ollama", "openai", "claude", "mlx"])
         self.provider_choice.SetStringSelection(self.original_provider)
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
@@ -678,10 +686,10 @@ class ProcessingOptionsDialog(wx.Dialog):
         provider_label = wx.StaticText(panel, label="&Provider:")
         provider_sizer.Add(provider_label, 0, wx.ALL, 5)
         
-        self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude"])
+        self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude", "MLX"])
         # Set from default_provider in config (case-insensitive match)
         default_provider = self.config.get('default_provider', 'ollama').lower()
-        provider_map = {'ollama': 0, 'openai': 1, 'claude': 2}
+        provider_map = {'ollama': 0, 'openai': 1, 'claude': 2, 'mlx': 3}
         self.provider_choice.SetSelection(provider_map.get(default_provider, 0))
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
@@ -853,6 +861,28 @@ class ProcessingOptionsDialog(wx.Dialog):
                     self.model_combo.Append(display, model)  # client data = API ID
                 # Set to first available model (list is ordered by recommendation)
                 if self.model_combo.GetCount() > 0:
+                    self.model_combo.SetSelection(0)
+            elif provider == "mlx":
+                # Show known MLX models; user can also type any HuggingFace repo ID
+                try:
+                    from ai_providers import MLXProvider as _MLXProvider
+                except ImportError:
+                    try:
+                        from imagedescriber.ai_providers import MLXProvider as _MLXProvider
+                    except ImportError:
+                        _MLXProvider = None
+                mlx_models = _MLXProvider.KNOWN_MODELS if _MLXProvider else [
+                    "mlx-community/Qwen2-VL-2B-Instruct-4bit",
+                    "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",
+                    "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
+                    "mlx-community/llava-1.5-7b-4bit",
+                ]
+                default_mlx = self.config.get('default_model', mlx_models[0])
+                for model in mlx_models:
+                    self.model_combo.Append(model)
+                if default_mlx in mlx_models:
+                    self.model_combo.SetStringSelection(default_mlx)
+                elif mlx_models:
                     self.model_combo.SetSelection(0)
         except Exception as e:
             print(f"Error populating models: {e}")

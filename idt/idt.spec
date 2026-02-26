@@ -17,10 +17,20 @@ All paths use ../ prefix since we're building from idt/ subdirectory.
 from PyInstaller.utils.hooks import collect_all
 bs4_datas, bs4_binaries, bs4_hiddenimports = collect_all('bs4')
 
+# Conditionally collect mlx-vlm (macOS Apple Silicon only)
+import sys as _sys
+if _sys.platform == 'darwin':
+    try:
+        mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = collect_all('mlx_vlm')
+    except Exception:
+        mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
+else:
+    mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
+
 a = Analysis(
     ['idt_cli.py'],
     pathex=['..'],  # Add parent directory to import path
-    binaries=bs4_binaries,
+    binaries=bs4_binaries + mlx_vlm_binaries,
     datas=[
         # Include ALL scripts files
         ('../scripts/workflow.py', 'scripts'),
@@ -50,7 +60,7 @@ a = Analysis(
         ('../imagedescriber/data_models.py', 'imagedescriber'),
         # Include VERSION file
         ('../VERSION', '.'),
-    ] + bs4_datas,
+    ] + bs4_datas + mlx_vlm_datas,
     hiddenimports=[
         # Scripts modules
         'scripts',
@@ -111,7 +121,10 @@ a = Analysis(
         'openai._exceptions',
         'openai.types',
         'openai.resources',
-    ] + bs4_hiddenimports,
+        # MLX / Apple Metal (macOS Apple Silicon only — no-op on Windows)
+        'mlx_vlm',
+        'mlx',
+    ] + bs4_hiddenimports + mlx_vlm_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
