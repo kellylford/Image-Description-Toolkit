@@ -416,6 +416,47 @@ class TestConfigFlagSupport:
         assert 'def find_config_file(' not in source, \
             "Old hardcoded find_config_file() should be removed"
 
+    def test_prompt_editor_dialog_uses_config_loader(self):
+        """Test prompt_editor_dialog.py uses config_loader instead of find_config_file().
+
+        This ensures custom prompts saved via the GUI are written to the same
+        location that the CLI reads from (user config dir on Windows/macOS).
+        Regression guard for GitHub issue: prompt saves to exe scripts/ dir
+        instead of %APPDATA%/IDT/.
+        """
+        source_file = Path(__file__).parent.parent.parent / "imagedescriber" / "prompt_editor_dialog.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+
+        # Must use config_loader to resolve the config path
+        assert 'load_json_config' in source, \
+            "prompt_editor_dialog must use load_json_config from config_loader"
+
+        # Must not use find_config_file for the initial config resolution
+        # (find_config_file omits the user config dir and can create shadow copies)
+        # The function may still appear in comments but must not be called as:
+        #   self.config_file = find_config_file(...)
+        assert "self.config_file = find_config_file(" not in source, \
+            "prompt_editor_dialog must not set config_file via find_config_file(); use config_loader instead"
+
+    def test_dialogs_wx_load_prompts_uses_config_loader(self):
+        """Test dialogs_wx.py load_prompts uses config_loader not find_config_file().
+
+        ProcessingOptionsDialog.load_prompts() must read from the same location
+        as the CLI so the prompt dropdown reflects any custom prompts the user saved.
+        """
+        source_file = Path(__file__).parent.parent.parent / "imagedescriber" / "dialogs_wx.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+
+        # Must use config_loader
+        assert 'load_json_config' in source, \
+            "dialogs_wx must import load_json_config from config_loader"
+
+        # load_prompts must NOT call find_config_file
+        assert "config_path = find_config_file(" not in source, \
+            "dialogs_wx.load_prompts() must not use find_config_file(); use load_json_config instead"
+
 
 if __name__ == "__main__":
     print("Run these tests with: python run_unit_tests.py pytest_tests/unit/test_configuration_system.py")
