@@ -55,9 +55,15 @@ mlx-vlm>=0.3.0 ; sys_platform == 'darwin'
 # ----------------------------------------------------------------------------
 # OPTIONAL - Advanced Features
 # ----------------------------------------------------------------------------
+# Required for MLX provider when using Phi-3.5-Vision or other models whose
+# transformers processors request return_tensors="pt" internally. Inference
+# still runs on Metal via MLX — torch is only used for the processor layer.
+# Qwen2-VL / Qwen2.5-VL models work without torch.
+# Note: llava-1.5-7b-4bit is NOT supported (breaks with transformers 5.x).
+torch>=2.0.0 ; sys_platform == 'darwin'        # CPU-only, needed by transformers processor
+torchvision ; sys_platform == 'darwin'         # required by torch
+# transformers>=4.30.0 # Already pulled in by mlx-vlm
 # Uncomment if you need GroundingDINO object detection:
-# torch>=2.0.0         # PyTorch for GroundingDINO
-# transformers>=4.30.0 # HuggingFace transformers
 # groundingdino        # GroundingDINO package
 
 # Note: The imagedescriber bundles scripts directory for configurations

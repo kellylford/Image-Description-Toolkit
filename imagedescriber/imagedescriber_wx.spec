@@ -26,9 +26,16 @@ if _sys.platform == 'darwin':
         mlx_datas, mlx_binaries, mlx_hiddenimports = collect_all('mlx')
     except Exception:
         mlx_datas, mlx_binaries, mlx_hiddenimports = [], [], []
+    try:
+        # torch (CPU-only) is required by transformers processor layer for some
+        # models (e.g. Phi-3.5-Vision) even though inference runs on Metal via MLX.
+        torch_datas, torch_binaries, torch_hiddenimports = collect_all('torch')
+    except Exception:
+        torch_datas, torch_binaries, torch_hiddenimports = [], [], []
 else:
     mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
     mlx_datas, mlx_binaries, mlx_hiddenimports = [], [], []
+    torch_datas, torch_binaries, torch_hiddenimports = [], [], []
 
 a = Analysis(
     [str(project_root / 'imagedescriber' / 'imagedescriber_wx.py')],
@@ -39,11 +46,11 @@ a = Analysis(
         str(project_root / 'shared'),
         str(project_root / 'models'),
     ],
-    binaries=wx_binaries + cv2_binaries + mlx_vlm_binaries + mlx_binaries,
+    binaries=wx_binaries + cv2_binaries + mlx_vlm_binaries + mlx_binaries + torch_binaries,
     datas=[
         (str(project_root / 'scripts' / '*.json'), 'scripts'),
         (str(project_root / 'VERSION'), '.'),
-    ] + wx_datas + cv2_datas + mlx_vlm_datas + mlx_datas,
+    ] + wx_datas + cv2_datas + mlx_vlm_datas + mlx_datas + torch_datas,
     hiddenimports=[
         'wx.adv',
         'wx.lib.newevent',
@@ -118,15 +125,28 @@ a = Analysis(
         'transformers.models.qwen2_5_vl.configuration_qwen2_5_vl',
         'transformers.models.qwen2_5_vl.modeling_qwen2_5_vl',
         'transformers.models.qwen2_5_vl.processing_qwen2_5_vl',
+        # LLaVA modules — kept for potential future use, currently broken with
+        # transformers 5.x (patch_size NoneType in LLaVA processor)
+        'transformers.models.llava',
+        'transformers.models.llava.configuration_llava',
+        'transformers.models.llava.modeling_llava',
+        'transformers.models.llava.processing_llava',
+        # Phi-3 modules (for mlx-community/phi-3.5-vision-instruct-4bit)
+        'transformers.models.phi3',
+        'transformers.models.phi3.configuration_phi3',
+        'transformers.models.phi3.modeling_phi3',
+        # PyTorch — CPU-only, required by transformers processor layer for LLaVA/Phi models
+        'torch',
+        'torchvision',
         'huggingface_hub',
         'safetensors',
         'sentencepiece',
         'tokenizers',
-    ] + wx_hiddenimports + cv2_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports,
+    ] + wx_hiddenimports + cv2_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports + torch_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['setuptools', 'pip'],  # Exclude packages that cause pyi_rth_setuptools crash on Python 3.14
+    excludes=['setuptools', 'pip'],  # Prevent pyi_rth_setuptools bootstrap crash
     noarchive=False,
 )
 

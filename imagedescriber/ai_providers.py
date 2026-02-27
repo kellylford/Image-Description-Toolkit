@@ -1552,11 +1552,16 @@ class MLXProvider(AIProvider):
 
     # Known-good models from MLX Community Hub (tested with mlx-vlm).
     # Listed from smallest/fastest to largest/most capable.
+    # Note: torch (CPU-only) must be installed for some model processors
+    # (e.g. Phi-3.5-Vision) that use transformers return_tensors="pt" internally.
+    # Qwen2-VL / Qwen2.5-VL models work without torch.
+    # Note: llava-1.5-7b-4bit is excluded — incompatible with transformers 5.x
+    # (patch_size NoneType error in LLaVA processor, no upstream fix yet).
     KNOWN_MODELS: List[str] = [
-        "mlx-community/Qwen2-VL-2B-Instruct-4bit",
-        "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",
-        "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
-        "mlx-community/llava-1.5-7b-4bit",
+        "mlx-community/Qwen2-VL-2B-Instruct-4bit",       # ~1.5 GB, fastest
+        "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",     # ~2.0 GB
+        "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",     # ~4.5 GB, best Qwen quality
+        "mlx-community/phi-3.5-vision-instruct-4bit",    # ~2.5 GB, Microsoft Phi family
     ]
 
     # Tokens to generate per image — matches production Ollama num_predict setting.
