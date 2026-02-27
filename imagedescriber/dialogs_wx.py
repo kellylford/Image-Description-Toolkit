@@ -36,7 +36,6 @@ from shared.wx_common import (
     select_directory_dialog,
     open_file_dialog,
     save_file_dialog,
-    find_config_file,
 )
 
 # Import config loader for prompt loading
@@ -867,23 +866,24 @@ class ProcessingOptionsDialog(wx.Dialog):
 
     def load_prompts(self):
         """Load available prompt styles from config file
-        
-        Uses find_config_file() for consistency with PromptEditor.
-        This ensures both components read/write the SAME config file.
+
+        Uses load_json_config() (same as the CLI and main window) so the prompt
+        list reflects the same config that will be used when describing images.
+        find_config_file() was previously used here but it does not check the
+        user config dir (%APPDATA%/IDT on Windows), leading to a mismatch.
         """
         self.prompt_choice.Clear()
         prompts_added = False
         default_style = "narrative"
-        
-        # Find the config file using same method as PromptEditor
+
+        # Load using config_loader for consistent resolution with CLI / main window
         try:
-            config_path = find_config_file('image_describer_config.json')
-            if config_path and config_path.exists():
+            if load_json_config is None:
+                raise ImportError("config_loader.load_json_config not available")
+            cfg, config_path, _ = load_json_config('image_describer_config.json')
+            if cfg and config_path:
                 logger.debug(f"Loading prompts from: {config_path}")
-                
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f)
-                
+
                 prompts = cfg.get('prompt_variations', {})
                 default_style = cfg.get('default_prompt_style', 'narrative')
                 
