@@ -135,6 +135,27 @@ a = Analysis(
         'transformers.models.phi3',
         'transformers.models.phi3.configuration_phi3',
         'transformers.models.phi3.modeling_phi3',
+        # Gemma3 modules (for mlx-community/gemma-3-4b-it-qat-4bit)
+        'transformers.models.gemma3',
+        'transformers.models.gemma3.configuration_gemma3',
+        'transformers.models.gemma3.modeling_gemma3',
+        'transformers.models.gemma3.processing_gemma3',
+        'transformers.models.gemma3.image_processing_gemma3',
+        'transformers.models.gemma3.image_processing_gemma3_fast',
+        # Idefics3 / SmolVLM modules (for mlx-community/SmolVLM-Instruct-4bit)
+        'transformers.models.idefics3',
+        'transformers.models.idefics3.configuration_idefics3',
+        'transformers.models.idefics3.modeling_idefics3',
+        'transformers.models.idefics3.processing_idefics3',
+        'transformers.models.idefics3.image_processing_idefics3',
+        'transformers.models.idefics3.image_processing_idefics3_fast',
+        # MLLama modules (for mlx-community/Llama-3.2-11B-Vision-Instruct-4bit)
+        'transformers.models.mllama',
+        'transformers.models.mllama.configuration_mllama',
+        'transformers.models.mllama.modeling_mllama',
+        'transformers.models.mllama.processing_mllama',
+        'transformers.models.mllama.image_processing_mllama',
+        'transformers.models.mllama.image_processing_mllama_fast',
         # PyTorch — CPU-only, required by transformers processor layer for LLaVA/Phi models
         'torch',
         'torchvision',

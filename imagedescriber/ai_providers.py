@@ -1558,10 +1558,18 @@ class MLXProvider(AIProvider):
     # Note: llava-1.5-7b-4bit is excluded — incompatible with transformers 5.x
     # (patch_size NoneType error in LLaVA processor, no upstream fix yet).
     KNOWN_MODELS: List[str] = [
-        "mlx-community/Qwen2-VL-2B-Instruct-4bit",       # ~1.5 GB, fastest
-        "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",     # ~2.0 GB
-        "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",     # ~4.5 GB, best Qwen quality
-        "mlx-community/phi-3.5-vision-instruct-4bit",    # ~2.5 GB, Microsoft Phi family
+        # -- Qwen family (Alibaba) --
+        "mlx-community/Qwen2-VL-2B-Instruct-4bit",              # ~1.5 GB, fastest Qwen
+        "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",            # ~2.0 GB
+        "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",            # ~4.5 GB, best Qwen quality
+        # -- Gemma family (Google) --
+        "mlx-community/gemma-3-4b-it-qat-4bit",                 # ~2.5 GB, QAT quantization, strong English
+        # -- Phi family (Microsoft) --
+        "mlx-community/phi-3.5-vision-instruct-4bit",           # ~2.5 GB, good at text/detail
+        # -- SmolVLM (HuggingFace) --
+        "mlx-community/SmolVLM-Instruct-4bit",                  # ~0.5 GB, very fast, shorter descriptions
+        # -- Llama Vision (Meta) --
+        "mlx-community/Llama-3.2-11B-Vision-Instruct-4bit",     # ~6.5 GB, slow on 16 GB RAM (~1-2 tok/s)
     ]
 
     # Tokens to generate per image — matches production Ollama num_predict setting.
@@ -1641,18 +1649,22 @@ class MLXProvider(AIProvider):
             )
             elapsed = time.time() - t0
 
-            # GenerationResult exposes .text, .generation_tokens, .generation_tps
+            # GenerationResult exposes .text, .generation_tokens, .generation_tps,
+            # .prompt_tokens, and .prompt_tps (via mlx_lm GenerationResult dataclass)
             text = getattr(output, 'text', None) or str(output)
+            tokens_in = getattr(output, 'prompt_tokens', 0) or 0
             tokens_out = getattr(output, 'generation_tokens', 0) or 0
             tps = getattr(output, 'generation_tps', 0.0) or 0.0
+            prompt_tps = getattr(output, 'prompt_tps', 0.0) or 0.0
 
             self.last_usage = {
-                'prompt_tokens': 0,          # mlx-vlm does not expose prompt tokens
+                'prompt_tokens': tokens_in,
                 'completion_tokens': tokens_out,
-                'total_tokens': tokens_out,
+                'total_tokens': tokens_in + tokens_out,
                 'model': model,
                 'elapsed_s': elapsed,
                 'tokens_per_s': tps,
+                'prompt_tokens_per_s': prompt_tps,
                 'finish_reason': 'stop',     # assume stop; no length info from mlx-vlm
             }
 

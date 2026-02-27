@@ -298,6 +298,39 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
     provider = (provider or "").lower()
 
     if provider == "mlx":
+        _mlx_descriptions = {
+            "mlx-community/Qwen2-VL-2B-Instruct-4bit":
+                "Alibaba Qwen2-VL · 2 B params · ~1.5 GB download\n"
+                "Fastest Qwen option (~35 tok/s on M-series). Solid all-round descriptions "
+                "in very short time. Good starting point for large batches.",
+            "mlx-community/Qwen2.5-VL-3B-Instruct-4bit":
+                "Alibaba Qwen2.5-VL · 3 B params · ~2.0 GB download\n"
+                "Updated Qwen2.5 architecture with improved instruction-following over the 2B. "
+                "Good balance of speed and description quality.",
+            "mlx-community/Qwen2.5-VL-7B-Instruct-4bit":
+                "Alibaba Qwen2.5-VL · 7 B params · ~4.5 GB download\n"
+                "Best quality of the Qwen family. Noticeably more detailed and accurate "
+                "descriptions than the 3B. Recommended when quality matters more than speed.",
+            "mlx-community/gemma-3-4b-it-qat-4bit":
+                "Google Gemma 3 · 4 B params · ~2.5 GB download · QAT quantization\n"
+                "Quantization-Aware Training gives better accuracy at 4-bit than standard PTQ. "
+                "Produces natural, fluent English prose. Strong at scene and context description.",
+            "mlx-community/phi-3.5-vision-instruct-4bit":
+                "Microsoft Phi-3.5 Vision · 3.8 B params · ~2.5 GB download\n"
+                "Excels at reading text within images (signs, labels, documents) and producing "
+                "structured, detail-oriented descriptions. Good choice for images with text.",
+            "mlx-community/SmolVLM-Instruct-4bit":
+                "HuggingFace SmolVLM · 2 B params · ~0.5 GB download\n"
+                "Smallest and fastest model (~42 tok/s). Descriptions are shorter and more "
+                "concise than larger models. Best for quick previews or very large batches.",
+            "mlx-community/Llama-3.2-11B-Vision-Instruct-4bit":
+                "Meta Llama 3.2 Vision · 11 B params · ~6.5 GB download\n"
+                "⚠ Very slow on 16 GB RAM (~1–2 tok/s; ~8–10 min per image). "
+                "Best results on 32 GB+ Apple Silicon. Highest potential quality of the set.",
+        }
+        if model_id and model_id in _mlx_descriptions:
+            return _mlx_descriptions[model_id]
+        # Fallback for unknown/custom models
         return (
             f"{model_id} — " if model_id else ""
         ) + (
