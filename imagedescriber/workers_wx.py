@@ -1474,6 +1474,16 @@ class VideoProcessingWorker(threading.Thread):
         
         # Get video properties
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            # Some video containers don't report FPS correctly (e.g. MKV without
+            # container-level header).  Fall back to 1 fps so all downstream
+            # frame/timestamp arithmetic stays non-blocking instead of crashing
+            # with a ZeroDivisionError.
+            self._post_progress(
+                "Warning: Video FPS not detected (reported as 0 or negative). "
+                "Using 1 fps fallback for frame extraction."
+            )
+            fps = 1.0
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps if fps > 0 else 0
         
@@ -1555,7 +1565,7 @@ class VideoProcessingWorker(threading.Thread):
                 break
             
             # Calculate timestamp (matches CLI convention)
-            timestamp = frame_num / fps
+            timestamp = frame_num / fps if fps > 0 else 0.0
             
             # Save frame with timestamp in filename (matches CLI: video_0.00s.jpg)
             frame_filename = f"{video_stem}_{timestamp:.2f}s.jpg"
@@ -1581,7 +1591,7 @@ class VideoProcessingWorker(threading.Thread):
         extracted_paths = []
         prev_frame = None
         last_extract_frame = -1
-        min_frame_gap = int(fps * min_duration)
+        min_frame_gap = int(fps * min_duration) if fps > 0 else 1
         frame_num = 0
         extract_count = 0
         
@@ -1607,7 +1617,7 @@ class VideoProcessingWorker(threading.Thread):
                     frame_num - last_extract_frame >= min_frame_gap):
                     
                     # Calculate timestamp (matches CLI convention)
-                    timestamp = frame_num / fps
+                    timestamp = frame_num / fps if fps > 0 else 0.0
                     
                     # Save frame with scene number and timestamp (matches CLI: video_scene_0001_5.23s.jpg)
                     frame_filename = f"{video_stem}_scene_{extract_count:04d}_{timestamp:.2f}s.jpg"
