@@ -1457,14 +1457,6 @@ class VideoProcessingWorker(threading.Thread):
         evt = ProgressUpdateEventData(file_path=self.video_path, message=message)
         wx.PostEvent(self.parent_window, evt)
     
-    @staticmethod
-    def _format_duration(seconds: float) -> str:
-        """Format duration in seconds as M:SS for status bar display"""
-        total_sec = max(0, int(seconds))
-        m = total_sec // 60
-        s = total_sec % 60
-        return f"{m}:{s:02d}"
-    
     def _extract_frames(self) -> tuple:
         """Extract frames from video based on configuration
         
@@ -1482,6 +1474,16 @@ class VideoProcessingWorker(threading.Thread):
         
         # Get video properties
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            # Some video containers don't report FPS correctly (e.g. MKV without
+            # container-level header).  Fall back to 1 fps so all downstream
+            # frame/timestamp arithmetic stays non-blocking instead of crashing
+            # with a ZeroDivisionError.
+            self._post_progress(
+                "Warning: Video FPS not detected (reported as 0 or negative). "
+                "Using 1 fps fallback for frame extraction."
+            )
+            fps = 1.0
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps if fps > 0 else 0
         
@@ -1510,15 +1512,15 @@ class VideoProcessingWorker(threading.Thread):
         # Extract based on mode
         extraction_mode = self.extraction_config.get("extraction_mode", "time_interval")
         if extraction_mode == "scene_change":
-            extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir, duration)
+            extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir)
         else:
             # Default to time_interval if mode not recognized
-            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir, duration)
+            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir)
         
         cap.release()
         return extracted_paths, video_metadata
     
-    def _extract_by_time_interval(self, cap, fps: float, output_dir: Path, total_duration: float = 0) -> list:
+    def _extract_by_time_interval(self, cap, fps: float, output_dir: Path) -> list:
         """Extract frames at regular time intervals"""
         import cv2
         
@@ -1563,7 +1565,7 @@ class VideoProcessingWorker(threading.Thread):
                 break
             
             # Calculate timestamp (matches CLI convention)
-            timestamp = frame_num / fps
+            timestamp = frame_num / fps if fps > 0 else 0.0
             
             # Save frame with timestamp in filename (matches CLI: video_0.00s.jpg)
             frame_filename = f"{video_stem}_{timestamp:.2f}s.jpg"
@@ -1575,13 +1577,11 @@ class VideoProcessingWorker(threading.Thread):
             frame_num += frame_interval
             
             if extract_count % 10 == 0:
-                pos_str = self._format_duration(timestamp)
-                dur_str = self._format_duration(total_duration)
-                self._post_progress(f"Extracted {extract_count} frames ({pos_str} / {dur_str})")
+                self._post_progress(f"Extracted {extract_count} frames...")
         
         return extracted_paths
     
-    def _extract_by_scene_detection(self, cap, fps: float, output_dir: Path, total_duration: float = 0) -> list:
+    def _extract_by_scene_detection(self, cap, fps: float, output_dir: Path) -> list:
         """Extract frames based on scene changes"""
         import cv2
         
@@ -1591,28 +1591,16 @@ class VideoProcessingWorker(threading.Thread):
         extracted_paths = []
         prev_frame = None
         last_extract_frame = -1
-        min_frame_gap = int(fps * min_duration)
+        min_frame_gap = int(fps * min_duration) if fps > 0 else 1
         frame_num = 0
         extract_count = 0
         
-        # Post scan progress every ~1 second of video (or at least every 30 frames)
-        scan_interval = max(int(fps), 30) if fps > 0 else 30
-        
         video_stem = Path(self.video_path).stem
-        dur_str = self._format_duration(total_duration)
         
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
-            
-            # Post scanning progress update at regular frame intervals (not just on scene found)
-            if frame_num % scan_interval == 0:
-                current_time = frame_num / fps if fps > 0 else 0
-                pos_str = self._format_duration(current_time)
-                self._post_progress(
-                    f"Scanning for scenes: {pos_str} / {dur_str}, {extract_count} scene(s) found"
-                )
             
             # Calculate difference from previous frame
             if prev_frame is not None:
@@ -1629,7 +1617,7 @@ class VideoProcessingWorker(threading.Thread):
                     frame_num - last_extract_frame >= min_frame_gap):
                     
                     # Calculate timestamp (matches CLI convention)
-                    timestamp = frame_num / fps
+                    timestamp = frame_num / fps if fps > 0 else 0.0
                     
                     # Save frame with scene number and timestamp (matches CLI: video_scene_0001_5.23s.jpg)
                     frame_filename = f"{video_stem}_scene_{extract_count:04d}_{timestamp:.2f}s.jpg"
@@ -1641,8 +1629,7 @@ class VideoProcessingWorker(threading.Thread):
                     extract_count += 1
                     
                     if extract_count % 10 == 0:
-                        pos_str = self._format_duration(timestamp)
-                        self._post_progress(f"Extracted {extract_count} scenes ({pos_str} / {dur_str})")
+                        self._post_progress(f"Extracted {extract_count} scenes...")
             
             prev_frame = frame.copy()
             frame_num += 1
