@@ -54,6 +54,18 @@ pillow-heif>=0.13.0     # HEIC/HEIF image format conversion
 # geopy>=2.4.0          # GPS coordinate reverse geocoding (Nominatim)
 
 # ----------------------------------------------------------------------------
+# OPTIONAL - Apple Metal GPU Inference (macOS Apple Silicon only)
+# ----------------------------------------------------------------------------
+# Enables --provider mlx for on-device AI descriptions via scripts/workflow.py
+# and scripts/image_describer.py. Automatically installed on macOS by macsetup.sh.
+# If not installed, the MLX provider is silently disabled at import time.
+mlx-vlm>=0.3.0 ; sys_platform == 'darwin'
+# Required for models whose transformers processors use return_tensors="pt"
+# (e.g. phi-3.5-vision). Qwen2-VL models work without torch.
+torch>=2.0.0 ; sys_platform == 'darwin'
+torchvision ; sys_platform == 'darwin'
+
+# ----------------------------------------------------------------------------
 # DEVELOPMENT & TESTING
 # ----------------------------------------------------------------------------
 tqdm>=4.60.0            # Progress bars (optional, nice-to-have)
