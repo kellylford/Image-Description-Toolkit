@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - WXMigration
-      - main
     tags:
       - 'v*'
 
