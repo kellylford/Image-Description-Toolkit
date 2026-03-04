@@ -47,7 +47,6 @@ if str(_project_root) not in sys.path:
 # Import shared utilities
 try:
     from shared.wx_common import (
-        find_config_file,
         ConfigManager,
         ModifiedStateMixin,
         show_error,
@@ -93,8 +92,29 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         wx.Dialog.__init__(self, parent, title="Image Description Prompt Editor", size=(900, 650))
         ModifiedStateMixin.__init__(self)
         
-        # Find the config file
-        self.config_file = find_config_file('image_describer_config.json')
+        # Find the config file using config_loader (same resolution as CLI/main window).
+        # find_config_file() does not check the user config dir (%APPDATA%/IDT on
+        # Windows) so it could create a shadow copy next to the exe that would
+        # then shadow the user's real config.  config_loader.load_json_config()
+        # uses the authoritative resolution order and is consistent with the CLI.
+        try:
+            from config_loader import load_json_config, get_user_config_dir
+        except ImportError:
+            from scripts.config_loader import load_json_config, get_user_config_dir
+        _cfg, _cfg_path, _cfg_source = load_json_config('image_describer_config.json')
+        # If config was loaded from the read-only bundled location (_MEIPASS),
+        # redirect writes to the user config dir so edits persist correctly.
+        if _cfg_source == 'bundled':
+            _user_dir = get_user_config_dir()
+            _user_dir.mkdir(parents=True, exist_ok=True)
+            _cfg_path = _user_dir / 'image_describer_config.json'
+            # Seed user dir with bundled data if the file doesn't exist yet
+            if not _cfg_path.exists() and _cfg:
+                _cfg_path.write_text(
+                    json.dumps(_cfg, indent=2, ensure_ascii=False),
+                    encoding='utf-8'
+                )
+        self.config_file = _cfg_path
         self.config_data = {}
         self.current_prompt_name = None
         
