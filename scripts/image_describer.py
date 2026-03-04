@@ -89,7 +89,8 @@ from imagedescriber.ai_providers import (
     OllamaProvider,
     OpenAIProvider,
     ClaudeProvider,
-    HuggingFaceProvider
+    HuggingFaceProvider,
+    MLXProvider,
 )
 
 
@@ -383,9 +384,28 @@ class ImageDescriber:
                 if not provider.is_available():
                     raise ValueError("HuggingFace provider requires Florence-2 dependencies. Install with: pip install 'transformers>=4.45.0' torch torchvision einops timm")
                 return provider
-                
+
+            elif self.provider_name == "mlx":
+                logger.info("Initializing MLX (Apple Metal) provider...")
+                provider = MLXProvider()
+                if not provider.is_available():
+                    import platform as _platform
+                    if _platform.system() != "Darwin":
+                        raise ValueError(
+                            "MLX provider is only available on macOS with Apple Silicon."
+                        )
+                    raise ValueError(
+                        "MLX provider requires mlx-vlm. Install with:\n"
+                        "  pip install mlx-vlm"
+                    )
+                logger.info(
+                    f"MLX provider ready. Model will be loaded on first image "
+                    f"and kept in Metal memory for the batch."
+                )
+                return provider
+
             else:
-                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, huggingface")
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, huggingface, mlx")
                 
         except Exception as e:
             logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
@@ -2167,7 +2187,7 @@ Configuration:
         "--provider",
         type=str,
         default="ollama",
-        choices=["ollama", "openai", "claude", "huggingface"],
+        choices=["ollama", "openai", "claude", "huggingface", "mlx"],
         help="AI provider to use (default: ollama)"
     )
     parser.add_argument(

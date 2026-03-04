@@ -2843,7 +2843,7 @@ Viewing Results:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "claude", "huggingface"],
+        choices=["ollama", "openai", "claude", "huggingface", "mlx"],
         default=None,
         help="AI provider to use for image description (default: ollama for new workflows, auto-detected for resume)"
     )

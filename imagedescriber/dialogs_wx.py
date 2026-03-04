@@ -297,6 +297,47 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
     """
     provider = (provider or "").lower()
 
+    if provider == "mlx":
+        _mlx_descriptions = {
+            "mlx-community/Qwen2-VL-2B-Instruct-4bit":
+                "Alibaba Qwen2-VL · 2 B params · ~1.5 GB download\n"
+                "Fastest Qwen option (~35 tok/s on M-series). Solid all-round descriptions "
+                "in very short time. Good starting point for large batches.",
+            "mlx-community/Qwen2.5-VL-3B-Instruct-4bit":
+                "Alibaba Qwen2.5-VL · 3 B params · ~2.0 GB download\n"
+                "Updated Qwen2.5 architecture with improved instruction-following over the 2B. "
+                "Good balance of speed and description quality.",
+            "mlx-community/Qwen2.5-VL-7B-Instruct-4bit":
+                "Alibaba Qwen2.5-VL · 7 B params · ~4.5 GB download\n"
+                "Best quality of the Qwen family. Noticeably more detailed and accurate "
+                "descriptions than the 3B. Recommended when quality matters more than speed.",
+            "mlx-community/gemma-3-4b-it-qat-4bit":
+                "Google Gemma 3 · 4 B params · ~2.5 GB download · QAT quantization\n"
+                "Quantization-Aware Training gives better accuracy at 4-bit than standard PTQ. "
+                "Produces natural, fluent English prose. Strong at scene and context description.",
+            "mlx-community/phi-3.5-vision-instruct-4bit":
+                "Microsoft Phi-3.5 Vision · 3.8 B params · ~2.5 GB download\n"
+                "Excels at reading text within images (signs, labels, documents) and producing "
+                "structured, detail-oriented descriptions. Good choice for images with text.",
+            "mlx-community/SmolVLM-Instruct-4bit":
+                "HuggingFace SmolVLM · 2 B params · ~0.5 GB download\n"
+                "Smallest and fastest model (~42 tok/s). Descriptions are shorter and more "
+                "concise than larger models. Best for quick previews or very large batches.",
+            "mlx-community/Llama-3.2-11B-Vision-Instruct-4bit":
+                "Meta Llama 3.2 Vision · 11 B params · ~6.5 GB download\n"
+                "⚠ Very slow on 16 GB RAM (~1–2 tok/s; ~8–10 min per image). "
+                "Best results on 32 GB+ Apple Silicon. Highest potential quality of the set.",
+        }
+        if model_id and model_id in _mlx_descriptions:
+            return _mlx_descriptions[model_id]
+        # Fallback for unknown/custom models
+        return (
+            f"{model_id} — " if model_id else ""
+        ) + (
+            "Metal GPU inference on Apple Silicon. No API key or cloud cost. "
+            "macOS only. Models download once to ~/.cache/huggingface/hub/."
+        )
+
     if provider == "ollama":
         if not model_id:
             return "Local Ollama models have no API cost. Requires Ollama running locally."
@@ -421,7 +462,7 @@ class FollowupQuestionDialog(wx.Dialog):
         provider_label = wx.StaticText(self, label="&Provider:")
         provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         
-        self.provider_choice = wx.Choice(self, choices=["ollama", "openai", "claude"])
+        self.provider_choice = wx.Choice(self, choices=["ollama", "openai", "claude", "mlx"])
         self.provider_choice.SetStringSelection(self.original_provider)
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
@@ -678,10 +719,10 @@ class ProcessingOptionsDialog(wx.Dialog):
         provider_label = wx.StaticText(panel, label="&Provider:")
         provider_sizer.Add(provider_label, 0, wx.ALL, 5)
         
-        self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude"])
+        self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude", "MLX"])
         # Set from default_provider in config (case-insensitive match)
         default_provider = self.config.get('default_provider', 'ollama').lower()
-        provider_map = {'ollama': 0, 'openai': 1, 'claude': 2}
+        provider_map = {'ollama': 0, 'openai': 1, 'claude': 2, 'mlx': 3}
         self.provider_choice.SetSelection(provider_map.get(default_provider, 0))
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
@@ -853,6 +894,28 @@ class ProcessingOptionsDialog(wx.Dialog):
                     self.model_combo.Append(display, model)  # client data = API ID
                 # Set to first available model (list is ordered by recommendation)
                 if self.model_combo.GetCount() > 0:
+                    self.model_combo.SetSelection(0)
+            elif provider == "mlx":
+                # Show known MLX models; user can also type any HuggingFace repo ID
+                try:
+                    from ai_providers import MLXProvider as _MLXProvider
+                except ImportError:
+                    try:
+                        from imagedescriber.ai_providers import MLXProvider as _MLXProvider
+                    except ImportError:
+                        _MLXProvider = None
+                mlx_models = _MLXProvider.KNOWN_MODELS if _MLXProvider else [
+                    "mlx-community/Qwen2-VL-2B-Instruct-4bit",
+                    "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",
+                    "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
+                    "mlx-community/llava-1.5-7b-4bit",
+                ]
+                default_mlx = self.config.get('default_model', mlx_models[0])
+                for model in mlx_models:
+                    self.model_combo.Append(model)
+                if default_mlx in mlx_models:
+                    self.model_combo.SetStringSelection(default_mlx)
+                elif mlx_models:
                     self.model_combo.SetSelection(0)
         except Exception as e:
             print(f"Error populating models: {e}")
