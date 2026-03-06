@@ -59,11 +59,11 @@ pillow-heif>=0.13.0     # HEIC/HEIF image format conversion
 # Enables --provider mlx for on-device AI descriptions via scripts/workflow.py
 # and scripts/image_describer.py. Automatically installed on macOS by macsetup.sh.
 # If not installed, the MLX provider is silently disabled at import time.
-mlx-vlm>=0.3.0 ; sys_platform == 'darwin'
+mlx-vlm>=0.3.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'
 # Required for models whose transformers processors use return_tensors="pt"
 # (e.g. phi-3.5-vision). Qwen2-VL models work without torch.
-torch>=2.0.0 ; sys_platform == 'darwin'
-torchvision ; sys_platform == 'darwin'
+torch>=2.0.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'
+torchvision ; sys_platform == 'darwin' and platform_machine == 'arm64'
 
 # ----------------------------------------------------------------------------
 # DEVELOPMENT & TESTING

@@ -27,6 +27,11 @@ read -p "Press Enter to continue or Ctrl+C to cancel..."
 
 SETUP_ERRORS=0
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ARCH="$(uname -m)"
+IS_APPLE_SILICON=0
+if [ "$ARCH" = "arm64" ]; then
+    IS_APPLE_SILICON=1
+fi
 
 # ============================================================================
 echo ""
@@ -106,8 +111,13 @@ if [ $SETUP_ERRORS -eq 0 ]; then
     echo "  - .venv (root - for IDT CLI build)"
     echo "  - imagedescriber/.venv"
     echo ""
-    echo "MLX/Metal provider: mlx-vlm installed (Apple Silicon on-device inference)"
-    echo "  To use: idt workflow <images> --provider mlx"
+    if [ $IS_APPLE_SILICON -eq 1 ]; then
+        echo "MLX/Metal provider: enabled (Apple Silicon detected: $ARCH)"
+        echo "  To use: idt workflow <images> --provider mlx"
+    else
+        echo "MLX/Metal provider: skipped (non-Apple Silicon detected: $ARCH)"
+        echo "  Use OpenAI, Claude, or Ollama providers on this machine"
+    fi
     echo ""
     echo "Next steps:"
     echo "  1. Build all applications: ./BuildAndRelease/MacBuilds/builditall_macos.command"
