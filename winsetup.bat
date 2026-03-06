@@ -18,10 +18,7 @@ echo install all required dependencies.
 echo.
 echo Applications to set up:
 echo   - IDT (CLI)
-echo   - Viewer
-echo   - ImageDescriber
-echo   - Prompt Editor
-echo   - IDTConfigure
+echo   - ImageDescriber (with integrated Viewer Mode, prompt editor, and configuration manager)
 echo.
 pause
 
@@ -29,7 +26,7 @@ set SETUP_ERRORS=0
 
 REM ============================================================================
 echo.
-echo [1/5] Setting up IDT (CLI)...
+echo [1/2] Setting up IDT (CLI)...
 echo ========================================================================
 echo.
 
@@ -45,7 +42,7 @@ if errorlevel 1 (
     echo ERROR: Failed to create virtual environment for IDT
     set /a SETUP_ERRORS+=1
     cd ..
-    goto :viewer
+    goto :imagedescriber
 )
 
 echo Installing dependencies...
@@ -62,44 +59,9 @@ call deactivate
 cd ..
 
 REM ============================================================================
-:viewer
-echo.
-echo [2/5] Setting up Viewer...
-echo ========================================================================
-echo.
-
-cd viewer
-if exist ".winenv" (
-    echo Removing old .winenv...
-    rmdir /s /q .winenv
-)
-
-echo Creating virtual environment...
-python -m venv .winenv
-if errorlevel 1 (
-    echo ERROR: Failed to create virtual environment for Viewer
-    set /a SETUP_ERRORS+=1
-    cd ..
-    goto :imagedescriber
-)
-
-echo Installing dependencies...
-call .winenv\Scripts\activate.bat
-pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install dependencies for Viewer
-    set /a SETUP_ERRORS+=1
-) else (
-    echo SUCCESS: Viewer setup complete
-)
-call deactivate
-cd ..
-
-REM ============================================================================
 :imagedescriber
 echo.
-echo [3/5] Setting up ImageDescriber...
+echo [2/2] Setting up ImageDescriber...
 echo ========================================================================
 echo.
 
@@ -115,7 +77,7 @@ if errorlevel 1 (
     echo ERROR: Failed to create virtual environment for ImageDescriber
     set /a SETUP_ERRORS+=1
     cd ..
-    goto :prompteditor
+    goto :summary
 )
 
 echo Installing dependencies...
@@ -127,76 +89,6 @@ if errorlevel 1 (
     set /a SETUP_ERRORS+=1
 ) else (
     echo SUCCESS: ImageDescriber setup complete
-)
-call deactivate
-cd ..
-
-REM ============================================================================
-:prompteditor
-echo.
-echo [4/5] Setting up Prompt Editor...
-echo ========================================================================
-echo.
-
-cd prompt_editor
-if exist ".winenv" (
-    echo Removing old .winenv...
-    rmdir /s /q .winenv
-)
-
-echo Creating virtual environment...
-python -m venv .winenv
-if errorlevel 1 (
-    echo ERROR: Failed to create virtual environment for Prompt Editor
-    set /a SETUP_ERRORS+=1
-    cd ..
-    goto :idtconfigure
-)
-
-echo Installing dependencies...
-call .winenv\Scripts\activate.bat
-pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install dependencies for Prompt Editor
-    set /a SETUP_ERRORS+=1
-) else (
-    echo SUCCESS: Prompt Editor setup complete
-)
-call deactivate
-cd ..
-
-REM ============================================================================
-:idtconfigure
-echo.
-echo [5/5] Setting up IDTConfigure...
-echo ========================================================================
-echo.
-
-cd idtconfigure
-if exist ".winenv" (
-    echo Removing old .winenv...
-    rmdir /s /q .winenv
-)
-
-echo Creating virtual environment...
-python -m venv .winenv
-if errorlevel 1 (
-    echo ERROR: Failed to create virtual environment for IDTConfigure
-    set /a SETUP_ERRORS+=1
-    cd ..
-    goto :summary
-)
-
-echo Installing dependencies...
-call .winenv\Scripts\activate.bat
-pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install dependencies for IDTConfigure
-    set /a SETUP_ERRORS+=1
-) else (
-    echo SUCCESS: IDTConfigure setup complete
 )
 call deactivate
 cd ..
@@ -214,10 +106,7 @@ if "%SETUP_ERRORS%"=="0" (
     echo.
     echo Virtual environments created:
     echo   - idt\.winenv
-    echo   - viewer\.winenv
     echo   - imagedescriber\.winenv
-    echo   - prompt_editor\.winenv
-    echo   - idtconfigure\.winenv
     echo.
     echo Next steps:
     echo   1. Build all applications: BuildAndRelease\WinBuilds\builditall_wx.bat
