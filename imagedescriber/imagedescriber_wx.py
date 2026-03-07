@@ -391,6 +391,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.current_image_item = None
         self.current_filter = "all"  # View filter: all, described, undescribed
         self.show_image_previews = True  # View option: show/hide image preview panel
+        self.preview_source_image = None  # PIL image used to regenerate scaled preview on resize
         self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
         self.batch_progress = None  # Track batch processing: {current: N, total: M, file_path: "..."}
         # Throttle list redraws during batch processing - only refresh every N seconds.
@@ -918,8 +919,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.image_preview_label = wx.StaticText(panel, label="Image Preview:")
         sizer.Add(self.image_preview_label, 0, wx.ALL, 5)
         
-        # Preview panel with fixed size for thumbnail display
-        self.image_preview_panel = wx.Panel(panel, size=(250, 250))
+        # Preview panel is resizable so the image can use available space.
+        self.image_preview_panel = wx.Panel(panel)
+        self.image_preview_panel.SetMinSize((250, 250))
         self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
         self.image_preview_panel.SetName("Image preview panel")
         
@@ -928,6 +930,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         # Bind paint event for displaying image
         self.image_preview_panel.Bind(wx.EVT_PAINT, self.on_paint_preview)
+        self.image_preview_panel.Bind(wx.EVT_SIZE, self.on_preview_panel_resized)
         
         sizer.Add(self.image_preview_panel, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -1263,6 +1266,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             # No selection - clear current item and disable buttons
             self.current_image_item = None
+            self.preview_source_image = None
             self.image_preview_bitmap = None
             self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
             self.image_preview_panel.Refresh()
@@ -1575,8 +1579,55 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Paint the image preview on the preview panel"""
         dc = wx.PaintDC(self.image_preview_panel)
         if self.image_preview_bitmap:
-            # Draw the bitmap at top-left corner
-            dc.DrawBitmap(self.image_preview_bitmap, 0, 0)
+            panel_w, panel_h = self.image_preview_panel.GetClientSize()
+            img_w, img_h = self.image_preview_bitmap.GetSize()
+            x = max(0, (panel_w - img_w) // 2)
+            y = max(0, (panel_h - img_h) // 2)
+            dc.DrawBitmap(self.image_preview_bitmap, x, y)
+
+    def on_preview_panel_resized(self, event):
+        """Regenerate preview bitmap when panel size changes."""
+        if self.preview_source_image is not None:
+            self._refresh_preview_bitmap()
+            self.image_preview_panel.Refresh()
+        event.Skip()
+
+    def _refresh_preview_bitmap(self):
+        """Scale source image to fit current preview panel without distortion."""
+        if self.preview_source_image is None:
+            self.image_preview_bitmap = None
+            return
+
+        panel_w, panel_h = self.image_preview_panel.GetClientSize()
+        if panel_w <= 1 or panel_h <= 1:
+            return
+
+        src_w, src_h = self.preview_source_image.size
+        if src_w <= 0 or src_h <= 0:
+            self.image_preview_bitmap = None
+            return
+
+        try:
+            from PIL import Image as PILImage
+            resample = PILImage.Resampling.LANCZOS
+        except Exception:
+            resample = None
+
+        # Small inset keeps image off the panel edge and avoids clipping artifacts.
+        padding = 8
+        max_w = max(1, panel_w - padding)
+        max_h = max(1, panel_h - padding)
+        scale = min(max_w / src_w, max_h / src_h)
+        new_w = max(1, int(src_w * scale))
+        new_h = max(1, int(src_h * scale))
+
+        if resample is not None:
+            resized = self.preview_source_image.resize((new_w, new_h), resample)
+        else:
+            resized = self.preview_source_image.resize((new_w, new_h))
+        wx_image = wx.Image(new_w, new_h)
+        wx_image.SetData(resized.tobytes())
+        self.image_preview_bitmap = wx.Bitmap(wx_image)
     
     def resolve_image_path(self, file_path_str):
         """Resolve image path handling relative paths and moved workspaces"""
@@ -1618,6 +1669,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 from PIL import Image
             except ImportError:
                 # Fallback: PIL not available
+                self.preview_source_image = None
                 self.image_preview_bitmap = None
                 self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
                 self.image_preview_panel.Refresh()
@@ -1629,23 +1681,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Don't pre-check exists() for network paths - os.path.exists() can give
             # false negatives on network shares due to latency/caching.
             # Just try to load and fail silently if needed.
-            img = Image.open(resolved_path)
-            img.thumbnail((250, 250), Image.Resampling.LANCZOS)
-            
-            # Get dimensions
-            width, height = img.size
-            
-            # Convert to RGB if needed (handle transparency, grayscale, etc.)
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Convert PIL image to wx.Image
-            wx_image = wx.Image(width, height)
-            rgb_data = img.tobytes()
-            wx_image.SetData(rgb_data)
-            
-            # Convert to bitmap for display
-            self.image_preview_bitmap = wx.Bitmap(wx_image)
+            with Image.open(resolved_path) as img:
+                # Convert to RGB once and keep source for dynamic panel-fit scaling.
+                self.preview_source_image = img.convert('RGB')
+
+            self._refresh_preview_bitmap()
             
             # Update panel appearance
             self.image_preview_panel.SetBackgroundColour(wx.Colour(255, 255, 255))
@@ -1654,6 +1694,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             # If image can't be loaded, silently show grey placeholder
             # (No error dialogs for missing files, network errors, corrupt images, etc.)
+            self.preview_source_image = None
             self.image_preview_bitmap = None
             self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
             self.image_preview_panel.Refresh()
@@ -4881,6 +4922,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.show_image_previews:
             self.image_preview_label.Show()
             self.image_preview_panel.Show()
+            if self.preview_source_image is not None:
+                self._refresh_preview_bitmap()
+                self.image_preview_panel.Refresh()
         else:
             self.image_preview_label.Hide()
             self.image_preview_panel.Hide()
