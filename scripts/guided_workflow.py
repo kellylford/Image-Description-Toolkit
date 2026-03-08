@@ -637,13 +637,8 @@ def guided_workflow(custom_config_path=None):
                 print("\nReturning to provider selection...\n")
                 return guided_workflow()
 
-            # Use hardcoded known-good models (same list as the GUI)
-            mlx_models = [
-                "mlx-community/Qwen2-VL-2B-Instruct-4bit (2B fastest, recommended)",
-                "mlx-community/Qwen2.5-VL-3B-Instruct-4bit (3B, better quality)",
-                "mlx-community/Qwen2.5-VL-7B-Instruct-4bit (7B, best quality, slower)",
-                "mlx-community/llava-1.5-7b-4bit (LLaVA 7B alternative)",
-            ]
+            # Use the authoritative model list from MLXProvider to stay in sync with the GUI
+            mlx_models = mlx_provider.KNOWN_MODELS
             print("\nAvailable MLX (Metal) models — downloaded from HuggingFace on first use:")
             model_choice = get_choice("Select a model", mlx_models, default=1, allow_back=True)
             if model_choice == 'EXIT':
@@ -651,8 +646,7 @@ def guided_workflow(custom_config_path=None):
                 return
             if model_choice == 'BACK':
                 return guided_workflow()
-            # Extract the HuggingFace model ID (everything before the first space)
-            model = model_choice.split()[0]
+            model = model_choice
 
         except ImportError as e:
             print(f"\n⚠️  Error loading MLX provider: {e}")
