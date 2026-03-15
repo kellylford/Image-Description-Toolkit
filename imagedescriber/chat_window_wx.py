@@ -155,12 +155,12 @@ class ChatDialog(wx.Dialog):
                 
                 if models:
                     for model in models:
-                        self.model_combo.Append(model)
+                        self.model_combo.Append(model, model)
                     # Set first model as default
                     self.model_combo.SetSelection(0)
                 else:
                     # Fallback if no models found
-                    self.model_combo.Append('llava:latest')
+                    self.model_combo.Append('llava:latest', 'llava:latest')
                     self.model_combo.SetSelection(0)
                     
             elif provider == 'openai':
@@ -170,7 +170,7 @@ class ChatDialog(wx.Dialog):
                 except ImportError:
                     from imagedescriber.ai_providers import DEV_OPENAI_MODELS
                 for model in DEV_OPENAI_MODELS:
-                    self.model_combo.Append(model)
+                    self.model_combo.Append(model, model)
                 self.model_combo.SetStringSelection('gpt-4o')
                 
             elif provider == 'claude':
@@ -187,7 +187,7 @@ class ChatDialog(wx.Dialog):
                 # HuggingFace models
                 models = ['Salesforce/blip-image-captioning-large', 'microsoft/git-large-coco']
                 for model in models:
-                    self.model_combo.Append(model)
+                    self.model_combo.Append(model, model)
                 if models:
                     self.model_combo.SetSelection(0)
 
@@ -198,7 +198,7 @@ class ChatDialog(wx.Dialog):
                 except ImportError:
                     from ai_providers import MLXProvider
                 for model in MLXProvider.KNOWN_MODELS:
-                    self.model_combo.Append(model)
+                    self.model_combo.Append(model, model)
                 if MLXProvider.KNOWN_MODELS:
                     self.model_combo.SetSelection(0)
 
@@ -206,10 +206,10 @@ class ChatDialog(wx.Dialog):
             print(f"Error populating models for {provider}: {e}")
             # Set a reasonable fallback
             if provider == 'ollama':
-                self.model_combo.Append('llava:latest')
+                self.model_combo.Append('llava:latest', 'llava:latest')
                 self.model_combo.SetSelection(0)
             elif provider == 'openai':
-                self.model_combo.Append('gpt-4o')
+                self.model_combo.Append('gpt-4o', 'gpt-4o')
                 self.model_combo.SetSelection(0)
             elif provider == 'claude':
                 # Use first model from official Claude models list with friendly display name
