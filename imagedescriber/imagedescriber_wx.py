@@ -4511,6 +4511,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     None,
                     api_key  # API key for cloud providers
                 )
+                # Mark as processing so the image list shows the indicator
+                self.processing_items[self.current_image_item.file_path] = {
+                    'provider': values['provider'],
+                    'model': values['model']
+                }
+                self.refresh_image_list()
+                self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
                 self.followup_worker.start()
         
         dlg.Destroy()
