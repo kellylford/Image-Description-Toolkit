@@ -554,10 +554,21 @@ class FollowupQuestionDialog(wx.Dialog):
     def populate_models(self):
         """Populate model choice based on selected provider - uses cached models to avoid blocking UI"""
         provider = self.provider_choice.GetStringSelection()
-        
-        # Save current selection
-        current_model = self.model_combo.GetStringSelection()
-        
+
+        # Capture current selection by API ID (client data) before clearing.
+        # On the very first call the combo is empty, so fall back to original_model
+        # so the dialog pre-selects the model that was used for the existing description.
+        current_selection = self.model_combo.GetSelection()
+        if current_selection != wx.NOT_FOUND:
+            try:
+                cd = self.model_combo.GetClientData(current_selection)
+                current_model_id = cd if cd is not None else self.model_combo.GetStringSelection()
+            except Exception:
+                current_model_id = self.model_combo.GetStringSelection()
+        else:
+            # First call — default to the model used for the original description
+            current_model_id = self.original_model
+
         # Clear choices
         self.model_combo.Clear()
         
@@ -591,21 +602,36 @@ class FollowupQuestionDialog(wx.Dialog):
                     self.model_combo.Append(display, model)  # client data = API ID
         except Exception as e:
             logger.warning(f"Error populating models: {e}")
-        
-        # Restore previous selection if it exists in new list, otherwise use first item
-        if current_model and current_model in [self.model_combo.GetString(i) for i in range(self.model_combo.GetCount())]:
-            self.model_combo.SetStringSelection(current_model)
-        elif self.model_combo.GetCount() > 0:
-            self.model_combo.SetSelection(0)
-        else:
-            # Fallback to original model - try to find and select it
-            try:
-                from ai_providers import CLAUDE_MODEL_METADATA
-                display = CLAUDE_MODEL_METADATA.get(self.original_model, {}).get("name", self.original_model)
-                self.model_combo.Append(display, self.original_model)
+
+        # Restore selection: prefer matching by API ID via client data, then by display string.
+        selected = False
+        if current_model_id:
+            for i in range(self.model_combo.GetCount()):
+                try:
+                    cd = self.model_combo.GetClientData(i)
+                    if cd == current_model_id:
+                        self.model_combo.SetSelection(i)
+                        selected = True
+                        break
+                except Exception:
+                    pass
+                if not selected and self.model_combo.GetString(i) == current_model_id:
+                    self.model_combo.SetSelection(i)
+                    selected = True
+                    break
+
+        if not selected:
+            if self.model_combo.GetCount() > 0:
                 self.model_combo.SetSelection(0)
-            except:
-                pass  # Silently ignore if can't set fallback
+            else:
+                # Last-resort: insert a placeholder entry for the original model
+                try:
+                    from ai_providers import CLAUDE_MODEL_METADATA
+                    display = CLAUDE_MODEL_METADATA.get(self.original_model, {}).get("name", self.original_model)
+                    self.model_combo.Append(display, self.original_model)
+                    self.model_combo.SetSelection(0)
+                except Exception:
+                    pass
 
         # Always refresh the description hint after loading models
         self.update_model_description()
