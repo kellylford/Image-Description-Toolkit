@@ -413,7 +413,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.download_worker = None  # Store DownloadProcessingWorker reference to prevent GC
         self.scan_worker: Optional[DirectoryScanWorker] = None  # Store DirectoryScanWorker reference for async file loading
         self.followup_worker = None  # Store ProcessingWorker reference for follow-up questions
-        self.batch_progress_dialog: Optional[BatchProgressDialog] = None  # Progress dialog
+        self.batch_progress_dialog = None  # Progress dialog (BatchProgressDialog when active)
         self.batch_start_time: Optional[float] = None  # For avg time calculation
         self.batch_processing_times: List[float] = []  # Track times per image
         self.last_completed_image: Optional[str] = None  # Last image described (for progress dialog)

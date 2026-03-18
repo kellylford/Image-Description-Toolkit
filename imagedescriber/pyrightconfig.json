@@ -1,0 +1,13 @@
+{
+    "venvPath": ".",
+    "venv": ".winenv",
+    "extraPaths": [
+        ".",
+        "../scripts",
+        "../models",
+        "../shared"
+    ],
+    "typeCheckingMode": "basic",
+    "reportMissingImports": "warning",
+    "reportMissingModuleSource": "none"
+}
