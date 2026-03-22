@@ -390,7 +390,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.processing_thread = None
         self.current_image_item = None
         self.current_filter = "all"  # View filter: all, described, undescribed
+        self.search_filter_text = ""  # Text search filter for image list
         self.show_image_previews = True  # View option: show/hide image preview panel
+        self.preview_source_image = None  # PIL image used to regenerate scaled preview on resize
+        self.preview_placeholder_text = ""  # Message shown when no preview image is available
         self.processing_items = {}  # Track items being processed: {file_path: {provider, model}}
         self.batch_progress = None  # Track batch processing: {current: N, total: M, file_path: "..."}
         # Throttle list redraws during batch processing - only refresh every N seconds.
@@ -413,7 +416,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.download_worker = None  # Store DownloadProcessingWorker reference to prevent GC
         self.scan_worker: Optional[DirectoryScanWorker] = None  # Store DirectoryScanWorker reference for async file loading
         self.followup_worker = None  # Store ProcessingWorker reference for follow-up questions
-        self.batch_progress_dialog = None  # Progress dialog (BatchProgressDialog when active)
+        self.batch_progress_dialog: Optional[BatchProgressDialog] = None  # Progress dialog
         self.batch_start_time: Optional[float] = None  # For avg time calculation
         self.batch_processing_times: List[float] = []  # Track times per image
         self.last_completed_image: Optional[str] = None  # Last image described (for progress dialog)
@@ -882,17 +885,38 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         panel = wx.Panel(parent)
         panel.SetCanFocus(False)  # Avoid panel stealing focus
         sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        # Label
-        label = wx.StaticText(panel, label="Images:")
-        sizer.Add(label, 0, wx.ALL, 5)
-        
+
+        # Label - stored as instance var so refresh_image_list can update count
+        self.image_list_label = wx.StaticText(panel, label="Images:")
+        sizer.Add(self.image_list_label, 0, wx.ALL, 5)
+
+        # Search/filter bar (hidden by default, toggled via View > Find Images or Ctrl+F)
+        self.search_panel = wx.Panel(panel)
+        search_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        find_label = wx.StaticText(self.search_panel, label="Find:")
+        search_sizer.Add(find_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 5)
+        self.search_ctrl = wx.TextCtrl(
+            self.search_panel, style=wx.TE_PROCESS_ENTER,
+            name="Filter images by text"
+        )
+        self.search_ctrl.SetHint("e.g. house or garage and purpose")
+        search_sizer.Add(self.search_ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 4)
+        clear_btn = wx.Button(self.search_panel, label="\u2715", size=(28, -1), name="Clear search")
+        search_sizer.Add(clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        self.search_panel.SetSizer(search_sizer)
+        self.search_panel.Hide()
+        sizer.Add(self.search_panel, 0, wx.EXPAND | wx.BOTTOM, 2)
+
+        self.search_ctrl.Bind(wx.EVT_TEXT, self.on_search_text_changed)
+        self.search_ctrl.Bind(wx.EVT_CHAR_HOOK, self.on_search_key)
+        clear_btn.Bind(wx.EVT_BUTTON, self.on_clear_search)
+
         # Image list (using ListBox for accessibility - single tab stop)
         self.image_list = wx.ListBox(panel, name="Images in workspace", style=wx.LB_SINGLE | wx.LB_NEEDED_SB)
         self.image_list.Bind(wx.EVT_LISTBOX, self.on_image_selected)
         self.image_list.Bind(wx.EVT_CHAR_HOOK, self.on_image_list_key)
         sizer.Add(self.image_list, 1, wx.EXPAND | wx.ALL, 5)
-        
+
         panel.SetSizer(sizer)
         return panel
     
@@ -901,8 +925,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         Create the right panel with image preview, descriptions list, and editor.
         
         Layout:
-        - TOP: Image preview panel (thumbnail of selected image)
-        - MIDDLE: Descriptions ListBox (all descriptions for current image)
+        - TOP: Side-by-side image preview and descriptions ListBox
         - BOTTOM: Description editor TextCtrl (for editing selected description)
         """
         panel = wx.Panel(parent)
@@ -913,40 +936,58 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.image_info_label = wx.StaticText(panel, label="No image selected")
         sizer.Add(self.image_info_label, 0, wx.ALL, 5)
         
-        # ===== TOP SECTION: IMAGE PREVIEW =====
-        
-        self.image_preview_label = wx.StaticText(panel, label="Image Preview:")
-        sizer.Add(self.image_preview_label, 0, wx.ALL, 5)
-        
-        # Preview panel with fixed size for thumbnail display
-        self.image_preview_panel = wx.Panel(panel, size=(250, 250))
+        # ===== TOP SECTION: PREVIEW + DESCRIPTION LIST (SIDE-BY-SIDE) =====
+        top_row_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Left column: image preview section
+        self.preview_container = wx.Panel(panel)
+        self.preview_container.SetCanFocus(False)
+        preview_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.image_preview_label = wx.StaticText(self.preview_container, label="Image Preview:")
+        preview_sizer.Add(self.image_preview_label, 0, wx.ALL, 5)
+
+        # Preview panel is centered and sized to current image aspect ratio.
+        self.image_preview_panel = wx.Panel(self.preview_container)
+        self.image_preview_panel.SetMinSize((250, 250))
         self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
         self.image_preview_panel.SetName("Image preview panel")
-        
+
         # Store bitmap for painting and initialize to None
         self.image_preview_bitmap = None
-        
+
         # Bind paint event for displaying image
         self.image_preview_panel.Bind(wx.EVT_PAINT, self.on_paint_preview)
-        
-        sizer.Add(self.image_preview_panel, 0, wx.ALL | wx.EXPAND, 5)
-        
-        # ===== MIDDLE SECTION: DESCRIPTIONS LIST =====
-        
-        # Label for descriptions list
-        desc_list_label = wx.StaticText(panel, label="Descriptions for this image:")
-        sizer.Add(desc_list_label, 0, wx.ALL, 5)
-        
+        self.image_preview_panel.Bind(wx.EVT_SIZE, self.on_preview_panel_resized)
+        panel.Bind(wx.EVT_SIZE, self.on_description_panel_resized)
+
+        preview_sizer.Add(self.image_preview_panel, 1, wx.ALL | wx.EXPAND, 5)
+        self.preview_container.SetSizer(preview_sizer)
+
+        # Right column: descriptions list section (non-editable list)
+        self.desc_list_container = wx.Panel(panel)
+        self.desc_list_container.SetCanFocus(False)
+        desc_list_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        desc_list_label = wx.StaticText(self.desc_list_container, label="Descriptions for this image:")
+        desc_list_sizer.Add(desc_list_label, 0, wx.ALL, 5)
+
         # Descriptions list using accessible pattern
         # Shows truncated text visually, full text to screen readers
         self.desc_list = DescriptionListBox(
-            panel, 
+            self.desc_list_container,
             name="Description list for current image",
             style=wx.LB_SINGLE | wx.LB_NEEDED_SB
         )
         self.desc_list.Bind(wx.EVT_LISTBOX, self.on_description_selected)
         self.desc_list.Bind(wx.EVT_CHAR_HOOK, self.on_desc_list_key)
-        sizer.Add(self.desc_list, 1, wx.EXPAND | wx.ALL, 5)
+        desc_list_sizer.Add(self.desc_list, 1, wx.EXPAND | wx.ALL, 5)
+        self.desc_list_container.SetSizer(desc_list_sizer)
+
+        top_row_sizer.Add(self.preview_container, 1, wx.EXPAND | wx.RIGHT, 4)
+        top_row_sizer.Add(self.desc_list_container, 1, wx.EXPAND | wx.LEFT, 4)
+        # Use the combined space previously consumed by preview + description list.
+        sizer.Add(top_row_sizer, 2, wx.EXPAND | wx.ALL, 5)
         
         # ===== BOTTOM SECTION: EDITOR =====
         
@@ -1171,7 +1212,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.show_preview_item = view_menu.AppendCheckItem(wx.ID_ANY, "Show &Image Previews")
         self.show_preview_item.Check(True)  # Default: show previews
         self.Bind(wx.EVT_MENU, self.on_toggle_image_previews, self.show_preview_item)
-        
+
+        view_menu.AppendSeparator()
+        self.find_images_item = view_menu.AppendCheckItem(wx.ID_ANY, "Find &Images...\tCtrl+F")
+        self.Bind(wx.EVT_MENU, self.on_toggle_search_bar, self.find_images_item)
+
         menubar.Append(view_menu, "&View")
         
         # Tools menu
@@ -1256,14 +1301,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if file_path and file_path in self.workspace.items:
                 self.current_image_item = self.workspace.items[file_path]
                 self.display_image_info(self.current_image_item)
-                # Load preview image
-                self.load_preview_image(file_path)
+                # Load preview image or video frame placeholder
+                self.update_preview_for_item(self.current_image_item)
                 self.process_btn.Enable(True)
                 self.save_desc_btn.Enable(True)
         else:
             # No selection - clear current item and disable buttons
             self.current_image_item = None
+            self.preview_source_image = None
             self.image_preview_bitmap = None
+            self.preview_placeholder_text = ""
             self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
             self.image_preview_panel.Refresh()
             self.process_btn.Enable(False)
@@ -1271,10 +1318,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     # Explicit tab order: image_list -> desc_list -> description_text
     def on_image_list_key(self, event):
-        if event.GetKeyCode() == wx.WXK_TAB and not event.ShiftDown():
+        keycode = event.GetKeyCode()
+        if keycode == wx.WXK_TAB and not event.ShiftDown():
             if self.desc_list:
                 self.desc_list.SetFocus()
             return
+        # EVT_LISTBOX does not fire on arrow key navigation on macOS.
+        # EVT_CHAR_HOOK fires BEFORE the native Cocoa widget updates its
+        # selection, so wx.CallAfter still reads the old index.
+        # Solution: own the navigation entirely — compute and set the new
+        # selection ourselves, then load the image immediately.
+        if keycode in (wx.WXK_UP, wx.WXK_DOWN):
+            count = self.image_list.GetCount()
+            if count > 0:
+                current = self.image_list.GetSelection()
+                if keycode == wx.WXK_UP:
+                    new_sel = max(0, (current - 1) if current != wx.NOT_FOUND else 0)
+                else:
+                    new_sel = min(count - 1, (current + 1) if current != wx.NOT_FOUND else 0)
+                if new_sel != current:
+                    self.image_list.SetSelection(new_sel)
+                    self.image_list.EnsureVisible(new_sel)
+                    self.on_image_selected(None)
+            return  # Consume the event — we handled navigation fully
         event.Skip()
 
     def on_desc_list_key(self, event):
@@ -1570,13 +1636,134 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 pass
     
     # Image Preview Handlers
+
+    def show_preview_message(self, message: str):
+        """Show centered text in preview panel when no image is available."""
+        self.preview_source_image = None
+        self.image_preview_bitmap = None
+        self.preview_placeholder_text = message
+        self.image_preview_panel.SetMinSize((250, 250))
+        self.image_preview_panel.SetInitialSize((250, 250))
+        self.image_preview_panel.SetBackgroundColour(wx.Colour(235, 235, 235))
+        self.image_preview_panel.Refresh()
+
+    def _get_video_preview_frame(self, image_item: ImageItem) -> Optional[str]:
+        """Return the first extracted frame path for a video item if available."""
+        if image_item.item_type != "video":
+            return None
+
+        if not hasattr(image_item, 'extracted_frames') or not image_item.extracted_frames:
+            return None
+
+        # Use the first extracted frame as requested; mirror what users expect in the list.
+        first_frame = image_item.extracted_frames[0]
+        resolved = self.resolve_image_path(first_frame)
+        return str(resolved)
+
+    def update_preview_for_item(self, image_item: Optional[ImageItem]):
+        """Update preview for selected item, with special handling for videos."""
+        if not self.show_image_previews or image_item is None:
+            return
+
+        if image_item.item_type == "video":
+            frame_path = self._get_video_preview_frame(image_item)
+            if frame_path:
+                self.load_preview_image(frame_path)
+            else:
+                self.show_preview_message("Extract images from this video")
+            return
+
+        self.load_preview_image(image_item.file_path)
     
     def on_paint_preview(self, event):
         """Paint the image preview on the preview panel"""
         dc = wx.PaintDC(self.image_preview_panel)
         if self.image_preview_bitmap:
-            # Draw the bitmap at top-left corner
-            dc.DrawBitmap(self.image_preview_bitmap, 0, 0)
+            panel_w, panel_h = self.image_preview_panel.GetClientSize()
+            img_w, img_h = self.image_preview_bitmap.GetSize()
+            x = max(0, (panel_w - img_w) // 2)
+            y = max(0, (panel_h - img_h) // 2)
+            dc.DrawBitmap(self.image_preview_bitmap, x, y)
+        elif self.preview_placeholder_text:
+            panel_w, panel_h = self.image_preview_panel.GetClientSize()
+            font = dc.GetFont()
+            font.SetPointSize(max(9, font.GetPointSize()))
+            dc.SetFont(font)
+            dc.SetTextForeground(wx.Colour(80, 80, 80))
+
+            text = self.preview_placeholder_text
+            text_w, text_h = dc.GetTextExtent(text)
+            x = max(8, (panel_w - text_w) // 2)
+            y = max(8, (panel_h - text_h) // 2)
+            dc.DrawText(text, x, y)
+
+    def on_preview_panel_resized(self, event):
+        """Regenerate preview bitmap when panel size changes."""
+        if self.preview_source_image is not None:
+            self._refresh_preview_bitmap()
+            self.image_preview_panel.Refresh()
+        elif self.preview_placeholder_text:
+            self.image_preview_panel.Refresh()
+        event.Skip()
+
+    def on_description_panel_resized(self, event):
+        """Recompute preview bounds when the right-side panel changes size."""
+        if self.preview_source_image is not None:
+            self._refresh_preview_bitmap()
+            self.image_preview_panel.Refresh()
+        event.Skip()
+
+    def _get_preview_target_bounds(self):
+        """Get max preview bounds based on current layout space."""
+        panel_parent = self.image_preview_panel.GetParent()
+        parent_w, parent_h = panel_parent.GetClientSize()
+
+        # Fill preview container while reserving a small margin for label/padding.
+        max_w = max(250, parent_w - 16)
+        max_h = max(250, parent_h - 42)
+        return max_w, max_h
+
+    def _refresh_preview_bitmap(self):
+        """Scale source image to fit current preview panel without distortion."""
+        if self.preview_source_image is None:
+            self.image_preview_bitmap = None
+            return
+
+        max_w, max_h = self._get_preview_target_bounds()
+        if max_w <= 1 or max_h <= 1:
+            return
+
+        src_w, src_h = self.preview_source_image.size
+        if src_w <= 0 or src_h <= 0:
+            self.image_preview_bitmap = None
+            return
+
+        try:
+            from PIL import Image as PILImage
+            resample = PILImage.Resampling.LANCZOS
+        except Exception:
+            resample = None
+
+        # Small inset keeps image off the panel edge and avoids clipping artifacts.
+        inner_padding = 8
+        scale = min(max_w / src_w, max_h / src_h)
+        new_w = max(1, int(src_w * scale))
+        new_h = max(1, int(src_h * scale))
+
+        if resample is not None:
+            resized = self.preview_source_image.resize((new_w, new_h), resample)
+        else:
+            resized = self.preview_source_image.resize((new_w, new_h))
+
+        # Fit panel tightly around bitmap to reduce visible whitespace for portrait images.
+        panel_w = new_w + inner_padding
+        panel_h = new_h + inner_padding
+        self.image_preview_panel.SetMinSize((panel_w, panel_h))
+        self.image_preview_panel.SetInitialSize((panel_w, panel_h))
+
+        wx_image = wx.Image(new_w, new_h)
+        wx_image.SetData(resized.tobytes())
+        self.image_preview_bitmap = wx.Bitmap(wx_image)
     
     def resolve_image_path(self, file_path_str):
         """Resolve image path handling relative paths and moved workspaces"""
@@ -1611,6 +1798,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Skip loading if previews are disabled
         if not self.show_image_previews:
             return
+
+        self.preview_placeholder_text = ""
         
         try:
             # Try to import PIL for image loading
@@ -1618,7 +1807,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 from PIL import Image
             except ImportError:
                 # Fallback: PIL not available
+                self.preview_source_image = None
                 self.image_preview_bitmap = None
+                self.preview_placeholder_text = ""
                 self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
                 self.image_preview_panel.Refresh()
                 return
@@ -1629,23 +1820,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Don't pre-check exists() for network paths - os.path.exists() can give
             # false negatives on network shares due to latency/caching.
             # Just try to load and fail silently if needed.
-            img = Image.open(resolved_path)
-            img.thumbnail((250, 250), Image.Resampling.LANCZOS)
-            
-            # Get dimensions
-            width, height = img.size
-            
-            # Convert to RGB if needed (handle transparency, grayscale, etc.)
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Convert PIL image to wx.Image
-            wx_image = wx.Image(width, height)
-            rgb_data = img.tobytes()
-            wx_image.SetData(rgb_data)
-            
-            # Convert to bitmap for display
-            self.image_preview_bitmap = wx.Bitmap(wx_image)
+            with Image.open(resolved_path) as img:
+                # Convert to RGB once and keep source for dynamic panel-fit scaling.
+                self.preview_source_image = img.convert('RGB')
+
+            self._refresh_preview_bitmap()
             
             # Update panel appearance
             self.image_preview_panel.SetBackgroundColour(wx.Colour(255, 255, 255))
@@ -1654,7 +1833,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             # If image can't be loaded, silently show grey placeholder
             # (No error dialogs for missing files, network errors, corrupt images, etc.)
+            self.preview_source_image = None
             self.image_preview_bitmap = None
+            self.preview_placeholder_text = ""
             self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
             self.image_preview_panel.Refresh()
 
@@ -2118,8 +2299,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     all_items.append((frame_path, frame_item, 1))  # indent level 1
         
         # Display all items
+        type_filter_count = 0  # items passing the type filter (before text search)
         for file_path, item, indent_level in all_items:
-            # Apply filters
+            # Apply type filter
             if self.current_filter == "described":
                 if not item.descriptions:
                     continue
@@ -2130,7 +2312,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # Show videos and their extracted frames only
                 if item.item_type not in ["video", "extracted_frame"]:
                     continue
-            
+
+            type_filter_count += 1
+
+            # Apply text search filter if active
+            if self.search_filter_text and not self._matches_search(item, self.search_filter_text):
+                continue
+
             base_name = Path(file_path).name
             prefix_parts = []
             
@@ -2173,6 +2361,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if current_file_path and file_path == current_file_path:
                 new_selection_index = index
         
+        # Update label with result count when text search is active
+        if hasattr(self, 'image_list_label'):
+            displayed = self.image_list.GetCount()
+            if self.search_filter_text:
+                self.image_list_label.SetLabel(f"Images ({displayed} of {type_filter_count}):")
+            else:
+                self.image_list_label.SetLabel("Images:")
+
         # RESTORE FOCUS: Select the same item after refresh
         if new_selection_index != wx.NOT_FOUND:
             self.image_list.SetSelection(new_selection_index)
@@ -2187,6 +2383,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if first_file_path and first_file_path in self.workspace.items:
                 self.current_image_item = self.workspace.items[first_file_path]
                 self.display_image_info(self.current_image_item)
+                self.update_preview_for_item(self.current_image_item)
         
         # PERFORMANCE DIAGNOSTIC: Log refresh time for large lists
         elapsed = time.time() - start_time
@@ -4305,9 +4502,45 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_processing_error(self, event):
         """Handle processing errors (legacy)"""
         pass
+
+    def _is_text_entry_focused(self) -> bool:
+        """Return True when keyboard focus is inside any editable text-entry control."""
+        focused = self.FindFocus()
+        if not focused:
+            return False
+
+        # Walk up parent chain so child/native text controls are covered too.
+        current = focused
+        while current:
+            if isinstance(current, wx.TextCtrl):
+                return True
+
+            # Some editable controls expose text-entry APIs without being TextCtrl.
+            if hasattr(current, 'IsEditable'):
+                try:
+                    if current.IsEditable():
+                        return True
+                except Exception:
+                    pass
+
+            if hasattr(current, 'GetEditable'):
+                try:
+                    if current.GetEditable():
+                        return True
+                except Exception:
+                    pass
+
+            current = current.GetParent()
+
+        return False
     
     def on_key_press(self, event):
         """Handle keyboard shortcuts (matching Qt6 behavior)"""
+        # Do not intercept app shortcuts while user is typing in editable fields.
+        if self._is_text_entry_focused():
+            event.Skip()
+            return
+
         keycode = event.GetKeyCode()
         modifiers = event.GetModifiers()
         
@@ -4422,10 +4655,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 selections = chat_dialog.get_selections()
                 chat_dialog.Destroy()
                 
-                # Ensure a workspace exists (user may not have opened one yet)
-                if not self.workspace:
-                    self.workspace = ImageWorkspace(new_workspace=True)
-                
                 # Open chat window with selected settings (no image required)
                 chat_window = ChatWindow(
                     parent=self,
@@ -4511,13 +4740,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     None,
                     api_key  # API key for cloud providers
                 )
-                # Mark as processing so the image list shows the indicator
-                self.processing_items[self.current_image_item.file_path] = {
-                    'provider': values['provider'],
-                    'model': values['model']
-                }
-                self.refresh_image_list()
-                self.update_window_title("ImageDescriber", Path(self.workspace_file).name if self.workspace_file else "Untitled")
                 self.followup_worker.start()
         
         dlg.Destroy()
@@ -4884,15 +5106,88 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.current_filter = filter_type
         self.refresh_image_list()
         self.SetStatusText(f"Filter: {filter_type}", 1)
-    
+
+    def _matches_search(self, image_item, query_text: str) -> bool:
+        """Return True if image_item matches the search query.
+
+        Supports boolean AND/OR with case-insensitive substring matching:
+          - Split by ' and ' to get AND-groups (all must match)
+          - Split each group by ' or ' to get OR-alternatives (any must match)
+        Example: 'purpose and house or garage'
+          → must contain 'purpose' AND ('house' OR 'garage')
+        """
+        q = query_text.strip().lower()
+        if not q:
+            return True
+
+        # Build searchable text: filename + all description texts
+        from pathlib import Path as _Path
+        parts = [_Path(image_item.file_path).stem.lower()]
+        for desc in image_item.descriptions:
+            if desc.text:
+                parts.append(desc.text.lower())
+        haystack = " ".join(parts)
+
+        # AND-groups, then OR within each group
+        for and_group in q.split(" and "):
+            or_terms = and_group.split(" or ")
+            if not any(term.strip() in haystack for term in or_terms):
+                return False
+        return True
+
+    def on_toggle_search_bar(self, event):
+        """Show/hide the search bar above the image list (View > Find Images / Ctrl+F)"""
+        if not hasattr(self, 'search_panel'):
+            return
+        showing = not self.search_panel.IsShown()
+        self.search_panel.Show(showing)
+        if hasattr(self, 'find_images_item'):
+            self.find_images_item.Check(showing)
+        if showing:
+            self.search_ctrl.SetFocus()
+        else:
+            # Clear filter and refresh so all items are visible again
+            self.search_filter_text = ""
+            self.search_ctrl.ChangeValue("")  # ChangeValue doesn't fire EVT_TEXT
+            self.refresh_image_list()
+        # Reflow the left panel
+        if hasattr(self, 'search_panel'):
+            self.search_panel.GetParent().Layout()
+
+    def on_search_text_changed(self, event):
+        """Live-filter the image list as the user types in the search bar"""
+        self.search_filter_text = event.GetString()
+        self.refresh_image_list()
+
+    def on_search_key(self, event):
+        """Handle Escape in the search bar to dismiss it"""
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.on_toggle_search_bar(None)
+            return
+        event.Skip()
+
+    def on_clear_search(self, event):
+        """Clear the search field (EVT_TEXT fires automatically, triggering a refresh)"""
+        self.search_ctrl.SetValue("")
+        self.search_ctrl.SetFocus()
+
     def on_toggle_image_previews(self, event):
         """Toggle image preview panel visibility"""
         self.show_image_previews = event.IsChecked()
         
         if self.show_image_previews:
+            if hasattr(self, 'preview_container'):
+                self.preview_container.Show()
             self.image_preview_label.Show()
             self.image_preview_panel.Show()
+            if self.current_image_item:
+                self.update_preview_for_item(self.current_image_item)
+            elif self.preview_source_image is not None:
+                self._refresh_preview_bitmap()
+                self.image_preview_panel.Refresh()
         else:
+            if hasattr(self, 'preview_container'):
+                self.preview_container.Hide()
             self.image_preview_label.Hide()
             self.image_preview_panel.Hide()
         
