@@ -1723,6 +1723,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         max_h = max(250, parent_h - 42)
         return max_w, max_h
 
+    def _refresh_and_paint_preview(self):
+        """Deferred repaint: regenerate bitmap from source image then repaint the
+        preview panel.  Called via wx.CallAfter so it runs after the current event
+        processing chain completes, giving the panel its correct settled size."""
+        if self.preview_source_image is not None:
+            self._refresh_preview_bitmap()
+        self.image_preview_panel.Refresh()
+
     def _refresh_preview_bitmap(self):
         """Scale source image to fit current preview panel without distortion."""
         if self.preview_source_image is None:
@@ -1824,12 +1832,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # Convert to RGB once and keep source for dynamic panel-fit scaling.
                 self.preview_source_image = img.convert('RGB')
 
-            self._refresh_preview_bitmap()
-            
-            # Update panel appearance
             self.image_preview_panel.SetBackgroundColour(wx.Colour(255, 255, 255))
-            self.image_preview_panel.Refresh()
-            
+            # Defer bitmap generation and repaint to after the current event processing
+            # chain completes.  On macOS/Cocoa, Refresh() called during a listbox
+            # selection event is suppressed by the OS's own redraws for the click.
+            # wx.CallAfter runs after all pending events are drained, guaranteeing
+            # the panel has its final settled dimensions and our paint wins.
+            wx.CallAfter(self._refresh_and_paint_preview)
+
         except Exception as e:
             # If image can't be loaded, silently show grey placeholder
             # (No error dialogs for missing files, network errors, corrupt images, etc.)
@@ -1837,7 +1847,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_preview_bitmap = None
             self.preview_placeholder_text = ""
             self.image_preview_panel.SetBackgroundColour(wx.Colour(200, 200, 200))
-            self.image_preview_panel.Refresh()
+            wx.CallAfter(self.image_preview_panel.Refresh)
 
     def on_import_workflow(self, event):
         """Import descriptions from a completed workflow directory."""
