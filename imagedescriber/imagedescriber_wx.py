@@ -1175,6 +1175,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.Bind(wx.EVT_MENU, self.on_show_batch_progress, self.show_batch_progress_item)
         
         process_menu.AppendSeparator()
+
+        refresh_list_item = process_menu.Append(wx.ID_ANY, "&Update Image List\tF5")
+        self.Bind(wx.EVT_MENU, self.on_refresh_image_list, refresh_list_item)
+
+        process_menu.AppendSeparator()
         
         refresh_models_item = process_menu.Append(wx.ID_ANY, "Refresh AI &Models")
         self.Bind(wx.EVT_MENU, self.on_refresh_ai_models, refresh_models_item)
@@ -4960,6 +4965,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception:
             pass  # Silent failure on startup
     
+    def on_refresh_image_list(self, event):
+        """Handle Update Image List menu item / F5 — force a full list refresh."""
+        self.refresh_image_list()
+        self.SetStatusText("Image list updated", 0)
+
     def on_refresh_ai_models(self, event):
         """Handle menu item to refresh AI model cache"""
         wx.BeginBusyCursor()
