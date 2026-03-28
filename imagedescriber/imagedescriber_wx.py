@@ -901,7 +901,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         )
         self.search_ctrl.SetHint("e.g. house or garage and purpose")
         search_sizer.Add(self.search_ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 4)
-        clear_btn = wx.Button(self.search_panel, label="\u2715", size=(28, -1), name="Clear search")
+        clear_btn = wx.Button(self.search_panel, label="Clear", name="Clear search")
         search_sizer.Add(clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         self.search_panel.SetSizer(search_sizer)
         self.search_panel.Hide()
