@@ -6,6 +6,7 @@
 #define VersionFile FileOpen(SourcePath + "\\..\\..\\VERSION")
 #define MyAppVersion Trim(FileRead(VersionFile))
 #expr FileClose(VersionFile)
+#define MyFileVersion StringChange(MyAppVersion, " ", "_")
 #define MyAppPublisher "Kelly Ford"
 #define MyAppURL "https://github.com/kellylford/Image-Description-Toolkit"
 #define MyAppExeName "idt.exe"
@@ -26,7 +27,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile={#LicensePath}
 OutputDir=dist_all
-OutputBaseFilename=ImageDescriptionToolkitSetupv4.0.0Beta1
+OutputBaseFilename=ImageDescriptionToolkitSetup_{#MyFileVersion}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
