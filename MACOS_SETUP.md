@@ -119,3 +119,21 @@ After successful setup:
 - Python 3.10 or later (3.11+ recommended for Apple Silicon)
 - Xcode Command Line Tools
 - At least 2GB free disk space for all virtual environments
+
+## Optional: FFmpeg for Video GPS Data
+
+By default, video frames are extracted but carry no GPS or timestamp metadata.
+Installing FFmpeg adds `ffprobe`, which lets IDT read GPS coordinates, recording
+dates, and camera info embedded in video files (iPhone MOV, Android MP4, etc.)
+and stamp them into each extracted frame — so descriptions include location and date.
+
+**Install via Homebrew (recommended):**
+```bash
+brew install ffmpeg
+```
+
+This is optional — video frame extraction works fine without it, but GPS/date
+data from videos will not appear in descriptions. Open a **new Terminal window**
+after installing for the PATH to take effect.
+
+You can also install FFmpeg from within ImageDescriber via **Tools → Install FFmpeg**.

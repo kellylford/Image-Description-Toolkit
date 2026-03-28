@@ -102,3 +102,26 @@ cd ..
 
 REM Repeat for imagedescriber, prompt_editor, idtconfigure
 ```
+
+## Optional: FFmpeg for Video GPS Data
+
+By default, video frames are extracted but carry no GPS or timestamp metadata.
+Installing FFmpeg adds `ffprobe`, which lets IDT read GPS coordinates, recording
+dates, and camera info embedded in video files (iPhone MOV, Android MP4, etc.)
+and stamp them into each extracted frame — so descriptions include location and date.
+
+**Install via winget (recommended, built into Windows 10/11):**
+```batch
+winget install Gyan.FFmpeg
+```
+
+**Manual install:**
+1. Download the "release essentials" build from https://www.gyan.dev/ffmpeg/builds/
+2. Extract to e.g. `C:\Program Files\FFmpeg\`
+3. Add `C:\Program Files\FFmpeg\bin\` to your system PATH
+4. Open a **new** Command Prompt and verify: `ffprobe -version`
+
+This is optional — video frame extraction works fine without it, but GPS/date
+data from videos will not appear in descriptions.
+
+You can also install FFmpeg from within ImageDescriber via **Tools → Install FFmpeg**.

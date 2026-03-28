@@ -72,6 +72,19 @@ except ImportError:
     except ImportError:
         pass
 
+# Import video metadata extractor and EXIF embedder (GPS embedding into extracted frames)
+VideoMetadataExtractor = None
+ExifEmbedder = None
+try:
+    from video_metadata_extractor import VideoMetadataExtractor
+    from exif_embedder import ExifEmbedder
+except ImportError:
+    try:
+        from scripts.video_metadata_extractor import VideoMetadataExtractor
+        from scripts.exif_embedder import ExifEmbedder
+    except ImportError:
+        pass
+
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
 ProcessingCompleteEvent, EVT_PROCESSING_COMPLETE = wx.lib.newevent.NewEvent()
@@ -1508,19 +1521,41 @@ class VideoProcessingWorker(threading.Thread):
             video_dir = toolkit_dir / f"{video_path_obj.stem}_frames"
         
         video_dir.mkdir(parents=True, exist_ok=True)
-        
+
+        # Extract GPS/date metadata from the source video via ffprobe (if available).
+        # If ffprobe is absent or the video has no tags, this is a safe no-op and
+        # frame extraction continues exactly as before.
+        video_source_metadata = None
+        if VideoMetadataExtractor is not None:
+            try:
+                _vme = VideoMetadataExtractor()
+                if _vme.ffprobe_available:
+                    video_source_metadata = _vme.extract_metadata(video_path_obj)
+                    if video_source_metadata:
+                        logger.info(
+                            f"Video metadata extracted: "
+                            f"GPS={('gps' in video_source_metadata)}, "
+                            f"Date={('datetime' in video_source_metadata)}"
+                        )
+                    else:
+                        logger.info("No metadata extracted from video (no GPS/date tags found)")
+                else:
+                    logger.info("ffprobe not available; video frames will have no GPS EXIF")
+            except Exception as _e:
+                logger.warning(f"Video metadata extraction failed (non-fatal): {_e}")
+
         # Extract based on mode
         extraction_mode = self.extraction_config.get("extraction_mode", "time_interval")
         if extraction_mode == "scene_change":
-            extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir)
+            extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir, video_source_metadata)
         else:
             # Default to time_interval if mode not recognized
-            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir)
+            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir, video_source_metadata)
         
         cap.release()
         return extracted_paths, video_metadata
     
-    def _extract_by_time_interval(self, cap, fps: float, output_dir: Path) -> list:
+    def _extract_by_time_interval(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
         """Extract frames at regular time intervals"""
         import cv2
         
@@ -1571,6 +1606,16 @@ class VideoProcessingWorker(threading.Thread):
             frame_filename = f"{video_stem}_{timestamp:.2f}s.jpg"
             frame_path = output_dir / frame_filename
             cv2.imwrite(str(frame_path), frame)
+            # Embed video GPS/date into frame EXIF if metadata is available
+            if video_source_metadata and ExifEmbedder is not None:
+                try:
+                    ExifEmbedder().embed_metadata(
+                        frame_path, video_source_metadata,
+                        frame_time=timestamp,
+                        source_video_path=Path(self.video_path)
+                    )
+                except Exception as _ee:
+                    logger.debug(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
             extracted_paths.append(str(frame_path))
             
             extract_count += 1
@@ -1581,7 +1626,7 @@ class VideoProcessingWorker(threading.Thread):
         
         return extracted_paths
     
-    def _extract_by_scene_detection(self, cap, fps: float, output_dir: Path) -> list:
+    def _extract_by_scene_detection(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
         """Extract frames based on scene changes"""
         import cv2
         
@@ -1623,6 +1668,16 @@ class VideoProcessingWorker(threading.Thread):
                     frame_filename = f"{video_stem}_scene_{extract_count:04d}_{timestamp:.2f}s.jpg"
                     frame_path = output_dir / frame_filename
                     cv2.imwrite(str(frame_path), frame)
+                    # Embed video GPS/date into frame EXIF if metadata is available
+                    if video_source_metadata and ExifEmbedder is not None:
+                        try:
+                            ExifEmbedder().embed_metadata(
+                                frame_path, video_source_metadata,
+                                frame_time=timestamp,
+                                source_video_path=Path(self.video_path)
+                            )
+                        except Exception as _ee:
+                            logger.debug(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
                     extracted_paths.append(str(frame_path))
                     
                     last_extract_frame = frame_num

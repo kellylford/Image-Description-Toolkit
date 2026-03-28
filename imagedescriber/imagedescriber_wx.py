@@ -86,6 +86,19 @@ try:
 except ImportError:
     cv2 = None
 
+# Video metadata and EXIF embedding (GPS extraction from video files via ffprobe)
+VideoMetadataExtractor = None
+ExifEmbedder = None
+try:
+    from video_metadata_extractor import VideoMetadataExtractor
+    from exif_embedder import ExifEmbedder
+except ImportError:
+    try:
+        from scripts.video_metadata_extractor import VideoMetadataExtractor
+        from scripts.exif_embedder import ExifEmbedder
+    except ImportError:
+        pass
+
 try:
     import openai
 except ImportError:
@@ -636,21 +649,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         extracted_frames_dir = workspace_dir / "extracted_frames"
         video_dir = extracted_frames_dir / f"{video_path_obj.stem}"
         video_dir.mkdir(parents=True, exist_ok=True)
-        
+
+        # Extract GPS/date metadata from the source video via ffprobe (if available).
+        # If ffprobe is absent or the video has no tags, this is a safe no-op and
+        # frame extraction continues exactly as before.
+        video_source_metadata = None
+        if VideoMetadataExtractor is not None:
+            try:
+                _vme = VideoMetadataExtractor()
+                if _vme.ffprobe_available:
+                    video_source_metadata = _vme.extract_metadata(video_path_obj)
+                    if video_source_metadata:
+                        print(f"Video metadata extracted: GPS={('gps' in video_source_metadata)}, Date={('datetime' in video_source_metadata)}")
+                    else:
+                        print("No metadata extracted from video (no GPS/date tags found)")
+                else:
+                    print("ffprobe not available; video frames will have no GPS EXIF")
+            except Exception as _e:
+                print(f"Video metadata extraction failed (non-fatal): {_e}")
+
         # Extract based on mode (time_interval or scene_change)
         extraction_mode = extraction_config.get("extraction_mode", "time_interval")
         print(f"Video extraction mode: {extraction_mode}")
         print(f"Video: {frame_count} total frames, {duration:.1f}s, fps={fps:.2f}")
-        
+
         if extraction_mode == "scene_change":
-            extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir, extraction_config, video_path_obj)
+            extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir, extraction_config, video_path_obj, video_source_metadata)
         else:
-            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir, extraction_config, video_path_obj)
+            extracted_paths = self._extract_by_time_interval(cap, fps, video_dir, extraction_config, video_path_obj, video_source_metadata)
         
         cap.release()
         return extracted_paths, video_metadata
     
-    def _extract_by_time_interval(self, cap, fps: float, video_dir: Path, extraction_config: dict, video_path_obj: Path) -> list:
+    def _extract_by_time_interval(self, cap, fps: float, video_dir: Path, extraction_config: dict, video_path_obj: Path, video_source_metadata: dict = None) -> list:
         """Extract frames at time intervals"""
         import cv2
         
@@ -721,8 +752,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             frame_filename = f"{video_path_obj.stem}_frame_{extract_count:05d}.jpg"
             frame_path = video_dir / frame_filename
             cv2.imwrite(str(frame_path), frame)
+            # Embed video GPS/date into frame EXIF if metadata is available
+            if video_source_metadata and ExifEmbedder is not None:
+                try:
+                    frame_time = frame_num / fps if fps > 0 else 0.0
+                    ExifEmbedder().embed_metadata(
+                        frame_path, video_source_metadata,
+                        frame_time=frame_time,
+                        source_video_path=video_path_obj
+                    )
+                except Exception as _ee:
+                    print(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
             extracted_paths.append(str(frame_path))
-            
+
             with open(log_file, 'a') as f:
                 f.write(f" OK, saved as {frame_filename}\n")
             
@@ -738,7 +780,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         
         return extracted_paths
     
-    def _extract_by_scene_detection(self, cap, fps: float, video_dir: Path, extraction_config: dict, video_path_obj: Path) -> list:
+    def _extract_by_scene_detection(self, cap, fps: float, video_dir: Path, extraction_config: dict, video_path_obj: Path, video_source_metadata: dict = None) -> list:
         """Extract frames based on scene changes"""
         import cv2
         
@@ -777,8 +819,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     frame_filename = f"{video_path_obj.stem}_scene_{extract_count:04d}.jpg"
                     frame_path = video_dir / frame_filename
                     cv2.imwrite(str(frame_path), frame)
+                    # Embed video GPS/date into frame EXIF if metadata is available
+                    if video_source_metadata and ExifEmbedder is not None:
+                        try:
+                            frame_time = frame_num / fps if fps > 0 else 0.0
+                            ExifEmbedder().embed_metadata(
+                                frame_path, video_source_metadata,
+                                frame_time=frame_time,
+                                source_video_path=video_path_obj
+                            )
+                        except Exception as _ee:
+                            print(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
                     extracted_paths.append(str(frame_path))
-                    
+
                     last_extract_frame = frame_num
                     extract_count += 1
             
@@ -1239,7 +1292,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Ollama installation helper
         install_ollama_item = tools_menu.Append(wx.ID_ANY, "Install &Ollama...")
         self.Bind(wx.EVT_MENU, self.on_install_ollama, install_ollama_item)
-        
+
+        install_ffmpeg_item = tools_menu.Append(wx.ID_ANY, "Install &FFmpeg (for video GPS)...")
+        self.Bind(wx.EVT_MENU, self.on_install_ffmpeg, install_ffmpeg_item)
+
         tools_menu.AppendSeparator()
         
         export_config_item = tools_menu.Append(wx.ID_ANY, "E&xport Configuration...")
@@ -5376,7 +5432,106 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             from shared.wx_common import show_error
             show_error(self, f"Error checking Ollama status:\n{e}")
-    
+
+    def on_install_ffmpeg(self, event):
+        """Help user install FFmpeg (ffprobe) for video GPS/metadata extraction"""
+        try:
+            # Check if ffprobe is already available
+            ffprobe_path = shutil.which('ffprobe')
+            if ffprobe_path:
+                try:
+                    result = subprocess.run(
+                        ['ffprobe', '-version'],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    version_line = result.stdout.split('\n')[0] if result.stdout else 'installed'
+                except Exception:
+                    version_line = 'installed'
+
+                show_info(self, "FFmpeg Status",
+                         f"FFmpeg (ffprobe) is already installed!\n\n"
+                         f"Version: {version_line}\n"
+                         f"Location: {ffprobe_path}\n\n"
+                         "GPS coordinates and timestamps from video files will automatically\n"
+                         "be embedded into extracted frames and included in descriptions.")
+                return
+
+            # ffprobe not found — offer installation help
+            if sys.platform == 'darwin':
+                msg = (
+                    "FFmpeg is not installed. Without it, video frames will be extracted\n"
+                    "but GPS location and date/time will not be embedded.\n\n"
+                    "Installation Options:\n\n"
+                    "1. Copy 'brew install ffmpeg' to clipboard\n"
+                    "   Paste into Terminal and press Enter\n\n"
+                    "2. Open ffmpeg.org download page in browser\n\n"
+                    "After installing, open a NEW Terminal window for PATH to take effect,\n"
+                    "then restart ImageDescriber."
+                )
+                dlg = wx.MessageDialog(
+                    self, msg, "Install FFmpeg",
+                    wx.YES_NO | wx.CANCEL | wx.ICON_QUESTION
+                )
+                dlg.SetYesNoCancelLabels("&Copy brew Command", "&Open Website", "Cancel")
+                result = dlg.ShowModal()
+                dlg.Destroy()
+
+                if result == wx.ID_YES:
+                    install_cmd = "brew install ffmpeg"
+                    if wx.TheClipboard.Open():
+                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
+                        wx.TheClipboard.Close()
+                    show_info(self, "Command Copied",
+                             f"Copied to clipboard:\n\n{install_cmd}\n\n"
+                             "1. Open Terminal\n"
+                             "2. Paste (Cmd+V) and press Enter\n"
+                             "3. Open a NEW Terminal window after install completes\n"
+                             "4. Restart ImageDescriber to enable GPS extraction")
+                elif result == wx.ID_NO:
+                    webbrowser.open('https://ffmpeg.org/download.html')
+
+            elif sys.platform == 'win32':
+                msg = (
+                    "FFmpeg is not installed. Without it, video frames will be extracted\n"
+                    "but GPS location and date/time will not be embedded.\n\n"
+                    "Installation Options:\n\n"
+                    "1. Copy 'winget install Gyan.FFmpeg' to clipboard\n"
+                    "   Paste into Command Prompt or PowerShell and press Enter\n\n"
+                    "2. Open gyan.dev download page (pre-built Windows binaries)\n\n"
+                    "After installing, open a NEW Command Prompt for PATH to take effect,\n"
+                    "then restart ImageDescriber."
+                )
+                dlg = wx.MessageDialog(
+                    self, msg, "Install FFmpeg",
+                    wx.YES_NO | wx.CANCEL | wx.ICON_QUESTION
+                )
+                dlg.SetYesNoCancelLabels("&Copy winget Command", "&Open Download Page", "Cancel")
+                result = dlg.ShowModal()
+                dlg.Destroy()
+
+                if result == wx.ID_YES:
+                    install_cmd = "winget install Gyan.FFmpeg"
+                    if wx.TheClipboard.Open():
+                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
+                        wx.TheClipboard.Close()
+                    show_info(self, "Command Copied",
+                             f"Copied to clipboard:\n\n{install_cmd}\n\n"
+                             "1. Open Command Prompt or PowerShell\n"
+                             "2. Paste (Ctrl+V) and press Enter\n"
+                             "3. Open a NEW Command Prompt after install completes\n"
+                             "4. Restart ImageDescriber to enable GPS extraction")
+                elif result == wx.ID_NO:
+                    webbrowser.open('https://www.gyan.dev/ffmpeg/builds/')
+
+            else:
+                show_info(self, "Install FFmpeg",
+                         "Please install FFmpeg using your system package manager.\n\n"
+                         "Example: sudo apt install ffmpeg\n\n"
+                         "After installing, restart ImageDescriber.")
+
+        except Exception as e:
+            show_error(self, f"Error checking FFmpeg status:\n{e}")
+
     def on_export_configuration(self, event):
         """Export all configuration files as backup"""
         try:

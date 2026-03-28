@@ -39,6 +39,11 @@ beautifulsoup4>=4.9.0   # HTML parsing for web image extraction
 # ----------------------------------------------------------------------------
 opencv-python>=4.8.0    # Video frame extraction
 numpy>=1.24.0           # Array operations (required by opencv-python)
+# NOTE: ffprobe (part of FFmpeg) is an OPTIONAL system dependency — not a pip package.
+# Without it, video frames are extracted but GPS/date EXIF is not embedded.
+# Install via:  Windows: winget install Gyan.FFmpeg
+#               macOS:   brew install ffmpeg
+# See WINDOWS_SETUP.md / MACOS_SETUP.md for details.
 
 # ----------------------------------------------------------------------------
 # HEIC IMAGE SUPPORT (scripts/ConvertImage.py only)
