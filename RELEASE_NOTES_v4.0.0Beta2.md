@@ -2,7 +2,7 @@
 
 **Release Date:** March 28, 2026  
 **Version:** 4.0.0 Beta 2  
-**Status:** 🧪 Beta — feedback welcome
+**Status:**  Beta — feedback welcome
 
 ---
 
