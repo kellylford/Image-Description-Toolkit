@@ -59,6 +59,7 @@ Also in video:
 ### Bug Fixes
 
 - **Prompt editor** was saving prompts inside the application bundle instead of the user config directory — prompts were lost on reinstall. Fixed.
+- **Update Image List (F5)** — added to the Process menu. During a batch run the image list is not refreshed per-image (intentional, avoids UI lag at scale). F5 lets you manually trigger a refresh at any point to see which images have been described so far (`d1`, `d2` prefixes).
 - Integration test suite stabilized for CI reliability.
 
 ---
