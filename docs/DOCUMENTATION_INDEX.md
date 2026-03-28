@@ -1,16 +1,15 @@
-# Documentation Index - v4.1.0
+# Documentation Index - v4.0.0Beta2
 
-**Last Updated:** January 14, 2026 | **Version:** 4.1.0
+**Last Updated:** March 28, 2026 | **Version:** 4.0.0Beta2
 
 ---
 
 ## 📖 User Documentation
 
 ### Getting Started
-- **[README.md](README.md)** - Project overview, installation, quick start
-- **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user guide for all applications
-- **[MACOS_USER_GUIDE.md](MACOS_USER_GUIDE.md)** - macOS-specific user guide
-- **[WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md)** - Downloading models and resources
+- **[USER_GUIDE_COMPLETE.md](USER_GUIDE_COMPLETE.md)** ⭐ - The authoritative user guide — start here
+- **[README.md](README.md)** - Project overview and quick start
+- **[WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md)** - Downloading images from websites
 
 ### Configuration & Setup
 - **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Configuration file reference and setup
@@ -18,9 +17,13 @@
 - **[MACOS_SETUP.md](../MACOS_SETUP.md)** - macOS installation and setup
 
 ### Feature Guides
-- **[PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md)** - Writing effective prompts for AI descriptions
+- **[PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md)** - Detailed prompt engineering reference
 - **[HUGGINGFACE_PROVIDER_GUIDE.md](HUGGINGFACE_PROVIDER_GUIDE.md)** - Using HuggingFace models
-- **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - Complete command-line interface reference
+
+### Superseded Documents
+- **[USER_GUIDE.md](USER_GUIDE.md)** - ⚠️ Superseded by USER_GUIDE_COMPLETE.md
+- **[MACOS_USER_GUIDE.md](MACOS_USER_GUIDE.md)** - ⚠️ Superseded by USER_GUIDE_COMPLETE.md
+- **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - ⚠️ Superseded by USER_GUIDE_COMPLETE.md
 
 ### Release Information
 - **[WHATS_NEW_v4.1.0.md](WHATS_NEW_v4.1.0.md)** - What's new in v4.1.0

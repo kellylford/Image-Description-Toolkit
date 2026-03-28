@@ -1,3 +1,5 @@
+> ⚠️ This document has been superseded by [USER_GUIDE_COMPLETE.md](USER_GUIDE_COMPLETE.md).
+
 # IDT Complete Application Reference
 
 Comprehensive reference for all Image Description Toolkit applications and commands

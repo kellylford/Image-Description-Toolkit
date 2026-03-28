@@ -1,3 +1,5 @@
+> ⚠️ This document has been superseded by [USER_GUIDE_COMPLETE.md](USER_GUIDE_COMPLETE.md).
+
 # Image Description Toolkit (IDT) - User Guide
 
 ## Overview

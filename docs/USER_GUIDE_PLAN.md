@@ -390,6 +390,8 @@ Key file alternatives (simpler for GUI users):
 | `simple` | Plain language, minimal jargon |
 
 Select at run time: `--prompt-style colorful`, or in the GUI sidebar before pressing P. Set a permanent default in `image_describer_config.json` or via the Configuration Manager.
+KF: we should include the text al all existing prompts.
+
 
 **Section 21: Writing Custom Prompts**
 
