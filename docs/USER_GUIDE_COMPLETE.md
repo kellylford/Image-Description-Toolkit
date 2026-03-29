@@ -54,7 +54,7 @@ IDT is for the situation where you have **dozens, hundreds, or thousands of phot
 | **IDT** (`idt` / `idt.exe`) | Command-line batch workflows, automation, large-scale processing |
 | **ImageDescriber** | Interactive sessions: per-image control, multiple descriptions, follow-up questions, built-in chat |
 
-Both tools support local AI models (free, private, no internet required) and cloud AI models (OpenAI, Claude). The same images can be processed through multiple models and prompts; results accumulate rather than overwrite.
+Both tools support local AI models (free, private, no internet required) and cloud AI models (OpenAI, Claude, and Ollama cloud models). The same images can be processed through multiple models and prompts; results accumulate rather than overwrite.
 
 ---
 
@@ -109,7 +109,7 @@ Ollama runs AI models entirely on your machine. No API key, no internet connecti
 
 After installation, Ollama runs as a background service automatically.
 
-**Download your first model.** Moondream is recommended for new users — it is fast (under 2 seconds per image on most hardware) and only 1.7 GB:
+**Download your first model.** Moondream is recommended for new users — it is fast and only 1.7 GB. Run this in Terminal (macOS) or Command Prompt (Windows):
 
 ```
 ollama pull moondream
@@ -127,14 +127,36 @@ Other models to consider:
 
 To see all models you have installed: `ollama list`
 
-Ollama automatically uses your GPU if one is available (NVIDIA CUDA on Windows/Linux, Apple Metal on Mac). No configuration is needed.
-
 > **Apple Silicon (M1/M2/M3/M4 Mac):** IDT also supports the MLX provider, which runs vision models natively using Apple's Metal framework and is optimized for Apple Silicon. MLX is available as a provider option within ImageDescriber and delivers fast, high-quality results without Ollama. See Section 19 for more on choosing providers.
+
+### Ollama Cloud Models — Free Tier and Subscription
+
+Although Ollama started by making AI models available for local use, and this remains a cornerstone of what they offer, Ollama is increasingly making cloud models available. These run entirely in Ollama's infrastructure, so processing is not limited by the memory or hardware of your local computer — making high-quality models accessible on virtually any machine.
+
+Ollama cloud models include a limited amount of free use and a significantly greater allowance with a subscription (around $20/month — check [ollama.com](https://ollama.com) for current pricing). Token allowances reset on a rolling basis. As a rough example, one test run of 10,000 images used approximately 9% of a weekly token allowance — but Ollama does not publish specific limits, so treat this as illustrative.
+
+**Once set up, Ollama cloud models work identically to local models in IDT.** You select them from the same model list, use them with the same prompts, and see results the same way. There is no distinction in the interface.
+
+Browse available cloud models at: [ollama.com/search?c=cloud](https://ollama.com/search?c=cloud)
+
+A standout example is `kimi-k2.5` — it produces exceptionally detailed, high-quality descriptions at approximately 15 seconds per image, regardless of your local hardware.
+
+**First-time setup for an Ollama cloud model:**
+
+1. In Terminal (macOS) or Command Prompt (Windows), run:
+
+   ```
+   ollama run kimi-k2.5:cloud
+   ```
+
+2. The first time you use a cloud model, Ollama will display a URL. Open it in your browser to authorize your machine against your Ollama account.
+3. After authorization, pull and use cloud models exactly like local ones — select them by name in IDT.
 
 ### OpenAI — Cloud, Paid
 
 1. Create an account at [platform.openai.com](https://platform.openai.com) and obtain an API key.
-2. Make the key available to IDT using either method:
+2. Make the key available to IDT using any of these methods:
+   - **ImageDescriber:** Open `Tools → Configure Settings` and enter your key in the OpenAI section. This is the easiest option.
    - **Environment variable:**
      - macOS: `export OPENAI_API_KEY="sk-..."` (add to `~/.zprofile` for persistence)
      - Windows: Set `OPENAI_API_KEY` in System → Environment Variables
@@ -146,7 +168,8 @@ Token usage (and therefore cost) is recorded with each description. See [Section
 ### Anthropic Claude — Cloud, Paid
 
 1. Create an account at [console.anthropic.com](https://console.anthropic.com) and obtain an API key.
-2. Make the key available:
+2. Make the key available using any of these methods:
+   - **ImageDescriber:** Open `Tools → Configure Settings` and enter your key in the Claude section. This is the easiest option.
    - **Environment variable:** `ANTHROPIC_API_KEY`
    - **Key file:** `~/claude.txt` containing only the key
 3. Available models include Claude 3.5 Haiku (fast, economical), Claude 3.5 Sonnet (balanced), and Claude Opus (highest quality).
@@ -894,8 +917,13 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 - LLaVA 7B: 2–3 seconds per image
 - LLaVA 13B: 3–5 seconds per image
 - llama3.2-vision: 5–15 seconds per image depending on hardware
-- Ollama uses your GPU automatically (NVIDIA CUDA on Windows/Linux, Apple Metal on Apple Silicon Mac). No configuration required.
 - First request after Ollama has been idle causes a model reload. This is normal; subsequent requests are fast.
+
+### Ollama Cloud Models
+
+- Processing happens in Ollama's cloud, so local hardware has no impact on speed or model availability
+- `kimi-k2.5`: approximately 15 seconds per image, exceptional description quality
+- Token allowances reset on a rolling basis; limits are not publicly documented — as one example, 10,000 images used approximately 9% of a weekly allowance (see [ollama.com](https://ollama.com) for current plan details)
 
 ### Cloud Models
 
