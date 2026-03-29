@@ -1,132 +1,234 @@
-# 📚 Documentation Index
+# Documentation Index - v4.0.0Beta2
 
-## 🎯 Current Documentation Status: **COMPREHENSIVE** ✅
+**Last Updated:** March 28, 2026 | **Version:** 4.0.0Beta2
 
-All build and runtime issues have been resolved, and the toolkit is fully documented for both users and developers.
+---
 
 ## 📖 User Documentation
 
 ### Getting Started
-- **[README.md](../README.md)** - Main project overview and features
-- **[QUICK_START.md](../QUICK_START.md)** - Fast setup and basic usage
-- **[docs/USER_GUIDE.md](USER_GUIDE.md)** - Complete user guide with examples
+- **[USER_GUIDE_COMPLETE.md](USER_GUIDE_COMPLETE.md)** ⭐ - The authoritative user guide — start here
+- **[README.md](README.md)** - Project overview and quick start
+- **[WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md)** - Downloading images from websites
 
-### Usage Guides  
-- **[CHANGELOG.md](../CHANGELOG.md)** - Version history and changes
-- **Batch Files** - Ready-to-use commands in `bat_exe/` directory
-  - `run_ollama_*.bat` - Local Ollama models
-  - `run_claude_*.bat` - Claude AI models  
-  - `run_openai_*.bat` - OpenAI models
+### Configuration & Setup
+- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Configuration file reference and setup
+- **[WINDOWS_SETUP.md](../WINDOWS_SETUP.md)** - Windows installation and setup
+- **[MACOS_SETUP.md](../MACOS_SETUP.md)** - macOS installation and setup
 
-## 🛠️ Developer Documentation
+### Feature Guides
+- **[PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md)** - Detailed prompt engineering reference
+- **[HUGGINGFACE_PROVIDER_GUIDE.md](HUGGINGFACE_PROVIDER_GUIDE.md)** - Using HuggingFace models
+
+### Superseded Documents
+- **[USER_GUIDE.md](USER_GUIDE.md)** - ⚠️ Superseded by USER_GUIDE_COMPLETE.md
+- **[MACOS_USER_GUIDE.md](MACOS_USER_GUIDE.md)** - ⚠️ Superseded by USER_GUIDE_COMPLETE.md
+- **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - ⚠️ Superseded by USER_GUIDE_COMPLETE.md
+
+### Release Information
+- **[WHATS_NEW_v4.1.0.md](WHATS_NEW_v4.1.0.md)** - What's new in v4.1.0
+- **[WHATS_NEW_v3.6.0.md](WHATS_NEW_v3.6.0.md)** - What's new in v3.6.0
+- **[WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md)** - What's new in v3.5.0
+
+---
+
+## 👨‍💻 Developer Documentation
 
 ### Architecture & Design
-- **[docs/RESOURCE_MANAGER.md](RESOURCE_MANAGER.md)** - **NEW!** Core path resolution system
-- **[docs/EXECUTABLE_FIRST_DEVELOPMENT.md](EXECUTABLE_FIRST_DEVELOPMENT.md)** - **NEW!** Development workflow
-- **[final_working.spec](../final_working.spec)** - PyInstaller build configuration
+- **[ARCHITECTURE_SEARCH_RESULTS.md](ARCHITECTURE_SEARCH_RESULTS.md)** - Codebase architecture overview
+- **[AI_ONBOARDING.md](AI_ONBOARDING.md)** - AI agent onboarding and project context
+
+### Research & Experiments
+- **[NPU_ACCELERATION_EXPERIMENT.md](NPU_ACCELERATION_EXPERIMENT.md)** - NPU/DirectML acceleration testing (Feb 2026, negative results)
 
 ### Build & Deployment
-- **[build_executable.sh](../build_executable.sh)** - **NEW!** Automated build script
-- **[test_executable.py](../test_executable.py)** - **NEW!** Executable validation tests
-- **[EXECUTABLE_BUILD_SUMMARY.md](../EXECUTABLE_BUILD_SUMMARY.md)** - Build process documentation
+- **[BUILD_MACOS.md](BUILD_MACOS.md)** - macOS build process
+- **[BuildAndRelease/BUILD_SYSTEM_REFERENCE.md](../BuildAndRelease/BUILD_SYSTEM_REFERENCE.md)** - Complete build system reference
+- **[BuildAndRelease/README.md](../BuildAndRelease/README.md)** - Build and release overview
 
-### Component Documentation
-- **[analysis/README.md](../analysis/README.md)** - Analysis tools documentation
-- **[models/README.md](../models/README.md)** - Model checking utilities
-- **[prompt_editor/README.md](../prompt_editor/README.md)** - Prompt customization
+### Code Quality & Testing
+- **[ACCESSIBLE_LISTBOX_INTEGRATION_GUIDE.md](ACCESSIBLE_LISTBOX_INTEGRATION_GUIDE.md)** - Accessible UI component implementation
+- **[code_audit/](code_audit/)** - Code audit reports and analysis
 
-### Historical Documentation
-- **[docs/archive/](archive/)** - Previous documentation versions
-  - Build guides, distribution strategies, troubleshooting guides
-  - Kept for historical reference and lessons learned
+### Work Tracking
+- **[WorkTracking/](WorkTracking/)** - Session summaries and work progress tracking
 
-## 🎯 Key Documentation Highlights
+---
 
-### 🆕 **NEW: Resource Manager** 
-**[docs/RESOURCE_MANAGER.md](RESOURCE_MANAGER.md)** - The revolutionary solution that makes IDT work seamlessly in both development and executable modes.
+## 📦 Project Files
 
-**What it solves:**
-- ✅ Configuration file loading in PyInstaller executables
-- ✅ Output file creation in correct locations  
-- ✅ Path resolution across different execution contexts
-- ✅ Portable executable distribution
+### Configuration
+- **[pyproject.toml](../pyproject.toml)** - Project metadata and dependencies
+- **[requirements.txt](../requirements.txt)** - Python package requirements
+- **[VERSION](../VERSION)** - Current version number
 
-**Key Features:**
-- **Automatic context detection** (development vs executable)
-- **Unified API** for all file operations
-- **Smart path resolution** for inputs and outputs
-- **Helpful error messages** with search paths
+### Version Control
+- **[CHANGELOG.md](../CHANGELOG.md)** - Complete change history
+- **[BRANCH_INFO.md](../BRANCH_INFO.md)** - Git branch information
+- **[LICENSE](../LICENSE)** - Project license
 
-### 🆕 **NEW: Executable-First Development**
-**[docs/EXECUTABLE_FIRST_DEVELOPMENT.md](EXECUTABLE_FIRST_DEVELOPMENT.md)** - Complete guide for developing and maintaining IDT as an executable-first application.
+### Release Notes
+- **[RELEASE_NOTES_v4.1.0.md](../RELEASE_NOTES_v4.1.0.md)** - v4.1.0 release notes
+- **[RELEASES_README.md](../RELEASES_README.md)** - Release process documentation
 
-**Covers:**
-- ✅ Development workflow prioritizing executable testing
-- ✅ Best practices for PyInstaller compatibility
-- ✅ Troubleshooting guide for common issues
-- ✅ Testing strategies and success metrics
+---
 
-## 🔧 Build System Documentation
+## 🗂️ Directory Structure
 
-### Automated Build Process
-```bash
-# Complete build and test cycle
-./build_executable.sh          # Automated build
-python test_executable.py      # Validation tests
+### Source Code
+```
+scripts/              - Core workflow and image processing scripts
+imagedescriber/       - GUI batch processor (wxPython)
+viewer/              - Workflow results browser (wxPython)
+prompt_editor/       - Prompt template editor (wxPython)
+idtconfigure/        - Configuration manager (wxPython)
+idt/                 - CLI dispatcher
+shared/              - Shared utilities across all applications
+analysis/            - Analysis and reporting tools
+models/              - AI model provider implementations
+MetaData/            - EXIF and metadata handling
 ```
 
-### Manual Build Process  
-```bash
-# Manual build (if needed)
-python -m PyInstaller final_working.spec
+### Documentation
+```
+docs/                - User and developer documentation
+docs/archive/        - Legacy documentation
+docs/code_audit/     - Code analysis reports
+docs/packaging/      - Packaging and distribution info
+docs/WorkTracking/   - Session summaries and progress
 ```
 
-### Build Configuration
-- **[final_working.spec](../final_working.spec)** - Comprehensive PyInstaller configuration
-  - Hidden imports for all required modules
-  - Data file inclusion for configs and resources
-  - Optimized exclusions to reduce size
+### Testing & Build
+```
+pytest_tests/        - Unit and integration tests
+BuildAndRelease/     - Build scripts and processes
+testimages/          - Test images for development
+```
 
-## 📊 Current Status Summary
+---
 
-### ✅ **FULLY DOCUMENTED:**
-1. **User Experience** - Complete guides for end users
-2. **Developer Workflow** - Full development documentation  
-3. **Build Process** - Automated and manual build guides
-4. **Architecture** - Core systems (resource manager) documented
-5. **Troubleshooting** - Common issues and solutions
-6. **Testing** - Validation and quality assurance
+## 🎯 Quick Reference
 
-### ✅ **INFRASTRUCTURE COMPLETE:**
-1. **Resource Manager** - Solves all path resolution issues
-2. **Build Automation** - Reliable, repeatable builds
-3. **Test Validation** - Automated executable testing
-4. **Development Guidelines** - Clear best practices
+### Common Tasks
 
-### ✅ **ALL ISSUES RESOLVED:**
-1. **Batch File Arguments** - Flexible argument support ✅
-2. **PyInstaller Build** - All modules included ✅  
-3. **Workflow Commands** - Full functionality ✅
-4. **Analysis Tools** - Correct output locations ✅
-5. **Path Resolution** - Works in all contexts ✅
+**Running Workflows:**
+```bash
+idt workflow --provider ollama --model llava testimages/
+```
 
-## 🚀 For New Developers
+**Batch Processing:**
+```bash
+ImageDescriber.exe   # or ./dist/ImageDescriber on macOS
+```
 
-**Start here:**
-1. Read **[docs/USER_GUIDE.md](USER_GUIDE.md)** to understand the toolkit
-2. Review **[docs/RESOURCE_MANAGER.md](RESOURCE_MANAGER.md)** to understand the architecture
-3. Follow **[docs/EXECUTABLE_FIRST_DEVELOPMENT.md](EXECUTABLE_FIRST_DEVELOPMENT.md)** for development workflow
-4. Use **[build_executable.sh](../build_executable.sh)** and **[test_executable.py](../test_executable.py)** for testing
+**Viewing Results:**
+```bash
+Viewer.exe          # or ./dist/Viewer on macOS
+```
 
-## 🎉 Documentation Achievement
+**Configuration:**
+```bash
+ImageDescriber.exe   # Open Tools → Configure Settings (or on macOS: ImageDescriber.app)
+```
 
-The Image Description Toolkit now has **comprehensive, production-ready documentation** covering:
+**Building from Source:**
+```bash
+# Windows
+BuildAndRelease\WinBuilds\builditall_wx.bat
 
-- ✅ **Complete user guides** from basic to advanced usage
-- ✅ **Full developer documentation** with clear workflows  
-- ✅ **Architectural documentation** of core systems
-- ✅ **Build and deployment guides** for reliable distribution
-- ✅ **Troubleshooting guides** for common issues
-- ✅ **Historical documentation** preserving lessons learned
+# macOS
+./BuildAndRelease/MacBuilds/builditall_macos.command
+```
 
-**The toolkit is ready for production use with full documentation support!** 🎯
+---
+
+## 📚 By Topic
+
+### AI Providers
+- Configuration: [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)
+- HuggingFace Setup: [HUGGINGFACE_PROVIDER_GUIDE.md](HUGGINGFACE_PROVIDER_GUIDE.md)
+- API Keys: [USER_GUIDE.md](USER_GUIDE.md#api-keys-and-authentication)
+- Model Selection: [WHATS_NEW_v4.1.0.md](WHATS_NEW_v4.1.0.md#supported-providers)
+
+### GUI Applications
+- ImageDescriber: [USER_GUIDE.md](USER_GUIDE.md#imagedescriber-app)
+- Viewer: [USER_GUIDE.md](USER_GUIDE.md#viewer-app)
+- PromptEditor: [USER_GUIDE.md](USER_GUIDE.md#prompt-editor)
+- IDTConfigure: [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)
+
+### Command-Line Interface
+- Full Reference: [CLI_REFERENCE.md](CLI_REFERENCE.md)
+- Workflows: [CLI_REFERENCE.md](CLI_REFERENCE.md#workflow-command)
+- Analysis: [CLI_REFERENCE.md](CLI_REFERENCE.md#analysis-commands)
+
+### Development
+- Architecture: [ARCHITECTURE_SEARCH_RESULTS.md](ARCHITECTURE_SEARCH_RESULTS.md)
+- Building: [BUILD_MACOS.md](BUILD_MACOS.md) or [WINDOWS_SETUP.md](../WINDOWS_SETUP.md)
+- Testing: [pytest_tests/](../pytest_tests/)
+- Contributing: See [README.md](README.md#contributing)
+
+---
+
+## 🔍 Searching Documentation
+
+### By Feature
+- **Image Processing**: [WHATS_NEW_v4.1.0.md](WHATS_NEW_v4.1.0.md)
+- **Video to Images**: [CLI_REFERENCE.md](CLI_REFERENCE.md)
+- **Batch Processing**: [USER_GUIDE.md](USER_GUIDE.md#batch-processing)
+- **Prompt Customization**: [PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md)
+
+### By Problem
+- **Setup Issues**: Start with [WINDOWS_SETUP.md](../WINDOWS_SETUP.md) or [MACOS_SETUP.md](../MACOS_SETUP.md)
+- **Configuration**: [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)
+- **AI Provider Issues**: [HUGGINGFACE_PROVIDER_GUIDE.md](HUGGINGFACE_PROVIDER_GUIDE.md)
+- **Build Failures**: [BuildAndRelease/BUILD_SYSTEM_REFERENCE.md](../BuildAndRelease/BUILD_SYSTEM_REFERENCE.md)
+
+---
+
+## 📝 Documentation Changes in v4.1.0
+
+### Updated
+- **README.md** - Version updated to v4.1.0, installer references updated
+- **CHANGELOG.md** - v4.1.0 entry added with comprehensive change list
+- **USER_GUIDE.md** - wxPython GUI updates (in progress)
+- **CONFIGURATION_GUIDE.md** - Frozen mode notes added (in progress)
+
+### New
+- **WHATS_NEW_v4.1.0.md** - Comprehensive v4.1.0 release documentation
+- **RELEASE_NOTES_v4.1.0.md** - Detailed release notes with installation guide
+
+### Archived
+- Legacy PyQt6 documentation moved to `docs/archive/`
+- See [Legacy Documentation](#-legacy-documentation) below
+
+---
+
+## 🏛️ Legacy Documentation
+
+Legacy documentation from pre-wxPython versions is archived in `docs/archive/`:
+- Original PyQt6 architecture documentation
+- Previous version release notes and change logs
+- Historical implementation notes
+- Deprecated feature documentation
+
+**Note:** These documents are for historical reference only. Use current documentation for development and deployment.
+
+---
+
+## 📞 Getting Help
+
+1. **Check the USER_GUIDE.md** - Most questions answered there
+2. **Review relevant How-To guides** - Listed by topic above
+3. **Check troubleshooting in CLI_REFERENCE.md** - Common issues and solutions
+4. **Browse WHATS_NEW files** - Recent changes and improvements
+5. **Report issues on GitHub** - If you find a problem
+
+---
+
+## ✨ Version Information
+
+**Current Release:** v4.1.0 (January 14, 2026)
+**Latest Documentation:** Updated for v4.1.0
+
+For version history, see [CHANGELOG.md](../CHANGELOG.md)
+
