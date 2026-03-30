@@ -451,7 +451,9 @@ class VideoFrameExtractor:
         extracted_files = []
         
         for i, frame_info in enumerate(frames):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_info.frame_num)
+            # Use time-based seeking: MPEG and many other containers silently
+            # ignore CAP_PROP_POS_FRAMES, but honour CAP_PROP_POS_MSEC.
+            cap.set(cv2.CAP_PROP_POS_MSEC, frame_info.timestamp * 1000.0)
             ret, frame = cap.read()
             
             if not ret:
@@ -520,12 +522,19 @@ class VideoFrameExtractor:
             return []
         
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            # MPEG and some AVI containers report fps=0; fall back so
+            # downstream arithmetic doesn't divide by zero or produce a
+            # zero-frame range.
+            self.logger.warning("Video FPS not detected (reported 0); using 1.0 fps fallback")
+            fps = 1.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps if fps > 0 else 0
+        duration = total_frames / fps
         
         start_frame = int(fps * self.config["start_time_seconds"])
         end_frame = int(fps * self.config["end_time_seconds"]) if self.config["end_time_seconds"] else total_frames
-        min_scene_frames = int(fps * self.config["min_scene_duration_seconds"])
+        # Guard: fps fallback means min_scene_frames could be 0 or 1; force >=1.
+        min_scene_frames = max(1, int(fps * self.config["min_scene_duration_seconds"]))
         
         self.logger.info(f"Video properties: duration={duration:.1f}s, fps={fps:.1f}, total_frames={total_frames}")
         self.logger.info(f"Scene detection settings: threshold={self.config['scene_change_threshold']}%, min_duration={self.config['min_scene_duration_seconds']}s")

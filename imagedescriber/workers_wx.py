@@ -1668,8 +1668,13 @@ class VideoProcessingWorker(threading.Thread):
             cap.release()
             cap_was_released = True
             
+            # detect_scenes calls its progress callback as (current, total, message).
+            # _post_progress only accepts a single message string, so wrap it.
+            def _scene_progress(current, total, msg):
+                self._post_progress(msg)
+            
             # Detect scenes
-            frames = detector.detect_scenes(self.video_path, self._post_progress)
+            frames = detector.detect_scenes(self.video_path, _scene_progress)
             
             if not frames:
                 self._post_progress("No scenes detected, falling back to time interval")
@@ -1684,7 +1689,9 @@ class VideoProcessingWorker(threading.Thread):
             video_stem = Path(self.video_path).stem
             
             for i, frame_info in enumerate(frames):
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_info.frame_num)
+                # Use time-based seeking: MPEG and many other containers silently
+                # ignore CAP_PROP_POS_FRAMES, but honour CAP_PROP_POS_MSEC.
+                cap.set(cv2.CAP_PROP_POS_MSEC, frame_info.timestamp * 1000.0)
                 ret, frame = cap.read()
                 
                 if not ret:
@@ -1720,22 +1727,28 @@ class VideoProcessingWorker(threading.Thread):
             return self._extract_by_scene_detection_basic(cap, fps, output_dir, video_source_metadata)
     
     def _extract_by_scene_detection_basic(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
-        """Basic scene change detection (fallback)"""
+        """Basic scene change detection (fallback when enhanced detector is unavailable).
+
+        Reads frames sequentially — no seeking — so it works on MPEG and other
+        containers that don't support random access.  Applied caps:
+        - min_frame_gap: enforces at least min_scene_duration seconds between saves
+        - max_frames: hard stop at the configured maximum (default 50) so a
+          highly-dynamic video can't produce thousands of output frames
+        """
         import cv2
         import numpy as np
         
-        # Threshold is configured in the 0-100 range (e.g. 30 = "30% of pixels
-        # changed significantly").  Use a pixel-count percentage metric to match
-        # this scale — the old code divided by 100 and compared against
-        # mean_diff/255 which rarely exceeds 0.10, making the threshold
-        # effectively unreachable.
+        # Threshold in 0-100 range: percentage of pixels that must change
+        # significantly.  Matches the metric in enhanced_scene_detector.
         threshold = self.extraction_config.get("scene_change_threshold", 30)  # 0-100
         min_duration = self.extraction_config.get("min_scene_duration_seconds", 1)
+        max_frames = self.extraction_config.get("max_frames_per_video", 50) or 50
         
         extracted_paths = []
         prev_frame = None
         last_extract_frame = -1
-        min_frame_gap = int(fps * min_duration) if fps > 0 else 1
+        # Guard: fps=1.0 is a container fallback; ensure at least a 1-frame gap.
+        min_frame_gap = max(1, int(fps * min_duration)) if fps > 0 else 1
         frame_num = 0
         extract_count = 0
         
@@ -1746,13 +1759,15 @@ class VideoProcessingWorker(threading.Thread):
             if not ret:
                 break
             
+            if extract_count >= max_frames:
+                logger.info(f"Basic scene detection: reached max_frames cap ({max_frames})")
+                break
+            
             if prev_frame is not None:
                 gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 gray_prev = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
                 diff = cv2.absdiff(gray_current, gray_prev)
                 # Percentage of pixels that changed by more than 30/255 (~12%).
-                # This matches the metric used in enhanced_scene_detector so the
-                # user-facing threshold value means the same thing in both paths.
                 change_score = (np.sum(diff > 30) / diff.size) * 100
                 
                 if (change_score > threshold and frame_num - last_extract_frame >= min_frame_gap):

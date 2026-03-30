@@ -650,8 +650,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Get video properties
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            # MPEG and some AVI containers report fps=0; fall back so
+            # downstream arithmetic doesn't divide by zero or produce a
+            # zero-frame range.
+            print("Warning: Video FPS not detected (reported 0); using 1.0 fps fallback")
+            fps = 1.0
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = frame_count / fps if fps > 0 else 0
+        duration = frame_count / fps
 
         video_metadata = {
             'fps': fps,
@@ -803,19 +809,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         threshold = extraction_config.get("scene_change_threshold", 30.0)  # 0-100 scale
         min_duration = extraction_config.get("min_scene_duration_seconds", 1.0)
+        max_frames = extraction_config.get("max_frames_per_video", 50) or 50
 
-        print(f"Scene detection: threshold={threshold:.1f}%, min_duration={min_duration}s")
+        print(f"Scene detection: threshold={threshold:.1f}%, min_duration={min_duration}s, max_frames={max_frames}")
 
         extracted_paths = []
         prev_frame = None
         last_extract_frame = -1
-        min_frame_gap = int(fps * min_duration)
+        # Guard: fps=1.0 fallback means min_frame_gap could be 1 actual frame;
+        # force >= 1 so we never compare two identical frames.
+        min_frame_gap = max(1, int(fps * min_duration)) if fps > 0 else 1
         frame_num = 0
         extract_count = 0
 
         while True:
             ret, frame = cap.read()
             if not ret:
+                break
+
+            if extract_count >= max_frames:
+                print(f"Scene detection: reached max_frames cap ({max_frames})")
                 break
 
             if prev_frame is not None:
