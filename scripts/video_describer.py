@@ -64,7 +64,7 @@ class VideoDescriber:
     """
     
     def __init__(self, config: Optional[Dict] = None, log_dir: Optional[str] = None):
-        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg'}
         self.config = config or self.get_default_config()
         self.log_dir = log_dir or "."
         self.setup_logging()

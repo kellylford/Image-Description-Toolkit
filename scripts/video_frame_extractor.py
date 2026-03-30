@@ -41,7 +41,7 @@ except ImportError:
 
 class VideoFrameExtractor:
     def __init__(self, config_file: str = "video_frame_extractor_config.json", log_dir: str = None):
-        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg'}
         self.config_file = config_file  # Store for logging
         self.log_dir = log_dir
         self.setup_logging()  # Set up logging first

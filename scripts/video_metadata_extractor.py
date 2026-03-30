@@ -16,7 +16,7 @@ class VideoMetadataExtractor:
     """Extract metadata from video files using ffprobe"""
     
     def __init__(self):
-        self.supported_formats = {'.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
+        self.supported_formats = {'.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg'}
         self.ffprobe_available = self._check_ffprobe()
     
     def _check_ffprobe(self) -> bool:

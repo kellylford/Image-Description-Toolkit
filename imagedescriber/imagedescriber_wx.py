@@ -453,7 +453,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
-        self.video_extensions = {'.mp4', '.mov', '.avi', '.mkv'}
+        self.video_extensions = {'.mp4', '.mov', '.avi', '.mkv', '.mpg', '.mpeg'}
 
         # Configuration
         self.load_config()
@@ -4353,7 +4353,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             file_path = open_file_dialog(
                 self,
                 "Select Video File",
-                "Video files (*.mp4;*.mov;*.avi;*.mkv)|*.mp4;*.mov;*.avi;*.mkv|All files (*.*)|*.*",
+                "Video files (*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg)|*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg|All files (*.*)|*.*",
                 "",
                 ""
             )
@@ -4440,7 +4440,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             file_path = open_file_dialog(
                 self,
                 "Select Video File",
-                "Video files (*.mp4;*.mov;*.avi;*.mkv)|*.mp4;*.mov;*.avi;*.mkv|All files (*.*)|*.*",
+                "Video files (*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg)|*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg|All files (*.*)|*.*",
                 "",
                 ""
             )

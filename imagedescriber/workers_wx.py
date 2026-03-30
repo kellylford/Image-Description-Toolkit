@@ -1910,7 +1910,7 @@ class DirectoryScanWorker(threading.Thread):
     
     # Supported image and video extensions
     IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.tiff', '.tif'}
-    VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.m4v', '.webm', '.flv', '.wmv'}
+    VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.m4v', '.webm', '.flv', '.wmv', '.mpg', '.mpeg'}
     
     def __init__(self, parent_window, directory_path: Path, batch_size: int = 50, recursive: bool = True):
         """Initialize directory scanner
