@@ -141,6 +141,35 @@ class TestCLIEntryPoints:
         assert result.returncode in (0, 1), \
             f"results-list should exit cleanly (got {result.returncode})"
 
+    def test_idt_help_has_video_commands(self):
+        """Test that 'idt help' output includes video-related commands."""
+        result = subprocess.run(
+            [sys.executable, 'idt_cli.py', 'help'],
+            capture_output=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=10
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        for cmd in ('extract-frames', 'describe-video', 'descriptions-to-html'):
+            assert cmd in output, f"'idt help' output should include '{cmd}'"
+
+    def test_idt_help_no_deprecated_commands(self):
+        """Test that 'idt help' does not list removed commands (viewer, prompteditor, configure)."""
+        result = subprocess.run(
+            [sys.executable, 'idt_cli.py', 'help'],
+            capture_output=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=10
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        # These commands were removed; should not appear in the COMMANDS section
+        for cmd in ('prompteditor', 'configure (or config)'):
+            assert cmd not in output, (
+                f"'idt help' output should not mention deprecated command '{cmd}'"
+            )
+
 
 class TestGUIEntryPoints:
     """Test that GUI apps launch without crashing."""
@@ -152,56 +181,7 @@ class TestGUIEntryPoints:
         return (os.environ.get("GITHUB_ACTIONS", "").lower() == "true" 
                 or os.environ.get("CI", "").lower() == "true")
     
-    def test_viewer_launches(self):
-        """Test that Viewer.exe or viewer.py launches."""
-        if self._skip_gui_in_ci():
-            print("CI environment detected; skipping viewer GUI launch test")
-            return
-        viewer_paths = [
-            Path('viewer/Viewer.exe'),
-            Path('viewer/viewer.py')
-        ]
-        
-        viewer_path = None
-        for path in viewer_paths:
-            if path.exists():
-                viewer_path = path
-                break
-        
-        if viewer_path is None:
-            # Skip if viewer not found (may not be built yet)
-            print("Viewer not found, skipping launch test")
-            return
-        
-        # Determine command
-        if viewer_path.suffix == '.exe':
-            cmd = [str(viewer_path)]
-        else:
-            cmd = [sys.executable, str(viewer_path)]
-        
-        # Launch viewer
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
-        # Wait to see if it crashes immediately
-        time.sleep(1.0)
-        
-        poll_result = proc.poll()
-        
-        # Terminate
-        proc.terminate()
-        try:
-            proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-        
-        # Should still be running when we checked
-        assert poll_result is None, \
-            f"Viewer should launch and stay running (exited with {poll_result})"
+
     
     def test_imagedescriber_launches(self):
         """Test that ImageDescriber.exe or app launches."""
@@ -247,49 +227,7 @@ class TestGUIEntryPoints:
         assert poll_result is None, \
             f"ImageDescriber should launch and stay running (exited with {poll_result})"
     
-    def test_prompteditor_launches(self):
-        """Test that PromptEditor.exe or app launches."""
-        if self._skip_gui_in_ci():
-            print("CI environment detected; skipping PromptEditor GUI launch test")
-            return
-        app_paths = [
-            Path('prompt_editor/PromptEditor.exe'),
-            Path('prompt_editor/prompt_editor.py')
-        ]
-        
-        app_path = None
-        for path in app_paths:
-            if path.exists():
-                app_path = path
-                break
-        
-        if app_path is None:
-            print("PromptEditor not found, skipping launch test")
-            return
-        
-        if app_path.suffix == '.exe':
-            cmd = [str(app_path)]
-        else:
-            cmd = [sys.executable, str(app_path)]
-        
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
-        time.sleep(1.0)
-        poll_result = proc.poll()
-        
-        proc.terminate()
-        try:
-            proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-        
-        assert poll_result is None, \
-            f"PromptEditor should launch and stay running (exited with {poll_result})"
+
 
 
 if __name__ == "__main__":
