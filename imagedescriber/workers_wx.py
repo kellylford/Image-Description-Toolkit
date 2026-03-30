@@ -2108,3 +2108,72 @@ class SaveWorkspaceWorker(threading.Thread):
             logger.error(f"Workspace save failed: {e}", exc_info=True)
             evt = WorkspaceSaveFailedEvent(error=str(e))
             wx.PostEvent(self.parent_window, evt)
+
+
+# Video Description Worker
+VideoDescriptionCompleteEvent, EVT_VIDEO_DESCRIPTION_COMPLETE = wx.lib.newevent.NewEvent()
+VideoDescriptionFailedEvent, EVT_VIDEO_DESCRIPTION_FAILED = wx.lib.newevent.NewEvent()
+
+
+class VideoDescriptionWorker(threading.Thread):
+    """Worker thread for video description generation"""
+
+    def __init__(self, parent_window, video_path: str, options: dict, api_key: str = None):
+        super().__init__(daemon=True)
+        self.parent_window = parent_window
+        self.video_path = video_path
+        self.options = options
+        self.api_key = api_key
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        """Request thread to stop"""
+        self._stop_event.set()
+
+    def run(self):
+        """Process video in background thread"""
+        try:
+            # Import video_describer module
+            import sys
+            from pathlib import Path
+
+            scripts_path = Path(__file__).parent.parent / "scripts"
+            if str(scripts_path) not in sys.path:
+                sys.path.insert(0, str(scripts_path))
+
+            from video_describer import VideoDescriber
+
+            # Create describer with options
+            config = {
+                "provider": self.options.get('provider', 'ollama'),
+                "model": self.options.get('model', 'llava'),
+                "prompt_style": self.options.get('prompt_style', 'video_description'),
+                "custom_prompt": self.options.get('custom_prompt', ''),
+                "num_frames": 5,
+                "frame_selection_mode": "key_frames",
+            }
+
+            describer = VideoDescriber(config=config)
+
+            # Generate description
+            result = describer.describe_video(
+                self.video_path,
+                provider=config['provider'],
+                model=config['model'],
+                custom_prompt=config['custom_prompt']
+            )
+
+            # Post completion event
+            evt = VideoDescriptionCompleteEvent(
+                video_path=self.video_path,
+                result=result
+            )
+            wx.PostEvent(self.parent_window, evt)
+
+        except Exception as e:
+            logger.error(f"Video description failed: {e}", exc_info=True)
+            evt = VideoDescriptionFailedEvent(
+                video_path=self.video_path,
+                error=str(e)
+            )
+            wx.PostEvent(self.parent_window, evt)

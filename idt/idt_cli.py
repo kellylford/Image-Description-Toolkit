@@ -515,6 +515,48 @@ def main():
             result = subprocess.run(cmd, cwd=str(extract_script.parent))
             return result.returncode
     
+    elif command == 'describe-video':
+        # Generate AI description for videos
+        if getattr(sys, 'frozen', False):
+            # Running as executable - import directly
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                
+                import video_describer
+                
+                # Set up sys.argv for the video describer script
+                original_argv = sys.argv[:]
+                sys.argv = ['video_describer.py'] + sys.argv[2:]
+                
+                try:
+                    return video_describer.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+                    
+            except ImportError as e:
+                print(f"Error: Could not import video_describer module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running video describer: {e}")
+                return 1
+        else:
+            # Running as script - use subprocess
+            describer_script = get_resource_path('scripts/video_describer.py')
+            
+            if not describer_script.exists():
+                print(f"Error: Video describer script not found at {describer_script}")
+                return 1
+            
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(describer_script)] + args
+            result = subprocess.run(cmd, cwd=str(describer_script.parent))
+            return result.returncode
+    
     elif command == 'version' or command == '--version' or command == '-v':
         # Show version (with build number and git info)
         try:
@@ -910,6 +952,7 @@ COMMANDS:
     check-models          Check installed Ollama models
     prompt-list           List available prompt styles
     extract-frames        Extract frames from video files
+    describe-video        Generate AI description for videos (NEW!)
     convert-images        Convert HEIC images to JPG
     version               Show version information
     help                  Show this help message
