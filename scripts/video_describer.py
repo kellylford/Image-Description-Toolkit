@@ -77,7 +77,8 @@ except ImportError:
             get_available_providers = None
 
 import logging
-from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class VideoDescriber:
@@ -90,11 +91,11 @@ class VideoDescriber:
     """
     
     def __init__(self, config: Optional[Dict] = None, log_dir: Optional[str] = None):
-        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg'}
+        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts'}
         self.config = config or self.get_default_config()
         self.log_dir = log_dir or "."
-        self.setup_logging()
-        
+        self.logger = logger
+
         # Initialize frame extractor for getting representative frames
         if VideoFrameExtractor:
             self.frame_extractor = VideoFrameExtractor()
@@ -139,21 +140,6 @@ class VideoDescriber:
             "include_metadata": True,
             "include_timestamps": True,
         }
-    
-    def setup_logging(self):
-        """Set up logging"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = Path(self.log_dir) / f"video_describer_{timestamp}.log"
-        
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler()
-            ]
-        )
-        self.logger = logging.getLogger(__name__)
     
     def extract_key_frames(self, video_path: str) -> List[Tuple[np.ndarray, float]]:
         """

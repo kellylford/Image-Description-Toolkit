@@ -453,7 +453,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
-        self.video_extensions = {'.mp4', '.mov', '.avi', '.mkv', '.mpg', '.mpeg'}
+        self.video_extensions = {'.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts'}
 
         # Configuration
         self.load_config()
@@ -4383,7 +4383,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             file_path = open_file_dialog(
                 self,
                 "Select Video File",
-                "Video files (*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg)|*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg|All files (*.*)|*.*",
+                "Video files (*.mp4;*.mov;*.avi;*.mkv;*.wmv;*.flv;*.webm;*.m4v;*.mpg;*.mpeg;*.3gp;*.3g2;*.mts;*.m2ts)|*.mp4;*.mov;*.avi;*.mkv;*.wmv;*.flv;*.webm;*.m4v;*.mpg;*.mpeg;*.3gp;*.3g2;*.mts;*.m2ts|All files (*.*)|*.*",
                 "",
                 ""
             )
@@ -4452,10 +4452,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_describe_video(self, event):
         """Generate AI description for video using key frames"""
-        # Check if video_describer module is available
-        try:
-            from video_describer import VideoDescriber
-        except ImportError:
+        # Check worker is available (imported at module level)
+        if VideoDescriptionWorker is None:
             show_error(self, "Video describer module not available.\n\n"
                        "Make sure video_describer.py is in the scripts directory.")
             return
@@ -4470,7 +4468,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             file_path = open_file_dialog(
                 self,
                 "Select Video File",
-                "Video files (*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg)|*.mp4;*.mov;*.avi;*.mkv;*.mpg;*.mpeg|All files (*.*)|*.*",
+                "Video files (*.mp4;*.mov;*.avi;*.mkv;*.wmv;*.flv;*.webm;*.m4v;*.mpg;*.mpeg;*.3gp;*.3g2;*.mts;*.m2ts)|*.mp4;*.mov;*.avi;*.mkv;*.wmv;*.flv;*.webm;*.m4v;*.mpg;*.mpeg;*.3gp;*.3g2;*.mts;*.m2ts|All files (*.*)|*.*",
                 "",
                 ""
             )
@@ -4517,14 +4515,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Create and start worker thread
         try:
-            from workers_wx import VideoDescriptionWorker
-            if VideoDescriptionWorker:
-                self.video_desc_worker = VideoDescriptionWorker(
-                    self, selected_video, options, api_key
-                )
-                self.video_desc_worker.start()
-            else:
-                show_error(self, "VideoDescriptionWorker not available.")
+            self.video_desc_worker = VideoDescriptionWorker(
+                self, selected_video, options, api_key
+            )
+            self.video_desc_worker.start()
         except Exception as e:
             show_error(self, f"Could not start video description: {e}")
 

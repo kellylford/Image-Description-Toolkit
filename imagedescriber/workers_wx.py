@@ -1971,7 +1971,7 @@ class DirectoryScanWorker(threading.Thread):
     
     # Supported image and video extensions
     IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic', '.heif', '.tiff', '.tif'}
-    VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.m4v', '.webm', '.flv', '.wmv', '.mpg', '.mpeg'}
+    VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts'}
     
     def __init__(self, parent_window, directory_path: Path, batch_size: int = 50, recursive: bool = True):
         """Initialize directory scanner
@@ -2194,11 +2194,8 @@ class VideoDescriptionWorker(threading.Thread):
     def run(self):
         """Process video in background thread"""
         try:
-            # Import video_describer module
-            import sys
-            from pathlib import Path
-
-            scripts_path = Path(__file__).parent.parent / "scripts"
+            # Use module-level _project_root which handles both frozen and dev mode
+            scripts_path = _project_root / "scripts"
             if str(scripts_path) not in sys.path:
                 sys.path.insert(0, str(scripts_path))
 

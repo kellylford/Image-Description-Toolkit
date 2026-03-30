@@ -1334,7 +1334,7 @@ def analyze_file_enhanced(file_path: Path, imports: Dict) -> Dict[str, Any]:
     
     # Image formats
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.webp', '.heic', '.heif'}
-    video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+    video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts'}
     
     if extension in image_extensions:
         metadata['file_type'] = 'image'

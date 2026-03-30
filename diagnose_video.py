@@ -26,7 +26,7 @@ if not video_candidates:
     sys.exit(1)
 
 for video_path in video_candidates:
-    if video_path.suffix.lower() in ['.mp4', '.mov', '.avi', '.m4v']:
+    if video_path.suffix.lower() in ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts']:
         print(f"Analyzing: {video_path}\n")
         
         cap = cv2.VideoCapture(str(video_path))

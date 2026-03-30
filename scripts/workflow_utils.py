@@ -79,7 +79,7 @@ class WorkflowConfig:
                 }
             },
             "file_patterns": {
-                "videos": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"],
+                "videos": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".3gp", ".3g2", ".mts", ".m2ts"],
                 "images": [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"],
                 "heic": [".heic", ".heif"],
                 "descriptions": ["image_descriptions.txt"]
