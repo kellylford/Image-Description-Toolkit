@@ -216,24 +216,39 @@ class VideoDescriber:
         diff = cv2.absdiff(gray1, gray2)
         return float(np.mean(diff))
     
-    def frames_to_base64(self, frames: List[Tuple[np.ndarray, float]], 
-                        quality: int = 85) -> List[Tuple[str, float]]:
+    def frames_to_temp_files(self, frames: List[Tuple[np.ndarray, float]], 
+                             quality: int = 85) -> List[Tuple[str, float, str]]:
         """
-        Convert frames to base64-encoded JPEGs for AI transmission.
+        Save frames as temporary JPEG files for AI processing.
         
-        Returns list of (base64_string, timestamp) tuples.
+        Returns list of (base64_string, timestamp, temp_path) tuples.
+        The temp_path should be deleted after processing.
         """
-        encoded = []
+        import tempfile
+        import os
+        
+        results = []
         for frame, timestamp in frames:
             # Encode as JPEG
             encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
             _, buffer = cv2.imencode('.jpg', frame, encode_params)
             
-            # Convert to base64
+            # Convert to base64 for metadata
             base64_str = base64.b64encode(buffer).decode('utf-8')
-            encoded.append((base64_str, timestamp))
+            
+            # Save to temp file - AI providers expect file paths
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.jpg', prefix='video_frame_')
+            try:
+                with os.fdopen(temp_fd, 'wb') as f:
+                    f.write(buffer)
+                results.append((base64_str, timestamp, temp_path))
+            except Exception as e:
+                os.close(temp_fd)
+                self.logger.error(f"Failed to save temp file: {e}")
+                # Still include result but with empty path - caller should handle
+                results.append((base64_str, timestamp, None))
         
-        return encoded
+        return results
     
     def describe_video(self, video_path: str, 
                       provider: Optional[str] = None,
@@ -274,34 +289,47 @@ class VideoDescriber:
             except Exception as e:
                 self.logger.warning(f"Could not extract video metadata: {e}")
         
-        # Convert frames for AI
+        # Convert frames for AI - save to temp files
         self.logger.info("Preparing frames for AI...")
-        encoded_frames = self.frames_to_base64(frames)
+        frame_data = self.frames_to_temp_files(frames)
         
-        # Get AI provider
-        if not AI_PROVIDERS_AVAILABLE or not get_available_providers:
-            raise Exception("AI providers not available")
+        # Clean up temp files when done
+        temp_files = [path for _, _, path in frame_data if path]
         
-        providers = get_available_providers()
-        provider_name = provider or self.config.get("provider", "ollama")
-        
-        if provider_name not in providers:
-            raise Exception(f"Provider '{provider_name}' not available")
-        
-        ai_provider = providers[provider_name]
-        model_name = model or self.config.get("model", "llava")
-        
-        # Build prompt
-        prompt_style = custom_prompt or self.config.get("custom_prompt", "")
-        if not prompt_style:
-            prompt_style = self._build_default_video_prompt(len(frames), video_metadata)
-        
-        self.logger.info(f"Sending to {provider_name}/{model_name}...")
-        
-        # Call AI with multiple frames
-        description = self._call_vision_model(
-            ai_provider, model_name, encoded_frames, prompt_style, video_metadata
-        )
+        try:
+            # Get AI provider
+            if not AI_PROVIDERS_AVAILABLE or not get_available_providers:
+                raise Exception("AI providers not available")
+            
+            providers = get_available_providers()
+            provider_name = provider or self.config.get("provider", "ollama")
+            
+            if provider_name not in providers:
+                raise Exception(f"Provider '{provider_name}' not available")
+            
+            ai_provider = providers[provider_name]
+            model_name = model or self.config.get("model", "llava")
+            
+            # Build prompt
+            prompt_style = custom_prompt or self.config.get("custom_prompt", "")
+            if not prompt_style:
+                prompt_style = self._build_default_video_prompt(len(frames), video_metadata)
+            
+            self.logger.info(f"Sending to {provider_name}/{model_name}...")
+            
+            # Call AI with multiple frames
+            description = self._call_vision_model(
+                ai_provider, model_name, frame_data, prompt_style, video_metadata
+            )
+            
+        finally:
+            # Clean up temp files
+            for temp_path in temp_files:
+                try:
+                    if temp_path and os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except Exception as e:
+                    self.logger.warning(f"Failed to remove temp file {temp_path}: {e}")
         
         elapsed = time.time() - start_time
         
@@ -315,7 +343,7 @@ class VideoDescriber:
             "num_frames_used": len(frames),
             "processing_time": elapsed,
             "video_metadata": video_metadata,
-            "timestamps": [ts for _, ts in encoded_frames],
+            "timestamps": [ts for _, ts, _ in frame_data],
         }
         
         self.logger.info(f"Description complete in {elapsed:.1f}s")
@@ -337,39 +365,42 @@ class VideoDescriber:
         return prompt
     
     def _call_vision_model(self, provider, model: str, 
-                           encoded_frames: List[Tuple[str, float]], 
+                           frame_data: List[Tuple[str, float, str]], 
                            prompt: str, metadata: Dict) -> str:
         """
         Call vision model with multiple frames.
         
         Falls back to processing frames individually if multi-frame not supported.
+        frame_data is list of (base64_str, timestamp, temp_file_path)
         """
         # Try multi-frame if provider supports it
         if hasattr(provider, 'describe_video'):
             # Provider has native video support
-            return provider.describe_video(encoded_frames, prompt, model)
+            return provider.describe_video(frame_data, prompt, model)
         
         # Otherwise, process as individual images with combined prompt
-        return self._process_frames_as_batch(provider, model, encoded_frames, prompt)
+        return self._process_frames_as_batch(provider, model, frame_data, prompt)
     
     def _process_frames_as_batch(self, provider, model: str,
-                                  encoded_frames: List[Tuple[str, float]], 
+                                  frame_data: List[Tuple[str, float, str]], 
                                   prompt: str) -> str:
         """Process frames as individual images and combine descriptions"""
         descriptions = []
         
-        for i, (base64_frame, timestamp) in enumerate(encoded_frames):
-            frame_prompt = f"Frame {i+1} of {len(encoded_frames)} (timestamp: {timestamp:.1f}s)\n{prompt}"
+        for i, (base64_str, timestamp, temp_path) in enumerate(frame_data):
+            frame_prompt = f"Frame {i+1} of {len(frame_data)} (timestamp: {timestamp:.1f}s)\n{prompt}"
             
             try:
-                # Call provider's image description
-                if hasattr(provider, 'describe_image'):
-                    desc = provider.describe_image(base64_frame, frame_prompt, model)
+                # Call provider's image description with file path
+                if hasattr(provider, 'describe_image') and temp_path:
+                    desc = provider.describe_image(temp_path, frame_prompt, model)
+                    descriptions.append(f"[Frame {i+1} at {timestamp:.1f}s]: {desc}")
+                elif temp_path:
+                    # Fallback - try direct API call
+                    desc = self._direct_api_call(provider, temp_path, frame_prompt, model)
                     descriptions.append(f"[Frame {i+1} at {timestamp:.1f}s]: {desc}")
                 else:
-                    # Fallback - try direct API call
-                    desc = self._direct_api_call(provider, base64_frame, frame_prompt, model)
-                    descriptions.append(f"[Frame {i+1} at {timestamp:.1f}s]: {desc}")
+                    raise Exception("No temp file path available")
             except Exception as e:
                 self.logger.warning(f"Failed to describe frame {i+1}: {e}")
                 descriptions.append(f"[Frame {i+1}]: Error processing frame")
@@ -392,7 +423,7 @@ class VideoDescriber:
         # Fallback: return combined descriptions
         return f"Video Summary:\n\n{combined}"
     
-    def _direct_api_call(self, provider, base64_image: str, prompt: str, model: str) -> str:
+    def _direct_api_call(self, provider, image_path: str, prompt: str, model: str) -> str:
         """Direct API call fallback for providers without describe_image method"""
         # This is a simplified fallback - real implementation would use provider's native API
         raise NotImplementedError("Direct API call not implemented - provider must have describe_image method")
