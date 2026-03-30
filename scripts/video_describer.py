@@ -26,11 +26,24 @@ import sys
 import base64
 from io import BytesIO
 
+# Add script directory to path for frozen executables
+_script_dir = Path(__file__).parent.resolve()
+if str(_script_dir) not in sys.path:
+    sys.path.insert(0, str(_script_dir))
+
+# Also add parent directory (for imagedescriber/ai_providers access)
+_parent_dir = _script_dir.parent
+if str(_parent_dir) not in sys.path:
+    sys.path.insert(0, str(_parent_dir))
+
 # Import frame extraction logic from existing module
 try:
     from video_frame_extractor import VideoFrameExtractor
 except ImportError:
-    VideoFrameExtractor = None
+    try:
+        from scripts.video_frame_extractor import VideoFrameExtractor
+    except ImportError:
+        VideoFrameExtractor = None
 
 # Import metadata extraction
 try:
@@ -38,17 +51,30 @@ try:
     from exif_embedder import ExifEmbedder
     VIDEO_METADATA_AVAILABLE = True
 except ImportError:
-    VIDEO_METADATA_AVAILABLE = False
-    VideoMetadataExtractor = None
-    ExifEmbedder = None
+    try:
+        from scripts.video_metadata_extractor import VideoMetadataExtractor
+        from scripts.exif_embedder import ExifEmbedder
+        VIDEO_METADATA_AVAILABLE = True
+    except ImportError:
+        VIDEO_METADATA_AVAILABLE = False
+        VideoMetadataExtractor = None
+        ExifEmbedder = None
 
-# Import AI providers
+# Import AI providers - try multiple locations
 try:
     from ai_providers import get_available_providers
     AI_PROVIDERS_AVAILABLE = True
 except ImportError:
-    AI_PROVIDERS_AVAILABLE = False
-    get_available_providers = None
+    try:
+        from imagedescriber.ai_providers import get_available_providers
+        AI_PROVIDERS_AVAILABLE = True
+    except ImportError:
+        try:
+            from scripts.ai_providers import get_available_providers
+            AI_PROVIDERS_AVAILABLE = True
+        except ImportError:
+            AI_PROVIDERS_AVAILABLE = False
+            get_available_providers = None
 
 import logging
 from datetime import datetime

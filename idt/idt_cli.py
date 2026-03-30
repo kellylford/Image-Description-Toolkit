@@ -520,9 +520,14 @@ def main():
         if getattr(sys, 'frozen', False):
             # Running as executable - import directly
             try:
+                # Add both scripts and imagedescriber directories to path
                 scripts_path = get_resource_path('scripts')
+                imagedescriber_path = get_resource_path('imagedescriber')
+                
                 if str(scripts_path) not in sys.path:
                     sys.path.insert(0, str(scripts_path))
+                if str(imagedescriber_path) not in sys.path:
+                    sys.path.insert(0, str(imagedescriber_path))
                 
                 import video_describer
                 
@@ -539,9 +544,13 @@ def main():
                     
             except ImportError as e:
                 print(f"Error: Could not import video_describer module: {e}")
+                import traceback
+                traceback.print_exc()
                 return 1
             except Exception as e:
                 print(f"Error running video describer: {e}")
+                import traceback
+                traceback.print_exc()
                 return 1
         else:
             # Running as script - use subprocess
