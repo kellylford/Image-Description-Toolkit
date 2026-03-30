@@ -97,8 +97,13 @@ class EnhancedSceneDetector:
             raise ValueError(f"Cannot open video: {video_path}")
         
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            # Some MPEG/AVI containers report FPS as 0; fall back to 1 to avoid
+            # division-by-zero errors throughout the detector.
+            logger.warning(f"Video reported fps={fps:.4f}; using 1.0 fps fallback")
+            fps = 1.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps if fps > 0 else 0
+        duration = total_frames / fps
         
         logger.info(f"Analyzing video: {duration:.1f}s, {total_frames} frames, {fps:.2f} fps")
         
@@ -136,6 +141,7 @@ class EnhancedSceneDetector:
         
         frame_num = 0
         check_interval = max(1, int(fps * 0.5))  # Check every 0.5 seconds minimum
+        # fps is guaranteed > 0 at this point (detect_scenes() enforces the fallback)
         
         while True:
             ret, frame = cap.read()
@@ -161,7 +167,7 @@ class EnhancedSceneDetector:
                     # Store candidate
                     info = FrameInfo(
                         frame_num=frame_num,
-                        timestamp=frame_num / fps,
+                        timestamp=frame_num / fps if fps > 0 else float(frame_num),
                         change_score=change_score,
                         quality_score=quality_score,
                         motion_type=motion_type
@@ -410,6 +416,8 @@ class EnhancedSceneDetector:
         """
         Fallback when scene detection fails: uniform time sampling.
         """
+        if fps <= 0:
+            fps = 1.0
         duration = total_frames / fps
         interval = duration / (self.target_frames + 1)
         

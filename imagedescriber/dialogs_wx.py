@@ -1142,7 +1142,7 @@ class VideoExtractionDialog(wx.Dialog):
         self.process_after_extraction = True
         
         self.init_ui()
-        self.SetSize((500, 400))
+        self.SetSize((520, 450))
         self.Centre()
         
         # Set initial focus to extraction mode for accessibility
@@ -1203,7 +1203,7 @@ class VideoExtractionDialog(wx.Dialog):
         # Scene threshold input
         scene_panel = wx.Panel(panel)
         scene_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        scene_label = wx.StaticText(scene_panel, label="Threshold:")
+        scene_label = wx.StaticText(scene_panel, label="Sensitivity (1–100, lower = more frames):")
         self.scene_input = wx.SpinCtrlDouble(
             scene_panel,
             value="30.0",
@@ -1231,8 +1231,10 @@ class VideoExtractionDialog(wx.Dialog):
         
         # Help text
         help_text = (
-            "Time Interval: Extract frames at regular intervals (e.g., every 5 seconds)\n"
-            "Scene Change: Extract frames when the scene changes significantly\n\n"
+            "Time Interval: Extract one frame every N seconds of video.\n"
+            "Scene Change: Use adaptive detection to find key frames automatically.\n"
+            "  Threshold controls sensitivity (lower = more frames).\n"
+            "  The detector adapts to each video, so exact frame count varies.\n\n"
             "Extracted frames will appear in the workspace list after the video."
         )
         help_label = wx.StaticText(panel, label=help_text)

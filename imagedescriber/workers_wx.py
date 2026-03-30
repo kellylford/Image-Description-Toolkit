@@ -1556,56 +1556,65 @@ class VideoProcessingWorker(threading.Thread):
         return extracted_paths, video_metadata
     
     def _extract_by_time_interval(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
-        """Extract frames at regular time intervals"""
+        """Extract frames at regular time intervals.
+
+        Uses time-based seeking (CAP_PROP_POS_MSEC) rather than frame-number
+        seeking (CAP_PROP_POS_FRAMES) because MPEG/MPG containers often do not
+        support random frame-level access — cap.set(POS_FRAMES, n) is silently
+        ignored, causing the video to be read sequentially regardless of the
+        requested position.  Time-based seeking has much wider codec support.
+        """
         import cv2
-        
+
         interval_seconds = self.extraction_config.get("time_interval_seconds", 5)
         start_time = self.extraction_config.get("start_time_seconds", 0)
-        end_time = self.extraction_config.get("end_time_seconds")
-        
+        end_time_cfg = self.extraction_config.get("end_time_seconds")
+
+        # Derive total duration from fps + frame_count.  When the container
+        # doesn't report a reliable frame count we fall back to a large value
+        # and let the read loop terminate naturally on ret=False.
         total_frames_in_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        frame_interval = max(1, int(fps * interval_seconds))  # Minimum 1 frame
-        start_frame = int(fps * start_time)
-        
-        # Calculate end point (either user-specified or video end)
-        if end_time:
-            end_frame = int(fps * end_time)
+        if total_frames_in_video > 0 and fps > 0:
+            video_duration = total_frames_in_video / fps
         else:
-            end_frame = total_frames_in_video
-        
-        # EMERGENCY: Safety limit
-        safety_limit = total_frames_in_video + 10
-        
-        # Log extraction parameters for debugging
-        self._post_progress(f"FPS: {fps:.2f}, Interval: {interval_seconds}s = {frame_interval} frames")
-        self._post_progress(f"Video: {total_frames_in_video} frames total, extracting frames {start_frame} to {end_frame}")
-        
+            video_duration = None  # Unknown — read until EOF
+
+        end_time = end_time_cfg if end_time_cfg else video_duration
+
+        self._post_progress(
+            f"FPS: {fps:.2f}, Interval: {interval_seconds}s"
+            + (f", Duration: {video_duration:.1f}s" if video_duration else ", Duration: unknown")
+        )
+
         extracted_paths = []
-        frame_num = start_frame
+        current_time = float(start_time)
         extract_count = 0
-        
+
         video_stem = Path(self.video_path).stem
-        
-        # Use CLI logic: check frame position in while condition
-        while frame_num < end_frame:
-            # EMERGENCY STOP (shouldn't be needed, but keep as safety)
-            if extract_count >= safety_limit:
-                self._post_progress(f"SAFETY STOP: Extracted {extract_count} frames from {total_frames_in_video}-frame video!")
+
+        while True:
+            # Stop when we have passed the end of the requested range
+            if end_time is not None and current_time >= end_time:
                 break
-            
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+
+            # Seek to the desired position using milliseconds (better MPEG support)
+            target_ms = current_time * 1000.0
+            cap.set(cv2.CAP_PROP_POS_MSEC, target_ms)
             ret, frame = cap.read()
-            
+
             if not ret:
                 break
-            
-            # Calculate timestamp (matches CLI convention)
-            timestamp = frame_num / fps if fps > 0 else 0.0
-            
+
+            # Use the actual position that OpenCV landed on (seeking can snap
+            # to the nearest keyframe in some codecs)
+            actual_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            timestamp = actual_ms / 1000.0 if actual_ms > 0 else current_time
+
             # Save frame with timestamp in filename (matches CLI: video_0.00s.jpg)
             frame_filename = f"{video_stem}_{timestamp:.2f}s.jpg"
             frame_path = output_dir / frame_filename
             cv2.imwrite(str(frame_path), frame)
+
             # Embed video GPS/date into frame EXIF if metadata is available
             if video_source_metadata and ExifEmbedder is not None:
                 try:
@@ -1616,20 +1625,24 @@ class VideoProcessingWorker(threading.Thread):
                     )
                 except Exception as _ee:
                     logger.debug(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
+
             extracted_paths.append(str(frame_path))
-            
             extract_count += 1
-            frame_num += frame_interval
-            
+            current_time += interval_seconds
+
             if extract_count % 10 == 0:
-                self._post_progress(f"Extracted {extract_count} frames...")
+                self._post_progress(f"Extracted {extract_count} frames ({timestamp:.1f}s)...")
         
         return extracted_paths
     
     def _extract_by_scene_detection(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
         """Extract frames based on scene changes using enhanced scene detector"""
         import cv2
-        
+
+        # Track whether we've released the caller's cap so the except-block
+        # can reopen it before falling back to basic detection.
+        cap_was_released = False
+
         # Try to use enhanced scene detector
         try:
             # Add scripts path for import
@@ -1650,8 +1663,10 @@ class VideoProcessingWorker(threading.Thread):
                 adaptive_threshold=True
             )
             
-            # Release cap since detector will reopen video
+            # Release cap since the detector reopens the video itself.
+            # Track the release so the except-block can reopen if needed.
             cap.release()
+            cap_was_released = True
             
             # Detect scenes
             frames = detector.detect_scenes(self.video_path, self._post_progress)
@@ -1698,13 +1713,23 @@ class VideoProcessingWorker(threading.Thread):
         except Exception as e:
             logger.warning(f"Enhanced scene detection failed: {e}, using basic detection")
             self._post_progress("Using basic scene detection...")
+            # If we already released cap before detect_scenes() crashed, reopen it
+            # so the basic fallback has a valid VideoCapture to read from.
+            if cap_was_released:
+                cap = cv2.VideoCapture(self.video_path)
             return self._extract_by_scene_detection_basic(cap, fps, output_dir, video_source_metadata)
     
     def _extract_by_scene_detection_basic(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
         """Basic scene change detection (fallback)"""
         import cv2
+        import numpy as np
         
-        threshold = self.extraction_config.get("scene_change_threshold", 30) / 100.0
+        # Threshold is configured in the 0-100 range (e.g. 30 = "30% of pixels
+        # changed significantly").  Use a pixel-count percentage metric to match
+        # this scale — the old code divided by 100 and compared against
+        # mean_diff/255 which rarely exceeds 0.10, making the threshold
+        # effectively unreachable.
+        threshold = self.extraction_config.get("scene_change_threshold", 30)  # 0-100
         min_duration = self.extraction_config.get("min_scene_duration_seconds", 1)
         
         extracted_paths = []
@@ -1725,9 +1750,12 @@ class VideoProcessingWorker(threading.Thread):
                 gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 gray_prev = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
                 diff = cv2.absdiff(gray_current, gray_prev)
-                mean_diff = diff.mean() / 255.0
+                # Percentage of pixels that changed by more than 30/255 (~12%).
+                # This matches the metric used in enhanced_scene_detector so the
+                # user-facing threshold value means the same thing in both paths.
+                change_score = (np.sum(diff > 30) / diff.size) * 100
                 
-                if (mean_diff > threshold and frame_num - last_extract_frame >= min_frame_gap):
+                if (change_score > threshold and frame_num - last_extract_frame >= min_frame_gap):
                     timestamp = frame_num / fps if fps > 0 else 0.0
                     frame_filename = f"{video_stem}_scene_{extract_count:04d}_{timestamp:.2f}s.jpg"
                     frame_path = output_dir / frame_filename

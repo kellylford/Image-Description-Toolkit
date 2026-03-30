@@ -316,44 +316,49 @@ class VideoFrameExtractor:
             return []
         
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            self.logger.warning(f"Video reported fps={fps}; using 1.0 fps fallback")
+            fps = 1.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps if fps > 0 else 0
+        duration = total_frames / fps
         
-        interval_frames = int(fps * self.config["time_interval_seconds"])
-        start_frame = int(fps * self.config["start_time_seconds"])
-        end_frame = int(fps * self.config["end_time_seconds"]) if self.config["end_time_seconds"] else total_frames
-        
+        interval_seconds = self.config["time_interval_seconds"]
+        start_time = self.config["start_time_seconds"]
+        end_time_cfg = self.config["end_time_seconds"]
+
         self.logger.info(f"Video properties: duration={duration:.1f}s, fps={fps:.1f}, total_frames={total_frames}")
-        self.logger.info(f"Extraction settings: interval={self.config['time_interval_seconds']}s, start={self.config['start_time_seconds']}s")
-        self.logger.info(f"Frame range: {start_frame} to {end_frame} (every {interval_frames} frames)")
-        
-        estimated_frames = (end_frame - start_frame) // interval_frames
-        if self.config["max_frames_per_video"]:
-            estimated_frames = min(estimated_frames, self.config["max_frames_per_video"])
-        self.logger.info(f"Estimated frames to extract: {estimated_frames}")
-        
+        self.logger.info(f"Extraction settings: interval={interval_seconds}s, start={start_time}s")
+
+        end_time = (end_time_cfg if end_time_cfg else duration)
+
         extracted_files = []
         frame_count = 0
-        current_frame = start_frame
-        
-        while current_frame < end_frame:
+        current_time = float(start_time)
+
+        while current_time < end_time:
             if self.config["max_frames_per_video"] and frame_count >= self.config["max_frames_per_video"]:
                 self.logger.info(f"Reached maximum frames limit: {self.config['max_frames_per_video']}")
                 break
-                
-            cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+
+            # Use time-based seeking (CAP_PROP_POS_MSEC) — more reliable than
+            # frame-number seeking for MPEG/MPG and other container formats.
+            target_ms = current_time * 1000.0
+            cap.set(cv2.CAP_PROP_POS_MSEC, target_ms)
             ret, frame = cap.read()
-            
+
             if not ret:
-                self.logger.warning(f"Failed to read frame at position {current_frame}")
+                self.logger.warning(f"Failed to read frame at {current_time:.2f}s")
                 break
+
+            # Use the actual position OpenCV landed on (keyframe snapping)
+            actual_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            timestamp = actual_ms / 1000.0 if actual_ms > 0 else current_time
             
             # Resize if specified
             if self.config["resize_width"] or self.config["resize_height"]:
                 frame = self.resize_frame(frame)
             
             # Save frame with video name for clear source attribution
-            timestamp = current_frame / fps
             filename = f"{video_name}_{timestamp:.2f}s.jpg"
             output_path = os.path.join(output_dir, filename)
             
@@ -383,12 +388,11 @@ class VideoFrameExtractor:
             else:
                 self.logger.error(f"Failed to save frame to {output_path}")
             
-            current_frame += interval_frames
+            current_time += interval_seconds
             
-            # Progress logging every 10 frames or at specific intervals
-            if frame_count % 10 == 0 or frame_count == estimated_frames:
-                progress = (frame_count / estimated_frames * 100) if estimated_frames > 0 else 0
-                self.logger.info(f"Progress: {frame_count}/{estimated_frames} frames ({progress:.1f}%)")
+            # Progress logging every 10 frames
+            if frame_count % 10 == 0:
+                self.logger.info(f"Progress: {frame_count} frames extracted ({timestamp:.1f}s)")
         
         cap.release()
         self.logger.info(f"Time interval extraction completed: {len(extracted_files)} frames extracted")

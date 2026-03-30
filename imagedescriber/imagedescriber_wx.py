@@ -799,11 +799,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def _extract_by_scene_detection(self, cap, fps: float, video_dir: Path, extraction_config: dict, video_path_obj: Path, video_source_metadata: dict = None) -> list:
         """Extract frames based on scene changes"""
         import cv2
+        import numpy as np
 
-        threshold = extraction_config.get("scene_change_threshold", 30.0) / 100.0
+        threshold = extraction_config.get("scene_change_threshold", 30.0)  # 0-100 scale
         min_duration = extraction_config.get("min_scene_duration_seconds", 1.0)
 
-        print(f"Scene detection: threshold={threshold*100:.1f}%, min_duration={min_duration}s")
+        print(f"Scene detection: threshold={threshold:.1f}%, min_duration={min_duration}s")
 
         extracted_paths = []
         prev_frame = None
@@ -817,18 +818,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if not ret:
                 break
 
-            # Calculate difference from previous frame
             if prev_frame is not None:
-                # Convert to grayscale for comparison
                 gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 gray_prev = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-
-                # Calculate mean squared difference
                 diff = cv2.absdiff(gray_current, gray_prev)
-                mean_diff = diff.mean() / 255.0
+                # Percentage of changed pixels — matches the 0-100 threshold scale
+                change_score = (np.sum(diff > 30) / diff.size) * 100
 
-                # Check if scene change detected and minimum duration passed
-                if (mean_diff > threshold and
+                if (change_score > threshold and
                     frame_num - last_extract_frame >= min_frame_gap):
 
                     # Save frame
