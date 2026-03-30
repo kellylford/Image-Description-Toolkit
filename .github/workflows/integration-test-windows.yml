@@ -214,14 +214,26 @@ jobs:
 
     # ------------------------------------------------------------------ #
     #  8. Video frame extraction test                                      #
-    #     Generate a synthetic test video with ffmpeg (no binary in repo) #
+    #     ffmpeg is NOT pre-installed on windows-latest; install via      #
+    #     Chocolatey, then regenerate the test video fresh each run.      #
     #     Two color segments give scene detection a real cut to find.     #
     #     Both time-interval and scene-change modes are exercised.        #
     # ------------------------------------------------------------------ #
+    - name: Install ffmpeg
+      shell: pwsh
+      run: |
+        Write-Host "Installing ffmpeg via Chocolatey..."
+        choco install ffmpeg --no-progress -y
+        # Reload PATH so ffmpeg is visible in subsequent steps
+        $machinePath = [System.Environment]::GetEnvironmentVariable('PATH', 'Machine')
+        $userPath    = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
+        $env:PATH    = "$machinePath;$userPath"
+        Add-Content $env:GITHUB_PATH "C:\ProgramData\chocolatey\bin"
+        Write-Host "ffmpeg version: $(ffmpeg -version 2>&1 | Select-String 'ffmpeg version')"
+
     - name: Generate synthetic test video
       shell: pwsh
       run: |
-        # ffmpeg is pre-installed on windows-latest GitHub Actions runners.
         # Build a 10-second video with three solid-color segments:
         #   0-3 s  → black  (0x000000)
         #   3-7 s  → white  (0xffffff)
