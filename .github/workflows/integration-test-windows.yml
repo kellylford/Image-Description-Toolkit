@@ -213,7 +213,59 @@ jobs:
         Write-Host "PASS: $imageBlocks image description(s) produced with meaningful content"
 
     # ------------------------------------------------------------------ #
-    #  8. Bonus: ImageDescriber launch smoke test                          #
+    #  8. Video frame extraction test                                      #
+    #     Generate a synthetic test video with ffmpeg (no binary in repo) #
+    #     then verify idt.exe extract-frames produces .jpg frame files.   #
+    # ------------------------------------------------------------------ #
+    - name: Generate synthetic test video
+      shell: pwsh
+      run: |
+        # ffmpeg is pre-installed on windows-latest GitHub Actions runners.
+        # Create a 5-second blue solid-color video at 5 fps (25 frames total).
+        # Using the lavfi virtual device keeps the video under 50 KB.
+        Write-Host "Generating testimages/test_video.mp4 ..."
+        ffmpeg -y -f lavfi -i "color=c=0x3399ff:s=320x240:rate=5:duration=5" `
+               -c:v libx264 -preset ultrafast -pix_fmt yuv420p `
+               testimages/test_video.mp4
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "ERROR: ffmpeg failed to generate test video"
+          exit 1
+        }
+        $size = (Get-Item "testimages/test_video.mp4").Length
+        Write-Host "Test video created: testimages/test_video.mp4 ($size bytes)"
+
+    - name: Run idt extract-frames on test video
+      shell: pwsh
+      run: |
+        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir video_frames_output --time 1"
+        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir video_frames_output --time 1
+        $exitCode = $LASTEXITCODE
+        Write-Host "idt extract-frames exit code: $exitCode"
+        if ($exitCode -ne 0) {
+          Write-Host "ERROR: idt extract-frames command failed"
+          exit $exitCode
+        }
+
+    - name: Verify extracted frames
+      shell: pwsh
+      run: |
+        $frames = Get-ChildItem -Path "video_frames_output" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
+        Write-Host "Frames found: $($frames.Count)"
+        $frames | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
+
+        # A 5-second video sampled every 1 second should produce at least 4 frames
+        if ($frames.Count -lt 4) {
+          Write-Host "ERROR: Expected at least 4 extracted frames, got $($frames.Count)"
+          Write-Host "Directory contents:"
+          Get-ChildItem -Path "video_frames_output" -Recurse | Select-Object FullName, Length
+          exit 1
+        }
+
+        Write-Host ""
+        Write-Host "PASS: $($frames.Count) frame(s) extracted from test video"
+
+    # ------------------------------------------------------------------ #
+    #  9. Bonus: ImageDescriber launch smoke test                          #
     #     continue-on-error so a runner/GUI issue doesn't fail the core   #
     # ------------------------------------------------------------------ #
     - name: Smoke test - ImageDescriber launches without crashing
@@ -235,7 +287,7 @@ jobs:
         Write-Host "Process terminated cleanly."
 
     # ------------------------------------------------------------------ #
-    #  9. Upload artifacts (always -- so you get outputs even on failure)  #
+    # 10. Upload artifacts (always -- so you get outputs even on failure)  #
     # ------------------------------------------------------------------ #
     - name: Upload idt executable
       uses: actions/upload-artifact@v4
@@ -259,5 +311,14 @@ jobs:
       with:
         name: workflow-output
         path: Descriptions/wf_*/
+        retention-days: 14
+        if-no-files-found: warn
+
+    - name: Upload extracted video frames
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: video-frames-output
+        path: video_frames_output/
         retention-days: 14
         if-no-files-found: warn
