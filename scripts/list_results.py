@@ -250,15 +250,15 @@ def get_next_available_filename(base_name: str, extension: str = '.csv') -> Path
             raise ValueError("Too many existing files with this base name")
 
 
-def generate_viewer_command(workflow_dir: Path, use_relative_path: bool = True) -> str:
-    """Generate the viewer command for a workflow.
+def format_workflow_path(workflow_dir: Path, use_relative_path: bool = True) -> str:
+    """Get the workflow directory path for display.
     
     Args:
         workflow_dir: Path to workflow directory
         use_relative_path: If True, use relative path from current directory
         
     Returns:
-        Viewer command string
+        Workflow directory path string
     """
     if use_relative_path:
         try:
@@ -271,13 +271,13 @@ def generate_viewer_command(workflow_dir: Path, use_relative_path: bool = True) 
     else:
         path_str = str(workflow_dir).replace('\\', '/')
     
-    return f'idt viewer "{path_str}"'
+    return path_str
 
 
 def main():
     """Main function for results-list command."""
     parser = argparse.ArgumentParser(
-        description="List available workflow results and generate viewer commands",
+        description="List available workflow results and their directories",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -285,7 +285,7 @@ Examples:
   idt results-list
   
   # List results in specific directory
-  idt results-list --input-dir c:\\path\\to\\results
+  idt results-list --input-dir /path/to/results
   
   # List results in current directory
   idt results-list --input-dir .
@@ -293,7 +293,7 @@ Examples:
   # Save to custom output file
   idt results-list --output my_workflows.csv
   
-  # Use absolute paths in viewer commands
+  # Use absolute paths
   idt results-list --absolute-paths
   
 Auto-detection searches these locations in order:
@@ -319,7 +319,7 @@ Auto-detection searches these locations in order:
     parser.add_argument(
         '--absolute-paths',
         action='store_true',
-        help='Use absolute paths in viewer commands instead of relative'
+        help='Use absolute paths instead of relative'
     )
     
     parser.add_argument(
@@ -385,7 +385,7 @@ Auto-detection searches these locations in order:
     rows = []
     for workflow_dir, metadata in workflows:
         desc_count = count_descriptions(workflow_dir)
-        viewer_cmd = generate_viewer_command(workflow_dir, not args.absolute_paths)
+        viewer_cmd = format_workflow_path(workflow_dir, not args.absolute_paths)
         
         row = {
             'Name': metadata.get('workflow_name', 'unknown'),
@@ -394,7 +394,7 @@ Auto-detection searches these locations in order:
             'Prompt': metadata.get('prompt_style', 'unknown'),
             'Descriptions': desc_count,
             'Timestamp': format_timestamp(metadata.get('timestamp', 'unknown')),
-            'Viewer Command': viewer_cmd
+            'Workflow Directory': viewer_cmd
         }
         rows.append(row)
     
@@ -419,7 +419,7 @@ Auto-detection searches these locations in order:
     
     # Write CSV
     with open(output_file, 'w', newline='', encoding='utf-8') as f:
-        fieldnames = ['Name', 'Provider', 'Model', 'Prompt', 'Descriptions', 'Timestamp', 'Viewer Command']
+        fieldnames = ['Name', 'Provider', 'Model', 'Prompt', 'Descriptions', 'Timestamp', 'Workflow Directory']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         
         writer.writeheader()
@@ -430,7 +430,7 @@ Auto-detection searches these locations in order:
     print(f"  Total workflows: {len(rows)}")
     print(f"  Providers: {', '.join(sorted(set(r['Provider'] for r in rows)))}")
     print(f"  Models: {', '.join(sorted(set(r['Model'] for r in rows)))}")
-    print(f"\nTo view a workflow, copy and paste the command from the 'Viewer Command' column.")
+    print(f"\nTo view a workflow, open ImageDescriber and switch to Viewer Mode, then browse to the workflow directory.")
     
     return 0
 

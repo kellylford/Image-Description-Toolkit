@@ -247,49 +247,85 @@ class TestGUIEntryPoints:
         assert poll_result is None, \
             f"ImageDescriber should launch and stay running (exited with {poll_result})"
     
-    def test_prompteditor_launches(self):
-        """Test that PromptEditor.exe or app launches."""
-        if self._skip_gui_in_ci():
-            print("CI environment detected; skipping PromptEditor GUI launch test")
-            return
-        app_paths = [
-            Path('prompt_editor/PromptEditor.exe'),
-            Path('prompt_editor/prompt_editor.py')
-        ]
-        
-        app_path = None
-        for path in app_paths:
-            if path.exists():
-                app_path = path
-                break
-        
-        if app_path is None:
-            print("PromptEditor not found, skipping launch test")
-            return
-        
-        if app_path.suffix == '.exe':
-            cmd = [str(app_path)]
-        else:
-            cmd = [sys.executable, str(app_path)]
-        
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+    def test_idt_help_no_deprecated_commands(self):
+        """Test that idt help does not list removed commands in the COMMANDS section."""
+        result = subprocess.run(
+            [sys.executable, 'idt_cli.py', 'help'],
+            capture_output=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=10
         )
         
-        time.sleep(1.0)
-        poll_result = proc.poll()
+        stdout = result.stdout or ""
+        stderr = result.stderr or ""
+        output = stdout + stderr
         
-        proc.terminate()
-        try:
-            proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+        # Extract the COMMANDS section (between "COMMANDS:" and the next blank-line-followed-by-header)
+        lines = output.splitlines()
+        in_commands_section = False
+        command_section_lines = []
+        for line in lines:
+            if line.strip() == 'COMMANDS:':
+                in_commands_section = True
+                continue
+            if in_commands_section:
+                # Stop at the next section header (a non-indented header line)
+                if line and not line.startswith(' ') and line.rstrip().endswith(':'):
+                    break
+                command_section_lines.append(line)
         
-        assert poll_result is None, \
-            f"PromptEditor should launch and stay running (exited with {poll_result})"
+        commands_text = '\n'.join(command_section_lines)
+        
+        # Deprecated commands should not appear in the COMMANDS section
+        assert 'prompteditor' not in commands_text, \
+            f"'prompteditor' should not be listed in COMMANDS section: {commands_text}"
+        assert 'viewer (or view)' not in commands_text, \
+            f"'viewer (or view)' should not be listed in COMMANDS section: {commands_text}"
+        assert 'configure (or config)' not in commands_text, \
+            f"'configure (or config)' should not be listed in COMMANDS section: {commands_text}"
+        
+        # Current video commands should be present in the COMMANDS section
+        assert 'extract-frames' in commands_text, \
+            f"'extract-frames' should be in COMMANDS section: {commands_text}"
+        assert 'describe-video' in commands_text, \
+            f"'describe-video' should be in COMMANDS section: {commands_text}"
+    
+    def test_idt_viewer_command_shows_migration_message(self):
+        """Test that 'idt viewer' shows a helpful migration message instead of an error."""
+        result = subprocess.run(
+            [sys.executable, 'idt_cli.py', 'viewer'],
+            capture_output=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=10
+        )
+        
+        stdout = result.stdout or ""
+        stderr = result.stderr or ""
+        output = stdout + stderr
+        
+        # Should print migration guidance
+        assert 'ImageDescriber' in output, \
+            f"'idt viewer' should direct users to ImageDescriber, got: {output}"
+    
+    def test_idt_prompteditor_command_shows_migration_message(self):
+        """Test that 'idt prompteditor' shows a helpful migration message."""
+        result = subprocess.run(
+            [sys.executable, 'idt_cli.py', 'prompteditor'],
+            capture_output=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=10
+        )
+        
+        stdout = result.stdout or ""
+        stderr = result.stderr or ""
+        output = stdout + stderr
+        
+        # Should print migration guidance
+        assert 'ImageDescriber' in output, \
+            f"'idt prompteditor' should direct users to ImageDescriber, got: {output}"
 
 
 if __name__ == "__main__":

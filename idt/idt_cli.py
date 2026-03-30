@@ -98,9 +98,6 @@ def main():
     title_map = {
         'guideme': 'IDT - Guided Workflow',
         'workflow': 'IDT - Describing Images',
-        'viewer': 'IDT - Viewer',
-        'view': 'IDT - Viewer',
-        'prompteditor': 'IDT - Prompt Editor',
         'imagedescriber': 'IDT - Image Describer',
         'stats': 'IDT - Analyzing Statistics',
         'contentreview': 'IDT - Content Review',
@@ -109,7 +106,9 @@ def main():
         'check-models': 'IDT - Checking Models',
         'prompt-list': 'IDT - Listing Prompts',
         'extract-frames': 'IDT - Extracting Video Frames',
+        'describe-video': 'IDT - Describing Videos',
         'convert-images': 'IDT - Converting Images',
+        'descriptions-to-html': 'IDT - Generating HTML',
         'version': 'IDT - Version Info',
         'help': 'IDT - Help'
     }
@@ -694,121 +693,24 @@ def main():
             return result.returncode
     
     elif command == 'viewer' or command == 'view':
-        # Launch the viewer executable with optional directory argument
-        import subprocess
-        import platform
-        
-        # Detect architecture
-        machine = platform.machine().lower()
-        if machine in ('aarch64', 'arm64'):
-            arch = 'arm64'
-        else:
-            arch = 'amd64'
-        
-        # Try multiple possible viewer locations
-        viewer_names = [
-            f'viewer_{arch}.exe',
-            'viewer.exe',
-            f'viewer/viewer_{arch}.exe',
-            'viewer/viewer.exe',
-            f'../viewer/viewer_{arch}.exe',
-            '../viewer/viewer.exe',
-        ]
-        
-        viewer_exe = None
-        for name in viewer_names:
-            candidate = base_dir / name
-            if candidate.exists():
-                viewer_exe = candidate
-                break
-        
-        if not viewer_exe:
-            print("Error: Viewer executable not found.")
-            print(f"Looked in: {base_dir}")
-            print(f"Expected: viewer_{arch}.exe or viewer.exe")
-            print()
-            print("The viewer must be built separately using:")
-            print("  cd viewer")
-            print("  build_viewer.bat")
-            return 1
-        
-        # Get any additional arguments to pass to viewer
-        viewer_args = sys.argv[2:]  # Everything after 'idt viewer'
-        
-        # Build command with arguments
-        cmd = [str(viewer_exe)] + viewer_args
-        
-        # Launch viewer as separate process (detached)
-        try:
-            # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
-            if sys.platform == 'win32':
-                subprocess.Popen(cmd, 
-                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
-            else:
-                subprocess.Popen(cmd)
-            
-            if viewer_args:
-                print(f"Launched viewer: {viewer_exe.name} {' '.join(viewer_args)}")
-            else:
-                print(f"Launched viewer: {viewer_exe.name}")
-            return 0
-        except Exception as e:
-            print(f"Error launching viewer: {e}")
-            return 1
+        print("The standalone Viewer has been integrated into ImageDescriber.")
+        print("To view workflow results:")
+        print("  1. Open ImageDescriber")
+        print("  2. Switch to the Viewer Mode tab")
+        print()
+        print("Or launch ImageDescriber directly:")
+        print("  idt imagedescriber")
+        return 1
     
     elif command == 'prompteditor':
-        # Launch the prompt editor executable
-        import subprocess
-        import platform
-        
-        # Detect architecture
-        machine = platform.machine().lower()
-        if machine in ('aarch64', 'arm64'):
-            arch = 'arm64'
-        else:
-            arch = 'amd64'
-        
-        # Try multiple possible prompt editor locations
-        editor_names = [
-            f'prompteditor_{arch}.exe',
-            'prompteditor.exe',
-            f'prompteditor/prompteditor_{arch}.exe',
-            'prompteditor/prompteditor.exe',
-            f'../prompteditor/prompteditor_{arch}.exe',
-            '../prompteditor/prompteditor.exe',
-        ]
-        
-        editor_exe = None
-        for name in editor_names:
-            candidate = base_dir / name
-            if candidate.exists():
-                editor_exe = candidate
-                break
-        
-        if not editor_exe:
-            print("Error: Prompt Editor executable not found.")
-            print(f"Looked in: {base_dir}")
-            print(f"Expected: prompteditor_{arch}.exe or prompteditor.exe")
-            print()
-            print("The prompt editor must be built separately using:")
-            print("  cd prompt_editor")
-            print("  build_prompt_editor.bat")
-            return 1
-        
-        # Launch prompt editor as separate process (detached)
-        try:
-            # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
-            if sys.platform == 'win32':
-                subprocess.Popen([str(editor_exe)], 
-                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
-            else:
-                subprocess.Popen([str(editor_exe)])
-            
-            print(f"Launched prompt editor: {editor_exe.name}")
-            return 0
-        except Exception as e:
-            print(f"Error launching prompt editor: {e}")
-            return 1
+        print("The standalone Prompt Editor has been integrated into ImageDescriber.")
+        print("To edit prompts:")
+        print("  1. Open ImageDescriber")
+        print("  2. Go to Tools → Edit Prompts")
+        print()
+        print("Or launch ImageDescriber directly:")
+        print("  idt imagedescriber")
+        return 1
     
     elif command == 'imagedescriber':
         # Launch the image describer GUI executable
@@ -865,58 +767,14 @@ def main():
             return 1
     
     elif command == 'configure' or command == 'config':
-        # Launch the IDT Configure executable
-        import subprocess
-        import platform
-        
-        # Detect architecture
-        machine = platform.machine().lower()
-        if machine in ('aarch64', 'arm64'):
-            arch = 'arm64'
-        else:
-            arch = 'amd64'
-        
-        # Try multiple possible IDT Configure locations
-        configure_names = [
-            f'idtconfigure_{arch}.exe',
-            'idtconfigure.exe',
-            f'idtconfigure/idtconfigure_{arch}.exe',
-            'idtconfigure/idtconfigure.exe',
-            f'../idtconfigure/idtconfigure_{arch}.exe',
-            '../idtconfigure/idtconfigure.exe',
-        ]
-        
-        configure_exe = None
-        for name in configure_names:
-            candidate = base_dir / name
-            if candidate.exists():
-                configure_exe = candidate
-                break
-        
-        if not configure_exe:
-            print("Error: IDT Configure executable not found.")
-            print(f"Looked in: {base_dir}")
-            print(f"Expected: idtconfigure_{arch}.exe or idtconfigure.exe")
-            print()
-            print("The IDT Configure tool must be built separately using:")
-            print("  cd idtconfigure")
-            print("  build_idtconfigure.bat")
-            return 1
-        
-        # Launch IDT Configure as separate process (detached)
-        try:
-            # On Windows, use CREATE_NO_WINDOW to launch GUI cleanly
-            if sys.platform == 'win32':
-                subprocess.Popen([str(configure_exe)], 
-                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
-            else:
-                subprocess.Popen([str(configure_exe)])
-            
-            print(f"Launched IDT Configure: {configure_exe.name}")
-            return 0
-        except Exception as e:
-            print(f"Error launching IDT Configure: {e}")
-            return 1
+        print("The standalone Configuration Manager has been integrated into ImageDescriber.")
+        print("To configure settings:")
+        print("  1. Open ImageDescriber")
+        print("  2. Go to Tools → Configure Settings")
+        print()
+        print("Or launch ImageDescriber directly:")
+        print("  idt imagedescriber")
+        return 1
     
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
@@ -950,19 +808,18 @@ USAGE:
 COMMANDS:
     guideme               Interactive wizard to build and run workflows
     workflow              Run image description workflow
-    viewer (or view)      Launch the GUI viewer for browsing results
-    prompteditor          Launch the prompt editor to manage prompts
-    imagedescriber        Launch the image describer GUI
-    configure (or config) Launch the configuration manager
+    imagedescriber        Launch the ImageDescriber GUI
+      (includes Viewer Mode, Prompt Editor, and Configuration Manager)
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
-    results-list          List available workflow results with viewer commands
+    results-list          List available workflow results
     check-models          Check installed Ollama models
     prompt-list           List available prompt styles
     extract-frames        Extract frames from video files
-    describe-video        Generate AI description for videos (NEW!)
+    describe-video        Generate AI description for videos
     convert-images        Convert HEIC images to JPG
+    descriptions-to-html  Generate HTML report from descriptions
     version               Show version information
     help                  Show this help message
 
@@ -970,46 +827,98 @@ GLOBAL OPTIONS:
     --config-workflow, --config-wf <file>     Workflow orchestration config (default: workflow_config.json)
     --config-image-describer, --config-id <file>  Image describer config (prompts, AI, metadata)
     --config-video <file>                     Video extraction config
-    --config <file>                           [DEPRECATED] Use --config-image-describer instead
+
+WORKFLOW OPTIONS (idt workflow):
+    input_source                              Input directory or URL (optional with --resume)
+    --output-dir, -o <dir>                    Output directory (default: Descriptions)
+    --provider <name>                         AI provider: ollama, openai, claude (default: ollama)
+    --model <name>                            AI model name (e.g. llava, gpt-4o, claude-opus-4)
+    --prompt-style <style>                    Prompt style (see 'idt prompt-list' for options)
+    --steps <list>                            Comma-separated workflow steps (default: video,convert,describe,html)
+    --resume, -r                              Resume an interrupted workflow
+    --redescribe                              Re-describe images with different AI settings
+    --dry-run                                 Show what would be done without executing
+    --download, -d <url>                      Download images from a URL before describing
+    --min-size <size>                         Minimum image size filter (e.g. 100KB, 1MB)
+    --max-images <n>                          Maximum number of images to download
+    --metadata / --no-metadata                Enable/disable metadata extraction (default: enabled)
+    --no-geocode                              Disable reverse geocoding
+    --verbose, -v                             Enable verbose logging
+    --batch                                   Non-interactive mode (skip prompts)
+
+VIDEO EXTRACTION OPTIONS (idt extract-frames):
+    input                                     Video file(s) or directory containing videos
+    --output-dir <dir>                        Output directory for extracted frames
+    --time <seconds>                          Time interval mode: extract every N seconds
+    --scene <threshold>                       Scene change mode: detect scene changes (0-100)
+    --config-video <file>                     Video config file (default: video_frame_extractor_config.json)
+    --log-dir <dir>                           Directory for log files
+    --create-config                           Create a default config file and exit
+    --quiet                                   Suppress console output
+
+    Supported video formats: .mp4, .avi, .mkv, .mov, .wmv, .flv, .webm,
+                             .m4v, .mpg, .mpeg, .3gp, .3g2, .mts, .m2ts
+
+VIDEO DESCRIPTION OPTIONS (idt describe-video):
+    video [video ...]                         One or more video files to describe
+    --provider <name>                         AI provider: ollama, openai, claude (default: ollama)
+    --model <name>                            Model name (default: llava)
+    --prompt <text>                           Custom description prompt
+    --frames <n>                              Number of frames to extract (default: 5)
+    --mode <mode>                             Frame selection: key_frames, uniform, scene_change
+    --output, -o <file>                       Output file (.txt or .json)
+    --verbose, -v                             Enable verbose logging
 
 EXAMPLES:
     # Interactive guided workflow (recommended for beginners)
     {base_call} guideme
 
-    # Run workflow with Ollama
-    {base_call} workflow --provider ollama --model llava
+    # Run workflow with Ollama (local)
+    {base_call} workflow photos/ --provider ollama --model llava
 
-    # Run workflow with custom prompts and metadata settings
-    {base_call} workflow photos --config-id my_prompts.json --prompt-style detailed
-
-    # Run workflow with multiple custom configs (advanced)
-    {base_call} workflow photos --config-wf production.json --config-id artistic.json
-
-    # Launch viewer (empty)
-    {base_call} viewer
-
-    # Launch viewer with specific directory
-    {base_call} viewer C:\\path\\to\\workflow_output
-
-    # Launch viewer with directory picker
-    {base_call} viewer --open
-
-    # Launch prompt editor
-    {base_call} prompteditor
-
-    # Launch image describer GUI
-    {base_call} imagedescriber
-
-    # Launch configuration manager
-    {base_call} configure
+    # Run workflow with OpenAI
+    {base_call} workflow photos/ --provider openai --model gpt-4o
 
     # Run workflow with Claude
-    {base_call} workflow --provider claude --model claude-opus-4
+    {base_call} workflow photos/ --provider claude --model claude-opus-4
 
-    # Analyze statistics
+    # Run workflow with a specific prompt style
+    {base_call} workflow photos/ --prompt-style detailed
+
+    # Run only the describe step (skip video extraction and HTML)
+    {base_call} workflow photos/ --steps describe
+
+    # Resume an interrupted workflow
+    {base_call} workflow --resume wf_2025-01-15_143022_llava_Simple
+
+    # Re-describe with a different model
+    {base_call} workflow --redescribe wf_2025-01-15_143022_llava_Simple --model gpt-4o
+
+    # Download images from a website and describe them
+    {base_call} workflow --download https://example.com/gallery --provider ollama
+
+    # Extract frames from a video every 5 seconds
+    {base_call} extract-frames video.mp4 --time 5 --output-dir frames/
+
+    # Extract frames using scene change detection
+    {base_call} extract-frames video.mp4 --scene 30 --output-dir frames/
+
+    # Extract frames from all videos in a directory
+    {base_call} extract-frames videos/ --time 10 --output-dir frames/
+
+    # Generate AI description for a video
+    {base_call} describe-video video.mp4 --provider ollama --model llava
+
+    # Describe a video with more frames and a custom prompt
+    {base_call} describe-video video.mp4 --frames 10 --prompt "Describe the key events"
+
+    # Convert HEIC images to JPG
+    {base_call} convert-images photos/
+
+    # Analyze workflow statistics
     {base_call} stats
 
-    # Analyze content quality
+    # Analyze description content quality
     {base_call} contentreview
 
     # Combine descriptions to CSV
@@ -1017,19 +926,22 @@ EXAMPLES:
 
     # List available workflow results
     {base_call} results-list
-    {base_call} results-list --input-dir c:\\path\\to\\descriptions
+    {base_call} results-list --input-dir /path/to/Descriptions
 
-    # Check available models
+    # Check available Ollama models
     {base_call} check-models
 
     # List available prompt styles
     {base_call} prompt-list
     {base_call} prompt-list --verbose
 
+    # Launch the ImageDescriber GUI (includes viewer, prompt editor, config manager)
+    {base_call} imagedescriber
+
 NOTES:
-    - Requires Ollama to be installed for Ollama models
+    - Requires Ollama to be installed for local AI models (https://ollama.ai)
     - Requires API keys for OpenAI and Anthropic (set via environment variables)
-    - GUI tools (viewer, prompteditor, imagedescriber, configure) must be built separately
+    - The ImageDescriber GUI includes: Viewer Mode, Prompt Editor, and Configuration Manager
     - All commands support --help for detailed options
 
 For detailed documentation, see the docs/ folder.
