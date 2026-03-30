@@ -194,7 +194,7 @@ class VideoFrameExtractor:
             
             # Try config_loader first for frozen mode compatibility
             if load_json_config:
-                config, _, _ = load_json_config(explicit=str(config_path))
+                config, _, _ = load_json_config('video_frame_extractor_config.json', explicit=str(config_path))
                 if config:
                     self.logger.info(f"Configuration loaded from: {config_path}")
                     return config
