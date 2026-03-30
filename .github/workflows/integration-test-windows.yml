@@ -215,18 +215,28 @@ jobs:
     # ------------------------------------------------------------------ #
     #  8. Video frame extraction test                                      #
     #     Generate a synthetic test video with ffmpeg (no binary in repo) #
-    #     then verify idt.exe extract-frames produces .jpg frame files.   #
+    #     Two color segments give scene detection a real cut to find.     #
+    #     Both time-interval and scene-change modes are exercised.        #
     # ------------------------------------------------------------------ #
     - name: Generate synthetic test video
       shell: pwsh
       run: |
         # ffmpeg is pre-installed on windows-latest GitHub Actions runners.
-        # Create a 5-second blue solid-color video at 5 fps (25 frames total).
-        # Using the lavfi virtual device keeps the video under 50 KB.
-        Write-Host "Generating testimages/test_video.mp4 ..."
-        ffmpeg -y -f lavfi -i "color=c=0x3399ff:s=320x240:rate=5:duration=5" `
-               -c:v libx264 -preset ultrafast -pix_fmt yuv420p `
-               testimages/test_video.mp4
+        # Build a 10-second video with two distinct solid-color segments:
+        #   0-5 s  → blue   (0x3399ff)
+        #   5-10 s → orange (0xff8800)
+        # The hard color cut at 5 s gives scene-change detection a clear trigger.
+        # Rate = 5 fps, 320x240 keeps the file under ~100 KB.
+        Write-Host "Generating testimages/test_video.mp4 (blue 0-5s / orange 5-10s) ..."
+
+        # Encode two color sources and concatenate them
+        ffmpeg -y `
+          -f lavfi -i "color=c=0x3399ff:s=320x240:rate=5:duration=5" `
+          -f lavfi -i "color=c=0xff8800:s=320x240:rate=5:duration=5" `
+          -filter_complex "[0:v][1:v]concat=n=2:v=1[out]" `
+          -map "[out]" -c:v libx264 -preset ultrafast -pix_fmt yuv420p `
+          testimages/test_video.mp4
+
         if ($LASTEXITCODE -ne 0) {
           Write-Host "ERROR: ffmpeg failed to generate test video"
           exit 1
@@ -234,35 +244,62 @@ jobs:
         $size = (Get-Item "testimages/test_video.mp4").Length
         Write-Host "Test video created: testimages/test_video.mp4 ($size bytes)"
 
-    - name: Run idt extract-frames on test video
+    - name: "Extract frames - time interval mode (every 2 s)"
       shell: pwsh
       run: |
-        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir video_frames_output --time 1"
-        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir video_frames_output --time 1
+        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_time --time 2"
+        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_time --time 2
         $exitCode = $LASTEXITCODE
-        Write-Host "idt extract-frames exit code: $exitCode"
+        Write-Host "exit code: $exitCode"
         if ($exitCode -ne 0) {
-          Write-Host "ERROR: idt extract-frames command failed"
+          Write-Host "ERROR: extract-frames (time interval) failed"
           exit $exitCode
         }
 
-    - name: Verify extracted frames
+    - name: "Verify time-interval frames"
       shell: pwsh
       run: |
-        $frames = Get-ChildItem -Path "video_frames_output" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
-        Write-Host "Frames found: $($frames.Count)"
+        $frames = Get-ChildItem -Path "frames_time" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
+        Write-Host "Time-interval frames found: $($frames.Count)"
         $frames | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
 
-        # A 5-second video sampled every 1 second should produce at least 4 frames
+        # 10-second video sampled every 2 seconds → at least 4 frames
         if ($frames.Count -lt 4) {
-          Write-Host "ERROR: Expected at least 4 extracted frames, got $($frames.Count)"
-          Write-Host "Directory contents:"
-          Get-ChildItem -Path "video_frames_output" -Recurse | Select-Object FullName, Length
+          Write-Host "ERROR: Expected at least 4 frames from time-interval mode, got $($frames.Count)"
+          Get-ChildItem -Path "frames_time" -Recurse | Select-Object FullName, Length
           exit 1
         }
+        Write-Host "PASS: $($frames.Count) frame(s) - time interval mode"
 
-        Write-Host ""
-        Write-Host "PASS: $($frames.Count) frame(s) extracted from test video"
+    - name: "Extract frames - scene change detection mode"
+      shell: pwsh
+      run: |
+        # Threshold 30 = detect cuts where pixel difference exceeds 30%.
+        # The blue→orange hard cut should easily exceed this.
+        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30"
+        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30
+        $exitCode = $LASTEXITCODE
+        Write-Host "exit code: $exitCode"
+        if ($exitCode -ne 0) {
+          Write-Host "ERROR: extract-frames (scene change) failed"
+          exit $exitCode
+        }
+
+    - name: "Verify scene-change frames"
+      shell: pwsh
+      run: |
+        $frames = Get-ChildItem -Path "frames_scene" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
+        Write-Host "Scene-change frames found: $($frames.Count)"
+        $frames | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
+
+        # There is exactly one hard cut (blue→orange at 5 s), so we expect
+        # at least 2 frames (one per scene) but allow a few boundary frames.
+        if ($frames.Count -lt 2) {
+          Write-Host "ERROR: Expected at least 2 frames from scene-change mode, got $($frames.Count)"
+          Get-ChildItem -Path "frames_scene" -Recurse | Select-Object FullName, Length
+          exit 1
+        }
+        Write-Host "PASS: $($frames.Count) frame(s) - scene change mode"
 
     # ------------------------------------------------------------------ #
     #  9. Bonus: ImageDescriber launch smoke test                          #
@@ -319,6 +356,8 @@ jobs:
       if: always()
       with:
         name: video-frames-output
-        path: video_frames_output/
+        path: |
+          frames_time/
+          frames_scene/
         retention-days: 14
         if-no-files-found: warn
