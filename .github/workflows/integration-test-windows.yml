@@ -214,52 +214,19 @@ jobs:
 
     # ------------------------------------------------------------------ #
     #  8. Video frame extraction test                                      #
-    #     ffmpeg is NOT pre-installed on windows-latest; install via      #
-    #     Chocolatey, then regenerate the test video fresh each run.      #
-    #     Two color segments give scene detection a real cut to find.     #
-    #     Both time-interval and scene-change modes are exercised.        #
+    #     testimages/test_video.mp4 is committed to the repo:             #
+    #       0-3 s black / 3-7 s white / 7-10 s black (5 fps, 320x240)    #
+    #     Two hard cuts let both time-interval and scene-change modes run. #
     # ------------------------------------------------------------------ #
-    - name: Install ffmpeg
+    - name: Verify committed test video exists
       shell: pwsh
       run: |
-        Write-Host "Installing ffmpeg via Chocolatey..."
-        choco install ffmpeg --no-progress -y
-        # Reload PATH so ffmpeg is visible in subsequent steps
-        $machinePath = [System.Environment]::GetEnvironmentVariable('PATH', 'Machine')
-        $userPath    = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
-        $env:PATH    = "$machinePath;$userPath"
-        Add-Content $env:GITHUB_PATH "C:\ProgramData\chocolatey\bin"
-        Write-Host "ffmpeg version: $(ffmpeg -version 2>&1 | Select-String 'ffmpeg version')"
-
-    - name: Generate synthetic test video
-      shell: pwsh
-      run: |
-        # Build a 10-second video with three solid-color segments:
-        #   0-3 s  → black  (0x000000)
-        #   3-7 s  → white  (0xffffff)
-        #   7-10 s → black  (0x000000)
-        # Two hard cuts (black→white at 3s and white→black at 7s) give
-        # scene-change detection two triggers to find, ensuring even the
-        # basic grayscale detector returns ≥ 2 frames.
-        # Black/white have maximum grayscale contrast (0 vs 255) so both
-        # the basic (pixel diff > 30) and enhanced detectors fire reliably.
-        # Rate = 5 fps, 320x240 keeps the file under ~5 KB.
-        Write-Host "Generating testimages/test_video.mp4 (black 0-3s / white 3-7s / black 7-10s) ..."
-
-        ffmpeg -y `
-          -f lavfi -i "color=c=0x000000:s=320x240:rate=5:duration=3" `
-          -f lavfi -i "color=c=0xffffff:s=320x240:rate=5:duration=4" `
-          -f lavfi -i "color=c=0x000000:s=320x240:rate=5:duration=3" `
-          -filter_complex "[0:v][1:v][2:v]concat=n=3:v=1[out]" `
-          -map "[out]" -c:v libx264 -preset ultrafast -pix_fmt yuv420p `
-          testimages/test_video.mp4
-
-        if ($LASTEXITCODE -ne 0) {
-          Write-Host "ERROR: ffmpeg failed to generate test video"
+        if (-not (Test-Path "testimages/test_video.mp4")) {
+          Write-Host "ERROR: testimages/test_video.mp4 not found in checkout"
           exit 1
         }
         $size = (Get-Item "testimages/test_video.mp4").Length
-        Write-Host "Test video created: testimages/test_video.mp4 ($size bytes)"
+        Write-Host "Using committed test video: testimages/test_video.mp4 ($size bytes)"
 
     - name: "Extract frames - time interval mode (every 2 s)"
       shell: pwsh
@@ -291,8 +258,6 @@ jobs:
     - name: "Extract frames - scene change detection mode"
       shell: pwsh
       run: |
-        # Threshold 30 = detect cuts where pixel difference exceeds 30%.
-        # The blue→orange hard cut should easily exceed this.
         Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30"
         .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30
         $exitCode = $LASTEXITCODE
