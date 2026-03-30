@@ -222,18 +222,23 @@ jobs:
       shell: pwsh
       run: |
         # ffmpeg is pre-installed on windows-latest GitHub Actions runners.
-        # Build a 10-second video with two distinct solid-color segments:
-        #   0-5 s  → blue   (0x3399ff)
-        #   5-10 s → orange (0xff8800)
-        # The hard color cut at 5 s gives scene-change detection a clear trigger.
-        # Rate = 5 fps, 320x240 keeps the file under ~100 KB.
-        Write-Host "Generating testimages/test_video.mp4 (blue 0-5s / orange 5-10s) ..."
+        # Build a 10-second video with three solid-color segments:
+        #   0-3 s  → black  (0x000000)
+        #   3-7 s  → white  (0xffffff)
+        #   7-10 s → black  (0x000000)
+        # Two hard cuts (black→white at 3s and white→black at 7s) give
+        # scene-change detection two triggers to find, ensuring even the
+        # basic grayscale detector returns ≥ 2 frames.
+        # Black/white have maximum grayscale contrast (0 vs 255) so both
+        # the basic (pixel diff > 30) and enhanced detectors fire reliably.
+        # Rate = 5 fps, 320x240 keeps the file under ~5 KB.
+        Write-Host "Generating testimages/test_video.mp4 (black 0-3s / white 3-7s / black 7-10s) ..."
 
-        # Encode two color sources and concatenate them
         ffmpeg -y `
-          -f lavfi -i "color=c=0x3399ff:s=320x240:rate=5:duration=5" `
-          -f lavfi -i "color=c=0xff8800:s=320x240:rate=5:duration=5" `
-          -filter_complex "[0:v][1:v]concat=n=2:v=1[out]" `
+          -f lavfi -i "color=c=0x000000:s=320x240:rate=5:duration=3" `
+          -f lavfi -i "color=c=0xffffff:s=320x240:rate=5:duration=4" `
+          -f lavfi -i "color=c=0x000000:s=320x240:rate=5:duration=3" `
+          -filter_complex "[0:v][1:v][2:v]concat=n=3:v=1[out]" `
           -map "[out]" -c:v libx264 -preset ultrafast -pix_fmt yuv420p `
           testimages/test_video.mp4
 
