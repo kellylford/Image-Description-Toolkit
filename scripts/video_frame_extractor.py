@@ -232,9 +232,9 @@ class VideoFrameExtractor:
             pass
         
         default_config = {
-            "extraction_mode": "time_interval",
+            "extraction_mode": "scene_change",  # Default to enhanced scene detection
             "time_interval_seconds": 5.0,
-            "scene_change_threshold": 30.0,
+            "scene_change_threshold": 30.0,  # Used by basic detection; enhanced uses adaptive
             "min_scene_duration_seconds": 1.0,
             "output_directory": default_output_dir,
             "preserve_directory_structure": False,
@@ -245,6 +245,8 @@ class VideoFrameExtractor:
             "start_time_seconds": 0,
             "end_time_seconds": None,
             "max_frames_per_video": None,
+            "min_frames_per_video": 5,  # Enhanced scene detection: minimum frames guaranteed
+            "target_frames_per_video": 15,  # Enhanced scene detection: target number of frames
             "skip_existing": False,
             "log_progress": True
         }
