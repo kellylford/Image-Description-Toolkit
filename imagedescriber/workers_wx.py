@@ -1627,7 +1627,81 @@ class VideoProcessingWorker(threading.Thread):
         return extracted_paths
     
     def _extract_by_scene_detection(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
-        """Extract frames based on scene changes"""
+        """Extract frames based on scene changes using enhanced scene detector"""
+        import cv2
+        
+        # Try to use enhanced scene detector
+        try:
+            # Add scripts path for import
+            scripts_path = _project_root / 'scripts'
+            if str(scripts_path) not in sys.path:
+                sys.path.insert(0, str(scripts_path))
+            
+            from enhanced_scene_detector import EnhancedSceneDetector
+            
+            self._post_progress("Using enhanced scene detection...")
+            
+            # Create detector with config
+            detector = EnhancedSceneDetector(
+                min_frames=self.extraction_config.get("min_frames_per_video", 5),
+                max_frames=self.extraction_config.get("max_frames_per_video", 50) or 50,
+                target_frames=self.extraction_config.get("target_frames_per_video", 15),
+                min_scene_duration=self.extraction_config.get("min_scene_duration_seconds", 1.0),
+                adaptive_threshold=True
+            )
+            
+            # Release cap since detector will reopen video
+            cap.release()
+            
+            # Detect scenes
+            frames = detector.detect_scenes(self.video_path, self._post_progress)
+            
+            if not frames:
+                self._post_progress("No scenes detected, falling back to time interval")
+                cap = cv2.VideoCapture(self.video_path)
+                return self._extract_by_time_interval(cap, fps, output_dir, video_source_metadata)
+            
+            self._post_progress(f"Detected {len(frames)} scenes, extracting frames...")
+            
+            # Reopen video for frame extraction
+            cap = cv2.VideoCapture(self.video_path)
+            extracted_paths = []
+            video_stem = Path(self.video_path).stem
+            
+            for i, frame_info in enumerate(frames):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_info.frame_num)
+                ret, frame = cap.read()
+                
+                if not ret:
+                    continue
+                
+                # Save frame with scene number and timestamp
+                frame_filename = f"{video_stem}_scene_{i+1:04d}_{frame_info.timestamp:.2f}s.jpg"
+                frame_path = output_dir / frame_filename
+                cv2.imwrite(str(frame_path), frame)
+                
+                # Embed metadata
+                if video_source_metadata and ExifEmbedder is not None:
+                    try:
+                        ExifEmbedder().embed_metadata(
+                            frame_path, video_source_metadata,
+                            frame_time=frame_info.timestamp,
+                            source_video_path=Path(self.video_path)
+                        )
+                    except Exception as _ee:
+                        logger.debug(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
+                
+                extracted_paths.append(str(frame_path))
+            
+            return extracted_paths
+            
+        except Exception as e:
+            logger.warning(f"Enhanced scene detection failed: {e}, using basic detection")
+            self._post_progress("Using basic scene detection...")
+            return self._extract_by_scene_detection_basic(cap, fps, output_dir, video_source_metadata)
+    
+    def _extract_by_scene_detection_basic(self, cap, fps: float, output_dir: Path, video_source_metadata: dict = None) -> list:
+        """Basic scene change detection (fallback)"""
         import cv2
         
         threshold = self.extraction_config.get("scene_change_threshold", 30) / 100.0
@@ -1647,28 +1721,18 @@ class VideoProcessingWorker(threading.Thread):
             if not ret:
                 break
             
-            # Calculate difference from previous frame
             if prev_frame is not None:
-                # Convert to grayscale for comparison
                 gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 gray_prev = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-                
-                # Calculate mean squared difference
                 diff = cv2.absdiff(gray_current, gray_prev)
                 mean_diff = diff.mean() / 255.0
                 
-                # Check if scene change detected and minimum duration passed
-                if (mean_diff > threshold and 
-                    frame_num - last_extract_frame >= min_frame_gap):
-                    
-                    # Calculate timestamp (matches CLI convention)
+                if (mean_diff > threshold and frame_num - last_extract_frame >= min_frame_gap):
                     timestamp = frame_num / fps if fps > 0 else 0.0
-                    
-                    # Save frame with scene number and timestamp (matches CLI: video_scene_0001_5.23s.jpg)
                     frame_filename = f"{video_stem}_scene_{extract_count:04d}_{timestamp:.2f}s.jpg"
                     frame_path = output_dir / frame_filename
                     cv2.imwrite(str(frame_path), frame)
-                    # Embed video GPS/date into frame EXIF if metadata is available
+                    
                     if video_source_metadata and ExifEmbedder is not None:
                         try:
                             ExifEmbedder().embed_metadata(
@@ -1676,15 +1740,12 @@ class VideoProcessingWorker(threading.Thread):
                                 frame_time=timestamp,
                                 source_video_path=Path(self.video_path)
                             )
-                        except Exception as _ee:
-                            logger.debug(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
-                    extracted_paths.append(str(frame_path))
+                        except Exception:
+                            pass
                     
+                    extracted_paths.append(str(frame_path))
                     last_extract_frame = frame_num
                     extract_count += 1
-                    
-                    if extract_count % 10 == 0:
-                        self._post_progress(f"Extracted {extract_count} scenes...")
             
             prev_frame = frame.copy()
             frame_num += 1
