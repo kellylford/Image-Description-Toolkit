@@ -566,9 +566,10 @@ Examples:
             print(f"\n❌ {result['video_path']}")
             print(f"   Error: {result['error']}")
         else:
-            print(f"\n✓ {result['video_name']}")
+            print(f"\n[SUCCESS] {result['video_name']}")
             print(f"  Time: {result['processing_time']:.1f}s")
-            print(f"  Description:\n{result['description'][:300]}...")
+            desc_preview = result['description'][:300] if len(result['description']) > 300 else result['description']
+            print(f"  Description:\n{desc_preview}")
     
     # Save if output specified
     if args.output:
@@ -579,7 +580,8 @@ Examples:
     print(f"\n{'=' * 60}")
     print(f"Processed: {describer.statistics['processed']}")
     print(f"Failed: {describer.statistics['failed']}")
-    print(f"Total time: {describer.statistics['end_time'] - describer.statistics['start_time']:.1f}s")
+    total_time = describer.statistics['end_time'] - describer.statistics['start_time'] if describer.statistics['end_time'] else 0
+    print(f"Total time: {total_time:.1f}s")
 
 
 if __name__ == "__main__":
