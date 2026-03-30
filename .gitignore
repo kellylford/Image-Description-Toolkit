@@ -149,5 +149,11 @@ BuildAndRelease/WinBuilds/dist_all/
 /BuildAndRelease
 imagedescriber/build_log_debug.txt
 
-# Video frame extraction output
+# Video frame extraction output (test artifacts from CI and local runs)
+frames_time/
+frames_scene/
+frames_time_exe/
+frames_scene_exe/
+frames_scene_exe2/
+frames_*/
 **/imagedescriptiontoolkit/

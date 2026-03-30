@@ -49,6 +49,8 @@ a = Analysis(
     binaries=wx_binaries + cv2_binaries + mlx_vlm_binaries + mlx_binaries + torch_binaries,
     datas=[
         (str(project_root / 'scripts' / '*.json'), 'scripts'),
+        (str(project_root / 'scripts' / 'video_describer.py'), 'scripts'),
+        (str(project_root / 'scripts' / 'enhanced_scene_detector.py'), 'scripts'),
         (str(project_root / 'VERSION'), '.'),
     ] + wx_datas + cv2_datas + mlx_vlm_datas + mlx_datas + torch_datas,
     hiddenimports=[
@@ -82,6 +84,10 @@ a = Analysis(
         'scripts.config_loader',
         'scripts.descriptions_to_html',  # HTML export functionality
         'scripts.web_image_downloader',  # URL image downloader
+        'scripts.video_describer',       # Video description feature
+        'scripts.enhanced_scene_detector',  # Enhanced scene detection
+        'video_describer',               # Frozen mode: bare module name
+        'enhanced_scene_detector',       # Frozen mode: bare module name
         'models.provider_configs',
         'models.claude_models',  # Central Claude model configuration
         'models.openai_models',  # Central OpenAI model configuration

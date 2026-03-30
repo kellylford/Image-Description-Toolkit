@@ -36,6 +36,7 @@ class FrameInfo:
     quality_score: float  # Sharpness/blur score (0-100)
     motion_type: str  # 'static', 'camera_pan', 'scene_change'
     is_keyframe: bool = False
+    importance_score: float = 0.0  # Composite score used during frame reduction
 
 
 class EnhancedSceneDetector:
