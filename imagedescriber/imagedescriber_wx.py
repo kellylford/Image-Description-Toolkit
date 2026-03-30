@@ -2385,7 +2385,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # If this is a video with extracted frames, insert them immediately after
             if item.item_type == "video" and file_path in frames:
-                for frame_path, frame_item in frames[file_path]:
+                # Sort frames by timestamp (extracted from filename like "video_10.00s.jpg")
+                def extract_timestamp(frame_tuple):
+                    frame_path = frame_tuple[0]
+                    # Extract timestamp from filename (e.g., "video_10.00s.jpg" -> 10.00)
+                    try:
+                        import re
+                        match = re.search(r'_(\d+\.?\d*)s\.', Path(frame_path).name)
+                        if match:
+                            return float(match.group(1))
+                    except Exception:
+                        pass
+                    # Fallback to mtime if timestamp extraction fails
+                    try:
+                        return Path(frame_path).stat().st_mtime
+                    except Exception:
+                        return 0
+
+                sorted_frames = sorted(frames[file_path], key=extract_timestamp)
+                for frame_path, frame_item in sorted_frames:
                     all_items.append((frame_path, frame_item, 1))  # indent level 1
 
         # Display all items
@@ -2935,7 +2953,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 video_item.video_metadata = video_metadata
 
         # Add extracted frames as items to workspace
-        for frame_path in extracted_frames:
+        # Sort by timestamp to maintain chronological order
+        def get_frame_timestamp(frame_path):
+            try:
+                import re
+                match = re.search(r'_(\d+\.?\d*)s\.', Path(frame_path).name)
+                if match:
+                    return float(match.group(1))
+            except Exception:
+                pass
+            return 0
+        
+        sorted_frames = sorted(extracted_frames, key=get_frame_timestamp)
+        for frame_path in sorted_frames:
             if frame_path not in self.workspace.items:
                 frame_item = ImageItem(frame_path, "extracted_frame")
                 frame_item.parent_video = video_path
