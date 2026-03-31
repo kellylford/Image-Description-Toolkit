@@ -103,8 +103,13 @@ ditto "idt/dist/idt" "$DMG_STAGING/IDT/idt"
 chmod +x "$DMG_STAGING/IDT/idt"
 
 # Copy user guide with versioned filename
-echo "Copying user guide..."
-cp "docs/USER_GUIDE_COMPLETE.md" "$DMG_STAGING/IDT/IDT_User_Guide_${VERSION_CLEAN}.md"
+if [ -f "docs/USER_GUIDE_COMPLETE.md" ]; then
+    echo "Copying user guide..."
+    cp "docs/USER_GUIDE_COMPLETE.md" "$DMG_STAGING/IDT/IDT_User_Guide_${VERSION_CLEAN}.md"
+else
+    echo "⚠️  WARNING: docs/USER_GUIDE_COMPLETE.md not found — user guide will not be included in DMG"
+    echo "   Make sure you are on the feature/video-description branch or later."
+fi
 
 # Sign applications if code signing is enabled
 if [ "$SIGN_CODE" = "1" ]; then
