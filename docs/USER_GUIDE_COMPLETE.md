@@ -190,15 +190,17 @@ The wizard will ask:
 3. Which model?
 4. Which prompt style?
 
-After you answer, IDT processes all images in your chosen folder and creates a workflow results directory in your current working directory. The directory is named:
+After you answer, IDT processes all images in your chosen folder and creates a workflow results directory inside a `Descriptions/` folder in your current working directory. The directory is named:
 
 ```
-wf_YYYY-MM-DD_HHMMSS_modelname_promptstyle/
+wf_{name}_{provider}_{model}_{prompt}_{timestamp}/
 ```
+
+For example: `Descriptions/wf_Vacation2025_ollama_moondream_narrative_2026-03-31_120000/`
 
 Inside you will find:
 - `image_descriptions.txt` — all descriptions as plain text, one block per image
-- `descriptions.html` — a browsable HTML report with thumbnails; open it in any browser
+- `image_descriptions.html` — a browsable HTML report with thumbnails; open it in any browser
 - `workflow_metadata.json` — a machine-readable summary of the run
 - `logs/` — detailed per-step logs
 
@@ -208,20 +210,22 @@ That is all there is to a basic workflow. Run `guideme` again with a different m
 
 ## 5. Opening the ImageDescriber App
 
-- **macOS:** Double-click ImageDescriber in your Applications folder, or run `idt imagedescriber` in Terminal.
-- **Windows:** Start Menu → IDT → ImageDescriber, or run `idt imagedescriber` in a Command Prompt.
+- **macOS:** Double-click ImageDescriber in your Applications folder.
+- **Windows:** Start Menu → IDT → ImageDescriber.
 
 **Loading images:**
-- `File → Open Folder` (or `Ctrl+L`) — loads all images from a folder
+- `File → Load Directory` (or `Ctrl+L`) — loads all images from a folder
 - Drag and drop a folder or individual images onto the window
 - `File → Open Workspace` — reloads a previously saved `.idw` workspace file
 
 **What you see:** Image list on the left, description panel on the right.
 
 **Status indicators** appear as a prefix on each image name in the list:
-- `d` — the image has at least one description
-- `b` — the image is marked for batch processing
-- `p` — the image is currently being processed
+- `d{N}` — the image has N descriptions (e.g. `d1`, `d3`)
+- `P` — the image is currently being processed
+- `.` — the image is queued in an active batch run
+- `!` — the image was paused mid-batch
+- `X` — processing failed for this image
 
 ---
 
@@ -229,23 +233,21 @@ That is all there is to a basic workflow. Run `guideme` again with a different m
 
 ### Single Image
 
-Select an image in the list, then press `P` or choose `Processing → Process Selected`. A dialog appears where you select the provider, model, and prompt style. The default is Ollama / Moondream / Narrative.
+Select an image in the list, then press `P` or choose `Process → Process Current Image`. A dialog appears where you select the provider, model, and prompt style. The default is Ollama / Moondream / Narrative.
 
 The description appears in the right panel when processing is complete.
 
 ### Batch Processing
 
-**Mark images for batch:** Select one or more images and press `B`. Marked images get a light-blue highlight and a `b` prefix in the list.
+**Run a batch:**
+- `Process → Process Undescribed Images` — processes every image in the workspace that has no description yet (safe default; never re-processes already-described images)
+- `Process → Redescribe All Images` — processes all images again, adding new descriptions alongside existing ones
 
-**Run the batch:**
-- `Processing → Process Batch` — processes all marked images
-- `Processing → Process All Undescribed` — processes every image in the workspace that has no description yet
-
-The window title shows live progress: `Batch Processing: X of Y`. Press `Processing → Stop` to cancel at any time. Processing stops gracefully after the current image finishes.
+The window title shows live progress: `XX%, X of Y - ImageDescriber`. During a batch run, use `Process → Show Batch Progress` to open the progress dialog, which includes a Stop button to cancel gracefully after the current image finishes.
 
 ### Multiple Descriptions per Image
 
-Running the same image again with a different model or prompt **adds** a new description; it does not replace the existing one. An image can accumulate many descriptions from different runs. Use the description list in the right panel to navigate between them, or open `All Descriptions` to browse descriptions across all images at once.
+Running the same image again with a different model or prompt **adds** a new description; it does not replace the existing one. An image can accumulate many descriptions from different runs. Use the description list in the right panel to navigate between them, or open `Descriptions → Show All Descriptions...` to browse descriptions across all images at once.
 
 ### Choosing Model and Prompt Style
 
@@ -259,7 +261,7 @@ After an image is described, you can ask follow-up questions without re-processi
 
 **How to use it:**
 1. Select an image or an existing description.
-2. Press `F`, or choose `Processing → Follow Up`.
+2. Press `F`, or choose `Descriptions → Ask Followup Question`.
 3. A dialog appears. Type your question — for example: "What colors are dominant?", "List all visible text in this image", or "How many people are in this photo?"
 4. You can select a different model for the follow-up than was used for the original description.
 5. The response is appended as a new entry in the description list.
@@ -288,7 +290,7 @@ Chat is useful for testing a model's capabilities, asking general questions whil
 
 Both tools can download images from a web page and describe them.
 
-**In ImageDescriber:** Press `Ctrl+U` or choose `File → Open URL`. Enter the URL of any web page. IDT downloads all images found on the page and loads them into the workspace for description.
+**In ImageDescriber:** Press `Ctrl+U` or choose `File → Load Images From URL...`. Enter the URL of any web page. IDT downloads all images found on the page and loads them into the workspace for description.
 
 **In the CLI:**
 ```
@@ -303,13 +305,13 @@ For more detail on web download behaviour and options, see `docs/WEB_DOWNLOAD_GU
 
 ## 10. Viewing and Managing Results
 
-**Filter bar:** Switch between viewing all images, described images only, or batch-marked images only.
+**Filter bar (View menu):** Switch between viewing all images, described images only, undescribed images only, or videos only.
 
 **Tree view:** Video files appear as parent items with their extracted frames as children. You can expand/collapse the tree to focus on specific videos.
 
-**All Descriptions dialog:** Browse every description across all images in the workspace in one place — useful for comparing results across models and prompts.
+**All Descriptions dialog:** Browse every description across all images in the workspace in one place — use `Descriptions → Show All Descriptions...` to open it. Useful for comparing results across models and prompts.
 
-**Saving your workspace:** Press `Ctrl+S` to save a `.idw` workspace file. This persists all batch marks, descriptions, and processing state. Reopen the file later and pick up exactly where you left off. Workspace files are valuable for large batch jobs — save frequently.
+**Saving your workspace:** Press `Ctrl+S` to save a `.idw` workspace file. This persists all descriptions and processing state. Reopen the file later and pick up exactly where you left off. Workspace files are valuable for large batch jobs — save frequently.
 
 ---
 
@@ -330,13 +332,11 @@ The Prompt Editor and Configuration Manager are built into ImageDescriber's Tool
 - Adjust workflow preferences (batch delay, image size, logging)
 - Provides a form-based interface that validates settings before saving
 
-These were previously separate standalone applications. Everything is now accessible from within ImageDescriber.
-
 ---
 
 ## 12. Exporting Descriptions
 
-**HTML report:** Created automatically in each `wf_*` directory. Open `descriptions.html` in any browser. Images appear with thumbnails and their descriptions side by side.
+**HTML report:** Created automatically in each `wf_*` directory. Open `image_descriptions.html` in any browser. Images appear with thumbnails and their descriptions side by side.
 
 **Plain text:** `image_descriptions.txt` in each `wf_*` directory. One block per image, with a metadata header (timestamp, model, prompt style, EXIF information). Copy and paste into any application.
 
@@ -394,7 +394,7 @@ idt workflow ~/Photos --progress-status
 idt workflow https://example.com/gallery
 ```
 
-**Output:** A `wf_YYYY-MM-DD_HHMMSS_{model}_{prompt}/` directory is created in the current working directory. The source folder is not modified.
+**Output:** A `wf_{name}_{provider}_{model}_{prompt}_{timestamp}/` directory is created inside a `Descriptions/` subdirectory of the current working directory. The source folder is not modified.
 
 Running the same command again creates a new `wf_*` directory — existing results are never overwritten. Run as many times as you like with different models or prompts to build up a collection of descriptions for comparison.
 
@@ -418,7 +418,7 @@ idt extract-frames myvideo.mp4
 idt convert-images ~/Photos/iPhone
 
 # Regenerate the HTML report from existing descriptions (no new AI calls)
-idt descriptions-to-html wf_2026-03-28_120000_moondream_narrative
+idt descriptions-to-html Descriptions/wf_2026-03-28_ollama_moondream_narrative_120000/image_descriptions.txt
 
 # List all Ollama models currently installed
 idt check-models
@@ -670,10 +670,7 @@ You can write any prompt you want in place of the built-in styles.
 
 **In ImageDescriber:** Type directly in the Custom Prompt field in the sidebar before pressing `P`. To save it as a named style for future use, open `Tools → Edit Prompts`.
 
-**In the CLI:**
-```
-idt workflow ~/Photos --custom-prompt "List all visible objects in this image as a numbered list."
-```
+**In the CLI:** There is no inline `--custom-prompt` flag. To use a custom prompt from the CLI, add it to the config file first (see below) and then pass its name with `--prompt-style`.
 
 **In the config file:** Set `prompt_template` in `image_describer_config.json` to change the default for all runs.
 
@@ -891,10 +888,10 @@ Estimated costs are pre-calculated by `idt stats`. Cross-reference with publishe
 Every workflow run creates a self-contained directory:
 
 ```
-wf_2026-03-28_120000_moondream_narrative/
+wf_2026-03-28_ollama_moondream_narrative_120000/
 ├── image_descriptions.txt     ← one block per image, with metadata header
-├── descriptions.html           ← open in browser; thumbnails + descriptions
-├── workflow_metadata.json      ← model, prompt, timestamps, image count
+├── image_descriptions.html    ← open in browser; thumbnails + descriptions
+├── workflow_metadata.json     ← model, prompt, timestamps, image count
 └── logs/
     ├── workflow.log
     └── image_describer.log
@@ -946,10 +943,9 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 |---|---|
 | `idt guideme` | Interactive wizard — best starting point |
 | `idt workflow <path>` | Run workflow on a local folder or URL |
-| `idt imagedescriber [path]` | Open ImageDescriber, optionally loading a folder |
 | `idt extract-frames <video>` | Extract frames from a video file |
 | `idt convert-images <dir>` | Convert HEIC/HEIF images to JPEG |
-| `idt descriptions-to-html <dir>` | Regenerate HTML report from existing descriptions |
+| `idt descriptions-to-html <file.txt>` | Regenerate HTML report from existing descriptions |
 | `idt combinedescriptions` | Export all workflows to a CSV or TSV spreadsheet |
 | `idt stats` | Performance and cost analysis across workflow runs |
 | `idt contentreview` | Description quality and vocabulary analysis |
@@ -965,13 +961,15 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 
 | Key | Action |
 |---|---|
-| `P` | Process selected image |
-| `B` | Toggle batch mark on selected image |
+| `P` | Process current image |
+| `R` or `F2` | Rename selected item |
+| `M` | Add a manual description to selected image |
 | `F` | Ask a follow-up question about selected image |
 | `C` | Open AI chat |
 | `Ctrl+L` | Load a folder |
-| `Ctrl+U` | Open URL (download images from a web page) |
+| `Ctrl+U` | Load images from a URL |
 | `Ctrl+S` | Save workspace |
+| `Ctrl+V` | Paste image from clipboard |
 
 ---
 
@@ -1005,10 +1003,10 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 
 **Batch job appears stuck**
 
-- The window title should show `Batch Processing: X of Y` with an incrementing count
+- The window title should show `XX%, X of Y - ImageDescriber` with an incrementing count
 - Very large images take longer; the count does not update until an image finishes
 - Check `logs/image_describer.log` for errors
-- `Processing → Stop` cancels gracefully after the current image
+- Open `Process → Show Batch Progress` for a progress dialog with a Stop button to cancel gracefully after the current image
 
 **HEIC images not processing**
 
