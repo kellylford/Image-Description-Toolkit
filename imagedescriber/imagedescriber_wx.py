@@ -672,6 +672,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         video_dir = extracted_frames_dir / f"{video_path_obj.stem}"
         video_dir.mkdir(parents=True, exist_ok=True)
 
+        # Clear any files from a previous extraction run so stale frames
+        # (e.g. from a different mode or a previous failed run) can never
+        # co-mingle with the current output.  Only jpg files are removed;
+        # the directory itself is preserved.
+        for _old in list(video_dir.glob("*.jpg")):
+            try:
+                _old.unlink()
+            except OSError:
+                pass
+
         # Extract GPS/date metadata from the source video via ffprobe (if available).
         # If ffprobe is absent or the video has no tags, this is a safe no-op and
         # frame extraction continues exactly as before.

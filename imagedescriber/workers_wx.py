@@ -1522,7 +1522,15 @@ class VideoProcessingWorker(threading.Thread):
         
         video_dir.mkdir(parents=True, exist_ok=True)
 
-        # Extract GPS/date metadata from the source video via ffprobe (if available).
+        # Clear any files from a previous extraction run so stale frames
+        # (e.g. from a different mode or a previous failed run) can never
+        # co-mingle with the current output.  Only jpg files are removed;
+        # the directory itself is preserved.
+        for _old in list(video_dir.glob("*.jpg")):
+            try:
+                _old.unlink()
+            except OSError:
+                pass
         # If ffprobe is absent or the video has no tags, this is a safe no-op and
         # frame extraction continues exactly as before.
         video_source_metadata = None
