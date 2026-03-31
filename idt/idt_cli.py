@@ -98,7 +98,6 @@ def main():
     title_map = {
         'guideme': 'IDT - Guided Workflow',
         'workflow': 'IDT - Describing Images',
-        'imagedescriber': 'IDT - Image Describer',
         'stats': 'IDT - Analyzing Statistics',
         'contentreview': 'IDT - Content Review',
         'combinedescriptions': 'IDT - Combining Descriptions',
@@ -141,7 +140,7 @@ def main():
                 
                 # Set up sys.argv for the workflow script
                 original_argv = sys.argv[:]
-                sys.argv = ['workflow.py'] + args  # Use modified args with default output dir
+                sys.argv = ['idt workflow'] + args  # Use modified args with default output dir
                 
                 try:
                     # Run the workflow main function
@@ -236,7 +235,7 @@ def main():
                 
                 # Set up sys.argv for the stats script
                 original_argv = sys.argv[:]
-                sys.argv = ['stats_analysis.py'] + sys.argv[2:]
+                sys.argv = ['idt stats'] + sys.argv[2:]
                 
                 try:
                     return stats_analysis.main()
@@ -278,7 +277,7 @@ def main():
                 
                 # Set up sys.argv for the content script
                 original_argv = sys.argv[:]
-                sys.argv = ['content_analysis.py'] + sys.argv[2:]
+                sys.argv = ['idt contentreview'] + sys.argv[2:]
                 
                 try:
                     return content_analysis.main()
@@ -320,7 +319,7 @@ def main():
                 
                 # Set up sys.argv for the combine script
                 original_argv = sys.argv[:]
-                sys.argv = ['combine_workflow_descriptions.py'] + sys.argv[2:]
+                sys.argv = ['idt combinedescriptions'] + sys.argv[2:]
                 
                 try:
                     return combine_workflow_descriptions.main()
@@ -361,7 +360,7 @@ def main():
                 import check_models
                 
                 original_argv = sys.argv[:]
-                sys.argv = ['check_models.py'] + sys.argv[2:]
+                sys.argv = ['idt check-models'] + sys.argv[2:]
                 
                 try:
                     return check_models.main()
@@ -402,7 +401,7 @@ def main():
                 import list_results
                 
                 original_argv = sys.argv[:]
-                sys.argv = ['list_results.py'] + sys.argv[2:]
+                sys.argv = ['idt results-list'] + sys.argv[2:]
                 
                 try:
                     return list_results.main()
@@ -443,7 +442,7 @@ def main():
                 import list_prompts
                 
                 original_argv = sys.argv[:]
-                sys.argv = ['list_prompts.py'] + sys.argv[2:]
+                sys.argv = ['idt prompt-list'] + sys.argv[2:]
                 
                 try:
                     return list_prompts.main()
@@ -485,7 +484,7 @@ def main():
                 
                 # Set up sys.argv for the video frame extractor script
                 original_argv = sys.argv[:]
-                sys.argv = ['video_frame_extractor.py'] + sys.argv[2:]
+                sys.argv = ['idt extract-frames'] + sys.argv[2:]
                 
                 try:
                     return video_frame_extractor.main()
@@ -532,7 +531,7 @@ def main():
                 
                 # Set up sys.argv for the video describer script
                 original_argv = sys.argv[:]
-                sys.argv = ['video_describer.py'] + sys.argv[2:]
+                sys.argv = ['idt describe-video'] + sys.argv[2:]
                 
                 try:
                     return video_describer.main()
@@ -599,7 +598,7 @@ def main():
                 import descriptions_to_html as dth
                 # Rebuild argv: remove command token
                 original_argv = sys.argv[:]
-                sys.argv = ['descriptions_to_html.py'] + sys.argv[2:]
+                sys.argv = ['idt descriptions-to-html'] + sys.argv[2:]
                 try:
                     return dth.main()
                 except SystemExit as e:
@@ -630,7 +629,7 @@ def main():
                 import ConvertImage as ci
                 # Rebuild argv: remove command token
                 original_argv = sys.argv[:]
-                sys.argv = ['ConvertImage.py'] + sys.argv[2:]
+                sys.argv = ['idt convert-images'] + sys.argv[2:]
                 try:
                     return ci.main()
                 except SystemExit as e:
@@ -663,7 +662,7 @@ def main():
                 import guided_workflow
                 
                 original_argv = sys.argv[:]
-                sys.argv = ['guided_workflow.py'] + sys.argv[2:]
+                sys.argv = ['idt guideme'] + sys.argv[2:]
                 
                 try:
                     return guided_workflow.main()
@@ -721,51 +720,71 @@ USAGE:
     {base_call} <command> [options]
 
 COMMANDS:
-    guideme               Interactive wizard to build and run workflows
+    guideme               Interactive wizard to build and run a workflow
     workflow              Run image description workflow
-    imagedescriber        Launch the ImageDescriber GUI
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
     results-list          List available workflow results
-    check-models          Check installed Ollama models
+    check-models          Check available AI models (Ollama, OpenAI, Claude)
     prompt-list           List available prompt styles
     extract-frames        Extract frames from video files
-    describe-video        Generate AI description for videos
-    convert-images        Convert HEIC images to JPG
-    descriptions-to-html  Generate HTML report from descriptions
+    describe-video        Generate an AI description for a standalone video file
+    convert-images        Convert HEIC/HEIF images to JPEG
+    descriptions-to-html  Generate HTML report from a workflow descriptions file
     version               Show version information
     help                  Show this help message
 
-GLOBAL OPTIONS:
-    --config-workflow, --config-wf <file>         Workflow orchestration config (default: workflow_config.json)
-    --config-image-describer, --config-id <file>  Image describer config (prompts, AI, metadata)
-    --config-video <file>                         Video extraction config
+  Note: ImageDescriber is a standalone GUI application (ImageDescriber.exe /
+  ImageDescriber.app). It is not launched via idt -- open it directly from
+  your installation folder or Applications.
 
 WORKFLOW OPTIONS (idt workflow):
-    input_source                              Input directory or URL (optional with --resume)
-    --output-dir, -o <dir>                    Output directory (default: Descriptions)
-    --provider <name>                         AI provider: ollama, openai, claude (default: ollama)
-    --model <name>                            AI model name (e.g. llava, gpt-4o, claude-opus-4)
-    --prompt-style <style>                    Prompt style (see 'idt prompt-list' for options)
-    --steps <list>                            Comma-separated steps (default: video,convert,describe,html)
-    --resume, -r                              Resume an interrupted workflow
-    --redescribe                              Re-describe images with different AI settings
-    --dry-run                                 Show what would be done without executing
-    --download, -d <url>                      Download images from a URL before describing
-    --min-size <size>                         Minimum image size filter (e.g. 100KB, 1MB)
-    --max-images <n>                          Maximum number of images to download
-    --metadata / --no-metadata                Enable/disable metadata extraction (default: enabled)
-    --no-geocode                              Disable reverse geocoding
-    --verbose, -v                             Enable verbose logging
-    --batch                                   Non-interactive mode (skip prompts)
+    input_source                                  Input directory or URL
+                                                  (optional with --resume/--redescribe)
+    --output-dir, -o <dir>                        Output directory (default: Descriptions)
+    --provider <name>                             AI provider: ollama, openai, claude,
+                                                  huggingface, mlx (default: ollama)
+    --model <name>                                AI model name (e.g. llava, gpt-4o,
+                                                  claude-opus-4-5)
+    --prompt-style <style>                        Prompt style (see 'idt prompt-list')
+    --steps <list>                                Comma-separated steps
+                                                  (default: video,convert,describe,html)
+    --resume, -r <workflow_dir>                   Resume an interrupted workflow
+    --redescribe <workflow_dir>                   Re-describe images from an existing
+                                                  workflow with different AI settings
+    --preserve-descriptions                       When resuming, skip re-describing if
+                                                  already substantially complete
+    --timeout <seconds>                           Ollama request timeout in seconds
+                                                  (default: 90; increase for slow hardware)
+    --name <name>                                 Custom identifier appended to the
+                                                  workflow directory name
+    --api-key-file <file>                         File containing API key (OpenAI or Claude)
+    --download, -d <url>                          Download images from a URL before describing
+    --min-size <size>                             Minimum image size filter for downloads
+                                                  (e.g. 100KB, 1MB)
+    --max-images <n>                              Maximum number of images to download
+    --metadata / --no-metadata                    Enable/disable metadata extraction
+                                                  (default: enabled)
+    --no-geocode                                  Disable reverse geocoding
+    --dry-run                                     Show what would be done without executing
+    --batch                                       Non-interactive mode (skip prompts)
+    --verbose, -v                                 Enable verbose logging
+    --config-workflow, --config-wf <file>         Workflow orchestration config
+                                                  (default: workflow_config.json)
+    --config-image-describer, --config-id <file>  Image describer config (prompts, AI,
+                                                  metadata)
+    --config-video <file>                         Video extraction config
 
 VIDEO EXTRACTION OPTIONS (idt extract-frames):
-    input                                     Video file(s) or directory containing videos
+    input                                     Video file or directory containing videos
     --output-dir <dir>                        Output directory for extracted frames
-    --time <seconds>                          Time interval mode: extract one frame every N seconds
-    --scene <threshold>                       Scene change mode: sensitivity 1-100 (lower = more frames)
-    --config-video <file>                     Video config file (default: video_frame_extractor_config.json)
+    --time <seconds>                          Time interval mode: one frame every N seconds
+    --scene <threshold>                       Scene change mode: threshold 0-100, lower =
+                                              more sensitive (e.g. --scene 30).
+                                              Mutually exclusive with --time.
+    --config-video, --config, -c <file>       Video config file
+                                              (default: video_frame_extractor_config.json)
     --log-dir <dir>                           Directory for log files
     --create-config                           Create a default config file and exit
     --quiet                                   Suppress console output
@@ -775,13 +794,72 @@ VIDEO EXTRACTION OPTIONS (idt extract-frames):
 
 VIDEO DESCRIPTION OPTIONS (idt describe-video):
     video [video ...]                         One or more video files to describe
-    --provider <name>                         AI provider: ollama, openai, claude (default: ollama)
+    --provider <name>                         AI provider: ollama, openai, claude
+                                              (default: ollama)
     --model <name>                            Model name (default: llava)
     --prompt <text>                           Custom description prompt
     --frames <n>                              Number of frames to extract (default: 5)
-    --mode <mode>                             Frame selection: key_frames, uniform, scene_change
+    --mode <mode>                             Frame selection: key_frames, uniform,
+                                              scene_change (default: key_frames)
     --output, -o <file>                       Output file (.txt or .json)
+    --config, -c <file>                       Config file path
     --verbose, -v                             Enable verbose logging
+
+CONVERT IMAGES OPTIONS (idt convert-images):
+    input                                     HEIC/HEIF file or directory to convert
+    --output, -o <path>                       Output file or directory
+                                              (default: 'converted' subdirectory)
+    --recursive, -r                           Process subdirectories recursively
+    --quality, -q <1-100>                     JPEG quality (default: 95)
+    --no-metadata                             Don't preserve metadata in converted files
+    --verbose, -v                             Enable verbose logging
+    --quiet                                   Suppress console output
+
+DESCRIPTIONS TO HTML OPTIONS (idt descriptions-to-html):
+    input_file                                Descriptions text file
+                                              (default: image_descriptions.txt)
+    output_file                               Output HTML file (default: input file
+                                              with .html extension)
+    --title <text>                            Title for the HTML page
+                                              (default: 'Image Descriptions')
+    --full                                    Include full metadata details per image
+    --verbose                                 Enable verbose output
+
+COMBINE DESCRIPTIONS OPTIONS (idt combinedescriptions):
+    --input-dir <dir>                         Directory containing workflow folders
+                                              (default: auto-detect)
+    --output <file>                           Output filename
+                                              (default: analysis/results/combineddescriptions.csv)
+    --format csv|tsv|atsv                     Output format (default: csv; opens in Excel)
+    --sort name|date                          Sort by filename or EXIF date (default: date)
+
+STATS OPTIONS (idt stats):
+    --input-dir <dir>                         Directory containing workflow folders
+                                              (default: Descriptions/)
+    --csv-output <file>                       CSV output file
+                                              (default: analysis/results/workflow_timing_stats.csv)
+    --json-output <file>                      JSON output file
+                                              (default: analysis/results/workflow_statistics.json)
+    --text-output <file>                      Text report file
+                                              (default: analysis/results/workflow_report.txt)
+
+CONTENT REVIEW OPTIONS (idt contentreview):
+    --input <file>                            Combined descriptions CSV to review
+                                              (default: combineddescriptions.csv)
+    --output <file>                           Output CSV
+                                              (default: analysis/results/description_content_analysis.csv)
+
+CHECK MODELS OPTIONS (idt check-models):
+    --provider ollama|ollama-cloud|openai|claude   Check only a specific provider
+    --verbose, -v                             Show detailed model information
+    --json                                    Output as JSON (for scripting)
+
+RESULTS LIST OPTIONS (idt results-list):
+    --input-dir, -i <dir>                     Directory containing workflow results
+                                              (default: auto-detect)
+    --output, -o <file>                       Output CSV (default: workflow_results.csv)
+    --sort-by name|timestamp|provider|model   Sort field (default: timestamp)
+    --absolute-paths                          Use absolute paths in output
 
 EXAMPLES:
     # Interactive guided workflow (recommended for beginners)
@@ -794,7 +872,7 @@ EXAMPLES:
     {base_call} workflow photos/ --provider openai --model gpt-4o
 
     # Run workflow with Claude
-    {base_call} workflow photos/ --provider claude --model claude-opus-4
+    {base_call} workflow photos/ --provider claude --model claude-opus-4-5
 
     # Run only the describe step (skip video extraction and HTML)
     {base_call} workflow photos/ --steps describe
@@ -823,16 +901,19 @@ EXAMPLES:
     # Describe a video with more frames and a custom prompt
     {base_call} describe-video video.mp4 --frames 10 --prompt "Describe the key events"
 
-    # Convert HEIC images to JPG
+    # Convert HEIC images to JPEG
     {base_call} convert-images photos/
 
-    # Generate HTML report from existing descriptions
-    {base_call} descriptions-to-html wf_2025-01-15_143022_llava_Simple/
+    # Convert HEIC images recursively with custom quality
+    {base_call} convert-images photos/ --recursive --quality 90
+
+    # Generate HTML report from a workflow's descriptions file
+    {base_call} descriptions-to-html wf_2025-01-15_143022_llava_Simple/image_descriptions.txt
 
     # Analyze workflow statistics
     {base_call} stats
 
-    # Analyze description content quality
+    # Analyze description content quality (run combinedescriptions first)
     {base_call} contentreview
 
     # Combine descriptions to CSV
@@ -842,21 +923,19 @@ EXAMPLES:
     {base_call} results-list
     {base_call} results-list --input-dir /path/to/Descriptions
 
-    # Check available Ollama models
+    # Check available AI models
     {base_call} check-models
+    {base_call} check-models --provider ollama --verbose
 
     # List available prompt styles
     {base_call} prompt-list
     {base_call} prompt-list --verbose
 
-    # Launch the ImageDescriber GUI (includes viewer, prompt editor, config manager)
-    {base_call} imagedescriber
-
 NOTES:
-    - Requires Ollama to be installed for local AI models (https://ollama.ai)
-    - Requires API keys for OpenAI and Anthropic (set via environment variables)
-    - The ImageDescriber GUI includes: Viewer Mode, Prompt Editor, and Configuration Manager
-    - All commands support --help for detailed options
+    - Requires Ollama for local AI models (https://ollama.ai)
+    - Requires API keys for OpenAI (OPENAI_API_KEY) and Anthropic (ANTHROPIC_API_KEY)
+    - All commands support --help for their full option reference
+    - Run 'idt guideme' for an interactive setup walkthrough
 
 For detailed documentation, see the docs/ folder.
 """)
