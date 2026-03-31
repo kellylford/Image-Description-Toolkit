@@ -99,15 +99,6 @@ The guide covers all commands, workflow output format, prompt styles, video supp
 
 ---
 
-### Setup & Packaging
-
-- **Windows setup** (`winsetup.bat`) simplified — now installs IDT CLI and ImageDescriber only (PromptEditor and IDTConfigure are now integrated into ImageDescriber's Tools menu)
-- **Windows installer filename** now reflects the `VERSION` file automatically — no longer hardcoded to Beta 1
-- **macOS setup** updated to document MLX/Metal provider dependencies
-- MLX dependencies (`mlx-vlm`, `torch`) are platform-gated — Windows/Linux builds are unaffected
-
----
-
 ## Known Issues / Beta Notes
 
 - MLX model downloads are large (1–7 GB). Ensure adequate disk space before selecting a model for the first time.
@@ -121,4 +112,4 @@ The guide covers all commands, workflow output format, prompt styles, video supp
 Download `ImageDescriptionToolkitSetup_4.0.0Beta2_bld1.exe` and run the installer.
 
 ### macOS
-Download `IDT-4.0.0Beta2 bld1.dmg`, open it, and drag the apps to your Applications folder.
+Download `IDT-4.0.0Beta2 bld1.dmg`, open it, and copy/drag the apps to your Applications folder.
