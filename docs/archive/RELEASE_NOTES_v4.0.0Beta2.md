@@ -1,14 +1,14 @@
 # Release Notes: v4.0.0 Beta 2
 
-**Release Date:** March 28, 2026  
+**Release Date:** March 31, 2026  
 **Version:** 4.0.0 Beta 2  
-**Status:**  Beta — feedback welcome
+**Status:** Beta — feedback welcome
 
 ---
 
 ## Overview
 
-Beta 2 delivers one major new capability — **Apple on-device AI** via the MLX / Metal provider — alongside a significantly improved image browsing experience in ImageDescriber, richer video support, and several bug fixes.
+Beta 2 delivers one major new capability — **Apple on-device AI** via the MLX / Metal provider — alongside a significantly improved image browsing experience in ImageDescriber, richer video support, several bug fixes, and a complete user guide bundled with the installer.
 
 ---
 
@@ -53,6 +53,41 @@ Also in video:
 - Status bar shows video duration during frame extraction
 - Crash fix when a video reports fps ≤ 0
 - New **Tools → Install FFmpeg** menu item with platform-specific install instructions (winget on Windows, brew on macOS)
+
+---
+
+### Video: Scene Detection Accuracy (Post-Beta-2 Fix)
+
+MPEG/MPG files exposed three bugs in the enhanced scene detector that have been resolved:
+
+- **Timestamp calculation** — fps = 0 in MPEG container metadata caused divide-by-zero; real duration is now measured before sampling
+- **Output directory** — extracted frames from a prior run were not cleared before each new extraction, causing stale frames to appear in results
+- **Scene boundary detection** — candidate collection and fallback uniform sampling both had off-by-one and ordering issues that caused duplicate or missing frames in some MPG files
+
+These fixes improve reliability across all video formats, not just MPEG.
+
+---
+
+### CLI: Overhauled Help Text and Removed Deprecated Commands
+
+`idt --help` and every `idt <command> --help` have been rewritten to be accurate:
+
+- All `--help` output now shows `idt <command>` as the program name instead of the underlying script filename
+- `--provider` choices updated to include all supported providers (ollama, openai, claude, huggingface, mlx)
+- Removed several commands that no longer exist (`idt imagedescriber`, `idt prompteditor`, `idt configure`, `idt viewer`) — these previously silently failed with "Unknown command"
+- Fixed `descriptions-to-html` example to use the correct `.txt` file path argument
+- Added missing options sections for all commands that previously had no documented flags
+
+---
+
+### Documentation: Complete User Guide
+
+A comprehensive user guide covering both the CLI and ImageDescriber GUI is now included with every installation:
+
+- **Windows:** installed to `{app}\docs\IDT_User_Guide_4.0.0Beta2_bld1.md`
+- **macOS:** included in the DMG as `IDT/IDT_User_Guide_4.0.0Beta2_bld1.md`
+
+The guide covers all commands, workflow output format, prompt styles, video support, configuration, keyboard shortcuts, and troubleshooting.
 
 ---
 
