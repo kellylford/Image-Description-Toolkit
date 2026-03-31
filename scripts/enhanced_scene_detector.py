@@ -96,19 +96,35 @@ class EnhancedSceneDetector:
         if not cap.isOpened():
             raise ValueError(f"Cannot open video: {video_path}")
         
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0:
-            # Some MPEG/AVI containers report FPS as 0; fall back to 1 to avoid
-            # division-by-zero errors throughout the detector.
-            logger.warning(f"Video reported fps={fps:.4f}; using 1.0 fps fallback")
-            fps = 1.0
+        reported_fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps
         
-        logger.info(f"Analyzing video: {duration:.1f}s, {total_frames} frames, {fps:.2f} fps")
+        # Determine real duration using AVI-ratio seeking — works on MPEG/AVI
+        # containers that report fps=0 where total_frames/fps would be wrong.
+        real_duration = self._get_real_duration(cap)
         
-        # Phase 1: Collect candidate frames with change detection
-        candidates = self._collect_candidates(cap, fps, total_frames, progress_callback)
+        # Estimate fps from real duration when the container doesn't report it.
+        if reported_fps > 0:
+            fps = reported_fps
+        elif real_duration > 0 and total_frames > 0:
+            fps = total_frames / real_duration
+            logger.warning(
+                f"Video reported fps=0; estimated {fps:.2f} fps from "
+                f"real duration ({real_duration:.1f}s, {total_frames} frames)"
+            )
+        else:
+            fps = 25.0  # last resort — container provides no timing info at all
+            logger.warning("Cannot determine fps or duration; using 25.0 fps last-resort fallback")
+        
+        if real_duration <= 0:
+            real_duration = total_frames / fps if fps > 0 else 0
+        
+        logger.info(f"Analyzing video: {real_duration:.1f}s, {total_frames} frames, {fps:.2f} fps")
+        
+        # Phase 1: Collect candidate frames with change detection.
+        # Timestamps come from CAP_PROP_POS_MSEC after each read — these are
+        # always in real wall-clock seconds regardless of the reported fps value.
+        candidates = self._collect_candidates(cap, fps, total_frames, real_duration, progress_callback)
         
         cap.release()
         
@@ -117,20 +133,43 @@ class EnhancedSceneDetector:
             return self._fallback_uniform_sampling(video_path, fps, total_frames)
         
         # Phase 2: Select final frames from candidates
-        selected = self._select_final_frames(candidates, duration)
+        selected = self._select_final_frames(candidates, real_duration)
         
         logger.info(f"Selected {len(selected)} frames from {len(candidates)} candidates")
         return selected
     
-    def _collect_candidates(self, cap, fps: float, total_frames: int, 
+    def _get_real_duration(self, cap) -> float:
+        """Determine real video duration in seconds.
+        
+        Uses CAP_PROP_POS_AVI_RATIO to jump to the end and read the actual
+        position — this works for MPEG, AVI, and most containers even when
+        CAP_PROP_FPS reports 0.  Restores the original position before returning.
+        """
+        saved_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+        try:
+            cap.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)
+            end_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if end_ms > 0:
+                return end_ms / 1000.0
+        except Exception:
+            pass
+        finally:
+            cap.set(cv2.CAP_PROP_POS_MSEC, saved_ms)
+        return 0.0
+    
+    def _collect_candidates(self, cap, fps: float, total_frames: int,
+                            real_duration: float,
                            progress_callback=None) -> List[FrameInfo]:
         """
         First pass: Collect all potential scene change frames.
         
         Analyzes frame differences, motion patterns, and quality.
+        Timestamps come from CAP_PROP_POS_MSEC (real wall-clock time) so
+        they are correct even for containers that report fps=0 (MPEG/MPG).
+        Frame sampling is based on elapsed real time, not frame count, so
+        the check interval stays ~0.5 s regardless of reported fps.
         """
         candidates = []
-        prev_frame = None
         prev_gray = None
         
         # Motion history for detecting camera pans
@@ -140,16 +179,22 @@ class EnhancedSceneDetector:
         change_scores = []
         
         frame_num = 0
-        check_interval = max(1, int(fps * 0.5))  # Check every 0.5 seconds minimum
-        # fps is guaranteed > 0 at this point (detect_scenes() enforces the fallback)
+        # Sample every 0.5 real seconds — avoids analyzing 30× too many frames
+        # when fps=1.0 fallback is active for a real 30fps container.
+        check_interval_seconds = 0.5
+        last_check_time = -check_interval_seconds  # ensure first frame is always checked
         
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
             
-            # Only analyze every Nth frame for performance
-            if frame_num % check_interval == 0:
+            # Real timestamp from the container — correct for MPEG and all others.
+            current_time = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            
+            # Only analyse every check_interval_seconds of real video time
+            if current_time - last_check_time >= check_interval_seconds:
+                last_check_time = current_time
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 
                 if prev_gray is not None:
@@ -164,10 +209,10 @@ class EnhancedSceneDetector:
                     # Analyze motion type
                     motion_type = self._analyze_motion(diff, motion_history)
                     
-                    # Store candidate
+                    # Store candidate — timestamp is always in real seconds
                     info = FrameInfo(
                         frame_num=frame_num,
-                        timestamp=frame_num / fps if fps > 0 else float(frame_num),
+                        timestamp=current_time,
                         change_score=change_score,
                         quality_score=quality_score,
                         motion_type=motion_type
@@ -182,10 +227,15 @@ class EnhancedSceneDetector:
             
             frame_num += 1
             
-            # Progress update
+            # Progress update (based on real time when duration is known)
             if progress_callback and frame_num % 30 == 0:
-                progress = (frame_num / total_frames) * 100
-                progress_callback(frame_num, total_frames, 
+                if real_duration > 0:
+                    progress = min(100, (current_time / real_duration) * 100)
+                elif total_frames > 0:
+                    progress = (frame_num / total_frames) * 100
+                else:
+                    progress = 0
+                progress_callback(frame_num, total_frames,
                                 f"Analyzing: {progress:.0f}% ({len(candidates)} candidates)")
         
         # Calculate adaptive threshold if enabled
@@ -415,11 +465,28 @@ class EnhancedSceneDetector:
                                    total_frames: int) -> List[FrameInfo]:
         """
         Fallback when scene detection fails: uniform time sampling.
+        
+        Gets real duration from the container so that timestamps are seekable
+        even when the container reports fps=0 (MPEG/MPG files).
         """
+        # Get real duration so timestamps stay within the actual video length
+        cap = cv2.VideoCapture(video_path)
+        if cap.isOpened():
+            real_duration = self._get_real_duration(cap)
+            cap.release()
+        else:
+            real_duration = 0.0
+
+        if real_duration <= 0:
+            # Last resort: compute from fps (may be wrong for MPEG)
+            if fps <= 0:
+                fps = 25.0
+            real_duration = total_frames / fps
+
         if fps <= 0:
-            fps = 1.0
-        duration = total_frames / fps
-        interval = duration / (self.target_frames + 1)
+            fps = total_frames / real_duration if real_duration > 0 else 25.0
+
+        interval = real_duration / (self.target_frames + 1)
         
         frames = []
         for i in range(1, self.target_frames + 1):
