@@ -22,7 +22,8 @@ cd "$(dirname "$0")/../.."
 
 # Version information
 VERSION=$(cat VERSION 2>/dev/null || echo "1.0.0")
-DMG_NAME="IDT-${VERSION}"
+VERSION_CLEAN=$(echo "$VERSION" | tr ' ' '_')
+DMG_NAME="IDT-${VERSION_CLEAN}"
 
 echo "Building disk image for version: $VERSION"
 echo ""
@@ -100,6 +101,10 @@ echo "Copying CLI tool..."
 # Use ditto to preserve code signatures and extended attributes
 ditto "idt/dist/idt" "$DMG_STAGING/IDT/idt"
 chmod +x "$DMG_STAGING/IDT/idt"
+
+# Copy user guide with versioned filename
+echo "Copying user guide..."
+cp "docs/USER_GUIDE_COMPLETE.md" "$DMG_STAGING/IDT/IDT_User_Guide_${VERSION_CLEAN}.md"
 
 # Sign applications if code signing is enabled
 if [ "$SIGN_CODE" = "1" ]; then
@@ -200,6 +205,10 @@ WHAT'S INCLUDED IN THE IDT FOLDER:
 
   idt                - Command-line interface for all features
                         Can be run directly: ~/Applications/IDT/idt --help
+
+  IDT_User_Guide_${VERSION_CLEAN}.md
+                     - Complete user guide (open with any Markdown viewer
+                       or plain text editor)
 
   Config & Logs      - All configuration files and logs stay in this folder
                         Keeps your Applications folder clean and organized
