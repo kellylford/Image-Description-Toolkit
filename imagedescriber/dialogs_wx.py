@@ -580,10 +580,24 @@ class FollowupQuestionDialog(wx.Dialog):
                     for model in sorted(self.cached_ollama_models):
                         self.model_combo.Append(model)
                 else:
-                    # Fallback to common defaults (don't fetch live - would block UI)
-                    common_models = sorted(["moondream", "llava", "llama3.2-vision"])
-                    for model in common_models:
-                        self.model_combo.Append(model)
+                    # No cached models - try live detection from Ollama
+                    detected_models = []
+                    try:
+                        try:
+                            from ai_providers import get_available_providers
+                        except ImportError:
+                            from imagedescriber.ai_providers import get_available_providers
+                        providers = get_available_providers()
+                        if 'ollama' in providers:
+                            detected_models = providers['ollama'].get_available_models() or []
+                    except Exception as e:
+                        logger.warning(f"Could not detect Ollama models for followup dialog: {e}")
+                    if detected_models:
+                        for model in sorted(detected_models):
+                            self.model_combo.Append(model)
+                    elif self.original_model:
+                        # Last resort: show the model that was originally used
+                        self.model_combo.Append(self.original_model)
                         
             elif provider == "openai":
                 # Load from canonical list - supports both frozen and dev mode

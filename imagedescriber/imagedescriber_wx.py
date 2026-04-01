@@ -4910,6 +4910,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         original_provider = last_description.provider or self.config.get('default_provider', 'ollama')
         original_model = last_description.model or self.config.get('default_model', 'moondream')
 
+        # Ensure we have a fresh model list before opening the dialog
+        if self.cached_ollama_models is None:
+            self.refresh_ai_models_silent()
+
         # Show dialog with model selection
         from dialogs_wx import FollowupQuestionDialog
 
