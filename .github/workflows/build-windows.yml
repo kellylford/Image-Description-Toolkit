@@ -2,9 +2,9 @@ name: Build Windows Executables
 
 on:
   push:
-    branches: [ WXMigration ]
+    branches: [ WXMigration, feature/video-description, main, 'copilot/**' ]
   pull_request:
-    branches: [ WXMigration ]
+    branches: [ WXMigration, feature/video-description, main ]
   workflow_dispatch:  # Also allow manual trigger
 
 jobs:
