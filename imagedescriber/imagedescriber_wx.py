@@ -2655,6 +2655,27 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if elapsed > 0.5 or (self.workspace and len(self.workspace.items) > 100):
             logger.info(f"refresh_image_list took {elapsed:.2f}s for {len(self.workspace.items) if self.workspace else 0} items")
 
+    def _get_file_paths_under_node(self, node) -> list:
+        """Return all file paths (leaf items) that are descendants of a tree node.
+
+        Recursively walks children.  Folder nodes have GetItemData()==None and are
+        skipped; only nodes with a non-None file path are included.
+        """
+        paths = []
+        child, cookie = self.image_list.GetFirstChild(node)
+        while child.IsOk():
+            data = self.image_list.GetItemData(child)
+            if data is None:
+                # Nested folder node — recurse
+                paths.extend(self._get_file_paths_under_node(child))
+            elif data:
+                paths.append(data)
+                # Also collect children of this node (e.g. extracted video frames)
+                if self.image_list.ItemHasChildren(child):
+                    paths.extend(self._get_file_paths_under_node(child))
+            child, cookie = self.image_list.GetNextChild(node, cookie)
+        return paths
+
     def on_process_single(self, event):
         """Process single selected image or extract video frames"""
         logger.info("on_process_single CALLED")
@@ -2667,6 +2688,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def _on_process_single_impl(self, event):
         """Internal implementation of on_process_single"""
+        # Check if the selected tree node is a folder node (data == None).
+        # If so, process all images/frames under it as a batch instead of
+        # showing "No image selected".
+        selected_node = self.image_list.GetSelection()
+        if selected_node.IsOk() and self.image_list.GetItemData(selected_node) is None:
+            # Folder node selected — collect all file paths under it
+            folder_paths = self._get_file_paths_under_node(selected_node)
+            # Filter to items that exist in workspace and aren't already described
+            to_process = [
+                fp for fp in folder_paths
+                if fp in self.workspace.items and not self.workspace.items[fp].descriptions
+                and self.workspace.items[fp].item_type != "video"
+            ]
+            if not to_process:
+                show_info(self, "All images in this folder already have descriptions")
+                return
+            folder_label = self.image_list.GetItemText(selected_node)
+            self._run_batch_for_paths(event, to_process, folder_label)
+            return
+
         if not self.current_image_item:
             show_warning(self, "No image selected")
             return
@@ -3016,6 +3057,81 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.batch_worker.start()
 
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
+
+    def _run_batch_for_paths(self, event, to_process: list, context_label: str = "folder"):
+        """Start batch processing for an explicit list of file paths.
+
+        Used when the user presses Process with a folder node selected.  Shows
+        the same ProcessingOptionsDialog and BatchProgressDialog as on_process_all,
+        but operates only on the supplied paths rather than the whole workspace.
+        """
+        if not BatchProcessingWorker:
+            show_error(self, "Batch processing worker not available")
+            return
+
+        # Show processing options dialog
+        if ProcessingOptionsDialog:
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            if dialog.ShowModal() != wx.ID_OK:
+                dialog.Destroy()
+                return
+            options = dialog.get_config()
+            dialog.Destroy()
+        else:
+            options = {
+                'provider': self.config.get('default_provider', 'ollama'),
+                'model': self.config.get('default_model', 'moondream'),
+                'prompt_style': self.config.get('default_prompt_style', 'narrative'),
+                'custom_prompt': '',
+            }
+
+        # Mark items as pending
+        for idx, file_path in enumerate(to_process):
+            if file_path in self.workspace.items:
+                item = self.workspace.items[file_path]
+                item.processing_state = "pending"
+                item.batch_queue_position = idx
+
+        self.batch_worker = BatchProcessingWorker(
+            self,
+            to_process,
+            options['provider'],
+            options['model'],
+            options['prompt_style'],
+            options.get('custom_prompt', ''),
+            None,   # detection_settings
+            None,   # prompt_config_path
+            True,   # skip_existing
+            progress_offset=0
+        )
+
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
+
+        if BatchProgressDialog:
+            self._batch_active = True
+            self._token_records = []
+            self._batch_provider = options['provider']
+            self._batch_model = options['model']
+            self._batch_prompt = options.get('prompt_style', '')
+            self.batch_progress_dialog = BatchProgressDialog(
+                self, len(to_process),
+                batch_provider=self._batch_provider,
+                batch_model=self._batch_model,
+                batch_prompt=self._batch_prompt
+            )
+            self.batch_progress_dialog.Show()
+            self.batch_progress_dialog.Raise()
+            if hasattr(self, 'show_batch_progress_item'):
+                self.show_batch_progress_item.Enable(True)
+            if hasattr(self, 'workspace_stats_item'):
+                self.workspace_stats_item.Enable(False)
+
+        self.batch_worker.start()
+        self.SetStatusText(f"Processing {len(to_process)} images in '{context_label}'...", 0)
 
     def _extract_next_video_in_batch(self):
         """Extract next video in batch processing queue"""
