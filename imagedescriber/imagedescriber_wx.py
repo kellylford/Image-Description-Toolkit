@@ -425,6 +425,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # rebuild when the batch ends (natural completion or user stop). This keeps
         # the UI fully responsive on large collections (1000+ images).
         self._batch_active = False
+        # Guard against EVT_TREE_SEL_CHANGED firing during programmatic SelectItem() calls
+        # inside refresh_image_list().  wx.TreeCtrl.SelectItem() fires the event unlike
+        # wx.ListBox.SetSelection() which does not - so without this flag every list
+        # rebuild would synchronously load a preview image on the main thread.
+        self._refreshing_list = False
         # Per-batch token usage accumulation (reset each time a new batch starts)
         self._token_records = []   # list of {input, output, total, name} dicts
         # Batch settings shown in the progress dialog Job Settings section
@@ -1000,9 +1005,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.search_ctrl.Bind(wx.EVT_CHAR_HOOK, self.on_search_key)
         clear_btn.Bind(wx.EVT_BUTTON, self.on_clear_search)
 
-        # Image list (using ListBox for accessibility - single tab stop)
-        self.image_list = wx.ListBox(panel, name="Images in workspace", style=wx.LB_SINGLE | wx.LB_NEEDED_SB)
-        self.image_list.Bind(wx.EVT_LISTBOX, self.on_image_selected)
+        # Image list using TreeCtrl: videos become expandable nodes, extracted
+        # frames appear as their children, regular images are leaf nodes.
+        # TR_HIDE_ROOT hides the invisible root so all top-level items look
+        # like root items. TR_HAS_BUTTONS adds the expand/collapse arrows.
+        self.image_list = wx.TreeCtrl(
+            panel,
+            name="Images in workspace",
+            style=(wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_SINGLE
+                   | wx.TR_HAS_BUTTONS | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
+        )
+        # Hidden root that anchors all top-level items
+        self._image_tree_root = self.image_list.AddRoot("Images")
+        self.image_list.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_image_selected)
         self.image_list.Bind(wx.EVT_CHAR_HOOK, self.on_image_list_key)
         sizer.Add(self.image_list, 1, wx.EXPAND | wx.ALL, 5)
 
@@ -1395,10 +1410,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_image_selected(self, event):
         """Handle image selection"""
-        selection = self.image_list.GetSelection()
-        if selection != wx.NOT_FOUND:
-            file_path = self.image_list.GetClientData(selection)
-            if file_path and file_path in self.workspace.items:
+        # Skip expensive I/O during programmatic SelectItem() calls in refresh_image_list().
+        # TreeCtrl fires EVT_TREE_SEL_CHANGED for programmatic selections (unlike ListBox
+        # which does not fire EVT_LISTBOX for SetSelection).  Without this guard each list
+        # rebuild would synchronously load a preview image, freezing the main thread.
+        if self._refreshing_list:
+            return
+        item = self.image_list.GetSelection()
+        if item.IsOk():
+            file_path = self.image_list.GetItemData(item)
+            # file_path is None for folder nodes — clicking a folder just focuses it,
+            # it does not change the current image or load a preview.
+            if file_path is None:
+                return
+            if file_path and self.workspace and file_path in self.workspace.items:
                 self.current_image_item = self.workspace.items[file_path]
                 self.display_image_info(self.current_image_item)
                 # Load preview image or video frame placeholder
@@ -1423,23 +1448,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if self.desc_list:
                 self.desc_list.SetFocus()
             return
-        # EVT_LISTBOX does not fire on arrow key navigation on macOS.
-        # EVT_CHAR_HOOK fires BEFORE the native Cocoa widget updates its
-        # selection, so wx.CallAfter still reads the old index.
-        # Solution: own the navigation entirely - compute and set the new
-        # selection ourselves, then load the image immediately.
+        # On macOS, EVT_TREE_SEL_CHANGED may not fire when arrow keys change
+        # the selection because EVT_CHAR_HOOK fires BEFORE the native Cocoa
+        # widget updates its internal state.  Own the navigation here so that
+        # the new item is selected and the preview is updated immediately.
         if keycode in (wx.WXK_UP, wx.WXK_DOWN):
-            count = self.image_list.GetCount()
-            if count > 0:
-                current = self.image_list.GetSelection()
-                if keycode == wx.WXK_UP:
-                    new_sel = max(0, (current - 1) if current != wx.NOT_FOUND else 0)
+            current = self.image_list.GetSelection()
+            if keycode == wx.WXK_UP:
+                if current.IsOk():
+                    new_item = self.image_list.GetPrevVisible(current)
+                    if not new_item.IsOk():
+                        new_item = current  # Already at the top
                 else:
-                    new_sel = min(count - 1, (current + 1) if current != wx.NOT_FOUND else 0)
-                if new_sel != current:
-                    self.image_list.SetSelection(new_sel)
-                    self.image_list.EnsureVisible(new_sel)
-                    self.on_image_selected(None)
+                    new_item = self.image_list.GetFirstVisibleItem()
+            else:
+                if current.IsOk():
+                    new_item = self.image_list.GetNextVisible(current)
+                    if not new_item.IsOk():
+                        new_item = current  # Already at the bottom
+                else:
+                    new_item = self.image_list.GetFirstVisibleItem()
+            if new_item.IsOk() and new_item != current:
+                self.image_list.SelectItem(new_item)
+                self.image_list.EnsureVisible(new_item)
+                self.on_image_selected(None)
             return  # Consume the event - we handled navigation fully
         event.Skip()
 
@@ -2319,20 +2351,52 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # PERFORMANCE DIAGNOSTIC: Track how long this takes
         start_time = time.time()
 
+        # Ensure the hidden root exists (it is removed by DeleteAllItems).
+        # Returns the root TreeItemId (creating it if necessary).
+        def _get_or_create_root():
+            root = self.image_list.GetRootItem()
+            if not root.IsOk():
+                self._image_tree_root = self.image_list.AddRoot("Images")
+                return self._image_tree_root
+            return root
+
         # Guard against no workspace
         if not self.workspace or not self.workspace.items:
-            self.image_list.Clear()
+            self.image_list.DeleteAllItems()
+            _get_or_create_root()
             return
 
-        # PRESERVE FOCUS: Remember currently selected item before refresh
-        current_selection = self.image_list.GetSelection()
+        # PRESERVE STATE: Remember currently selected file path and which
+        # video nodes the user has expanded/collapsed.
+        current_item = self.image_list.GetSelection()
         current_file_path = None
-        if current_selection != wx.NOT_FOUND:
-            current_file_path = self.image_list.GetClientData(current_selection)
+        if current_item.IsOk():
+            current_file_path = self.image_list.GetItemData(current_item)
 
-        self.image_list.Clear()
+        # Track expanded state of video nodes and folder nodes so we can restore
+        # it after rebuild.  Key = file_path for video nodes, subfolder path string
+        # for folder nodes.  We never auto-expand anything — only the user can
+        # open/close nodes (good for accessibility: no surprise tree mutations on focus).
+        expanded_videos = set()    # file paths of video nodes the user has expanded
+        expanded_folders = set()   # subfolder strings the user has expanded
+        root = self.image_list.GetRootItem()
+        if root.IsOk():
+            child, cookie = self.image_list.GetFirstChild(root)
+            while child.IsOk():
+                data = self.image_list.GetItemData(child)
+                if data is None:
+                    # Folder node — data is a subfolder string stored as the label text
+                    if self.image_list.IsExpanded(child):
+                        expanded_folders.add(self.image_list.GetItemText(child))
+                elif data and self.image_list.IsExpanded(child):
+                    expanded_videos.add(data)
+                child, cookie = self.image_list.GetNextChild(root, cookie)
 
-        new_selection_index = wx.NOT_FOUND
+        # Rebuild tree from scratch
+        self.image_list.DeleteAllItems()
+        root = _get_or_create_root()
+
+        new_selection_item = None
 
         # Separate items into categories
         videos = []
@@ -2392,61 +2456,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # This keeps them in extraction order
             frames[parent].sort(key=lambda x: x[0])
 
-        # Merge videos and regular images in chronological order
-        all_items = []
-
         # Combine and sort videos + regular images together by date
         mixed_items = videos + regular_images
         mixed_items.sort(key=lambda x: get_sort_date(x[0]))
 
-        # Build display list: insert extracted frames right after their parent videos
-        for file_path, item in mixed_items:
-            all_items.append((file_path, item, 0))  # indent level 0
-
-            # If this is a video with extracted frames, insert them immediately after
-            if item.item_type == "video" and file_path in frames:
-                # Sort frames by timestamp (extracted from filename like "video_10.00s.jpg")
-                def extract_timestamp(frame_tuple):
-                    frame_path = frame_tuple[0]
-                    # Extract timestamp from filename (e.g., "video_10.00s.jpg" -> 10.00)
-                    try:
-                        import re
-                        match = re.search(r'_(\d+\.?\d*)s\.', Path(frame_path).name)
-                        if match:
-                            return float(match.group(1))
-                    except Exception:
-                        pass
-                    # Fallback to mtime if timestamp extraction fails
-                    try:
-                        return Path(frame_path).stat().st_mtime
-                    except Exception:
-                        return 0
-
-                sorted_frames = sorted(frames[file_path], key=extract_timestamp)
-                for frame_path, frame_item in sorted_frames:
-                    all_items.append((frame_path, frame_item, 1))  # indent level 1
-
-        # Display all items
-        type_filter_count = 0  # items passing the type filter (before text search)
-        for file_path, item, indent_level in all_items:
-            # Apply type filter
-            if self.current_filter == "described":
-                if not item.descriptions:
-                    continue
-            elif self.current_filter == "undescribed":
-                if item.descriptions:
-                    continue
-            elif self.current_filter == "videos":
-                # Show videos and their extracted frames only
-                if item.item_type not in ["video", "extracted_frame"]:
-                    continue
-
-            type_filter_count += 1
-
-            # Apply text search filter if active
-            if self.search_filter_text and not self._matches_search(item, self.search_filter_text):
-                continue
-
+        def _build_display_name(file_path, item):
+            """Return the label shown in the tree for a single item."""
             base_name = Path(file_path).name
             prefix_parts = []
 
@@ -2472,51 +2487,194 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 frame_count = len(item.extracted_frames)
                 prefix_parts.append(f"E{frame_count}")
 
-            # 4. Item type icon indicator (removed for screen reader accessibility)
-            type_icon = ""
-
-            # Combine prefix and display name with indentation
-            indent = "  " * indent_level  # Two spaces per level
             if prefix_parts:
-                prefix = "".join(prefix_parts)
-                display_name = f"{indent}{type_icon}{prefix} {base_name}"
-            else:
-                display_name = f"{indent}{type_icon}{base_name}"
+                return "".join(prefix_parts) + " " + base_name
+            return base_name
 
-            index = self.image_list.Append(display_name, file_path)  # Store file_path as client data
+        def _extract_timestamp(frame_path):
+            """Extract numeric timestamp from a frame filename like 'video_10.00s.jpg'."""
+            try:
+                match = re.search(r'_(\d+\.?\d*)s\.', Path(frame_path).name)
+                if match:
+                    return float(match.group(1))
+            except Exception:
+                pass
+            try:
+                return Path(frame_path).stat().st_mtime
+            except Exception:
+                return 0
 
-            # Track if this is the previously selected item
-            if current_file_path and file_path == current_file_path:
-                new_selection_index = index
+        # Build the tree: folder nodes group items by subfolder, with videos
+        # nested one level deeper inside those groups (or at root for root-level items).
+        # Extracted frames are children of their parent video node.
+        # Folder nodes are NEVER auto-expanded — only the user controls expand/collapse.
+        type_filter_count = 0  # items passing the type filter (before text search)
+        displayed_count = 0
+
+        # Group mixed_items by subfolder.  Order of subfolders follows the first
+        # item encountered (i.e. chronological within each group since mixed_items
+        # is already sorted by date).
+        from collections import OrderedDict
+        subfolder_groups: OrderedDict = OrderedDict()  # subfolder_str -> [(file_path, item)]
+        for file_path, item in mixed_items:
+            key = item.subfolder or ""  # "" = root level
+            if key not in subfolder_groups:
+                subfolder_groups[key] = []
+            subfolder_groups[key].append((file_path, item))
+
+        # Map of subfolder string -> tree node (created lazily as items are added)
+        folder_nodes: dict = {}
+
+        def _get_or_create_folder_node(subfolder: str):
+            """Return (or create) the folder node for the given subfolder path.
+            Folder nodes use SetItemData(None) so on_image_selected ignores them.
+            The subfolder string is used as the label (last component for nested paths).
+            """
+            if subfolder in folder_nodes:
+                return folder_nodes[subfolder]
+            # For nested paths like "Vacation/Beach", create parents first
+            parts = Path(subfolder).parts
+            parent_node = root
+            accumulated = ""
+            for part in parts:
+                accumulated = str(Path(accumulated) / part) if accumulated else part
+                if accumulated not in folder_nodes:
+                    node = self.image_list.AppendItem(parent_node, part)
+                    self.image_list.SetItemData(node, None)  # None = folder node
+                    # Restore user's expand state; never auto-expand
+                    if accumulated in expanded_folders:
+                        self.image_list.Expand(node)
+                    folder_nodes[accumulated] = node
+                parent_node = folder_nodes[accumulated]
+            return folder_nodes[subfolder]
+
+        for subfolder_key, items_in_group in subfolder_groups.items():
+            parent_node = _get_or_create_folder_node(subfolder_key) if subfolder_key else root
+
+            for file_path, item in items_in_group:
+                # Apply type filter
+                if self.current_filter == "described":
+                    if not item.descriptions:
+                        continue
+                elif self.current_filter == "undescribed":
+                    if item.descriptions:
+                        continue
+                elif self.current_filter == "videos":
+                    if item.item_type not in ["video", "extracted_frame"]:
+                        continue
+
+                type_filter_count += 1
+
+                # Apply text search filter if active
+                if self.search_filter_text and not self._matches_search(item, self.search_filter_text):
+                    continue
+
+                display_name = _build_display_name(file_path, item)
+                tree_item = self.image_list.AppendItem(parent_node, display_name)
+                self.image_list.SetItemData(tree_item, file_path)
+                displayed_count += 1
+
+                if current_file_path and file_path == current_file_path:
+                    new_selection_item = tree_item
+
+                # Add extracted frames as children if this is a video
+                if item.item_type == "video" and file_path in frames:
+                    sorted_frame_paths = sorted(
+                        (fp for fp, _ in frames[file_path]),
+                        key=_extract_timestamp
+                    )
+                    frames_added = 0
+                    for frame_path in sorted_frame_paths:
+                        frame_item_obj = self.workspace.items.get(frame_path)
+                        if frame_item_obj is None:
+                            continue
+
+                        # Apply type filter for frames
+                        if self.current_filter == "described":
+                            if not frame_item_obj.descriptions:
+                                continue
+                        elif self.current_filter == "undescribed":
+                            if frame_item_obj.descriptions:
+                                continue
+
+                        type_filter_count += 1
+
+                        if self.search_filter_text and not self._matches_search(frame_item_obj, self.search_filter_text):
+                            continue
+
+                        frame_display = _build_display_name(frame_path, frame_item_obj)
+                        frame_node = self.image_list.AppendItem(tree_item, frame_display)
+                        self.image_list.SetItemData(frame_node, frame_path)
+                        displayed_count += 1
+                        frames_added += 1
+
+                        if current_file_path and frame_path == current_file_path:
+                            new_selection_item = frame_node
+
+                    # Restore video expand state (never auto-expand)
+                    if frames_added > 0 and file_path in expanded_videos:
+                        self.image_list.Expand(tree_item)
+
+        # Prune folder nodes that ended up with zero visible children (all filtered out)
+        for subfolder_str, folder_node in list(folder_nodes.items()):
+            if folder_node.IsOk() and not self.image_list.ItemHasChildren(folder_node):
+                self.image_list.Delete(folder_node)
 
         # Update label with result count when text search is active
         if hasattr(self, 'image_list_label'):
-            displayed = self.image_list.GetCount()
             if self.search_filter_text:
-                self.image_list_label.SetLabel(f"Images ({displayed} of {type_filter_count}):")
+                self.image_list_label.SetLabel(f"Images ({displayed_count} of {type_filter_count}):")
             else:
                 self.image_list_label.SetLabel("Images:")
 
-        # RESTORE FOCUS: Select the same item after refresh
-        if new_selection_index != wx.NOT_FOUND:
-            self.image_list.SetSelection(new_selection_index)
-            # Ensure it's visible
-            self.image_list.EnsureVisible(new_selection_index)
-        elif self.image_list.GetCount() > 0:
-            # No previous selection - select first item (e.g., after loading directory)
-            self.image_list.SetSelection(0)
-            self.image_list.EnsureVisible(0)
-            # Trigger selection event to update display
-            first_file_path = self.image_list.GetClientData(0)
-            if first_file_path and first_file_path in self.workspace.items:
-                self.current_image_item = self.workspace.items[first_file_path]
-                self.display_image_info(self.current_image_item)
-                self.update_preview_for_item(self.current_image_item)
+        # RESTORE FOCUS: Select the same item after refresh.
+        # Use _refreshing_list flag to suppress EVT_TREE_SEL_CHANGED during programmatic
+        # SelectItem() - TreeCtrl fires the event for programmatic selections unlike ListBox.
+        self._refreshing_list = True
+        try:
+            if new_selection_item is not None:
+                self.image_list.SelectItem(new_selection_item)
+                # Ensure it's visible (may need to expand parent first)
+                self.image_list.EnsureVisible(new_selection_item)
+            elif displayed_count > 0:
+                # No previous selection - select first visible item (e.g., after loading directory)
+                first = self.image_list.GetFirstVisibleItem()
+                if first.IsOk():
+                    self.image_list.SelectItem(first)
+                    self.image_list.EnsureVisible(first)
+                    first_file_path = self.image_list.GetItemData(first)
+                    if first_file_path and first_file_path in self.workspace.items:
+                        self.current_image_item = self.workspace.items[first_file_path]
+                        self.display_image_info(self.current_image_item)
+                        self.update_preview_for_item(self.current_image_item)
+        finally:
+            self._refreshing_list = False
 
         # PERFORMANCE DIAGNOSTIC: Log refresh time for large lists
         elapsed = time.time() - start_time
         if elapsed > 0.5 or (self.workspace and len(self.workspace.items) > 100):
             logger.info(f"refresh_image_list took {elapsed:.2f}s for {len(self.workspace.items) if self.workspace else 0} items")
+
+    def _get_file_paths_under_node(self, node) -> list:
+        """Return all file paths (leaf items) that are descendants of a tree node.
+
+        Recursively walks children.  Folder nodes have GetItemData()==None and are
+        skipped; only nodes with a non-None file path are included.
+        """
+        paths = []
+        child, cookie = self.image_list.GetFirstChild(node)
+        while child.IsOk():
+            data = self.image_list.GetItemData(child)
+            if data is None:
+                # Nested folder node — recurse
+                paths.extend(self._get_file_paths_under_node(child))
+            elif data:
+                paths.append(data)
+                # Also collect children of this node (e.g. extracted video frames)
+                if self.image_list.ItemHasChildren(child):
+                    paths.extend(self._get_file_paths_under_node(child))
+            child, cookie = self.image_list.GetNextChild(node, cookie)
+        return paths
 
     def on_process_single(self, event):
         """Process single selected image or extract video frames"""
@@ -2530,6 +2688,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def _on_process_single_impl(self, event):
         """Internal implementation of on_process_single"""
+        # Check if the selected tree node is a folder node (data == None).
+        # If so, process all images/frames under it as a batch instead of
+        # showing "No image selected".
+        selected_node = self.image_list.GetSelection()
+        if selected_node.IsOk() and self.image_list.GetItemData(selected_node) is None:
+            # Folder node selected — collect all file paths under it
+            folder_paths = self._get_file_paths_under_node(selected_node)
+            # Filter to items that exist in workspace and aren't already described
+            to_process = [
+                fp for fp in folder_paths
+                if fp in self.workspace.items and not self.workspace.items[fp].descriptions
+                and self.workspace.items[fp].item_type != "video"
+            ]
+            if not to_process:
+                show_info(self, "All images in this folder already have descriptions")
+                return
+            folder_label = self.image_list.GetItemText(selected_node)
+            self._run_batch_for_paths(event, to_process, folder_label)
+            return
+
         if not self.current_image_item:
             show_warning(self, "No image selected")
             return
@@ -2880,6 +3058,81 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
 
+    def _run_batch_for_paths(self, event, to_process: list, context_label: str = "folder"):
+        """Start batch processing for an explicit list of file paths.
+
+        Used when the user presses Process with a folder node selected.  Shows
+        the same ProcessingOptionsDialog and BatchProgressDialog as on_process_all,
+        but operates only on the supplied paths rather than the whole workspace.
+        """
+        if not BatchProcessingWorker:
+            show_error(self, "Batch processing worker not available")
+            return
+
+        # Show processing options dialog
+        if ProcessingOptionsDialog:
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            if dialog.ShowModal() != wx.ID_OK:
+                dialog.Destroy()
+                return
+            options = dialog.get_config()
+            dialog.Destroy()
+        else:
+            options = {
+                'provider': self.config.get('default_provider', 'ollama'),
+                'model': self.config.get('default_model', 'moondream'),
+                'prompt_style': self.config.get('default_prompt_style', 'narrative'),
+                'custom_prompt': '',
+            }
+
+        # Mark items as pending
+        for idx, file_path in enumerate(to_process):
+            if file_path in self.workspace.items:
+                item = self.workspace.items[file_path]
+                item.processing_state = "pending"
+                item.batch_queue_position = idx
+
+        self.batch_worker = BatchProcessingWorker(
+            self,
+            to_process,
+            options['provider'],
+            options['model'],
+            options['prompt_style'],
+            options.get('custom_prompt', ''),
+            None,   # detection_settings
+            None,   # prompt_config_path
+            True,   # skip_existing
+            progress_offset=0
+        )
+
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+
+        if self.workspace_file:
+            self.save_workspace(self.workspace_file)
+
+        if BatchProgressDialog:
+            self._batch_active = True
+            self._token_records = []
+            self._batch_provider = options['provider']
+            self._batch_model = options['model']
+            self._batch_prompt = options.get('prompt_style', '')
+            self.batch_progress_dialog = BatchProgressDialog(
+                self, len(to_process),
+                batch_provider=self._batch_provider,
+                batch_model=self._batch_model,
+                batch_prompt=self._batch_prompt
+            )
+            self.batch_progress_dialog.Show()
+            self.batch_progress_dialog.Raise()
+            if hasattr(self, 'show_batch_progress_item'):
+                self.show_batch_progress_item.Enable(True)
+            if hasattr(self, 'workspace_stats_item'):
+                self.workspace_stats_item.Enable(False)
+
+        self.batch_worker.start()
+        self.SetStatusText(f"Processing {len(to_process)} images in '{context_label}'...", 0)
+
     def _extract_next_video_in_batch(self):
         """Extract next video in batch processing queue"""
         print(f"_extract_next_video_in_batch: count={self._extracted_video_count}, total={len(self._videos_to_extract)}", flush=True)
@@ -3145,7 +3398,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.current_image_item = None
 
         # Clear UI
-        self.image_list.Clear()
+        self.image_list.DeleteAllItems()
+        self._image_tree_root = self.image_list.AddRoot("Images")
         self.description_text.SetValue("")
         self.image_info_label.SetLabel("No image selected")
 
@@ -4074,6 +4328,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         Just add files to workspace with minimal metadata (mtime only).
         Actual EXIF extraction happens lazily in refresh_image_list's get_sort_date().
         """
+        scan_root = getattr(event, 'scan_root', None)  # Path of scanned root dir (for subfolder)
+
         # Add discovered files to workspace
         for file_path in event.files:
             file_path_str = str(file_path)
@@ -4086,6 +4342,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                 # Create item with MINIMAL metadata (no network I/O!)
                 item = ImageItem(file_path_str, item_type)
+
+                # Compute subfolder relative to scan root (e.g. "Vacation/Beach")
+                # None means root-level (no subfolder grouping needed)
+                if scan_root is not None:
+                    try:
+                        relative = file_path.relative_to(scan_root)
+                        parent = relative.parent
+                        if str(parent) not in ('', '.'):
+                            item.subfolder = str(parent)
+                    except ValueError:
+                        pass  # file_path not under scan_root — leave subfolder as None
 
                 # ONLY cache file mtime (already available from directory scan, no extra I/O)
                 try:

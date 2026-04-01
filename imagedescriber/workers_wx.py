@@ -159,11 +159,12 @@ class WorkflowFailedEventData(WorkflowFailedEvent):
 
 class FilesDiscoveredEventData(FilesDiscoveredEvent):
     """Event data for file discovery during directory scan"""
-    def __init__(self, files, batch_number, total_batches):
+    def __init__(self, files, batch_number, total_batches, scan_root=None):
         FilesDiscoveredEvent.__init__(self)
         self.files = files  # List of Path objects
         self.batch_number = batch_number  # Current batch number
         self.total_batches = total_batches  # Total batches (may be estimate)
+        self.scan_root = scan_root  # Path: root directory of this scan (for subfolder computation)
 
 
 class ScanProgressEventData(ScanProgressEvent):
@@ -2120,7 +2121,8 @@ class DirectoryScanWorker(threading.Thread):
             evt = FilesDiscoveredEventData(
                 files=batch.copy(),  # Copy to avoid reference issues
                 batch_number=batch_number,
-                total_batches=total_batches
+                total_batches=total_batches,
+                scan_root=self.directory_path  # Pass root so handler can compute subfolders
             )
             wx.PostEvent(self.parent_window, evt)
         except Exception as e:

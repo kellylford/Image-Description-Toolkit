@@ -105,6 +105,11 @@ class ImageItem:
         # This is critical for network share access where repeated reads are 10-100x slower
         self.exif_datetime: Optional[str] = None  # Cached EXIF datetime (ISO format) from DateTimeOriginal→DateTimeDigitized→DateTime
         self.file_mtime: Optional[float] = None  # Cached file modification time (fallback for sorting)
+
+        # Subfolder grouping: path of this item relative to the scanned root directory.
+        # e.g. "Vacation", "Vacation/Beach", or None for root-level items.
+        # Used by the tree view to group items under folder nodes.
+        self.subfolder: Optional[str] = None
         
     def add_description(self, description: ImageDescription):
         self.descriptions.append(description)
@@ -131,7 +136,9 @@ class ImageItem:
             "batch_queue_position": self.batch_queue_position,
             # Performance optimization caches
             "exif_datetime": self.exif_datetime,
-            "file_mtime": self.file_mtime
+            "file_mtime": self.file_mtime,
+            # Subfolder grouping for tree view
+            "subfolder": self.subfolder
         }
     
     @classmethod
@@ -160,6 +167,8 @@ class ImageItem:
         # Performance optimization caches - backward compatible defaults
         item.exif_datetime = data.get("exif_datetime", None)
         item.file_mtime = data.get("file_mtime", None)
+        # Subfolder grouping - backward compatible default (None = root level)
+        item.subfolder = data.get("subfolder", None)
         return item
 
 
