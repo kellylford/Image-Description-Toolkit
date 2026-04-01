@@ -681,6 +681,7 @@ class ImageDescriptionViewer(wx.Frame):
         # See ACCESSIBLE_LISTBOX_PATTERN.txt for details
         self.desc_list = DescriptionListBox(left_panel, style=wx.LB_SINGLE)
         self.desc_list.Bind(wx.EVT_LISTBOX, self.on_description_selected)
+        self.desc_list.Bind(wx.EVT_CHAR_HOOK, self.on_desc_list_key)
         left_sizer.Add(self.desc_list, 1, wx.ALL | wx.EXPAND, 5)
         
         left_panel.SetSizer(left_sizer)
@@ -1254,33 +1255,36 @@ class ImageDescriptionViewer(wx.Frame):
         # Return entry only if it has both a file path and description
         return entry if (entry['description'] and entry['file_path']) else None
     
-    def on_description_selected(self, event):
-        """Handle description selection"""
-        sel = self.desc_list.GetSelection()
-        if sel != wx.NOT_FOUND:
-            self.display_description(sel)
-    
-    def on_list_key_down(self, event):
-        """Handle keyboard navigation in list"""
+    def on_desc_list_key(self, event):
+        """Handle keyboard navigation in description list.
+
+        EVT_LISTBOX does not fire on arrow key navigation on macOS because
+        Cocoa handles it natively. EVT_CHAR_HOOK fires BEFORE Cocoa updates
+        the selection, so wx.CallAfter still reads the old index.
+        Solution: own the navigation — compute the new index ourselves and
+        call display_description directly.
+        """
         keycode = event.GetKeyCode()
-        
-        if keycode == wx.WXK_UP or keycode == wx.WXK_DOWN:
-            event.Skip()  # Let default handling work
-            wx.CallAfter(self.update_after_key_nav)
+        if keycode in (wx.WXK_UP, wx.WXK_DOWN):
+            count = self.desc_list.GetCount()
+            if count > 0:
+                current = self.desc_list.GetSelection()
+                if keycode == wx.WXK_UP:
+                    new_sel = max(0, (current - 1) if current != wx.NOT_FOUND else 0)
+                else:
+                    new_sel = min(count - 1, (current + 1) if current != wx.NOT_FOUND else 0)
+                if new_sel != current:
+                    self.desc_list.SetSelection(new_sel)
+                    self.desc_list.EnsureVisible(new_sel)
+                    self.display_description(new_sel)
+            return  # Consume the event — we handled navigation fully
         elif keycode == wx.WXK_RETURN:
-            # Enter key - just display current
             sel = self.desc_list.GetSelection()
             if sel != wx.NOT_FOUND:
                 self.display_description(sel)
-        else:
-            event.Skip()
-    
-    def update_after_key_nav(self):
-        """Update display after keyboard navigation"""
-        sel = self.desc_list.GetSelection()
-        if sel != wx.NOT_FOUND:
-            self.display_description(sel)
-    
+            return
+        event.Skip()
+
     def display_description(self, index):
         """Display the selected description"""
         if 0 <= index < len(self.descriptions):
