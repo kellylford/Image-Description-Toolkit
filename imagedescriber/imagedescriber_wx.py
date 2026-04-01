@@ -1419,6 +1419,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         item = self.image_list.GetSelection()
         if item.IsOk():
             file_path = self.image_list.GetItemData(item)
+            # file_path is None for folder nodes — clicking a folder just focuses it,
+            # it does not change the current image or load a preview.
+            if file_path is None:
+                return
             if file_path and self.workspace and file_path in self.workspace.items:
                 self.current_image_item = self.workspace.items[file_path]
                 self.display_image_info(self.current_image_item)
@@ -2369,20 +2373,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if current_item.IsOk():
             current_file_path = self.image_list.GetItemData(current_item)
 
-        # Track known video paths (all top-level items) and which were expanded.
-        # New videos (not previously in the tree) are auto-expanded; previously
-        # collapsed videos stay collapsed to respect the user's preference.
-        known_videos = set()
-        expanded_videos = set()
+        # Track expanded state of video nodes and folder nodes so we can restore
+        # it after rebuild.  Key = file_path for video nodes, subfolder path string
+        # for folder nodes.  We never auto-expand anything — only the user can
+        # open/close nodes (good for accessibility: no surprise tree mutations on focus).
+        expanded_videos = set()    # file paths of video nodes the user has expanded
+        expanded_folders = set()   # subfolder strings the user has expanded
         root = self.image_list.GetRootItem()
         if root.IsOk():
             child, cookie = self.image_list.GetFirstChild(root)
             while child.IsOk():
-                fp = self.image_list.GetItemData(child)
-                if fp:
-                    known_videos.add(fp)
+                data = self.image_list.GetItemData(child)
+                if data is None:
+                    # Folder node — data is a subfolder string stored as the label text
                     if self.image_list.IsExpanded(child):
-                        expanded_videos.add(fp)
+                        expanded_folders.add(self.image_list.GetItemText(child))
+                elif data and self.image_list.IsExpanded(child):
+                    expanded_videos.add(data)
                 child, cookie = self.image_list.GetNextChild(root, cookie)
 
         # Rebuild tree from scratch
@@ -2497,76 +2504,121 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             except Exception:
                 return 0
 
-        # Build the tree: top-level items first, extracted frames as children.
+        # Build the tree: folder nodes group items by subfolder, with videos
+        # nested one level deeper inside those groups (or at root for root-level items).
+        # Extracted frames are children of their parent video node.
+        # Folder nodes are NEVER auto-expanded — only the user controls expand/collapse.
         type_filter_count = 0  # items passing the type filter (before text search)
         displayed_count = 0
 
+        # Group mixed_items by subfolder.  Order of subfolders follows the first
+        # item encountered (i.e. chronological within each group since mixed_items
+        # is already sorted by date).
+        from collections import OrderedDict
+        subfolder_groups: OrderedDict = OrderedDict()  # subfolder_str -> [(file_path, item)]
         for file_path, item in mixed_items:
-            # Apply type filter at the top-level item level
-            if self.current_filter == "described":
-                if not item.descriptions:
-                    continue
-            elif self.current_filter == "undescribed":
-                if item.descriptions:
-                    continue
-            elif self.current_filter == "videos":
-                if item.item_type not in ["video", "extracted_frame"]:
-                    continue
+            key = item.subfolder or ""  # "" = root level
+            if key not in subfolder_groups:
+                subfolder_groups[key] = []
+            subfolder_groups[key].append((file_path, item))
 
-            type_filter_count += 1
+        # Map of subfolder string -> tree node (created lazily as items are added)
+        folder_nodes: dict = {}
 
-            # Apply text search filter if active
-            if self.search_filter_text and not self._matches_search(item, self.search_filter_text):
-                continue
+        def _get_or_create_folder_node(subfolder: str):
+            """Return (or create) the folder node for the given subfolder path.
+            Folder nodes use SetItemData(None) so on_image_selected ignores them.
+            The subfolder string is used as the label (last component for nested paths).
+            """
+            if subfolder in folder_nodes:
+                return folder_nodes[subfolder]
+            # For nested paths like "Vacation/Beach", create parents first
+            parts = Path(subfolder).parts
+            parent_node = root
+            accumulated = ""
+            for part in parts:
+                accumulated = str(Path(accumulated) / part) if accumulated else part
+                if accumulated not in folder_nodes:
+                    node = self.image_list.AppendItem(parent_node, part)
+                    self.image_list.SetItemData(node, None)  # None = folder node
+                    # Restore user's expand state; never auto-expand
+                    if accumulated in expanded_folders:
+                        self.image_list.Expand(node)
+                    folder_nodes[accumulated] = node
+                parent_node = folder_nodes[accumulated]
+            return folder_nodes[subfolder]
 
-            display_name = _build_display_name(file_path, item)
-            tree_item = self.image_list.AppendItem(root, display_name)
-            self.image_list.SetItemData(tree_item, file_path)
-            displayed_count += 1
+        for subfolder_key, items_in_group in subfolder_groups.items():
+            parent_node = _get_or_create_folder_node(subfolder_key) if subfolder_key else root
 
-            if current_file_path and file_path == current_file_path:
-                new_selection_item = tree_item
-
-            # Add extracted frames as children if this is a video
-            if item.item_type == "video" and file_path in frames:
-                sorted_frame_paths = sorted(
-                    (fp for fp, _ in frames[file_path]),
-                    key=_extract_timestamp
-                )
-                frames_added = 0
-                for frame_path in sorted_frame_paths:
-                    frame_item_obj = self.workspace.items.get(frame_path)
-                    if frame_item_obj is None:
+            for file_path, item in items_in_group:
+                # Apply type filter
+                if self.current_filter == "described":
+                    if not item.descriptions:
+                        continue
+                elif self.current_filter == "undescribed":
+                    if item.descriptions:
+                        continue
+                elif self.current_filter == "videos":
+                    if item.item_type not in ["video", "extracted_frame"]:
                         continue
 
-                    # Apply type filter for frames
-                    if self.current_filter == "described":
-                        if not frame_item_obj.descriptions:
+                type_filter_count += 1
+
+                # Apply text search filter if active
+                if self.search_filter_text and not self._matches_search(item, self.search_filter_text):
+                    continue
+
+                display_name = _build_display_name(file_path, item)
+                tree_item = self.image_list.AppendItem(parent_node, display_name)
+                self.image_list.SetItemData(tree_item, file_path)
+                displayed_count += 1
+
+                if current_file_path and file_path == current_file_path:
+                    new_selection_item = tree_item
+
+                # Add extracted frames as children if this is a video
+                if item.item_type == "video" and file_path in frames:
+                    sorted_frame_paths = sorted(
+                        (fp for fp, _ in frames[file_path]),
+                        key=_extract_timestamp
+                    )
+                    frames_added = 0
+                    for frame_path in sorted_frame_paths:
+                        frame_item_obj = self.workspace.items.get(frame_path)
+                        if frame_item_obj is None:
                             continue
-                    elif self.current_filter == "undescribed":
-                        if frame_item_obj.descriptions:
+
+                        # Apply type filter for frames
+                        if self.current_filter == "described":
+                            if not frame_item_obj.descriptions:
+                                continue
+                        elif self.current_filter == "undescribed":
+                            if frame_item_obj.descriptions:
+                                continue
+
+                        type_filter_count += 1
+
+                        if self.search_filter_text and not self._matches_search(frame_item_obj, self.search_filter_text):
                             continue
 
-                    type_filter_count += 1
+                        frame_display = _build_display_name(frame_path, frame_item_obj)
+                        frame_node = self.image_list.AppendItem(tree_item, frame_display)
+                        self.image_list.SetItemData(frame_node, frame_path)
+                        displayed_count += 1
+                        frames_added += 1
 
-                    if self.search_filter_text and not self._matches_search(frame_item_obj, self.search_filter_text):
-                        continue
+                        if current_file_path and frame_path == current_file_path:
+                            new_selection_item = frame_node
 
-                    frame_display = _build_display_name(frame_path, frame_item_obj)
-                    frame_node = self.image_list.AppendItem(tree_item, frame_display)
-                    self.image_list.SetItemData(frame_node, frame_path)
-                    displayed_count += 1
-                    frames_added += 1
-
-                    if current_file_path and frame_path == current_file_path:
-                        new_selection_item = frame_node
-
-                # Expand video nodes: auto-expand new videos and those the user
-                # had expanded before the refresh; keep user-collapsed nodes collapsed.
-                if frames_added > 0:
-                    is_new = file_path not in known_videos
-                    if is_new or file_path in expanded_videos:
+                    # Restore video expand state (never auto-expand)
+                    if frames_added > 0 and file_path in expanded_videos:
                         self.image_list.Expand(tree_item)
+
+        # Prune folder nodes that ended up with zero visible children (all filtered out)
+        for subfolder_str, folder_node in list(folder_nodes.items()):
+            if folder_node.IsOk() and not self.image_list.ItemHasChildren(folder_node):
+                self.image_list.Delete(folder_node)
 
         # Update label with result count when text search is active
         if hasattr(self, 'image_list_label'):
@@ -4160,6 +4212,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         Just add files to workspace with minimal metadata (mtime only).
         Actual EXIF extraction happens lazily in refresh_image_list's get_sort_date().
         """
+        scan_root = getattr(event, 'scan_root', None)  # Path of scanned root dir (for subfolder)
+
         # Add discovered files to workspace
         for file_path in event.files:
             file_path_str = str(file_path)
@@ -4172,6 +4226,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                 # Create item with MINIMAL metadata (no network I/O!)
                 item = ImageItem(file_path_str, item_type)
+
+                # Compute subfolder relative to scan root (e.g. "Vacation/Beach")
+                # None means root-level (no subfolder grouping needed)
+                if scan_root is not None:
+                    try:
+                        relative = file_path.relative_to(scan_root)
+                        parent = relative.parent
+                        if str(parent) not in ('', '.'):
+                            item.subfolder = str(parent)
+                    except ValueError:
+                        pass  # file_path not under scan_root — leave subfolder as None
 
                 # ONLY cache file mtime (already available from directory scan, no extra I/O)
                 try:
