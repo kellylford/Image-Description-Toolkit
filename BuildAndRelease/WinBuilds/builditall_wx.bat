@@ -2,17 +2,12 @@
 REM ============================================================================
 REM Build All wxPython Applications for Windows
 REM ============================================================================
-REM This script builds all three wxPython-based applications:
+REM This script builds both wxPython-based applications:
 REM   1. IDT (CLI - no GUI framework)
-REM   2. Viewer (wxPython)
-REM   3. ImageDescriber (wxPython - includes integrated PromptEditor and IDTConfigure)
+REM   2. ImageDescriber (wxPython - includes integrated Viewer Mode, PromptEditor, and IDTConfigure)
 REM
 REM NOTE: Uses .winenv virtual environments (created by winsetup.bat)
 REM       This allows .venv (macOS) and .winenv (Windows) to coexist
-REM
-REM DEPRECATED (now part of ImageDescriber):
-REM   - Prompt Editor (wxPython) - Tools → Edit Prompts
-REM   - IDTConfigure (wxPython) - Tools → Configure Settings
 REM ============================================================================
 
 echo.
@@ -47,24 +42,6 @@ if errorlevel 1 (
 cd ..
 
 REM ============================================================================
-REM [DEPRECATED 2/2] Viewer (wxPython) - now integrated into ImageDescriber
-REM Access via: Viewer Mode tab in ImageDescriber
-REM ============================================================================
-REM echo.
-REM echo [2/2] Building Viewer (wxPython)...
-REM echo ========================================================================
-REM echo.
-REM cd viewer
-REM call build_viewer_wx.bat
-REM if errorlevel 1 (
-REM     echo ERROR: Viewer build failed!
-REM     set /a BUILD_ERRORS+=1
-REM ) else (
-REM     echo SUCCESS: Viewer built successfully
-REM )
-REM cd ..
-
-REM ============================================================================
 echo.
 echo [2/2] Building ImageDescriber (wxPython - includes Viewer Mode + PromptEditor + IDTConfigure)...
 echo ========================================================================
@@ -79,24 +56,6 @@ if errorlevel 1 (
     echo SUCCESS: ImageDescriber built successfully
 )
 cd ..
-
-REM ============================================================================
-REM [DEPRECATED 5/5] IDTConfigure (wxPython) - now integrated into ImageDescriber
-REM Access via: Tools → Configure Settings in ImageDescriber
-REM ============================================================================
-REM echo.
-REM echo [5/5] Building IDTConfigure (wxPython)...
-REM echo ========================================================================
-REM echo.
-REM cd idtconfigure
-REM call build_idtconfigure.bat
-REM if errorlevel 1 (
-REM     echo ERROR: IDTConfigure build failed!
-REM     set /a BUILD_ERRORS+=1
-REM ) else (
-REM     echo SUCCESS: IDTConfigure built successfully
-REM )
-REM cd ..
 
 REM ============================================================================
 echo.
@@ -136,22 +95,6 @@ if "%BUILD_ERRORS%"=="0" (
         echo   ✗ idt.exe NOT FOUND
     )
     
-    REM [DEPRECATED] Viewer - now integrated into ImageDescriber as Viewer Mode
-    REM if exist "viewer\dist\Viewer.exe" (
-    REM     copy /Y "viewer\dist\Viewer.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-    REM     echo   ✓ Viewer.exe
-    REM ) else (
-    REM     echo   ✗ Viewer.exe NOT FOUND
-    REM )
-    
-    REM [DEPRECATED] Prompt Editor - now part of ImageDescriber Tools menu
-    REM if exist "prompt_editor\dist\PromptEditor.exe" (
-    REM     copy /Y "prompt_editor\dist\PromptEditor.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-    REM     echo   ✓ PromptEditor.exe
-    REM ) else (
-    REM     echo   ✗ PromptEditor.exe NOT FOUND
-    REM )
-    
     REM Copy ImageDescriber (includes Viewer Mode, PromptEditor and IDTConfigure)
     if exist "imagedescriber\dist\ImageDescriber.exe" (
         copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
@@ -159,14 +102,6 @@ if "%BUILD_ERRORS%"=="0" (
     ) else (
         echo   ✗ ImageDescriber.exe NOT FOUND
     )
-    
-    REM [DEPRECATED] IDTConfigure - now part of ImageDescriber Tools menu
-    REM if exist "idtconfigure\dist\IDTConfigure.exe" (
-    REM     copy /Y "idtconfigure\dist\IDTConfigure.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-    REM     echo   ✓ IDTConfigure.exe
-    REM ) else (
-    REM     echo   ✗ IDTConfigure.exe NOT FOUND
-    REM )
     
     REM Copy documentation
     echo.

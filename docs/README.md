@@ -64,9 +64,7 @@ docs/
 Individual components have their own README files:
 
 - **[analysis/README.md](../analysis/README.md)** - Analysis tools (combine descriptions, stats, content review)
-- **[viewer/README.md](../viewer/README.md)** - Results viewer GUI
-- **[imagedescriber/README.md](../imagedescriber/README.md)** - Batch processing GUI
-- **[prompt_editor/README.md](../prompt_editor/README.md)** - Prompt template editor
+- **[imagedescriber/README.md](../imagedescriber/README.md)** - Batch processing GUI (includes Viewer Mode, prompt editor, and configuration)
 - **[tools/README.md](../tools/README.md)** - Additional utilities
 - **[bat/README.md](../bat/README.md)** - Batch file reference
 
@@ -105,7 +103,6 @@ See **[WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md)** for complete detail
 - **Custom configuration priority** - Config files now properly respect default settings
 - **Web image download** - Download and describe images directly from websites
 - **Interactive image gallery** - Compare AI model outputs side-by-side
-- **IDTConfigure app** - GUI for managing all configuration settings
 
 ### Documentation Improvements
 - **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - New "Configuration Priority Order" section

@@ -177,10 +177,10 @@ If the user reports something "has been working for months," your first assumpti
 ## Architecture Overview
 
 ### Multi-Application Structure
-IDT consists of three standalone applications, each with isolated dependencies:
+IDT consists of two standalone applications, each with isolated dependencies:
 - **`idt.exe`** / **`idt`** - CLI dispatcher (routes to all commands via `idt_cli.py`)
-- **`viewer.exe`** / **`Viewer.app`** - wxPython workflow results browser with live monitoring
 - **`imagedescriber.exe`** / **`ImageDescriber.app`** - wxPython batch processing GUI with integrated Tools menu
+  - Includes Viewer Mode (formerly standalone Viewer app)
   - Includes prompt editor (formerly standalone PromptEditor app)
   - Includes configuration manager (formerly standalone IDTConfigure app)
   - Access via Tools → Edit Prompts and Tools → Configure Settings
@@ -224,9 +224,9 @@ Multi-provider abstraction in `imagedescriber/ai_providers.py`:
 - **Capabilities**: `models/provider_configs.py` - dynamic UI based on `supports_prompts()`, `supports_custom_prompts()`
 
 ### Build & Release System
-- **Windows Master Build**: `BuildAndRelease/WinBuilds/builditall_wx.bat` - builds all 3 apps sequentially
-- **macOS Master Build**: `BuildAndRelease/MacBuilds/builditall_macos.command` - builds all 3 .app bundles
-- **Spec Files**: Each app directory has its own `.spec` file (e.g., `viewer/viewer_wx.spec`)
+- **Windows Master Build**: `BuildAndRelease/WinBuilds/builditall_wx.bat` - builds both apps sequentially
+- **macOS Master Build**: `BuildAndRelease/MacBuilds/builditall_macos.command` - builds both .app bundles
+- **Spec Files**: Each app directory has its own `.spec` file (e.g., `imagedescriber/imagedescriber_wx.spec`)
 - **Per-App Builds**: Each app has platform-specific build scripts
   - Windows: `build_*_wx.bat`
   - macOS Terminal: `build_*_wx.sh`
@@ -255,7 +255,6 @@ BuildAndRelease\WinBuilds\builditall_wx.bat
 
 REM Build individual apps
 cd idt && build_idt.bat
-cd viewer && build_viewer_wx.bat
 cd imagedescriber && build_imagedescriber_wx.bat
 ```
 
@@ -274,7 +273,7 @@ REM Path debugging
 dist\idt.exe --debug-paths
 
 REM Test GUI apps
-dist\Viewer.exe
+dist\ImageDescriber.exe
 ```
 
 **macOS:**
@@ -286,9 +285,8 @@ dist\Viewer.exe
 ./dist/idt --debug-paths
 
 # Test GUI apps
-open dist/Viewer.apps
-cd viewer && build_viewer.bat
-cd imagedescriber && build_imagedescriber.bat
+open imagedescriber/dist/ImageDescriber.app
+cd imagedescriber && build_imagedescriber_wx.bat
 ```
 
 ### Testing Executable After Build
@@ -347,7 +345,7 @@ All accessible via `idt` commands:
 ### Accessibility Requirements (WCAG 2.2 AA)
 - **Single Tab Stops*the app-specific `.spec` file in each app directory
 ```python
-# Example: viewer/viewer_wx.spec
+# Example: imagedescriber/imagedescriber_wx.spec
 hiddenimports=[
     'scripts.new_module',  # Add your module here
     'anthropic._client',   # Include submodules for SDKs
