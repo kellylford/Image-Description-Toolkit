@@ -1179,7 +1179,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Process menu
         process_menu = wx.Menu()
 
-        process_single_item = process_menu.Append(wx.ID_ANY, "Process &Current Image\tP")
+        process_single_item = process_menu.Append(wx.ID_ANY, "Process &Current Image")
         self.Bind(wx.EVT_MENU, self.on_process_single, process_single_item)
 
         process_menu.AppendSeparator()
@@ -1222,7 +1222,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         process_menu.AppendSeparator()
 
-        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with AI Model\tC")
+        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with AI Model")
         self.Bind(wx.EVT_MENU, self.on_chat, chat_item)
 
         process_menu.AppendSeparator()
@@ -1238,7 +1238,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         process_menu.AppendSeparator()
 
-        rename_item = process_menu.Append(wx.ID_ANY, "&Rename Item\tR")
+        rename_item = process_menu.Append(wx.ID_ANY, "&Rename Item")
         self.Bind(wx.EVT_MENU, self.on_rename_item, rename_item)
 
         menubar.Append(process_menu, "&Process")
@@ -1246,10 +1246,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Descriptions menu
         desc_menu = wx.Menu()
 
-        add_manual_item = desc_menu.Append(wx.ID_ANY, "Add &Manual Description\tM")
+        add_manual_item = desc_menu.Append(wx.ID_ANY, "Add &Manual Description")
         self.Bind(wx.EVT_MENU, self.on_add_manual_description, add_manual_item)
 
-        followup_item = desc_menu.Append(wx.ID_ANY, "Ask &Followup Question\tF")
+        followup_item = desc_menu.Append(wx.ID_ANY, "Ask &Followup Question")
         self.Bind(wx.EVT_MENU, self.on_followup_question, followup_item)
 
         desc_menu.AppendSeparator()
