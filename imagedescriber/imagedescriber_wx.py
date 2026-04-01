@@ -425,6 +425,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # rebuild when the batch ends (natural completion or user stop). This keeps
         # the UI fully responsive on large collections (1000+ images).
         self._batch_active = False
+        # Guard against EVT_TREE_SEL_CHANGED firing during programmatic SelectItem() calls
+        # inside refresh_image_list().  wx.TreeCtrl.SelectItem() fires the event unlike
+        # wx.ListBox.SetSelection() which does not - so without this flag every list
+        # rebuild would synchronously load a preview image on the main thread.
+        self._refreshing_list = False
         # Per-batch token usage accumulation (reset each time a new batch starts)
         self._token_records = []   # list of {input, output, total, name} dicts
         # Batch settings shown in the progress dialog Job Settings section
@@ -1405,6 +1410,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_image_selected(self, event):
         """Handle image selection"""
+        # Skip expensive I/O during programmatic SelectItem() calls in refresh_image_list().
+        # TreeCtrl fires EVT_TREE_SEL_CHANGED for programmatic selections (unlike ListBox
+        # which does not fire EVT_LISTBOX for SetSelection).  Without this guard each list
+        # rebuild would synchronously load a preview image, freezing the main thread.
+        if self._refreshing_list:
+            return
         item = self.image_list.GetSelection()
         if item.IsOk():
             file_path = self.image_list.GetItemData(item)
@@ -2564,24 +2575,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             else:
                 self.image_list_label.SetLabel("Images:")
 
-        # RESTORE FOCUS: Select the same item after refresh
-        if new_selection_item is not None:
-            self.image_list.SelectItem(new_selection_item)
-            # Ensure it's visible (may need to expand parent first)
-            self.image_list.EnsureVisible(new_selection_item)
-        elif displayed_count > 0:
-            # No previous selection - select first visible item (e.g., after loading directory)
-            first = self.image_list.GetFirstVisibleItem()
-            if first.IsOk():
-                self.image_list.SelectItem(first)
-                self.image_list.EnsureVisible(first)
-                # EVT_TREE_SEL_CHANGED may not fire synchronously on all platforms,
-                # so update the display explicitly here.
-                first_file_path = self.image_list.GetItemData(first)
-                if first_file_path and first_file_path in self.workspace.items:
-                    self.current_image_item = self.workspace.items[first_file_path]
-                    self.display_image_info(self.current_image_item)
-                    self.update_preview_for_item(self.current_image_item)
+        # RESTORE FOCUS: Select the same item after refresh.
+        # Use _refreshing_list flag to suppress EVT_TREE_SEL_CHANGED during programmatic
+        # SelectItem() - TreeCtrl fires the event for programmatic selections unlike ListBox.
+        self._refreshing_list = True
+        try:
+            if new_selection_item is not None:
+                self.image_list.SelectItem(new_selection_item)
+                # Ensure it's visible (may need to expand parent first)
+                self.image_list.EnsureVisible(new_selection_item)
+            elif displayed_count > 0:
+                # No previous selection - select first visible item (e.g., after loading directory)
+                first = self.image_list.GetFirstVisibleItem()
+                if first.IsOk():
+                    self.image_list.SelectItem(first)
+                    self.image_list.EnsureVisible(first)
+                    first_file_path = self.image_list.GetItemData(first)
+                    if first_file_path and first_file_path in self.workspace.items:
+                        self.current_image_item = self.workspace.items[first_file_path]
+                        self.display_image_info(self.current_image_item)
+                        self.update_preview_for_item(self.current_image_item)
+        finally:
+            self._refreshing_list = False
 
         # PERFORMANCE DIAGNOSTIC: Log refresh time for large lists
         elapsed = time.time() - start_time
