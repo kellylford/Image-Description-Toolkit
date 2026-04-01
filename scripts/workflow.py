@@ -35,6 +35,9 @@ import shutil
 import shlex
 from urllib.parse import urlparse
 
+# Suppress console windows when spawning child processes from a GUI app on Windows
+_SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+
 # Set UTF-8 encoding for console output on Windows
 if sys.platform.startswith('win'):
     import codecs
@@ -1222,7 +1225,8 @@ class WorkflowOrchestrator:
             
             self.logger.info(f"Running: {' '.join(cmd)}")
             # Stream output directly to terminal for real-time progress feedback
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace',
+                                    creationflags=_SUBPROCESS_FLAGS)
             
             # Stop monitoring
             if 'video' in self.step_results:
@@ -1373,7 +1377,8 @@ class WorkflowOrchestrator:
 
             self.logger.info(f"Running: {' '.join(cmd)}")
             # Stream output directly to terminal for real-time progress feedback (conversion tool runs quiet)
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace',
+                                    creationflags=_SUBPROCESS_FLAGS)
             
             # Mark conversion as no longer in progress and final update
             if 'convert' in self.step_results:
@@ -2166,7 +2171,8 @@ class WorkflowOrchestrator:
                 cmd.append("--full")
             
             self.logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace',
+                                    creationflags=_SUBPROCESS_FLAGS)
             
             if result.returncode == 0:
                 self.logger.info("HTML generation completed successfully")

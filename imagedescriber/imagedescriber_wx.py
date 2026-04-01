@@ -5654,7 +5654,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 try:
                     result = subprocess.run(
                         ['ffprobe', '-version'],
-                        capture_output=True, text=True, timeout=5
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
                     )
                     version_line = result.stdout.split('\n')[0] if result.stdout else 'installed'
                 except Exception:

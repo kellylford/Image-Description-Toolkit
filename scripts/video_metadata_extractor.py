@@ -7,9 +7,13 @@ Designed to work alongside image metadata extraction for frame embedding
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
+
+# Suppress console windows when spawning subprocesses from a GUI app on Windows
+_SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
 
 
 class VideoMetadataExtractor:
@@ -26,7 +30,8 @@ class VideoMetadataExtractor:
                 ['ffprobe', '-version'],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                creationflags=_SUBPROCESS_FLAGS
             )
             return result.returncode == 0
         except (subprocess.SubprocessError, FileNotFoundError):
@@ -69,7 +74,8 @@ class VideoMetadataExtractor:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
+                creationflags=_SUBPROCESS_FLAGS
             )
             
             if result.returncode != 0:

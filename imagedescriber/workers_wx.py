@@ -835,6 +835,7 @@ class WorkflowProcessWorker(threading.Thread):
         """Execute workflow command and monitor progress"""
         try:
             import subprocess
+            _no_window = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             
             # Start the workflow process
             self._post_progress("Starting workflow process...")
@@ -844,7 +845,8 @@ class WorkflowProcessWorker(threading.Thread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                universal_newlines=True
+                universal_newlines=True,
+                creationflags=_no_window
             )
             
             # Monitor output for progress
