@@ -4913,13 +4913,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Show dialog with model selection
         from dialogs_wx import FollowupQuestionDialog
 
+        try:
+            from ai_providers import get_available_providers
+            available_providers = list(get_available_providers().keys())
+        except Exception:
+            available_providers = None
+
         dlg = FollowupQuestionDialog(
             self,
             original_provider,
             original_model,
             existing_desc[:300] + ("..." if len(existing_desc) > 300 else ""),
             self.config,
-            cached_ollama_models=self.cached_ollama_models
+            cached_ollama_models=self.cached_ollama_models,
+            available_providers=available_providers
         )
 
         if dlg.ShowModal() == wx.ID_OK:

@@ -397,7 +397,8 @@ class FollowupQuestionDialog(wx.Dialog):
     """Dialog for asking follow-up questions with model selection"""
     
     def __init__(self, parent, original_provider: str, original_model: str, 
-                 description_preview: str, config: dict, cached_ollama_models=None):
+                 description_preview: str, config: dict, cached_ollama_models=None,
+                 available_providers=None):
         super().__init__(
             parent,
             title="Ask Follow-up Question",
@@ -408,6 +409,9 @@ class FollowupQuestionDialog(wx.Dialog):
         self.original_model = original_model
         self.config = config
         self.cached_ollama_models = cached_ollama_models  # Use cached models to avoid blocking
+        # Only show providers that are actually configured/available on this machine.
+        # Falls back to full list if caller did not supply one.
+        self.available_providers = available_providers or ["ollama", "openai", "claude", "mlx"]
         self.question = ""
         self.selected_provider = original_provider
         self.selected_model = original_model
@@ -461,7 +465,12 @@ class FollowupQuestionDialog(wx.Dialog):
         provider_label = wx.StaticText(self, label="&Provider:")
         provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         
-        self.provider_choice = wx.Choice(self, choices=["ollama", "openai", "claude", "mlx"])
+        # Build provider list; ensure the original provider is always present so
+        # the pre-selection below never silently picks the wrong entry.
+        provider_choices = list(self.available_providers)
+        if self.original_provider and self.original_provider not in provider_choices:
+            provider_choices.insert(0, self.original_provider)
+        self.provider_choice = wx.Choice(self, choices=provider_choices)
         self.provider_choice.SetStringSelection(self.original_provider)
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
@@ -600,6 +609,14 @@ class FollowupQuestionDialog(wx.Dialog):
                 for model in DEV_CLAUDE_MODELS:
                     display = CLAUDE_MODEL_METADATA.get(model, {}).get("name", model)
                     self.model_combo.Append(display, model)  # client data = API ID
+
+            elif provider == "mlx":
+                try:
+                    from ai_providers import MLXProvider
+                except ImportError:
+                    from imagedescriber.ai_providers import MLXProvider
+                for model in MLXProvider.KNOWN_MODELS:
+                    self.model_combo.Append(model)
         except Exception as e:
             logger.warning(f"Error populating models: {e}")
 
