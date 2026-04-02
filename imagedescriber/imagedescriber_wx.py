@@ -32,6 +32,12 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
+# wx.dataview is needed for the macOS accessible tree control.
+try:
+    import wx.dataview as _wx_dv
+except ImportError:
+    _wx_dv = None
+
 # Add project root to path for shared module imports
 # Works in both development mode (running script) and frozen mode (PyInstaller exe)
 if getattr(sys, 'frozen', False):
@@ -388,8 +394,234 @@ def format_image_metadata(metadata: dict) -> list:
     return lines
 
 
-# Logger instance - configuration is done in main() when --debug flag is used
-logger = logging.getLogger(__name__)
+# =====================================================================
+# macOS VoiceOver fix: DataViewTreeCtrl-backed image list
+# =====================================================================
+#
+# wx.TreeCtrl on macOS does not post the NSAccessibility selection-change
+# notifications that VoiceOver monitors, so arrow-key navigation is silent.
+#
+# wx.dataview.DataViewTreeCtrl wraps NSOutlineView natively with a
+# complete Cocoa data-source / delegate that fires all required
+# NSAccessibility events.  VoiceOver announces each item correctly.
+#
+# _DataViewTreeCtrlAdapter wraps DataViewTreeCtrl with the wx.TreeCtrl
+# API used by ImageDescriberFrame. Only instantiated on macOS;
+# Windows keeps the native wx.TreeCtrl unchanged.
+# =====================================================================
+
+if _wx_dv is not None:
+
+    class _DVRootItem:
+        """Sentinel for the implicit root of DataViewTreeCtrl.
+
+        DataViewTreeCtrl uses NullDataViewItem (IsOk==False) as the implicit
+        root.  This sentinel has IsOk()==True so that existing code such as
+        ``if root.IsOk(): child, cookie = self.image_list.GetFirstChild(root)``
+        keeps working without modification.
+        """
+        def IsOk(self) -> bool:
+            return True
+        def __eq__(self, other) -> bool:
+            return isinstance(other, _DVRootItem)
+        def __ne__(self, other) -> bool:
+            return not isinstance(other, _DVRootItem)
+        def __hash__(self) -> int:
+            return hash("_DVRootItem")
+
+    class _DataViewTreeCtrlAdapter(_wx_dv.DataViewTreeCtrl):
+        """macOS tree control: DataViewTreeCtrl with a wx.TreeCtrl-compatible API.
+
+        wx.dataview.DataViewTreeCtrl is backed by NSOutlineView and its Cocoa
+        delegate posts NSAccessibilitySelectedRowsChangedNotification on every
+        selection change — which is exactly what VoiceOver monitors to announce
+        the focused item.  wx.TreeCtrl on macOS lacks this Cocoa delegate and
+        is therefore silent to VoiceOver.
+
+        Two item-creation methods are exposed:
+
+        * AppendItem(parent, text)     — expandable container node.
+          Use for folder nodes and video items that may gain children.
+        * AppendLeafItem(parent, text) — leaf node (never has children).
+          Use for regular images and extracted frames so that NSOutlineView
+          does not display spurious expand triangles.
+        """
+
+        _ROOT = _DVRootItem()   # class-level singleton root sentinel
+
+        def __init__(self, parent, name: str = "Images in workspace"):
+            super().__init__(
+                parent,
+                style=_wx_dv.DV_NO_HEADER | _wx_dv.DV_SINGLE | wx.NO_BORDER,
+                name=name,
+            )
+            self._data: dict = {}           # DataViewItem → Python data (str | None)
+            self._root_created: bool = False
+
+        # ---- internal helpers ------------------------------------------------
+
+        def _dv_item(self, item):
+            """Convert _DVRootItem sentinel → NullDataViewItem for DV API calls."""
+            if isinstance(item, _DVRootItem):
+                return _wx_dv.NullDataViewItem
+            return item
+
+        def _sibling_at_offset(self, item, offset: int):
+            """Return the sibling of item at (current_index + offset).
+
+            Returns NullDataViewItem when no such sibling exists.
+            Uses GetItemParent + GetNthChild because DataViewTreeCtrl does not
+            expose GetPrevSibling(DataViewItem) / GetNextSibling(DataViewItem)
+            — those names on wx.Window navigate the wxWidgets window tree.
+            """
+            parent = self.GetItemParent(item)
+            dv_parent = self._dv_item(parent)
+            count = self.GetChildCount(dv_parent)
+            for i in range(count):
+                child = self.GetNthChild(dv_parent, i)
+                if child == item:
+                    idx = i + offset
+                    if 0 <= idx < count:
+                        return self.GetNthChild(dv_parent, idx)
+                    return _wx_dv.NullDataViewItem
+            return _wx_dv.NullDataViewItem
+
+        # ---- root API --------------------------------------------------------
+
+        def AddRoot(self, label: str) -> "_DVRootItem":
+            """Mark root as initialised; actual root is NullDataViewItem in DV."""
+            self._root_created = True
+            return self._ROOT
+
+        def GetRootItem(self):
+            """Return the root sentinel (IsOk True) after AddRoot has been called."""
+            return self._ROOT if self._root_created else _wx_dv.NullDataViewItem
+
+        # ---- item creation ---------------------------------------------------
+
+        def AppendItem(self, parent, text: str) -> _wx_dv.DataViewItem:
+            """Append an expandable container node (folder nodes, video items).
+
+            Calls DataViewTreeCtrl.AppendContainer so that NSOutlineView can
+            display expand/collapse indicators when children are present.
+            For leaf items (images, frames) call AppendLeafItem instead.
+            """
+            item = super().AppendContainer(self._dv_item(parent), text)
+            self._data[item] = None
+            return item
+
+        def AppendLeafItem(self, parent, text: str) -> _wx_dv.DataViewItem:
+            """Append a leaf node (regular images, extracted frames).
+
+            Calls DataViewTreeCtrl.AppendItem so NSOutlineView omits the
+            expand indicator for items that will never have children.
+            """
+            item = super().AppendItem(self._dv_item(parent), text)
+            self._data[item] = None
+            return item
+
+        def SetItemData(self, item, data) -> None:
+            if not isinstance(item, _DVRootItem):
+                self._data[item] = data
+
+        def GetItemData(self, item):
+            if isinstance(item, _DVRootItem):
+                return None
+            return self._data.get(item)
+
+        def GetItemText(self, item) -> str:
+            if isinstance(item, _DVRootItem):
+                return ""
+            return super().GetItemText(item)
+
+        # ---- deletion --------------------------------------------------------
+
+        def Delete(self, item) -> None:
+            self._data.pop(item, None)
+            self.DeleteItem(item)
+
+        def DeleteAllItems(self) -> None:
+            self._data.clear()
+            super().DeleteAllItems()
+            self._root_created = False
+
+        # ---- selection -------------------------------------------------------
+
+        def SelectItem(self, item) -> None:
+            if item.IsOk() and not isinstance(item, _DVRootItem):
+                self.Select(item)
+
+        def GetSelection(self) -> _wx_dv.DataViewItem:
+            return super().GetSelection()
+
+        def EnsureVisible(self, item) -> None:
+            """DataViewCtrl scrolls to selection automatically; no-op."""
+            pass
+
+        # ---- visible-item navigation -----------------------------------------
+
+        def GetFirstVisibleItem(self) -> _wx_dv.DataViewItem:
+            if self.GetChildCount(_wx_dv.NullDataViewItem) > 0:
+                return self.GetNthChild(_wx_dv.NullDataViewItem, 0)
+            return _wx_dv.NullDataViewItem
+
+        def GetPrevVisible(self, item) -> _wx_dv.DataViewItem:
+            if isinstance(item, _DVRootItem):
+                return _wx_dv.NullDataViewItem
+            prev = self._sibling_at_offset(item, -1)
+            if prev.IsOk():
+                while self.IsExpanded(prev) and self.GetChildCount(prev) > 0:
+                    prev = self.GetNthChild(prev, self.GetChildCount(prev) - 1)
+                return prev
+            parent = self.GetItemParent(item)
+            return parent if parent.IsOk() else _wx_dv.NullDataViewItem
+
+        def GetNextVisible(self, item) -> _wx_dv.DataViewItem:
+            if isinstance(item, _DVRootItem):
+                return self.GetFirstVisibleItem()
+            if self.IsExpanded(item) and self.GetChildCount(item) > 0:
+                return self.GetNthChild(item, 0)
+            next_sib = self._sibling_at_offset(item, +1)
+            if next_sib.IsOk():
+                return next_sib
+            parent = self.GetItemParent(item)
+            while parent.IsOk():
+                ns = self._sibling_at_offset(parent, +1)
+                if ns.IsOk():
+                    return ns
+                parent = self.GetItemParent(parent)
+            return _wx_dv.NullDataViewItem
+
+        # ---- child iteration (wx.TreeCtrl cookie-based API) ------------------
+
+        def GetFirstChild(self, parent) -> tuple:
+            """Return (first_child_item, cookie).  cookie is the child index int."""
+            dv_parent = self._dv_item(parent)
+            if self.GetChildCount(dv_parent) > 0:
+                return self.GetNthChild(dv_parent, 0), 0
+            return _wx_dv.NullDataViewItem, -1
+
+        def GetNextChild(self, parent, cookie: int) -> tuple:
+            """Return (next_child_item, cookie).  cookie is the child index int."""
+            dv_parent = self._dv_item(parent)
+            next_idx = cookie + 1
+            if next_idx < self.GetChildCount(dv_parent):
+                return self.GetNthChild(dv_parent, next_idx), next_idx
+            return _wx_dv.NullDataViewItem, -1
+
+        def ItemHasChildren(self, item) -> bool:
+            return self.GetChildCount(self._dv_item(item)) > 0
+
+        # ---- expand / collapse -----------------------------------------------
+
+        def IsExpanded(self, item) -> bool:
+            if isinstance(item, _DVRootItem):
+                return True
+            return super().IsExpanded(item)
+
+        def Expand(self, item) -> None:
+            if not isinstance(item, _DVRootItem):
+                super().Expand(item)
 
 
 class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
@@ -1005,19 +1237,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.search_ctrl.Bind(wx.EVT_CHAR_HOOK, self.on_search_key)
         clear_btn.Bind(wx.EVT_BUTTON, self.on_clear_search)
 
-        # Image list using TreeCtrl: videos become expandable nodes, extracted
-        # frames appear as their children, regular images are leaf nodes.
-        # TR_HIDE_ROOT hides the invisible root so all top-level items look
-        # like root items. TR_HAS_BUTTONS adds the expand/collapse arrows.
-        self.image_list = wx.TreeCtrl(
-            panel,
-            name="Images in workspace",
-            style=(wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_SINGLE
-                   | wx.TR_HAS_BUTTONS | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
-        )
-        # Hidden root that anchors all top-level items
-        self._image_tree_root = self.image_list.AddRoot("Images")
-        self.image_list.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_image_selected)
+        # Image list — platform-specific for VoiceOver accessibility:
+        #
+        # macOS: _DataViewTreeCtrlAdapter  (wraps DataViewTreeCtrl / NSOutlineView)
+        #   Fires NSAccessibilitySelectedRowsChangedNotification on selection change,
+        #   which VoiceOver monitors to announce the focused item.
+        #   Uses AppendItem (container) for folders/videos and AppendLeafItem for
+        #   images/frames so NSOutlineView only shows expand indicators where needed.
+        #
+        # Windows: wx.TreeCtrl  (native SysTreeView32)
+        #   MSAA/UIA built into the Windows common control; works with NVDA/JAWS.
+        if sys.platform == 'darwin' and _wx_dv is not None:
+            self.image_list = _DataViewTreeCtrlAdapter(panel, name="Images in workspace")
+            self._image_tree_root = self.image_list.AddRoot("Images")
+            self.image_list.Bind(_wx_dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_image_selected)
+        else:
+            # Windows / other: native TreeCtrl with expand/collapse
+            self.image_list = wx.TreeCtrl(
+                panel,
+                name="Images in workspace",
+                style=(wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_SINGLE
+                       | wx.TR_HAS_BUTTONS | wx.TR_FULL_ROW_HIGHLIGHT | wx.NO_BORDER)
+            )
+            self._image_tree_root = self.image_list.AddRoot("Images")
+            self.image_list.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_image_selected)
+
         self.image_list.Bind(wx.EVT_CHAR_HOOK, self.on_image_list_key)
         sizer.Add(self.image_list, 1, wx.EXPAND | wx.ALL, 5)
 
@@ -1448,11 +1692,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if self.desc_list:
                 self.desc_list.SetFocus()
             return
-        # On macOS, EVT_TREE_SEL_CHANGED may not fire when arrow keys change
-        # the selection because EVT_CHAR_HOOK fires BEFORE the native Cocoa
-        # widget updates its internal state.  Own the navigation here so that
-        # the new item is selected and the preview is updated immediately.
         if keycode in (wx.WXK_UP, wx.WXK_DOWN):
+            if sys.platform == 'darwin':
+                # On macOS, let the native NSOutlineView handle arrow-key navigation
+                # so that VoiceOver receives the proper NSAccessibility selection-change
+                # notification and announces the newly focused item.
+                # Consuming the event (not calling Skip) prevents Cocoa from ever
+                # processing the keypress, which is why VoiceOver was silent.
+                # We schedule a preview update via CallAfter to run after Cocoa has
+                # moved the selection, guaranteeing the right item is in GetSelection().
+                wx.CallAfter(self.on_image_selected, None)
+                event.Skip()  # Pass to native NSOutlineView — VoiceOver needs this
+                return
+            # On Windows, EVT_TREE_SEL_CHANGED does not always fire for keyboard
+            # navigation, so we manually advance the selection here.
             current = self.image_list.GetSelection()
             if keycode == wx.WXK_UP:
                 if current.IsOk():
@@ -1472,7 +1725,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.image_list.SelectItem(new_item)
                 self.image_list.EnsureVisible(new_item)
                 self.on_image_selected(None)
-            return  # Consume the event - we handled navigation fully
+            return  # Consume the event — we handled it fully on Windows
         event.Skip()
 
     def on_desc_list_key(self, event):
@@ -2570,7 +2823,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     continue
 
                 display_name = _build_display_name(file_path, item)
-                tree_item = self.image_list.AppendItem(parent_node, display_name)
+                # Video items are containers (may have extracted-frame children).
+                # Regular images are always leaves — using AppendLeafItem prevents
+                # NSOutlineView from showing spurious expand triangles on macOS.
+                # On Windows (wx.TreeCtrl) both methods behave identically.
+                _append_leaf = getattr(self.image_list, 'AppendLeafItem',
+                                       self.image_list.AppendItem)
+                if item.item_type == "video":
+                    tree_item = self.image_list.AppendItem(parent_node, display_name)
+                else:
+                    tree_item = _append_leaf(parent_node, display_name)
                 self.image_list.SetItemData(tree_item, file_path)
                 displayed_count += 1
 
@@ -2603,7 +2865,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             continue
 
                         frame_display = _build_display_name(frame_path, frame_item_obj)
-                        frame_node = self.image_list.AppendItem(tree_item, frame_display)
+                        _append_frame = getattr(self.image_list, 'AppendLeafItem',
+                                                self.image_list.AppendItem)
+                        frame_node = _append_frame(tree_item, frame_display)
                         self.image_list.SetItemData(frame_node, frame_path)
                         displayed_count += 1
                         frames_added += 1
