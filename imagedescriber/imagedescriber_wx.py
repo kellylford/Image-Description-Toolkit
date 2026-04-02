@@ -450,11 +450,16 @@ if _wx_dv is not None:
         _ROOT = _DVRootItem()   # class-level singleton root sentinel
 
         def __init__(self, parent, name: str = "Images in workspace"):
+            # DataViewTreeCtrl does not accept a 'name' keyword argument;
+            # pass positional args only and set the accessible name via SetName.
             super().__init__(
                 parent,
-                style=_wx_dv.DV_NO_HEADER | _wx_dv.DV_SINGLE | wx.NO_BORDER,
-                name=name,
+                wx.ID_ANY,
+                wx.DefaultPosition,
+                wx.DefaultSize,
+                _wx_dv.DV_NO_HEADER | _wx_dv.DV_SINGLE | wx.NO_BORDER,
             )
+            self.SetName(name)
             self._data: dict = {}           # DataViewItem → Python data (str | None)
             self._root_created: bool = False
 
