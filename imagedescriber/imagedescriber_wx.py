@@ -2899,12 +2899,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # RESTORE FOCUS: Select the same item after refresh.
         # Use _refreshing_list flag to suppress EVT_TREE_SEL_CHANGED during programmatic
         # SelectItem() - TreeCtrl fires the event for programmatic selections unlike ListBox.
+        # On macOS DataViewTreeCtrl (NSOutlineView), clicking an already-selected item does
+        # NOT re-fire EVT_DATAVIEW_SELECTION_CHANGED, so we must enable process_btn here
+        # whenever we programmatically select an item (to avoid the button being stuck disabled).
         self._refreshing_list = True
         try:
             if new_selection_item is not None:
                 self.image_list.SelectItem(new_selection_item)
                 # Ensure it's visible (may need to expand parent first)
                 self.image_list.EnsureVisible(new_selection_item)
+                # Re-enable action buttons if current_image_item is still valid.
+                # This guards against the macOS DataViewTreeCtrl behaviour where
+                # re-clicking an already-selected item fires no selection-change event.
+                if self.current_image_item:
+                    self.process_btn.Enable(True)
+                    self.save_desc_btn.Enable(True)
             elif displayed_count > 0:
                 # No previous selection - select first visible item (e.g., after loading directory)
                 first = self.image_list.GetFirstVisibleItem()
@@ -2916,6 +2925,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         self.current_image_item = self.workspace.items[first_file_path]
                         self.display_image_info(self.current_image_item)
                         self.update_preview_for_item(self.current_image_item)
+                        # Enable action buttons — on macOS DataViewTreeCtrl the first
+                        # item is selected programmatically, and clicking it again does
+                        # not fire EVT_DATAVIEW_SELECTION_CHANGED (no-change event).
+                        # Without this explicit Enable the button stays disabled until
+                        # the user selects a *different* item first.
+                        self.process_btn.Enable(True)
+                        self.save_desc_btn.Enable(True)
         finally:
             self._refreshing_list = False
 
