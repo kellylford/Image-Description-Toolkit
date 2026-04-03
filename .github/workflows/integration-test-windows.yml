@@ -1,10 +1,12 @@
 name: "Integration Test: Windows (Ollama + moondream)"
 
-# Manual trigger only -- Ollama model pull + inference takes ~20-30 min.
-# Run this when you want to verify the full end-to-end user flow works.
-# Public repo = free GitHub Actions minutes on windows-latest.
+# Runs automatically on every push to feature/video-description.
+# Manual trigger also available via workflow_dispatch.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/video-description
 
 jobs:
   integration-test:
