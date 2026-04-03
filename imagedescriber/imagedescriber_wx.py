@@ -296,6 +296,7 @@ else:
             VideoDescriptionWorker,
             HEICConversionWorker,
             DirectoryScanWorker,
+            SaveWorkspaceWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -307,6 +308,8 @@ else:
             EVT_SCAN_PROGRESS,
             EVT_SCAN_COMPLETE,
             EVT_SCAN_FAILED,
+            EVT_WORKSPACE_SAVE_COMPLETE,
+            EVT_WORKSPACE_SAVE_FAILED,
             EVT_VIDEO_DESCRIPTION_COMPLETE,
             EVT_VIDEO_DESCRIPTION_FAILED,
         )
