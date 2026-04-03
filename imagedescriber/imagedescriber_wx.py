@@ -38,6 +38,10 @@ try:
 except ImportError:
     _wx_dv = None
 
+# Module-level logger — configured fully in main() once log file path is known.
+# Must be at module scope so all class methods can use it.
+logger = logging.getLogger(__name__)
+
 # Add project root to path for shared module imports
 # Works in both development mode (running script) and frozen mode (PyInstaller exe)
 if getattr(sys, 'frozen', False):
