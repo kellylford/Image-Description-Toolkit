@@ -1,0 +1,10 @@
+CRITICAL ERROR: name 'EVT_WORKSPACE_SAVE_COMPLETE' is not defined
+
+Traceback (most recent call last):
+  File "/Users/user/GitHub/Image-Description-Toolkit/imagedescriber/imagedescriber_wx.py", line 6648, in <module>
+    main()
+  File "/Users/user/GitHub/Image-Description-Toolkit/imagedescriber/imagedescriber_wx.py", line 6623, in main
+    frame = ImageDescriberFrame()
+  File "/Users/user/GitHub/Image-Description-Toolkit/imagedescriber/imagedescriber_wx.py", line 741, in __init__
+    if EVT_WORKSPACE_SAVE_COMPLETE:
+NameError: name 'EVT_WORKSPACE_SAVE_COMPLETE' is not defined

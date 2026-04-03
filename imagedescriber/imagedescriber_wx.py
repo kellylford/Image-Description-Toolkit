@@ -3096,12 +3096,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
             logger.info("CHECKPOINT 3: Workspace is None or Untitled - showing save dialog")
             # Inform user they need to save first
+            # CRITICAL: Must pass parent=self so the dialog is attached to the main window.
+            # Without a parent the dialog is parentless and appears hidden behind the main
+            # window on both macOS and Windows, silently blocking all further UI actions
+            # (including Quit) while the app waits indefinitely for a response.
+            self.Raise()
             result = wx.MessageBox(
                 "Batch processing requires a named workspace.\n\n"
                 "Please save your workspace with a descriptive name before processing.\n\n"
                 "Would you like to save the workspace now?",
                 "Save Workspace Required",
-                wx.YES_NO | wx.ICON_QUESTION
+                wx.YES_NO | wx.ICON_QUESTION,
+                self
             )
 
             if result != wx.YES:
@@ -3638,12 +3644,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_process_undescribed(self, event):
         """Menu handler: Process only undescribed images"""
         logger.info("on_process_undescribed menu handler called")
-        self.on_process_all(event, skip_existing=True)
+        try:
+            self.on_process_all(event, skip_existing=True)
+        except Exception as exc:
+            import traceback
+            logger.error(f"on_process_undescribed CRASHED: {exc}\n{traceback.format_exc()}")
+            show_error(self, f"Processing error: {exc}")
 
     def on_redescribe_all(self, event):
         """Menu handler: Redescribe all images"""
         logger.info("on_redescribe_all menu handler called")
-        self.on_process_all(event, skip_existing=False)
+        try:
+            self.on_process_all(event, skip_existing=False)
+        except Exception as exc:
+            import traceback
+            logger.error(f"on_redescribe_all CRASHED: {exc}\n{traceback.format_exc()}")
+            show_error(self, f"Processing error: {exc}")
 
     def on_save_description(self, event):
         """Save edited description"""
