@@ -10,6 +10,8 @@
 **Production code that's been working for months should be changed with EXTREME caution**
 **INCOMPLETE REFACTORS caused 23% of commits to be fixes - ALWAYS check ALL callers**
 **Changing function signatures REQUIRES updating ALL callers - search first, change later**
+**wx event handlers SILENTLY SWALLOW exceptions - "does nothing" means exception on line 1**
+**REGRESSION? Run `git log` to find breaking commit FIRST. Dev mode SECOND. Frozen exe LAST.**
 
 ## 🚨 MANDATORY READING
 
@@ -171,6 +173,40 @@ Before "fixing" working code:
 5. **Production code caution** - If code has been working in production for months, be EXTREMELY cautious about "improvements"
 
 If the user reports something "has been working for months," your first assumption should be: **The code is probably correct, and the issue is elsewhere.**
+
+## ⚠️ wx "Silent Failure" Diagnosis — MANDATORY FIRST STEP
+
+**When a wx button/menu/close/key handler silently does nothing** (no error shown, no dialog, just nothing happens):
+
+wxPython **catches and discards ALL exceptions** thrown inside event handlers. The handler fails on line 1 with a `NameError`, `AttributeError`, or `ImportError` and wx swallows it completely.
+
+### The ONLY correct first step:
+```bash
+# Run the app in Python dev mode — NOT the frozen exe
+cd imagedescriber && .winenv/Scripts/python imagedescriber_wx.py
+# Then reproduce the broken action
+# The exception will print to stderr immediately
+```
+
+**Do NOT:**
+- Investigate tree controls, worker threads, or architecture
+- Build a frozen exe and check crash logs
+- Add print statements or extra logging
+- Spend more than 5 minutes before running dev mode
+
+**The broken logger pattern (8 hours wasted, April 2026):**
+- Commit moved `logger = logging.getLogger(__name__)` from module scope into `main()`
+- Every event handler calling `logger.info(...)` silently raised `NameError`
+- `on_close`, `on_process_single`, and ALL other handlers appeared to do nothing
+- Alt+F4 broken, processing broken, no error shown anywhere
+- **Fix: 1 line. Discovery time in dev mode: under 30 seconds.**
+
+## Regression Diagnosis Protocol
+
+When something that used to work no longer works:
+1. **`git log v<tag>..HEAD --oneline -- <file>`** — find the breaking commit (2 minutes)
+2. **Run in dev mode, reproduce the action** — read the exception (30 seconds)
+3. **Only then** look at architecture/code if needed
 
 
 

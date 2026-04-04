@@ -101,6 +101,38 @@
 - [ ] ❌ I'm renaming variables without grepping for all uses
 - [ ] ❌ The code is 500+ lines and I haven't read it all
 
+## ⚠️ CRITICAL: Regression Diagnosis Protocol
+
+**When something that used to work no longer works:**
+
+### Step 1: Git bisect FIRST (not last)
+```bash
+git log v<last_known_good>..HEAD --oneline -- <affected_file>
+```
+Identify the breaking commit in minutes. Do NOT investigate code before doing this.
+
+### Step 2: Run in dev mode BEFORE building a frozen exe
+```bash
+# For imagedescriber:
+cd imagedescriber && .winenv/Scripts/python imagedescriber_wx.py
+```
+**Then reproduce the broken action.** Python will print exceptions to stderr that wxPython silently swallows in event handlers. A frozen exe hides ALL exceptions. Dev mode shows them immediately.
+
+### Step 3: "Silent failure" = exception in event handler
+**When a wx button/menu/close handler silently does nothing** — no error, no dialog, just nothing — the **first and only suspect** is an unhandled exception inside the handler. wxPython catches and discards all exceptions thrown from event handlers. Dev mode will expose it.
+
+**The 8-hour timewaste pattern:**
+- Handler silently does nothing
+- Investigate architecture, tree controls, worker threads, logs
+- Build frozen exes, check crash logs
+- Eventually find it was a `NameError`/`AttributeError` on line 1 of the handler
+
+**The 5-minute correct pattern:**
+1. Run in dev mode
+2. Click the broken button
+3. Read the exception in the terminal
+4. Fix it
+
 ## Mandatory Statement Before Committing
 
 **I have completed all checklist items. I have:**
