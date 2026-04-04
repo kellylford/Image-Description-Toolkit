@@ -3650,23 +3650,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_process_undescribed(self, event):
         """Menu handler: Process only undescribed images"""
-        logger.info("on_process_undescribed menu handler called")
-        try:
-            self.on_process_all(event, skip_existing=True)
-        except Exception as exc:
-            import traceback
-            logger.error(f"on_process_undescribed CRASHED: {exc}\n{traceback.format_exc()}")
-            show_error(self, f"Processing error: {exc}")
+        self.on_process_all(event, skip_existing=True)
 
     def on_redescribe_all(self, event):
         """Menu handler: Redescribe all images"""
-        logger.info("on_redescribe_all menu handler called")
-        try:
-            self.on_process_all(event, skip_existing=False)
-        except Exception as exc:
-            import traceback
-            logger.error(f"on_redescribe_all CRASHED: {exc}\n{traceback.format_exc()}")
-            show_error(self, f"Processing error: {exc}")
+        self.on_process_all(event, skip_existing=False)
 
     def on_save_description(self, event):
         """Save edited description"""
