@@ -2433,7 +2433,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                     self.load_directory(
                         selection['directory'],
-                        recursive=selection['recursive']
+                        recursive=selection['recursive'],
+                        append=selection['add_to_existing']
                     )
                 else:
                     dlg.Destroy()
