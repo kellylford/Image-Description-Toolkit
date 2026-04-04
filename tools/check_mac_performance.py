@@ -20,6 +20,18 @@ def section(title):
     print('='*50)
 
 
+def is_apple_silicon_mac():
+    """Return True if the physical hardware is Apple Silicon."""
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", "hw.optional.arm64"],
+            capture_output=True, text=True
+        )
+        return result.stdout.strip() == "1"
+    except Exception:
+        return False
+
+
 def check_architecture():
     section("Python & Architecture")
     print(f"  Python version : {sys.version}")
@@ -27,11 +39,16 @@ def check_architecture():
     print(f"  platform.processor: {platform.processor()}")
 
     machine = platform.machine()
+    apple_silicon = is_apple_silicon_mac()
+    print(f"  Apple Silicon hardware: {'Yes' if apple_silicon else 'No (Intel)'}")
+
     if machine == "arm64":
         print("  ✓ Running NATIVELY on Apple Silicon (arm64)")
-    elif machine == "x86_64":
-        print("  ✗ Running under ROSETTA 2 (x86_64) — this adds overhead!")
+    elif machine == "x86_64" and apple_silicon:
+        print("  ✗ Running under ROSETTA 2 (x86_64 on Apple Silicon) — this adds overhead!")
         print("    Fix: reinstall Python as arm64 and rebuild your venv.")
+    elif machine == "x86_64":
+        print("  ✓ Running natively on Intel Mac (x86_64)")
     else:
         print(f"  ? Unknown architecture: {machine}")
 
@@ -63,29 +80,45 @@ def check_system_info():
         print(f"  Could not read system profile: {e}")
 
 
+def get_so_arch(package_dir):
+    """Find a compiled .so extension in a package dir and check its architecture."""
+    so_files = list(Path(package_dir).rglob("*.so"))
+    if not so_files:
+        return "pure Python (no compiled extensions)"
+    # Check the first .so found
+    try:
+        result = subprocess.run(
+            ["file", str(so_files[0])],
+            capture_output=True, text=True
+        )
+        out = result.stdout
+        if "arm64" in out and "x86_64" in out:
+            return "universal (arm64 + x86_64)"
+        elif "arm64" in out:
+            return "arm64 (native Apple Silicon)"
+        elif "x86_64" in out:
+            return "x86_64"
+    except Exception:
+        pass
+    return "unknown"
+
+
 def check_key_packages():
     section("Key Package Architectures")
+    apple_silicon = is_apple_silicon_mac()
     packages = ["PIL", "numpy", "ollama", "anthropic", "openai", "requests"]
     for pkg in packages:
         try:
             mod = __import__(pkg)
-            loc = getattr(mod, "__file__", "built-in")
-            arch = "unknown"
-            if loc and loc != "built-in":
-                try:
-                    result = subprocess.run(
-                        ["file", loc],
-                        capture_output=True, text=True
-                    )
-                    out = result.stdout.strip()
-                    if "arm64" in out:
-                        arch = "arm64 (native)"
-                    elif "x86_64" in out:
-                        arch = "x86_64 (Rosetta)"
-                    elif "Python" in out or "script" in out.lower():
-                        arch = "pure Python"
-                except Exception:
-                    arch = "could not check"
+            pkg_dir = getattr(mod, "__file__", None)
+            if pkg_dir:
+                pkg_dir = str(Path(pkg_dir).parent)
+                arch = get_so_arch(pkg_dir)
+                # Flag x86_64 only as a problem on Apple Silicon
+                if "x86_64" in arch and "arm64" not in arch and apple_silicon:
+                    arch += "  ← Rosetta overhead!"
+            else:
+                arch = "built-in"
             print(f"  {pkg:<12} {arch}")
         except ImportError:
             print(f"  {pkg:<12} NOT INSTALLED")
@@ -116,7 +149,7 @@ def check_image_encode_speed():
     elapsed = time.time() - start
     print(f"  10x 2MB base64 encodes: {elapsed:.3f}s  ({elapsed/10*1000:.1f}ms each)")
     if elapsed / 10 > 0.05:
-        print("  (slow — may indicate Rosetta or memory pressure)")
+        print("  (slow — may indicate Rosetta overhead or memory pressure)")
     else:
         print("  (fast — looks good)")
 
