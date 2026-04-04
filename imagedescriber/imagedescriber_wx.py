@@ -4651,11 +4651,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # Create item with MINIMAL metadata (no network I/O!)
                 item = ImageItem(file_path_str, item_type)
 
-                # Compute subfolder relative to scan root (e.g. "Vacation/Beach")
-                # None means root-level (no subfolder grouping needed)
+                # Compute subfolder relative to scan root's PARENT so that the
+                # scan root directory itself appears as a top-level folder node.
+                # Example: scanning \\server\photos\iphone recursively
+                #   file: \\server\photos\iphone\2004\img.jpg
+                #   scan_root: \\server\photos\iphone
+                #   scan_root.parent: \\server\photos
+                #   relative to parent: iphone\2004\img.jpg
+                #   parent of relative: iphone\2004  → subfolder = "iphone/2004"
+                # Files directly in the scan root (no subdirectory):
+                #   relative parent: iphone  → subfolder = "iphone"
                 if scan_root is not None:
                     try:
-                        relative = file_path.relative_to(scan_root)
+                        relative = file_path.relative_to(scan_root.parent)
                         parent = relative.parent
                         if str(parent) not in ('', '.'):
                             item.subfolder = str(parent)
