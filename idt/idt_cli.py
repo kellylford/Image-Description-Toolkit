@@ -108,6 +108,7 @@ def main():
         'describe-video': 'IDT - Describing Videos',
         'convert-images': 'IDT - Converting Images',
         'descriptions-to-html': 'IDT - Generating HTML',
+        'persons': 'IDT - Person Identification',
         'version': 'IDT - Version Info',
         'help': 'IDT - Help'
     }
@@ -691,6 +692,44 @@ def main():
             result = subprocess.run(cmd, cwd=str(guided_script.parent))
             return result.returncode
     
+    elif command == 'persons':
+        # Person identification management
+        if getattr(sys, 'frozen', False):
+            try:
+                scripts_path = get_resource_path('scripts')
+                imagedescriber_path = get_resource_path('imagedescriber')
+                for p in (scripts_path, imagedescriber_path):
+                    if str(p) not in sys.path:
+                        sys.path.insert(0, str(p))
+
+                import persons_cli
+
+                original_argv = sys.argv[:]
+                sys.argv = ['idt persons'] + sys.argv[2:]
+                try:
+                    return persons_cli.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+
+            except ImportError as e:
+                print(f"Error: Could not import persons_cli module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running persons: {e}")
+                return 1
+        else:
+            persons_script = get_resource_path('scripts/persons_cli.py')
+            if not persons_script.exists():
+                print(f"Error: persons_cli.py not found at {persons_script}")
+                return 1
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(persons_script)] + args
+            result = subprocess.run(cmd, cwd=str(persons_script.parent))
+            return result.returncode
+
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
         return 0
@@ -732,6 +771,7 @@ COMMANDS:
     describe-video        Generate an AI description for a standalone video file
     convert-images        Convert HEIC/HEIF images to JPEG
     descriptions-to-html  Generate HTML report from a workflow descriptions file
+    persons               Manage person identification and tagging
     version               Show version information
     help                  Show this help message
 
@@ -930,6 +970,18 @@ EXAMPLES:
     # List available prompt styles
     {base_call} prompt-list
     {base_call} prompt-list --verbose
+
+    # Add a known person to the workspace
+    {base_call} persons add --name "Alice Smith" --traits "tall, auburn hair, glasses"
+
+    # Tag an image with a person
+    {base_call} persons tag --image IMG_001.jpg --person "Alice Smith"
+
+    # List all known persons
+    {base_call} persons list
+
+    # Generate a person identification report
+    {base_call} persons report --workflow ./Descriptions/wf_photos_...
 
 NOTES:
     - Requires Ollama for local AI models (https://ollama.ai)

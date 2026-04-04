@@ -7,6 +7,7 @@ images, descriptions, and workspaces.
 
 import time
 import logging
+import uuid
 from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -80,6 +81,72 @@ class ImageDescription:
         return desc
 
 
+class PersonRecord:
+    """Represents a known person in the workspace persons database"""
+    def __init__(self, name: str, description_traits: str = "", notes: str = ""):
+        self.id: str = str(uuid.uuid4())
+        self.name: str = name
+        self.description_traits: str = description_traits  # Physical traits for AI matching
+        self.notes: str = notes
+        self.tagged_images: List[str] = []  # file_path strings
+        self.face_embedding: Optional[List[float]] = None  # Reserved for CV face recognition (Phase 5)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description_traits": self.description_traits,
+            "notes": self.notes,
+            "tagged_images": self.tagged_images,
+            "face_embedding": self.face_embedding,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PersonRecord":
+        record = cls(
+            name=data.get("name", ""),
+            description_traits=data.get("description_traits", ""),
+            notes=data.get("notes", ""),
+        )
+        record.id = data.get("id", record.id)
+        record.tagged_images = data.get("tagged_images", [])
+        record.face_embedding = data.get("face_embedding", None)
+        return record
+
+
+class PersonGroup:
+    """Represents an auto-detected or manually created group of images believed to contain the same person"""
+    def __init__(self, display_label: str = "", description_summary: str = "", method: str = "manual"):
+        self.id: str = str(uuid.uuid4())
+        self.display_label: str = display_label  # e.g. "Candidate Person A" or "Alice Smith"
+        self.resolved_person_id: Optional[str] = None  # Set when group is linked to a PersonRecord
+        self.images: List[str] = []  # file_path strings
+        self.description_summary: str = description_summary  # Auto-generated trait summary
+        self.method: str = method  # "manual", "text", "ai", "cv"
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "display_label": self.display_label,
+            "resolved_person_id": self.resolved_person_id,
+            "images": self.images,
+            "description_summary": self.description_summary,
+            "method": self.method,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PersonGroup":
+        group = cls(
+            display_label=data.get("display_label", ""),
+            description_summary=data.get("description_summary", ""),
+            method=data.get("method", "manual"),
+        )
+        group.id = data.get("id", group.id)
+        group.resolved_person_id = data.get("resolved_person_id", None)
+        group.images = data.get("images", [])
+        return group
+
+
 class ImageItem:
     """Represents an image or video in the workspace"""
     def __init__(self, file_path: str, item_type: str = "image"):
@@ -110,6 +177,10 @@ class ImageItem:
         # e.g. "Vacation", "Vacation/Beach", or None for root-level items.
         # Used by the tree view to group items under folder nodes.
         self.subfolder: Optional[str] = None
+
+        # Person identification: tags linking this image to known persons
+        self.person_tags: List[str] = []  # List of PersonRecord.id values
+        self.person_group_id: Optional[str] = None  # PersonGroup.id if auto-grouped
         
     def add_description(self, description: ImageDescription):
         self.descriptions.append(description)
@@ -138,7 +209,10 @@ class ImageItem:
             "exif_datetime": self.exif_datetime,
             "file_mtime": self.file_mtime,
             # Subfolder grouping for tree view
-            "subfolder": self.subfolder
+            "subfolder": self.subfolder,
+            # Person identification
+            "person_tags": self.person_tags,
+            "person_group_id": self.person_group_id,
         }
     
     @classmethod
@@ -169,6 +243,9 @@ class ImageItem:
         item.file_mtime = data.get("file_mtime", None)
         # Subfolder grouping - backward compatible default (None = root level)
         item.subfolder = data.get("subfolder", None)
+        # Person identification - backward compatible defaults
+        item.person_tags = data.get("person_tags", [])
+        item.person_group_id = data.get("person_group_id", None)
         return item
 
 
@@ -200,6 +277,10 @@ class ImageWorkspace:
         # }
         self.batch_state: Optional[dict] = None
         self.load_failures: List[tuple] = []  # Track items that failed to load from workspace file
+
+        # Person identification data
+        self.persons: Dict[str, PersonRecord] = {}  # person_id -> PersonRecord
+        self.person_groups: Dict[str, PersonGroup] = {}  # group_id -> PersonGroup
         
     def add_directory(self, directory_path: str):
         """Add a directory to the workspace"""
@@ -344,6 +425,8 @@ class ImageWorkspace:
             "imported_workflow_dir": getattr(self, 'imported_workflow_dir', None),  # Track workflow imports
             "cached_ollama_models": getattr(self, 'cached_ollama_models', None),  # Cached Ollama models
             "batch_state": getattr(self, 'batch_state', None),  # Batch processing state (Phase 1: Batch Management)
+            "persons": {pid: p.to_dict() for pid, p in getattr(self, 'persons', {}).items()},
+            "person_groups": {gid: g.to_dict() for gid, g in getattr(self, 'person_groups', {}).items()},
             "created": self.created,
             "modified": self.modified
         }
@@ -384,6 +467,9 @@ class ImageWorkspace:
         workspace.imported_workflow_dir = data.get("imported_workflow_dir", None)  # Load workflow dir
         workspace.cached_ollama_models = data.get("cached_ollama_models", None)  # Load cached models
         workspace.batch_state = data.get("batch_state", None)  # Load batch state (Phase 1: Batch Management)
+        # Person identification - backward compatible defaults
+        workspace.persons = {pid: PersonRecord.from_dict(p) for pid, p in data.get("persons", {}).items()}
+        workspace.person_groups = {gid: PersonGroup.from_dict(g) for gid, g in data.get("person_groups", {}).items()}
         workspace.created = data.get("created", workspace.created)
         workspace.modified = data.get("modified", workspace.modified)
         workspace.saved = True

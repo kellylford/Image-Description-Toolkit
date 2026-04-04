@@ -103,6 +103,7 @@ class DescriptionEntry:
         self.timestamp = ""
         self.processing_time = ""  # Processing time in seconds
         self.raw_metadata = {}
+        self.person_tags: List[str] = []  # Names of identified persons (loaded from persons_export.json)
     
     def to_html(self, include_details: bool = False) -> str:
         """Convert the entry to HTML format
@@ -179,7 +180,14 @@ class DescriptionEntry:
                 html_content.append(f'<p>{description_html}</p>')
         else:
             html_content.append('<p><em>No description available</em></p>')
-        
+
+        # Person tags (if any were loaded from persons_export.json)
+        if self.person_tags:
+            names_html = ", ".join(html.escape(n) for n in self.person_tags)
+            html_content.append(
+                f'<p class="person-tags"><strong>People identified:</strong> {names_html}</p>'
+            )
+
         return '\n'.join(html_content)
 
 
@@ -230,7 +238,24 @@ class DescriptionsParser:
                 entry = self._parse_section(section)
                 if entry and entry.filename:
                     self.entries.append(entry)
-            
+
+            # Inject person tags from persons_export.json if present
+            export_file = self.input_file.parent / "persons_export.json"
+            if export_file.exists():
+                try:
+                    import json as _json
+                    with open(export_file, 'r', encoding='utf-8') as _f:
+                        export_data = _json.load(_f)
+                    person_map = {
+                        fname: idata.get("person_names", [])
+                        for fname, idata in export_data.get("images", {}).items()
+                    }
+                    for entry in self.entries:
+                        if entry.filename in person_map:
+                            entry.person_tags = person_map[entry.filename]
+                except Exception:
+                    pass  # skip gracefully if export file is malformed
+
             return self.entries
             
         except Exception as e:
@@ -418,6 +443,16 @@ class HTMLGenerator:
             color: #495057;
             font-weight: bold;
             margin-bottom: 30px;
+        }}
+        
+        .person-tags {{
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin-top: 8px;
+            font-size: 0.95em;
         }}
         
         .entry {{

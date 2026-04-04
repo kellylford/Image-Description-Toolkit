@@ -92,6 +92,13 @@ a = Analysis(
         'scripts.config_loader',
         'scripts.list_prompts',
         'scripts.list_results',
+        # Person identification
+        'scripts.persons_manager',
+        'scripts.persons_cli',
+        'scripts.person_identifier',
+        'scripts.face_db',
+        'scripts.face_engine',
+        'scripts.install_persons_engine',
         # Models and analysis
         'models.check_models',
         'models.claude_models',  # Central Claude model configuration
@@ -158,6 +165,9 @@ a = Analysis(
         'safetensors',
         'sentencepiece',
         'tokenizers',
+        # stdlib modules torch/torchvision need at import time (excluded by PyInstaller by default)
+        'timeit',
+        'modulefinder',
     ] + bs4_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports,
     hookspath=[],
     hooksconfig={},

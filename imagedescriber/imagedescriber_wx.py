@@ -1296,6 +1296,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.image_info_label = wx.StaticText(panel, label="No image selected")
         sizer.Add(self.image_info_label, 0, wx.ALL, 5)
 
+        # Person tags label (hidden when no tags)
+        self.person_tags_label = wx.StaticText(
+            panel, label="",
+            name="People identified in this image"
+        )
+        self.person_tags_label.SetFont(
+            self.person_tags_label.GetFont().Italic()
+        )
+        sizer.Add(self.person_tags_label, 0, wx.LEFT | wx.BOTTOM, 8)
+        self.person_tags_label.Show(False)
+
         # ===== TOP SECTION: PREVIEW + DESCRIPTION LIST (SIDE-BY-SIDE) =====
         top_row_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -1512,6 +1523,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         rename_item = process_menu.Append(wx.ID_ANY, "&Rename Item")
         self.Bind(wx.EVT_MENU, self.on_rename_item, rename_item)
 
+        process_menu.AppendSeparator()
+
+        scan_faces_item = process_menu.Append(wx.ID_ANY, "&Scan Faces in Images...")
+        self.Bind(wx.EVT_MENU, self.on_scan_faces, scan_faces_item)
+
+        cluster_faces_item = process_menu.Append(wx.ID_ANY, "&Cluster Faces...")
+        self.Bind(wx.EVT_MENU, self.on_cluster_faces, cluster_faces_item)
+
+        find_similar_item = process_menu.Append(wx.ID_ANY, "&Find Similar Faces...")
+        self.Bind(wx.EVT_MENU, self.on_find_similar_faces, find_similar_item)
+
         menubar.Append(process_menu, "&Process")
 
         # Descriptions menu
@@ -1543,6 +1565,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         show_all_item = desc_menu.Append(wx.ID_ANY, "&Show All Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_show_all_descriptions, show_all_item)
+
+        desc_menu.AppendSeparator()
+
+        tag_person_item = desc_menu.Append(wx.ID_ANY, "&Tag Person in Image...")
+        self.Bind(wx.EVT_MENU, self.on_tag_person, tag_person_item)
 
         menubar.Append(desc_menu, "&Descriptions")
 
@@ -1610,6 +1637,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         install_ffmpeg_item = tools_menu.Append(wx.ID_ANY, "Install &FFmpeg (for video GPS)...")
         self.Bind(wx.EVT_MENU, self.on_install_ffmpeg, install_ffmpeg_item)
+
+        tools_menu.AppendSeparator()
+
+        manage_persons_item = tools_menu.Append(wx.ID_ANY, "&Manage Known Persons...")
+        self.Bind(wx.EVT_MENU, self.on_manage_persons, manage_persons_item)
+
+        install_face_engine_item = tools_menu.Append(wx.ID_ANY, "Install &Face Recognition Engine...")
+        self.Bind(wx.EVT_MENU, self.on_install_face_engine, install_face_engine_item)
 
         tools_menu.AppendSeparator()
 
@@ -1799,6 +1834,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 info += f"\n\n⚠️ Processing Failed: {image_item.processing_error}"
 
         self.image_info_label.SetLabel(info)
+
+        # Update person tags display
+        self._refresh_person_tags_label(image_item)
 
         # Populate descriptions list with accessible pattern
         if image_item.descriptions:
@@ -3699,6 +3737,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._image_tree_root = self.image_list.AddRoot("Images")
         self.description_text.SetValue("")
         self.image_info_label.SetLabel("No image selected")
+        if hasattr(self, 'person_tags_label'):
+            self.person_tags_label.SetLabel("")
+            self.person_tags_label.Show(False)
 
         # Update status
         self.SetStatusText("New workspace created", 0)
@@ -5956,6 +5997,442 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dlg.Centre()
         dlg.ShowModal()
         dlg.Destroy()
+
+    def _refresh_person_tags_label(self, image_item=None):
+        """Update the person tags label below the image info label."""
+        if not hasattr(self, 'person_tags_label'):
+            return
+        if image_item is None or not self.workspace:
+            self.person_tags_label.SetLabel("")
+            self.person_tags_label.Show(False)
+            return
+        try:
+            from persons_manager import get_persons_for_image
+        except ImportError:
+            try:
+                _scripts = str(__import__('pathlib').Path(__file__).parent.parent / 'scripts')
+                import sys as _sys
+                if _scripts not in _sys.path:
+                    _sys.path.insert(0, _scripts)
+                from persons_manager import get_persons_for_image
+            except ImportError:
+                return
+        persons = get_persons_for_image(self.workspace, image_item.file_path)
+        if persons:
+            names = ", ".join(p.name for p in persons)
+            self.person_tags_label.SetLabel(f"People: {names}")
+            self.person_tags_label.Show(True)
+        else:
+            self.person_tags_label.SetLabel("")
+            self.person_tags_label.Show(False)
+        self.person_tags_label.GetParent().Layout()
+
+    def on_tag_person(self, event):
+        """Tag the selected image with a known person (Descriptions menu)."""
+        if not self.current_image_item:
+            show_warning(self, "No image selected")
+            return
+        if not self.workspace:
+            show_warning(self, "No workspace loaded")
+            return
+
+        description_text = ""
+        if self.current_image_item.descriptions:
+            description_text = self.current_image_item.descriptions[-1].text
+
+        try:
+            from person_dialogs_wx import TagPersonDialog
+        except ImportError:
+            from imagedescriber.person_dialogs_wx import TagPersonDialog
+
+        try:
+            from persons_manager import tag_image
+        except ImportError:
+            _scripts = str(__import__('pathlib').Path(__file__).parent.parent / 'scripts')
+            import sys as _sys
+            if _scripts not in _sys.path:
+                _sys.path.insert(0, _scripts)
+            from persons_manager import tag_image
+
+        dlg = TagPersonDialog(self, self.workspace,
+                              self.current_image_item.file_path,
+                              description_text)
+        if dlg.ShowModal() == wx.ID_OK:
+            name = dlg.get_person_name()
+            tag_image(self.workspace, self.current_image_item.file_path, name)
+            self.mark_modified()
+            self._refresh_person_tags_label(self.current_image_item)
+            self.SetStatusText(f"Tagged image as: {name}", 0)
+        dlg.Destroy()
+
+    def on_manage_persons(self, event):
+        """Open the Known Persons Database dialog (Tools menu)."""
+        if not self.workspace:
+            show_warning(self, "No workspace loaded. Open or create a workspace first.")
+            return
+
+        try:
+            from person_dialogs_wx import PersonDatabaseDialog
+        except ImportError:
+            from imagedescriber.person_dialogs_wx import PersonDatabaseDialog
+
+        dlg = PersonDatabaseDialog(self, self.workspace)
+        dlg.ShowModal()
+        if dlg.was_modified():
+            self.mark_modified()
+            # Refresh person tags display for current image
+            if self.current_image_item:
+                self._refresh_person_tags_label(self.current_image_item)
+            self.SetStatusText("Persons database updated", 0)
+        dlg.Destroy()
+
+    # ------------------------------------------------------------------ #
+    # Face recognition handlers (Phase 5 — engine optional)
+    # ------------------------------------------------------------------ #
+
+    def on_install_face_engine(self, event):
+        """Tools → Install Face Recognition Engine."""
+        try:
+            from install_persons_engine import is_engine_available, get_installation_status
+        except ImportError:
+            from scripts.install_persons_engine import is_engine_available, get_installation_status
+
+        already = is_engine_available()
+        status = get_installation_status()
+        lines = []
+        for pkg, info in status.items():
+            mark = "✓" if info["installed"] else "✗"
+            ver = f" v{info['version']}" if info.get("version") else ""
+            lines.append(f"  {mark}  {pkg}{ver}")
+        status_text = "\n".join(lines)
+
+        if already:
+            msg = (
+                "The face recognition engine is already installed.\n\n"
+                f"Package status:\n{status_text}\n\n"
+                "Do you want to reinstall / upgrade it?"
+            )
+            if wx.MessageBox(msg, "Face Recognition Engine",
+                             wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION, self) != wx.YES:
+                return
+            reinstall = True
+        else:
+            disk_note = (
+                "Installing facenet-pytorch requires approximately 1 GB of disk space\n"
+                "(torch, torchvision, facenet-pytorch, scikit-learn).\n\n"
+                f"Package status:\n{status_text}\n\n"
+                "Do you want to install the face recognition engine now?"
+            )
+            if wx.MessageBox(disk_note, "Install Face Recognition Engine",
+                             wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION, self) != wx.YES:
+                return
+            reinstall = False
+
+        # Show progress dialog
+        progress = wx.ProgressDialog(
+            "Installing Face Recognition Engine",
+            "Starting...",
+            maximum=100,
+            parent=self,
+            style=wx.PD_APP_MODAL | wx.PD_ELAPSED_TIME | wx.PD_AUTO_HIDE,
+        )
+
+        def _progress_cb(msg: str, pct: int) -> None:
+            wx.CallAfter(progress.Update, pct, msg)
+
+        try:
+            from install_persons_engine import install_engine
+        except ImportError:
+            from scripts.install_persons_engine import install_engine
+
+        import threading
+
+        def _run():
+            ok = install_engine(progress_cb=_progress_cb, reinstall=reinstall)
+            wx.CallAfter(progress.Destroy)
+            if ok:
+                wx.CallAfter(
+                    show_info, self,
+                    "Face recognition engine installed successfully.\n"
+                    "You can now use Scan Faces and Cluster Faces.",
+                    "Installation Complete",
+                )
+            else:
+                wx.CallAfter(
+                    show_error, self,
+                    "Some packages failed to install. Check the application log for details.",
+                    "Installation Error",
+                )
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def on_scan_faces(self, event):
+        """Process → Scan Faces — detect and embed faces in workspace images."""
+        if not self.workspace:
+            show_warning(self, "No workspace loaded.")
+            return
+
+        try:
+            from face_engine import is_engine_available
+        except ImportError:
+            from scripts.face_engine import is_engine_available
+
+        if not is_engine_available():
+            show_warning(
+                self,
+                "The face recognition engine is not installed.\n"
+                "Use Tools → Install Face Recognition Engine to install it.",
+            )
+            return
+
+        images = [item for item in self.workspace.images.values()
+                  if item.file_path and Path(item.file_path).exists()]
+        if not images:
+            show_warning(self, "No images with valid paths found in the workspace.")
+            return
+
+        msg = (
+            f"Scan {len(images)} image(s) for faces?\n\n"
+            "Results will be saved to the workspace face database.\n"
+            "This may take several minutes on large collections."
+        )
+        if wx.MessageBox(msg, "Scan Faces",
+                         wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION, self) != wx.YES:
+            return
+
+        progress = wx.ProgressDialog(
+            "Scanning Faces",
+            "Initialising...",
+            maximum=len(images),
+            parent=self,
+            style=wx.PD_APP_MODAL | wx.PD_ELAPSED_TIME | wx.PD_CAN_ABORT | wx.PD_AUTO_HIDE,
+        )
+
+        import threading
+
+        def _run():
+            try:
+                from face_engine import scan_image_with_boxes
+                from face_db import FaceDatabase
+            except ImportError:
+                from scripts.face_engine import scan_image_with_boxes
+                from scripts.face_db import FaceDatabase
+
+            workspace_dir = Path(self.workspace_path).parent if self.workspace_path else Path.cwd()
+            db = FaceDatabase(workspace_dir)
+            total_faces = 0
+            cancelled = False
+
+            for i, item in enumerate(images):
+                cont, _skip = wx.CallAfter(progress.Update, i,
+                                           f"Scanning {item.filename}...") or (True, False)
+                # wx.ProgressDialog.Update returns (continue, skip)
+                # Since we used CallAfter, just check the flag via a flag var
+                try:
+                    results = scan_image_with_boxes(item.file_path)
+                    for face in results:
+                        if face.embedding:
+                            db.upsert_face(
+                                item.filename, face.face_index,
+                                face.embedding, face.bbox, face.confidence,
+                            )
+                    total_faces += len(results)
+                except Exception as exc:
+                    logger.warning("Face scan error for %s: %s", item.filename, exc)
+
+            db.close()
+            wx.CallAfter(progress.Destroy)
+            wx.CallAfter(
+                show_info, self,
+                f"Face scan complete.\n"
+                f"Processed {len(images)} image(s), found {total_faces} face(s).\n\n"
+                "Use Process → Cluster Faces to group similar faces.",
+                "Scan Complete",
+            )
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def on_cluster_faces(self, event):
+        """Process → Cluster Faces — run DBSCAN on stored embeddings."""
+        if not self.workspace:
+            show_warning(self, "No workspace loaded.")
+            return
+
+        try:
+            from face_engine import is_engine_available, cluster_faces, build_person_groups_from_clusters
+            from face_db import FaceDatabase
+        except ImportError:
+            from scripts.face_engine import is_engine_available, cluster_faces, build_person_groups_from_clusters
+            from scripts.face_db import FaceDatabase
+
+        if not is_engine_available():
+            show_warning(
+                self,
+                "The face recognition engine is not installed.\n"
+                "Use Tools → Install Face Recognition Engine.",
+            )
+            return
+
+        workspace_dir = Path(self.workspace_path).parent if self.workspace_path else Path.cwd()
+        db = FaceDatabase(workspace_dir)
+        face_count = db.face_count()
+        if face_count < 2:
+            db.close()
+            show_warning(
+                self,
+                "Not enough faces stored to cluster.\n"
+                "Run Process → Scan Faces first.",
+            )
+            return
+
+        msg = (
+            f"Cluster {face_count} stored faces?\n\n"
+            "DBSCAN will group similar-looking faces together.\n"
+            "Results will be shown for review and can be linked to known persons."
+        )
+        if wx.MessageBox(msg, "Cluster Faces",
+                         wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION, self) != wx.YES:
+            db.close()
+            return
+
+        try:
+            assignments = cluster_faces(db)
+            groups = build_person_groups_from_clusters(db, self.workspace)
+        except RuntimeError as exc:
+            db.close()
+            show_error(self, str(exc), "Clustering Error")
+            return
+        finally:
+            db.close()
+
+        if not groups:
+            show_info(self, "No multi-image face clusters found.", "Cluster Faces")
+            return
+
+        # Show results using GroupingResultsDialog
+        try:
+            from person_dialogs_wx import GroupingResultsDialog
+        except ImportError:
+            from imagedescriber.person_dialogs_wx import GroupingResultsDialog
+
+        # Build descriptions dict for the dialog
+        descriptions = {
+            item.filename: (item.descriptions[0].text if item.descriptions else "")
+            for item in self.workspace.images.values()
+        }
+        dlg = GroupingResultsDialog(self, groups, descriptions, self.workspace)
+        dlg.ShowModal()
+        if dlg.was_modified():
+            self.mark_modified()
+            self.SetStatusText(f"Face clusters reviewed: {len(groups)} group(s)", 0)
+        dlg.Destroy()
+
+    def on_find_similar_faces(self, event):
+        """Process → Find Similar Faces — match current image's faces to stored clusters."""
+        if not self.workspace or not self.current_image_item:
+            show_warning(self, "Select an image first.")
+            return
+
+        try:
+            from face_engine import is_engine_available, scan_image_with_boxes
+            from face_db import FaceDatabase
+        except ImportError:
+            from scripts.face_engine import is_engine_available, scan_image_with_boxes
+            from scripts.face_db import FaceDatabase
+
+        if not is_engine_available():
+            show_warning(
+                self,
+                "The face recognition engine is not installed.\n"
+                "Use Tools → Install Face Recognition Engine.",
+            )
+            return
+
+        item = self.current_image_item
+        if not item.file_path or not Path(item.file_path).exists():
+            show_warning(self, "The selected image file cannot be found on disk.")
+            return
+
+        workspace_dir = Path(self.workspace_path).parent if self.workspace_path else Path.cwd()
+        db = FaceDatabase(workspace_dir)
+
+        if db.face_count() < 2:
+            db.close()
+            show_warning(
+                self,
+                "No face embeddings stored yet.\n"
+                "Run Process → Scan Faces first.",
+            )
+            return
+
+        clusters = db.get_cluster_assignments(method="cv")
+        if not clusters:
+            db.close()
+            show_warning(
+                self,
+                "No clusters computed yet.\n"
+                "Run Process → Cluster Faces first.",
+            )
+            return
+
+        try:
+            query_faces = scan_image_with_boxes(item.file_path)
+        except Exception as exc:
+            db.close()
+            show_error(self, f"Face scan failed: {exc}", "Find Similar Faces")
+            return
+
+        if not query_faces:
+            db.close()
+            show_info(self, "No faces detected in the selected image.", "Find Similar Faces")
+            return
+
+        # Find nearest cluster for each detected face
+        import json as _json
+        import math
+
+        def _cosine_sim(a, b):
+            dot = sum(x * y for x, y in zip(a, b))
+            norm_a = math.sqrt(sum(x * x for x in a))
+            norm_b = math.sqrt(sum(x * x for x in b))
+            return dot / (norm_a * norm_b + 1e-8)
+
+        all_stored = db.get_all_faces()
+        db.close()
+
+        result_lines = [f"Similar faces to '{item.filename}':\n"]
+        for qface in query_faces:
+            if not qface.embedding:
+                continue
+            best_score = -1.0
+            best_fname = None
+            for stored in all_stored:
+                if stored["filename"] == item.filename:
+                    continue
+                stored_emb = _json.loads(stored["embedding"])
+                score = _cosine_sim(qface.embedding, stored_emb)
+                if score > best_score:
+                    best_score = score
+                    best_fname = stored["filename"]
+
+            if best_fname and best_score > 0.4:
+                person_id = None
+                # find person name if assigned
+                for stored in all_stored:
+                    if stored["filename"] == best_fname and stored.get("person_id"):
+                        person_id = stored["person_id"]
+                        break
+                person_name = ""
+                if person_id and person_id in self.workspace.persons:
+                    person_name = f" ({self.workspace.persons[person_id].name})"
+                result_lines.append(
+                    f"  Face {qface.face_index}: best match → {best_fname}{person_name}  "
+                    f"(similarity {best_score:.2f})"
+                )
+            else:
+                result_lines.append(f"  Face {qface.face_index}: no close match found")
+
+        show_info(self, "\n".join(result_lines), "Find Similar Faces")
 
     # View menu handlers
     def on_set_filter(self, filter_type):

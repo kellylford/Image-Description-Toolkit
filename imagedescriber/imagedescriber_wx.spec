@@ -84,6 +84,19 @@ a = Analysis(
         'scripts.config_loader',
         'scripts.descriptions_to_html',  # HTML export functionality
         'scripts.web_image_downloader',  # URL image downloader
+        # Person identification
+        'scripts.persons_manager',
+        'scripts.person_identifier',
+        'scripts.face_db',
+        'scripts.face_engine',
+        'scripts.install_persons_engine',
+        'imagedescriber.person_dialogs_wx',
+        'person_dialogs_wx',
+        'persons_manager',
+        'person_identifier',
+        'face_db',
+        'face_engine',
+        'install_persons_engine',
         'scripts.video_describer',       # Video description feature
         'scripts.enhanced_scene_detector',  # Enhanced scene detection
         'video_describer',               # Frozen mode: bare module name
@@ -165,6 +178,9 @@ a = Analysis(
         # PyTorch — CPU-only, required by transformers processor layer for LLaVA/Phi models
         'torch',
         'torchvision',
+        # stdlib modules torch/torchvision need at import time (excluded by PyInstaller by default)
+        'timeit',
+        'modulefinder',
         'huggingface_hub',
         'safetensors',
         'sentencepiece',

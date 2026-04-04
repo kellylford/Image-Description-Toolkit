@@ -17,7 +17,8 @@
     "artistic": "Analyze this image from an artistic perspective, describing:\n- Visual composition and framing\n- Color palette and lighting mood\n- Artistic style or technique\n- Emotional tone or atmosphere\n- Subject matter and symbolism",
     "technical": "Provide a technical analysis of this image:\n- Camera settings and photographic technique\n- Lighting conditions and quality\n- Composition and framing\n- Image quality and clarity\n- Technical strengths or weaknesses",
     "colorful": "Give me a rich, vivid description emphasizing colors, lighting, and visual atmosphere. Focus on the palette, color relationships, and how colors contribute to the mood and composition.",
-    "Simple": "Provide a simple, brief description of this image."
+    "Simple": "Provide a simple, brief description of this image.",
+    "people_focused": "This description will be read by someone who cannot see the image and may need to identify who is in it later. For each person visible in the image, describe them in detail: approximate age range, gender expression, build/height impression, hair color, hair length, and style. Describe their clothing including colors and style. Note any distinctive features such as glasses, facial hair, jewelry, or other identifiable characteristics. If multiple people are present, describe each person separately and numbered (Person 1, Person 2, etc.). After describing the people, briefly describe the setting and context."
   },
   "output_format": {
     "include_timestamp": true,
