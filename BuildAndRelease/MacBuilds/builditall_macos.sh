@@ -94,8 +94,8 @@ echo "Building IDT and ImageDescriber in parallel..."
 echo "========================================================================"
 echo ""
 
-IDT_LOG=$(mktemp /tmp/idt_build_XXXXXX.log)
-IMAGEDESC_LOG=$(mktemp /tmp/imagedesc_build_XXXXXX.log)
+IDT_LOG=$(mktemp /tmp/idt_build_XXXXXX)
+IMAGEDESC_LOG=$(mktemp /tmp/imagedesc_build_XXXXXX)
 
 # Start IDT build in background
 (
