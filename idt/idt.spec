@@ -102,6 +102,9 @@ a = Analysis(
         # imagedescriber package
         'imagedescriber',
         'imagedescriber.ai_providers',
+        # jaraco packages required by pkg_resources (setuptools >= 75)
+        'jaraco', 'jaraco.text', 'jaraco.functools', 'jaraco.context',
+        'jaraco.collections',
         # Standard library
         'json', 'pathlib', 'subprocess', 'logging', 'datetime', 'argparse',
         # Image processing
@@ -161,7 +164,7 @@ a = Analysis(
     ] + bs4_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['hooks/rthooks/pyi_rth_pkgres.py'],
     excludes=['workflow', 'setuptools', 'pip'],  # Exclude conflicting/problematic packages
     noarchive=False,
     optimize=0,

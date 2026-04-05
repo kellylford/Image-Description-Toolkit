@@ -16,7 +16,7 @@ else
 fi
 
 # Run PyInstaller
-pyinstaller --noconfirm idt.spec
+pyinstaller --noconfirm --clean idt.spec
 
 # macOS code signing fix - remove conflicting signatures and re-sign
 if [[ "$OSTYPE" == "darwin"* ]]; then

@@ -54,6 +54,9 @@ a = Analysis(
         (str(project_root / 'VERSION'), '.'),
     ] + wx_datas + cv2_datas + mlx_vlm_datas + mlx_datas + torch_datas,
     hiddenimports=[
+        # jaraco packages required by pkg_resources (setuptools >= 75)
+        'jaraco', 'jaraco.text', 'jaraco.functools', 'jaraco.context',
+        'jaraco.collections',
         'wx.adv',
         'wx.lib.newevent',
         'shared.wx_common',
@@ -172,7 +175,7 @@ a = Analysis(
     ] + wx_hiddenimports + cv2_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports + torch_hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['hooks/rthooks/pyi_rth_pkgres.py'],
     excludes=['setuptools', 'pip'],  # Prevent pyi_rth_setuptools bootstrap crash
     noarchive=False,
 )
