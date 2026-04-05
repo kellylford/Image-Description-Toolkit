@@ -165,34 +165,69 @@ a = Analysis(
         'safetensors',
         'sentencepiece',
         'tokenizers',
-        # stdlib modules torch/torchvision/facenet need at import time (excluded by PyInstaller by default)
-        # These are only needed in face_engine_packages which is added at runtime, so PyInstaller
-        # can't auto-detect them via static analysis — they must be listed explicitly.
-        'timeit',
-        'modulefinder',
-        'unittest',
-        'unittest.case',
-        'unittest.loader',
-        'unittest.main',
-        'unittest.mock',
-        'unittest.result',
-        'unittest.runner',
-        'unittest.signals',
-        'unittest.suite',
-        'unittest.util',
-        'colorsys',
-        'fractions',
-        'statistics',
-        'numbers',
-        'dis',
-        'opcode',
-        'profile',
-        'pstats',
-        'cProfile',
-        'pickletools',
-        'nturl2path',
-        'quopri',
-        'stringprep',
+        # stdlib modules torch/torchvision/facenet/sklearn need at import time.
+        # face_engine_packages is loaded at runtime so PyInstaller can't auto-detect these.
+        # Full list derived from exhaustive import-trace of all four packages together.
+        'timeit', 'modulefinder', 'colorsys', 'fractions', 'statistics', 'numbers',
+        'dis', 'opcode', 'profile', 'pstats', 'cProfile', 'pickletools',
+        'nturl2path', 'quopri', 'stringprep',
+        # ctypes submodules (ctypes itself is included but submodules are not auto-bundled)
+        'ctypes._endian', 'ctypes.util', 'ctypes.wintypes',
+        # unittest (all submodules needed by torch._dynamo)
+        'unittest', 'unittest.case', 'unittest.loader', 'unittest.main',
+        'unittest.mock', 'unittest.result', 'unittest.runner', 'unittest.signals',
+        'unittest.suite', 'unittest.util',
+        # re submodules (re is a PY3_BASE_MODULE but submodules need explicit listing)
+        're._casefix', 're._compiler', 're._constants', 're._parser',
+        # asyncio full package
+        'asyncio', 'asyncio.base_events', 'asyncio.base_futures',
+        'asyncio.base_subprocess', 'asyncio.base_tasks', 'asyncio.constants',
+        'asyncio.coroutines', 'asyncio.events', 'asyncio.exceptions',
+        'asyncio.format_helpers', 'asyncio.futures', 'asyncio.locks',
+        'asyncio.log', 'asyncio.mixins', 'asyncio.proactor_events',
+        'asyncio.protocols', 'asyncio.queues', 'asyncio.runners',
+        'asyncio.selector_events', 'asyncio.sslproto', 'asyncio.staggered',
+        'asyncio.streams', 'asyncio.subprocess', 'asyncio.taskgroups',
+        'asyncio.tasks', 'asyncio.threads', 'asyncio.timeouts',
+        'asyncio.transports', 'asyncio.trsock',
+        'asyncio.windows_events', 'asyncio.windows_utils',
+        # collections submodule
+        'collections.abc',
+        # concurrent.futures full package
+        'concurrent.futures', 'concurrent.futures._base',
+        'concurrent.futures.process', 'concurrent.futures.thread',
+        # email full package
+        'email', 'email._encoded_words', 'email._parseaddr', 'email._policybase',
+        'email.base64mime', 'email.charset', 'email.encoders', 'email.errors',
+        'email.feedparser', 'email.header', 'email.iterators', 'email.message',
+        'email.parser', 'email.quoprimime', 'email.utils',
+        # html
+        'html', 'html.entities', 'html.parser',
+        # http full package
+        'http', 'http.client', 'http.cookiejar', 'http.cookies',
+        # importlib submodules
+        'importlib._abc', 'importlib.abc',
+        'importlib.metadata', 'importlib.metadata._adapters',
+        'importlib.metadata._collections', 'importlib.metadata._functools',
+        'importlib.metadata._itertools', 'importlib.metadata._meta',
+        'importlib.metadata._text',
+        'importlib.readers', 'importlib.resources', 'importlib.resources._adapters',
+        'importlib.resources._common', 'importlib.resources._itertools',
+        'importlib.resources._legacy', 'importlib.resources.abc',
+        'importlib.resources.readers',
+        # json submodules
+        'json', 'json.decoder', 'json.encoder', 'json.scanner',
+        # multiprocessing full package
+        'multiprocessing', 'multiprocessing.connection', 'multiprocessing.context',
+        'multiprocessing.pool', 'multiprocessing.process', 'multiprocessing.queues',
+        'multiprocessing.reduction', 'multiprocessing.resource_sharer',
+        'multiprocessing.resource_tracker', 'multiprocessing.spawn',
+        'multiprocessing.synchronize', 'multiprocessing.util',
+        # urllib full package
+        'urllib', 'urllib.error', 'urllib.parse', 'urllib.request', 'urllib.response',
+        # xml.etree
+        'xml', 'xml.etree', 'xml.etree.ElementPath', 'xml.etree.ElementTree',
+        # zipfile submodule
         'zipfile._path',
     ] + bs4_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports,
     hookspath=[],

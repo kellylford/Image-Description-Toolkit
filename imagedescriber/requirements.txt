@@ -66,5 +66,17 @@ torchvision ; sys_platform == 'darwin' and platform_machine == 'arm64'         #
 # Uncomment if you need GroundingDINO object detection:
 # groundingdino        # GroundingDINO package
 
+# ----------------------------------------------------------------------------
+# FACE RECOGNITION - Required for Process → Scan/Cluster/Find Similar Faces
+# ----------------------------------------------------------------------------
+# Windows: install torch with CPU wheel first to avoid a multi-GB CUDA download:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+# macOS/Linux: torch installs normally via pip.
+torch>=2.0.0 ; sys_platform != 'darwin' or platform_machine != 'arm64'
+torchvision ; sys_platform != 'darwin' or platform_machine != 'arm64'
+facenet-pytorch>=2.5.3     # Face detection + embedding (MTCNN + InceptionResnet)
+scikit-learn>=1.3.0        # DBSCAN clustering for Cluster Faces feature
+
 # Note: The imagedescriber bundles scripts directory for configurations
 # and includes all necessary AI provider dependencies.

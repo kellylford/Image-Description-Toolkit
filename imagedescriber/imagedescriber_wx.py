@@ -6185,7 +6185,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             )
             return
 
-        images = [item for item in self.workspace.images.values()
+        images = [item for item in self.workspace.items.values()
                   if item.file_path and Path(item.file_path).exists()]
         if not images:
             show_warning(self, "No images with valid paths found in the workspace.")
@@ -6218,27 +6218,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 from scripts.face_engine import scan_image_with_boxes
                 from scripts.face_db import FaceDatabase
 
-            workspace_dir = Path(self.workspace_path).parent if self.workspace_path else Path.cwd()
+            workspace_dir = self.get_workspace_directory()
             db = FaceDatabase(workspace_dir)
             total_faces = 0
-            cancelled = False
 
             for i, item in enumerate(images):
-                cont, _skip = wx.CallAfter(progress.Update, i,
-                                           f"Scanning {item.filename}...") or (True, False)
-                # wx.ProgressDialog.Update returns (continue, skip)
-                # Since we used CallAfter, just check the flag via a flag var
+                fname = Path(item.file_path).name
+                wx.CallAfter(progress.Update, i, f"Scanning {fname}...")
                 try:
                     results = scan_image_with_boxes(item.file_path)
                     for face in results:
                         if face.embedding:
                             db.upsert_face(
-                                item.filename, face.face_index,
+                                fname, face.face_index,
                                 face.embedding, face.bbox, face.confidence,
                             )
                     total_faces += len(results)
                 except Exception as exc:
-                    logger.warning("Face scan error for %s: %s", item.filename, exc)
+                    logger.warning("Face scan error for %s: %s", Path(item.file_path).name, exc)
 
             db.close()
             wx.CallAfter(progress.Destroy)
@@ -6273,7 +6270,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             )
             return
 
-        workspace_dir = Path(self.workspace_path).parent if self.workspace_path else Path.cwd()
+        workspace_dir = self.get_workspace_directory()
         db = FaceDatabase(workspace_dir)
         face_count = db.face_count()
         if face_count < 2:
@@ -6317,10 +6314,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Build descriptions dict for the dialog
         descriptions = {
-            item.filename: (item.descriptions[0].text if item.descriptions else "")
-            for item in self.workspace.images.values()
+            Path(item.file_path).name: (item.descriptions[0].text if item.descriptions else "")
+            for item in self.workspace.items.values()
+            if item.file_path
         }
-        dlg = GroupingResultsDialog(self, groups, descriptions, self.workspace)
+        dlg = GroupingResultsDialog(self, self.workspace, groups, descriptions,
+                                    workspace_dir=str(workspace_dir))
         dlg.ShowModal()
         if dlg.was_modified():
             self.mark_modified()
@@ -6353,7 +6352,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, "The selected image file cannot be found on disk.")
             return
 
-        workspace_dir = Path(self.workspace_path).parent if self.workspace_path else Path.cwd()
+        workspace_dir = self.get_workspace_directory()
         db = FaceDatabase(workspace_dir)
 
         if db.face_count() < 2:
@@ -6400,14 +6399,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         all_stored = db.get_all_faces()
         db.close()
 
-        result_lines = [f"Similar faces to '{item.filename}':\n"]
+        current_fname = Path(item.file_path).name
+        result_lines = [f"Similar faces to '{current_fname}':\n"]
         for qface in query_faces:
             if not qface.embedding:
                 continue
             best_score = -1.0
             best_fname = None
             for stored in all_stored:
-                if stored["filename"] == item.filename:
+                if stored["filename"] == current_fname:
                     continue
                 stored_emb = _json.loads(stored["embedding"])
                 score = _cosine_sim(qface.embedding, stored_emb)

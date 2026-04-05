@@ -11,6 +11,7 @@ All dialogs comply with WCAG 2.2 AA: single-tab-stop list boxes, descriptive
 name= parameters on all controls, no multi-column list controls.
 """
 
+import re
 import sys
 import logging
 from pathlib import Path
@@ -74,6 +75,35 @@ except ImportError:
             tag_image, untag_image, get_persons_for_image, get_images_for_person,
             create_group, resolve_group_to_person, remove_group,
         )
+
+
+# ---------------------------------------------------------------------------
+# Description parsing — positional person extraction
+# ---------------------------------------------------------------------------
+
+def _extract_person_from_description(description: str, person_number: int) -> str:
+    """Extract the text for person N from a left-to-right numbered description.
+
+    The AI generates descriptions like:
+        1. **Man in maroon** - Wearing a maroon polo...
+        2. **Woman with dark hair** - Wearing a white blouse...
+
+    Given person_number=2 this returns:
+        "Woman with dark hair - Wearing a white blouse..."
+
+    Returns empty string if the person number is not found.
+    """
+    # Match "N. text until next numbered item or end-of-string"
+    pattern = rf'(?:^|\n)\s*{person_number}\.\s+(.*?)(?=\n\s*\d+\.|\Z)'
+    match = re.search(pattern, description, re.DOTALL)
+    if not match:
+        return ""
+    text = match.group(1).strip()
+    # Strip markdown bold markers (**word**)
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    # Collapse whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text[:400]
 
 
 # ---------------------------------------------------------------------------
@@ -472,19 +502,23 @@ class GroupingResultsDialog(wx.Dialog):
 
     def __init__(self, parent, workspace: ImageWorkspace,
                  candidate_groups: List[PersonGroup],
-                 image_descriptions: dict):
+                 image_descriptions: dict,
+                 workspace_dir: Optional[str] = None):
         """
         Args:
             parent: Parent window.
             workspace: Active ImageWorkspace.
             candidate_groups: Groups produced by person_identifier.py.
             image_descriptions: Dict of {file_path: description_text} for display.
+            workspace_dir: Path to the workspace directory (enables per-face description).
         """
         super().__init__(parent, title="Person Grouping Results",
                          style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self._workspace = workspace
         self._candidates = list(candidate_groups)
         self._descriptions = image_descriptions
+        self._workspace_dir = workspace_dir
+        self._face_db = None  # Lazily opened when workspace_dir is set
         self._accepted: List[PersonGroup] = []
         self._current_idx = 0
         self._modified = False
@@ -577,6 +611,7 @@ class GroupingResultsDialog(wx.Dialog):
     def _show_group(self, idx: int):
         total = len(self._candidates)
         if idx >= total:
+            self.SetTitle(f"Person Grouping Results — Done")
             self._group_label.SetLabel("All groups reviewed.")
             self._summary_label.SetLabel("")
             self._progress_label.SetLabel(f"Done — {len(self._accepted)} group(s) accepted.")
@@ -589,6 +624,7 @@ class GroupingResultsDialog(wx.Dialog):
 
         self._current_idx = idx
         group = self._candidates[idx]
+        self.SetTitle(f"Person Grouping Results — {idx + 1} of {total}")
         self._progress_label.SetLabel(
             f"Group {idx + 1} of {total}  —  method: {group.method}"
         )
@@ -606,8 +642,68 @@ class GroupingResultsDialog(wx.Dialog):
             self._show_description_for(group.images[0])
 
     def _show_description_for(self, file_path: str):
-        text = self._descriptions.get(file_path, "(no description)")
-        self._desc_ctrl.SetValue(text)
+        full_text = self._descriptions.get(file_path, "(no description)")
+        if self._workspace_dir is not None:
+            focused = self._get_focused_person_description(file_path, full_text)
+            if focused:
+                self._desc_ctrl.SetValue(focused)
+                return
+        self._desc_ctrl.SetValue(full_text)
+
+    def _get_focused_person_description(self, filename: str, full_text: str) -> str:
+        """Return a focused per-face description using bounding box position matching.
+
+        Looks up which x-position this cluster's face occupies in *filename*,
+        then ranks that position among all faces in the image (left to right) to
+        determine the person number, and extracts just that person's text.
+
+        Returns empty string when the lookup fails or no match is found.
+        """
+        group = self._candidates[self._current_idx]
+        cluster_label = self._parse_cluster_label(group.display_label)
+        if cluster_label is None:
+            return ""
+
+        # Lazy-init the face DB connection for this session
+        if self._face_db is None:
+            try:
+                _scripts_path = str(_project_root / "scripts")
+                if _scripts_path not in sys.path:
+                    sys.path.insert(0, _scripts_path)
+                from face_db import FaceDatabase
+                self._face_db = FaceDatabase(Path(self._workspace_dir))
+            except Exception as exc:
+                logger.warning("GroupingResultsDialog: could not open face DB: %s", exc)
+                return ""
+
+        try:
+            x1 = self._face_db.get_cluster_face_x_for_image(cluster_label, filename)
+            if x1 is None:
+                return ""
+            rank = self._face_db.get_x_rank_in_image(filename, x1)
+            person_text = _extract_person_from_description(full_text, rank)
+            if person_text:
+                return f"Person {rank} (from left in image):\n{person_text}"
+            # rank exists but AI didn't number that person — show position note + full text
+            return f"Person {rank} (from left in image) — not individually described by AI.\n\nFull image description:\n{full_text}"
+        except Exception as exc:
+            logger.warning("GroupingResultsDialog: position lookup failed: %s", exc)
+        return ""
+
+    def _parse_cluster_label(self, display_label: str) -> Optional[int]:
+        """Parse the integer cluster label from a 'Face cluster N' display label."""
+        m = re.search(r'Face cluster\s+(\d+)', display_label, re.IGNORECASE)
+        return int(m.group(1)) if m else None
+
+    def _resolve_image_paths(self, filenames: list) -> list:
+        """Resolve short filenames from the face DB to full workspace paths.
+
+        The face DB stores filenames only (e.g. 'img_0022.jpg'), but
+        workspace.items is keyed by full path. Build a name→path map and
+        return full paths where possible, falling back to the original string.
+        """
+        name_to_path = {Path(fp).name: fp for fp in self._workspace.items}
+        return [name_to_path.get(Path(p).name, p) for p in filenames]
 
     def _on_image_select(self, _event):
         idx = self._image_list.GetSelection()
@@ -619,10 +715,11 @@ class GroupingResultsDialog(wx.Dialog):
 
     def _on_accept(self, _event):
         group = self._candidates[self._current_idx]
+        resolved = self._resolve_image_paths(group.images)
         saved = create_group(
             self._workspace,
             display_label=group.display_label,
-            images=group.images,
+            images=resolved,
             description_summary=group.description_summary,
             method=group.method,
         )
@@ -639,10 +736,11 @@ class GroupingResultsDialog(wx.Dialog):
         if dlg.ShowModal() == wx.ID_OK:
             name = dlg.GetValue().strip()
             group = self._candidates[self._current_idx]
+            resolved = self._resolve_image_paths(group.images)
             saved = create_group(
                 self._workspace,
                 display_label=name or group.display_label,
-                images=group.images,
+                images=resolved,
                 description_summary=group.description_summary,
                 method=group.method,
             )

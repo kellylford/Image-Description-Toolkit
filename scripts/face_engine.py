@@ -227,30 +227,31 @@ def scan_image_with_boxes(image_path: str) -> List[FaceResult]:
     device = next(resnet.parameters()).device
 
     import torch
-    # Get aligned crops via a second pass (MTCNN.forward with return_prob)
-    try:
-        faces_tensor, face_probs, _ = mtcnn(img, return_prob=True)
-    except Exception:
-        faces_tensor = None
+    from facenet_pytorch.models.utils.detect_face import extract_face
 
-    for i, box in enumerate(boxes):
-        prob = float(probs[i]) if probs is not None else 1.0
-        bbox = tuple(float(v) for v in box)  # (x1, y1, x2, y2)
+    with torch.no_grad():
+        for i, box in enumerate(boxes):
+            prob = float(probs[i]) if probs is not None else 1.0
+            bbox = tuple(float(v) for v in box)
 
-        embedding: List[float] = []
-        if faces_tensor is not None and i < len(faces_tensor):
-            with torch.no_grad():
-                crop = faces_tensor[i].unsqueeze(0).float().to(device)
+            embedding: List[float] = []
+            try:
+                # extract_face returns a (3, 160, 160) float tensor in [0, 255]
+                face_tensor = extract_face(img, box, image_size=160, margin=20)
+                crop = face_tensor.unsqueeze(0).float().to(device)
                 crop = (crop / 127.5) - 1.0
                 embedding = resnet(crop).squeeze(0).cpu().tolist()
+            except Exception as exc:
+                logger.warning("Embedding extraction failed for face %d in %s: %s",
+                               i, image_path, exc)
 
-        results.append(FaceResult(
-            filename=basename,
-            face_index=i,
-            embedding=embedding,
-            bbox=bbox,
-            confidence=prob,
-        ))
+            results.append(FaceResult(
+                filename=basename,
+                face_index=i,
+                embedding=embedding,
+                bbox=bbox,
+                confidence=prob,
+            ))
 
     return results
 
@@ -354,10 +355,10 @@ def build_person_groups_from_clusters(
             continue
         group = PersonGroup(
             display_label=f"Face cluster {label}",
-            images=images,
             description_summary="",
             method="cv",
         )
+        group.images = images
         groups.append(group)
 
     groups.sort(key=lambda g: len(g.images), reverse=True)

@@ -287,3 +287,42 @@ class FaceDatabase:
             (method,),
         ).fetchall()
         return sorted(r["cluster_label"] for r in rows)
+
+    def get_cluster_face_x_for_image(
+        self, cluster_label: int, filename: str, method: str = "cv"
+    ) -> Optional[float]:
+        """Return bbox_x1 of the face in *cluster_label* that belongs to *filename*.
+
+        Returns None if no matching face row is found or bbox_x1 is NULL.
+        """
+        conn = self._connect()
+        row = conn.execute(
+            """
+            SELECT f.bbox_x1
+            FROM faces f
+            JOIN clusters c ON c.face_id = f.id
+            WHERE c.cluster_label = ? AND c.method = ? AND f.filename = ?
+            LIMIT 1
+            """,
+            (cluster_label, method, filename),
+        ).fetchone()
+        return row["bbox_x1"] if row else None
+
+    def get_x_rank_in_image(self, filename: str, target_x1: float) -> int:
+        """Return 1-based left-to-right position rank of a face in *filename*.
+
+        Faces are ordered by bbox_x1 (left edge).  If *target_x1* is not an
+        exact match, the closest stored x value is used.
+
+        Returns 1 when the image has only one face or no stored x positions.
+        """
+        conn = self._connect()
+        rows = conn.execute(
+            "SELECT bbox_x1 FROM faces WHERE filename = ? AND bbox_x1 IS NOT NULL ORDER BY bbox_x1",
+            (filename,),
+        ).fetchall()
+        if not rows:
+            return 1
+        x_values = [r["bbox_x1"] for r in rows]
+        closest = min(range(len(x_values)), key=lambda i: abs(x_values[i] - target_x1))
+        return closest + 1  # convert to 1-based
