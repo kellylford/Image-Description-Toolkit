@@ -25,13 +25,17 @@ echo "========================================================================"
 echo ""
 
 # ============================================================================
-# SETUP
+# CLEAN BUILD CACHE
 # ============================================================================
 # Change to project root directory FIRST (now two levels up since we're in MacBuilds/)
 cd "$(dirname "$0")/../.."
 
+echo "Cleaning PyInstaller cache to ensure fresh build..."
+python3 -c "import shutil; from pathlib import Path; cache_dir = Path.home() / 'Library' / 'Caches' / 'pyinstaller'; shutil.rmtree(cache_dir, ignore_errors=True); print(f'Cleaned: {cache_dir}')"
+
 echo "Cleaning build and dist directories..."
 rm -rf build dist
+echo "Build cache cleaned successfully."
 echo ""
 
 # ============================================================================
@@ -87,79 +91,42 @@ echo ""
 BUILD_ERRORS=0
 
 # ============================================================================
-# BUILD IN PARALLEL - Both apps are independent, run simultaneously
-# ============================================================================
 echo ""
-echo "Building IDT and ImageDescriber in parallel..."
+echo "[1/2] Building IDT (main toolkit)..."
 echo "========================================================================"
 echo ""
 
-IDT_LOG=$(mktemp /tmp/idt_build_XXXXXX)
-IMAGEDESC_LOG=$(mktemp /tmp/imagedesc_build_XXXXXX)
-
-# Start IDT build in background
-(
-    cd idt
-    bash build_idt.sh
-) > "$IDT_LOG" 2>&1 &
-IDT_PID=$!
-
-# Start ImageDescriber build in background
-(
-    cd imagedescriber
-    if [ -f ".venv/bin/activate" ]; then
-        source .venv/bin/activate
-        bash build_imagedescriber_wx.sh
-        EXIT_CODE=$?
-        deactivate
-        exit $EXIT_CODE
-    else
-        echo "ERROR: ImageDescriber virtual environment not found at imagedescriber/.venv"
-        echo "Please run: cd imagedescriber && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
-        exit 1
-    fi
-) > "$IMAGEDESC_LOG" 2>&1 &
-IMAGEDESC_PID=$!
-
-# Wait for both builds to finish
-echo "Waiting for IDT build (PID $IDT_PID) and ImageDescriber build (PID $IMAGEDESC_PID)..."
-set +e  # Disable exit-on-error so we can capture both exit codes
-wait $IDT_PID
-IDT_EXIT=$?
-wait $IMAGEDESC_PID
-IMAGEDESC_EXIT=$?
-set -e
-
-# Show IDT output
-echo ""
-echo "========================================================================"
-echo "IDT BUILD OUTPUT"
-echo "========================================================================"
-cat "$IDT_LOG"
-rm -f "$IDT_LOG"
-
-# Show ImageDescriber output
-echo ""
-echo "========================================================================"
-echo "IMAGEDESCRIBER BUILD OUTPUT"
-echo "========================================================================"
-cat "$IMAGEDESC_LOG"
-rm -f "$IMAGEDESC_LOG"
-
-echo ""
-echo "========================================================================"
-if [ $IDT_EXIT -eq 0 ]; then
+cd idt
+if bash build_idt.sh; then
     echo "SUCCESS: IDT built successfully"
 else
     echo "ERROR: IDT build failed!"
     ((BUILD_ERRORS++))
 fi
-if [ $IMAGEDESC_EXIT -eq 0 ]; then
-    echo "SUCCESS: ImageDescriber built successfully"
+cd ..
+
+# ============================================================================
+echo ""
+echo "[2/2] Building ImageDescriber..."
+echo "========================================================================"
+echo ""
+
+cd imagedescriber
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+    if bash build_imagedescriber_wx.sh; then
+        echo "SUCCESS: ImageDescriber built successfully"
+    else
+        echo "ERROR: ImageDescriber build failed!"
+        ((BUILD_ERRORS++))
+    fi
+    deactivate
 else
-    echo "ERROR: ImageDescriber build failed!"
+    echo "ERROR: ImageDescriber virtual environment not found at imagedescriber/.venv"
+    echo "Please run: cd imagedescriber && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
     ((BUILD_ERRORS++))
 fi
+cd ..
 
 # ============================================================================
 echo ""
