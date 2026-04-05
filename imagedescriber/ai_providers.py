@@ -312,7 +312,7 @@ class OllamaProvider(AIProvider):
             return False
     
     def get_available_models(self) -> List[str]:
-        """Get list of available Ollama models (local only, excludes cloud models)"""
+        """Get list of available Ollama models"""
         # DEVELOPMENT MODE: Return hardcoded models for faster testing
         if DEV_MODE_HARDCODED_MODELS:
             return sorted(DEV_OLLAMA_MODELS.copy())
@@ -329,8 +329,7 @@ class OllamaProvider(AIProvider):
             if response.status_code == 200:
                 data = response.json()
                 all_models = [model['name'] for model in data.get('models', [])]
-                # Filter out cloud models (those ending with '-cloud')
-                local_models = sorted([model for model in all_models if not model.endswith('-cloud')])
+                local_models = sorted(all_models)
                 
                 # Update cache
                 self._models_cache = local_models

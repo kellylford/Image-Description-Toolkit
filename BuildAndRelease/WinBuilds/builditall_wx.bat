@@ -26,36 +26,71 @@ cd /d "%~dp0..\.."
 set BUILD_ERRORS=0
 
 REM ============================================================================
-echo [1/2] Building IDT (CLI)...
+REM BUILD IN PARALLEL - Both apps are independent, run simultaneously
+REM ============================================================================
+echo Building IDT and ImageDescriber in parallel...
 echo ========================================================================
 echo.
-echo.
 
-cd idt
-call build_idt.bat
-if errorlevel 1 (
+REM Use temp files to capture exit codes from background processes
+set "IDT_STATUS_FILE=%TEMP%\idt_build_status_%RANDOM%.txt"
+set "IMAGEDESC_STATUS_FILE=%TEMP%\imagedesc_build_status_%RANDOM%.txt"
+set "IDT_LOG=%TEMP%\idt_build_%RANDOM%.log"
+set "IMAGEDESC_LOG=%TEMP%\imagedesc_build_%RANDOM%.log"
+
+REM Start IDT build in background
+start /B cmd /C "cd /d "%CD%\idt" && call build_idt.bat > "%IDT_LOG%" 2>&1 && echo 0 > "%IDT_STATUS_FILE%" || echo 1 > "%IDT_STATUS_FILE%""
+
+REM Start ImageDescriber build in background
+start /B cmd /C "cd /d "%CD%\imagedescriber" && call build_imagedescriber_wx.bat > "%IMAGEDESC_LOG%" 2>&1 && echo 0 > "%IMAGEDESC_STATUS_FILE%" || echo 1 > "%IMAGEDESC_STATUS_FILE%""
+
+REM Wait for both status files to appear (poll every 5 seconds)
+echo Waiting for both builds to complete...
+:WAIT_LOOP
+timeout /t 5 /nobreak >nul
+if not exist "%IDT_STATUS_FILE%" goto WAIT_LOOP
+if not exist "%IMAGEDESC_STATUS_FILE%" goto WAIT_LOOP
+
+REM Show IDT output
+echo.
+echo ========================================================================
+echo IDT BUILD OUTPUT
+echo ========================================================================
+type "%IDT_LOG%"
+del /Q "%IDT_LOG%" 2>nul
+
+REM Show ImageDescriber output
+echo.
+echo ========================================================================
+echo IMAGEDESCRIBER BUILD OUTPUT
+echo ========================================================================
+type "%IMAGEDESC_LOG%"
+del /Q "%IMAGEDESC_LOG%" 2>nul
+
+REM Check results
+echo.
+echo ========================================================================
+set /P IDT_RESULT=<"%IDT_STATUS_FILE%"
+set /P IMAGEDESC_RESULT=<"%IMAGEDESC_STATUS_FILE%"
+del /Q "%IDT_STATUS_FILE%" 2>nul
+del /Q "%IMAGEDESC_STATUS_FILE%" 2>nul
+
+REM Trim whitespace from results
+for /f "tokens=* delims= " %%a in ("%IDT_RESULT%") do set IDT_RESULT=%%a
+for /f "tokens=* delims= " %%a in ("%IMAGEDESC_RESULT%") do set IMAGEDESC_RESULT=%%a
+
+if "%IDT_RESULT%"=="0" (
+    echo SUCCESS: IDT built successfully
+) else (
     echo ERROR: IDT build failed!
     set /a BUILD_ERRORS+=1
-) else (
-    echo SUCCESS: IDT built successfully
 )
-cd ..
-
-REM ============================================================================
-echo.
-echo [2/2] Building ImageDescriber (wxPython - includes Viewer Mode + PromptEditor + IDTConfigure)...
-echo ========================================================================
-echo.
-
-cd imagedescriber
-call build_imagedescriber_wx.bat
-if errorlevel 1 (
+if "%IMAGEDESC_RESULT%"=="0" (
+    echo SUCCESS: ImageDescriber built successfully
+) else (
     echo ERROR: ImageDescriber build failed!
     set /a BUILD_ERRORS+=1
-) else (
-    echo SUCCESS: ImageDescriber built successfully
 )
-cd ..
 
 REM ============================================================================
 echo.
