@@ -123,10 +123,12 @@ IMAGEDESC_PID=$!
 
 # Wait for both builds to finish
 echo "Waiting for IDT build (PID $IDT_PID) and ImageDescriber build (PID $IMAGEDESC_PID)..."
+set +e  # Disable exit-on-error so we can capture both exit codes
 wait $IDT_PID
 IDT_EXIT=$?
 wait $IMAGEDESC_PID
 IMAGEDESC_EXIT=$?
+set -e
 
 # Show IDT output
 echo ""
