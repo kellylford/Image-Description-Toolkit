@@ -192,7 +192,54 @@ jobs:
         Write-Host "PASS: $($txtFiles.Count) descriptions produced successfully"
 
     # ------------------------------------------------------------------ #
-    #  8. Bonus: ImageDescriber launch smoke test                          #
+    #  8. Run unit tests for stats_analysis frame parsing                  #
+    #     Validates the fix for idt stats reporting 0 frames extracted     #
+    # ------------------------------------------------------------------ #
+    - name: Run stats_analysis unit tests
+      shell: pwsh
+      run: |
+        Write-Host "Running stats_analysis frame-parsing unit tests..."
+        python -m pytest pytest_tests/unit/test_stats_analysis_frames.py -v -s --no-header --no-cov
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+          Write-Host "ERROR: stats_analysis unit tests failed (exit code $exitCode)"
+          exit $exitCode
+        }
+        Write-Host "PASS: stats_analysis unit tests passed"
+
+    # ------------------------------------------------------------------ #
+    #  9. Validate idt stats reports non-zero frames extracted             #
+    #     Workflow in step 6 runs against testimages/ which may have       #
+    #     videos. If frames were extracted, stats must show > 0.           #
+    # ------------------------------------------------------------------ #
+    - name: Validate idt stats reports frames extracted
+      shell: pwsh
+      run: |
+        Write-Host "Running: idt.exe stats"
+        $output = .\idt\dist\idt.exe stats 2>&1
+        Write-Host $output
+
+        # Look for the "Frames Extracted:" line and verify it is not 0
+        $framesLine = ($output | Out-String) -split "`n" | Where-Object { $_ -match "Frames Extracted" }
+        Write-Host "Frames line: $framesLine"
+
+        if ($framesLine) {
+          $match = [regex]::Match($framesLine, '[\d,]+')
+          if ($match.Success) {
+            $count = [int]($match.Value -replace ',','')
+            Write-Host "Frames extracted reported by idt stats: $count"
+            if ($count -eq 0) {
+              Write-Host "ERROR: idt stats reports 0 frames extracted - frame_extractor log parser may be broken"
+              exit 1
+            }
+            Write-Host "PASS: idt stats correctly reports $count frames extracted"
+          }
+        } else {
+          Write-Host "INFO: No video frames in this workflow run - skipping frames check"
+        }
+
+    # ------------------------------------------------------------------ #
+    # 10. Bonus: ImageDescriber launch smoke test                          #
     #     continue-on-error so a runner/GUI issue doesn't fail the core   #
     # ------------------------------------------------------------------ #
     - name: Smoke test - ImageDescriber launches without crashing
@@ -214,7 +261,7 @@ jobs:
         Write-Host "Process terminated cleanly."
 
     # ------------------------------------------------------------------ #
-    #  9. Upload artifacts (always -- so you get outputs even on failure)  #
+    # 11. Upload artifacts (always -- so you get outputs even on failure)  #
     # ------------------------------------------------------------------ #
     - name: Upload idt executable
       uses: actions/upload-artifact@v4
