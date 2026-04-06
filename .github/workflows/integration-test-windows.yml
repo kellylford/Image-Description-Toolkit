@@ -309,17 +309,16 @@ jobs:
     - name: Validate idt stats reports frames extracted
       shell: pwsh
       run: |
-        Write-Host "Running: idt.exe stats Descriptions"
-        $output = .\idt\dist\idt.exe stats Descriptions 2>&1
+        Write-Host "Running: idt.exe stats --input-dir Descriptions"
+        $output = .\idt\dist\idt.exe stats --input-dir Descriptions 2>&1
         Write-Host $output
 
-        # idt stats exits non-zero only on fatal errors; parse the output
         # Look for the "Frames Extracted:" line and verify it is not 0
         $framesLine = ($output | Out-String) -split "`n" | Where-Object { $_ -match "Frames Extracted" }
         Write-Host "Frames line: $framesLine"
 
         if (-not $framesLine) {
-          Write-Host "WARNING: 'Frames Extracted' not found in idt stats output - skipping check"
+          Write-Host "INFO: 'Frames Extracted' not found in idt stats output - no video step ran, skipping check"
         } else {
           $match = [regex]::Match($framesLine, '[\d,]+')
           if ($match.Success) {
