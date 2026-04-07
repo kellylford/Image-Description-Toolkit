@@ -4132,51 +4132,152 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     f.write(separator + "\n\n")
 
     def export_descriptions_to_html(self, output_file: str):
-        """Export workspace descriptions to HTML file using descriptions_to_html module
+        """Export workspace descriptions to HTML file.
+
+        Images with multiple descriptions (e.g. a website alt-text description
+        plus an AI description) are grouped under a single heading so each
+        image appears exactly once in the output.
 
         Args:
             output_file: Path to output HTML file
         """
-        # Create temporary text file
-        temp_txt = None
-        try:
-            # Export to temporary text file first
-            temp_txt = Path(tempfile.gettempdir()) / f"imagedescriber_export_{int(time.time())}.txt"
-            self.export_descriptions_to_text(str(temp_txt))
+        import html as html_module
 
-            # Import HTML generation modules
-            try:
-                from scripts.descriptions_to_html import DescriptionsParser, HTMLGenerator
-            except ImportError:
-                # Try without scripts prefix (frozen mode)
-                from descriptions_to_html import DescriptionsParser, HTMLGenerator
+        # Sort items by filename for consistent output
+        sorted_items = sorted(
+            self.workspace.items.items(),
+            key=lambda x: Path(x[0]).name.lower()
+        )
+        # Keep only items that have at least one description
+        described_items = [(fp, item) for fp, item in sorted_items if item.descriptions]
 
-            # Parse the text file
-            parser = DescriptionsParser(temp_txt)
-            entries = parser.parse()
+        if not described_items:
+            raise Exception("No description entries found to export")
 
-            if not entries:
-                raise Exception("No description entries found to export")
+        title = "Image Descriptions - Exported from ImageDescriber"
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # Generate HTML with full details
-            generator = HTMLGenerator(
-                entries,
-                title="Image Descriptions - Exported from ImageDescriber",
-                include_details=True
-            )
-            html_content = generator.generate()
+        parts = []
+        parts.append(f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{html_module.escape(title)}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #212529;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }}
+        .container {{
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        h1 {{ color: #212529; border-bottom: 2px solid #dee2e6; padding-bottom: 10px; }}
+        h2 {{ color: #343a40; margin-top: 30px; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; }}
+        h3 {{ color: #495057; margin-top: 15px; }}
+        h4 {{ color: #6c757d; margin-top: 10px; }}
+        .entry {{ margin-bottom: 30px; }}
+        .entry-separator {{ border: none; border-top: 2px solid #dee2e6; margin: 30px 0; }}
+        .description-block {{ border-left: 3px solid #dee2e6; padding-left: 15px; margin: 10px 0 20px 0; }}
+        .description-block.website {{ border-left-color: #0d6efd; }}
+        .description-block.ai {{ border-left-color: #198754; }}
+        .desc-source {{ font-size: 0.85em; color: #6c757d; margin-bottom: 4px; font-weight: 600; }}
+        ul {{ list-style-type: none; padding: 0; }}
+        ul li {{ padding: 2px 0; }}
+        .stats, .generation-info {{ color: #6c757d; }}
+        p {{ margin: 0.5em 0; }}
+    </style>
+</head>
+<body>
+<div class="container">
+<h1>{html_module.escape(title)}</h1>
+<p class="generation-info">Generated on {now_str}</p>
+<p class="stats">Total images: {len(described_items)}</p>''')
 
-            # Write HTML file
-            with open(output_file, 'w', encoding='utf-8') as f:
-                f.write(html_content)
+        # Table of contents
+        if len(described_items) > 5:
+            parts.append('<nav aria-label="Table of contents"><h2>Contents</h2><ul>')
+            for i, (fp, _item) in enumerate(described_items):
+                name = html_module.escape(Path(fp).name)
+                parts.append(f'<li><a href="#entry-{i}">{name}</a></li>')
+            parts.append('</ul></nav><hr class="entry-separator">')
 
-        finally:
-            # Clean up temporary file
-            if temp_txt and temp_txt.exists():
-                try:
-                    temp_txt.unlink()
-                except Exception:
-                    pass  # Ignore cleanup errors
+        has_osm = False
+
+        for i, (file_path, item) in enumerate(described_items):
+            filename = Path(file_path).name
+            parts.append(f'<div class="entry" id="entry-{i}">')
+            parts.append(f'<h2>{html_module.escape(filename)}</h2>')
+
+            # Details section — use the first AI description's metadata if available,
+            # otherwise fall back to the first description overall.
+            ai_descs = [d for d in item.descriptions if d.provider != 'website']
+            meta_desc = ai_descs[0] if ai_descs else item.descriptions[0]
+            m = meta_desc.metadata or {}
+
+            details = []
+            details.append(f'<li><strong>File Path:</strong> {html_module.escape(file_path)}</li>')
+            if m.get('datetime_str'):
+                details.append(f'<li><strong>Photo Date:</strong> {html_module.escape(m["datetime_str"])}</li>')
+            if 'location' in m:
+                loc = m['location']
+                loc_parts = [v for k, v in loc.items() if k in ('city', 'town', 'state', 'country') and v]
+                if loc_parts:
+                    details.append(f'<li><strong>Location:</strong> {html_module.escape(", ".join(loc_parts))}</li>')
+                if 'latitude' in loc and 'longitude' in loc:
+                    details.append(f'<li><strong>GPS:</strong> {loc["latitude"]:.6f}, {loc["longitude"]:.6f}</li>')
+            if 'camera' in m:
+                cam = m['camera']
+                cam_str = f'{cam.get("make","")} {cam.get("model","")}'.strip()
+                if cam_str:
+                    details.append(f'<li><strong>Camera:</strong> {html_module.escape(cam_str)}</li>')
+            if m.get('osm_attribution_required'):
+                has_osm = True
+
+            if details:
+                parts.append('<h3>Details</h3><ul>')
+                parts.extend(details)
+                parts.append('</ul>')
+
+            # One description block per description
+            parts.append('<h3>Description</h3>' if len(item.descriptions) == 1 else '<h3>Descriptions</h3>')
+            for desc in item.descriptions:
+                if desc.provider == 'website':
+                    css_class = 'description-block website'
+                    source_label = f'Website Alt Text'
+                else:
+                    css_class = 'description-block ai'
+                    source_label = f'{desc.model} ({desc.provider})'
+
+                parts.append(f'<div class="{css_class}">')
+                if len(item.descriptions) > 1:
+                    parts.append(f'<p class="desc-source">{html_module.escape(source_label)}</p>')
+                desc_html = html_module.escape(desc.text).replace('\n', '<br>\n')
+                parts.append(f'<p>{desc_html}</p>')
+                parts.append('</div>')
+
+            parts.append('</div>')
+            if i < len(described_items) - 1:
+                parts.append('<hr class="entry-separator">')
+
+        if has_osm:
+            parts.append('<hr style="margin-top:40px;">')
+            parts.append('<footer style="text-align:center;padding:20px;color:#6c757d;font-size:0.9em;">')
+            parts.append('<p>Location data © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a></p>')
+            parts.append('</footer>')
+
+        parts.append('</div></body></html>')
+
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(parts))
 
     def _format_metadata_for_export(self, metadata: dict) -> str:
         """Format metadata for text export (matching CLI format)
