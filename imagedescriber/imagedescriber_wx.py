@@ -2433,8 +2433,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                     self.load_directory(
                         selection['directory'],
-                        recursive=selection['recursive'],
-                        append=selection['add_to_existing']
+                        recursive=selection['recursive']
                     )
                 else:
                     dlg.Destroy()
@@ -2517,6 +2516,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Get workspace directory
         workspace_dir = self.get_workspace_directory()
+
+        # If the user wants to process images after download, let them pick
+        # the provider, model and prompt now — before the download begins —
+        # so they don't have to wait until the images arrive.
+        if settings.get('process_after') and ProcessingOptionsDialog:
+            proc_dialog = ProcessingOptionsDialog(
+                self.config,
+                cached_ollama_models=self.cached_ollama_models,
+                parent=self
+            )
+            if proc_dialog.ShowModal() == wx.ID_OK:
+                settings['processing_options'] = proc_dialog.get_config()
+            else:
+                # User cancelled: still download, just skip auto-processing
+                settings['process_after'] = False
+                settings['processing_options'] = None
+            proc_dialog.Destroy()
 
         # Store settings for workflow completion handler
         self.current_download_settings = settings
@@ -4456,6 +4472,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 except Exception as e:
                     logger.warning(f"Could not load URL mapping: {e}")
 
+            # Load alt text mapping if available (created by WebImageDownloader)
+            alt_text_mapping = {}
+            alt_mapping_file = output_dir / 'alt_text_mapping.json'
+            if alt_mapping_file.exists():
+                try:
+                    with open(alt_mapping_file, 'r', encoding='utf-8') as f:
+                        alt_text_mapping = json.load(f)
+                    logger.debug(f"Loaded alt text mapping with {len(alt_text_mapping)} entries")
+                except Exception as e:
+                    logger.warning(f"Could not load alt text mapping: {e}")
+
             # Add all downloaded images to workspace (always add)
             for img_path in downloaded_images:
                 item = ImageItem(str(img_path), "downloaded_image")
@@ -4463,6 +4490,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 filename = img_path.name
                 item.download_url = url_mapping.get(filename, event.input_dir)
                 item.download_timestamp = datetime.now().isoformat()
+
+                # If the source page provided alt text, store it and create a
+                # "Website Alt Text" description so the user has both the
+                # site-authored text and any AI-generated description.
+                # Require >= 10 chars AND at least one space to avoid filenames
+                # and short labels (e.g. 'IMG_0160.DNG' or 'NASA Logo').
+                alt_text = alt_text_mapping.get(filename, '').strip()
+                item.alt_text = alt_text if alt_text else None
+                if len(alt_text) >= 10 and ' ' in alt_text:
+                    alt_desc = ImageDescription(
+                        text=alt_text,
+                        model="Website Alt Text",
+                        provider="website",
+                        prompt_style="alt_text",
+                        created=datetime.now().isoformat(),
+                        metadata={"source": "website_alt_text", "url": item.download_url or ""}
+                    )
+                    item.descriptions.append(alt_desc)
+                    logger.debug(f"Added alt text description for {filename}: {alt_text[:60]!r}")
+
                 self.workspace.add_item(item)
 
             self.mark_modified()
@@ -4474,8 +4521,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # Check if auto-processing is enabled
             process_after = False
+            processing_options = None
             if hasattr(self, 'current_download_settings'):
                 process_after = self.current_download_settings.get('process_after', False)
+                processing_options = self.current_download_settings.get('processing_options')
 
             # Clear download settings and worker
             if hasattr(self, 'current_download_settings'):
@@ -4485,8 +4534,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # If auto-process enabled, start batch processing
             if process_after and downloaded_images:
-                # Use default settings for auto-processing (don't show dialog)
-                self.auto_process_downloaded_images([str(img) for img in downloaded_images])
+                self.auto_process_downloaded_images(
+                    [str(img) for img in downloaded_images],
+                    options=processing_options
+                )
             else:
                 # Show completion message only if not auto-processing
                 # CRITICAL: Clear processing items in case any are lingering from downloads
@@ -5114,20 +5165,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             show_error(self, f"Could not start video description: {e}")
 
-    def auto_process_downloaded_images(self, image_paths: List[str]):
-        """Auto-process downloaded images using default settings (no dialog)
+    def auto_process_downloaded_images(self, image_paths: List[str], options: dict = None):
+        """Auto-process downloaded images after download.
 
         Args:
             image_paths: List of downloaded image file paths
+            options: Provider/model/prompt dict from ProcessingOptionsDialog.get_config().
+                     If None, the current default config values are used.
         """
-        # Use default settings from config
-        options = {
-            'provider': self.config.get('default_provider', 'ollama'),
-            'model': self.config.get('default_model', 'moondream'),
-            'prompt_style': self.config.get('default_prompt_style', 'narrative'),
-            'custom_prompt': '',
-            'skip_existing': True
-        }
+        # Use caller-supplied options when available (user explicitly chose provider/model/prompt).
+        # Fall back to defaults only when called without options (e.g. backward-compat callers).
+        if options is None:
+            options = {
+                'provider': self.config.get('default_provider', 'ollama'),
+                'model': self.config.get('default_model', 'moondream'),
+                'prompt_style': self.config.get('default_prompt_style', 'narrative'),
+                'custom_prompt': '',
+                'skip_existing': True
+            }
+        else:
+            # When the user explicitly chose settings, don't skip images that only
+            # have a website alt-text description — they came here for AI descriptions.
+            options.setdefault('skip_existing', False)
 
         logger.info(f"Auto-processing {len(image_paths)} downloaded images with defaults: {options['provider']}/{options['model']}")
 

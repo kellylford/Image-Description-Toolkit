@@ -16,6 +16,7 @@ Examples:
 
 import sys
 import os
+import json
 import argparse
 import requests
 from pathlib import Path
@@ -211,21 +212,22 @@ class WebImageDownloader:
             self.logger.warning(f"Error processing {img_url}: {e}")
             return None
     
-    def _extract_image_urls(self, html_content: str, base_url: str) -> List[str]:
+    def _extract_image_urls(self, html_content: str, base_url: str) -> List[Tuple[str, str]]:
         """
-        Extract image URLs from HTML content
+        Extract image URLs from HTML content, including alt text where available.
         
         Args:
             html_content: HTML content to parse
             base_url: Base URL for resolving relative URLs
             
         Returns:
-            List of absolute image URLs
+            List of (absolute_url, alt_text) tuples. alt_text is an empty string
+            when no alt attribute is present or applicable.
         """
         soup = BeautifulSoup(html_content, 'html.parser')
-        image_urls = []
+        image_entries: List[Tuple[str, str]] = []  # (url, alt_text)
         
-        # Find all img tags
+        # Find all img tags — capture alt text here
         for img in soup.find_all('img'):
             # Get src or data-src (for lazy loading)
             src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
@@ -236,10 +238,11 @@ class WebImageDownloader:
                 
                 # Add if it looks like an image
                 if self._is_valid_image_url(absolute_url):
-                    image_urls.append(absolute_url)
-                    self.logger.debug(f"Found image URL: {absolute_url}")
+                    alt_text = (img.get('alt') or '').strip()
+                    image_entries.append((absolute_url, alt_text))
+                    self.logger.debug(f"Found image URL: {absolute_url} (alt={repr(alt_text[:60])})")
         
-        # Also check for picture elements
+        # Also check for picture elements — <source> has no alt; inherit empty
         for picture in soup.find_all('picture'):
             for source in picture.find_all('source'):
                 srcset = source.get('srcset')
@@ -249,26 +252,26 @@ class WebImageDownloader:
                     for url in urls:
                         absolute_url = urljoin(base_url, url)
                         if self._is_valid_image_url(absolute_url):
-                            image_urls.append(absolute_url)
+                            image_entries.append((absolute_url, ''))
                             self.logger.debug(f"Found image URL in picture: {absolute_url}")
         
-        # Also check for links to images
+        # Also check for links to images — no alt text available
         for link in soup.find_all('a'):
             href = link.get('href')
             if href and self._is_valid_image_url(href):
                 absolute_url = urljoin(base_url, href)
-                image_urls.append(absolute_url)
+                image_entries.append((absolute_url, ''))
                 self.logger.debug(f"Found image URL in link: {absolute_url}")
         
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_urls = []
-        for url in image_urls:
+        # Remove duplicates by URL while preserving order and first-seen alt text
+        seen: Set[str] = set()
+        unique_entries: List[Tuple[str, str]] = []
+        for url, alt in image_entries:
             if url not in seen:
                 seen.add(url)
-                unique_urls.append(url)
+                unique_entries.append((url, alt))
         
-        return unique_urls
+        return unique_entries
     
     def download(self) -> Tuple[int, int]:
         """
@@ -288,11 +291,11 @@ class WebImageDownloader:
             response = self.session.get(self.url, timeout=self.timeout)
             response.raise_for_status()
             
-            # Extract image URLs
+            # Extract image URLs (returns list of (url, alt_text) tuples)
             self.logger.info(f"Extracting image URLs...")
-            image_urls = self._extract_image_urls(response.text, self.url)
+            image_entries = self._extract_image_urls(response.text, self.url)
             
-            total_found = len(image_urls)
+            total_found = len(image_entries)
             self.logger.info(f"Found {total_found} potential image URLs")
             
             if total_found == 0:
@@ -302,9 +305,10 @@ class WebImageDownloader:
             # Download images
             successful = 0
             failed = 0
-            url_mapping = {}  # Map filename to original URL
+            url_mapping = {}      # filename → original URL
+            alt_text_mapping = {}  # filename → alt text (only non-empty entries)
             
-            for i, img_url in enumerate(image_urls, 1):
+            for i, (img_url, alt_text) in enumerate(image_entries, 1):
                 # Check if we've reached max images
                 if self.max_images and successful >= self.max_images:
                     self.logger.info(f"Reached maximum image limit ({self.max_images})")
@@ -323,8 +327,10 @@ class WebImageDownloader:
                 if result:
                     successful += 1
                     # Store URL mapping (filename to original URL)
-                    if result:  # result is a Path object
-                        url_mapping[result.name] = img_url
+                    url_mapping[result.name] = img_url
+                    # Store alt text if non-empty
+                    if alt_text:
+                        alt_text_mapping[result.name] = alt_text
                 else:
                     failed += 1
                 
@@ -351,6 +357,16 @@ class WebImageDownloader:
                     self.logger.info(f"Saved URL mapping with {len(url_mapping)} entries")
                 except Exception as e:
                     self.logger.warning(f"Could not save URL mapping: {e}")
+            
+            # Save alt text mapping if any images had alt text
+            if alt_text_mapping:
+                try:
+                    alt_mapping_file = self.output_dir / 'alt_text_mapping.json'
+                    with open(alt_mapping_file, 'w', encoding='utf-8') as f:
+                        json.dump(alt_text_mapping, f, indent=2, ensure_ascii=False)
+                    self.logger.info(f"Saved alt text mapping with {len(alt_text_mapping)} entries")
+                except Exception as e:
+                    self.logger.warning(f"Could not save alt text mapping: {e}")
             
             return successful, failed
             

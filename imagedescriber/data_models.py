@@ -95,6 +95,7 @@ class ImageItem:
         # Download metadata (for downloaded images)
         self.download_url: Optional[str] = None  # Source URL for downloaded images
         self.download_timestamp: Optional[str] = None  # ISO format timestamp
+        self.alt_text: Optional[str] = None  # Alt text captured from the source web page
         
         # Batch processing state tracking (Phase 1: Batch Management)
         self.processing_state: Optional[str] = None  # None, "pending", "processing", "completed", "failed", "paused"
@@ -130,6 +131,7 @@ class ImageItem:
             # Download metadata
             "download_url": self.download_url,
             "download_timestamp": self.download_timestamp,
+            "alt_text": self.alt_text,
             # Batch processing state (Phase 1: Batch Management)
             "processing_state": self.processing_state,
             "processing_error": self.processing_error,
@@ -160,6 +162,7 @@ class ImageItem:
         # Download metadata - backward compatible defaults
         item.download_url = data.get("download_url", None)
         item.download_timestamp = data.get("download_timestamp", None)
+        item.alt_text = data.get("alt_text", None)
         # Batch processing state (Phase 1: Batch Management) - backward compatible defaults
         item.processing_state = data.get("processing_state", None)
         item.processing_error = data.get("processing_error", None)
