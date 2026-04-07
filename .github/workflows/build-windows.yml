@@ -7,6 +7,9 @@ on:
     branches: [ WXMigration ]
   workflow_dispatch:  # Also allow manual trigger
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-windows:
     runs-on: windows-latest
