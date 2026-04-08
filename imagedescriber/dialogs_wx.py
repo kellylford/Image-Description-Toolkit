@@ -583,15 +583,27 @@ class FollowupQuestionDialog(wx.Dialog):
         
         try:
             if provider == "ollama":
-                # CRITICAL: Use cached models if available (passed from main app) to avoid blocking UI
-                if self.cached_ollama_models:
-                    # Sort models alphabetically for easier navigation
-                    for model in sorted(self.cached_ollama_models):
+                # Use cached models if available; otherwise query Ollama live (same as
+                # ProcessingOptionsDialog) and cache the result to avoid repeated calls.
+                models = None
+                if self.cached_ollama_models is not None:
+                    models = self.cached_ollama_models
+                else:
+                    try:
+                        from ai_providers import get_available_providers
+                        providers = get_available_providers()
+                        if 'ollama' in providers:
+                            models = providers['ollama'].get_available_models()
+                            self.cached_ollama_models = models
+                    except Exception:
+                        pass
+
+                if models:
+                    for model in sorted(models):
                         self.model_combo.Append(model)
                 else:
-                    # Fallback to common defaults (don't fetch live - would block UI)
-                    common_models = sorted(["moondream", "llava", "llama3.2-vision"])
-                    for model in common_models:
+                    # Last-resort static fallback when Ollama is unreachable
+                    for model in sorted(["moondream", "llava", "llama3.2-vision"]):
                         self.model_combo.Append(model)
                         
             elif provider == "openai":

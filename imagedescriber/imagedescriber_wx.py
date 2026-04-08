@@ -5633,14 +5633,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Processing worker not available")
             return
 
-        # Get existing description for context
-        last_description = self.current_image_item.descriptions[-1]
-        existing_desc = last_description.text
+        # Get the description the user is currently viewing in the desc_list.
+        # Fall back to the most recently added description if nothing is selected.
+        sel = self.desc_list.GetSelection()
+        if sel != wx.NOT_FOUND and 0 <= sel < len(self.current_image_item.descriptions):
+            focused_description = self.current_image_item.descriptions[sel]
+        else:
+            focused_description = self.current_image_item.descriptions[-1]
+        existing_desc = focused_description.text
 
         # Get original provider and model from the description
         # Default to config values if not stored in description
-        original_provider = last_description.provider or self.config.get('default_provider', 'ollama')
-        original_model = last_description.model or self.config.get('default_model', 'moondream')
+        original_provider = focused_description.provider or self.config.get('default_provider', 'ollama')
+        original_model = focused_description.model or self.config.get('default_model', 'moondream')
 
         # Show dialog with model selection
         from dialogs_wx import FollowupQuestionDialog
