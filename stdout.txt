@@ -1,0 +1,325 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.8, pytest-9.0.2, pluggy-1.6.0 -- C:\Program Files\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\kelly\GitHub\Image-Description-Toolkit
+configfile: pyproject.toml
+plugins: anyio-4.12.1, cov-7.0.0, mock-3.15.1
+collecting ... collected 111 items / 2 errors
+
+<Dir Image-Description-Toolkit>
+  <Package pytest_tests>
+    <Dir unit>
+      <Module test_alt_text_support.py>
+        Unit tests for alt text support in image_describer.py
+        
+        Tests cover:
+          - _load_alt_text_mapping: explicit path, auto-detect, quality filter, disabled flag
+          - write_description_to_file: Alt Text field placement and suppression
+        <Class TestLoadAltTextMapping>
+          <Function test_returns_empty_when_disabled>
+            include_alt_text=False always returns empty dict regardless of file.
+          <Function test_auto_detects_mapping_in_image_dir>
+            Without an explicit path, mapping is auto-detected from the image directory.
+          <Function test_loads_from_explicit_path>
+            When alt_text_mapping_file is set, that explicit path takes precedence.
+          <Function test_returns_empty_when_file_not_found>
+            Returns empty dict gracefully when no mapping file exists.
+          <Function test_quality_filter_rejects_short_text>
+            Alt text shorter than 10 characters is excluded.
+          <Function test_quality_filter_rejects_text_without_space>
+            Alt text without a space (e.g. a bare filename) is excluded.
+          <Function test_quality_filter_accepts_valid_alt_text>
+            Alt text that passes both filters (>=10 chars and contains space) is kept.
+          <Function test_strips_internal_newlines>
+            Newlines and extra whitespace in alt text are collapsed to a single space.
+          <Function test_handles_malformed_json>
+            Returns empty dict gracefully when the mapping file is invalid JSON.
+          <Function test_ignores_non_string_values>
+            Non-string values in the mapping are silently skipped.
+        <Class TestWriteDescriptionAltText>
+          Tests for alt_text parameter in write_description_to_file.
+          <Function test_alt_text_written_before_description>
+            Alt Text: line appears immediately before Description: line.
+          <Function test_alt_text_line_content>
+            Alt Text: line contains the exact provided alt text.
+          <Function test_no_alt_text_field_when_none>
+            When alt_text is None (default), the Alt Text: line is not written.
+          <Function test_description_still_present_with_alt_text>
+            Description: field is always written even when alt text is provided.
+          <Function test_multiple_entries_each_have_alt_text>
+            Writing two entries to the same file gives each its own Alt Text: line.
+      <Module test_batch_state_tracking.py>
+        Unit tests for batch processing state tracking in data models
+        
+        Tests Phase 1: Data Model & State Tracking
+        - ImageItem processing state fields
+        - ImageWorkspace batch_state field
+        - Backward compatibility with old workspace files
+        <Function test_image_item_new_fields>
+          Test that ImageItem has new processing state fields
+        <Function test_image_item_serialization>
+          Test that ImageItem serializes new fields
+        <Function test_image_item_deserialization>
+          Test that ImageItem deserializes new fields
+        <Function test_image_item_backward_compatibility>
+          Test that old workspace files without new fields load correctly
+        <Function test_workspace_batch_state_field>
+          Test that ImageWorkspace has batch_state field
+        <Function test_workspace_batch_state_serialization>
+          Test that ImageWorkspace serializes batch_state
+        <Function test_workspace_batch_state_deserialization>
+          Test that ImageWorkspace deserializes batch_state
+        <Function test_workspace_backward_compatibility>
+          Test that old workspace files without batch_state load correctly
+        <Function test_full_workflow_roundtrip>
+          Test complete save/load cycle with batch processing state
+        <Function test_video_item_type>
+          Test that ImageItem supports video type
+        <Function test_video_with_extracted_frames>
+          Test video item with extracted frames
+        <Function test_extracted_frame_type>
+          Test that ImageItem supports extracted_frame type
+        <Function test_workspace_with_video_items>
+          Test workspace with mixed image, video, and frame items
+      <Module test_configuration_system.py>
+        Basic tests for IDT configuration system.
+        
+        Tests critical configuration infrastructure: file existence, validity,
+        and basic resolution. Designed to work with run_unit_tests.py (no pytest fixtures).
+        
+        See GitHub Issue #62 for comprehensive test coverage roadmap.
+        <Class TestConfigFiles>
+          Test that the three main configuration files exist and are valid.
+          <Function test_workflow_config_exists_and_valid>
+            Test workflow_config.json exists and is valid JSON with required structure.
+          <Function test_image_describer_config_exists_and_valid>
+            Test image_describer_config.json exists and is valid JSON with required structure.
+          <Function test_video_frame_extractor_config_exists_and_valid>
+            Test video_frame_extractor_config.json exists and is valid JSON with required structure.
+        <Class TestBasicConfigResolution>
+          Test basic configuration resolution paths.
+          <Function test_explicit_path_resolution>
+            Test that explicit --config path is resolved correctly.
+          <Function test_missing_config_returns_fallback>
+            Test that missing config returns fallback path gracefully.
+          <Function test_cwd_resolution>
+            Test that config in current working directory is found.
+        <Class TestConfigLoader>
+          Test JSON configuration loading.
+          <Function test_load_valid_json>
+            Test loading valid JSON configuration.
+          <Function test_load_invalid_json_returns_empty_dict>
+            Test that invalid JSON returns empty dict gracefully.
+          <Function test_load_missing_config_returns_empty_dict>
+            Test that missing config returns empty dict gracefully.
+        <Class TestEnvironmentVariables>
+          Test basic environment variable configuration.
+          <Function test_config_dir_env_var>
+            Test IDT_CONFIG_DIR environment variable.
+          <Function test_file_specific_env_var>
+            Test file-specific environment variable (e.g., IDT_WORKFLOW_CONFIG).
+        <Class TestCustomPrompts>
+          Test custom prompt configuration loading.
+          <Function test_load_custom_prompts>
+            Test loading custom prompt configuration.
+        <Class TestDocumentedBehavior>
+          Test that code matches documented behavior in CONFIGURATION_GUIDE.md.
+          <Function test_frozen_mode_detection_exists>
+            Test that frozen mode detection is implemented.
+          <Function test_search_order_documented>
+            Test that search order elements are present in config_loader.py.
+          <Function test_all_three_config_files_exist>
+            Test that all three documented config files exist.
+        <Class TestConfigFlagSupport>
+          Test that scripts properly support --config command-line flag (Oct 31 fixes).
+          <Function test_list_prompts_accepts_config_argument>
+            Test list_prompts.py accepts and uses --config argument.
+          <Function test_guided_workflow_accepts_config_argument>
+            Test guided_workflow.py accepts and uses --config argument.
+          <Function test_workflow_orchestrator_stores_config_file>
+            Test WorkflowOrchestrator stores user's config file for subprocess passing.
+          <Function test_list_prompts_uses_config_loader>
+            Test list_prompts.py uses config_loader instead of hardcoded paths.
+          <Function test_prompt_editor_dialog_uses_config_loader>
+            Test prompt_editor_dialog.py uses config_loader instead of find_config_file().
+            
+            This ensures custom prompts saved via the GUI are written to the same
+            location that the CLI reads from (user config dir on Windows/macOS).
+            Regression guard for GitHub issue: prompt saves to exe scripts/ dir
+            instead of %APPDATA%/IDT/.
+          <Function test_dialogs_wx_load_prompts_uses_config_loader>
+            Test dialogs_wx.py load_prompts uses config_loader not find_config_file().
+            
+            ProcessingOptionsDialog.load_prompts() must read from the same location
+            as the CLI so the prompt dropdown reflects any custom prompts the user saved.
+      <Module test_enhanced_scene_detector.py>
+        Unit tests for EnhancedSceneDetector.
+        
+        Tests cover the pure-Python logic layers (frame selection, coverage
+        filling, quality optimisation, adaptive thresholding, motion analysis)
+        without requiring a real video file or OpenCV VideoCapture.
+        <Class TestFrameInfo>
+          <Function test_default_importance_score>
+            importance_score should default to 0.0 (not a dynamic attribute).
+          <Function test_importance_score_assignable>
+            importance_score can be set as a proper field.
+          <Function test_is_keyframe_defaults_false>
+        <Class TestCalculateQuality>
+          <Function test_returns_float_in_range>
+            Quality score must be 0-100.
+          <Function test_blurry_frame_low_score>
+            A flat (zero-variance) frame should score near 0.
+          <Function test_sharp_frame_higher_score>
+            A checkerboard frame with high edge content should score higher than flat.
+        <Class TestAnalyzeMotion>
+          <Function test_insufficient_history_returns_static>
+            With fewer than 3 history entries, always returns 'static'.
+          <Function test_low_motion_returns_static>
+            Consistently low change scores \u2192 'static'.
+          <Function test_high_consistent_motion_returns_camera_pan>
+            High, low-variance change scores \u2192 'camera_pan'.
+          <Function test_high_variable_motion_returns_scene_change>
+            High variance in change scores \u2192 'scene_change'.
+        <Class TestAdaptiveThreshold>
+          <Function test_empty_scores_no_crash>
+          <Function test_high_motion_video_threshold>
+            mean > 30 \u2192 threshold should be set (not absent).
+          <Function test_low_motion_video_threshold>
+            mean < 10 \u2192 threshold clamped to minimum 5.
+          <Function test_threshold_clamped_to_range>
+            Threshold must always be in [5, 50].
+        <Class TestSelectFinalFrames>
+          <Function test_returns_list>
+          <Function test_empty_candidates_returns_empty>
+          <Function test_always_includes_first_frame>
+          <Function test_result_sorted_by_timestamp>
+          <Function test_respects_max_frames>
+        <Class TestEnsureCoverage>
+          <Function test_no_fill_needed_when_above_min>
+            If selected already meets min_frames, candidates unchanged.
+          <Function test_fills_when_below_min>
+            If selected < min_frames, more frames are added.
+          <Function test_result_sorted>
+            Output of _ensure_coverage is always sorted by timestamp.
+        <Class TestOptimizeQuality>
+          <Function test_no_reduction_when_under_target>
+          <Function test_reduces_to_max_frames>
+          <Function test_importance_score_set_during_reduction>
+            After reduction, remaining frames should have importance_score assigned.
+          <Function test_result_sorted_by_timestamp>
+        <Class TestFallbackUniformSampling>
+          <Function test_returns_target_frames>
+          <Function test_timestamps_within_duration>
+          <Function test_returns_frame_info_objects>
+      <Module test_guided_workflow.py>
+        Tests for guided_workflow.py command generation and CLI integration
+        
+        These tests validate that guideme generates correct workflow commands
+        with proper flags based on user choices.
+        <Class TestGuidedWorkflowCommandGeneration>
+          Test that guideme generates correct workflow commands for various scenarios
+          <Function test_basic_command_no_metadata_no_geocoding>
+            Test command generation with metadata and geocoding disabled
+          <Function test_metadata_enabled_geocoding_enabled>
+            Test command with metadata and geocoding both enabled (default behavior)
+          <Function test_metadata_enabled_geocoding_disabled>
+            Test command with metadata enabled but geocoding explicitly disabled
+          <Function test_custom_geocode_cache>
+            Test that custom geocode cache location is properly added
+          <Function test_default_geocode_cache_not_added>
+            Test that default geocode cache is NOT added to command (workflow.py default)
+          <Function test_extra_workflow_args_passthrough>
+            Test that extra workflow args like --timeout are passed through
+          <Function test_no_geocode_flag_passthrough>
+            Test that --no-geocode can be passed through from command line
+          <Function test_old_geocode_flag_not_accepted>
+            Test that the old --geocode flag is NOT in the allowed passthrough list
+          <Function test_all_workflow_options>
+            Test command with all options specified
+        <Class TestGuidedWorkflowFlagCompatibility>
+          Test compatibility between guideme flags and workflow.py argparse
+          <Function test_metadata_flags_compatibility>
+            Ensure metadata flags match between guideme and workflow.py
+          <Function test_geocoding_flags_compatibility>
+            Ensure geocoding flags match between guideme and workflow.py
+        <Class TestGuidedWorkflowEdgeCases>
+          Test edge cases and error conditions
+          <Function test_empty_geocode_cache_not_added>
+            Test that empty geocode cache string doesn't add flag
+          <Function test_geocode_cache_without_geocoding_enabled>
+            Test that geocode cache is not added if geocoding is disabled
+      <Module test_metadata_safety.py>
+        Unit tests for metadata extraction and format string safety.
+        
+        Tests ensure that user-provided text and EXIF data cannot cause format string
+        errors when used in string formatting operations.
+        <Class TestFormatStringSafety>
+          Test that format strings are safe from user input injection.
+          <Function test_camera_make_with_format_chars_safe>
+            Test that camera make/model with {} characters doesn't break formatting.
+          <Function test_location_prefix_with_format_chars_safe>
+            Test that city/state names with {} don't break formatting.
+          <Function test_metadata_formatting_uses_concatenation>
+            Verify that metadata formatting uses safe concatenation.
+        <Class TestMetadataExtraction>
+          Test metadata extraction functionality.
+          <Function test_gps_coordinates_extracted>
+            Test that GPS coordinates are properly extracted.
+          <Function test_date_formatting_windows_safe>
+            Test that date formatting works on Windows (no %-formatting).
+      <Module test_sanitization.py>
+        Unit tests for workflow.py sanitize_name function and name handling.
+        
+        These tests ensure that workflow names preserve or convert case as expected,
+        preventing regressions like the one where --name MyRunHasUpperCase was being
+        lowercased in the directory name despite preserve_case=True.
+        <Class TestSanitizeName>
+          Test the sanitize_name function for proper case handling.
+          <Function test_sanitize_name_preserves_case_when_requested>
+            Test that sanitize_name preserves case with preserve_case=True.
+          <Function test_sanitize_name_lowercases_when_not_preserving>
+            Test that sanitize_name converts to lowercase with preserve_case=False.
+          <Function test_sanitize_name_preserves_case_by_default>
+            Test that sanitize_name preserves case when preserve_case not specified.
+          <Function test_sanitize_name_removes_special_characters>
+            Test that special characters are removed/replaced.
+          <Function test_sanitize_name_preserves_underscores>
+            Test that underscores are preserved as they're valid in directory names.
+          <Function test_sanitize_name_preserves_hyphens>
+            Test that hyphens are preserved as they're valid in directory names.
+          <Function test_sanitize_name_handles_spaces>
+            Test that spaces are either removed or converted.
+          <Function test_sanitize_name_with_numbers>
+            Test that numbers are preserved.
+          <Function test_sanitize_name_empty_string>
+            Test handling of empty string input.
+          <Function test_sanitize_name_only_special_characters>
+            Test handling of string with only special characters.
+        <Class TestWorkflowNameHandling>
+          Test that workflow directory names use the correctly-cased name.
+          
+          These tests would have caught the recent bug where workflow_name was
+          being lowercased even when the user provided --name with uppercase letters.
+          <Function test_custom_name_preserves_case_in_metadata>
+            Test that custom names preserve case for display.
+          <Function test_custom_name_preserves_case_in_directory>
+            Test that custom names preserve case for directory naming.
+            
+            THIS IS THE BUG WE JUST FIXED - it was calling sanitize_name with
+            preserve_case=False for the directory name, even though we want
+            case preservation.
+          <Function test_lowercase_conversion_when_requested>
+            Test that we CAN lowercase when explicitly requested.
+            
+            This ensures the preserve_case=False option still works when needed.
+        <Class TestCasePreservationIntegration>
+          Integration tests for case preservation throughout the workflow.
+          
+          These tests verify that case preservation works correctly in the
+          complete workflow context, not just isolated functions.
+          <Function test_args_name_to_directory_name>
+            Test the full path from args.name to directory name.
+          <Function test_different_case_styles>
+            Test that various case styles are preserved correctly.
+
+=================== 111 tests collected, 2 errors in 2.11s ====================

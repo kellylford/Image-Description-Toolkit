@@ -688,7 +688,7 @@ def load_workflow_metadata(workflow_dir: Path) -> Optional[Dict[str, Any]]:
     try:
         # Try config_loader first for frozen mode compatibility
         if load_json_config:
-            metadata, _, _ = load_json_config(explicit=str(metadata_file))
+            metadata, _, _ = load_json_config("workflow_metadata.json", explicit=str(metadata_file))
             if metadata:
                 return metadata
         

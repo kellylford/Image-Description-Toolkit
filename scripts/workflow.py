@@ -1889,10 +1889,22 @@ class WorkflowOrchestrator:
                 # For now, metadata is handled via the config file which defaults to enabled
                 pass
             
-            # Add alt text mapping if available and not disabled
+            # Add alt text mapping if available and not disabled.
+            # When images are downloaded from the web, alt_text_mapping.json is saved
+            # in the image_download/ subfolder by web_image_downloader.py.  input_dir
+            # here is the user's original source (or temp_combined_dir), so we must
+            # also check the workflow's image_download directory explicitly.
             if not self.no_alt_text:
-                alt_text_mapping_path = input_dir / "alt_text_mapping.json"
-                if alt_text_mapping_path.exists():
+                alt_text_mapping_path = None
+                candidates = [
+                    input_dir / "alt_text_mapping.json",
+                    self.config.get_step_output_dir("image_download") / "alt_text_mapping.json",
+                ]
+                for candidate in candidates:
+                    if candidate.exists():
+                        alt_text_mapping_path = candidate
+                        break
+                if alt_text_mapping_path:
                     cmd.extend(["--alt-text-mapping", str(alt_text_mapping_path)])
                     self.logger.info(f"Including website alt text from: {alt_text_mapping_path}")
             
