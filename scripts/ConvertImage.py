@@ -26,14 +26,19 @@ from pathlib import Path
 from PIL import Image
 from datetime import datetime
 
-# Set UTF-8 encoding for console output on Windows
+# Set UTF-8 encoding for console output on Windows.
+# Use reconfigure() (Python 3.7+) to change encoding in-place without
+# detaching the underlying buffer.  The older codecs.getwriter/detach()
+# pattern tears out any buffer held by callers (e.g. pytest capture),
+# causing hard-to-diagnose failures.
 if sys.platform.startswith('win'):
-    import codecs
-    # Fix for PyInstaller executable - only detach if method exists
-    if hasattr(sys.stdout, 'detach'):
-        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    if hasattr(sys.stderr, 'detach'):
-        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+    for _stream in (sys.stdout, sys.stderr):
+        if hasattr(_stream, 'reconfigure'):
+            try:
+                _stream.reconfigure(encoding='utf-8', errors='replace')
+            except Exception:
+                pass  # Frozen/non-TextIOWrapper streams: leave untouched
+    del _stream
 import pillow_heif
 
 # Register HEIF opener with PIL

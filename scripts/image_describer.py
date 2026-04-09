@@ -157,7 +157,8 @@ class ImageDescriber:
                  enable_compression: bool = True, batch_delay: float = 2.0, 
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
-                 log_dir: str = None, workflow_name: str = None, timeout: int = 90, source_url: str = None):
+                 log_dir: str = None, workflow_name: str = None, timeout: int = 90, source_url: str = None,
+                 include_alt_text: bool = True, alt_text_mapping_file: str = None):
         """
         Initialize the ImageDescriber
         
@@ -175,6 +176,8 @@ class ImageDescriber:
             workflow_name: Name of the workflow (for window title display)
             timeout: Timeout in seconds for Ollama API requests (default: 90)
             source_url: Source URL if images were downloaded from the web
+            include_alt_text: Whether to include website alt text in descriptions (default: True)
+            alt_text_mapping_file: Explicit path to alt_text_mapping.json (auto-detected if None)
         """
         # Load configuration first
         self.config = self.load_config(config_file)
@@ -220,6 +223,8 @@ class ImageDescriber:
         self.workflow_name = workflow_name  # Workflow name for window title
         self.timeout = timeout  # Timeout for Ollama requests
         self.source_url = source_url  # Source URL if downloaded from web
+        self.include_alt_text = include_alt_text  # Whether to include website alt text
+        self.alt_text_mapping_file = alt_text_mapping_file  # Explicit mapping file path
         # Notice flags (avoid repeating log spam)
         self._geocode_notice_logged = False
         
@@ -1122,7 +1127,53 @@ class ImageDescriber:
             gc.collect()
             return None
     
-    def write_description_to_file(self, image_path: Path, description: str, output_file: Path, metadata: Dict[str, Any] = None, base_directory: Path = None) -> bool:
+    def _load_alt_text_mapping(self, image_dir: Path) -> dict:
+        """
+        Load alt text mapping for images downloaded from the web.
+
+        Looks for alt_text_mapping.json either at the explicitly configured path
+        (self.alt_text_mapping_file) or auto-detected in image_dir.  Only entries
+        that pass the quality filter (at least 10 characters and contains a space)
+        are included — this rejects bare filenames and very short labels.
+
+        Returns:
+            Dict mapping filename → alt text string, or {} if unavailable/disabled.
+        """
+        if not self.include_alt_text:
+            return {}
+
+        mapping_path = None
+        if self.alt_text_mapping_file:
+            mapping_path = Path(self.alt_text_mapping_file)
+        else:
+            candidate = image_dir / "alt_text_mapping.json"
+            if candidate.exists():
+                mapping_path = candidate
+
+        if mapping_path is None or not mapping_path.exists():
+            return {}
+
+        try:
+            with open(mapping_path, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load alt text mapping from {mapping_path}: {e}")
+            return {}
+
+        result = {}
+        for filename, alt_text in raw.items():
+            if not isinstance(alt_text, str):
+                continue
+            # Strip internal newlines/tabs so the entry stays on one line in the output file
+            cleaned = ' '.join(alt_text.split())
+            # Quality filter: must be at least 10 chars and contain a space
+            if len(cleaned) >= 10 and ' ' in cleaned:
+                result[filename] = cleaned
+
+        logger.info(f"Loaded alt text for {len(result)} image(s) from {mapping_path}")
+        return result
+
+    def write_description_to_file(self, image_path: Path, description: str, output_file: Path, metadata: Dict[str, Any] = None, base_directory: Path = None, alt_text: str = None) -> bool:
         """
         Write description to a text file
         
@@ -1132,6 +1183,7 @@ class ImageDescriber:
             output_file: Path to the output text file
             metadata: Optional metadata dictionary to include
             base_directory: Base directory for calculating relative paths
+            alt_text: Optional website alt text to include before the AI description
             
         Returns:
             True if successful, False otherwise
@@ -1194,7 +1246,10 @@ class ImageDescriber:
                     # Use string concatenation to avoid f-string format errors from curly braces in description
                     formatted_description = location_prefix + ": " + description
             
+            if alt_text:
+                entry += "Alt Text: " + alt_text + "\n"
             entry += "Description: " + formatted_description + "\n"
+
             
             if output_format.get('include_timestamp', True):
                 entry += "Timestamp: " + time.strftime('%Y-%m-%d %H:%M:%S') + "\n"
@@ -1355,6 +1410,9 @@ class ImageDescriber:
         
         logger.info(f"Processing {len(image_files)} image files")
         
+        # Load alt text mapping once for the entire directory (if available)
+        alt_text_map = self._load_alt_text_mapping(directory_path)
+        
         # Process each image with memory management
         success_count = 0
         skip_count = 0
@@ -1448,7 +1506,8 @@ class ImageDescriber:
                     metadata['token_usage'] = token_usage
                 
                 # Write description to file with metadata and base directory for relative paths
-                if self.write_description_to_file(image_path, description, output_file, metadata, directory_path):
+                image_alt_text = alt_text_map.get(image_path.name)
+                if self.write_description_to_file(image_path, description, output_file, metadata, directory_path, alt_text=image_alt_text):
                     # Update progress file immediately after successful write
                     try:
                         with open(progress_file, 'a', encoding='utf-8') as pf:
@@ -2292,6 +2351,17 @@ Configuration:
         type=str,
         help="Source URL if images were downloaded from the web (for attribution)"
     )
+    parser.add_argument(
+        "--no-alt-text",
+        action="store_true",
+        help="Do not include website alt text in descriptions (default: include when available)"
+    )
+    parser.add_argument(
+        "--alt-text-mapping",
+        type=str,
+        dest="alt_text_mapping",
+        help="Path to alt_text_mapping.json file (auto-detected from image directory if not specified)"
+    )
     
     args = parser.parse_args()
     
@@ -2369,7 +2439,9 @@ Configuration:
         log_dir=args.log_dir,
         workflow_name=args.workflow_name,
         timeout=args.timeout,
-        source_url=args.source_url
+        source_url=args.source_url,
+        include_alt_text=not args.no_alt_text,
+        alt_text_mapping_file=args.alt_text_mapping
     )
     
     # Override metadata extraction if disabled via command line

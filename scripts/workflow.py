@@ -38,14 +38,6 @@ from urllib.parse import urlparse
 # Suppress console windows when spawning child processes from a GUI app on Windows
 _SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
 
-# Set UTF-8 encoding for console output on Windows
-if sys.platform.startswith('win'):
-    import codecs
-    # Fix for PyInstaller executable - only detach if method exists
-    if hasattr(sys.stdout, 'detach'):
-        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    if hasattr(sys.stderr, 'detach'):
-        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
 import logging
 import json
 import platform
@@ -753,7 +745,8 @@ class WorkflowOrchestrator:
                  timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = True, 
                  geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
                  max_images: int = None, progress_status: bool = False,
-                 image_describer_config: Optional[str] = None, video_config: Optional[str] = None):
+                 image_describer_config: Optional[str] = None, video_config: Optional[str] = None,
+                 no_alt_text: bool = False):
         """
         Initialize the workflow orchestrator
         
@@ -811,6 +804,7 @@ class WorkflowOrchestrator:
         self.min_size = min_size
         self.max_images = max_images
         self.progress_status = progress_status
+        self.no_alt_text = no_alt_text
         
         # Available workflow steps
         self.available_steps = {
@@ -1895,6 +1889,13 @@ class WorkflowOrchestrator:
                 # For now, metadata is handled via the config file which defaults to enabled
                 pass
             
+            # Add alt text mapping if available and not disabled
+            if not self.no_alt_text:
+                alt_text_mapping_path = input_dir / "alt_text_mapping.json"
+                if alt_text_mapping_path.exists():
+                    cmd.extend(["--alt-text-mapping", str(alt_text_mapping_path)])
+                    self.logger.info(f"Including website alt text from: {alt_text_mapping_path}")
+            
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
             
@@ -2696,6 +2697,17 @@ def normalize_model_name(model: str, provider: str) -> str:
 
 def main():
     """Main function for command-line usage"""
+    # Set UTF-8 encoding for console output on Windows.
+    # Must be done inside main() (not at module level) to avoid interfering
+    # with pytest's capture streams, which replace sys.stdout/sys.stderr.
+    if sys.platform.startswith('win'):
+        for _stream in (sys.stdout, sys.stderr):
+            if hasattr(_stream, 'reconfigure'):
+                try:
+                    _stream.reconfigure(encoding='utf-8', errors='replace')
+                except Exception:
+                    pass  # Frozen/non-TextIOWrapper streams: leave untouched
+
     parser = argparse.ArgumentParser(
         description="Image Description Toolkit - Complete Workflow",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2948,6 +2960,12 @@ Viewing Results:
         "--max-images",
         type=int,
         help="Maximum number of images to download"
+    )
+    
+    parser.add_argument(
+        "--no-alt-text",
+        action="store_true",
+        help="Do not include website alt text in image descriptions (default: include when available)"
     )
     
     parser.add_argument(
@@ -3431,7 +3449,8 @@ Viewing Results:
             max_images=args.max_images,
             progress_status=args.progress_status,
             image_describer_config=image_describer_config,  # NEW: explicit image describer config
-            video_config=video_config  # NEW: explicit video config
+            video_config=video_config,  # NEW: explicit video config
+            no_alt_text=args.no_alt_text
         )
         
         if args.dry_run:
