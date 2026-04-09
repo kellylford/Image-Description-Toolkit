@@ -551,7 +551,13 @@ class ImageDescriber:
         # Remove model name from settings as it's passed separately to ollama
         settings = model_settings.copy()
         settings.pop('model', None)
-        
+
+        # Cloud models routed through Ollama (e.g. kimi-k2.5:cloud) enforce their own
+        # output limits server-side. Forwarding num_predict caps the cloud API output
+        # and is the primary cause of empty/truncated responses for cloud models.
+        if ':cloud' in self.model_name or self.model_name.endswith('-cloud'):
+            settings.pop('num_predict', None)
+
         return settings
         
     def is_supported_image(self, file_path: Path) -> bool:
@@ -819,176 +825,198 @@ class ImageDescriber:
                 # Get model settings from configuration
                 model_settings = self.get_model_settings()
                 logger.debug(f"Using model settings: {model_settings}")
-                
-                # Implement retry logic for Ollama API calls
-                max_retries = 3
-                # Optimized retry delays for server 500 errors - faster recovery
-                retry_delays = [0.5, 1.0, 2.0]  # Fixed delays instead of exponential backoff
-                
-                last_exception = None
-                for attempt in range(max_retries + 1):  # +1 for initial attempt
-                    try:
-                        # Call Ollama API with configured settings and timeout
-                        # Prefer python client when available; fallback to HTTP API
-                        use_python_client = (ollama is not None and hasattr(ollama, 'chat'))
-                        if use_python_client:
-                            import signal
-                            
-                            def timeout_handler(signum, frame):
-                                raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
-                            
-                            # Set up timeout for Windows/Unix compatibility
-                            try:
-                                # For Windows, we'll use a different approach since signal.alarm doesn't work
-                                import threading
-                                import time
-                                
-                                response = None
-                                exception_caught = None
-                                
-                                def make_request():
-                                    nonlocal response, exception_caught
-                                    try:
-                                        response = ollama.chat(
-                                            model=self.model_name,
-                                            messages=[
-                                                {
-                                                    'role': 'user',
-                                                    'content': prompt,
-                                                    'images': [image_base64]
-                                                }
-                                            ],
-                                            options=model_settings
-                                        )
-                                    except Exception as e:
-                                        exception_caught = e
-                                
-                                # Start request in background thread
-                                request_thread = threading.Thread(target=make_request)
-                                request_thread.daemon = True
-                                request_thread.start()
-                                
-                                # Wait for completion or timeout
-                                request_thread.join(timeout=self.timeout)
-                                
-                                if request_thread.is_alive():
-                                    # Request is still running - timeout occurred
-                                    logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after {self.timeout} seconds")
+
+                # Outer loop: empty-response retry (cloud models like kimi-k2.5:cloud
+                # return empty content intermittently — same Issue #91 pattern as OpenAI).
+                MAX_EMPTY_RETRIES = 2
+                description = ""
+                for empty_attempt in range(MAX_EMPTY_RETRIES + 1):
+                    # Inner loop: server/transport error retry (500, timeout, connection)
+                    max_retries = 3
+                    # Optimized retry delays for server 500 errors - faster recovery
+                    retry_delays = [0.5, 1.0, 2.0]  # Fixed delays instead of exponential backoff
+
+                    last_exception = None
+                    response = None
+                    for attempt in range(max_retries + 1):  # +1 for initial attempt
+                        try:
+                            # Call Ollama API with configured settings and timeout
+                            # Prefer python client when available; fallback to HTTP API
+                            use_python_client = (ollama is not None and hasattr(ollama, 'chat'))
+                            if use_python_client:
+                                import signal
+
+                                def timeout_handler(signum, frame):
                                     raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
-                                
-                                if exception_caught:
-                                    raise exception_caught
-                                    
-                                if response is None:
-                                    raise RuntimeError("Request completed but no response received")
-                                    
-                            except ImportError:
-                                # Fallback to direct call if threading unavailable
-                                response = ollama.chat(
-                                    model=self.model_name,
-                                    messages=[
-                                        {
-                                            'role': 'user',
-                                            'content': prompt,
-                                            'images': [image_base64]
-                                        }
-                                    ],
-                                    options=model_settings
+
+                                # Set up timeout for Windows/Unix compatibility
+                                try:
+                                    # For Windows, we'll use a different approach since signal.alarm doesn't work
+                                    import threading
+                                    import time
+
+                                    response = None
+                                    exception_caught = None
+
+                                    def make_request():
+                                        nonlocal response, exception_caught
+                                        try:
+                                            response = ollama.chat(
+                                                model=self.model_name,
+                                                messages=[
+                                                    {
+                                                        'role': 'user',
+                                                        'content': prompt,
+                                                        'images': [image_base64]
+                                                    }
+                                                ],
+                                                options=model_settings
+                                            )
+                                        except Exception as e:
+                                            exception_caught = e
+
+                                    # Start request in background thread
+                                    request_thread = threading.Thread(target=make_request)
+                                    request_thread.daemon = True
+                                    request_thread.start()
+
+                                    # Wait for completion or timeout
+                                    request_thread.join(timeout=self.timeout)
+
+                                    if request_thread.is_alive():
+                                        # Request is still running - timeout occurred
+                                        logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after {self.timeout} seconds")
+                                        raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
+
+                                    if exception_caught:
+                                        raise exception_caught
+
+                                    if response is None:
+                                        raise RuntimeError("Request completed but no response received")
+
+                                except ImportError:
+                                    # Fallback to direct call if threading unavailable
+                                    response = ollama.chat(
+                                        model=self.model_name,
+                                        messages=[
+                                            {
+                                                'role': 'user',
+                                                'content': prompt,
+                                                'images': [image_base64]
+                                            }
+                                        ],
+                                        options=model_settings
+                                    )
+                            else:
+                                # HTTP fallback to Ollama API
+                                import requests
+                                http_response = requests.post(
+                                    "http://127.0.0.1:11434/api/chat",
+                                    json={
+                                        'model': self.model_name,
+                                        'messages': [
+                                            {
+                                                'role': 'user',
+                                                'content': prompt,
+                                                'images': [image_base64]
+                                            }
+                                        ],
+                                        'options': model_settings,
+                                        'stream': False
+                                    },
+                                    timeout=self.timeout
                                 )
-                        else:
-                            # HTTP fallback to Ollama API
-                            import requests
-                            http_response = requests.post(
-                                "http://127.0.0.1:11434/api/chat",
-                                json={
-                                    'model': self.model_name,
-                                    'messages': [
-                                        {
-                                            'role': 'user',
-                                            'content': prompt,
-                                            'images': [image_base64]
-                                        }
-                                    ],
-                                    'options': model_settings,
-                                    'stream': False
-                                },
-                                timeout=self.timeout
-                            )
-                            http_response.raise_for_status()
-                            response = http_response.json()
-                        
-                        # If we get here, the call succeeded
-                        if attempt > 0:
-                            logger.info(f"  [RETRY] Success on attempt {attempt + 1} for {image_path.name}")
-                        break
-                        
-                    except Exception as e:
-                        last_exception = e
-                        error_msg = str(e).lower()
-                        error_type = type(e).__name__
-                        
-                        # Check if this is a retryable error
-                        is_retryable = (
-                            'server error' in error_msg or
-                            'status code: 5' in error_msg or
-                            '500' in error_msg or
-                            'unmarshal' in error_msg or
-                            'invalid character' in error_msg or
-                            'timeout' in error_msg or
-                            'connection' in error_msg.lower() or
-                            isinstance(e, TimeoutError)  # Handle our custom timeout
-                        )
-                        
-                        if is_retryable and attempt < max_retries:
-                            # Use fixed retry delays optimized for server errors
-                            import random
-                            base_delay = retry_delays[min(attempt, len(retry_delays) - 1)]
-                            jitter = random.uniform(0.1, 0.3) * base_delay  # Reduced jitter
-                            sleep_time = base_delay + jitter
-                            
-                            logger.warning(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed for {image_path.name} ({error_type}): {str(e)[:100]}...")
-                            logger.warning(f"  [RETRY] Retrying in {sleep_time:.1f}s...")
-                            time.sleep(sleep_time)
-                            continue
-                        else:
-                            # Non-retryable error or max retries reached
+                                http_response.raise_for_status()
+                                response = http_response.json()
+
+                            # If we get here, the call succeeded
                             if attempt > 0:
-                                logger.error(f"  [RETRY] All {max_retries + 1} attempts failed for {image_path.name}")
-                            raise e
-                else:
-                    # This should not be reached, but handle it just in case
-                    if last_exception:
-                        raise last_exception
-                
-                logger.debug(f"Raw response: {response}")
-                logger.debug(f"Response type: {type(response)}")
-                logger.debug(f"Response keys: {response.keys() if hasattr(response, 'keys') else 'no keys'}")
-                if 'message' in response:
-                    logger.debug(f"Message: {response['message']}")
-                    logger.debug(f"Message type: {type(response['message'])}")
-                    if hasattr(response['message'], 'content'):
-                        logger.debug(f"Message content: {repr(response['message'].content)}")
-                    elif 'content' in response['message']:
-                        logger.debug(f"Message content dict: {repr(response['message']['content'])}")
-                
-                # Normalize response for both python client and HTTP JSON
-                message = response['message'] if isinstance(response, dict) else response.get('message')
-                if hasattr(message, 'content'):
-                    description = message.content.strip()
-                elif isinstance(message, dict) and 'content' in message:
-                    description = str(message['content']).strip()
-                else:
-                    # Fallback: try to stringify whole response
-                    description = str(response).strip()
+                                logger.info(f"  [RETRY] Success on attempt {attempt + 1} for {image_path.name}")
+                            break
+
+                        except Exception as e:
+                            last_exception = e
+                            error_msg = str(e).lower()
+                            error_type = type(e).__name__
+
+                            # Check if this is a retryable error
+                            is_retryable = (
+                                'server error' in error_msg or
+                                'status code: 5' in error_msg or
+                                '500' in error_msg or
+                                'unmarshal' in error_msg or
+                                'invalid character' in error_msg or
+                                'timeout' in error_msg or
+                                'connection' in error_msg.lower() or
+                                isinstance(e, TimeoutError)  # Handle our custom timeout
+                            )
+
+                            if is_retryable and attempt < max_retries:
+                                # Use fixed retry delays optimized for server errors
+                                import random
+                                base_delay = retry_delays[min(attempt, len(retry_delays) - 1)]
+                                jitter = random.uniform(0.1, 0.3) * base_delay  # Reduced jitter
+                                sleep_time = base_delay + jitter
+
+                                logger.warning(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed for {image_path.name} ({error_type}): {str(e)[:100]}...")
+                                logger.warning(f"  [RETRY] Retrying in {sleep_time:.1f}s...")
+                                time.sleep(sleep_time)
+                                continue
+                            else:
+                                # Non-retryable error or max retries reached
+                                if attempt > 0:
+                                    logger.error(f"  [RETRY] All {max_retries + 1} attempts failed for {image_path.name}")
+                                raise e
+                    else:
+                        # This should not be reached, but handle it just in case
+                        if last_exception:
+                            raise last_exception
+
+                    logger.debug(f"Raw response: {response}")
+                    logger.debug(f"Response type: {type(response)}")
+                    logger.debug(f"Response keys: {response.keys() if hasattr(response, 'keys') else 'no keys'}")
+                    if 'message' in response:
+                        logger.debug(f"Message: {response['message']}")
+                        logger.debug(f"Message type: {type(response['message'])}")
+                        if hasattr(response['message'], 'content'):
+                            logger.debug(f"Message content: {repr(response['message'].content)}")
+                        elif 'content' in response['message']:
+                            logger.debug(f"Message content dict: {repr(response['message']['content'])}")
+
+                    # Normalize response for both python client and HTTP JSON
+                    message = response['message'] if isinstance(response, dict) else response.get('message')
+                    if hasattr(message, 'content'):
+                        description = message.content.strip()
+                    elif isinstance(message, dict) and 'content' in message:
+                        description = str(message['content']).strip()
+                    else:
+                        # Fallback: try to stringify whole response
+                        description = str(response).strip()
+
+                    if description and description.strip():
+                        break  # Good response — exit empty-retry loop
+
+                    if empty_attempt < MAX_EMPTY_RETRIES:
+                        logger.warning(
+                            f"  [EMPTY-RETRY] Empty response from {self.provider_name}/{self.model_name} "
+                            f"(attempt {empty_attempt + 1}/{MAX_EMPTY_RETRIES + 1}) for {image_path.name} — retrying..."
+                        )
+                        time.sleep(1.0 * (empty_attempt + 1))
+                    else:
+                        logger.warning(
+                            f"  [EMPTY-RETRY] All {MAX_EMPTY_RETRIES + 1} attempts returned empty "
+                            f"for {image_path.name} — keeping empty result."
+                        )
+
                 logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
                 logger.debug(f"Description content: {repr(description)}")
                 logger.debug(f"Description length: {len(description)}")
                 logger.debug(f"Description bool: {bool(description)}")
-                
+
                 # Clean up memory
-                del image_base64, response
+                del image_base64
                 gc.collect()
-                
+
                 return description
             
             else:
