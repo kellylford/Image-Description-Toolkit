@@ -1898,7 +1898,7 @@ class WorkflowOrchestrator:
                 alt_text_mapping_path = None
                 candidates = [
                     input_dir / "alt_text_mapping.json",
-                    self.config.get_step_output_dir("image_download") / "alt_text_mapping.json",
+                    self.config.get_step_output_dir("image_download", create=False) / "alt_text_mapping.json",
                 ]
                 for candidate in candidates:
                     if candidate.exists():

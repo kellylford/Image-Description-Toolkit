@@ -161,3 +161,8 @@ build_bisect_exes.sh
 
 # IDT agent session state (written by idt_hook_guard.py)
 .idt_session/
+
+# Temporary test output files
+errors.txt
+stderr.txt
+stdout.txt
