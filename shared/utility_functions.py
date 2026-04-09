@@ -67,7 +67,10 @@ def sanitize_name(name: str, preserve_case: bool = True) -> str:
     # Remove characters that are not letters, numbers, underscore, hyphen, or dot
     # Spaces and punctuation are removed (not replaced) to match expected behavior
     safe_name = re.sub(r'[^A-Za-z0-9_\-.]', '', str(name))
-    
+
+    if not safe_name:
+        return "unknown"
+
     # Convert to lowercase unless case preservation is requested
     return safe_name if preserve_case else safe_name.lower()
 

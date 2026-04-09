@@ -34,10 +34,9 @@ from typing import Dict, List, Tuple, Optional
 import json
 from analysis_utils import get_safe_filename, ensure_directory
 
-# Fix Windows terminal encoding issues
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# Fix Windows terminal encoding issues — must be done inside main() to avoid
+# corrupting pytest's capture stream when this module is imported in tests.
+# See: workflow.py main() for the same pattern.
 
 # API Pricing as of October 2025 (per million tokens)
 # Note: Prices may change - verify current pricing at provider websites
@@ -1208,6 +1207,17 @@ def save_text_report(all_stats: list, output_file: Path, base_dir: Path):
 
 def main():
     """Main function to analyze workflow statistics."""
+    # Set UTF-8 encoding for Windows console output without replacing the stream
+    # object (which would break pytest capture during tests).
+    if sys.platform == 'win32':
+        import io
+        for _stream in (sys.stdout, sys.stderr):
+            if isinstance(_stream, io.TextIOWrapper):
+                try:
+                    _stream.reconfigure(encoding='utf-8', errors='replace')
+                except Exception:
+                    pass
+
     parser = argparse.ArgumentParser(
         description='Analyze performance statistics from workflow logs.',
         formatter_class=argparse.RawDescriptionHelpFormatter,

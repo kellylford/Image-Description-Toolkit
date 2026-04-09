@@ -18,7 +18,7 @@ def test_basic_title():
     result = build_window_title(50, 5, 10, "Describing Images")
     expected = "IDT - Describing Images (50%, 5 of 10)"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_basic_title")
+    print("OK: test_basic_title")
 
 
 def test_with_context_parts():
@@ -29,7 +29,7 @@ def test_with_context_parts():
     )
     expected = "IDT - Describing (50%, 5 of 10) - my_workflow - detailed - gpt-4o"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_with_context_parts")
+    print("OK: test_with_context_parts")
 
 
 def test_with_suffix():
@@ -37,7 +37,7 @@ def test_with_suffix():
     result = build_window_title(50, 5, 10, "Describing", suffix=" - Live")
     expected = "IDT - Describing (50%, 5 of 10) - Live"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_with_suffix")
+    print("OK: test_with_suffix")
 
 
 def test_with_suffix_and_context():
@@ -49,7 +49,7 @@ def test_with_suffix_and_context():
     )
     expected = "IDT - Describing (50%, 5 of 10) - Live - wf - detailed"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_with_suffix_and_context")
+    print("OK: test_with_suffix_and_context")
 
 
 def test_filters_none_values():
@@ -60,7 +60,7 @@ def test_filters_none_values():
     )
     expected = "IDT - Process (50%, 5 of 10) - first - second"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_filters_none_values")
+    print("OK: test_filters_none_values")
 
 
 def test_filters_empty_strings():
@@ -71,7 +71,7 @@ def test_filters_empty_strings():
     )
     expected = "IDT - Process (50%, 5 of 10) - first - second"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_filters_empty_strings")
+    print("OK: test_filters_empty_strings")
 
 
 def test_from_context_all_params():
@@ -84,7 +84,7 @@ def test_from_context_all_params():
     )
     expected = "IDT - Describing (50%, 5 of 10) - my_workflow - detailed - gpt-4o"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_from_context_all_params")
+    print("OK: test_from_context_all_params")
 
 
 def test_from_context_with_suffix():
@@ -98,7 +98,7 @@ def test_from_context_with_suffix():
     )
     expected = "IDT - Describing (100%, 20 of 20) - Complete - project_a - concise - gpt-4o"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_from_context_with_suffix")
+    print("OK: test_from_context_with_suffix")
 
 
 def test_from_context_filters_none():
@@ -111,7 +111,7 @@ def test_from_context_filters_none():
     )
     expected = "IDT - Processing (50%, 5 of 10) - wf_test - claude-3"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_from_context_filters_none")
+    print("OK: test_from_context_filters_none")
 
 
 def test_context_order_preserved():
@@ -126,14 +126,14 @@ def test_context_order_preserved():
     second_idx = result.index("second")
     third_idx = result.index("third")
     assert first_idx < second_idx < third_idx, f"Order not preserved in: {result}"
-    print("✓ test_context_order_preserved")
+    print("OK: test_context_order_preserved")
 
 
 def test_large_numbers():
     """Test with large numbers"""
     result = build_window_title(99, 1000000, 1000000, "Processing")
     assert "99%, 1000000 of 1000000" in result
-    print("✓ test_large_numbers")
+    print("OK: test_large_numbers")
 
 
 def test_zero_progress():
@@ -141,7 +141,7 @@ def test_zero_progress():
     result = build_window_title(0, 0, 0, "Starting")
     expected = "IDT - Starting (0%, 0 of 0)"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ test_zero_progress")
+    print("OK: test_zero_progress")
 
 
 def test_equivalence_of_functions():
@@ -159,7 +159,7 @@ def test_equivalence_of_functions():
     )
     
     assert list_result == param_result, f"Functions not equivalent:\n  list: {list_result}\n  param: {param_result}"
-    print("✓ test_equivalence_of_functions")
+    print("OK: test_equivalence_of_functions")
 
 
 def test_whitespace_stripping():
@@ -172,7 +172,7 @@ def test_whitespace_stripping():
     )
     assert "wf_test - detailed - gpt-4o" in result
     assert "  " not in result.split("(100%,")[1] if "100%," in result else True
-    print("✓ test_whitespace_stripping")
+    print("OK: test_whitespace_stripping")
 
 
 def run_all_tests():
@@ -205,10 +205,10 @@ def run_all_tests():
             test_func()
             passed += 1
         except AssertionError as e:
-            print(f"✗ {test_func.__name__}: {e}")
+            print(f"FAIL: {test_func.__name__}: {e}")
             failed += 1
         except Exception as e:
-            print(f"✗ {test_func.__name__}: {type(e).__name__}: {e}")
+            print(f"FAIL: {test_func.__name__}: {type(e).__name__}: {e}")
             failed += 1
     
     print("=" * 50)

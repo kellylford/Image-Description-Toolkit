@@ -10,8 +10,12 @@ import pytest
 import sys
 from pathlib import Path
 
+# Add scripts directory to path so workflow and its dependencies can be imported
+scripts_path = Path(__file__).parent.parent.parent / 'scripts'
+sys.path.insert(0, str(scripts_path))
+
 # Import the function we're testing
-from scripts.workflow import sanitize_name
+from workflow import sanitize_name
 
 
 class TestSanitizeName:

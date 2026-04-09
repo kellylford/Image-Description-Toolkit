@@ -1166,8 +1166,11 @@ class ImageDescriber:
                 continue
             # Strip internal newlines/tabs so the entry stays on one line in the output file
             cleaned = ' '.join(alt_text.split())
-            # Quality filter: must be at least 10 chars and contain a space
-            if len(cleaned) >= 10 and ' ' in cleaned:
+            # Quality filter: must be at least 3 chars and contain a space.
+            # The space check rejects bare filenames (e.g. 'IMG_0160.DNG');
+            # the length check rejects near-empty strings. 10 was too aggressive
+            # and silently dropped valid short alt text like 'NASA Logo' (9 chars).
+            if len(cleaned) >= 3 and ' ' in cleaned:
                 result[filename] = cleaned
 
         logger.info(f"Loaded alt text for {len(result)} image(s) from {mapping_path}")

@@ -5,6 +5,7 @@ Interactive Guided Workflow - Helps users build and run workflow commands
 
 import sys
 import os
+import io
 from pathlib import Path
 import subprocess
 import json
@@ -425,6 +426,18 @@ def guided_workflow(custom_config_path=None):
     Args:
         custom_config_path: Optional path to custom image_describer_config.json
     """
+    # Set UTF-8 encoding for console output on Windows so Unicode characters
+    # (checkmarks, etc.) don't crash on cp1252 consoles.  Only reconfigure
+    # real TextIOWrapper streams; pytest replaces sys.stdout with its own
+    # capture objects which must not be reconfigured.
+    if sys.platform.startswith('win'):
+        for _stream in (sys.stdout, sys.stderr):
+            if isinstance(_stream, io.TextIOWrapper):
+                try:
+                    _stream.reconfigure(encoding='utf-8', errors='replace')
+                except Exception:
+                    pass
+
     # Parse any extra workflow arguments passed through (e.g., --timeout 300)
     # These will be appended to the final workflow command
     extra_workflow_args = []

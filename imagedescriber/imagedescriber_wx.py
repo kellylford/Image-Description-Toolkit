@@ -4595,11 +4595,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # If the source page provided alt text, store it and create a
                 # "Website Alt Text" description so the user has both the
                 # site-authored text and any AI-generated description.
-                # Require >= 10 chars AND at least one space to avoid filenames
-                # and short labels (e.g. 'IMG_0160.DNG' or 'NASA Logo').
+                # Require >= 3 chars AND at least one space to reject bare
+                # filenames (e.g. 'IMG_0160.DNG') while accepting short labels.
                 alt_text = alt_text_mapping.get(filename, '').strip()
                 item.alt_text = alt_text if alt_text else None
-                if len(alt_text) >= 10 and ' ' in alt_text:
+                if len(alt_text) >= 3 and ' ' in alt_text:
                     alt_desc = ImageDescription(
                         text=alt_text,
                         model="Website Alt Text",

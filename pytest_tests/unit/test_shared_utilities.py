@@ -188,7 +188,7 @@ class TestFormatTimestampStandard:
         """Test basic timestamp formatting."""
         dt = datetime(2025, 3, 25, 7, 35, 0)
         result = format_timestamp_standard(dt)
-        assert result == "3/25/2025 7:35P", \
+        assert result == "3/25/2025 7:35A", \
             "Should format as M/D/YYYY H:MMP"
     
     def test_format_timestamp_no_leading_zeros(self):
@@ -230,8 +230,8 @@ class TestFormatTimestampStandard:
         """Test that single-digit minutes have leading zero."""
         dt = datetime(2025, 3, 25, 7, 5, 0)
         result = format_timestamp_standard(dt)
-        assert "7:05P" in result, \
-            "Should pad minutes with leading zero: 7:05P not 7:5P"
+        assert "7:05A" in result, \
+            "Should pad minutes with leading zero: 7:05A not 7:5A"
     
     def test_format_timestamp_none_input(self):
         """Test that None input uses current time."""
@@ -253,8 +253,8 @@ class TestFormatTimestampStandard:
         # Both should have same time part (seconds are ignored)
         assert result1 == result2, \
             "Seconds should not affect formatting"
-        assert "7:35P" in result1, \
-            "Should format as 7:35P"
+        assert "7:35A" in result1, \
+            "Should format as 7:35A"
 
 
 if __name__ == "__main__":

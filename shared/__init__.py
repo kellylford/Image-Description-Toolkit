@@ -9,35 +9,40 @@ This package provides common functionality across all GUI applications:
 - Accessible widgets for VoiceOver compatibility
 """
 
-from .wx_common import (
-    # Path resolution
-    get_base_directory,
-    find_file,
-    find_scripts_directory,
-    find_config_file,
-    
-    # Config management
-    ConfigManager,
-    
-    # Modified state tracking
-    ModifiedStateMixin,
-    
-    # Dialogs
-    show_error,
-    show_warning,
-    show_info,
-    ask_yes_no,
-    ask_yes_no_cancel,
-    open_file_dialog,
-    save_file_dialog,
-    select_directory_dialog,
-    show_about_dialog,
-    
-    # Utilities
-    sanitize_filename,
-    format_timestamp,
-    get_app_version,
-)
+# wx-dependent utilities — only available when wxPython is installed
+try:
+    from .wx_common import (
+        # Path resolution
+        get_base_directory,
+        find_file,
+        find_scripts_directory,
+        find_config_file,
+
+        # Config management
+        ConfigManager,
+
+        # Modified state tracking
+        ModifiedStateMixin,
+
+        # Dialogs
+        show_error,
+        show_warning,
+        show_info,
+        ask_yes_no,
+        ask_yes_no_cancel,
+        open_file_dialog,
+        save_file_dialog,
+        select_directory_dialog,
+        show_about_dialog,
+
+        # Utilities
+        sanitize_filename,
+        format_timestamp,
+        get_app_version,
+    )
+except ImportError:
+    # wxPython not installed — shared package is still loadable for non-GUI modules
+    pass
 
 __all__ = [
     # Path resolution
