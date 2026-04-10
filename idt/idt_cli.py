@@ -93,6 +93,11 @@ def main():
         return 1
     
     command = sys.argv[1]
+
+    # Normalize alias: 'describe' is identical to 'workflow'
+    if command == 'describe':
+        command = 'workflow'
+        sys.argv[1] = 'workflow'
     
     # Update console title based on command
     title_map = {
@@ -722,6 +727,7 @@ USAGE:
 COMMANDS:
     guideme               Interactive wizard to build and run a workflow
     workflow              Run image description workflow
+    describe              Alias for workflow (e.g. idt describe ./photos)
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows

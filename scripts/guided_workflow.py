@@ -19,6 +19,25 @@ if str(SCRIPT_DIR) not in sys.path:
 # Import config loader
 from config_loader import load_json_config
 
+# WebImageDownloader is optional (requires beautifulsoup4 + pillow)
+try:
+    from web_image_downloader import WebImageDownloader
+except ImportError:
+    WebImageDownloader = None
+
+
+def _looks_like_url(text: str) -> bool:
+    """Return True if text looks like a web URL rather than a local path."""
+    t = text.strip()
+    if t.startswith(('http://', 'https://')):
+        return True
+    # Bare domain hint: contains a dot and does not exist as a local path
+    if '.' in t and not Path(t).exists():
+        # Must look URL-like: no backslashes, no drive letters
+        if '\\' not in t and (len(t) < 2 or t[1] != ':'):
+            return True
+    return False
+
 
 def print_header(text):
     """Print a section header"""
@@ -671,19 +690,72 @@ def guided_workflow(custom_config_path=None):
     print_header("Step 4: Image Directory")
     
     while True:
-        img_dir = get_input("Enter path to directory containing images")
-        valid, message = validate_directory(img_dir)
-        if valid:
-            print(f"✓ {message}")
-            break
+        img_dir = get_input("Enter path to image folder, or a URL to download images from")
+        
+        if _looks_like_url(img_dir):
+            # Ensure the URL has a scheme
+            url = img_dir.strip()
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+
+            if WebImageDownloader is None:
+                print("✗ URL downloads require the 'beautifulsoup4' and 'pillow' packages.")
+                print("  Install with: pip install beautifulsoup4 pillow")
+                print("  Alternatively use: idt workflow --download <url>")
+                retry = get_choice("Try again with a local path?", ["Yes", "No, go back to model selection"], allow_back=True)
+                if retry == 'EXIT':
+                    print("Exiting...")
+                    return
+                if retry == 'BACK' or retry == "No, go back to model selection":
+                    return guided_workflow()
+                continue
+
+            print(f"Downloading images from {url}...")
+            try:
+                base_output_dir = Path.cwd() / "Downloads"
+                downloader = WebImageDownloader(
+                    url=url,
+                    output_dir=base_output_dir,
+                    verbose=False
+                )
+                downloaded_count, failed_count = downloader.download()
+
+                if downloaded_count == 0:
+                    print(f"✗ No images were found at that URL.")
+                    retry = get_choice("Try again?", ["Yes", "No, go back to model selection"], allow_back=True)
+                    if retry == 'EXIT':
+                        print("Exiting...")
+                        return
+                    if retry == 'BACK' or retry == "No, go back to model selection":
+                        return guided_workflow()
+                    continue
+
+                img_dir = str(downloader.actual_output_dir)
+                print(f"✓ Downloaded {downloaded_count} images to: {img_dir}")
+                break
+
+            except Exception as e:
+                print(f"✗ Download failed: {e}")
+                retry = get_choice("Try again?", ["Yes", "No, go back to model selection"], allow_back=True)
+                if retry == 'EXIT':
+                    print("Exiting...")
+                    return
+                if retry == 'BACK' or retry == "No, go back to model selection":
+                    return guided_workflow()
+                continue
         else:
-            print(f"✗ {message}")
-            retry = get_choice("Try again?", ["Yes", "No, go back to model selection"], allow_back=True)
-            if retry == 'EXIT':
-                print("Exiting...")
-                return
-            if retry == 'BACK' or retry == "No, go back to model selection":
-                return guided_workflow()
+            valid, message = validate_directory(img_dir)
+            if valid:
+                print(f"✓ {message}")
+                break
+            else:
+                print(f"✗ {message}")
+                retry = get_choice("Try again?", ["Yes", "No, go back to model selection"], allow_back=True)
+                if retry == 'EXIT':
+                    print("Exiting...")
+                    return
+                if retry == 'BACK' or retry == "No, go back to model selection":
+                    return guided_workflow()
     
     # Step 5: Workflow Name (Optional)
     print_header("Step 5: Workflow Name (Optional)")
