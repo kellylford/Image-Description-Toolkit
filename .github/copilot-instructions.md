@@ -479,9 +479,34 @@ grep -r "find_workflow\|count_descriptions\|format_timestamp" scripts/
 - **Console Titles**: Use `ctypes.windll.kernel32.SetConsoleTitleW()` for progress visibility
 - **Path Separators**: Use `Path()` for cross-platform compatibility
 
+## Agent Team
+
+IDT development uses a two-lead model. Both agents are defined in `.github/agents/`.
+
+| Agent | File | When to Use |
+|---|---|---|
+| **PM Lead** | `pm-lead.agent.md` | Feature design, product direction, UX decisions, docs completeness, scope review, community-fit evaluation. Invoke BEFORE implementation on any non-trivial feature. |
+| **Dev Lead** | *(built-in mode)* | All implementation, code review, build verification, test enforcement. Invokes PM Lead for design handoff. |
+| **IDT Coding Agent** | `idt-coding.agent.md` | Deep coding tasks requiring strict pre/post verification protocol. |
+
+### Dev Lead + PM Lead Handoff Protocol
+
+**Dev Lead MUST invoke PM Lead before implementation when:**
+- The task involves a user-visible change (new UI, new folder structure, new config option)
+- The task involves a new feature (not a bug fix)
+- The scope is unclear or the design has open questions
+
+**Dev Lead MUST invoke PM Lead after implementation when:**
+- To verify docs and changelog are complete before closing a feature
+
+**PM Lead MUST hand back to Dev Lead when:**
+- The design spec is complete and approved
+- A design question from mid-implementation is answered
+
+---
+
 ## Additional Resources
 
-For in-depth technical details, see:
 - **[docs/archive/AI_AGENT_REFERENCE.md](docs/archive/AI_AGENT_REFERENCE.md)** - Complete CLI command reference, image optimization math, provider limits
 - **[docs/AI_ONBOARDING.md](docs/AI_ONBOARDING.md)** - Current development status, active issues, session context
 - **[BuildAndRelease/BUILD_SYSTEM_REFERENCE.md](BuildAndRelease/BUILD_SYSTEM_REFERENCE.md)** - Build system architecture and troubleshooting
