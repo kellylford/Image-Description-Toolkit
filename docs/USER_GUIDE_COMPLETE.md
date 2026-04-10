@@ -185,10 +185,12 @@ idt guideme
 ```
 
 The wizard will ask:
-1. Where are your images? (path to a folder, or a website URL)
+1. Where are your images? (path to a folder, **or a website URL**)
 2. Which AI provider? (Ollama, OpenAI, Claude)
 3. Which model?
 4. Which prompt style?
+
+**Tip:** At the image folder step, you can type a URL (e.g. `https://example.com/gallery`) instead of a local path. `guideme` will download the images automatically and continue with the downloaded folder. No extra flags needed.
 
 After you answer, IDT processes all images in your chosen folder and creates a workflow results directory inside a `Descriptions/` folder in your current working directory. The directory is named:
 
@@ -375,14 +377,17 @@ idt guideme
 
 Prompts you for source folder or URL, provider, model, and prompt style. Recommended when you are not sure which settings to use.
 
-### Direct — `idt workflow`
+### Direct — `idt workflow` / `idt describe`
 
 ```
 # Process a local folder with defaults
-idt workflow ~/Photos/Vacation2025
+idt describe ~/Photos/Vacation2025
 
 # Windows
-idt workflow C:\Photos\Vacation2025
+idt describe C:\Photos\Vacation2025
+
+# idt workflow and idt describe are identical — use whichever feels natural
+idt workflow ~/Photos/Vacation2025
 
 # Specify model and prompt style
 idt workflow ~/Photos --model llava:7b --prompt-style detailed
@@ -943,6 +948,7 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 |---|---|
 | `idt guideme` | Interactive wizard — best starting point |
 | `idt workflow <path>` | Run workflow on a local folder or URL |
+| `idt describe <path>` | Alias for `idt workflow` — same flags, same behavior |
 | `idt extract-frames <video>` | Extract frames from a video file |
 | `idt convert-images <dir>` | Convert HEIC/HEIF images to JPEG |
 | `idt descriptions-to-html <file.txt>` | Regenerate HTML report from existing descriptions |

@@ -1,3 +1,20 @@
+## [Unreleased]
+
+### ✨ New Features
+
+**`idt describe` — friendlier alias for `idt workflow`**
+- `idt describe <folder>` is now a full alias for `idt workflow`. Every flag, `--help`, and the frozen executable path all work identically.
+- Existing `idt workflow` scripts are unaffected.
+
+**`idt guideme` — URL support at the image folder prompt**
+- In Step 4, you can now enter a website URL instead of a local path. `guideme` downloads images from the page automatically and continues the workflow with the downloaded folder.
+- Graceful fallbacks: clear error messages if 0 images are found, or if download dependencies are not installed.
+
+**Downloaded images organized by domain and page title**
+- Web downloads now land in a subfolder named `{domain} - {page title} - {timestamp}` inside `downloaded_images/`, making it easy to identify the source at a glance.
+
+---
+
 ## [4.1.0] - 2026-01-14
 
 ### ✨ Major Updates

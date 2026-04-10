@@ -201,6 +201,7 @@ open imagedescriber/dist/ImageDescriber.app
 # Use idt globally (installed via install_idt_macos.sh)
 idt version
 idt workflow --help
+idt describe --help   # alias for workflow
 ```
 
 ### Path Resolution Pattern
