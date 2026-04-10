@@ -16,11 +16,13 @@ Examples:
 
 import sys
 import os
+import re
 import json
 import argparse
 import requests
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
+from datetime import datetime
 from typing import List, Set, Optional, Tuple
 import logging
 import time
@@ -112,6 +114,40 @@ class WebImageDownloader:
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'}
         
+    def _get_page_title(self, soup) -> Optional[str]:
+        """Extract and sanitize the <title> text from a parsed page."""
+        tag = soup.find('title')
+        if not tag:
+            return None
+        title = tag.get_text(separator=' ')
+        # Collapse whitespace and strip
+        title = re.sub(r'\s+', ' ', title).strip()
+        if not title:
+            return None
+        # Truncate at word boundary to keep folder names manageable
+        if len(title) > 60:
+            truncated = title[:60]
+            last_space = truncated.rfind(' ')
+            title = truncated[:last_space] if last_space > 0 else truncated
+        return title
+
+    def _build_subfolder_name(self, url: str, title: Optional[str]) -> str:
+        """Build a filesystem-safe subfolder name from domain and page title."""
+        parsed = urlparse(url)
+        netloc = parsed.netloc or parsed.path
+        # Strip www. and port
+        domain = re.sub(r'^www\.', '', netloc).split(':')[0]
+        # Sanitize domain: keep alphanumeric, dots, hyphens
+        domain = re.sub(r'[^\w.\-]', '_', domain).strip('_')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        if title:
+            # Sanitize title: keep alphanumeric, spaces, hyphens
+            safe_title = re.sub(r'[^\w\s\-]', ' ', title)
+            safe_title = re.sub(r'\s+', ' ', safe_title).strip()
+            if safe_title:
+                return f"{domain} - {safe_title} - {timestamp}"
+        return f"{domain} - {timestamp}"
+
     def _get_image_hash(self, image_data: bytes) -> str:
         """Calculate hash of image data to detect duplicates"""
         return hashlib.md5(image_data).hexdigest()
@@ -141,9 +177,9 @@ class WebImageDownloader:
         
         return filename
     
-    def _download_image(self, img_url: str, index: int) -> Optional[Path]:
+    def _download_image_to(self, img_url: str, index: int, output_dir: Path) -> Optional[Path]:
         """
-        Download a single image
+        Download a single image to the specified output directory.
         
         Returns:
             Path to downloaded image if successful, None otherwise
@@ -185,13 +221,13 @@ class WebImageDownloader:
             
             # Save image
             filename = self._get_safe_filename(img_url, index)
-            output_path = self.output_dir / filename
+            output_path = output_dir / filename
             
             # Ensure unique filename
             counter = 1
             while output_path.exists():
                 name, ext = os.path.splitext(filename)
-                output_path = self.output_dir / f"{name}_{counter}{ext}"
+                output_path = output_dir / f"{name}_{counter}{ext}"
                 counter += 1
             
             # Write image to file
@@ -282,8 +318,10 @@ class WebImageDownloader:
         """
         self.logger.info(f"Starting image download from: {self.url}")
         
-        # Create output directory
+        # Create base output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # actual_output_dir will be set to the subfolder once we know the page title
+        self.actual_output_dir = self.output_dir
         
         try:
             # Fetch the web page
@@ -291,6 +329,16 @@ class WebImageDownloader:
             response = self.session.get(self.url, timeout=self.timeout)
             response.raise_for_status()
             
+            # Parse page once so we can extract both images and title
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Build a timestamped subfolder named after the domain + page title
+            page_title = self._get_page_title(soup)
+            subfolder_name = self._build_subfolder_name(self.url, page_title)
+            self.actual_output_dir = self.output_dir / subfolder_name
+            self.actual_output_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Download subfolder: {self.actual_output_dir.name}")
+
             # Extract image URLs (returns list of (url, alt_text) tuples)
             self.logger.info(f"Extracting image URLs...")
             image_entries = self._extract_image_urls(response.text, self.url)
@@ -321,8 +369,8 @@ class WebImageDownloader:
                     except Exception as e:
                         self.logger.debug(f"Progress callback error: {e}")
                 
-                # Download the image
-                result = self._download_image(img_url, i)
+                # Download the image (write to subfolder)
+                result = self._download_image_to(img_url, i, self.actual_output_dir)
                 
                 if result:
                     successful += 1
@@ -351,7 +399,7 @@ class WebImageDownloader:
             # Save URL mapping to JSON file for ImageDescriber to use
             if url_mapping:
                 try:
-                    mapping_file = self.output_dir / 'url_mapping.json'
+                    mapping_file = self.actual_output_dir / 'url_mapping.json'
                     with open(mapping_file, 'w', encoding='utf-8') as f:
                         json.dump(url_mapping, f, indent=2, ensure_ascii=False)
                     self.logger.info(f"Saved URL mapping with {len(url_mapping)} entries")
@@ -361,7 +409,7 @@ class WebImageDownloader:
             # Save alt text mapping if any images had alt text
             if alt_text_mapping:
                 try:
-                    alt_mapping_file = self.output_dir / 'alt_text_mapping.json'
+                    alt_mapping_file = self.actual_output_dir / 'alt_text_mapping.json'
                     with open(alt_mapping_file, 'w', encoding='utf-8') as f:
                         json.dump(alt_text_mapping, f, indent=2, ensure_ascii=False)
                     self.logger.info(f"Saved alt text mapping with {len(alt_text_mapping)} entries")

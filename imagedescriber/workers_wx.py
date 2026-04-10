@@ -1956,11 +1956,15 @@ class DownloadProcessingWorker(threading.Thread):
             downloaded_count, failed_count = downloader.download()
             
             logger.info(f"Download complete: {downloaded_count} images downloaded, {failed_count} failed")
+
+            # Use the actual subfolder the downloader created (domain+title+timestamp).
+            # Falls back to the base output_dir if something went wrong before it was set.
+            actual_output_dir = getattr(downloader, 'actual_output_dir', self.output_dir)
             
             # Post completion event
             evt = WorkflowCompleteEventData(
                 input_dir=str(self.url),
-                output_dir=str(self.output_dir)
+                output_dir=str(actual_output_dir)
             )
             # Add download-specific attributes
             evt.step_name = "download"
