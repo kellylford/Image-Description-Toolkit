@@ -525,5 +525,88 @@ class TestGuidedWorkflowEdgeCases:
             assert '--geocode-cache' not in captured_args
 
 
+class TestMLXProviderPlatformFiltering:
+    """Test that MLX provider is only offered on Apple Silicon Macs"""
+
+    def test_mlx_not_in_providers_on_linux(self):
+        """MLX should not appear in the providers list on Linux"""
+        from guided_workflow import get_available_providers
+        with patch('guided_workflow.sys') as mock_sys, \
+             patch('guided_workflow.platform') as mock_platform:
+            mock_sys.platform = 'linux'
+            mock_platform.machine.return_value = 'x86_64'
+            assert 'mlx' not in get_available_providers()
+
+    def test_mlx_not_in_providers_on_windows(self):
+        """MLX should not appear in the providers list on Windows"""
+        from guided_workflow import get_available_providers
+        with patch('guided_workflow.sys') as mock_sys, \
+             patch('guided_workflow.platform') as mock_platform:
+            mock_sys.platform = 'win32'
+            mock_platform.machine.return_value = 'AMD64'
+            assert 'mlx' not in get_available_providers()
+
+    def test_mlx_not_in_providers_on_intel_mac(self):
+        """MLX should not appear in the providers list on Intel Macs"""
+        from guided_workflow import get_available_providers
+        with patch('guided_workflow.sys') as mock_sys, \
+             patch('guided_workflow.platform') as mock_platform:
+            mock_sys.platform = 'darwin'
+            mock_platform.machine.return_value = 'x86_64'
+            assert 'mlx' not in get_available_providers()
+
+    def test_mlx_in_providers_on_apple_silicon(self):
+        """MLX should appear in the providers list on Apple Silicon Macs"""
+        from guided_workflow import get_available_providers
+        with patch('guided_workflow.sys') as mock_sys, \
+             patch('guided_workflow.platform') as mock_platform:
+            mock_sys.platform = 'darwin'
+            mock_platform.machine.return_value = 'arm64'
+            assert 'mlx' in get_available_providers()
+
+
+class TestMLXProviderAvailability:
+    """Test MLXProvider.is_available() correctly requires Apple Silicon"""
+
+    def test_mlx_unavailable_on_linux(self):
+        """MLXProvider.is_available() should return False on Linux"""
+        import platform as _platform
+        with patch.object(_platform, 'system', return_value='Linux'), \
+             patch.object(_platform, 'machine', return_value='x86_64'):
+            # Import here so the patch applies
+            from imagedescriber.ai_providers import MLXProvider
+            provider = MLXProvider()
+            assert provider.is_available() is False
+
+    def test_mlx_unavailable_on_windows(self):
+        """MLXProvider.is_available() should return False on Windows"""
+        import platform as _platform
+        with patch.object(_platform, 'system', return_value='Windows'), \
+             patch.object(_platform, 'machine', return_value='AMD64'):
+            from imagedescriber.ai_providers import MLXProvider
+            provider = MLXProvider()
+            assert provider.is_available() is False
+
+    def test_mlx_unavailable_on_intel_mac(self):
+        """MLXProvider.is_available() should return False on Intel Mac"""
+        import platform as _platform
+        with patch.object(_platform, 'system', return_value='Darwin'), \
+             patch.object(_platform, 'machine', return_value='x86_64'):
+            from imagedescriber.ai_providers import MLXProvider
+            provider = MLXProvider()
+            assert provider.is_available() is False
+
+    def test_mlx_available_on_apple_silicon_with_mlx_vlm(self):
+        """MLXProvider.is_available() should return True on Apple Silicon with mlx-vlm installed"""
+        import platform as _platform
+        import imagedescriber.ai_providers as ai_providers_mod
+        with patch.object(_platform, 'system', return_value='Darwin'), \
+             patch.object(_platform, 'machine', return_value='arm64'), \
+             patch.object(ai_providers_mod, 'HAS_MLX_VLM', True):
+            from imagedescriber.ai_providers import MLXProvider
+            provider = MLXProvider()
+            assert provider.is_available() is True
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
