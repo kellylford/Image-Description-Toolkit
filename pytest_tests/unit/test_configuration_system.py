@@ -533,8 +533,16 @@ class TestShowDescriptionsOption:
         source_file = Path(__file__).parent.parent.parent / "scripts" / "image_describer.py"
         with source_file.open('r', encoding='utf-8') as f:
             source = f.read()
-        assert 'self.show_descriptions' in source and 'print(' in source, \
-            "process_directory must print the description when show_descriptions is True"
+        # Verify the guard block exists (show_descriptions check followed by print)
+        assert 'if self.show_descriptions:' in source, \
+            "process_directory must guard description printing with 'if self.show_descriptions:'"
+        assert 'print(description, flush=True)' in source, \
+            "process_directory must print the description with flush=True for real-time subprocess output"
+        # Verify the show_descriptions check is inside process_directory
+        process_dir_start = source.find('def process_directory(')
+        show_desc_pos = source.find('if self.show_descriptions:', process_dir_start)
+        assert show_desc_pos != -1, \
+            "show_descriptions guard must appear inside process_directory method"
 
 
 if __name__ == "__main__":

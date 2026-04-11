@@ -1541,9 +1541,9 @@ class ImageDescriber:
                 
                 # Print description to console if --show-descriptions on
                 if self.show_descriptions:
-                    print(f"\n--- {image_path.name} ---")
-                    print(description)
-                    print()
+                    print(f"\n--- {image_path.name} ---", flush=True)
+                    print(description, flush=True)
+                    print(flush=True)
                 
                 # Write description to file with metadata and base directory for relative paths
                 image_alt_text = alt_text_map.get(image_path.name)
