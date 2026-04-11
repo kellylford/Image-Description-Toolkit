@@ -1339,18 +1339,14 @@ class HuggingFaceProvider(AIProvider):
     
     def is_available(self) -> bool:
         """Check if Florence-2 dependencies are available"""
-        # For frozen executables, check at runtime instead of import time
-        if getattr(sys, 'frozen', False):
-            return _check_transformers_available()
-        return HAS_TRANSFORMERS
+        # Always do a fresh runtime check so that packages installed after
+        # process start (e.g. via auto-install in guideme) are detected
+        # without requiring a full restart.
+        return _check_transformers_available()
     
     def get_available_models(self) -> List[str]:
         """Get list of available Florence-2 models"""
-        # Check availability at runtime for frozen executables
-        if getattr(sys, 'frozen', False):
-            if not _check_transformers_available():
-                return []
-        elif not HAS_TRANSFORMERS:
+        if not _check_transformers_available():
             return []
         return self._available_models.copy()
     

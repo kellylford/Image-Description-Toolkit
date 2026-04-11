@@ -525,5 +525,231 @@ class TestGuidedWorkflowEdgeCases:
             assert '--geocode-cache' not in captured_args
 
 
+class TestHuggingFaceAutoInstall:
+    """Tests for the HuggingFace auto-install flow in guideme."""
+
+    def test_find_system_python_dev_mode(self):
+        """_find_system_python returns sys.executable in dev (non-frozen) mode."""
+        from guided_workflow import _find_system_python
+
+        result = _find_system_python()
+        # In dev mode (not frozen) the function must return sys.executable
+        assert result == sys.executable
+
+    def test_install_huggingface_deps_calls_pip(self):
+        """_install_huggingface_deps runs pip install with the expected packages."""
+        from guided_workflow import _install_huggingface_deps
+
+        with patch('guided_workflow.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = _install_huggingface_deps()
+
+        assert result is True
+        assert mock_run.called
+        call_args = mock_run.call_args[0][0]  # first positional arg = command list
+        assert '-m' in call_args
+        assert 'pip' in call_args
+        assert 'install' in call_args
+        # The required packages must be present
+        cmd_str = ' '.join(call_args)
+        assert 'transformers' in cmd_str
+        assert 'torch' in cmd_str
+
+    def test_install_huggingface_deps_returns_false_on_failure(self):
+        """_install_huggingface_deps returns False when pip exits non-zero."""
+        from guided_workflow import _install_huggingface_deps
+
+        with patch('guided_workflow.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=1)
+            result = _install_huggingface_deps()
+
+        assert result is False
+
+    def test_install_huggingface_deps_returns_false_on_exception(self):
+        """_install_huggingface_deps returns False when subprocess.run raises."""
+        from guided_workflow import _install_huggingface_deps
+
+        with patch('guided_workflow.subprocess.run', side_effect=OSError("no python")):
+            result = _install_huggingface_deps()
+
+        assert result is False
+
+    def test_huggingface_deps_available_proceeds_to_model_selection(self):
+        """When HuggingFace deps are already installed, model selection is shown."""
+        from guided_workflow import guided_workflow
+
+        captured_args = []
+
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
+        # Patch HuggingFaceProvider inside imagedescriber.ai_providers so that
+        # the 'from imagedescriber.ai_providers import HuggingFaceProvider' inside
+        # the guided_workflow function picks up the mock.
+        mock_hf_provider = MagicMock()
+        mock_hf_provider.is_available.return_value = True
+
+        with patch('guided_workflow.get_choice') as mock_choice, \
+             patch('guided_workflow.get_input') as mock_input, \
+             patch('guided_workflow.validate_directory') as mock_validate_dir, \
+             patch('guided_workflow.create_view_results_bat'), \
+             patch('guided_workflow.get_available_prompt_styles',
+                   return_value=(['detailed', 'simple'], 'detailed')), \
+             patch('imagedescriber.ai_providers.HuggingFaceProvider',
+                   return_value=mock_hf_provider), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+            mock_choice.side_effect = [
+                'huggingface',                                               # provider
+                'microsoft/Florence-2-base (230MB, faster, recommended)',   # model
+                'narrative (most detailed, default)',                        # Florence task
+                'No',                                                        # metadata
+                'Run this command now',                                      # action
+                'Use default (Descriptions)',                                # output dir
+            ]
+            mock_input.side_effect = [
+                '/test/images',   # image directory
+                '',               # workflow name
+            ]
+            mock_validate_dir.return_value = (True, None)
+
+            guided_workflow()
+
+        # Workflow should have been called with huggingface provider
+        assert '--provider' in captured_args
+        provider_idx = captured_args.index('--provider')
+        assert captured_args[provider_idx + 1] == 'huggingface'
+
+    def test_huggingface_deps_missing_offers_install_choice(self):
+        """When deps are missing, guideme offers to install rather than silently failing."""
+        from guided_workflow import guided_workflow
+
+        mock_hf_provider = MagicMock()
+        mock_hf_provider.is_available.return_value = False
+
+        # User chooses to return to provider selection (no install)
+        with patch('guided_workflow.get_choice') as mock_choice, \
+             patch('guided_workflow.get_input'), \
+             patch('guided_workflow.create_view_results_bat'), \
+             patch('imagedescriber.ai_providers.HuggingFaceProvider',
+                   return_value=mock_hf_provider):
+
+            # First call: select huggingface; second call: "Return to provider selection"
+            # which re-calls guided_workflow() — we stop it by raising SystemExit on the
+            # third call (the recursive provider-selection prompt).
+            call_count = [0]
+
+            def choice_side_effect(*args, **kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return 'huggingface'
+                if call_count[0] == 2:
+                    return 'Return to provider selection'
+                # Third call is the recursive re-entry; stop the test here
+                raise SystemExit(0)
+
+            mock_choice.side_effect = choice_side_effect
+
+            with pytest.raises(SystemExit):
+                guided_workflow()
+
+        # The key assertion: get_choice was called a second time offering the
+        # install-or-return menu (call_count reached at least 2).
+        assert call_count[0] >= 2, (
+            "Expected guideme to present an install/return choice when HuggingFace "
+            "deps are missing, but it returned to provider selection immediately."
+        )
+
+    def test_huggingface_auto_install_success_continues_workflow(self):
+        """When auto-install succeeds, the workflow continues to model selection."""
+        from guided_workflow import guided_workflow
+
+        captured_args = []
+
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
+        # Provider becomes available after install
+        call_count = [0]
+
+        def is_available_side_effect():
+            call_count[0] += 1
+            # First check: not available; subsequent checks: available (after install)
+            return call_count[0] > 1
+
+        mock_hf_provider = MagicMock()
+        mock_hf_provider.is_available.side_effect = is_available_side_effect
+
+        with patch('guided_workflow.get_choice') as mock_choice, \
+             patch('guided_workflow.get_input') as mock_input, \
+             patch('guided_workflow.validate_directory') as mock_validate_dir, \
+             patch('guided_workflow.create_view_results_bat'), \
+             patch('guided_workflow.get_available_prompt_styles',
+                   return_value=(['detailed', 'simple'], 'detailed')), \
+             patch('guided_workflow._install_huggingface_deps', return_value=True), \
+             patch('imagedescriber.ai_providers.HuggingFaceProvider',
+                   return_value=mock_hf_provider), \
+             patch('importlib.reload'), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+            mock_choice.side_effect = [
+                'huggingface',                                               # provider
+                'Install dependencies automatically (~2-4 GB download)',     # auto-install choice
+                'microsoft/Florence-2-base (230MB, faster, recommended)',   # model
+                'narrative (most detailed, default)',                        # Florence task
+                'No',                                                        # metadata
+                'Run this command now',                                      # action
+                'Use default (Descriptions)',                                # output dir
+            ]
+            mock_input.side_effect = [
+                '/test/images',   # image directory
+                '',               # workflow name
+            ]
+            mock_validate_dir.return_value = (True, None)
+
+            guided_workflow()
+
+        # Workflow should proceed with huggingface provider
+        assert '--provider' in captured_args
+        idx = captured_args.index('--provider')
+        assert captured_args[idx + 1] == 'huggingface'
+
+    def test_huggingface_auto_install_failure_returns_to_selection(self):
+        """When auto-install fails, guideme loops back to provider selection."""
+        from guided_workflow import guided_workflow
+
+        mock_hf_provider = MagicMock()
+        mock_hf_provider.is_available.return_value = False
+
+        call_count = [0]
+
+        def choice_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return 'huggingface'
+            if call_count[0] == 2:
+                # Choose to install
+                return 'Install dependencies automatically (~2-4 GB download)'
+            # After failed install, return-to-selection choice
+            raise SystemExit(0)
+
+        with patch('guided_workflow.get_choice') as mock_choice, \
+             patch('guided_workflow.get_input'), \
+             patch('guided_workflow.create_view_results_bat'), \
+             patch('guided_workflow._install_huggingface_deps', return_value=False), \
+             patch('imagedescriber.ai_providers.HuggingFaceProvider',
+                   return_value=mock_hf_provider):
+
+            mock_choice.side_effect = choice_side_effect
+
+            with pytest.raises(SystemExit):
+                guided_workflow()
+
+        # Should have reached at least the install-choice prompt
+        assert call_count[0] >= 2
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
