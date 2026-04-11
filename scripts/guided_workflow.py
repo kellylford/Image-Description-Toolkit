@@ -26,6 +26,62 @@ except ImportError:
     WebImageDownloader = None
 
 
+def _find_system_python() -> str:
+    """Find a Python executable suitable for running pip install.
+
+    In dev mode sys.executable is the running Python interpreter, which is
+    exactly what we want.  In frozen (PyInstaller) mode sys.executable is the
+    .exe bundle, so we fall back to searching PATH for a real Python.
+
+    Returns the path to a usable Python interpreter, or None if not found.
+    """
+    import shutil
+
+    if not getattr(sys, 'frozen', False):
+        # Dev mode: use the same interpreter that is running us
+        return sys.executable
+
+    # Frozen mode: search PATH for a real Python interpreter
+    for candidate in ('python', 'python3', 'python3.13', 'python3.12',
+                      'python3.11', 'python3.10'):
+        path = shutil.which(candidate)
+        if path:
+            return path
+    return None
+
+
+def _install_huggingface_deps() -> bool:
+    """Install HuggingFace Florence-2 dependencies via pip.
+
+    Downloads and installs the packages required for the local Florence-2
+    vision model provider.  Returns True on success, False on failure.
+    """
+    packages = [
+        'transformers>=4.45.0',
+        'torch',
+        'torchvision',
+        'einops',
+        'timm',
+    ]
+
+    python_exe = _find_system_python()
+    if not python_exe:
+        print("✗ Could not find a Python interpreter to run pip.")
+        print("  Please install manually:")
+        print(f"  pip install {' '.join(packages)}")
+        return False
+
+    try:
+        result = subprocess.run(
+            [python_exe, '-m', 'pip', 'install'] + packages,
+            check=False,
+        )
+        return result.returncode == 0
+    except Exception as exc:
+        print(f"✗ Installation error: {exc}")
+        return False
+
+
 def _looks_like_url(text: str) -> bool:
     """Return True if text looks like a web URL rather than a local path."""
     t = text.strip()
@@ -623,20 +679,72 @@ def guided_workflow(custom_config_path=None):
             sys.path.insert(0, str(Path(__file__).parent.parent))
             from imagedescriber.ai_providers import HuggingFaceProvider
             hf_provider = HuggingFaceProvider()
-            
+
             if not hf_provider.is_available():
-                print("\n⚠️  Florence-2 dependencies not installed.")
-                print("Install with: pip install transformers torch torchvision einops timm")
-                print("\nReturning to provider selection...\n")
-                return guided_workflow()
-            
-            available_models = hf_provider.get_available_models()
-            
+                print("\n⚠️  Florence-2 dependencies are not installed.")
+                print("Required packages: transformers>=4.45.0, torch, torchvision, einops, timm")
+                print("These packages are ~2-4 GB and will be downloaded from PyPI / HuggingFace Hub.")
+                print("After installation the Florence-2 model (~230 MB or ~700 MB) is downloaded")
+                print("automatically on first use — no separate setup step needed.")
+                print()
+                install_choice = get_choice(
+                    "What would you like to do?",
+                    [
+                        "Install dependencies automatically (~2-4 GB download)",
+                        "Return to provider selection",
+                    ],
+                    allow_back=True,
+                )
+                if install_choice == 'EXIT':
+                    print("Exiting...")
+                    return
+                if install_choice == 'BACK' or install_choice == "Return to provider selection":
+                    return guided_workflow()
+
+                # Auto-install
+                print("\nInstalling HuggingFace Florence-2 dependencies...")
+                print("This may take several minutes. Please wait.\n")
+                success = _install_huggingface_deps()
+                if not success:
+                    print("\n✗ Automatic installation failed.")
+                    print("Please install manually and then re-run guideme:")
+                    print("  pip install 'transformers>=4.45.0' torch torchvision einops timm")
+                    print()
+                    cont = get_choice(
+                        "What would you like to do?",
+                        ["Return to provider selection"],
+                        allow_back=True,
+                    )
+                    return guided_workflow()
+
+                print("\n✓ Installation complete!")
+                print("Re-checking HuggingFace availability...\n")
+
+                # Re-import to pick up the newly installed packages; update
+                # the local reference so the model-selection step below works.
+                try:
+                    import importlib
+                    import imagedescriber.ai_providers as _hf_mod
+                    importlib.reload(_hf_mod)
+                    from imagedescriber.ai_providers import HuggingFaceProvider as _HFP
+                    hf_provider = _HFP()
+                except Exception:
+                    pass  # Fall through to the re-check below
+
+                if not hf_provider.is_available():
+                    print("⚠️  Dependencies installed but not yet detected.")
+                    print("Please restart IDT and select HuggingFace again.")
+                    print()
+                    return guided_workflow()
+
+                print("✓ HuggingFace Florence-2 is ready!\n")
+
             hf_models = [
                 "microsoft/Florence-2-base (230MB, faster, recommended)",
                 "microsoft/Florence-2-large (700MB, slower, better quality)"
             ]
             print("Available HuggingFace models (Florence-2):")
+            print("Note: the selected model is downloaded from HuggingFace Hub on first use.")
             model_choice = get_choice("Select a model", hf_models, default=1, allow_back=True)
             if model_choice == 'EXIT':
                 print("Exiting...")
@@ -646,7 +754,7 @@ def guided_workflow(custom_config_path=None):
                 return guided_workflow()
             # Extract just the model name (before the space/parenthesis)
             model = model_choice.split()[0]
-            
+
         except ImportError as e:
             print(f"\n⚠️  Error loading HuggingFace provider: {e}")
             print("Make sure dependencies are installed: pip install transformers torch torchvision einops timm")
