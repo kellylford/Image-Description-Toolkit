@@ -166,3 +166,4 @@ build_bisect_exes.sh
 errors.txt
 stderr.txt
 stdout.txt
+/analysis/analysis/results
