@@ -477,18 +477,42 @@ def validate_redescribe_args(args, source_dir: Path) -> Dict[str, Any]:
             f"Hint: Use 'idt list' to see available workflows"
         )
     
-    # Check for required directories - at least one must exist
-    converted_images = source_dir / "converted_images"
-    extracted_frames = source_dir / "extracted_frames"
-    
-    has_images = converted_images.exists() and any(converted_images.iterdir())
-    has_frames = extracted_frames.exists() and any(extracted_frames.iterdir())
-    
-    if not has_images and not has_frames:
+    # Check that the workflow has images to redescribe.
+    # Primary check: file_path_mapping.json is written by describe_images after each
+    # successful run and lists every image that was processed. If it exists and is
+    # non-empty, we know exactly which files are available.
+    mapping_file = source_dir / "descriptions" / "file_path_mapping.json"
+    has_images = False
+    if mapping_file.exists():
+        try:
+            import json as _json
+            with open(mapping_file, 'r', encoding='utf-8') as _f:
+                _mapping = _json.load(_f)
+            if _mapping:
+                has_images = True
+        except Exception:
+            pass  # fall through to directory scan below
+
+    # Fallback: scan known image subdirectories (handles old workflows without mapping)
+    if not has_images:
+        def _has_images(d: Path) -> bool:
+            return d.exists() and (
+                any(d.rglob("*.jpg")) or any(d.rglob("*.jpeg")) or
+                any(d.rglob("*.png")) or any(d.rglob("*.webp"))
+            )
+        dirs_to_check = [
+            source_dir / "converted_images",
+            source_dir / "extracted_frames",
+            source_dir / "image_download",
+            source_dir / "input_images",
+        ]
+        has_images = any(_has_images(d) for d in dirs_to_check)
+
+    if not has_images:
         raise ValueError(
-            f"Source workflow has no processed images:\n"
-            f"  Missing or empty: converted_images/\n"
-            f"  Missing or empty: extracted_frames/\n"
+            f"Source workflow has no processed images.\n"
+            f"Expected file_path_mapping.json or at least one of:\n"
+            f"  converted_images/  extracted_frames/  image_download/  input_images/\n"
             f"Run the source workflow to completion before redescribing."
         )
     
@@ -544,6 +568,17 @@ def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[st
             reusable.append("convert")
             print(f"  ✓ Found {len(image_files)} converted images")
     
+    # Check for downloaded images (URL-based workflows)
+    image_download = source_dir / "image_download"
+    if image_download.exists():
+        dl_files = (list(image_download.rglob("*.jpg")) +
+                    list(image_download.rglob("*.jpeg")) +
+                    list(image_download.rglob("*.png")) +
+                    list(image_download.rglob("*.webp")))
+        if dl_files:
+            reusable.append("download")
+            print(f"  ✓ Found {len(dl_files)} downloaded images")
+
     # Check for input images (regular images copied to workflow)
     input_images = source_dir / "input_images"
     if input_images.exists():
@@ -625,6 +660,11 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     if source_converted.exists() and any(source_converted.iterdir()):
         image_dirs_to_copy.append(("converted_images", source_converted))
     
+    # Check for downloaded images (URL-based workflows)
+    source_download = source_dir / "image_download"
+    if source_download.exists() and any(source_download.rglob("*.jpg") or source_download.rglob("*.png")):
+        image_dirs_to_copy.append(("image_download", source_download))
+
     # Check for input images (regular images copied to workflow)
     source_input = source_dir / "input_images"
     if source_input.exists() and any(source_input.iterdir()):
@@ -1528,6 +1568,7 @@ class WorkflowOrchestrator:
         converted_dir = self.config.get_step_output_dir("image_conversion")
         frames_dir = self.config.get_step_output_dir("video_extraction")
         input_images_dir = self.config.base_output_dir / "input_images"
+        download_dir = self.config.get_step_output_dir("image_download")
         
         # Check if we're in a workflow directory (redescribe/resume mode)
         # In this case, input_dir == base_output_dir (user pointed at workflow dir, not source)
@@ -1547,7 +1588,8 @@ class WorkflowOrchestrator:
             has_workflow_structure = (
                 (converted_dir.exists() and any(converted_dir.iterdir())) or
                 (frames_dir.exists() and any(frames_dir.iterdir())) or
-                (input_images_dir.exists() and any(input_images_dir.iterdir()))
+                (input_images_dir.exists() and any(input_images_dir.iterdir())) or
+                (download_dir.exists() and any(download_dir.iterdir()))
             )
             if not has_workflow_structure:
                 self.logger.warning(
@@ -1559,27 +1601,51 @@ class WorkflowOrchestrator:
         all_image_files = []
         
         if is_workflow_dir:
-            # We're processing a workflow directory (redescribe mode)
-            # Scan the three possible image directories directly
-            self.logger.info("Scanning workflow directory for images...")
-            
-            # Check input_images directory
-            if input_images_dir.exists() and any(input_images_dir.iterdir()):
-                existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
-                all_image_files.extend(existing_images)
-                self.logger.info(f"Found {len(existing_images)} image(s) in: {input_images_dir}")
-            
-            # Check converted_images directory
-            if converted_dir.exists() and any(converted_dir.iterdir()):
-                converted_images = self.discovery.find_files_by_type(converted_dir, "images")
-                all_image_files.extend(converted_images)
-                self.logger.info(f"Found {len(converted_images)} converted image(s) in: {converted_dir}")
-            
-            # Check extracted_frames directory
-            if frames_dir.exists() and any(frames_dir.iterdir()):
-                frame_images = self.discovery.find_files_by_type(frames_dir, "images")
-                all_image_files.extend(frame_images)
-                self.logger.info(f"Found {len(frame_images)} extracted frame(s) in: {frames_dir}")
+            # We're processing a workflow directory (redescribe mode).
+            # Primary: use file_path_mapping.json — it lists every image from the
+            # original describe run, regardless of which subdirectory they lived in.
+            mapping_file = Path(self.config.base_output_dir) / "descriptions" / "file_path_mapping.json"
+            used_mapping = False
+            if mapping_file.exists():
+                try:
+                    import json as _json
+                    with open(mapping_file, 'r', encoding='utf-8') as _f:
+                        _mapping = _json.load(_f)
+                    if _mapping:
+                        for orig_path_str in _mapping.values():
+                            p = Path(orig_path_str)
+                            if p.exists() and p.is_file():
+                                all_image_files.append(p)
+                        self.logger.info(
+                            f"Loaded {len(all_image_files)} image(s) from file_path_mapping.json"
+                        )
+                        used_mapping = True
+                except Exception as e:
+                    self.logger.warning(f"Could not read file_path_mapping.json: {e}; falling back to directory scan")
+
+            if not used_mapping:
+                # Fallback: scan known image subdirectories (handles old workflows without mapping)
+                self.logger.info("file_path_mapping.json not found; scanning workflow subdirectories...")
+
+                if input_images_dir.exists() and any(input_images_dir.iterdir()):
+                    existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
+                    all_image_files.extend(existing_images)
+                    self.logger.info(f"Found {len(existing_images)} image(s) in: {input_images_dir}")
+
+                if converted_dir.exists() and any(converted_dir.iterdir()):
+                    converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+                    all_image_files.extend(converted_images)
+                    self.logger.info(f"Found {len(converted_images)} converted image(s) in: {converted_dir}")
+
+                if frames_dir.exists() and any(frames_dir.iterdir()):
+                    frame_images = self.discovery.find_files_by_type(frames_dir, "images")
+                    all_image_files.extend(frame_images)
+                    self.logger.info(f"Found {len(frame_images)} extracted frame(s) in: {frames_dir}")
+
+                if download_dir.exists() and any(download_dir.iterdir()):
+                    downloaded_images = self.discovery.find_files_by_type(download_dir, "images", recursive=True)
+                    all_image_files.extend(downloaded_images)
+                    self.logger.info(f"Found {len(downloaded_images)} downloaded image(s) in: {download_dir}")
         
         else:
             # Normal mode: process original input directory
