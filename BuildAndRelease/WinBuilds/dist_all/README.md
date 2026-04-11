@@ -41,7 +41,10 @@ Results are saved in the `Descriptions/` folder with an HTML viewer.
 ### Advanced Usage
 
 ```bash
-# Direct workflow with default settings
+# Describe a folder of images
+idt describe path/to/images
+
+# Same thing — workflow and describe are identical
 idt workflow path/to/images
 ```
 
