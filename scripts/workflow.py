@@ -746,7 +746,7 @@ class WorkflowOrchestrator:
                  geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
                  max_images: int = None, progress_status: bool = False,
                  image_describer_config: Optional[str] = None, video_config: Optional[str] = None,
-                 no_alt_text: bool = False):
+                 no_alt_text: bool = False, show_descriptions: bool = False):
         """
         Initialize the workflow orchestrator
         
@@ -771,6 +771,7 @@ class WorkflowOrchestrator:
             min_size: Minimum image size filter (e.g. "100KB", "1MB")
             max_images: Maximum number of images to download
             progress_status: Enable live progress status updates to console
+            show_descriptions: Print each AI-generated description to the console as it is produced
         """
         self.config = WorkflowConfig(config_file)
         self.config_file = config_file  # Workflow orchestration config
@@ -805,6 +806,7 @@ class WorkflowOrchestrator:
         self.max_images = max_images
         self.progress_status = progress_status
         self.no_alt_text = no_alt_text
+        self.show_descriptions = show_descriptions
         
         # Available workflow steps
         self.available_steps = {
@@ -1876,6 +1878,10 @@ class WorkflowOrchestrator:
             # Add workflow name if available (for window title identification)
             if self.workflow_name:
                 cmd.extend(["--workflow-name", self.workflow_name])
+            
+            # Pass --show-descriptions flag to subprocess when enabled
+            if self.show_descriptions:
+                cmd.extend(["--show-descriptions", "on"])
             
             # Add source URL if available (for downloaded images)
             if self.url:
@@ -2981,6 +2987,14 @@ Viewing Results:
     )
     
     parser.add_argument(
+        "--show-descriptions",
+        choices=["on", "off"],
+        default="off",
+        dest="show_descriptions",
+        help="Print each AI-generated description to the console as it is produced (default: off)"
+    )
+    
+    parser.add_argument(
         "--original-cwd",
         help=argparse.SUPPRESS  # Hidden argument for wrapper communication
     )
@@ -3462,7 +3476,8 @@ Viewing Results:
             progress_status=args.progress_status,
             image_describer_config=image_describer_config,  # NEW: explicit image describer config
             video_config=video_config,  # NEW: explicit video config
-            no_alt_text=args.no_alt_text
+            no_alt_text=args.no_alt_text,
+            show_descriptions=(args.show_descriptions == "on")
         )
         
         if args.dry_run:
