@@ -389,7 +389,8 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
     parts = dir_name.split('_')
     
     # Known prompt styles (must match those in image_describer_config.json)
-    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic', 'simple']
+    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful',
+                     'artistic', 'simple', 'accessibility', 'comparison', 'mood', 'functional']
     
     # Known providers
     known_providers = ['ollama', 'claude', 'openai']
