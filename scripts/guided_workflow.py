@@ -710,11 +710,9 @@ def guided_workflow(custom_config_path=None):
                     print("Please install manually and then re-run guideme:")
                     print("  pip install 'transformers>=4.45.0' torch torchvision einops timm")
                     print()
-                    cont = get_choice(
-                        "What would you like to do?",
-                        ["Return to provider selection"],
-                        allow_back=True,
-                    )
+                    # No choice needed — the only path forward is to return to
+                    # provider selection so the user can pick a different provider
+                    # or exit and install manually first.
                     return guided_workflow()
 
                 print("\n✓ Installation complete!")
@@ -728,11 +726,15 @@ def guided_workflow(custom_config_path=None):
                     importlib.reload(_hf_mod)
                     from imagedescriber.ai_providers import HuggingFaceProvider as _HFP
                     hf_provider = _HFP()
-                except Exception:
-                    pass  # Fall through to the re-check below
+                except Exception as _reload_err:
+                    # Reload failed (e.g. circular import during hot-reload).
+                    # The original hf_provider is still valid; its is_available()
+                    # will do a fresh import check against sys.modules below.
+                    print(f"  (Note: module reload skipped — {_reload_err})")
 
                 if not hf_provider.is_available():
-                    print("⚠️  Dependencies installed but not yet detected.")
+                    print("⚠️  Dependencies installed but not detected in this session.")
+                    print("This can happen when the new packages need a fresh process to load.")
                     print("Please restart IDT and select HuggingFace again.")
                     print()
                     return guided_workflow()
