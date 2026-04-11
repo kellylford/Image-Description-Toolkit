@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import json
 import argparse
+import platform
 
 # Add scripts directory to path
 SCRIPT_DIR = Path(__file__).parent.absolute()
@@ -51,6 +52,17 @@ def print_numbered_list(items, start=1):
     for idx, item in enumerate(items, start=start):
         print(f"  {idx}. {item}")
     print()
+
+
+def get_available_providers() -> list:
+    """Return the list of AI providers available on this platform.
+
+    MLX is only included on macOS with Apple Silicon (arm64).
+    """
+    providers = ["ollama", "openai", "claude", "huggingface"]
+    if sys.platform == 'darwin' and platform.machine() == 'arm64':
+        providers.append("mlx")
+    return providers
 
 
 def get_choice(prompt, options, default=None, allow_back=False, allow_exit=True):
@@ -504,7 +516,7 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude", "huggingface", "mlx"]
+    providers = get_available_providers()
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
     if provider == 'EXIT':

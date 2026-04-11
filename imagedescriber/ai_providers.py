@@ -1589,8 +1589,10 @@ class MLXProvider(AIProvider):
         return "MLX"
 
     def is_available(self) -> bool:
-        """MLX is only available on macOS (any version) with mlx-vlm installed."""
+        """MLX is only available on macOS with Apple Silicon and mlx-vlm installed."""
         if platform.system() != "Darwin":
+            return False
+        if platform.machine() != "arm64":
             return False
         return HAS_MLX_VLM
 
