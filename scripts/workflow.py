@@ -746,7 +746,7 @@ class WorkflowOrchestrator:
                  geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
                  max_images: int = None, progress_status: bool = False,
                  image_describer_config: Optional[str] = None, video_config: Optional[str] = None,
-                 no_alt_text: bool = False):
+                 no_alt_text: bool = False, show_descriptions: bool = False):
         """
         Initialize the workflow orchestrator
         
@@ -805,6 +805,7 @@ class WorkflowOrchestrator:
         self.max_images = max_images
         self.progress_status = progress_status
         self.no_alt_text = no_alt_text
+        self.show_descriptions = show_descriptions
         
         # Available workflow steps
         self.available_steps = {
@@ -1777,14 +1778,15 @@ class WorkflowOrchestrator:
             if getattr(sys, 'frozen', False):
                 # In frozen mode rely on dispatcher supporting 'image_describer' alias
                 cmd = [sys.executable, 'image_describer', str(temp_combined_dir), '--recursive',
-                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs'),
-                       '--quiet']  # Suppress subprocess console output to avoid duplicates
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
             else:
                 scripts_dir = Path(__file__).parent
                 image_describer_path = scripts_dir / 'image_describer.py'
                 cmd = [sys.executable, str(image_describer_path), str(temp_combined_dir), '--recursive',
-                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs'),
-                       '--quiet']  # Suppress subprocess console output to avoid duplicates
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
+            # Suppress subprocess console noise unless --show-descriptions is active
+            if not self.show_descriptions:
+                cmd.append('--quiet')
             
             # Add provider parameter
             if self.provider:
@@ -1908,6 +1910,10 @@ class WorkflowOrchestrator:
                     cmd.extend(["--alt-text-mapping", str(alt_text_mapping_path)])
                     self.logger.info(f"Including website alt text from: {alt_text_mapping_path}")
             
+            # Pass --show-descriptions flag to image_describer subprocess
+            if self.show_descriptions:
+                cmd.extend(["--show-descriptions", "on"])
+            
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
             
@@ -2003,15 +2009,26 @@ class WorkflowOrchestrator:
             progress_thread.start()
             
             # Run command, capturing output for logging
+            # When --show-descriptions is active, let stdout flow to the terminal
+            # so descriptions are visible as they arrive; stderr is always captured.
             # Note: explicit console output is suppressed by capture_output=True, 
             # but we have the progress monitoring thread for feedback.
-            result = subprocess.run(
-                cmd, 
-                text=True, 
-                encoding='utf-8', 
-                errors='replace',
-                capture_output=True
-            )
+            if self.show_descriptions:
+                result = subprocess.run(
+                    cmd,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    stderr=subprocess.PIPE
+                )
+            else:
+                result = subprocess.run(
+                    cmd, 
+                    text=True, 
+                    encoding='utf-8', 
+                    errors='replace',
+                    capture_output=True
+                )
             
             # Log the captured output to the workflow log for debugging
             if result.stdout:
@@ -2924,7 +2941,12 @@ Viewing Results:
         action="store_true",
         help="Automatically launch viewer to monitor workflow progress in real-time"
     )
-    
+    parser.add_argument(
+        "--show-descriptions",
+        choices=["on", "off"],
+        default="off",
+        help="Print each AI description to the console as it is generated (default: off)"
+    )
     parser.add_argument(
         "--batch",
         action="store_true",
@@ -3461,7 +3483,8 @@ Viewing Results:
             progress_status=args.progress_status,
             image_describer_config=image_describer_config,  # NEW: explicit image describer config
             video_config=video_config,  # NEW: explicit video config
-            no_alt_text=args.no_alt_text
+            no_alt_text=args.no_alt_text,
+            show_descriptions=(args.show_descriptions == 'on')
         )
         
         if args.dry_run:

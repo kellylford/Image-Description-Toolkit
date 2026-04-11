@@ -1294,6 +1294,7 @@ def _check_transformers_available():
             return False
 
 # Try import if not running as frozen executable
+HAS_TRANSFORMERS = False  # Default; set True below if imports succeed
 if not getattr(sys, 'frozen', False):
     try:
         from transformers import AutoProcessor, AutoModelForCausalLM

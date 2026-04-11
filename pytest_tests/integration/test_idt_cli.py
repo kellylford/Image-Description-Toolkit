@@ -176,6 +176,10 @@ class TestHelpContract:
         r = idt("help")
         assert "--view-results" in output(r)
 
+    def test_workflow_show_descriptions_flag_documented(self):
+        r = idt("help")
+        assert "--show-descriptions" in output(r)
+
     def test_no_stale_idt_viewer_command_in_help(self):
         r = idt("help")
         # "idt viewer" as a command invocation must not appear in COMMANDS table
@@ -266,6 +270,7 @@ class TestWorkflowFlags:
         "--batch",
         "--progress-status",
         "--view-results",
+        "--show-descriptions",
         "--verbose",
         "--config-workflow",
         "--config-image-describer",

@@ -838,6 +838,8 @@ WORKFLOW OPTIONS (idt workflow):
     --dry-run                                     Show what would be done without executing
     --batch                                       Non-interactive mode (skip prompts)
     --progress-status                             Show live INFO log updates in console
+    --show-descriptions <on|off>                  Print each AI description to the console
+                                                  as it is generated (default: off)
     --view-results                                After completion, print results path and
                                                   ImageDescriber viewing instructions
     --verbose, -v                                 Enable verbose logging

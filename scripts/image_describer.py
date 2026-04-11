@@ -158,7 +158,8 @@ class ImageDescriber:
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
                  log_dir: str = None, workflow_name: str = None, timeout: int = 90, source_url: str = None,
-                 include_alt_text: bool = True, alt_text_mapping_file: str = None):
+                 include_alt_text: bool = True, alt_text_mapping_file: str = None,
+                 show_descriptions: bool = False):
         """
         Initialize the ImageDescriber
         
@@ -225,6 +226,7 @@ class ImageDescriber:
         self.source_url = source_url  # Source URL if downloaded from web
         self.include_alt_text = include_alt_text  # Whether to include website alt text
         self.alt_text_mapping_file = alt_text_mapping_file  # Explicit mapping file path
+        self.show_descriptions = show_descriptions  # Print descriptions to console as they arrive
         # Notice flags (avoid repeating log spam)
         self._geocode_notice_logged = False
         
@@ -1546,6 +1548,10 @@ class ImageDescriber:
                         logger.debug(f"Updated progress file with: {image_path}")
                     except Exception as e:
                         logger.warning(f"Failed to update progress file: {e}")
+                    # Print description to console if --show-descriptions on
+                    if self.show_descriptions:
+                        print(f"\n--- {image_path.name} ---")
+                        print(description)
                     # Log with relative path for better readability
                     try:
                         relative_path = image_path.relative_to(directory_path)
@@ -2373,6 +2379,12 @@ Configuration:
         help="Suppress console output (log to file only)"
     )
     parser.add_argument(
+        "--show-descriptions",
+        choices=["on", "off"],
+        default="off",
+        help="Print each description to the console as it is generated (default: off)"
+    )
+    parser.add_argument(
         "--workflow-name",
         type=str,
         help="Workflow name (displayed in window title for identification)"
@@ -2472,7 +2484,8 @@ Configuration:
         timeout=args.timeout,
         source_url=args.source_url,
         include_alt_text=not args.no_alt_text,
-        alt_text_mapping_file=args.alt_text_mapping
+        alt_text_mapping_file=args.alt_text_mapping,
+        show_descriptions=(args.show_descriptions == 'on')
     )
     
     # Override metadata extraction if disabled via command line

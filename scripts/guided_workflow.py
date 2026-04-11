@@ -504,7 +504,9 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude", "huggingface", "mlx"]
+    providers = ["ollama", "openai", "claude", "huggingface"]
+    if sys.platform == "darwin":
+        providers.append("mlx")
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)
     
     if provider == 'EXIT':
@@ -625,8 +627,12 @@ def guided_workflow(custom_config_path=None):
             hf_provider = HuggingFaceProvider()
             
             if not hf_provider.is_available():
-                print("\n⚠️  Florence-2 dependencies not installed.")
-                print("Install with: pip install transformers torch torchvision einops timm")
+                print("\n⚠️  HuggingFace (Florence-2) dependencies not installed.")
+                print("Florence-2 runs fully offline — no API key needed — but requires a one-time install:")
+                print()
+                print("  pip install transformers torch torchvision einops timm")
+                print()
+                print("The model (~230 MB for -base, ~700 MB for -large) downloads automatically on first use.")
                 print("\nReturning to provider selection...\n")
                 return guided_workflow()
             

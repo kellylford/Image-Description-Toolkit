@@ -2,6 +2,11 @@
 
 ### ✨ New Features
 
+**`idt workflow --show-descriptions on` — live description output (issue #115)**
+- New flag prints each AI-generated description to the terminal as it is produced.
+- Passes through to the `image_describer` subprocess with clean per-image formatting (`--- filename.jpg ---` header).
+- Default is `off` (existing behavior unchanged).
+
 **`idt describe` — friendlier alias for `idt workflow`**
 - `idt describe <folder>` is now a full alias for `idt workflow`. Every flag, `--help`, and the frozen executable path all work identically.
 - Existing `idt workflow` scripts are unaffected.
@@ -12,6 +17,21 @@
 
 **Downloaded images organized by domain and page title**
 - Web downloads now land in a subfolder named `{domain} - {page title} - {timestamp}` inside `downloaded_images/`, making it easy to identify the source at a glance.
+
+### 🔧 Bug Fixes
+
+**`idt guideme` no longer shows MLX as a provider option on Windows (issue #111)**
+- MLX (Apple Metal) is now only listed as a provider choice on macOS.
+- On Windows and Linux, the provider list is `ollama / openai / claude / huggingface`.
+- If MLX is somehow selected on an unsupported platform the existing runtime guard remains intact.
+
+**HuggingFace `HAS_TRANSFORMERS` uninitialized name error (issue #113)**
+- `HAS_TRANSFORMERS` was only ever assigned `True` (when imports succeeded) but never
+  initialized to `False`. On systems without `transformers`/`torch` installed, calling
+  `HuggingFaceProvider().is_available()` raised `NameError` instead of returning `False`.
+- Fixed by initializing `HAS_TRANSFORMERS = False` at module level before the conditional import.
+- `guideme` HuggingFace error message improved: explains Florence-2 runs fully offline and
+  gives a single copy-paste install command.
 
 ---
 

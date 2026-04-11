@@ -395,6 +395,9 @@ idt workflow ~/Photos --model llava:7b --prompt-style detailed
 # Show live progress in the terminal
 idt workflow ~/Photos --progress-status
 
+# Print each description to the terminal as it is generated
+idt workflow ~/Photos --show-descriptions on
+
 # Process a web page (downloads images, then describes them)
 idt workflow https://example.com/gallery
 ```
@@ -444,6 +447,7 @@ Running the same command again creates a new `wf_*` directory — existing resul
 | `--dry-run` | Show what would happen without executing |
 | `--batch` | Non-interactive mode — skip post-run prompts (useful in scripts) |
 | `--progress-status` | Stream INFO log lines to the terminal for live progress visibility |
+| `--show-descriptions <on\|off>` | Print each AI description to the terminal as it is generated (default: off) |
 | `--view-results` | After completion, print the output path and instructions for opening in ImageDescriber |
 | `--config-workflow` / `--config-wf` | Path to a custom `workflow_config.json` |
 | `--config-image-describer` / `--config-id` | Path to a custom `image_describer_config.json` |
