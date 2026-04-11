@@ -2782,13 +2782,12 @@ Redescribe Examples (reuse images with different AI settings):
     --provider claude --model claude-sonnet-4-5 --link-images
   
 Viewing Results:
-  # Launch viewer automatically at workflow start (recommended for long batches):
+  # Show results path and ImageDescriber instructions at completion:
   idt workflow photos --view-results
   idt workflow --resume wf_photos --view-results
-  
-  # Or you'll be prompted after successful completion
-  # Or launch it manually anytime:
-  idt viewer [workflow_directory]
+
+  # Or you'll be prompted after successful completion.
+  # To browse results: open ImageDescriber and use the Viewer Mode tab.
         """
     )
     

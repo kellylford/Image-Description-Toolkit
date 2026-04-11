@@ -399,9 +399,55 @@ idt workflow ~/Photos --progress-status
 idt workflow https://example.com/gallery
 ```
 
+### Re-describing — `idt redescribe`
+
+Re-run AI description on an existing workflow's images using a different model, provider, or prompt — without re-copying or re-converting images.
+
+```bash
+# Re-describe with a different model (shorthand)
+idt redescribe wf_Vacation2025_ollama_moondream_narrative_20260101_120000 --model llava:13b
+
+# Full form (identical result)
+idt workflow --redescribe wf_Vacation2025_ollama_moondream_narrative_20260101_120000 --model llava:13b
+
+# Re-describe with a cloud model, using symlinks to avoid duplicating image files
+idt redescribe wf_Vacation2025_ollama_moondream_narrative_20260101_120000 \
+  --provider openai --model gpt-4o --link-images
+
+# Force a full copy instead of linking
+idt redescribe wf_Vacation2025_ollama_moondream_narrative_20260101_120000 \
+  --provider claude --model claude-sonnet-4-5 --force-copy
+```
+
+A new `wf_*` directory is created for the redescription run. The original workflow is untouched.
+
+**`--link-images`** uses symlinks (macOS/Linux) or hardlinks (Windows) instead of copying image files into the new workflow directory. This saves disk space with no impact on results. Use `--force-copy` to override this and always copy.
+
 **Output:** A `wf_{name}_{provider}_{model}_{prompt}_{timestamp}/` directory is created inside a `Descriptions/` subdirectory of the current working directory. The source folder is not modified.
 
 Running the same command again creates a new `wf_*` directory — existing results are never overwritten. Run as many times as you like with different models or prompts to build up a collection of descriptions for comparison.
+
+**Additional workflow flags:**
+
+| Flag | Description |
+|---|---|
+| `--name <label>` | Custom label appended to the workflow directory name |
+| `--steps <list>` | Run only specific steps, e.g. `--steps describe,html` (default: `video,convert,describe,html`) |
+| `--timeout <seconds>` | Ollama request timeout; increase for slow hardware (default: 90) |
+| `--api-key-file <file>` | Path to a file containing your API key (OpenAI or Claude) |
+| `--url <url>` | Alternative to providing a URL as the positional argument |
+| `--min-size <size>` | Minimum image size to download, e.g. `100KB` or `1MB` |
+| `--max-images <n>` | Cap the number of images downloaded from a URL |
+| `--no-alt-text` | Exclude the web page's alt-text from descriptions when downloading |
+| `--no-geocode` | Disable reverse geocoding even when GPS data is present |
+| `--geocode-cache <file>` | Custom path for the geocoding cache file (default: `geocode_cache.json`) |
+| `--dry-run` | Show what would happen without executing |
+| `--batch` | Non-interactive mode — skip post-run prompts (useful in scripts) |
+| `--progress-status` | Stream INFO log lines to the terminal for live progress visibility |
+| `--view-results` | After completion, print the output path and instructions for opening in ImageDescriber |
+| `--config-workflow` / `--config-wf` | Path to a custom `workflow_config.json` |
+| `--config-image-describer` / `--config-id` | Path to a custom `image_describer_config.json` |
+| `--config-video` | Path to a custom `video_frame_extractor_config.json` |
 
 **What the workflow does automatically:**
 1. Extracts frames from any video files found in the source folder
@@ -419,20 +465,46 @@ Individual steps can be enabled or disabled in `workflow_config.json` (see [Sect
 # Extract frames from a video without running a full workflow
 idt extract-frames myvideo.mp4
 
+# Extract frames every 5 seconds
+idt extract-frames myvideo.mp4 --time 5 --output-dir frames/
+
+# Extract frames using scene-change detection (lower threshold = more frames)
+idt extract-frames myvideo.mp4 --scene 30 --output-dir frames/
+
+# Generate an AI description for a standalone video (without a full workflow)
+idt describe-video myvideo.mp4 --provider ollama --model llava
+idt describe-video myvideo.mp4 --frames 10 --prompt "Describe the key events in this video"
+
 # Convert all HEIC/HEIF images in a folder to JPEG (preserves GPS metadata)
 idt convert-images ~/Photos/iPhone
+
+# Convert recursively with custom quality
+idt convert-images ~/Photos/iPhone --recursive --quality 90
 
 # Regenerate the HTML report from existing descriptions (no new AI calls)
 idt descriptions-to-html Descriptions/wf_2026-03-28_ollama_moondream_narrative_120000/image_descriptions.txt
 
-# List all Ollama models currently installed
+# Check all configured AI providers (Ollama, OpenAI, Claude)
 idt check-models
+
+# Check only one provider
+idt check-models --provider ollama
+idt check-models --provider openai --verbose
+
+# List, install, and manage AI models
+idt manage-models list
+idt manage-models list --installed
+idt manage-models install llava:7b
+idt manage-models remove llava:7b
+idt manage-models recommend
 
 # List available prompt styles
 idt prompt-list
+idt prompt-list --verbose
 
 # List all workflow result directories in the current folder
 idt results-list
+idt results-list --input-dir /path/to/Descriptions
 ```
 
 ---
@@ -479,9 +551,25 @@ Analyzes description quality across workflow runs.
 
 ```bash
 idt contentreview
+
+# Specify input file and output location
+idt contentreview --input analysis/results/combineddescriptions.csv --output my_review.csv
 ```
 
 Reports vocabulary richness, description length statistics, and style consistency. Useful for comparing the output quality of different models or evaluating a new custom prompt before running it on thousands of images.
+
+### `idt results-list`
+
+Lists all `wf_*` workflow directories found in the current folder (or a specified directory).
+
+```bash
+idt results-list
+idt results-list --input-dir /path/to/Descriptions
+idt results-list --sort-by provider
+idt results-list --output my_results_index.csv
+```
+
+Useful for auditing which workflows have been run, what models were used, and what percentage of images have descriptions.
 
 ---
 
@@ -815,9 +903,20 @@ Drop video files (MP4, MOV, AVI, MKV, and others) into your source folder alongs
 In ImageDescriber, video files appear as parent items in the image tree with their extracted frames as children. Select the parent to process all frames at once.
 
 **Standalone frame extraction** (without running a full workflow):
-```
+```bash
 idt extract-frames myvideo.mp4
+idt extract-frames myvideo.mp4 --time 5 --output-dir frames/
+idt extract-frames myvideo.mp4 --scene 30
 ```
+
+**Standalone video description** (describe a video file directly, without a full workflow):
+```bash
+idt describe-video myvideo.mp4
+idt describe-video myvideo.mp4 --provider openai --model gpt-4o --frames 10
+idt describe-video myvideo.mp4 --prompt "Describe the key events in this video"
+```
+
+Extracts frames, sends them to the AI model, and returns a description. Output can be written to a `.txt` or `.json` file with `--output`.
 
 Frame rate and output directory configuration: `video_frame_extractor_config.json` (see [Section 17](#17-configuration-files)).
 
@@ -949,17 +1048,22 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 | `idt guideme` | Interactive wizard — best starting point |
 | `idt workflow <path>` | Run workflow on a local folder or URL |
 | `idt describe <path>` | Alias for `idt workflow` — same flags, same behavior |
+| `idt redescribe <wf_dir>` | Re-describe an existing workflow with a different model/provider |
 | `idt extract-frames <video>` | Extract frames from a video file |
+| `idt describe-video <video>` | Generate an AI description for a standalone video file |
 | `idt convert-images <dir>` | Convert HEIC/HEIF images to JPEG |
 | `idt descriptions-to-html <file.txt>` | Regenerate HTML report from existing descriptions |
 | `idt combinedescriptions` | Export all workflows to a CSV or TSV spreadsheet |
 | `idt stats` | Performance and cost analysis across workflow runs |
 | `idt contentreview` | Description quality and vocabulary analysis |
 | `idt results-list` | List all workflow result directories in current folder |
-| `idt check-models` | List all Ollama models currently installed |
+| `idt check-models` | Check available AI models (Ollama, OpenAI, Claude) |
+| `idt manage-models list` | List known models across all providers |
+| `idt manage-models install <model>` | Install an Ollama model by name |
+| `idt manage-models recommend` | Show recommended models for this system |
 | `idt prompt-list` | List available prompt styles |
 | `idt version` | Show version information |
-| `idt help` | Show help |
+| `idt help` | Show all commands |
 
 ---
 

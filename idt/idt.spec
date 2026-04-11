@@ -94,6 +94,7 @@ a = Analysis(
         'scripts.list_results',
         # Models and analysis
         'models.check_models',
+        'models.manage_models',
         'models.claude_models',  # Central Claude model configuration
         'models.openai_models',  # Central OpenAI model configuration
         'analysis.stats_analysis',  # Fixed: was analyze_workflow_stats (wrong module name)

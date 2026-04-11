@@ -98,7 +98,18 @@ def main():
     if command == 'describe':
         command = 'workflow'
         sys.argv[1] = 'workflow'
-    
+
+    # Normalize alias: 'redescribe <wf_dir> [opts]' -> 'workflow --redescribe <wf_dir> [opts]'
+    elif command == 'redescribe':
+        rest = sys.argv[2:]
+        if '--help' in rest or '-h' in rest:
+            sys.argv = [sys.argv[0], 'workflow'] + rest
+        elif rest and not rest[0].startswith('-'):
+            sys.argv = [sys.argv[0], 'workflow', '--redescribe', rest[0]] + rest[1:]
+        else:
+            sys.argv = [sys.argv[0], 'workflow', '--redescribe'] + rest
+        command = 'workflow'
+
     # Update console title based on command
     title_map = {
         'guideme': 'IDT - Guided Workflow',
@@ -108,6 +119,7 @@ def main():
         'combinedescriptions': 'IDT - Combining Descriptions',
         'results-list': 'IDT - Listing Results',
         'check-models': 'IDT - Checking Models',
+        'manage-models': 'IDT - Managing Models',
         'prompt-list': 'IDT - Listing Prompts',
         'extract-frames': 'IDT - Extracting Video Frames',
         'describe-video': 'IDT - Describing Videos',
@@ -695,7 +707,46 @@ def main():
             cmd = [sys.executable, str(guided_script)] + args
             result = subprocess.run(cmd, cwd=str(guided_script.parent))
             return result.returncode
-    
+
+    elif command == 'manage-models':
+        # Manage AI models: list, install, remove, info, recommend
+        if getattr(sys, 'frozen', False):
+            try:
+                models_path = get_resource_path('models')
+                if str(models_path) not in sys.path:
+                    sys.path.insert(0, str(models_path))
+
+                import manage_models
+
+                original_argv = sys.argv[:]
+                sys.argv = ['idt manage-models'] + sys.argv[2:]
+
+                try:
+                    return manage_models.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+
+            except ImportError as e:
+                print(f"Error: Could not import manage_models module: {e}")
+                return 1
+            except Exception as e:
+                print(f"Error running manage_models: {e}")
+                return 1
+        else:
+            manage_script = get_resource_path('models/manage_models.py')
+
+            if not manage_script.exists():
+                print(f"Error: Manage models script not found at {manage_script}")
+                return 1
+
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(manage_script)] + args
+            result = subprocess.run(cmd, cwd=str(manage_script.parent))
+            return result.returncode
+
     elif command == 'help' or command == '--help' or command == '-h':
         print_usage()
         return 0
@@ -728,9 +779,11 @@ COMMANDS:
     guideme               Interactive wizard to build and run a workflow
     workflow              Run image description workflow
     describe              Alias for workflow (e.g. idt describe ./photos)
+    redescribe            Shorthand for workflow --redescribe (re-describe with new model)
     stats                 Analyze workflow performance statistics
     contentreview         Analyze description content and quality
     combinedescriptions   Combine descriptions from multiple workflows
+    manage-models         Install, remove, and list AI models
     results-list          List available workflow results
     check-models          Check available AI models (Ollama, OpenAI, Claude)
     prompt-list           List available prompt styles
@@ -742,8 +795,8 @@ COMMANDS:
     help                  Show this help message
 
   Note: ImageDescriber is a standalone GUI application (ImageDescriber.exe /
-  ImageDescriber.app). It is not launched via idt -- open it directly from
-  your installation folder or Applications.
+  ImageDescriber.app). Open it directly from your installation folder or Applications.
+  Viewer Mode is built into ImageDescriber — use it to browse workflow results.
 
 WORKFLOW OPTIONS (idt workflow):
     input_source                                  Input directory or URL
@@ -761,6 +814,10 @@ WORKFLOW OPTIONS (idt workflow):
                                                   workflow with different AI settings
     --preserve-descriptions                       When resuming, skip re-describing if
                                                   already substantially complete
+    --link-images                                 When redescribing, use symlinks/hardlinks
+                                                  instead of copying images (saves space)
+    --force-copy                                  When redescribing, always copy images
+                                                  even if linking is available
     --timeout <seconds>                           Ollama request timeout in seconds
                                                   (default: 90; increase for slow hardware)
     --name <name>                                 Custom identifier appended to the
@@ -770,11 +827,19 @@ WORKFLOW OPTIONS (idt workflow):
     --min-size <size>                             Minimum image size filter for downloads
                                                   (e.g. 100KB, 1MB)
     --max-images <n>                              Maximum number of images to download
+    --url <url>                                   URL to download from (alternative to
+                                                  providing URL as positional input_source)
+    --no-alt-text                                 Exclude website alt text from descriptions
     --metadata / --no-metadata                    Enable/disable metadata extraction
                                                   (default: enabled)
     --no-geocode                                  Disable reverse geocoding
+    --geocode-cache <file>                        Geocoding cache file
+                                                  (default: geocode_cache.json)
     --dry-run                                     Show what would be done without executing
     --batch                                       Non-interactive mode (skip prompts)
+    --progress-status                             Show live INFO log updates in console
+    --view-results                                After completion, print results path and
+                                                  ImageDescriber viewing instructions
     --verbose, -v                                 Enable verbose logging
     --config-workflow, --config-wf <file>         Workflow orchestration config
                                                   (default: workflow_config.json)
@@ -818,6 +883,7 @@ CONVERT IMAGES OPTIONS (idt convert-images):
     --recursive, -r                           Process subdirectories recursively
     --quality, -q <1-100>                     JPEG quality (default: 95)
     --no-metadata                             Don't preserve metadata in converted files
+    --log-dir <dir>                           Directory for log files
     --verbose, -v                             Enable verbose logging
     --quiet                                   Suppress console output
 
@@ -829,6 +895,7 @@ DESCRIPTIONS TO HTML OPTIONS (idt descriptions-to-html):
     --title <text>                            Title for the HTML page
                                               (default: 'Image Descriptions')
     --full                                    Include full metadata details per image
+    --log-dir <dir>                           Directory for log files
     --verbose                                 Enable verbose output
 
 COMBINE DESCRIPTIONS OPTIONS (idt combinedescriptions):
@@ -867,6 +934,22 @@ RESULTS LIST OPTIONS (idt results-list):
     --sort-by name|timestamp|provider|model   Sort field (default: timestamp)
     --absolute-paths                          Use absolute paths in output
 
+PROMPT LIST OPTIONS (idt prompt-list):
+    --config-image-describer <file>           Custom image_describer_config.json
+      (aliases: --config-id, --config, -c)
+    --verbose, -v                             Show full prompt text for each style
+
+MANAGE MODELS OPTIONS (idt manage-models <subcommand>):
+    list                                      List all known models
+      --installed                             Show only installed models
+      --provider <name>                       Filter by provider (ollama, openai,
+                                              claude, huggingface)
+    install <model>                           Install an Ollama model by name
+      --recommended                           Install all recommended Ollama models
+    remove <model>                            Remove an installed Ollama model
+    info <model>                              Show information about a model
+    recommend                                 Show recommended models for this system
+
 EXAMPLES:
     # Interactive guided workflow (recommended for beginners)
     {base_call} guideme
@@ -888,6 +971,7 @@ EXAMPLES:
 
     # Re-describe with a different model
     {base_call} workflow --redescribe wf_2025-01-15_143022_llava_Simple --model gpt-4o
+    {base_call} redescribe wf_2025-01-15_143022_llava_Simple --model gpt-4o
 
     # Download images from a website and describe them
     {base_call} workflow --download https://example.com/gallery --provider ollama
@@ -936,6 +1020,12 @@ EXAMPLES:
     # List available prompt styles
     {base_call} prompt-list
     {base_call} prompt-list --verbose
+
+    # Manage AI models
+    {base_call} manage-models list
+    {base_call} manage-models list --installed
+    {base_call} manage-models install llava:7b
+    {base_call} manage-models recommend
 
 NOTES:
     - Requires Ollama for local AI models (https://ollama.ai)
