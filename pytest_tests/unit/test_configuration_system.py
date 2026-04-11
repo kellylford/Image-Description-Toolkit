@@ -458,6 +458,85 @@ class TestConfigFlagSupport:
             "dialogs_wx.load_prompts() must not use find_config_file(); use load_json_config instead"
 
 
+class TestShowDescriptionsOption:
+    """Test that --show-descriptions argument is properly implemented."""
+
+    def test_image_describer_has_show_descriptions_parameter(self):
+        """ImageDescriber.__init__ must accept show_descriptions parameter."""
+        import inspect
+        import importlib
+        id_mod = importlib.import_module('image_describer')
+        sig = inspect.signature(id_mod.ImageDescriber.__init__)
+        assert 'show_descriptions' in sig.parameters, \
+            "ImageDescriber.__init__ must have a show_descriptions parameter"
+        assert sig.parameters['show_descriptions'].default is False, \
+            "show_descriptions must default to False"
+
+    def test_image_describer_stores_show_descriptions(self):
+        """ImageDescriber must store the show_descriptions flag on self."""
+        source_file = Path(__file__).parent.parent.parent / "scripts" / "image_describer.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+        assert 'self.show_descriptions' in source, \
+            "ImageDescriber must store show_descriptions as an instance attribute"
+
+    def test_image_describer_cli_has_show_descriptions_argument(self):
+        """image_describer.py must register --show-descriptions as a CLI argument."""
+        source_file = Path(__file__).parent.parent.parent / "scripts" / "image_describer.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+        assert '"--show-descriptions"' in source, \
+            "image_describer.py must add --show-descriptions argument to argparse"
+        assert '"on"' in source and '"off"' in source, \
+            "image_describer.py --show-descriptions must have 'on' and 'off' choices"
+
+    def test_workflow_orchestrator_has_show_descriptions_parameter(self):
+        """WorkflowOrchestrator.__init__ must accept show_descriptions parameter."""
+        import inspect
+        import importlib.util
+        scripts_wf = Path(__file__).parent.parent.parent / "scripts" / "workflow.py"
+        spec = importlib.util.spec_from_file_location("workflow_scripts", scripts_wf)
+        wf_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(wf_mod)
+        sig = inspect.signature(wf_mod.WorkflowOrchestrator.__init__)
+        assert 'show_descriptions' in sig.parameters, \
+            "WorkflowOrchestrator.__init__ must have a show_descriptions parameter"
+        assert sig.parameters['show_descriptions'].default is False, \
+            "show_descriptions must default to False"
+
+    def test_workflow_stores_show_descriptions(self):
+        """WorkflowOrchestrator must store show_descriptions on self."""
+        source_file = Path(__file__).parent.parent.parent / "scripts" / "workflow.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+        assert 'self.show_descriptions' in source, \
+            "WorkflowOrchestrator must store show_descriptions as an instance attribute"
+
+    def test_workflow_cli_has_show_descriptions_argument(self):
+        """workflow.py must register --show-descriptions as a CLI argument."""
+        source_file = Path(__file__).parent.parent.parent / "scripts" / "workflow.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+        assert '"--show-descriptions"' in source, \
+            "workflow.py must add --show-descriptions argument to argparse"
+
+    def test_workflow_passes_show_descriptions_to_subprocess(self):
+        """workflow.py describe_images must forward --show-descriptions on to image_describer subprocess."""
+        source_file = Path(__file__).parent.parent.parent / "scripts" / "workflow.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+        assert 'show_descriptions' in source and '--show-descriptions' in source, \
+            "workflow.py must pass --show-descriptions to the image_describer subprocess"
+
+    def test_process_directory_prints_when_enabled(self):
+        """process_directory must print description to console when show_descriptions=True."""
+        source_file = Path(__file__).parent.parent.parent / "scripts" / "image_describer.py"
+        with source_file.open('r', encoding='utf-8') as f:
+            source = f.read()
+        assert 'self.show_descriptions' in source and 'print(' in source, \
+            "process_directory must print the description when show_descriptions is True"
+
+
 if __name__ == "__main__":
     print("Run these tests with: python run_unit_tests.py pytest_tests/unit/test_configuration_system.py")
     print("For comprehensive test coverage, see GitHub Issue #62")

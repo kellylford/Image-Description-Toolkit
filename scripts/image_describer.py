@@ -158,7 +158,8 @@ class ImageDescriber:
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
                  log_dir: str = None, workflow_name: str = None, timeout: int = 90, source_url: str = None,
-                 include_alt_text: bool = True, alt_text_mapping_file: str = None):
+                 include_alt_text: bool = True, alt_text_mapping_file: str = None,
+                 show_descriptions: bool = False):
         """
         Initialize the ImageDescriber
         
@@ -178,6 +179,7 @@ class ImageDescriber:
             source_url: Source URL if images were downloaded from the web
             include_alt_text: Whether to include website alt text in descriptions (default: True)
             alt_text_mapping_file: Explicit path to alt_text_mapping.json (auto-detected if None)
+            show_descriptions: Whether to print each AI description to the console as it is generated
         """
         # Load configuration first
         self.config = self.load_config(config_file)
@@ -225,6 +227,7 @@ class ImageDescriber:
         self.source_url = source_url  # Source URL if downloaded from web
         self.include_alt_text = include_alt_text  # Whether to include website alt text
         self.alt_text_mapping_file = alt_text_mapping_file  # Explicit mapping file path
+        self.show_descriptions = show_descriptions  # Print each description to console as generated
         # Notice flags (avoid repeating log spam)
         self._geocode_notice_logged = False
         
@@ -1536,6 +1539,12 @@ class ImageDescriber:
                 if token_usage:
                     metadata['token_usage'] = token_usage
                 
+                # Print description to console if --show-descriptions on
+                if self.show_descriptions:
+                    print(f"\n--- {image_path.name} ---")
+                    print(description)
+                    print()
+                
                 # Write description to file with metadata and base directory for relative paths
                 image_alt_text = alt_text_map.get(image_path.name)
                 if self.write_description_to_file(image_path, description, output_file, metadata, directory_path, alt_text=image_alt_text):
@@ -2393,6 +2402,13 @@ Configuration:
         dest="alt_text_mapping",
         help="Path to alt_text_mapping.json file (auto-detected from image directory if not specified)"
     )
+    parser.add_argument(
+        "--show-descriptions",
+        choices=["on", "off"],
+        default="off",
+        dest="show_descriptions",
+        help="Print each AI-generated description to the console as it is produced (default: off)"
+    )
     
     args = parser.parse_args()
     
@@ -2472,7 +2488,8 @@ Configuration:
         timeout=args.timeout,
         source_url=args.source_url,
         include_alt_text=not args.no_alt_text,
-        alt_text_mapping_file=args.alt_text_mapping
+        alt_text_mapping_file=args.alt_text_mapping,
+        show_descriptions=(args.show_descriptions == "on")
     )
     
     # Override metadata extraction if disabled via command line
