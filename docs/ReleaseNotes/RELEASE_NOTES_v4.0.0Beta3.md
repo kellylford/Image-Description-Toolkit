@@ -20,6 +20,7 @@ The image list has been converted from a flat file list to a structured **folder
 
 - Images are grouped under their parent subfolder. Loading a directory recursively builds folder nodes automatically; nested paths (e.g. `Vacation/Beach`) produce nested nodes.
 - Select a **folder node** to queue all images it contains for processing — no need to select images individually.
+- When you process a folder node, a confirmation dialog summarizes the image count and context before the run begins. The button is labeled **Process All** to make the scope clear.
 - The scan root is always visible as the top-level node, giving context for the full directory.
 - Folder expand/collapse state is preserved across workspace refreshes.
 - Existing flat workspaces (no subfolders) display correctly without change.
@@ -53,7 +54,9 @@ File → Export Descriptions to HTML has been completely rewritten:
 
 ### ImageDescriber: Follow-up Chat Shows Only Configured Providers
 
-The follow-up question dialog (chat window) now lists only the AI providers actually available on the current machine, rather than always showing all four. Apple Silicon Macs also see MLX in the provider dropdown.
+The follow-up question dialog (chat window) now lists only the AI providers actually available on the current machine, rather than always showing all four. Apple Silicon Macs also see MLX in the provider dropdown. HuggingFace is only offered in the development environment — it is not shown in the installed application to avoid bundling large model dependencies.
+
+The follow-up question is now asked about the description you have **currently selected** in the description list, rather than always defaulting to the most recent one. This makes it practical to ask follow-up questions about an older description while newer ones are also present in the workspace.
 
 ---
 
@@ -106,6 +109,7 @@ The new `--show-descriptions on` flag streams each AI-generated description to t
 - **`idt combinedescriptions` showed `unknown` for four prompt styles** — accessibility, comparison, mood, and functional were defined in the config but missing from the recognition list in the export code. All four are now recognized correctly.
 - **`idt combinedescriptions` wrong model labels for URL-downloaded workflows** — model labels were derived by splitting the workflow directory name on underscores, which broke when the workflow name itself contained underscores (e.g. a downloaded page title). Labels are now read from `workflow_metadata.json` and only fall back to name parsing for legacy workflows without metadata.
 - **`--show-descriptions` flag had no effect (issue #115)** — the flag was accepted but not forwarded to the subprocess. Fixed.
+- **Image processing race condition on macOS** — when a folder node was processed, `EVT_TREE_SEL_CHANGED` could fire during the modal confirmation dialog and clear the current image reference, causing the run to start with no target. Fixed by capturing the image item into a local variable before opening any dialog.
 
 ---
 
