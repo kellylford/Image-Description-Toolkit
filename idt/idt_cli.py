@@ -331,20 +331,37 @@ def main():
                 analysis_path = get_resource_path('analysis')
                 if str(analysis_path) not in sys.path:
                     sys.path.insert(0, str(analysis_path))
-                
-                import combine_workflow_descriptions
-                
+
+                # Try loading from the filesystem first so that a .py file placed
+                # alongside the exe in analysis/ overrides the bundled module.
+                # (The frozen importer would otherwise always win over sys.path.)
+                _combine_mod = None
+                _override_py = Path(sys.executable).parent / 'analysis' / 'combine_workflow_descriptions.py'
+                if _override_py.exists():
+                    import importlib.util as _ilu
+                    _spec = _ilu.spec_from_file_location(
+                        'combine_workflow_descriptions', _override_py,
+                        submodule_search_locations=[]
+                    )
+                    _combine_mod = _ilu.module_from_spec(_spec)
+                    _spec.loader.exec_module(_combine_mod)
+
+                if _combine_mod is None:
+                    import combine_workflow_descriptions as _combine_mod
+
+                combine_workflow_descriptions = _combine_mod
+
                 # Set up sys.argv for the combine script
                 original_argv = sys.argv[:]
                 sys.argv = ['idt combinedescriptions'] + sys.argv[2:]
-                
+
                 try:
                     return combine_workflow_descriptions.main()
                 except SystemExit as e:
                     return e.code if e.code is not None else 0
                 finally:
                     sys.argv = original_argv
-                    
+
             except ImportError as e:
                 print(f"Error: Could not import combine_workflow_descriptions module: {e}")
                 return 1
@@ -354,7 +371,7 @@ def main():
         else:
             # Running as script - use subprocess
             combine_script = get_resource_path('analysis/combine_workflow_descriptions.py')
-            
+
             if not combine_script.exists():
                 print(f"Error: Combine script not found at {combine_script}")
                 return 1

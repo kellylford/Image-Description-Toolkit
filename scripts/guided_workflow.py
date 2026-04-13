@@ -504,7 +504,11 @@ def guided_workflow(custom_config_path=None):
     
     # Step 1: Select Provider
     print_header("Step 1: Select AI Provider")
-    providers = ["ollama", "openai", "claude", "huggingface"]
+    providers = ["ollama", "openai", "claude"]
+    if not getattr(sys, 'frozen', False):
+        # HuggingFace/Florence-2 requires transformers+torch which cannot be
+        # bundled in the frozen installer (~2 GB). Only offer it in dev mode.
+        providers.append("huggingface")
     if sys.platform == "darwin":
         providers.append("mlx")
     provider = get_choice("Which AI provider would you like to use?", providers, default=1)

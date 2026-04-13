@@ -11,12 +11,18 @@
 - `idt describe <folder>` is now a full alias for `idt workflow`. Every flag, `--help`, and the frozen executable path all work identically.
 - Existing `idt workflow` scripts are unaffected.
 
+**`idt redescribe` — top-level shorthand for re-describing with a new model**
+- `idt redescribe <workflow_dir>` routes directly to `idt workflow --redescribe`. All workflow flags are supported.
+
 **`idt guideme` — URL support at the image folder prompt**
 - In Step 4, you can now enter a website URL instead of a local path. `guideme` downloads images from the page automatically and continues the workflow with the downloaded folder.
 - Graceful fallbacks: clear error messages if 0 images are found, or if download dependencies are not installed.
 
 **Downloaded images organized by domain and page title**
 - Web downloads now land in a subfolder named `{domain} - {page title} - {timestamp}` inside `downloaded_images/`, making it easy to identify the source at a glance.
+
+**`idt manage-models` — install, remove, and list AI models from the CLI**
+- New command supports `list`, `install`, `remove`, `info`, and `recommend` subcommands for managing Ollama models without leaving the terminal.
 
 ### 🔧 Bug Fixes
 
@@ -32,6 +38,25 @@
 - Fixed by initializing `HAS_TRANSFORMERS = False` at module level before the conditional import.
 - `guideme` HuggingFace error message improved: explains Florence-2 runs fully offline and
   gives a single copy-paste install command.
+
+**`idt redescribe` fails on URL-downloaded workflows**
+- `--redescribe` now uses `descriptions/file_path_mapping.json` as the primary image source when deciding whether a workflow has processed images, fixing the "Source workflow has no processed images" error on URL-downloaded runs. Falls back to directory scanning for older workflows.
+
+**`idt combinedescriptions` — accessibility, comparison, mood, and functional prompt styles unrecognized**
+- These four prompt styles were defined in `image_describer_config.json` but absent from the recognition list in `combine_workflow_descriptions.py`, causing them to appear as `unknown` in the CSV output. All four are now recognized correctly.
+
+**`combinedescriptions` model labels wrong when workflow name contains underscores**
+- Model labels were derived by splitting the workflow directory name on underscores, which broke when the workflow name prefix was long (e.g. a downloaded URL title). Labels are now read from `workflow_metadata.json` (accurate provider + model fields) and only fall back to directory name parsing for legacy workflows without metadata.
+
+### 🔬 Internal / Developer
+
+**Ollama cloud model retry logic overhauled**
+- Two-tier retry: outer empty-response retry (handles intermittent truncated responses from cloud models) wrapping an inner transport/server retry loop. `num_predict` is no longer forwarded to cloud-tagged models to avoid server-side output caps.
+
+**CLI integration test suite — 60 new tests + CI workflow**
+- New `pytest_tests/integration/test_idt_cli.py` covers command routing, help contract, aliases, per-command `--help`, and regression guards against removed commands.
+- New `.github/workflows/cli-validation.yml` runs the suite on every push and PR to active branches.
+- Total passing tests: 311.
 
 ---
 
