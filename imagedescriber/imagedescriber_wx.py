@@ -3014,6 +3014,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 show_info(self, "All images in this folder already have descriptions")
                 return
             folder_label = self.image_list.GetItemText(selected_node)
+            logger.info(
+                f"Folder batch triggered via P key: folder='{folder_label}', "
+                f"count={len(to_process)}, current_image_item={self.current_image_item!r}"
+            )
             self._run_batch_for_paths(event, to_process, folder_label)
             return
 
@@ -3021,8 +3025,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, "No image selected")
             return
 
+        # Capture now — macOS EVT_TREE_SEL_CHANGED fired by ShowModal() below can
+        # clear self.current_image_item before we finish using it.
+        image_item = self.current_image_item
+
         # If video, show extraction dialog instead
-        if self.current_image_item.item_type == "video":
+        if image_item.item_type == "video":
             self.on_extract_video(event)
             return
 
@@ -3057,7 +3065,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         api_key = self.get_api_key_for_provider(options['provider'])
         worker = ProcessingWorker(
             self,
-            self.current_image_item.file_path,
+            image_item.file_path,
             options['provider'],
             options['model'],
             options['prompt_style'],
@@ -3068,7 +3076,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         )
 
         # Mark as processing with provider/model info
-        self.processing_items[self.current_image_item.file_path] = {
+        self.processing_items[image_item.file_path] = {
             'provider': options['provider'],
             'model': options['model']
         }
@@ -3079,7 +3087,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         worker.start()
 
-        self.SetStatusText(f"Processing: {Path(self.current_image_item.file_path).name}...", 0)
+        self.SetStatusText(f"Processing: {Path(image_item.file_path).name}...", 0)
 
     def on_process_all(self, event, skip_existing: bool = True):
         """Process images in batch
@@ -3384,9 +3392,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Batch processing worker not available")
             return
 
+        # Confirm folder batch before showing options — prevents accidental mass-processing
+        n = len(to_process)
+        noun = 'image' if n == 1 else 'images'
+        confirm = wx.MessageDialog(
+            self,
+            f"Process all {n} unprocessed {noun} in '{context_label}'?\n\n"
+            "To process a single image, select it in the list first.",
+            f"Process Folder: {context_label}",
+            wx.OK | wx.CANCEL | wx.ICON_QUESTION
+        )
+        confirm.SetOKLabel("Process All")
+        if confirm.ShowModal() != wx.ID_OK:
+            confirm.Destroy()
+            return
+        confirm.Destroy()
+
         # Show processing options dialog
         if ProcessingOptionsDialog:
             dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            dialog.SetTitle(f"Processing Options — {context_label} ({n} {noun})")
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
