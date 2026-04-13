@@ -30,12 +30,9 @@ echo ""
 # Change to project root directory FIRST (now two levels up since we're in MacBuilds/)
 cd "$(dirname "$0")/../.."
 
-echo "Cleaning PyInstaller cache to ensure fresh build..."
-python3 -c "import shutil; from pathlib import Path; cache_dir = Path.home() / 'Library' / 'Caches' / 'pyinstaller'; shutil.rmtree(cache_dir, ignore_errors=True); print(f'Cleaned: {cache_dir}')"
-
-echo "Cleaning build and dist directories..."
-rm -rf build dist
-echo "Build cache cleaned successfully."
+# Each build script passes --clean to PyInstaller, which cleans its own
+# build directory and the shared PyInstaller cache immediately before that
+# build runs. No separate pre-cleaning step is needed here.
 echo ""
 
 # ============================================================================
@@ -112,18 +109,11 @@ echo "========================================================================"
 echo ""
 
 cd imagedescriber
-if [ -f ".venv/bin/activate" ]; then
-    source .venv/bin/activate
-    if bash build_imagedescriber_wx.sh; then
-        echo "SUCCESS: ImageDescriber built successfully"
-    else
-        echo "ERROR: ImageDescriber build failed!"
-        ((BUILD_ERRORS++))
-    fi
-    deactivate
+# build_imagedescriber_wx.sh activates its own .venv — no need to do it here
+if bash build_imagedescriber_wx.sh; then
+    echo "SUCCESS: ImageDescriber built successfully"
 else
-    echo "ERROR: ImageDescriber virtual environment not found at imagedescriber/.venv"
-    echo "Please run: cd imagedescriber && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+    echo "ERROR: ImageDescriber build failed!"
     ((BUILD_ERRORS++))
 fi
 cd ..
@@ -143,10 +133,10 @@ else
 fi
 
 # Show version from built CLI if available
-if [ -f "dist/idt" ]; then
+if [ -f "idt/dist/idt" ]; then
     echo ""
     echo "--- Built Executable Version ---"
-    dist/idt version
+    idt/dist/idt version
     echo "--------------------------------"
 fi
 
