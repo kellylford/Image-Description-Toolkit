@@ -383,9 +383,16 @@ def _format_model_label_from_provider_model(provider: str, model: str) -> str:
     if p in ('claude', 'anthropic'):
         m = model.lower()
         if 'haiku' in m:
-            return "Claude Haiku 3.5" if ('3-5' in m or '3.5' in m) else "Claude Haiku 3"
-        elif 'sonnet' in m:
             if '4-5' in m or '4.5' in m:
+                return "Claude Haiku 4.5"
+            elif '3-5' in m or '3.5' in m:
+                return "Claude Haiku 3.5"
+            else:
+                return "Claude Haiku 3"
+        elif 'sonnet' in m:
+            if '4-6' in m or '4.6' in m:
+                return "Claude Sonnet 4.6"
+            elif '4-5' in m or '4.5' in m:
                 return "Claude Sonnet 4.5"
             elif '3-7' in m or '3.7' in m:
                 return "Claude Sonnet 3.7"
@@ -393,7 +400,13 @@ def _format_model_label_from_provider_model(provider: str, model: str) -> str:
                 return "Claude Sonnet 4"
             return "Claude Sonnet"
         elif 'opus' in m:
-            if '4-2' in m or '4.2' in m:
+            if '4-7' in m or '4.7' in m:
+                return "Claude Opus 4.7"
+            elif '4-6' in m or '4.6' in m:
+                return "Claude Opus 4.6"
+            elif '4-5' in m or '4.5' in m:
+                return "Claude Opus 4.5"
+            elif '4-2' in m or '4.2' in m:
                 return "Claude Opus 4"
             elif '4-1' in m or '4.1' in m:
                 return "Claude Opus 4.1"
@@ -577,15 +590,20 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
         if provider.lower() == 'claude':
             # claude-3-haiku-20240307 -> Haiku 3
             # claude-3-5-haiku-20241022 -> Haiku 3.5
+            # claude-haiku-4-5-20251001 -> Haiku 4.5
             # claude-opus-4-1-20250805 -> Opus 4.1
             # claude-sonnet-4-5-20250929 -> Sonnet 4.5
             if 'haiku' in model_part:
-                if '3-5' in model_part:
+                if '4-5' in model_part:
+                    model_label = "Claude Haiku 4.5"
+                elif '3-5' in model_part:
                     model_label = "Claude Haiku 3.5"
                 else:
                     model_label = "Claude Haiku 3"
             elif 'sonnet' in model_part:
-                if '4-5' in model_part:
+                if '4-6' in model_part:
+                    model_label = "Claude Sonnet 4.6"
+                elif '4-5' in model_part:
                     model_label = "Claude Sonnet 4.5"
                 elif '3-7' in model_part:
                     model_label = "Claude Sonnet 3.7"
@@ -594,7 +612,13 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
                 else:
                     model_label = "Claude Sonnet"
             elif 'opus' in model_part:
-                if '4-1' in model_part:
+                if '4-7' in model_part:
+                    model_label = "Claude Opus 4.7"
+                elif '4-6' in model_part:
+                    model_label = "Claude Opus 4.6"
+                elif '4-5' in model_part:
+                    model_label = "Claude Opus 4.5"
+                elif '4-1' in model_part:
                     model_label = "Claude Opus 4.1"
                 elif 'opus-4-2' in model_part:
                     model_label = "Claude Opus 4"
