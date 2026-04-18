@@ -190,6 +190,24 @@ IDT also has a freestanding chat mode (press C in ImageDescriber) for model-to-m
 
 ---
 
+## The NASA Meatball
+
+Some images are so iconic that AI models reference them by name without stopping to describe them — and the NASA meatball logo is the clearest example in this dataset.
+
+The term "meatball" appeared in 61 descriptions across 12 images. In 11 of those images, the logo appeared as an incidental background element — on a wall at JPL, projected as a backdrop behind a rock sample display, on the tail of a T-38 jet, on the building behind the Artemis II crew. Across all of those background appearances, models named the logo 26 times and actually described what it looks like only 7 times. Most of those 7 were borderline — noting that the logo was "circular" or appeared on the wall. Almost no description explained what a viewer would actually see.
+
+NASA's own alt-text set the tone. For the JPL auditorium selfie, NASA's caption reads: *"In the far background, there is a NASA 'meatball' insignia and the letters 'JPL' on the wall."* The name, nothing more. The AI models followed the same pattern. If you have never seen the NASA meatball and no one has ever described it to you, most of these descriptions left you exactly where you started.
+
+The one exception: when the NASA logo itself was the image subject (a standalone logo PNG in the dataset), models gave rich, accurate descriptions across virtually every prompt. Gemma4's AI alt text treatment is a good example: *"The NASA insignia, known as the 'meatball' logo. It consists of a blue sphere representing a planet, containing the word 'NASA' in bold white text. A red V-shaped vector symbolizes aeronautics, while a white orbital ring and scattered white stars represent space exploration."* That's exactly what someone unfamiliar with the logo needs. The problem is that this only happened when the logo was the foreground subject — never when it appeared in the background.
+
+**What the NASA meatball actually looks like:** A circular emblem on a deep blue field, with the word "NASA" in large bold white letters across the center. A red swoosh — sometimes described as a wing or chevron — cuts diagonally across the circle from lower-left to upper-right, representing aeronautics. A white curved orbital path arcs around the circle, suggesting a spacecraft in orbit. Small white stars are scattered through the blue field. The overall effect is dense but balanced: space, flight, and identity in one symbol.
+
+**Followup questions help, but aren't foolproof.** When asked as a standalone followup — *"Please describe what the NASA meatball looks like to someone who has never seen it"* — GPT-4.1 Mini returned an accurate description on the first try: blue background, red wing-shaped vector, white stars, bold white NASA lettering. Claude Haiku's response, by contrast, described it as having *"a large red circle dominating the center"* as the main element — significantly wrong. The logo is primarily blue. Even when a model knows the name of an iconic image, its ability to accurately describe that image from memory alone varies.
+
+**The prompt implication.** The accessibility and AI alt text prompts in IDT currently do not explicitly instruct models to describe iconic logos and emblems when they appear incidentally in an image. Adding language like *"when referencing iconic logos, insignia, or well-known symbols by name, include a brief visual description of what the symbol looks like"* may close this gap in a future prompt revision.
+
+---
+
 ## Data Completeness
 
 In a few instances, data for a prompt and model are not complete. In the case of Moondream, some prompts — such as Technical — failed to return any response on multiple tries.
