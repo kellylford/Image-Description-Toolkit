@@ -47,7 +47,7 @@ This turned out to be far more interesting than I expected once I chose my test 
 
 ## The NASA Opportunity
 
-On April 7, 2026, NASA launched the Artemis II mission — the first crewed Moon trip since the Apollo program. NASA's Image of the Day page had been building up to this for weeks with stunning photographs: the crew in training, the rocket being prepared, and then the mission itself: Earthrise from lunar orbit, the Milky Way seen from deep space, the crew capsule from a window looking back at a shrunken planet.
+On April 1, 2026, NASA launched the Artemis II mission — the first crewed Moon trip since the Apollo program. NASA's Image of the Day page had been building up to this for weeks with stunning photographs: the crew in training, the rocket being prepared, and then the mission itself: Earthrise from lunar orbit, the Milky Way seen from deep space, the crew capsule from a window looking back at a shrunken planet.
 
 This was a natural fit for IDT. I used `idt workflow` to download 64 images directly from the NASA Image of the Day page and ran all eleven built-in prompts across multiple AI models. The dataset includes descriptions from Claude Haiku 4.5, Claude Sonnet 4.6, Ollama Gemma4 31b (cloud), Ollama Kimi-K2.5 (cloud), Ollama Moondream, Ollama Qwen3-VL 235b (cloud), GPT-4.1 Mini, and GPT-4.1 Nano — over 700 descriptions in total.
 
