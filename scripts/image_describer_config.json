@@ -37,7 +37,9 @@
     
     "mood": "Describe the emotional atmosphere and mood of this image. What feelings does it evoke? What is the psychological tone? Describe the emotional quality of the lighting, the mood conveyed by the composition, and the overall feeling or atmosphere in rich, evocative language.",
     
-    "functional": "Describe what is happening in this image by focusing on function, purpose, and action. What are the objects FOR? What are they DOING? What is their utility or role? Describe actions, processes, relationships of use, and functional meaning. Focus on verbs: illuminates, supports, connects, transforms, protects, enables."
+    "functional": "Describe what is happening in this image by focusing on function, purpose, and action. What are the objects FOR? What are they DOING? What is their utility or role? Describe actions, processes, relationships of use, and functional meaning. Focus on verbs: illuminates, supports, connects, transforms, protects, enables.",
+
+    "aialttext": "Generate three instances of website alt text for this image of differing lengths:\n- 25 words\n- 50 words\n- 100 words"
   },
 
   "prompt_model_settings": {
@@ -127,6 +129,14 @@
       "top_k": 40,
       "top_p": 0.9,
       "repeat_penalty": 1.3
+    },
+
+    "aialttext": {
+      "temperature": 0.1,
+      "num_predict": 750,
+      "top_k": 40,
+      "top_p": 0.9,
+      "repeat_penalty": 1.3
     }
   },
 
@@ -185,13 +195,13 @@
       {
         "name": "kimi-k2.5:cloud",
         "description": "High quality, detailed descriptions. Best for narrative, detailed, artistic, and technical styles. Requires cloud provider setup.",
-        "best_for": ["narrative", "detailed", "artistic", "technical", "accessibility"],
+        "best_for": ["narrative", "detailed", "artistic", "technical", "accessibility", "aialttext"],
         "temperature_default": 0.15
       },
       {
         "name": "gemma4:31b-cloud",
         "description": "Fast, good quality, excellent at following structured prompts. Best for colorful, concise, comparison. Requires cloud provider setup.",
-        "best_for": ["colorful", "concise", "comparison", "simple"],
+        "best_for": ["colorful", "concise", "comparison", "simple", "aialttext"],
         "temperature_default": 0.2
       },
       {
@@ -218,8 +228,8 @@
 
   "documentation": {
     "overview": "This configuration file controls all aspects of the image description process. Version 3.1 includes extensively researched prompt improvements.",
-    "version": "3.1",
-    "last_updated": "2026-04-08",
+    "version": "3.2",
+    "last_updated": "2026-04-18",
     "prompt_styles": {
       "narrative": "Flowing description with spatial organization (left-to-right, foreground/background)",
       "detailed": "Structured sections: SUBJECT, SETTING, COLORS, COMPOSITION, DETAILS",
@@ -231,7 +241,8 @@
       "accessibility": "Screen reader optimized - concrete language, spatial relationships, no visual-only refs",
       "comparison": "Analogies to familiar objects - makes abstract images relatable",
       "mood": "Emotional atmosphere and psychological tone",
-      "functional": "Focus on purpose, action, utility - what things DO"
+      "functional": "Focus on purpose, action, utility - what things DO",
+      "aialttext": "Three website alt text options at 25, 50, and 100 words — ready for human review before publishing"
     },
     "prompt_style_recommendations": {
       "general_use": "narrative",
@@ -243,7 +254,8 @@
       "screen_readers": "accessibility",
       "education_outreach": "comparison",
       "emotional_content": "mood",
-      "process_documentation": "functional"
+      "process_documentation": "functional",
+      "web_alt_text_drafting": "aialttext"
     },
     "model_settings": {
       "temperature": "Controls randomness (0.0-1.0). Lower = more consistent. Recommended: 0.1-0.35 depending on style.",

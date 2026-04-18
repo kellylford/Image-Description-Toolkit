@@ -642,7 +642,7 @@ The key file approach is often simpler for GUI users — create a plain text fil
 
 ## 19. Prompt Styles — Built-In Options
 
-IDT includes seven built-in prompt styles. The prompt text shown below is sent verbatim to the AI model along with the image.
+IDT includes twelve built-in prompt styles. The prompt text shown below is sent verbatim to the AI model along with the image.
 
 ### narrative (Default)
 
@@ -743,6 +743,79 @@ Gives the model no structure or direction. Output is entirely model-dependent �
 
 ---
 
+### accessibility
+
+**Prompt text:**
+```
+Describe this image for a screen reader user. Start with the main subject and overall
+scene. Then describe objects and people from left to right, including their colors,
+sizes, and positions relative to each other. Mention foreground, middle ground, and
+background elements. Use concrete, specific language without metaphor or visual-only
+references.
+```
+
+Optimized for use with screen readers and assistive technology. Spatial, concrete, and free of visual-only language. Best for accessibility workflows, image metadata for AT users, and any situation where the description will be read aloud. Typical length: 200–400 words.
+
+---
+
+### comparison
+
+**Prompt text:**
+```
+Describe this image by comparing elements to familiar everyday objects, experiences,
+or well-known references. Use analogies like 'shaped like a...', 'resembles...',
+'similar to...', 'about the size of...' to help someone understand what they're seeing.
+Make space imagery and abstract concepts relatable.
+```
+
+Uses analogies and familiar references to make unfamiliar subjects accessible. Particularly useful for scientific, astronomical, or abstract imagery where a reader may have no frame of reference. Typical length: 200–400 words.
+
+---
+
+### mood
+
+**Prompt text:**
+```
+Describe the emotional atmosphere and mood of this image. What feelings does it evoke?
+What is the psychological tone? Describe the emotional quality of the lighting, the
+mood conveyed by the composition, and the overall feeling or atmosphere in rich,
+evocative language.
+```
+
+Focuses on emotional tone and psychological atmosphere rather than visual inventory. Best for editorial photography, fine art, and any context where the feeling of an image matters as much as its content. Typical length: 200–400 words.
+
+---
+
+### functional
+
+**Prompt text:**
+```
+Describe what is happening in this image by focusing on function, purpose, and action.
+What are the objects FOR? What are they DOING? What is their utility or role? Describe
+actions, processes, relationships of use, and functional meaning. Focus on verbs:
+illuminates, supports, connects, transforms, protects, enables.
+```
+
+Describes purpose and action rather than appearance. Best for instructional content, process documentation, product use cases, and technical workflows where what things do matters more than what they look like. Typical length: 200–350 words.
+
+---
+
+### aialttext
+
+**Prompt text:**
+```
+Generate three instances of website alt text for this image of differing lengths:
+- 25 words
+- 50 words
+- 100 words
+```
+
+Generates three ready-to-review alt text drafts at different lengths, giving you options depending on context and content complexity. The AI understands alt text conventions without additional instruction — shorter versions prioritize the essential visual fact, longer versions add spatial detail and significance.
+
+**Important:** AI-generated alt text requires human review before publishing. The AI can describe what is visually present but cannot supply names, mission context, or domain-specific knowledge that a human author would know. Use this prompt as a starting point, not a final product. Typical length: 50–200 words total (all three versions combined).
+
+---
+
 ### Choosing a Prompt Style
 
 Quick decision guide:
@@ -755,6 +828,11 @@ Quick decision guide:
 | Art or photography portfolio | `artistic` |
 | Camera / image quality review | `technical` |
 | Interior design, color analysis | `colorful` |
+| Screen reader / accessibility metadata | `accessibility` |
+| Scientific or abstract imagery | `comparison` |
+| Editorial or fine art | `mood` |
+| Instructional / process documentation | `functional` |
+| Website alt text drafts for human review | `aialttext` |
 | Testing a model baseline | `simple` |
 
 **Match prompt complexity to model capability.** Small local models (moondream, llava:7b) will not follow the structure in `detailed` or `technical` — they will produce narrative text regardless. Reserve complex prompts for larger models (llama3.2-vision, GPT-4o, Claude, qwen3-vl).
