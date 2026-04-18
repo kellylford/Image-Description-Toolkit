@@ -138,6 +138,48 @@ Used as a starting point for a human editor, the AI alt text prompt can save tim
 
 ---
 
+## Kimi-K2.5 and Gemma4: Same Prompt, Different Voice
+
+One of the things I wanted to know was whether two different models given the exact same alt text prompt would produce meaningfully different results — or whether the prompt would dominate and the model would not matter much.
+
+The short answer: both models followed the three-length structure cleanly, but they have genuinely different voices. And the differences matter for publishing.
+
+**Speed** is the most obvious difference — and it comes with a lesson. Kimi-K2.5 averaged 116 seconds per image for this run. Gemma4 averaged 14 seconds. For 64 images, Kimi took just over two hours; Gemma took about 15 minutes.
+
+What makes that gap interesting is that Kimi is not normally a slow model. Across all the other prompts in this dataset, it averaged between 11 and 36 seconds per image. The aialttext run was a significant outlier. My hypothesis is that asking for three outputs of different lengths in a single prompt caused Kimi to generate substantially more text per image — and longer outputs simply take longer to produce. Gemma handled the same multi-part prompt without the same time cost.
+
+The practical takeaway: any time you combine things in a prompt — multiple outputs, multiple formats, multiple lengths — it is worth running a small test batch first to understand how your model of choice responds before committing to 64 images. What works efficiently with one model may behave very differently with another.
+
+**Formatting** differed in small but telling ways. Kimi labeled its sections `**25 words:**`, `**50 words:**`, `**100 words:**` — a clean, precise claim. Gemma used `**Short (approx. 25 words)**`, `**Medium (approx. 50 words)**`, `**Long (approx. 100 words)**`. Gemma's "approx." qualifier is more honest: neither model is actually hitting the word counts precisely, but Gemma at least acknowledges it.
+
+Here is the same image — an astronaut silhouetted against a spacecraft window, with Earth filling the frame outside — described by both models.
+
+**Kimi-K2.5:**
+
+> *25 words:* Silhouette of an astronaut gazing at Earth through a spacecraft window, showing blue oceans, swirling white clouds, and the planet's curvature against the black space.
+
+> *50 words:* Astronaut's silhouette visible against a spacecraft window, gazing at Earth suspended in the blackness of space. The planet displays vibrant blue oceans, swirling white cloud formations, and hints of landmasses. The curved horizon emphasizes Earth's spherical shape, creating a striking contrast between the dark interior and the illuminated planet beyond.
+
+> *100 words:* The dark silhouette of an astronaut's profile is visible against a spacecraft window, gazing at the stunning view of Earth from orbit. The planet fills the window with vibrant blue oceans, swirling white cloud formations, and visible landmasses partially obscured by haze. The curvature of Earth is prominently displayed against the infinite blackness of space, creating a dramatic contrast between the illuminated planet and the dark void surrounding it. The spacecraft interior remains shadowed, emphasizing the isolation of space travel while highlighting the breathtaking beauty of our home planet. This perspective showcases Earth's fragility and the profound experience of orbital observation.
+
+**Gemma4:**
+
+> *Short (approx. 25 words):* Silhouette of an astronaut looking through a spacecraft window at a vibrant blue and white Earth against the deep black void of space.
+
+> *Medium (approx. 50 words):* A dramatic silhouette of a person's profile, likely an astronaut, gazing through a rounded spacecraft portal. Outside the window, the Earth is visible as a brilliant blue marble with swirling white clouds and brown landmasses, contrasting sharply against the absolute darkness of the surrounding outer space.
+
+> *Long (approx. 100 words):* A poignant, high-contrast photograph taken from inside a spacecraft. In the foreground, the dark silhouette of an astronaut's face is seen in profile, looking out through a curved observation window. The window frames a breathtaking view of planet Earth, showcasing deep blue oceans, intricate white cloud patterns, and the reddish-brown hues of a continent. The stark contrast between the pitch-black interior of the cabin and the luminous, glowing sphere of the planet emphasizes the isolation of space and the fragile beauty of Earth seen from a low-orbit perspective.
+
+Neither names the astronaut (Reid Wiseman). Neither identifies the spacecraft (Orion). That knowledge has to come from the human editor. But as starting drafts, both are genuinely useful.
+
+Kimi reads as more narrative and expansive. The 100-word version builds toward a conclusion — "the profound experience of orbital observation." Gemma is tighter and more visual — "the reddish-brown hues of a continent." Different writers will reach for one or the other depending on the context and tone of the publication.
+
+There is also a case where model voice led to an actual error worth noting. For the Earthset image — Earth appearing above the lunar horizon, taken from the far side of the Moon — Kimi's 100-word version referred to it as the "Earthrise" phenomenon. Earthrise and Earthset are different events. Earthrise famously refers to the Apollo 8 photograph from lunar orbit. This image, taken by the Artemis II crew, shows Earthset from the lunar far side. Kimi reached for the famous reference but got it wrong. NASA's captured alt text — "Earthset From the Lunar Far Side" — was correct. Gemma described it accurately without using either term.
+
+This is exactly why human review matters before publishing. The AI knew the image was significant. It chose a famous, evocative label. But the label was wrong. A human editor who knew the difference would catch it instantly. A human editor who did not might publish the error.
+
+---
+
 ## Follow-Up Questions and Chat
 
 One more IDT capability worth highlighting, now that the NASA dataset illustrates it well. After any image has been described, IDT lets you ask follow-up questions — press F in the ImageDescriber GUI or use the CLI. You can switch to a different model for the follow-up if you want.
@@ -162,14 +204,14 @@ The AI Alt Text prompt was only run on Kimi-K2.5 and Gemma4 models for this data
 
 You can obtain the full set of image descriptions and prompts used for this set of NASA images at the following locations.
 
-- [CSV of all descriptions]([LINK PLACEHOLDER])
-- [Markdown file of all prompts]([LINK PLACEHOLDER])
+- [CSV of all descriptions](https://www.theideaplace.net/projects/NasaDescriptions.csv)
+- [Markdown file of all prompts](https://www.theideaplace.net/projects/prompts.md)
 
 ---
 
 ## Try It Yourself
 
-IDT 4.0.0Beta3 is available for Windows and macOS (build from source). The Windows installer is at [theideaplace.net/projects](https://www.theideaplace.net/projects). Full documentation is in the [User Guide on GitHub](https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE_COMPLETE.md).
+The latest version of the Image Description Toolkit can be obtained from the [GitHub releases page](https://github.com/kellylford/Image-Description-Toolkit/releases/latest) or on the [project page at theideaplace.net](https://www.theideaplace.net/projects). Full documentation is in the [User Guide on GitHub](https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE_COMPLETE.md).
 
 If you want to replicate the NASA experiment, try:
 
