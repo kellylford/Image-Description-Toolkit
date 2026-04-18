@@ -206,6 +206,9 @@ You can obtain the full set of image descriptions and prompts used for this set 
 
 - [CSV of all descriptions](https://www.theideaplace.net/projects/NasaDescriptions.csv)
 - [Markdown file of all prompts](https://www.theideaplace.net/projects/prompts.md)
+- [AI models used in this dataset](https://www.theideaplace.net/projects/models.md)
+
+The CSV includes descriptions from eight models across six providers: Claude Haiku 4.5, Claude Sonnet 4.6, Gemma4 31b, Kimi K2, Moondream, Qwen3-VL 235b, GPT-4.1 Mini, and GPT-4.1 Nano. For a brief description of each model and links to official documentation, see the models file above.
 
 ---
 
