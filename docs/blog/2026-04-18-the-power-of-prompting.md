@@ -6,7 +6,7 @@ Since writing about [IDT 4.0 Beta 1](https://theideaplace.net/introducing-idt-4-
 
 ### What Has Changed Since Beta 1
 
-The [February post](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) introduced IDT 4.0's two main tools — the `ImageDescriber` GUI and the `idt` command line — along with support for Ollama, OpenAI, and Claude models. Since then, 4.0.0Beta3 has shipped with a number of additions worth knowing about:
+The [February post](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) introduced IDT 4.0's two main tools — the `ImageDescriber` GUI and the `idt` command line — along with support for Ollama, OpenAI, and Claude models. Since then, [4.0.0Beta3 has shipped](https://github.com/kellylford/Image-Description-Toolkit/releases/tag/v4.0.0Beta3) with a number of additions worth knowing about:
 
 - **`idt describe`** — a friendlier alias for `idt workflow`. Same command, easier to remember.
 - **`idt redescribe`** — re-runs AI description on a set of images you have already processed, skipping the video extraction and conversion steps. Useful for quickly testing a new model or prompt on the same images without starting from scratch.
