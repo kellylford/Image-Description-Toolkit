@@ -223,7 +223,7 @@ The AI Alt Text prompt was only run on Kimi-K2.5 and Gemma4 models for this data
 You can obtain the full set of image descriptions and prompts used for this set of NASA images at the following locations.
 
 - [CSV of all descriptions](https://www.theideaplace.net/projects/NasaDescriptions.csv)
-- [Markdown file of all prompts](https://www.theideaplace.net/projects/prompts.md) · [GitHub](https://github.com/kellylford/Image-Description-Toolkit/blob/v4.0.0Beta3/docs/archive/prompts.md)
+- [Markdown file of all prompts](https://github.com/kellylford/Image-Description-Toolkit/blob/v4.0.0Beta3/docs/archive/prompts.md)
 - [AI models used in this dataset](https://www.theideaplace.net/projects/models.md)
 
 The CSV includes descriptions from eight models across six providers: Claude Haiku 4.5, Claude Sonnet 4.6, Gemma4 31b, Kimi K2, Moondream, Qwen3-VL 235b, GPT-4.1 Mini, and GPT-4.1 Nano. For a brief description of each model and links to official documentation, see the models file above.
