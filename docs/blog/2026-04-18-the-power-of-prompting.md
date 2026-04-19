@@ -1,8 +1,7 @@
 # The Power of Prompting
 
-*[BYLINE PLACEHOLDER — options: "By Kelly Ford", "By [AI Author Name]", or note AI-assisted authorship here]*
 
-Since writing about [IDT 4.0 Beta 1](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) in February, things have moved quickly. A new beta is out, new models have been added, the prompt library has grown, and I found a perfect real-world dataset to put the whole system through its paces: NASA's Image of the Day collection. This post is about what I learned, what the data showed, and why the right prompt can make all the difference.
+Since writing about [The Image Description Toolkit (IDT)  4.0 Beta 1](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) in February, a lot of work on the toolkit has been happening. A new beta is out, new models have been added, the prompt library has grown, and I found a perfect real-world dataset to put the whole system through its paces: NASA's Image of the Day collection. This post is about what I learned, what the data showed, and why the right prompt can make all the difference.
 
 ### What Has Changed Since Beta 1
 
@@ -10,12 +9,10 @@ The [February post](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhan
 
 - **`idt describe`** — a friendlier alias for `idt workflow`. Same command, easier to remember.
 - **`idt redescribe`** — re-runs AI description on a set of images you have already processed, skipping the video extraction and conversion steps. Useful for quickly testing a new model or prompt on the same images without starting from scratch.
-- **`idt manage-models`** — install, remove, and list Ollama models directly from the IDT without leaving your terminal.
 - **`idt guideme` now accepts URLs** — in addition to a folder path, you can paste a web page URL at the image folder prompt and IDT will download images from that page and continue the workflow automatically.
 - **Downloaded images organized by source** — images downloaded from a URL are now placed in a subfolder named after the domain and page title, so you always know where a set of images came from.
-- **Expanded prompt recognition** — accessibility, comparison, mood, and functional prompt styles are now correctly identified across all analysis tools.
 
-The full list of prompts has also grown. IDT now ships with eleven built-in prompts, each designed to draw out a different aspect of an image:
+The full list of prompts has also grown. IDT now ships with twelve built-in prompts, each designed to draw out a different aspect of an image:
 
 1. **Narrative** — a straightforward scene description, grounding you in what is present
 2. **Detailed** — everything Narrative gives you, plus more technical depth
@@ -28,6 +25,7 @@ The full list of prompts has also grown. IDT now ships with eleven built-in prom
 9. **Comparison** — designed for comparing two versions of the same image
 10. **Mood** — emotional tone and atmosphere
 11. **Functional** — what the image is for, not just what it shows
+12. **AI Alt Text** — three website alt text options at 25, 50, and 100 words, designed as a starting draft for human review before publishing
 
 You can edit any of these or add your own through the Tools menu in ImageDescriber or by editing `prompts.json` directly.
 
@@ -41,11 +39,11 @@ This turned out to be far more interesting than I expected once I chose my test 
 
 On April 1, 2026, NASA launched the Artemis II mission — the first crewed Moon trip since the Apollo program. NASA's Image of the Day page had been building up to this for weeks with stunning photographs: the crew in training, the rocket being prepared, and then the mission itself: Earthrise from lunar orbit, the Milky Way seen from deep space, the crew capsule from a window looking back at a shrunken planet.
 
-This was a natural fit for IDT. I used `idt workflow` to download 64 images directly from the NASA Image of the Day page and ran all eleven built-in prompts across multiple AI models. The dataset includes descriptions from Claude Haiku 4.5, Claude Sonnet 4.6, Ollama Gemma4 31b (cloud), Ollama Kimi-K2.5 (cloud), Ollama Moondream, Ollama Qwen3-VL 235b (cloud), GPT-4.1 Mini, and GPT-4.1 Nano — over 700 descriptions in total.
+This was a natural fit for IDT. I used `idt workflow` to download 64 images directly from the NASA Image of the Day page and ran all twelve built-in prompts across multiple AI models. The dataset includes descriptions from Claude Haiku 4.5, Claude Sonnet 4.6, Ollama Gemma4 31b (cloud), Ollama Kimi-K2.5 (cloud), Ollama Moondream, Ollama Qwen3-VL 235b (cloud), GPT-4.1 Mini, and GPT-4.1 Nano — over 700 descriptions in total.
 
 And because IDT captured the alt text from NASA's page during download, I had a built-in comparison baseline.
 
-### NASA Does Alt Text Well
+### NASA Does Quality Alt Text Already
 
 Before getting into what IDT produced, it is worth saying clearly: NASA already writes excellent alt text. This is not a critique. NASA's image descriptions are thoughtful, specific, and informative. They name people, identify locations, and include context that no AI can supply from an image alone.
 
@@ -100,9 +98,11 @@ Each prompt gives you something different. None replaces NASA's contextual knowl
 
 ### Introducing the AI Alt Text Prompt (Experimental)
 
-The eleven standard prompts are all about understanding an image in depth. But there is also a practical question: can AI generate usable alt text for web images?
+The eleven standard prompts I was originally going to use in this version of the IDT are all about understanding an image in depth. But there is also a practical question: can AI generate usable alt text for web images?
 
-I added a twelfth experimental prompt — `aialttext` — that asks the AI for three versions of website alt text at different lengths: 25 words, 50 words, and 100 words. The goal is to give whoever is publishing the image options to choose from depending on the context.
+I added a twelfth experimental prompt — `aialttext` — that asks the AI for three versions of website alt text at different lengths: 25 words, 50 words, and 100 words. The goal is to give whoever is publishing the image options to choose from depending on the context. I'll give away the answer and say the answer is a qualified yes so the IDT now has twelve standard prompts.
+
+This yes is **qualified** because AI text should always be reviewed by a human. AI can assist in generating alt text is probably the better answer.
 
 The results above show what Kimi-K2.5 produced for the Earthset image. Let me give one more example. Here is NASA's alt text for the Saturn image taken by the James Webb Space Telescope:
 
@@ -218,4 +218,4 @@ That will download the current Image of the Day collection and describe the imag
 
 Questions, issues, and pull requests are welcome at [github.com/kellylford/Image-Description-Toolkit](https://github.com/kellylford/Image-Description-Toolkit).
 
-*This blog post was [written with / assisted by] AI. [AUTHOR NOTE: Fill in authorship disclosure as appropriate.]*
+*This blog post used AI for parts of the image research, content organization and overall editorial review.
