@@ -1,6 +1,6 @@
 # AI Models Used in IDT NASA Dataset
 
-This file describes the AI models used to generate image descriptions for the [NASA Image of the Day dataset](https://www.theideaplace.net/projects/NasaDescriptions.csv). All descriptions below are sourced from official documentation.
+This file describes the AI models used to generate image descriptions for the [NASA Image of the Day dataset](http://theideaplace.net/wp-content/uploads/2026/04/NasaDescriptions.csv). All descriptions below are sourced from official documentation.
 
 ---
 
