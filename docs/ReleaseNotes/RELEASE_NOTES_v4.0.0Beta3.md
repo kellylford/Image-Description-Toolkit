@@ -113,11 +113,15 @@ The new `--show-descriptions on` flag streams each AI-generated description to t
 
 ---
 
-### All 11 Prompt Styles Refined
+### Prompt Library: Existing Prompts Revised, New Prompts Added
 
-Every prompt style has been rewritten for Beta 3. The revisions address common failure modes from earlier versions: vague structural guidance, over-permissive language that encouraged hallucination, and inconsistent output across models. Each prompt now has a tighter behavioral contract and per-style model settings (temperature, output length) tuned to match its intent.
+IDT now ships with **12 built-in prompt styles**, up from 7 in Beta 1.
 
-The updated prompts (as they are sent to the AI model):
+**Existing prompts revised:** All original prompt styles have been rewritten for Beta 3. The revisions address common failure modes from earlier versions: vague structural guidance, over-permissive language that encouraged hallucination, and inconsistent output across models. Each prompt now has a tighter behavioral contract and per-style model settings (temperature, output length) tuned to match its intent.
+
+**New prompts added:** Four prompt styles are new in Beta 3 — **accessibility**, **comparison**, **mood**, and **functional** — covering structured screen-reader output, analogy-based description, emotional atmosphere, and action/purpose-focused description respectively. An experimental twelfth prompt, **aialttext**, generates three lengths of website alt text (25, 50, and 100 words) in a single pass, intended as a starting draft for human review.
+
+All 12 prompts (as they are sent to the AI model):
 
 **narrative**
 > Describe this image in a narrative style. Start with the overall scene, then describe specific objects and people from left to right. Include colors, clothing details, and spatial relationships. Mention what's in the foreground, middle ground, and background. Use concrete, specific language without metaphor or interpretation.
@@ -175,6 +179,12 @@ The updated prompts (as they are sent to the AI model):
 
 **functional**
 > Describe what is happening in this image by focusing on function, purpose, and action. What are the objects FOR? What are they DOING? What is their utility or role? Describe actions, processes, relationships of use, and functional meaning. Focus on verbs: illuminates, supports, connects, transforms, protects, enables.
+
+**aialttext** *(experimental)*
+> Generate three instances of website alt text for this image of differing lengths:
+> - 25 words
+> - 50 words
+> - 100 words
 
 ---
 
