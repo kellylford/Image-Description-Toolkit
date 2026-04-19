@@ -189,6 +189,24 @@ The updated prompts (as they are sent to the AI model):
 
 ---
 
+## Post-Tag Updates (since bld1)
+
+### AI Alt Text Prompt Now Official
+
+The **aialttext** prompt style is now fully registered in `image_describer_config.json`:
+
+- Added to `prompt_variations`, `prompt_model_settings`, `documentation.prompt_styles`, and `prompt_style_recommendations`
+- Added to the `best_for` arrays for Kimi-K2.5 and Gemma4 models, which produced the best results in testing
+- Config version bumped to 3.2 (2026-04-18)
+
+The User Guide has been updated to document all 12 prompt styles (previously listed 7), with a new choosing guide covering accessibility, comparison, mood, functional, and aialttext.
+
+### Claude Model Version Recognition Expanded
+
+`idt combinedescriptions` and the label-formatting logic now correctly identify and display friendly labels for newer Claude variants: Haiku 4.5, Sonnet 4.6, and Opus 4.7/4.6/4.5. Previously these were shown as unrecognized or fell through to the wrong label. Matching order has been adjusted so more specific version checks take precedence over fallbacks, preserving existing labels for older models (Haiku 3/3.5, Sonnet 3.7/4/4.5, Opus 4/4.1).
+
+---
+
 ## Known Issues / Beta Notes
 
 - MLX model downloads are large (1–7 GB). Ensure adequate disk space before selecting a model for the first time.
