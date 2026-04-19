@@ -2,11 +2,11 @@
 
 *[BYLINE PLACEHOLDER — options: "By Kelly Ford", "By [AI Author Name]", or note AI-assisted authorship here]*
 
-Since writing about IDT 4.0 Beta 1 in February, things have moved quickly. A new beta is out, new models have been added, the prompt library has grown, and I found a perfect real-world dataset to put the whole system through its paces: NASA's Image of the Day collection. This post is about what I learned, what the data showed, and why the right prompt can make all the difference.
+Since writing about [IDT 4.0 Beta 1](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) in February, things have moved quickly. A new beta is out, new models have been added, the prompt library has grown, and I found a perfect real-world dataset to put the whole system through its paces: NASA's Image of the Day collection. This post is about what I learned, what the data showed, and why the right prompt can make all the difference.
 
 ### What Has Changed Since Beta 1
 
-The February post introduced IDT 4.0's two main tools — the `ImageDescriber` GUI and the `idt` command line — along with support for Ollama, OpenAI, and Claude models. Since then, 4.0.0Beta3 has shipped with a number of additions worth knowing about:
+The [February post](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) introduced IDT 4.0's two main tools — the `ImageDescriber` GUI and the `idt` command line — along with support for Ollama, OpenAI, and Claude models. Since then, 4.0.0Beta3 has shipped with a number of additions worth knowing about:
 
 - **`idt describe`** — a friendlier alias for `idt workflow`. Same command, easier to remember.
 - **`idt redescribe`** — re-runs AI description on a set of images you have already processed, skipping the video extraction and conversion steps. Useful for quickly testing a new model or prompt on the same images without starting from scratch.
