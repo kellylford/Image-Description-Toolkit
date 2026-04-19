@@ -2,13 +2,9 @@
 
 *[BYLINE PLACEHOLDER — options: "By Kelly Ford", "By [AI Author Name]", or note AI-assisted authorship here]*
 
----
-
 Since writing about IDT 4.0 Beta 1 in February, things have moved quickly. A new beta is out, new models have been added, the prompt library has grown, and I found a perfect real-world dataset to put the whole system through its paces: NASA's Image of the Day collection. This post is about what I learned, what the data showed, and why the right prompt can make all the difference.
 
----
-
-## What Has Changed Since Beta 1
+### What Has Changed Since Beta 1
 
 The February post introduced IDT 4.0's two main tools — the `ImageDescriber` GUI and the `idt` command line — along with support for Ollama, OpenAI, and Claude models. Since then, 4.0.0Beta3 has shipped with a number of additions worth knowing about:
 
@@ -35,17 +31,13 @@ The full list of prompts has also grown. IDT now ships with eleven built-in prom
 
 You can edit any of these or add your own through the Tools menu in ImageDescriber or by editing `prompts.json` directly.
 
----
-
-## When You Download Images, IDT Now Captures Alt Text Too
+### When You Download Images, IDT Now Captures Alt Text Too
 
 One feature that did not get much attention in the Beta 1 post: when IDT downloads images from a web page, it also captures the alt text that is already on those images. That data is stored alongside your downloaded images and is available for comparison when you run the analysis tools.
 
 This turned out to be far more interesting than I expected once I chose my test dataset.
 
----
-
-## The NASA Opportunity
+### The NASA Opportunity
 
 On April 1, 2026, NASA launched the Artemis II mission — the first crewed Moon trip since the Apollo program. NASA's Image of the Day page had been building up to this for weeks with stunning photographs: the crew in training, the rocket being prepared, and then the mission itself: Earthrise from lunar orbit, the Milky Way seen from deep space, the crew capsule from a window looking back at a shrunken planet.
 
@@ -53,9 +45,7 @@ This was a natural fit for IDT. I used `idt workflow` to download 64 images dire
 
 And because IDT captured the alt text from NASA's page during download, I had a built-in comparison baseline.
 
----
-
-## NASA Does Alt Text Well
+### NASA Does Alt Text Well
 
 Before getting into what IDT produced, it is worth saying clearly: NASA already writes excellent alt text. This is not a critique. NASA's image descriptions are thoughtful, specific, and informative. They name people, identify locations, and include context that no AI can supply from an image alone.
 
@@ -72,9 +62,7 @@ Here is what Kimi-K2.5 produced for the same image with the Narrative prompt:
 
 Good, accurate description of what is visible — but no name, no mission context, no spacecraft identification. The AI sees the scene; NASA's writer knows the story.
 
----
-
-## Prompts Change What You Get
+### Prompts Change What You Get
 
 Here is where the Power of Prompting shows up. Take a different image: Earthset from the far side of the Moon — the Earth appearing as a crescent above the cratered lunar horizon.
 
@@ -110,9 +98,7 @@ Concise. Functional. Ready for a screen reader.
 
 Each prompt gives you something different. None replaces NASA's contextual knowledge. But together they build a much fuller picture than any single description could.
 
----
-
-## Introducing the AI Alt Text Prompt (Experimental)
+### Introducing the AI Alt Text Prompt (Experimental)
 
 The eleven standard prompts are all about understanding an image in depth. But there is also a practical question: can AI generate usable alt text for web images?
 
@@ -136,9 +122,7 @@ The AI cannot name people it has not been trained on. It may misread or invent l
 
 Used as a starting point for a human editor, the AI alt text prompt can save time and surface details a writer might miss. Used as a replacement for human review, it introduces exactly the kind of accessibility failure that ruins the experience for the people who most need it.
 
----
-
-## Kimi-K2.5 and Gemma4: Same Prompt, Different Voice
+### Kimi-K2.5 and Gemma4: Same Prompt, Different Voice
 
 One of the things I wanted to know was whether two different models given the exact same alt text prompt would produce meaningfully different results — or whether the prompt would dominate and the model would not matter much.
 
@@ -178,9 +162,7 @@ There is also a case where model voice led to an actual error worth noting. For 
 
 This is exactly why human review matters before publishing. The AI knew the image was significant. It chose a famous, evocative label. But the label was wrong. A human editor who knew the difference would catch it instantly. A human editor who did not might publish the error.
 
----
-
-## Follow-Up Questions and Chat
+### Follow-Up Questions and Chat
 
 One more IDT capability worth highlighting, now that the NASA dataset illustrates it well. After any image has been described, IDT lets you ask follow-up questions — press F in the ImageDescriber GUI or use the CLI. You can switch to a different model for the follow-up if you want.
 
@@ -188,9 +170,7 @@ For example: after running the Narrative prompt on the Artemis II launch photogr
 
 IDT also has a freestanding chat mode (press C in ImageDescriber) for model-to-model conversation without any image attached.
 
----
-
-## The NASA Meatball
+### The NASA Meatball
 
 Some images are so iconic that AI models reference them by name without stopping to describe them — and the NASA meatball logo is the clearest example in this dataset.
 
@@ -206,9 +186,7 @@ The one exception: when the NASA logo itself was the image subject (a standalone
 
 **The prompt implication.** The accessibility and AI alt text prompts in IDT currently do not explicitly instruct models to describe iconic logos and emblems when they appear incidentally in an image. Adding language like *"when referencing iconic logos, insignia, or well-known symbols by name, include a brief visual description of what the symbol looks like"* may close this gap in a future prompt revision.
 
----
-
-## Data Completeness
+### Data Completeness
 
 In a few instances, data for a prompt and model are not complete. In the case of Moondream, some prompts — such as Technical — failed to return any response on multiple tries.
 
@@ -216,9 +194,7 @@ In the case of Claude, not all prompts were run due to the amount of data alread
 
 The AI Alt Text prompt was only run on Kimi-K2.5 and Gemma4 models for this dataset.
 
----
-
-## The Data
+### The Data
 
 You can obtain the full set of image descriptions and prompts used for this set of NASA images at the following locations.
 
@@ -228,9 +204,7 @@ You can obtain the full set of image descriptions and prompts used for this set 
 
 The CSV includes descriptions from eight models across six providers: Claude Haiku 4.5, Claude Sonnet 4.6, Gemma4 31b, Kimi K2, Moondream, Qwen3-VL 235b, GPT-4.1 Mini, and GPT-4.1 Nano. For a brief description of each model and links to official documentation, see the models file above.
 
----
-
-## Try It Yourself
+### Try It Yourself
 
 The latest version of the Image Description Toolkit can be obtained from the [GitHub releases page](https://github.com/kellylford/Image-Description-Toolkit/releases/latest) or on the [project page at theideaplace.net](https://www.theideaplace.net/projects). Full documentation is in the [User Guide on GitHub](https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE_COMPLETE.md).
 
@@ -243,7 +217,5 @@ idt workflow https://www.nasa.gov/image-of-the-day/
 That will download the current Image of the Day collection and describe the images using your configured model and prompt. From there, `idt combinedescriptions` will compile everything into a CSV you can explore in Excel or any spreadsheet tool.
 
 Questions, issues, and pull requests are welcome at [github.com/kellylford/Image-Description-Toolkit](https://github.com/kellylford/Image-Description-Toolkit).
-
----
 
 *This blog post was [written with / assisted by] AI. [AUTHOR NOTE: Fill in authorship disclosure as appropriate.]*
