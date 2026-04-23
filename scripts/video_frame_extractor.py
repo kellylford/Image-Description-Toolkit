@@ -13,6 +13,20 @@ import numpy as np
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import time
+import sys
+
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
+# Import shared window title builder
+try:
+    from shared.window_title_builder import build_window_title
+except ImportError:
+    build_window_title = None
+
 import logging
 from datetime import datetime
 import sys
@@ -27,7 +41,7 @@ except ImportError:
 
 class VideoFrameExtractor:
     def __init__(self, config_file: str = "video_frame_extractor_config.json", log_dir: str = None):
-        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
+        self.supported_formats = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts'}
         self.config_file = config_file  # Store for logging
         self.log_dir = log_dir
         self.setup_logging()  # Set up logging first
@@ -75,6 +89,24 @@ class VideoFrameExtractor:
 
     def _build_window_title(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
         """Build a descriptive window title similar to image_describer."""
+        if build_window_title:
+            return build_window_title(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                operation="Extracting Video Frames",
+                suffix=suffix
+            )
+        else:
+            return self._build_window_title_fallback(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                suffix=suffix
+            )
+    
+    def _build_window_title_fallback(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
+        """Fallback window title builder (used when shared module unavailable)"""
         base = f"IDT - Extracting Video Frames ({progress_percent}%, {current} of {total})"
         return base + suffix
         
@@ -159,7 +191,15 @@ class VideoFrameExtractor:
             if not config_path.exists():
                 self.logger.warning(f"Config file not found: {config_path}")
                 return self.get_default_config()
-                
+            
+            # Try config_loader first for frozen mode compatibility
+            if load_json_config:
+                config, _, _ = load_json_config('video_frame_extractor_config.json', explicit=str(config_path))
+                if config:
+                    self.logger.info(f"Configuration loaded from: {config_path}")
+                    return config
+            
+            # Fallback to direct file loading
             with open(config_path, 'r') as f:
                 content = f.read().strip()
                 if not content:
@@ -205,6 +245,8 @@ class VideoFrameExtractor:
             "start_time_seconds": 0,
             "end_time_seconds": None,
             "max_frames_per_video": None,
+            "min_frames_per_video": 5,  # Enhanced scene detection: minimum frames guaranteed
+            "target_frames_per_video": 15,  # Enhanced scene detection: target number of frames
             "skip_existing": False,
             "log_progress": True
         }
@@ -274,44 +316,49 @@ class VideoFrameExtractor:
             return []
         
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            self.logger.warning(f"Video reported fps={fps}; using 1.0 fps fallback")
+            fps = 1.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps if fps > 0 else 0
+        duration = total_frames / fps
         
-        interval_frames = int(fps * self.config["time_interval_seconds"])
-        start_frame = int(fps * self.config["start_time_seconds"])
-        end_frame = int(fps * self.config["end_time_seconds"]) if self.config["end_time_seconds"] else total_frames
-        
+        interval_seconds = self.config["time_interval_seconds"]
+        start_time = self.config["start_time_seconds"]
+        end_time_cfg = self.config["end_time_seconds"]
+
         self.logger.info(f"Video properties: duration={duration:.1f}s, fps={fps:.1f}, total_frames={total_frames}")
-        self.logger.info(f"Extraction settings: interval={self.config['time_interval_seconds']}s, start={self.config['start_time_seconds']}s")
-        self.logger.info(f"Frame range: {start_frame} to {end_frame} (every {interval_frames} frames)")
-        
-        estimated_frames = (end_frame - start_frame) // interval_frames
-        if self.config["max_frames_per_video"]:
-            estimated_frames = min(estimated_frames, self.config["max_frames_per_video"])
-        self.logger.info(f"Estimated frames to extract: {estimated_frames}")
-        
+        self.logger.info(f"Extraction settings: interval={interval_seconds}s, start={start_time}s")
+
+        end_time = (end_time_cfg if end_time_cfg else duration)
+
         extracted_files = []
         frame_count = 0
-        current_frame = start_frame
-        
-        while current_frame < end_frame:
+        current_time = float(start_time)
+
+        while current_time < end_time:
             if self.config["max_frames_per_video"] and frame_count >= self.config["max_frames_per_video"]:
                 self.logger.info(f"Reached maximum frames limit: {self.config['max_frames_per_video']}")
                 break
-                
-            cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+
+            # Use time-based seeking (CAP_PROP_POS_MSEC) — more reliable than
+            # frame-number seeking for MPEG/MPG and other container formats.
+            target_ms = current_time * 1000.0
+            cap.set(cv2.CAP_PROP_POS_MSEC, target_ms)
             ret, frame = cap.read()
-            
+
             if not ret:
-                self.logger.warning(f"Failed to read frame at position {current_frame}")
+                self.logger.warning(f"Failed to read frame at {current_time:.2f}s")
                 break
+
+            # Use the actual position OpenCV landed on (keyframe snapping)
+            actual_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            timestamp = actual_ms / 1000.0 if actual_ms > 0 else current_time
             
             # Resize if specified
             if self.config["resize_width"] or self.config["resize_height"]:
                 frame = self.resize_frame(frame)
             
             # Save frame with video name for clear source attribution
-            timestamp = current_frame / fps
             filename = f"{video_name}_{timestamp:.2f}s.jpg"
             output_path = os.path.join(output_dir, filename)
             
@@ -341,20 +388,116 @@ class VideoFrameExtractor:
             else:
                 self.logger.error(f"Failed to save frame to {output_path}")
             
-            current_frame += interval_frames
+            current_time += interval_seconds
             
-            # Progress logging every 10 frames or at specific intervals
-            if frame_count % 10 == 0 or frame_count == estimated_frames:
-                progress = (frame_count / estimated_frames * 100) if estimated_frames > 0 else 0
-                self.logger.info(f"Progress: {frame_count}/{estimated_frames} frames ({progress:.1f}%)")
+            # Progress logging every 10 frames
+            if frame_count % 10 == 0:
+                self.logger.info(f"Progress: {frame_count} frames extracted ({timestamp:.1f}s)")
         
         cap.release()
         self.logger.info(f"Time interval extraction completed: {len(extracted_files)} frames extracted")
         return extracted_files
     
     def extract_frames_scene_change(self, video_path: str, output_dir: str) -> List[str]:
-        """Extract frames when scene changes are detected"""
+        """Extract frames when scene changes are detected using enhanced scene detector"""
         self.logger.info("Using scene change detection mode")
+        
+        # Try enhanced scene detection first
+        try:
+            from enhanced_scene_detector import EnhancedSceneDetector
+            return self._extract_frames_scene_change_enhanced(video_path, output_dir)
+        except Exception as e:
+            self.logger.warning(f"Enhanced scene detection failed: {e}, using basic detection")
+            return self._extract_frames_scene_change_basic(video_path, output_dir)
+    
+    def _extract_frames_scene_change_enhanced(self, video_path: str, output_dir: str) -> List[str]:
+        """Enhanced scene detection with adaptive thresholding and quality scoring"""
+        from enhanced_scene_detector import EnhancedSceneDetector
+        
+        self.logger.info("Using enhanced scene change detection")
+        start_time = time.time()
+        
+        video_name = Path(video_path).stem
+        
+        # Get metadata
+        video_metadata = None
+        if self.video_metadata_extractor and self.video_metadata_extractor.ffprobe_available:
+            try:
+                video_metadata = self.video_metadata_extractor.extract_metadata(Path(video_path))
+            except Exception:
+                pass
+        
+        # Create detector with config settings
+        detector = EnhancedSceneDetector(
+            min_frames=self.config.get("min_frames_per_video", 5),
+            max_frames=self.config.get("max_frames_per_video", 50) or 50,
+            target_frames=self.config.get("target_frames_per_video", 15),
+            min_scene_duration=self.config.get("min_scene_duration_seconds", 1.0),
+            adaptive_threshold=True
+        )
+        
+        # Detect scenes
+        frames = detector.detect_scenes(video_path)
+        
+        if not frames:
+            self.logger.warning("No scenes detected, falling back to time interval")
+            return self.extract_frames_time_interval(video_path, output_dir)
+        
+        # Extract frames
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return []
+        
+        extracted_files = []
+        
+        for i, frame_info in enumerate(frames):
+            # Use time-based seeking: MPEG and many other containers silently
+            # ignore CAP_PROP_POS_FRAMES, but honour CAP_PROP_POS_MSEC.
+            cap.set(cv2.CAP_PROP_POS_MSEC, frame_info.timestamp * 1000.0)
+            ret, frame = cap.read()
+            
+            if not ret:
+                continue
+            
+            # Resize if needed
+            if self.config["resize_width"] or self.config["resize_height"]:
+                frame = self.resize_frame(frame)
+            
+            # Save with scene number and timestamp
+            filename = f"{video_name}_scene_{i+1:04d}_{frame_info.timestamp:.2f}s.jpg"
+            output_path = os.path.join(output_dir, filename)
+            
+            success = cv2.imwrite(output_path, frame, [cv2.IMWRITE_JPEG_QUALITY, self.config["image_quality"]])
+            if success:
+                if video_metadata and self.exif_embedder:
+                    try:
+                        self.exif_embedder.embed_metadata(
+                            Path(output_path), video_metadata,
+                            frame_time=frame_info.timestamp,
+                            source_video_path=Path(video_path)
+                        )
+                    except Exception:
+                        pass
+                extracted_files.append(output_path)
+                self.statistics['frames_saved'] += 1
+                
+                # Preserve timestamp
+                try:
+                    video_stat = os.stat(video_path)
+                    os.utime(output_path, (video_stat.st_atime, video_stat.st_mtime))
+                except OSError:
+                    pass
+        
+        cap.release()
+        
+        elapsed_time = time.time() - start_time
+        self.logger.info(f"Enhanced scene detection: {len(extracted_files)} frames from {len(frames)} scenes in {elapsed_time:.1f}s")
+        
+        return extracted_files
+    
+    def _extract_frames_scene_change_basic(self, video_path: str, output_dir: str) -> List[str]:
+        """Basic scene change detection (original implementation)"""
+        self.logger.info("Using basic scene change detection")
         start_time = time.time()
         
         # Extract video name for frame naming
@@ -379,12 +522,19 @@ class VideoFrameExtractor:
             return []
         
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            # MPEG and some AVI containers report fps=0; fall back so
+            # downstream arithmetic doesn't divide by zero or produce a
+            # zero-frame range.
+            self.logger.warning("Video FPS not detected (reported 0); using 1.0 fps fallback")
+            fps = 1.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps if fps > 0 else 0
+        duration = total_frames / fps
         
         start_frame = int(fps * self.config["start_time_seconds"])
         end_frame = int(fps * self.config["end_time_seconds"]) if self.config["end_time_seconds"] else total_frames
-        min_scene_frames = int(fps * self.config["min_scene_duration_seconds"])
+        # Guard: fps fallback means min_scene_frames could be 0 or 1; force >=1.
+        min_scene_frames = max(1, int(fps * self.config["min_scene_duration_seconds"]))
         
         self.logger.info(f"Video properties: duration={duration:.1f}s, fps={fps:.1f}, total_frames={total_frames}")
         self.logger.info(f"Scene detection settings: threshold={self.config['scene_change_threshold']}%, min_duration={self.config['min_scene_duration_seconds']}s")

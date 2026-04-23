@@ -1,10 +1,15 @@
 # ============================================================================
-# Image Description Toolkit - Dependencies
+# Image Description Toolkit - Core Dependencies
 # ============================================================================
+# This file contains core dependencies for CLI/script usage.
+# 
+# GUI Applications (viewer, imagedescriber, prompt_editor, idtconfigure):
+#   Each GUI app has its own requirements.txt in its directory with wxPython
+#   Example: cd viewer && pip install -r requirements.txt
+#
 # Installation options:
-#   Minimal (scripts only):     pip install Pillow requests ollama openai anthropic
-#   GUI applications:           pip install -r requirements.txt
-#   Full (all features):        pip install -r requirements.txt
+#   CLI/Scripts only:       pip install -r requirements.txt
+#   GUI applications:       See individual app directories
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -30,12 +35,6 @@ anthropic>=0.18.0       # Anthropic Claude official SDK (retry logic, token trac
 beautifulsoup4>=4.9.0   # HTML parsing for web image extraction
 
 # ----------------------------------------------------------------------------
-# GUI APPLICATIONS (imagedescriber, viewer, prompt_editor)
-# ----------------------------------------------------------------------------
-PyQt6>=6.4.0                                # GUI framework
-pywin32>=306; sys_platform == "win32"       # Windows system integration
-
-# ----------------------------------------------------------------------------
 # ONNX/FLORENCE-2 SUPPORT (Local vision models)
 # ----------------------------------------------------------------------------
 # Florence-2 provides lightweight local image description without requiring Ollama
@@ -52,6 +51,11 @@ timm>=1.0.0             # PyTorch Image Models (required by Florence-2)
 # ----------------------------------------------------------------------------
 opencv-python>=4.8.0    # Video frame extraction
 numpy>=1.24.0           # Array operations (required by opencv-python)
+# NOTE: ffprobe (part of FFmpeg) is an OPTIONAL system dependency — not a pip package.
+# Without it, video frames are extracted but GPS/date EXIF is not embedded.
+# Install via:  Windows: winget install Gyan.FFmpeg
+#               macOS:   brew install ffmpeg
+# See WINDOWS_SETUP.md / MACOS_SETUP.md for details.
 
 # ----------------------------------------------------------------------------
 # HEIC IMAGE SUPPORT (scripts/ConvertImage.py only)
@@ -65,6 +69,18 @@ pillow-heif>=0.13.0     # HEIC/HEIF image format conversion
 # pyexiv2>=2.15.0       # Advanced EXIF metadata extraction (may require C++ compilation)
 # ExifRead>=3.0.0       # Alternative EXIF reader
 # geopy>=2.4.0          # GPS coordinate reverse geocoding (Nominatim)
+
+# ----------------------------------------------------------------------------
+# OPTIONAL - Apple Metal GPU Inference (macOS Apple Silicon only)
+# ----------------------------------------------------------------------------
+# Enables --provider mlx for on-device AI descriptions via scripts/workflow.py
+# and scripts/image_describer.py. Automatically installed on macOS by macsetup.sh.
+# If not installed, the MLX provider is silently disabled at import time.
+mlx-vlm>=0.3.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'
+# Required for models whose transformers processors use return_tensors="pt"
+# (e.g. phi-3.5-vision). Qwen2-VL models work without torch.
+torch>=2.0.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'
+torchvision ; sys_platform == 'darwin' and platform_machine == 'arm64'
 
 # ----------------------------------------------------------------------------
 # DEVELOPMENT & TESTING
@@ -97,17 +113,23 @@ pyinstaller>=6.0.0      # Executable bundling for distribution
 # Metadata utilities (optional advanced features):
 #   pip install pyexiv2 ExifRead geopy
 #
-# ============================================================================
-# NOTES
-# ============================================================================
-# 
-# Python 3.13 Compatibility:
-#   - All core dependencies work with Python 3.13+
-#   - pyexiv2 may require compilation on Python 3.13 (optional feature)
-#   - pillow-heif should work but check PyPI for latest wheels
+# ======================CLI/scripts only, no video, no HEIC):
+#   pip install Pillow requests ollama openai anthropic
 #
-# API Keys Required:
-#   - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
+# CLI with HEIC support (iPhone photos):
+#   pip install Pillow requests ollama openai anthropic pillow-heif piexif
+#
+# CLI with video processing:
+#   pip install Pillow requests ollama openai anthropic opencv-python numpy piexif
+#
+# Full CLI/scripts (all features):
+#   pip install -r requirements.txt
+#
+# GUI applications:
+#   cd viewer && pip install -r requirements.txt
+#   cd imagedescriber && pip install -r requirements.txt
+#   cd prompt_editor && pip install -r requirements.txt
+#   cd idtconfigure && - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
 #   - Claude: Set ANTHROPIC_API_KEY environment variable or create claude.txt
 #   - Ollama: Local installation, no API key needed
 #

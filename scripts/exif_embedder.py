@@ -37,6 +37,9 @@ class ExifEmbedder:
         Returns:
             True if successful, False otherwise
         """
+        if metadata is None:
+            metadata = {}
+
         try:
             # Load existing EXIF (if any)
             try:
@@ -55,17 +58,25 @@ class ExifEmbedder:
             # Embed datetime
             if 'datetime' in metadata:
                 dt = metadata['datetime']
+                # VideoMetadataExtractor stores datetime as an ISO string; convert if needed
+                if isinstance(dt, str):
+                    try:
+                        from datetime import datetime as _dt
+                        dt = _dt.fromisoformat(dt)
+                    except (ValueError, AttributeError):
+                        dt = None
                 # Add frame time offset if provided
-                if frame_time is not None:
+                if dt is not None and frame_time is not None:
                     from datetime import timedelta
                     dt = dt + timedelta(seconds=frame_time)
-                
-                dt_str = dt.strftime('%Y:%m:%d %H:%M:%S')
-                
-                # Set datetime fields
-                exif_dict['0th'][piexif.ImageIFD.DateTime] = dt_str
-                exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = dt_str
-                exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized] = dt_str
+
+                if dt is not None:
+                    dt_str = dt.strftime('%Y:%m:%d %H:%M:%S')
+
+                    # Set datetime fields
+                    exif_dict['0th'][piexif.ImageIFD.DateTime] = dt_str
+                    exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = dt_str
+                    exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized] = dt_str
             
             # Embed camera info
             if 'camera' in metadata:
@@ -82,17 +93,14 @@ class ExifEmbedder:
                 if frame_time is not None:
                     source_info += f' at {frame_time:.2f}s'
                 exif_dict['0th'][piexif.ImageIFD.ImageDescription] = source_info.encode('utf-8')
-                
-                # Also store in UserComment for redundancy
-                exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
-                    source_info
-                )
+
+                # Store in UserComment (EXIF requires 8-byte character code prefix for ASCII)
+                user_comment = b'ASCII\x00\x00\x00' + source_info.encode('ascii', errors='replace')
+                exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment
             else:
                 # Fallback if no source path provided
                 exif_dict['0th'][piexif.ImageIFD.ImageDescription] = b'Extracted from video'
-                exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
-                    'Frame extracted with metadata from source video'
-                )
+                exif_dict['Exif'][piexif.ExifIFD.UserComment] = b'ASCII\x00\x00\x00Frame extracted with metadata from source video'
             
             # Convert to bytes and save
             exif_bytes = piexif.dump(exif_dict)
@@ -104,7 +112,7 @@ class ExifEmbedder:
             return True
             
         except Exception as e:
-            print(f"Warning: Could not embed EXIF in {image_path.name}: {e}")
+            print(f"Warning: Could not embed EXIF in {Path(image_path).name}: {e}")
             return False
     
     def _create_gps_ifd(self, gps_data: Dict[str, float]) -> Optional[Dict]:

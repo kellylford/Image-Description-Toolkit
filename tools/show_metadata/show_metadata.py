@@ -35,6 +35,18 @@ try:
 except ImportError:
     pass  # HEIC support not available, will warn user later
 
+# Add project root to path for shared module imports
+if str(Path(__file__).parent.parent.parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+# Import shared EXIF utilities
+try:
+    from shared.exif_utils import extract_exif_date_string, extract_gps_coordinates
+except ImportError:
+    # Fallback for development mode
+    extract_exif_date_string = None
+    extract_gps_coordinates = None
+
 
 class MetadataExtractor:
     """Extract and format image metadata"""

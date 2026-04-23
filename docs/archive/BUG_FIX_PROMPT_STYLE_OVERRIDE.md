@@ -139,10 +139,10 @@ The `config_loader` module checks paths in this order:
 ### Test 1: From /tmp directory (no external config)
 ```bash
 cd /tmp
-/c/Users/kelly/GitHub/Image-Description-Toolkit/dist/idt.exe workflow \
+/path/to/Image-Description-Toolkit/dist/idt.exe workflow \
   --provider ollama --model qwen3-vl:235b-cloud \
   --prompt-style Simple --name test_final_fix --dry-run \
-  /c/Users/kelly/GitHub/Image-Description-Toolkit/testimages
+  /path/to/Image-Description-Toolkit/testimages
 ```
 
 **Result:** ✅ Created directory `wf_test_final_fix_ollama_qwen3-vl_235b-cloud_Simple_20251015_210429`

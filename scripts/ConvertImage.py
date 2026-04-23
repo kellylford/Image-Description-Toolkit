@@ -26,14 +26,19 @@ from pathlib import Path
 from PIL import Image
 from datetime import datetime
 
-# Set UTF-8 encoding for console output on Windows
+# Set UTF-8 encoding for console output on Windows.
+# Use reconfigure() (Python 3.7+) to change encoding in-place without
+# detaching the underlying buffer.  The older codecs.getwriter/detach()
+# pattern tears out any buffer held by callers (e.g. pytest capture),
+# causing hard-to-diagnose failures.
 if sys.platform.startswith('win'):
-    import codecs
-    # Fix for PyInstaller executable - only detach if method exists
-    if hasattr(sys.stdout, 'detach'):
-        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    if hasattr(sys.stderr, 'detach'):
-        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+    for _stream in (sys.stdout, sys.stderr):
+        if hasattr(_stream, 'reconfigure'):
+            try:
+                _stream.reconfigure(encoding='utf-8', errors='replace')
+            except Exception:
+                pass  # Frozen/non-TextIOWrapper streams: leave untouched
+    del _stream
 import pillow_heif
 
 # Register HEIF opener with PIL
@@ -337,10 +342,15 @@ def convert_directory(directory_path, output_directory=None, recursive=False, qu
 def optimize_image_size(image_path, max_file_size=TARGET_MAX_SIZE, quality=90):
     """
     Optimize an existing JPG/PNG image to meet file size requirements.
-    Modifies the image in-place if it exceeds the size limit.
+    
+    IMPORTANT: This function modifies the image in-place by replacing it with an optimized version.
+    Only use this on copied files in workflow directories, NEVER on user's original photos.
+    The workflow system ensures files are copied/hardlinked before processing.
+    
+    For one-off processing without modifying originals, use create_optimized_copy() instead.
     
     Args:
-        image_path: Path to the image file
+        image_path: Path to the image file (WILL BE REPLACED if optimization needed)
         max_file_size: Maximum file size in bytes (default 4.5MB)
         quality: Initial JPEG quality for optimization (default 90)
     
@@ -358,6 +368,7 @@ def optimize_image_size(image_path, max_file_size=TARGET_MAX_SIZE, quality=90):
             return True, original_size, original_size
         
         logger.info(f"Optimizing {image_path.name} ({original_size/1024/1024:.2f}MB exceeds {max_file_size/1024/1024:.1f}MB limit)")
+        logger.warning(f"NOTE: This will REPLACE the file at {image_path}")
         
         # Create a temporary file for the optimized version
         temp_path = image_path.with_suffix('.tmp.jpg')

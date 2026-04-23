@@ -13,7 +13,7 @@ This guide provides step-by-step instructions for creating a new image gallery u
 ### Tools Required
 - `idt.exe` installed at `c:/idt/idt.exe`
 - Python 3.x with `requests` package
-- Claude API key in `c:/users/kelly/onedrive/idt/claude.txt`
+- Claude API key in `~/.config/idt/claude.txt`
 - 15-30 source images (JPG format recommended)
 
 ### Before You Start
@@ -101,7 +101,7 @@ grep "model:" //qnap/home/idt/descriptions/wf_*/workflow_metadata.json | head -5
 
 **Set up API key** (do once per terminal session):
 ```bash
-export ANTHROPIC_API_KEY=$(cat /c/users/kelly/onedrive/idt/claude.txt)
+export ANTHROPIC_API_KEY=$(cat ~/.config/idt/claude.txt)
 ```
 
 **Run workflows** (execute all 4 commands):
@@ -115,7 +115,7 @@ c:/idt/idt.exe workflow images \
   --prompt-style narrative \
   --name yourproject \
   --output-dir descriptions \
-  --api-key-file c:/users/kelly/onedrive/idt/claude.txt \
+  --api-key-file ~/.config/idt/claude.txt \
   --batch
 
 # 2. Colorful prompt
@@ -125,7 +125,7 @@ c:/idt/idt.exe workflow images \
   --prompt-style colorful \
   --name yourproject \
   --output-dir descriptions \
-  --api-key-file c:/users/kelly/onedrive/idt/claude.txt \
+  --api-key-file ~/.config/idt/claude.txt \
   --batch
 
 # 3. Technical prompt
@@ -135,7 +135,7 @@ c:/idt/idt.exe workflow images \
   --prompt-style technical \
   --name yourproject \
   --output-dir descriptions \
-  --api-key-file c:/users/kelly/onedrive/idt/claude.txt \
+  --api-key-file ~/.config/idt/claude.txt \
   --batch
 
 # 4. Detailed prompt
@@ -145,7 +145,7 @@ c:/idt/idt.exe workflow images \
   --prompt-style detailed \
   --name yourproject \
   --output-dir descriptions \
-  --api-key-file c:/users/kelly/onedrive/idt/claude.txt \
+  --api-key-file ~/.config/idt/claude.txt \
   --batch
 ```
 
@@ -227,7 +227,7 @@ du -sh gallery-data/    # Small (JSON only)
 ```bash
 cd tools/ImageGallery/yourproject
 
-export ANTHROPIC_API_KEY=$(cat /c/users/kelly/onedrive/idt/claude.txt)
+export ANTHROPIC_API_KEY=$(cat ~/.config/idt/claude.txt)
 
 python ../generate_alt_text.py --jsondata-dir gallery-data/
 ```
@@ -432,7 +432,7 @@ grep "model:" //qnap/home/idt/descriptions/wf_*/workflow_metadata.json | head -1
 
 **Solution:** Always use `--api-key-file` option:
 ```bash
---api-key-file c:/users/kelly/onedrive/idt/claude.txt
+--api-key-file ~/.config/idt/claude.txt
 ```
 
 ### Issue: Gallery shows "No configurations found"
@@ -581,7 +581,7 @@ cd "$GALLERY_NAME"
 sed -i "s/yourproject/$GALLERY_NAME/g" index.html
 
 # Run workflows
-export ANTHROPIC_API_KEY=$(cat /c/users/kelly/onedrive/idt/claude.txt)
+export ANTHROPIC_API_KEY=$(cat ~/.config/idt/claude.txt)
 
 for PROMPT in narrative colorful technical detailed; do
     echo "Running $PROMPT workflow..."
@@ -591,7 +591,7 @@ for PROMPT in narrative colorful technical detailed; do
         --prompt-style $PROMPT \
         --name $GALLERY_NAME \
         --output-dir descriptions \
-        --api-key-file c:/users/kelly/onedrive/idt/claude.txt \
+        --api-key-file ~/.config/idt/claude.txt \
         --batch
 done
 
@@ -683,7 +683,7 @@ c:/idt/idt.exe workflow images \
     --prompt-style narrative \
     --name yourproject \
     --output-dir descriptions \
-    --api-key-file c:/users/kelly/onedrive/idt/claude.txt \
+    --api-key-file ~/.config/idt/claude.txt \
     --batch
 
 # Regenerate JSON (will include new model)
@@ -757,7 +757,7 @@ c:/idt/idt.exe workflow images/ \
   --prompt-style narrative \
   --name yourproject \
   --output-dir descriptions \
-  --api-key-file /c/users/kelly/onedrive/idt/claude.txt \
+  --api-key-file ~/.config/idt/claude.txt \
   --batch
 
 # Phase 3: Generate JSON (IMPORTANT: separate directory!)
@@ -767,7 +767,7 @@ python ../generate_descriptions.py \
   --pattern yourproject
 
 # Phase 4: Add alt text
-export ANTHROPIC_API_KEY=$(cat /c/users/kelly/onedrive/idt/claude.txt)
+export ANTHROPIC_API_KEY=$(cat ~/.config/idt/claude.txt)
 python ../generate_alt_text.py --jsondata-dir gallery-data/
 
 # Phase 5: Configure and test

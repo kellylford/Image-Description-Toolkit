@@ -1,0 +1,95 @@
+name: "CLI Validation"
+
+# Runs on every push and pull request to main/develop branches,
+# and can be triggered manually. No build required — tests run in dev mode.
+on:
+  push:
+    branches: [ main, master, develop, WXMigration, feature/video-description ]
+    paths:
+      - 'idt/idt_cli.py'
+      - 'scripts/**'
+      - 'analysis/**'
+      - 'models/**'
+      - 'pytest_tests/integration/test_idt_cli.py'
+      - '.github/workflows/cli-validation.yml'
+  pull_request:
+    branches: [ main, master, develop, WXMigration, feature/video-description ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  cli-validation:
+    name: "IDT CLI Integration Tests"
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      # ------------------------------------------------------------------ #
+      #  1. Checkout + Python                                                #
+      # ------------------------------------------------------------------ #
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+
+      # ------------------------------------------------------------------ #
+      #  2. Syntax validation — catch import errors before running tests     #
+      # ------------------------------------------------------------------ #
+      - name: Syntax-check idt_cli.py
+        run: python -m py_compile idt/idt_cli.py
+        shell: pwsh
+
+      - name: Syntax-check scripts
+        run: |
+          $files = Get-ChildItem scripts\*.py | Where-Object { $_.Name -notmatch 'llamado' }
+          foreach ($f in $files) {
+            python -m py_compile $f.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "SYNTAX ERROR in $($f.Name)"
+              exit 1
+            }
+          }
+        shell: pwsh
+
+      # ------------------------------------------------------------------ #
+      #  3. Run CLI integration tests (dev-mode, no build needed)           #
+      # ------------------------------------------------------------------ #
+      - name: Run IDT CLI integration tests
+        run: |
+          python -m pytest pytest_tests/integration/test_idt_cli.py -v --tb=short
+        shell: pwsh
+        env:
+          # Suppress noisy config-path info messages during tests
+          IDT_QUIET_CONFIG_LOG: "1"
+
+      # ------------------------------------------------------------------ #
+      #  4. Run existing smoke tests                                         #
+      # ------------------------------------------------------------------ #
+      - name: Run smoke tests
+        run: |
+          python -m pytest pytest_tests/smoke/ -v --tb=short
+        shell: pwsh
+        # smoke tests may require GUI; don't fail the workflow
+        continue-on-error: true
+
+      # ------------------------------------------------------------------ #
+      #  5. Summary                                                          #
+      # ------------------------------------------------------------------ #
+      - name: Test summary
+        if: always()
+        run: |
+          Write-Host ""
+          Write-Host "=== CLI Validation complete ==="
+          Write-Host "All idt command routing and help contract tests ran."
+        shell: pwsh

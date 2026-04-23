@@ -242,7 +242,7 @@ c:\IDT\
 
 ### Build All Tools:
 1. [ ] **IDT Main:**
-   - `cd c:\Users\kelly\GitHub\Image-Description-Toolkit`
+   - `cd C:\Path\To\Image-Description-Toolkit`
    - `build_idt.bat`
    - Verify: `dist\idt.exe` (75 MB)
 

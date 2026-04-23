@@ -1,0 +1,119 @@
+{
+  "timestamp": "2026-01-20T21:32:34.636603",
+  "file_analyzed": "C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\viewer\\viewer_wx.py",
+  "statistics": {
+    "total_lines": 1457,
+    "code_lines": 1056,
+    "comment_lines": 139,
+    "blank_lines": 262,
+    "functions": 50,
+    "classes": 6,
+    "imports": 20,
+    "try_blocks": 23
+  },
+  "issues": {
+    "pyinstaller_imports": [
+      {
+        "line": 81,
+        "module": "scripts.config_loader",
+        "issue": "Import from 'scripts.' may fail in frozen mode",
+        "severity": "high"
+      }
+    ],
+    "missing_import_fallback": [],
+    "error_handling": [
+      {
+        "function": "on_browse",
+        "line": 292,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_double_click",
+        "line": 298,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_list_key_down",
+        "line": 305,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_ok",
+        "line": 316,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_browse",
+        "line": 462,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_browse_workflows",
+        "line": 823,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_open_directory",
+        "line": 830,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_close",
+        "line": 844,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_char_hook",
+        "line": 852,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_live_toggle",
+        "line": 891,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_live_update",
+        "line": 908,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_description_selected",
+        "line": 977,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_description_selected",
+        "line": 1176,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_list_key_down",
+        "line": 1182,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      },
+      {
+        "function": "on_redescribe_image",
+        "line": 1294,
+        "issue": "Event handler or critical function without try/except",
+        "severity": "medium"
+      }
+    ],
+    "complex_signatures": []
+  },
+  "total_issues": 16
+}

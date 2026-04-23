@@ -34,10 +34,9 @@ from typing import Dict, List, Tuple, Optional
 import json
 from analysis_utils import get_safe_filename, ensure_directory
 
-# Fix Windows terminal encoding issues
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# Fix Windows terminal encoding issues — must be done inside main() to avoid
+# corrupting pytest's capture stream when this module is imported in tests.
+# See: workflow.py main() for the same pattern.
 
 # API Pricing as of October 2025 (per million tokens)
 # Note: Prices may change - verify current pricing at provider websites
@@ -383,6 +382,26 @@ def parse_workflow_log(log_path: Path) -> Dict:
         except:
             pass
     
+    # Also check frame_extractor log for video/frame counts
+    # These summary lines are written to the frame extractor log, not the workflow log
+    frame_extractor_logs = list(log_path.parent.glob("frame_extractor_*.log"))
+    if frame_extractor_logs:
+        # Use the largest log file (the one with actual extraction, not the stub)
+        frame_extractor_log = max(frame_extractor_logs, key=lambda p: p.stat().st_size)
+        try:
+            with open(frame_extractor_log, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if 'Total video files found:' in line:
+                        match = re.search(r'Total video files found: (\d+)', line)
+                        if match:
+                            stats['videos_found'] = int(match.group(1))
+                    elif 'Total frames extracted:' in line:
+                        match = re.search(r'Total frames extracted: (\d+)', line)
+                        if match:
+                            stats['frames_extracted'] = int(match.group(1))
+        except Exception as e:
+            print(f"Warning: Could not parse frame_extractor log: {e}")
+
     # Also check image_describer log for token usage data AND average timing
     image_describer_logs = list(log_path.parent.glob("image_describer_*.log"))
     if image_describer_logs:
@@ -1188,6 +1207,17 @@ def save_text_report(all_stats: list, output_file: Path, base_dir: Path):
 
 def main():
     """Main function to analyze workflow statistics."""
+    # Set UTF-8 encoding for Windows console output without replacing the stream
+    # object (which would break pytest capture during tests).
+    if sys.platform == 'win32':
+        import io
+        for _stream in (sys.stdout, sys.stderr):
+            if isinstance(_stream, io.TextIOWrapper):
+                try:
+                    _stream.reconfigure(encoding='utf-8', errors='replace')
+                except Exception:
+                    pass
+
     parser = argparse.ArgumentParser(
         description='Analyze performance statistics from workflow logs.',
         formatter_class=argparse.RawDescriptionHelpFormatter,

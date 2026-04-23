@@ -8,11 +8,10 @@ This project uses GitHub Actions to automatically build executables for multiple
 ### 1. Windows AMD64 Build
 **File:** `.github/workflows/build-windows-amd64.yml`
 
-Builds all four Windows applications:
+Builds all three Windows applications:
 1. **IDT** (Main CLI toolkit) - `idt.exe`
 2. **Viewer** - `viewer.exe`
-3. **Prompt Editor** - `prompteditor.exe`
-4. **ImageDescriber** - `imagedescriber.exe`
+3. **ImageDescriber** (with integrated tools) - `imagedescriber.exe`
 
 **Platform:** Windows Server 2022 (AMD64)  
 **Build Time:** 15-30 minutes
@@ -122,7 +121,7 @@ If artifacts aren't uploaded:
 If GitHub Actions isn't working, you can still build locally:
 ```bash
 # On Windows machine:
-cd C:\Users\kelly\GitHub\Image-Description-Toolkit
+cd C:\Path\To\Image-Description-Toolkit
 releaseitall.bat
 ```
 
@@ -195,4 +194,4 @@ For comparison, local build process:
 - `builditall.bat` - Build all executables
 - `packageitall.bat` - Package into ZIP files
 - `releaseitall.bat` - Complete build + package workflow
-- `tools/kelly_release_and_install.bat` - Personal workflow (git-ignored)
+- `tools/your_personal_workflow.bat (git-ignored)` - Personal workflow (git-ignored)

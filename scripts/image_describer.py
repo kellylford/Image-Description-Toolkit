@@ -29,6 +29,12 @@ import gc
 import time
 from datetime import datetime
 
+# Import shared window title builder
+try:
+    from shared.window_title_builder import build_window_title_from_context
+except ImportError:
+    build_window_title_from_context = None
+
 # Import shared metadata extraction module
 try:
     from metadata_extractor import MetadataExtractor, NominatimGeocoder
@@ -83,7 +89,8 @@ from imagedescriber.ai_providers import (
     OllamaProvider,
     OpenAIProvider,
     ClaudeProvider,
-    HuggingFaceProvider
+    HuggingFaceProvider,
+    MLXProvider,
 )
 
 
@@ -150,7 +157,9 @@ class ImageDescriber:
                  enable_compression: bool = True, batch_delay: float = 2.0, 
                  config_file: str = "image_describer_config.json", prompt_style: str = "detailed",
                  output_dir: str = None, provider: str = "ollama", api_key: str = None,
-                 log_dir: str = None, workflow_name: str = None, timeout: int = 90):
+                 log_dir: str = None, workflow_name: str = None, timeout: int = 90, source_url: str = None,
+                 include_alt_text: bool = True, alt_text_mapping_file: str = None,
+                 show_descriptions: bool = False):
         """
         Initialize the ImageDescriber
         
@@ -167,6 +176,9 @@ class ImageDescriber:
             log_dir: Directory where log files and progress tracking are stored
             workflow_name: Name of the workflow (for window title display)
             timeout: Timeout in seconds for Ollama API requests (default: 90)
+            source_url: Source URL if images were downloaded from the web
+            include_alt_text: Whether to include website alt text in descriptions (default: True)
+            alt_text_mapping_file: Explicit path to alt_text_mapping.json (auto-detected if None)
         """
         # Load configuration first
         self.config = self.load_config(config_file)
@@ -211,6 +223,10 @@ class ImageDescriber:
         self.api_key = api_key
         self.workflow_name = workflow_name  # Workflow name for window title
         self.timeout = timeout  # Timeout for Ollama requests
+        self.source_url = source_url  # Source URL if downloaded from web
+        self.include_alt_text = include_alt_text  # Whether to include website alt text
+        self.alt_text_mapping_file = alt_text_mapping_file  # Explicit mapping file path
+        self.show_descriptions = show_descriptions  # Print descriptions to console as they arrive
         # Notice flags (avoid repeating log spam)
         self._geocode_notice_logged = False
         
@@ -242,6 +258,27 @@ class ImageDescriber:
     
     def _build_window_title(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
         """Build a descriptive window title with workflow context"""
+        if build_window_title_from_context:
+            return build_window_title_from_context(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                operation="Describing Images",
+                workflow_name=self.workflow_name,
+                prompt_style=self.prompt_style,
+                model_name=self.model_name,
+                suffix=suffix
+            )
+        else:
+            return self._build_window_title_fallback(
+                progress_percent=progress_percent,
+                current=current,
+                total=total,
+                suffix=suffix
+            )
+    
+    def _build_window_title_fallback(self, progress_percent: int, current: int, total: int, suffix: str = "") -> str:
+        """Fallback window title builder (used when shared module unavailable)"""
         base_title = f"IDT - Describing Images ({progress_percent}%, {current} of {total})"
         
         # Add suffix if provided (e.g., " - Skipped", " - Validation Failed")
@@ -318,20 +355,34 @@ class ImageDescriber:
                 
             elif self.provider_name == "openai":
                 logger.info("Initializing OpenAI provider...")
-                if not self.api_key:
-                    raise ValueError("OpenAI provider requires an API key. Use --api-key-file option.")
-                # Pass api_key to constructor so client initializes correctly
+                # Pass api_key (may be None - provider will check config/env/files)
                 provider = OpenAIProvider(api_key=self.api_key)
+                if not provider.is_available():
+                    raise ValueError(
+                        "OpenAI provider requires an API key. Provide via:\n"
+                        "  1. Config file: image_describer_config.json → api_keys.OpenAI\n"
+                        "  2. Command line: --api-key-file /path/to/openai.txt\n"
+                        "  3. Environment: export OPENAI_API_KEY=sk-...\n"
+                        "  4. Text file: openai.txt in current directory"
+                    )
                 return provider
                 
             elif self.provider_name == "claude":
                 logger.info("Initializing Claude provider...")
-                if not self.api_key:
-                    raise ValueError("Claude provider requires an API key. Use --api-key-file option.")
-                # Pass api_key to constructor so client initializes correctly
+                # Pass api_key (may be None - provider will check config/env/files)
                 provider = ClaudeProvider(api_key=self.api_key)
+                if not provider.is_available():
+                    raise ValueError(
+                        "Claude provider requires an API key. Provide via:\n"
+                        "  1. Config file: image_describer_config.json → api_keys.Claude\n"
+                        "  2. Command line: --api-key-file /path/to/claude.txt\n"
+                        "  3. Environment: export ANTHROPIC_API_KEY=sk-ant-...\n"
+                        "  4. Text file: claude.txt in current directory"
+                    )
                 logger.info(f"Claude provider initialized. API key set: {bool(provider.api_key)}, Client available: {bool(provider.client)}, Is available: {provider.is_available()}")
                 print(f"INFO: Claude provider - API key set: {bool(provider.api_key)}, Client: {bool(provider.client)}, Available: {provider.is_available()}")
+                if not provider.is_available():
+                    raise ValueError("Claude provider requires an API key. Provide via --api-key-file, config file (image_describer_config.json), or ANTHROPIC_API_KEY environment variable.")
                 return provider
                 
             elif self.provider_name == "huggingface":
@@ -340,9 +391,28 @@ class ImageDescriber:
                 if not provider.is_available():
                     raise ValueError("HuggingFace provider requires Florence-2 dependencies. Install with: pip install 'transformers>=4.45.0' torch torchvision einops timm")
                 return provider
-                
+
+            elif self.provider_name == "mlx":
+                logger.info("Initializing MLX (Apple Metal) provider...")
+                provider = MLXProvider()
+                if not provider.is_available():
+                    import platform as _platform
+                    if _platform.system() != "Darwin":
+                        raise ValueError(
+                            "MLX provider is only available on macOS with Apple Silicon."
+                        )
+                    raise ValueError(
+                        "MLX provider requires mlx-vlm. Install with:\n"
+                        "  pip install mlx-vlm"
+                    )
+                logger.info(
+                    f"MLX provider ready. Model will be loaded on first image "
+                    f"and kept in Metal memory for the batch."
+                )
+                return provider
+
             else:
-                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, huggingface")
+                raise ValueError(f"Unknown provider: {self.provider_name}. Supported: ollama, openai, claude, huggingface, mlx")
                 
         except Exception as e:
             logger.error(f"Failed to initialize provider '{self.provider_name}': {e}")
@@ -350,51 +420,61 @@ class ImageDescriber:
     
     def load_config(self, config_file: str) -> dict:
         """
-        Load configuration from JSON file
-        
+        Load configuration from JSON file.
+
+        Uses config_loader for the full layered resolution (user config dir,
+        bundled _MEIPASS defaults, explicit path, env vars) so this works
+        correctly on both macOS and Windows in dev and frozen modes.
+
         Args:
-            config_file: Path to the JSON configuration file
-            
+            config_file: Filename (e.g. 'image_describer_config.json') or
+                         absolute path.
+
         Returns:
             Dictionary with configuration settings
         """
         try:
+            # If caller passed an absolute path that exists, use it directly.
             config_path = Path(config_file)
-            if not config_path.is_absolute():
-                # In frozen mode (PyInstaller), look for config next to executable first
-                # This allows workflow.py to update the config file and have it used
-                if getattr(sys, 'frozen', False):
-                    # Frozen mode: Check next to executable first
-                    exe_dir = Path(sys.executable).parent
-                    scripts_dir = exe_dir / 'scripts'
-                    if (scripts_dir / config_file).exists():
-                        config_path = scripts_dir / config_file
-                    elif (exe_dir / config_file).exists():
-                        config_path = exe_dir / config_file
-                    else:
-                        # Fallback to bundled config in temp directory
-                        script_dir = Path(__file__).parent
-                        config_path = script_dir / config_file
-                else:
-                    # Normal mode: Look in script directory
-                    script_dir = Path(__file__).parent
-                    config_path = script_dir / config_file
-            
-            if not config_path.exists():
-                logger.warning(f"Config file not found: {config_path}")
-                return self.get_default_config()
-            
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            logger.info(f"Loaded configuration from: {config_path}")
-            return config
-            
+            if config_path.is_absolute() and config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                logger.info(f"Loaded configuration from: {config_path}")
+                return config
+
+            # Otherwise delegate to the layered resolver so user-overridden
+            # configs and bundled defaults are found in the right order on
+            # every platform (macOS ~/Library/…, Windows %APPDATA%\…, etc.)
+            try:
+                from config_loader import load_json_config
+                filename = config_path.name  # strip any relative prefix
+                config, resolved_path, source = load_json_config(filename)
+                if config:
+                    logger.info(f"Loaded configuration from: {resolved_path} (source: {source})")
+                    prompts = config.get('prompt_variations', {})
+                    default_prompt = config.get('default_prompt_style', 'N/A')
+                    logger.debug(f"Config has {len(prompts)} prompts, default={default_prompt}")
+                    return config
+            except Exception as cl_err:
+                logger.debug(f"config_loader failed ({cl_err}), falling back to direct path")
+
+            # Last-resort fallback: look in same directory as this script
+            script_dir = Path(__file__).parent
+            fallback = script_dir / config_path.name
+            if fallback.exists():
+                with open(fallback, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                logger.info(f"Loaded configuration from fallback: {fallback}")
+                return config
+
+            logger.warning(f"Config file not found: {config_file}")
+            return self.get_default_config()
+
         except Exception as e:
             logger.error(f"Error loading config file: {e}")
             logger.info("Using default configuration")
             return self.get_default_config()
-    
+
     def get_default_config(self) -> dict:
         """
         Get default configuration if config file is not available
@@ -449,9 +529,12 @@ class ImageDescriber:
         lower_variations = {k.lower(): v for k, v in prompt_variations.items()}
         
         if self.prompt_style.lower() in lower_variations:
-            return lower_variations[self.prompt_style.lower()]
+            prompt_text = lower_variations[self.prompt_style.lower()]
+            logger.debug(f"Using prompt style '{self.prompt_style}' ({len(prompt_text)} chars)")
+            return prompt_text
         else:
             # Fallback to default prompt_template
+            logger.warning(f"Prompt style '{self.prompt_style}' not found in config, using prompt_template fallback")
             return self.config.get('prompt_template', 
                                  "Describe this image in detail, including the main subjects, setting, colors, and composition.")
     
@@ -470,7 +553,13 @@ class ImageDescriber:
         # Remove model name from settings as it's passed separately to ollama
         settings = model_settings.copy()
         settings.pop('model', None)
-        
+
+        # Cloud models routed through Ollama (e.g. kimi-k2.5:cloud) enforce their own
+        # output limits server-side. Forwarding num_predict caps the cloud API output
+        # and is the primary cause of empty/truncated responses for cloud models.
+        if ':cloud' in self.model_name or self.model_name.endswith('-cloud'):
+            settings.pop('num_predict', None)
+
         return settings
         
     def is_supported_image(self, file_path: Path) -> bool:
@@ -599,6 +688,95 @@ class ImageDescriber:
         except Exception as e:
             return False, f"Validation error: {str(e)}"
     
+    def _get_output_file(self, base_dir: Path) -> Path:
+        """Determine output file path for descriptions."""
+        if self.output_dir:
+            base = Path(self.output_dir)
+        else:
+            base = base_dir / "descriptions"
+        return base / "image_descriptions.txt"
+
+    def _write_description_entry(self, output_file: Path, image_path: Path, description: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Write a single viewer-compatible entry to the output file."""
+        separator = '-' * 80
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        rel = image_path.name
+        lines = [
+            separator,
+            f"File: {rel}",
+            f"Path: {str(image_path.resolve())}",
+            f"Provider: {self.provider_name}",
+            f"Model: {self.model_name}",
+            f"Prompt Style: {self.prompt_style}",
+            f"Timestamp: {timestamp}",
+        ]
+        # Add source URL if available (for downloaded images)
+        if self.source_url:
+            lines.append(f"Source URL: {self.source_url}")
+        # Optional compact metadata suffix (for human skim); main metadata block inclusion can be added later
+        if metadata and self.config.get('output_format', {}).get('include_metadata', True):
+            suffix = self._build_meta_suffix(image_path, metadata)
+            if suffix:
+                lines.append(suffix)
+        # Description block
+        first_line, *rest = (description or '').splitlines()
+        lines.append(f"Description: {first_line or ''}")
+        for extra in rest:
+            lines.append(extra)
+        lines.append('\n')
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        with output_file.open('a', encoding='utf-8') as f:
+            f.write('\n'.join(lines))
+
+    def process_directory(self, directory_path: Path, recursive: bool = False, max_files: Optional[int] = None) -> None:
+        """Process all supported images in a directory and write descriptions file."""
+        if not directory_path.exists() or not directory_path.is_dir():
+            raise ValueError(f"Input directory does not exist: {directory_path}")
+        # Discover images
+        patterns = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff", "*.webp"]
+        files: list[Path] = []
+        for pat in patterns:
+            if recursive:
+                files.extend(directory_path.rglob(pat))
+            else:
+                files.extend(directory_path.glob(pat))
+        if max_files:
+            files = files[:max_files]
+        if not files:
+            logger.warning("No supported images found to process.")
+        out_file = self._get_output_file(directory_path)
+        processed = 0
+        for idx, img in enumerate(files, start=1):
+            is_valid, err = self.validate_image_for_processing(img)
+            if not is_valid:
+                logger.warning(f"Skipping {img.name}: {err}")
+                continue
+            try:
+                desc = self.get_image_description(img)
+                if not desc:
+                    logger.warning(f"No description for {img.name}")
+                    continue
+                # Extract basic metadata if enabled
+                meta = None
+                if METADATA_SUPPORT and self.config.get('processing_options', {}).get('extract_metadata', True):
+                    try:
+                        meta = self.metadata_extractor.extract_metadata(img)
+                    except Exception:
+                        meta = None
+                self._write_description_entry(out_file, img, desc, meta)
+                processed += 1
+                # Delay to manage memory
+                time.sleep(max(0.0, float(self.batch_delay)))
+                # Progress title
+                try:
+                    pct = int((processed / max(1, len(files))) * 100)
+                    set_console_title(self._build_window_title(pct, processed, len(files)))
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.error(f"Failed to process {img.name}: {e}")
+        logger.info(f"Processed {processed} images. Output: {out_file}")
+
     def get_image_description(self, image_path: Path) -> Optional[str]:
         """
         Get description of an image using configured AI provider with retry logic
@@ -616,6 +794,11 @@ class ImageDescriber:
                 return None
             
             # Optimize image size for cloud providers (Claude 5MB limit, OpenAI 20MB)
+            # WARNING: optimize_image_size modifies the file in-place!
+            # This is safe here because:
+            # 1. When called via workflow, files are copies in workflow_output directory
+            # 2. When called standalone, user is responsible for working on copies
+            # See workflow.py copy_or_link_images() for how workflow protects originals
             if self.provider_name in ["claude", "openai"]:
                 # Determine appropriate size limit based on provider
                 max_size = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
@@ -644,176 +827,198 @@ class ImageDescriber:
                 # Get model settings from configuration
                 model_settings = self.get_model_settings()
                 logger.debug(f"Using model settings: {model_settings}")
-                
-                # Implement retry logic for Ollama API calls
-                max_retries = 3
-                # Optimized retry delays for server 500 errors - faster recovery
-                retry_delays = [0.5, 1.0, 2.0]  # Fixed delays instead of exponential backoff
-                
-                last_exception = None
-                for attempt in range(max_retries + 1):  # +1 for initial attempt
-                    try:
-                        # Call Ollama API with configured settings and timeout
-                        # Prefer python client when available; fallback to HTTP API
-                        use_python_client = (ollama is not None and hasattr(ollama, 'chat'))
-                        if use_python_client:
-                            import signal
-                            
-                            def timeout_handler(signum, frame):
-                                raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
-                            
-                            # Set up timeout for Windows/Unix compatibility
-                            try:
-                                # For Windows, we'll use a different approach since signal.alarm doesn't work
-                                import threading
-                                import time
-                                
-                                response = None
-                                exception_caught = None
-                                
-                                def make_request():
-                                    nonlocal response, exception_caught
-                                    try:
-                                        response = ollama.chat(
-                                            model=self.model_name,
-                                            messages=[
-                                                {
-                                                    'role': 'user',
-                                                    'content': prompt,
-                                                    'images': [image_base64]
-                                                }
-                                            ],
-                                            options=model_settings
-                                        )
-                                    except Exception as e:
-                                        exception_caught = e
-                                
-                                # Start request in background thread
-                                request_thread = threading.Thread(target=make_request)
-                                request_thread.daemon = True
-                                request_thread.start()
-                                
-                                # Wait for completion or timeout
-                                request_thread.join(timeout=self.timeout)
-                                
-                                if request_thread.is_alive():
-                                    # Request is still running - timeout occurred
-                                    logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after {self.timeout} seconds")
+
+                # Outer loop: empty-response retry (cloud models like kimi-k2.5:cloud
+                # return empty content intermittently — same Issue #91 pattern as OpenAI).
+                MAX_EMPTY_RETRIES = 2
+                description = ""
+                for empty_attempt in range(MAX_EMPTY_RETRIES + 1):
+                    # Inner loop: server/transport error retry (500, timeout, connection)
+                    max_retries = 3
+                    # Optimized retry delays for server 500 errors - faster recovery
+                    retry_delays = [0.5, 1.0, 2.0]  # Fixed delays instead of exponential backoff
+
+                    last_exception = None
+                    response = None
+                    for attempt in range(max_retries + 1):  # +1 for initial attempt
+                        try:
+                            # Call Ollama API with configured settings and timeout
+                            # Prefer python client when available; fallback to HTTP API
+                            use_python_client = (ollama is not None and hasattr(ollama, 'chat'))
+                            if use_python_client:
+                                import signal
+
+                                def timeout_handler(signum, frame):
                                     raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
-                                
-                                if exception_caught:
-                                    raise exception_caught
-                                    
-                                if response is None:
-                                    raise RuntimeError("Request completed but no response received")
-                                    
-                            except ImportError:
-                                # Fallback to direct call if threading unavailable
-                                response = ollama.chat(
-                                    model=self.model_name,
-                                    messages=[
-                                        {
-                                            'role': 'user',
-                                            'content': prompt,
-                                            'images': [image_base64]
-                                        }
-                                    ],
-                                    options=model_settings
+
+                                # Set up timeout for Windows/Unix compatibility
+                                try:
+                                    # For Windows, we'll use a different approach since signal.alarm doesn't work
+                                    import threading
+                                    import time
+
+                                    response = None
+                                    exception_caught = None
+
+                                    def make_request():
+                                        nonlocal response, exception_caught
+                                        try:
+                                            response = ollama.chat(
+                                                model=self.model_name,
+                                                messages=[
+                                                    {
+                                                        'role': 'user',
+                                                        'content': prompt,
+                                                        'images': [image_base64]
+                                                    }
+                                                ],
+                                                options=model_settings
+                                            )
+                                        except Exception as e:
+                                            exception_caught = e
+
+                                    # Start request in background thread
+                                    request_thread = threading.Thread(target=make_request)
+                                    request_thread.daemon = True
+                                    request_thread.start()
+
+                                    # Wait for completion or timeout
+                                    request_thread.join(timeout=self.timeout)
+
+                                    if request_thread.is_alive():
+                                        # Request is still running - timeout occurred
+                                        logger.warning(f"  [TIMEOUT] Request for {image_path.name} timed out after {self.timeout} seconds")
+                                        raise TimeoutError(f"Ollama request timed out after {self.timeout} seconds")
+
+                                    if exception_caught:
+                                        raise exception_caught
+
+                                    if response is None:
+                                        raise RuntimeError("Request completed but no response received")
+
+                                except ImportError:
+                                    # Fallback to direct call if threading unavailable
+                                    response = ollama.chat(
+                                        model=self.model_name,
+                                        messages=[
+                                            {
+                                                'role': 'user',
+                                                'content': prompt,
+                                                'images': [image_base64]
+                                            }
+                                        ],
+                                        options=model_settings
+                                    )
+                            else:
+                                # HTTP fallback to Ollama API
+                                import requests
+                                http_response = requests.post(
+                                    "http://127.0.0.1:11434/api/chat",
+                                    json={
+                                        'model': self.model_name,
+                                        'messages': [
+                                            {
+                                                'role': 'user',
+                                                'content': prompt,
+                                                'images': [image_base64]
+                                            }
+                                        ],
+                                        'options': model_settings,
+                                        'stream': False
+                                    },
+                                    timeout=self.timeout
                                 )
-                        else:
-                            # HTTP fallback to Ollama API
-                            import requests
-                            http_response = requests.post(
-                                "http://127.0.0.1:11434/api/chat",
-                                json={
-                                    'model': self.model_name,
-                                    'messages': [
-                                        {
-                                            'role': 'user',
-                                            'content': prompt,
-                                            'images': [image_base64]
-                                        }
-                                    ],
-                                    'options': model_settings,
-                                    'stream': False
-                                },
-                                timeout=self.timeout
-                            )
-                            http_response.raise_for_status()
-                            response = http_response.json()
-                        
-                        # If we get here, the call succeeded
-                        if attempt > 0:
-                            logger.info(f"  [RETRY] Success on attempt {attempt + 1} for {image_path.name}")
-                        break
-                        
-                    except Exception as e:
-                        last_exception = e
-                        error_msg = str(e).lower()
-                        error_type = type(e).__name__
-                        
-                        # Check if this is a retryable error
-                        is_retryable = (
-                            'server error' in error_msg or
-                            'status code: 5' in error_msg or
-                            '500' in error_msg or
-                            'unmarshal' in error_msg or
-                            'invalid character' in error_msg or
-                            'timeout' in error_msg or
-                            'connection' in error_msg.lower() or
-                            isinstance(e, TimeoutError)  # Handle our custom timeout
-                        )
-                        
-                        if is_retryable and attempt < max_retries:
-                            # Use fixed retry delays optimized for server errors
-                            import random
-                            base_delay = retry_delays[min(attempt, len(retry_delays) - 1)]
-                            jitter = random.uniform(0.1, 0.3) * base_delay  # Reduced jitter
-                            sleep_time = base_delay + jitter
-                            
-                            logger.warning(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed for {image_path.name} ({error_type}): {str(e)[:100]}...")
-                            logger.warning(f"  [RETRY] Retrying in {sleep_time:.1f}s...")
-                            time.sleep(sleep_time)
-                            continue
-                        else:
-                            # Non-retryable error or max retries reached
+                                http_response.raise_for_status()
+                                response = http_response.json()
+
+                            # If we get here, the call succeeded
                             if attempt > 0:
-                                logger.error(f"  [RETRY] All {max_retries + 1} attempts failed for {image_path.name}")
-                            raise e
-                else:
-                    # This should not be reached, but handle it just in case
-                    if last_exception:
-                        raise last_exception
-                
-                logger.debug(f"Raw response: {response}")
-                logger.debug(f"Response type: {type(response)}")
-                logger.debug(f"Response keys: {response.keys() if hasattr(response, 'keys') else 'no keys'}")
-                if 'message' in response:
-                    logger.debug(f"Message: {response['message']}")
-                    logger.debug(f"Message type: {type(response['message'])}")
-                    if hasattr(response['message'], 'content'):
-                        logger.debug(f"Message content: {repr(response['message'].content)}")
-                    elif 'content' in response['message']:
-                        logger.debug(f"Message content dict: {repr(response['message']['content'])}")
-                
-                # Normalize response for both python client and HTTP JSON
-                message = response['message'] if isinstance(response, dict) else response.get('message')
-                if hasattr(message, 'content'):
-                    description = message.content.strip()
-                elif isinstance(message, dict) and 'content' in message:
-                    description = str(message['content']).strip()
-                else:
-                    # Fallback: try to stringify whole response
-                    description = str(response).strip()
+                                logger.info(f"  [RETRY] Success on attempt {attempt + 1} for {image_path.name}")
+                            break
+
+                        except Exception as e:
+                            last_exception = e
+                            error_msg = str(e).lower()
+                            error_type = type(e).__name__
+
+                            # Check if this is a retryable error
+                            is_retryable = (
+                                'server error' in error_msg or
+                                'status code: 5' in error_msg or
+                                '500' in error_msg or
+                                'unmarshal' in error_msg or
+                                'invalid character' in error_msg or
+                                'timeout' in error_msg or
+                                'connection' in error_msg.lower() or
+                                isinstance(e, TimeoutError)  # Handle our custom timeout
+                            )
+
+                            if is_retryable and attempt < max_retries:
+                                # Use fixed retry delays optimized for server errors
+                                import random
+                                base_delay = retry_delays[min(attempt, len(retry_delays) - 1)]
+                                jitter = random.uniform(0.1, 0.3) * base_delay  # Reduced jitter
+                                sleep_time = base_delay + jitter
+
+                                logger.warning(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed for {image_path.name} ({error_type}): {str(e)[:100]}...")
+                                logger.warning(f"  [RETRY] Retrying in {sleep_time:.1f}s...")
+                                time.sleep(sleep_time)
+                                continue
+                            else:
+                                # Non-retryable error or max retries reached
+                                if attempt > 0:
+                                    logger.error(f"  [RETRY] All {max_retries + 1} attempts failed for {image_path.name}")
+                                raise e
+                    else:
+                        # This should not be reached, but handle it just in case
+                        if last_exception:
+                            raise last_exception
+
+                    logger.debug(f"Raw response: {response}")
+                    logger.debug(f"Response type: {type(response)}")
+                    logger.debug(f"Response keys: {response.keys() if hasattr(response, 'keys') else 'no keys'}")
+                    if 'message' in response:
+                        logger.debug(f"Message: {response['message']}")
+                        logger.debug(f"Message type: {type(response['message'])}")
+                        if hasattr(response['message'], 'content'):
+                            logger.debug(f"Message content: {repr(response['message'].content)}")
+                        elif 'content' in response['message']:
+                            logger.debug(f"Message content dict: {repr(response['message']['content'])}")
+
+                    # Normalize response for both python client and HTTP JSON
+                    message = response['message'] if isinstance(response, dict) else response.get('message')
+                    if hasattr(message, 'content'):
+                        description = message.content.strip()
+                    elif isinstance(message, dict) and 'content' in message:
+                        description = str(message['content']).strip()
+                    else:
+                        # Fallback: try to stringify whole response
+                        description = str(response).strip()
+
+                    if description and description.strip():
+                        break  # Good response — exit empty-retry loop
+
+                    if empty_attempt < MAX_EMPTY_RETRIES:
+                        logger.warning(
+                            f"  [EMPTY-RETRY] Empty response from {self.provider_name}/{self.model_name} "
+                            f"(attempt {empty_attempt + 1}/{MAX_EMPTY_RETRIES + 1}) for {image_path.name} — retrying..."
+                        )
+                        time.sleep(1.0 * (empty_attempt + 1))
+                    else:
+                        logger.warning(
+                            f"  [EMPTY-RETRY] All {MAX_EMPTY_RETRIES + 1} attempts returned empty "
+                            f"for {image_path.name} — keeping empty result."
+                        )
+
                 logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
                 logger.debug(f"Description content: {repr(description)}")
                 logger.debug(f"Description length: {len(description)}")
                 logger.debug(f"Description bool: {bool(description)}")
-                
+
                 # Clean up memory
-                del image_base64, response
+                del image_base64
                 gc.collect()
-                
+
                 return description
             
             else:
@@ -822,6 +1027,8 @@ class ImageDescriber:
                 
                 # SAFETY CHECK: Ensure image size is under limit before sending to provider
                 # This is a fallback in case the earlier optimization didn't run
+                # WARNING: optimize_image_size modifies the file in-place!
+                # Safe when files are in workflow directories (copies), but be cautious with standalone use
                 if self.provider_name in ["claude", "openai"]:
                     current_size = image_path.stat().st_size
                     max_allowed = CLAUDE_MAX_SIZE if self.provider_name == "claude" else OPENAI_MAX_SIZE
@@ -831,14 +1038,51 @@ class ImageDescriber:
                         if not success:
                             logger.error(f"Emergency optimization failed! Image may be rejected by {self.provider_name} API")
                 
-                # Call provider's describe_image method with correct signature
+                # Call provider's describe_image method with correct signature.
                 # Providers expect: describe_image(image_path: str, prompt: str, model: str)
-                description = self.provider.describe_image(
-                    image_path=str(image_path),
-                    prompt=prompt,
-                    model=self.model_name
-                )
-                
+                # Retry on empty only when finish_reason='length' (token budget exhausted).
+                # Issue #91: gpt-5-nano has ~28% empty rate due to reasoning token use.
+                # We skip retrying on finish_reason='stop' — it costs money and won't help.
+                # When finish_reason is unavailable (Ollama) we allow one retry.
+                MAX_EMPTY_RETRIES = 2
+                description = None
+                import time as _time
+                for attempt in range(MAX_EMPTY_RETRIES + 1):
+                    description = self.provider.describe_image(
+                        image_path=str(image_path),
+                        prompt=prompt,
+                        model=self.model_name
+                    )
+                    if description and description.strip():
+                        break
+
+                    # Check finish_reason to decide whether retry will help
+                    finish_reason = None
+                    if hasattr(self.provider, 'last_usage') and self.provider.last_usage:
+                        finish_reason = self.provider.last_usage.get('finish_reason')
+
+                    should_retry = (finish_reason == 'length' or finish_reason is None)
+
+                    if should_retry and attempt < MAX_EMPTY_RETRIES:
+                        logger.warning(
+                            f"  [EMPTY-RETRY] Empty response from {self.provider_name}/{self.model_name} "
+                            f"finish_reason={finish_reason!r} "
+                            f"(attempt {attempt + 1}/{MAX_EMPTY_RETRIES + 1}) for {image_path.name} — retrying..."
+                        )
+                        _time.sleep(1.0 * (attempt + 1))
+                    else:
+                        if not should_retry:
+                            logger.warning(
+                                f"  [EMPTY-RETRY] Empty response finish_reason={finish_reason!r} — "
+                                f"not retrying for {image_path.name} (not a token-budget issue)."
+                            )
+                        else:
+                            logger.warning(
+                                f"  [EMPTY-RETRY] All {MAX_EMPTY_RETRIES + 1} attempts returned empty "
+                                f"for {image_path.name} — keeping empty result."
+                            )
+                        break
+
                 if description:
                     logger.info(f"Generated description for {image_path.name} (Provider: {self.provider_name}, Model: {self.model_name})")
                     logger.debug(f"Description content: {repr(description)}")
@@ -913,7 +1157,56 @@ class ImageDescriber:
             gc.collect()
             return None
     
-    def write_description_to_file(self, image_path: Path, description: str, output_file: Path, metadata: Dict[str, Any] = None, base_directory: Path = None) -> bool:
+    def _load_alt_text_mapping(self, image_dir: Path) -> dict:
+        """
+        Load alt text mapping for images downloaded from the web.
+
+        Looks for alt_text_mapping.json either at the explicitly configured path
+        (self.alt_text_mapping_file) or auto-detected in image_dir.  Only entries
+        that pass the quality filter (at least 10 characters and contains a space)
+        are included — this rejects bare filenames and very short labels.
+
+        Returns:
+            Dict mapping filename → alt text string, or {} if unavailable/disabled.
+        """
+        if not self.include_alt_text:
+            return {}
+
+        mapping_path = None
+        if self.alt_text_mapping_file:
+            mapping_path = Path(self.alt_text_mapping_file)
+        else:
+            candidate = image_dir / "alt_text_mapping.json"
+            if candidate.exists():
+                mapping_path = candidate
+
+        if mapping_path is None or not mapping_path.exists():
+            return {}
+
+        try:
+            with open(mapping_path, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load alt text mapping from {mapping_path}: {e}")
+            return {}
+
+        result = {}
+        for filename, alt_text in raw.items():
+            if not isinstance(alt_text, str):
+                continue
+            # Strip internal newlines/tabs so the entry stays on one line in the output file
+            cleaned = ' '.join(alt_text.split())
+            # Quality filter: must be at least 3 chars and contain a space.
+            # The space check rejects bare filenames (e.g. 'IMG_0160.DNG');
+            # the length check rejects near-empty strings. 10 was too aggressive
+            # and silently dropped valid short alt text like 'NASA Logo' (9 chars).
+            if len(cleaned) >= 3 and ' ' in cleaned:
+                result[filename] = cleaned
+
+        logger.info(f"Loaded alt text for {len(result)} image(s) from {mapping_path}")
+        return result
+
+    def write_description_to_file(self, image_path: Path, description: str, output_file: Path, metadata: Dict[str, Any] = None, base_directory: Path = None, alt_text: str = None) -> bool:
         """
         Write description to a text file
         
@@ -923,6 +1216,7 @@ class ImageDescriber:
             output_file: Path to the output text file
             metadata: Optional metadata dictionary to include
             base_directory: Base directory for calculating relative paths
+            alt_text: Optional website alt text to include before the AI description
             
         Returns:
             True if successful, False otherwise
@@ -985,7 +1279,10 @@ class ImageDescriber:
                     # Use string concatenation to avoid f-string format errors from curly braces in description
                     formatted_description = location_prefix + ": " + description
             
+            if alt_text:
+                entry += "Alt Text: " + alt_text + "\n"
             entry += "Description: " + formatted_description + "\n"
+
             
             if output_format.get('include_timestamp', True):
                 entry += "Timestamp: " + time.strftime('%Y-%m-%d %H:%M:%S') + "\n"
@@ -1091,7 +1388,9 @@ class ImageDescriber:
                     f.write(f"Directory: {directory_path}\n")
                     f.write(f"Runtime Configuration: Model='{self.model_name}', Prompt='{self.prompt_style}'\n")
                     f.write(f"Config File Model Settings: {self.config.get('model_settings', {})}\n")
-                    f.write("=" * 80 + "\n\n")
+                    f.write("=" * 80 + "\n")
+                    # Add separator line before first description entry so it's properly delimited
+                    f.write("-" * 80 + "\n\n")
                 logger.info(f"Created output file: {output_file}")
                 # Create new progress file
                 progress_file.write_text("")
@@ -1143,6 +1442,9 @@ class ImageDescriber:
             logger.info(f"Limited to first {max_files} files for processing")
         
         logger.info(f"Processing {len(image_files)} image files")
+        
+        # Load alt text mapping once for the entire directory (if available)
+        alt_text_map = self._load_alt_text_mapping(directory_path)
         
         # Process each image with memory management
         success_count = 0
@@ -1215,6 +1517,11 @@ class ImageDescriber:
             logger.info(f"Getting AI description for {image_path.name}{metadata_status}")
             description = self.get_image_description(image_path)
             
+            # Capture token usage from provider if available
+            token_usage = None
+            if hasattr(self.provider, 'get_last_token_usage'):
+                token_usage = self.provider.get_last_token_usage()
+            
             # Log end time for this image
             image_end_time = time.time()
             processing_duration = image_end_time - image_start_time
@@ -1222,8 +1529,18 @@ class ImageDescriber:
             logger.info(f"Processing duration: {processing_duration:.2f} seconds")
             
             if description and not description.startswith("Error:"):
+                # Add processing time to metadata
+                if metadata is None:
+                    metadata = {}
+                metadata['processing_time_seconds'] = round(processing_duration, 2)
+                
+                # Add token usage to metadata if available
+                if token_usage:
+                    metadata['token_usage'] = token_usage
+                
                 # Write description to file with metadata and base directory for relative paths
-                if self.write_description_to_file(image_path, description, output_file, metadata, directory_path):
+                image_alt_text = alt_text_map.get(image_path.name)
+                if self.write_description_to_file(image_path, description, output_file, metadata, directory_path, alt_text=image_alt_text):
                     # Update progress file immediately after successful write
                     try:
                         with open(progress_file, 'a', encoding='utf-8') as pf:
@@ -1231,6 +1548,10 @@ class ImageDescriber:
                         logger.debug(f"Updated progress file with: {image_path}")
                     except Exception as e:
                         logger.warning(f"Failed to update progress file: {e}")
+                    # Print description to console if --show-descriptions on
+                    if self.show_descriptions:
+                        print(f"\n--- {image_path.name} ---")
+                        print(description)
                     # Log with relative path for better readability
                     try:
                         relative_path = image_path.relative_to(directory_path)
@@ -1698,6 +2019,20 @@ class ImageDescriber:
             if camera_parts:
                 lines.append("Camera: " + ", ".join(camera_parts))
         
+        # Format processing time if available
+        if 'processing_time_seconds' in metadata:
+            proc_time = metadata['processing_time_seconds']
+            lines.append(f"Processing Time: {proc_time:.2f} seconds")
+        
+        # Format token usage if available
+        if 'token_usage' in metadata:
+            usage = metadata['token_usage']
+            prompt_tokens = usage.get('prompt_tokens', 0)
+            completion_tokens = usage.get('completion_tokens', 0)
+            total_tokens = usage.get('total_tokens', 0)
+            if total_tokens > 0:
+                lines.append(f"Tokens: {total_tokens:,} total ({prompt_tokens:,} prompt + {completion_tokens:,} completion)")
+        
         return "\n".join(lines)
 
     def _build_meta_suffix(self, image_path: Path, metadata: Dict[str, Any]) -> str:
@@ -1857,8 +2192,12 @@ def main():
         print("             Requires: Ollama running locally")
         print()
         print("openai       - OpenAI cloud models")
-        print("             Models: gpt-4o, gpt-4o-mini, gpt-4-vision-preview")
-        print("             Requires: API key (--api-key-file or OPENAI_API_KEY)")
+        print("             Models: gpt-5.2, gpt-5, gpt-4o, gpt-4o-mini, etc.")
+        print("             Requires: API key via --api-key-file, config file, or OPENAI_API_KEY")
+        print()
+        print("claude       - Anthropic Claude models")
+        print("             Models: claude-opus-4-6, claude-sonnet-4-5, claude-haiku-4-5, etc.")
+        print("             Requires: API key via --api-key-file, config file, or ANTHROPIC_API_KEY")
         print()
         print("copilot      - Copilot+ PC NPU acceleration (experimental)")
         print("             Models: florence-2")
@@ -1891,7 +2230,13 @@ def main():
         default_style = get_default_prompt_style()
     
     parser = argparse.ArgumentParser(
-        description="Process images with AI vision models and save descriptions to a text file",
+        description="""Process images with AI vision models and save descriptions to a text file
+
+⚠️  IMPORTANT: For cloud providers (OpenAI, Claude), large images may be optimized in-place
+    to meet file size limits. Always use the workflow command or work on copies of your photos!
+    
+    Recommended: Use 'idt workflow' instead to ensure originals are never modified.
+    Direct use: Only run this on copies in a workflow output directory.""",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Available prompt styles: {', '.join(available_styles)}
@@ -1903,13 +2248,17 @@ Examples:
   python {Path(__file__).name} exportedphotos --prompt-style artistic --model llava:7b
   python {Path(__file__).name} exportedphotos --model llava:13b --prompt-style technical
   
-  # OpenAI
+  # OpenAI (API key from file)
   python {Path(__file__).name} exportedphotos --provider openai --model gpt-4o-mini --api-key-file ~/openai.txt
+  
+  # OpenAI (API key from config)
   python {Path(__file__).name} exportedphotos --provider openai --model gpt-4-vision-preview
   
-  # Claude (Anthropic)
+  # Claude (API key from file)
   python {Path(__file__).name} exportedphotos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file ~/claude.txt
-  python {Path(__file__).name} exportedphotos --provider claude --model claude-3-5-haiku-20241022
+  
+  # Claude (API key from config)
+  python {Path(__file__).name} exportedphotos --provider claude --model claude-haiku-4-5-20251001
   
   # HuggingFace (Local Florence-2 models)
   python {Path(__file__).name} exportedphotos --provider huggingface --model microsoft/Florence-2-base
@@ -1934,7 +2283,7 @@ Configuration:
         "--provider",
         type=str,
         default="ollama",
-        choices=["ollama", "openai", "claude", "huggingface"],
+        choices=["ollama", "openai", "claude", "huggingface", "mlx"],
         help="AI provider to use (default: ollama)"
     )
     parser.add_argument(
@@ -1946,7 +2295,9 @@ Configuration:
     parser.add_argument(
         "--api-key-file",
         type=str,
-        help="Path to file containing API key for cloud providers (OpenAI, Claude)"
+        help="Path to file containing API key for cloud providers (OpenAI, Claude). "
+             "If not specified, checks config file (image_describer_config.json), "
+             "environment variables (OPENAI_API_KEY/ANTHROPIC_API_KEY), or .txt files."
     )
     parser.add_argument(
         "--recursive",
@@ -2028,9 +2379,31 @@ Configuration:
         help="Suppress console output (log to file only)"
     )
     parser.add_argument(
+        "--show-descriptions",
+        choices=["on", "off"],
+        default="off",
+        help="Print each description to the console as it is generated (default: off)"
+    )
+    parser.add_argument(
         "--workflow-name",
         type=str,
         help="Workflow name (displayed in window title for identification)"
+    )
+    parser.add_argument(
+        "--source-url",
+        type=str,
+        help="Source URL if images were downloaded from the web (for attribution)"
+    )
+    parser.add_argument(
+        "--no-alt-text",
+        action="store_true",
+        help="Do not include website alt text in descriptions (default: include when available)"
+    )
+    parser.add_argument(
+        "--alt-text-mapping",
+        type=str,
+        dest="alt_text_mapping",
+        help="Path to alt_text_mapping.json file (auto-detected from image directory if not specified)"
     )
     
     args = parser.parse_args()
@@ -2081,6 +2454,8 @@ Configuration:
             sys.exit(1)
     
     # Check for API key in environment variables if not provided via file
+    # Note: If still no API key, the provider will check config file (image_describer_config.json)
+    # and .txt files (openai.txt / claude.txt) during initialization
     if not api_key and args.provider in ["openai", "claude"]:
         if args.provider == "openai":
             env_var = "OPENAI_API_KEY"
@@ -2091,9 +2466,7 @@ Configuration:
         if api_key:
             logger.info(f"Using API key from environment variable {env_var}")
         else:
-            logger.error(f"Provider '{args.provider}' requires an API key.")
-            logger.error(f"Provide it via --api-key-file or set {env_var} environment variable")
-            sys.exit(1)
+            logger.info(f"No API key provided via --api-key-file or {env_var}. Will check config file and .txt files.")
     
     # Create ImageDescriber instance with memory optimization
     describer = ImageDescriber(
@@ -2108,7 +2481,11 @@ Configuration:
         api_key=api_key,
         log_dir=args.log_dir,
         workflow_name=args.workflow_name,
-        timeout=args.timeout
+        timeout=args.timeout,
+        source_url=args.source_url,
+        include_alt_text=not args.no_alt_text,
+        alt_text_mapping_file=args.alt_text_mapping,
+        show_descriptions=(args.show_descriptions == 'on')
     )
     
     # Override metadata extraction if disabled via command line
@@ -2124,9 +2501,28 @@ Configuration:
         if ollama is not None and hasattr(ollama, 'list'):
             try:
                 models = ollama.list()
-                available_models = [model['name'] for model in models.get('models', [])]
+                
+                # Robustly handle different response structures (dict vs object)
+                model_list = []
+                if isinstance(models, dict):
+                    model_list = models.get('models', [])
+                elif hasattr(models, 'models'):
+                    model_list = models.models
+                
+                available_models = []
+                for model in model_list:
+                    # Handle dict vs object model items
+                    name = None
+                    if isinstance(model, dict):
+                        name = model.get('name') or model.get('model')
+                    else:
+                        name = getattr(model, 'name', None) or getattr(model, 'model', None)
+                    
+                    if name:
+                        available_models.append(name)
+                        
                 ollama_ok = True
-                logger.info("Ollama is available (python client)")
+                logger.info(f"Ollama is available (python client, found {len(available_models)} models)")
             except Exception as e:
                 logger.warning(f"Ollama python client check failed: {e}")
         # Fallback to HTTP API

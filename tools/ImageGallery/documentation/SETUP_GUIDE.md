@@ -23,7 +23,7 @@ This document focuses on **deploying an existing gallery** to a web server.
 ### Local Testing
 
 ```bash
-cd /c/Users/kelly/GitHub/Image-Description-Toolkit/tools/ImageGallery/yourproject
+cd /path/to/Image-Description-Toolkit/tools/ImageGallery/yourproject
 python -m http.server 8082
 ```
 
@@ -86,7 +86,7 @@ xcopy /E /I yourproject C:\inetpub\wwwroot\gallery
 
 1. **Create repository or use existing**
    ```bash
-   cd /c/Users/kelly/GitHub/Image-Description-Toolkit
+   cd /path/to/Image-Description-Toolkit
    ```
 
 2. **Create gh-pages branch**

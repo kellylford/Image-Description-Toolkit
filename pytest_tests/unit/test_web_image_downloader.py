@@ -65,8 +65,8 @@ class TestWebImageDownloader:
         filename = downloader._get_safe_filename("https://example.com/image", 5)
         assert filename == "image_0005.jpg"
         
-        # Test with special characters
-        filename = downloader._get_safe_filename("https://example.com/my photo!@#.png", 1)
+        # Test with special characters (no # which would be parsed as URL fragment)
+        filename = downloader._get_safe_filename("https://example.com/my photo!@.png", 1)
         assert "myphoto" in filename.lower()
         assert filename.endswith(".png")
     
@@ -92,7 +92,8 @@ class TestWebImageDownloader:
         assert len(urls) >= 3  # At least the main src images
         
         # Check that relative URLs are converted to absolute
-        assert all(url.startswith("http") for url in urls)
+        # _extract_image_urls returns (url, alt_text) tuples
+        assert all(url.startswith("http") for url, _alt in urls)
     
     def test_extract_image_urls_no_duplicates(self, tmp_path):
         """Test that duplicate URLs are removed"""

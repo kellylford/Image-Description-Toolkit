@@ -31,6 +31,13 @@ from typing import Dict, List, Optional
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Import Claude model list from central source so this file never needs
+# to be edited when models are added or deprecated - only claude_models.py does.
+try:
+    from models.claude_models import CLAUDE_MODELS as _CLAUDE_MODEL_IDS, CLAUDE_MODEL_METADATA as _CLAUDE_MODEL_META
+except ImportError:
+    from claude_models import CLAUDE_MODELS as _CLAUDE_MODEL_IDS, CLAUDE_MODEL_METADATA as _CLAUDE_MODEL_META
+
 try:
     from colorama import Fore, Style, init
     init(autoreset=True)
@@ -128,109 +135,129 @@ MODEL_METADATA = {
         "tags": ["text"]
     },
     
-    # OpenAI Models
-    "gpt-4o": {
+    # OpenAI Models — verified 2026-02-23 via live API test
+    # See models/openai_models.py for full canonical list
+    "gpt-5.2": {
         "provider": "openai",
-        "description": "GPT-4o - Latest multimodal model",
+        "description": "GPT-5.2 - Best model for coding and agentic tasks",
         "size": "Cloud-based",
         "install_command": "Requires API key in openai.txt",
         "recommended": True,
-        "cost": "$$$",
+        "cost": "$$$$",
         "tags": ["vision", "cloud", "accurate", "recommended"]
     },
-    "gpt-4o-mini": {
+    "gpt-5.1": {
         "provider": "openai",
-        "description": "GPT-4o Mini - Faster, cheaper variant",
+        "description": "GPT-5.1 - Mid-tier GPT-5 reasoning model",
         "size": "Cloud-based",
         "install_command": "Requires API key in openai.txt",
-        "recommended": True,
-        "cost": "$$",
-        "tags": ["vision", "cloud", "fast", "recommended"]
-    },
-    "gpt-4-turbo": {
-        "provider": "openai",
-        "description": "GPT-4 Turbo with vision",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in openai.txt",
-        "recommended": False,
-        "cost": "$$$",
-        "tags": ["vision", "cloud"]
-    },
-    "gpt-4-vision-preview": {
-        "provider": "openai",
-        "description": "GPT-4 Vision (older)",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in openai.txt",
-        "recommended": False,
-        "cost": "$$$",
-        "tags": ["vision", "cloud"]
-    },
-    
-    # Claude (Anthropic) Models
-    "claude-sonnet-4-5-20250929": {
-        "provider": "claude",
-        "description": "Claude Sonnet 4.5 - Latest, most capable",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": True,
-        "cost": "$$",
-        "tags": ["vision", "cloud", "accurate", "recommended"]
-    },
-    "claude-opus-4-1-20250805": {
-        "provider": "claude",
-        "description": "Claude Opus 4.1 - Highest quality",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": True,
-        "cost": "$$$",
-        "tags": ["vision", "cloud", "accurate", "recommended"]
-    },
-    "claude-sonnet-4-20250514": {
-        "provider": "claude",
-        "description": "Claude Sonnet 4.0",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
-        "recommended": False,
-        "cost": "$$",
-        "tags": ["vision", "cloud"]
-    },
-    "claude-opus-4-20250514": {
-        "provider": "claude",
-        "description": "Claude Opus 4.0",
-        "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
         "recommended": False,
         "cost": "$$$",
         "tags": ["vision", "cloud", "accurate"]
     },
-    "claude-3-7-sonnet-20250219": {
-        "provider": "claude",
-        "description": "Claude 3.7 Sonnet",
+    "gpt-5": {
+        "provider": "openai",
+        "description": "GPT-5 - Previous flagship reasoning model",
         "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "accurate"]
+    },
+    "gpt-5-mini": {
+        "provider": "openai",
+        "description": "GPT-5 Mini - Faster, cost-efficient GPT-5",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
         "recommended": False,
         "cost": "$$",
-        "tags": ["vision", "cloud"]
+        "tags": ["vision", "cloud", "fast"]
     },
-    "claude-3-5-haiku-20241022": {
-        "provider": "claude",
-        "description": "Claude 3.5 Haiku - Fastest, cheapest",
+    "gpt-5-nano": {
+        "provider": "openai",
+        "description": "GPT-5 Nano - Fastest, most affordable GPT-5",
         "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast"]
+    },
+    "o4-mini": {
+        "provider": "openai",
+        "description": "o4-mini - Fast cost-efficient reasoning model",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$",
+        "tags": ["vision", "cloud", "reasoning"]
+    },
+    "o3": {
+        "provider": "openai",
+        "description": "o3 - Reasoning model for complex tasks",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "reasoning"]
+    },
+    "o1": {
+        "provider": "openai",
+        "description": "o1 - Previous o-series reasoning model (slow)",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$$",
+        "tags": ["vision", "cloud", "reasoning"]
+    },
+    "gpt-4o": {
+        "provider": "openai",
+        "description": "GPT-4o - Fast, intelligent, flexible multimodal model",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": True,
+        "cost": "$$",
+        "tags": ["vision", "cloud", "accurate", "recommended"]
+    },
+    "gpt-4o-mini": {
+        "provider": "openai",
+        "description": "GPT-4o Mini - Fast and affordable",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
         "recommended": True,
         "cost": "$",
         "tags": ["vision", "cloud", "fast", "recommended"]
     },
-    "claude-3-haiku-20240307": {
-        "provider": "claude",
-        "description": "Claude 3.0 Haiku - Budget option",
+    "gpt-4.1": {
+        "provider": "openai",
+        "description": "GPT-4.1 - Smartest non-reasoning model",
         "size": "Cloud-based",
-        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$$",
+        "tags": ["vision", "cloud", "accurate"]
+    },
+    "gpt-4.1-mini": {
+        "provider": "openai",
+        "description": "GPT-4.1 Mini - Smaller GPT-4.1",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
+        "recommended": False,
+        "cost": "$",
+        "tags": ["vision", "cloud", "fast"]
+    },
+    "gpt-4.1-nano": {
+        "provider": "openai",
+        "description": "GPT-4.1 Nano - Ultra-budget GPT-4.1",
+        "size": "Cloud-based",
+        "install_command": "Requires API key in openai.txt",
         "recommended": False,
         "cost": "$",
         "tags": ["vision", "cloud", "fast"]
     },
     
+    # Claude (Anthropic) Models - populated dynamically below from models.claude_models
+    # To add/remove Claude models, edit models/claude_models.py only.
+
     # HuggingFace Models (Florence-2)
     "microsoft/Florence-2-base": {
         "provider": "huggingface",
@@ -253,6 +280,22 @@ MODEL_METADATA = {
         "tags": ["vision", "local", "npu", "accurate", "recommended"]
     },
 }
+
+
+# Populate Claude entries from the central model registry.
+# This runs once at import time so MODEL_METADATA is fully populated before use.
+for _model_id in _CLAUDE_MODEL_IDS:
+    _meta = _CLAUDE_MODEL_META.get(_model_id, {})
+    _recommended = _meta.get("recommended", False)
+    MODEL_METADATA[_model_id] = {
+        "provider": "claude",
+        "description": _meta.get("description", "Claude model"),
+        "size": "Cloud-based",
+        "install_command": "Requires API key in claude.txt or ANTHROPIC_API_KEY",
+        "recommended": _recommended,
+        "cost": _meta.get("cost", "$$"),
+        "tags": ["vision", "cloud"] + (["recommended"] if _recommended else []),
+    }
 
 
 def get_installed_ollama_models() -> List[str]:
@@ -494,7 +537,7 @@ def show_recommendations():
     print(f"    Best for: Maximum accuracy, complex images")
     print(f"    Setup: Add OpenAI API key to openai.txt\n")
     
-    print(f"  • {Fore.CYAN}claude-3.5-sonnet{Style.RESET_ALL} - High quality cloud")
+    print(f"  • {Fore.CYAN}claude-sonnet-4-5-20250929{Style.RESET_ALL} - High quality cloud")
     print(f"    Best for: Detailed analysis, complex reasoning")
     print(f"    Setup: Add Anthropic API key to claude.txt\n")
     

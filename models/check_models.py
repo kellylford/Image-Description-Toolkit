@@ -35,6 +35,12 @@ _original_stderr = sys.stderr
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Import Claude model list from central source
+try:
+    from models.claude_models import CLAUDE_MODELS as _CLAUDE_MODELS
+except ImportError:
+    from claude_models import CLAUDE_MODELS as _CLAUDE_MODELS
+
 try:
     from colorama import Fore, Style, init
     init(autoreset=True)
@@ -144,16 +150,8 @@ def check_claude_status() -> Tuple[bool, List[str], str]:
         if not provider.is_available():
             return False, [], "API key not configured (need claude.txt or ANTHROPIC_API_KEY)"
         
-        # Known Claude vision models
-        models = [
-            "claude-sonnet-4-5-20250929",
-            "claude-opus-4-1-20250805",
-            "claude-sonnet-4-20250514",
-            "claude-opus-4-20250514",
-            "claude-3-7-sonnet-20250219",
-            "claude-3-5-haiku-20241022",
-            "claude-3-haiku-20240307"
-        ]
+        # Model list comes from the central registry so it stays in sync
+        models = list(_CLAUDE_MODELS)
         return True, models, "API key configured"
     except Exception as e:
         return False, [], f"Error: {str(e)}"

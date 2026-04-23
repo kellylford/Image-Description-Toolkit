@@ -13,6 +13,12 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
 
 def find_workflow_directories(base_dir: Path) -> list:
     """Find all workflow result directories.
@@ -45,8 +51,12 @@ def find_workflow_directories(base_dir: Path) -> list:
         
         if metadata_file.exists():
             try:
-                with open(metadata_file, 'r', encoding='utf-8') as f:
-                    metadata = json.load(f)
+                # Use config_loader for frozen mode compatibility
+                if load_json_config:
+                    metadata, _, _ = load_json_config(explicit=str(metadata_file))
+                else:
+                    with open(metadata_file, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
             except Exception:
                 pass
         
@@ -240,55 +250,61 @@ def get_next_available_filename(base_name: str, extension: str = '.csv') -> Path
             raise ValueError("Too many existing files with this base name")
 
 
-def generate_viewer_command(workflow_dir: Path, use_relative_path: bool = True) -> str:
-    """Generate the viewer command for a workflow.
+def format_workflow_path(workflow_dir: Path, use_relative_path: bool = True) -> str:
+    """Format the workflow directory path for display.
     
     Args:
         workflow_dir: Path to workflow directory
         use_relative_path: If True, use relative path from current directory
         
     Returns:
-        Viewer command string
+        Path string (relative if possible, otherwise absolute)
     """
     if use_relative_path:
         try:
             # Try to make it relative to current directory
             rel_path = workflow_dir.relative_to(Path.cwd())
-            path_str = str(rel_path).replace('\\', '/')
+            return str(rel_path)
         except ValueError:
             # Can't make relative, use absolute
-            path_str = str(workflow_dir).replace('\\', '/')
-    else:
-        path_str = str(workflow_dir).replace('\\', '/')
-    
-    return f'idt viewer "{path_str}"'
+            pass
+    return str(workflow_dir)
 
 
 def main():
     """Main function for results-list command."""
     parser = argparse.ArgumentParser(
-        description="List available workflow results and generate viewer commands",
+        description="List available workflow results",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # List results in default Descriptions directory
+  # Auto-detect and list results from common locations
   idt results-list
   
   # List results in specific directory
   idt results-list --input-dir c:\\path\\to\\results
+  
+  # List results in current directory
+  idt results-list --input-dir .
   
   # Save to custom output file
   idt results-list --output my_workflows.csv
   
   # Use absolute paths in viewer commands
   idt results-list --absolute-paths
+  
+Auto-detection searches these locations in order:
+  1. Current directory (for wf_* subdirectories)
+  2. ./Descriptions
+  3. ~/IDT_Descriptions  
+  4. C:\\idt\\Descriptions (Windows) or /opt/idt/Descriptions (Unix)
         """
     )
     
     parser.add_argument(
         '--input-dir', '-i',
-        default='Descriptions',
-        help='Directory containing workflow results (default: Descriptions)'
+        default=None,  # Changed from 'Descriptions' to None - will auto-detect
+        help='Directory containing workflow results (default: auto-detect from common locations)'
     )
     
     parser.add_argument(
@@ -300,7 +316,7 @@ Examples:
     parser.add_argument(
         '--absolute-paths',
         action='store_true',
-        help='Use absolute paths in viewer commands instead of relative'
+        help='Use absolute paths in the Workflow Directory column instead of relative'
     )
     
     parser.add_argument(
@@ -312,15 +328,42 @@ Examples:
     
     args = parser.parse_args()
     
-    # Resolve input directory
-    input_dir = Path(args.input_dir)
-    if not input_dir.is_absolute():
-        input_dir = Path.cwd() / input_dir
+    # Resolve input directory with smart defaults
+    if args.input_dir:
+        input_dir = Path(args.input_dir)
+        if not input_dir.is_absolute():
+            input_dir = Path.cwd() / input_dir
+    else:
+        # Auto-detect workflow directory from common locations
+        possible_dirs = [
+            Path.cwd(),  # Current directory (might have wf_* subdirs)
+            Path.cwd() / 'Descriptions',  # CWD/Descriptions
+            Path.home() / 'IDT_Descriptions',  # ~/IDT_Descriptions
+            Path('C:/idt/Descriptions') if sys.platform == 'win32' else Path('/opt/idt/Descriptions'),  # System install location
+        ]
+        
+        # Find first directory that exists and contains workflows
+        input_dir = None
+        for candidate in possible_dirs:
+            if candidate.exists():
+                # Check if it contains any wf_* directories
+                wf_dirs = list(candidate.glob('wf_*'))
+                if wf_dirs:
+                    input_dir = candidate
+                    print(f"Auto-detected workflow directory: {input_dir}")
+                    break
+        
+        if not input_dir:
+            # None found - default to current directory
+            input_dir = Path.cwd()
+            print(f"No workflow directories found, searching current directory: {input_dir}")
     
     print(f"Scanning for workflow results in: {input_dir}")
     
     if not input_dir.exists():
         print(f"Error: Directory does not exist: {input_dir}")
+        print(f"\nTip: Run 'idt workflow <images_dir>' first to create workflow results")
+        print(f"     Or specify a different directory with --input-dir")
         return 1
     
     # Find all workflow directories
@@ -328,7 +371,9 @@ Examples:
     
     if not workflows:
         print(f"No workflow results found in {input_dir}")
-        return 0
+        print(f"\nSearched for directories starting with 'wf_'")
+        print(f"To create workflow results, run: idt workflow <images_directory>")
+        return 0  # Not an error - just no results yet
     
     print(f"Found {len(workflows)} workflow(s)")
     
@@ -336,7 +381,7 @@ Examples:
     rows = []
     for workflow_dir, metadata in workflows:
         desc_count = count_descriptions(workflow_dir)
-        viewer_cmd = generate_viewer_command(workflow_dir, not args.absolute_paths)
+        workflow_path = format_workflow_path(workflow_dir, not args.absolute_paths)
         
         row = {
             'Name': metadata.get('workflow_name', 'unknown'),
@@ -345,7 +390,7 @@ Examples:
             'Prompt': metadata.get('prompt_style', 'unknown'),
             'Descriptions': desc_count,
             'Timestamp': format_timestamp(metadata.get('timestamp', 'unknown')),
-            'Viewer Command': viewer_cmd
+            'Workflow Directory': workflow_path
         }
         rows.append(row)
     
@@ -370,7 +415,7 @@ Examples:
     
     # Write CSV
     with open(output_file, 'w', newline='', encoding='utf-8') as f:
-        fieldnames = ['Name', 'Provider', 'Model', 'Prompt', 'Descriptions', 'Timestamp', 'Viewer Command']
+        fieldnames = ['Name', 'Provider', 'Model', 'Prompt', 'Descriptions', 'Timestamp', 'Workflow Directory']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         
         writer.writeheader()
@@ -381,7 +426,7 @@ Examples:
     print(f"  Total workflows: {len(rows)}")
     print(f"  Providers: {', '.join(sorted(set(r['Provider'] for r in rows)))}")
     print(f"  Models: {', '.join(sorted(set(r['Model'] for r in rows)))}")
-    print(f"\nTo view a workflow, copy and paste the command from the 'Viewer Command' column.")
+    print(f"\nWorkflow directories are listed in the 'Workflow Directory' column of the CSV.")
     
     return 0
 

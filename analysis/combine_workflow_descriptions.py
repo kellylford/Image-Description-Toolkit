@@ -29,6 +29,13 @@ except ImportError:
     def get_resource_path(relative_path):
         return Path(__file__).parent.parent / relative_path
 
+# Import shared EXIF utilities
+try:
+    from shared.exif_utils import get_image_date_for_sorting as _shared_get_image_date
+except ImportError:
+    # Fallback for development mode
+    _shared_get_image_date = None
+
 try:
     from scripts.metadata_extractor import MetadataExtractor
 except ImportError:
@@ -44,22 +51,12 @@ from datetime import datetime
 from analysis_utils import get_safe_filename, ensure_directory
 
 
-def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
-    """
-    Extract the date/time the image was taken from EXIF data for sorting purposes.
+# Note: get_image_date_for_sorting() is now imported from shared.exif_utils above.
+# This fallback implementation is used if the shared import fails.
+def _get_image_date_for_sorting_fallback(image_name: str, base_dir: Path) -> datetime:
+    """Fallback implementation (used if shared import fails).
     
-    Searches for the image file in the workflow directories and tries multiple EXIF fields:
-    1. DateTimeOriginal (when photo was taken)
-    2. DateTimeDigitized (when photo was digitized) 
-    3. DateTime (file modification date in EXIF)
-    4. Falls back to file modification time
-    
-    Args:
-        image_name: The filename to search for
-        base_dir: Base directory containing workflow folders
-        
-    Returns:
-        datetime object for sorting (earliest possible date if file not found)
+    See shared.exif_utils.get_image_date_for_sorting for full documentation.
     """
     try:
         from PIL import Image
@@ -128,6 +125,51 @@ def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
     except Exception as e:
         # Return epoch time if any error occurs (will sort to beginning)
         return datetime.fromtimestamp(0)
+
+
+# Bridge function to handle different signatures
+# shared.exif_utils version takes (image_path) 
+# but we need to pass (image_name, base_dir) from calling code
+def get_image_date_for_sorting(image_name: str, base_dir: Path) -> datetime:
+    """Wrapper that finds image path and calls shared EXIF utility.
+    
+    Args:
+        image_name: Filename to search for
+        base_dir: Base directory containing workflow folders
+        
+    Returns:
+        datetime object for sorting
+    """
+    if _shared_get_image_date is not None:
+        # Use shared version - need to find the image file first
+        image_path = None
+        for workflow_dir in base_dir.glob("wf_*"):
+            for subdir in ['converted_images', 'extracted_frames', 'temp_combined_images', 'input_images', '']:
+                search_dir = workflow_dir / subdir if subdir else workflow_dir
+                if search_dir.exists():
+                    potential_path = search_dir / image_name
+                    if potential_path.exists():
+                        image_path = potential_path
+                        break
+                    # Also check subdirectories
+                    for img_file in search_dir.rglob(image_name):
+                        if img_file.is_file():
+                            image_path = img_file
+                            break
+                if image_path:
+                    break
+            if image_path:
+                break
+        
+        # Call shared version with single argument
+        if image_path:
+            return _shared_get_image_date(image_path)
+        else:
+            # File not found, return epoch
+            return datetime.fromtimestamp(0)
+    else:
+        # Use fallback version with 2 arguments
+        return _get_image_date_for_sorting_fallback(image_name, base_dir)
 
 
 def get_image_location_for_display(image_name: str, base_dir: Path) -> str:
@@ -323,6 +365,148 @@ def get_workflow_name(workflow_dir: Path) -> str:
     return None
 
 
+def _format_model_label_from_provider_model(provider: str, model: str) -> str:
+    """Format a human-readable model label from raw provider and model name.
+
+    This is the authoritative label formatter used when workflow_metadata.json
+    is available (all workflows created after the metadata feature was added).
+
+    Args:
+        provider: Raw provider string from metadata (e.g., 'ollama', 'openai', 'claude')
+        model: Raw model name from metadata (e.g., 'kimi-k2.5:cloud', 'gpt-4.1-mini')
+
+    Returns:
+        Human-readable label (e.g., 'Ollama Kimi-K2.5 Cloud', 'OpenAI GPT-4.1 Mini')
+    """
+    p = provider.lower()
+
+    if p in ('claude', 'anthropic'):
+        m = model.lower()
+        if 'haiku' in m:
+            if '4-5' in m or '4.5' in m:
+                return "Claude Haiku 4.5"
+            elif '3-5' in m or '3.5' in m:
+                return "Claude Haiku 3.5"
+            else:
+                return "Claude Haiku 3"
+        elif 'sonnet' in m:
+            if '4-6' in m or '4.6' in m:
+                return "Claude Sonnet 4.6"
+            elif '4-5' in m or '4.5' in m:
+                return "Claude Sonnet 4.5"
+            elif '3-7' in m or '3.7' in m:
+                return "Claude Sonnet 3.7"
+            elif 'sonnet-4' in m:
+                return "Claude Sonnet 4"
+            return "Claude Sonnet"
+        elif 'opus' in m:
+            if '4-7' in m or '4.7' in m:
+                return "Claude Opus 4.7"
+            elif '4-6' in m or '4.6' in m:
+                return "Claude Opus 4.6"
+            elif '4-5' in m or '4.5' in m:
+                return "Claude Opus 4.5"
+            elif '4-2' in m or '4.2' in m:
+                return "Claude Opus 4"
+            elif '4-1' in m or '4.1' in m:
+                return "Claude Opus 4.1"
+            return "Claude Opus"
+        else:
+            # Generic Claude fallback
+            return f"Claude {model}"
+
+    elif p == 'openai':
+        known = {
+            'gpt-4o': 'OpenAI GPT-4o',
+            'gpt-4o-mini': 'OpenAI GPT-4o Mini',
+            'gpt-4.1': 'OpenAI GPT-4.1',
+            'gpt-4.1-mini': 'OpenAI GPT-4.1 Mini',
+            'gpt-4.1-nano': 'OpenAI GPT-4.1 Nano',
+            'gpt-4.1-preview': 'OpenAI GPT-4.1 Preview',
+            'gpt-5': 'OpenAI GPT-5',
+            'gpt-5-mini': 'OpenAI GPT-5 Mini',
+            'o1': 'OpenAI o1',
+            'o1-mini': 'OpenAI o1 Mini',
+            'o3': 'OpenAI o3',
+            'o3-mini': 'OpenAI o3 Mini',
+            'o4-mini': 'OpenAI o4 Mini',
+        }
+        return known.get(model.lower(), f"OpenAI {model.upper()}")
+
+    elif p == 'ollama':
+        # Ollama models use "name:tag" format (e.g., kimi-k2.5:cloud, llava:7b)
+        if ':' in model:
+            model_name, model_tag = model.rsplit(':', 1)
+        else:
+            model_name, model_tag = model, ''
+
+        mn = model_name.lower()
+        mt = model_tag.lower()
+
+        def _tag_suffix(tag: str) -> str:
+            """Return a formatted tag suffix, empty for 'latest'."""
+            if not tag or tag == 'latest':
+                return ''
+            # Uppercase size tags like 7b, 13b, 90b
+            return f" {tag.upper()}" if tag.endswith('b') and tag[:-1].isdigit() else f" {tag.capitalize()}"
+
+        if mn == 'bakllava':
+            return "Ollama BakLLaVA" + _tag_suffix(mt)
+        elif 'llava-phi3' in mn:
+            return "Ollama LLaVA-Phi3" + _tag_suffix(mt)
+        elif 'llava-llama3' in mn:
+            return "Ollama LLaVA-Llama3" + _tag_suffix(mt)
+        elif 'llava' in mn:
+            return "Ollama LLaVA" + _tag_suffix(mt)
+        elif 'llama3.2-vision' in mn or 'llama3-2-vision' in mn:
+            return "Ollama Llama3.2-Vision" + _tag_suffix(mt)
+        elif 'moondream' in mn:
+            return "Ollama Moondream" + _tag_suffix(mt)
+        elif 'minicpm' in mn:
+            return "Ollama MiniCPM-V" + _tag_suffix(mt)
+        elif 'cogvlm' in mn:
+            return "Ollama CogVLM2" if '2' in mn else "Ollama CogVLM"
+        elif 'internvl' in mn:
+            return "Ollama InternVL" + _tag_suffix(mt)
+        elif 'kimi' in mn:
+            # kimi-k2.5 → "Kimi-K2.5"; preserve version numbers
+            parts = model_name.split('-')
+            formatted = []
+            for part in parts:
+                # k2.5, k2, k1 etc → K2.5, K2, K1
+                if re.match(r'^k\d', part, re.IGNORECASE):
+                    formatted.append(part.upper())
+                else:
+                    formatted.append(part.capitalize())
+            base = '-'.join(formatted)
+            return f"Ollama {base}" + _tag_suffix(mt)
+        elif 'qwen' in mn:
+            if 'qwen2.5' in mn and 'vl' in mn:
+                base = "Qwen2.5-VL"
+            elif 'qwen3' in mn and 'vl' in mn:
+                base = "Qwen3-VL"
+            elif 'qwen3-coder' in mn:
+                base = "Qwen3-Coder"
+            else:
+                base = "Qwen"
+            return f"Ollama {base}" + _tag_suffix(mt)
+        elif 'mistral' in mn:
+            if 'small3.2' in mn or 'small-3.2' in mn:
+                return "Ollama Mistral Small 3.2"
+            elif 'small3.1' in mn or 'small-3.1' in mn:
+                return "Ollama Mistral Small 3.1"
+            return f"Ollama Mistral" + _tag_suffix(mt)
+        elif 'gemma' in mn:
+            return f"Ollama {model_name.title()}" + _tag_suffix(mt)
+        else:
+            # Generic Ollama fallback
+            return f"Ollama {model_name.title()}" + _tag_suffix(mt)
+
+    else:
+        # Generic fallback for unrecognized providers
+        return f"{provider.capitalize()} {model}"
+
+
 def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
     """
     Extract a readable label and prompt style from the workflow directory name.
@@ -339,34 +523,57 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
         wf_openai_gpt-4o-mini_detailed_... -> ("OpenAI GPT-4o-mini", "detailed")
         wf_10multipletest_ollama_gemma3_narrative_... -> ("Ollama Gemma3", "narrative")
     """
+    import json
+
+    # --- Primary path: use workflow_metadata.json for accurate provider/model/prompt ---
+    # Directory name parsing is unreliable when workflow names contain underscores.
+    metadata_file = workflow_dir / "workflow_metadata.json"
+    if metadata_file.exists():
+        try:
+            with open(metadata_file, 'r', encoding='utf-8') as _mf:
+                _meta = json.load(_mf)
+            _provider = _meta.get('provider', '')
+            _model = _meta.get('model', '')
+            _prompt = _meta.get('prompt_style', 'unknown')
+            if _provider and _model:
+                return (_format_model_label_from_provider_model(_provider, _model), _prompt)
+        except Exception:
+            pass  # Fall through to legacy directory name parsing
+
+    # --- Legacy path: parse the directory name (workflows without metadata) ---
     dir_name = workflow_dir.name
-    
+
     # Extract provider and model from directory name
     # Format: wf_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
     # OR: wf_WORKFLOWNAME_PROVIDER_MODEL_[VARIANT]_PROMPTSTYLE_DATETIME
     parts = dir_name.split('_')
-    
+
     # Known prompt styles (must match those in image_describer_config.json)
-    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful', 'artistic', 'simple']
-    
+    prompt_styles = ['narrative', 'detailed', 'concise', 'technical', 'creative', 'colorful',
+                     'artistic', 'simple', 'accessibility', 'comparison', 'mood', 'functional']
+
     # Known providers
     known_providers = ['ollama', 'claude', 'openai']
-    
+
     # Find the prompt style (it's the part before the datetime)
     prompt_style = 'unknown'
     for i, part in enumerate(parts):
         if part.lower() in prompt_styles:
             prompt_style = part
             break
-    
-    # Detect if parts[1] is a provider or a workflow name
-    # If parts[1] is a known provider, use format 1
-    # Otherwise, assume format 2 (workflow name prefix)
-    provider_idx = 1
-    if len(parts) > 2 and parts[1].lower() not in known_providers:
-        # Format 2: wf_WORKFLOWNAME_PROVIDER_...
-        provider_idx = 2
-    
+
+    # Search for the first known provider anywhere in the parts list, not just at
+    # positions 1 or 2 — long workflow name prefixes can push the provider further.
+    provider_idx = None
+    for _i, _part in enumerate(parts):
+        if _part.lower() in known_providers:
+            provider_idx = _i
+            break
+
+    # Fallback: assume position 1 or 2 (original heuristic)
+    if provider_idx is None:
+        provider_idx = 1 if parts[1].lower() in known_providers else 2
+
     if len(parts) >= provider_idx + 2:
         provider = parts[provider_idx].capitalize()
         model_part = parts[provider_idx + 1]
@@ -383,15 +590,20 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
         if provider.lower() == 'claude':
             # claude-3-haiku-20240307 -> Haiku 3
             # claude-3-5-haiku-20241022 -> Haiku 3.5
+            # claude-haiku-4-5-20251001 -> Haiku 4.5
             # claude-opus-4-1-20250805 -> Opus 4.1
             # claude-sonnet-4-5-20250929 -> Sonnet 4.5
             if 'haiku' in model_part:
-                if '3-5' in model_part:
+                if '4-5' in model_part:
+                    model_label = "Claude Haiku 4.5"
+                elif '3-5' in model_part:
                     model_label = "Claude Haiku 3.5"
                 else:
                     model_label = "Claude Haiku 3"
             elif 'sonnet' in model_part:
-                if '4-5' in model_part:
+                if '4-6' in model_part:
+                    model_label = "Claude Sonnet 4.6"
+                elif '4-5' in model_part:
                     model_label = "Claude Sonnet 4.5"
                 elif '3-7' in model_part:
                     model_label = "Claude Sonnet 3.7"
@@ -400,7 +612,13 @@ def get_workflow_label(workflow_dir: Path) -> Tuple[str, str]:
                 else:
                     model_label = "Claude Sonnet"
             elif 'opus' in model_part:
-                if '4-1' in model_part:
+                if '4-7' in model_part:
+                    model_label = "Claude Opus 4.7"
+                elif '4-6' in model_part:
+                    model_label = "Claude Opus 4.6"
+                elif '4-5' in model_part:
+                    model_label = "Claude Opus 4.5"
+                elif '4-1' in model_part:
                     model_label = "Claude Opus 4.1"
                 elif 'opus-4-2' in model_part:
                     model_label = "Claude Opus 4"

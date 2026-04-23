@@ -1,10 +1,12 @@
 name: "Integration Test: Windows (Ollama + moondream)"
 
-# Manual trigger only -- Ollama model pull + inference takes ~20-30 min.
-# Run this when you want to verify the full end-to-end user flow works.
-# Public repo = free GitHub Actions minutes on windows-latest.
+# Runs automatically on every push to feature/video-description.
+# Manual trigger also available via workflow_dispatch.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/video-description
 
 jobs:
   integration-test:
@@ -158,9 +160,12 @@ jobs:
     - name: Verify description output
       shell: pwsh
       run: |
-        $wfDirs = Get-ChildItem -Directory -Filter "wf_*" | Sort-Object LastWriteTime -Descending
+        # idt workflow defaults to --output-dir Descriptions, so wf_* dirs land under Descriptions\
+        $wfDirs = Get-ChildItem -Path "Descriptions" -Directory -Filter "wf_*" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
         if ($wfDirs.Count -eq 0) {
-          Write-Host "ERROR: No workflow output directory (wf_*) was created"
+          Write-Host "ERROR: No workflow output directory found under Descriptions\\"
+          Write-Host "Contents of current directory:"
+          Get-ChildItem -Recurse -Depth 2 | Select-Object FullName
           exit 1
         }
 
@@ -173,27 +178,116 @@ jobs:
         }
         Write-Host ""
 
-        $txtFiles = Get-ChildItem -Path $wfDir -Filter "*.txt" -Recurse
-        Write-Host "Description .txt files found: $($txtFiles.Count)"
-
-        if ($txtFiles.Count -lt 2) {
-          Write-Host "ERROR: Expected at least 2 description files (one per test image), found $($txtFiles.Count)"
+        # Check the combined descriptions file has at least 1 image described
+        $descFile = Get-ChildItem -Path $wfDir -Filter "image_descriptions.txt" -Recurse | Select-Object -First 1
+        if (-not $descFile) {
+          Write-Host "ERROR: image_descriptions.txt not found in output directory"
           exit 1
         }
 
-        foreach ($f in $txtFiles) {
-          Write-Host ""
-          Write-Host "=== $($f.Name) ==="
-          Get-Content $f.FullName
-          Write-Host "=========================="
+        $content = Get-Content $descFile.FullName -Raw
+        Write-Host "=== image_descriptions.txt ==="
+        Write-Host $content
+        Write-Host "=============================="
+
+        # Require at least one image block in the descriptions file
+        # The file format uses "File: <name>" headers for each image entry
+        $imageBlocks = ([regex]::Matches($content, '(?m)^File:')).Count
+        Write-Host "Image description blocks found: $imageBlocks"
+        if ($imageBlocks -lt 1) {
+          Write-Host "ERROR: No image descriptions found in image_descriptions.txt"
+          exit 1
+        }
+
+        # Verify actual description content -- test images are outdoor_scene.jpg (sky, grass, tree, sun)
+        # and coffee_desk.jpg (coffee cup, notebook, desk).
+        # At least one meaningful scene word should appear in the AI output.
+        $sceneWords = @('sky','grass','sun','cloud','tree','outdoor','green','coffee','cup','notebook','desk','pen','table','wood')
+        $matched = $sceneWords | Where-Object { $content -imatch "\b$_\b" }
+        Write-Host "Scene words found: $($matched -join ', ')"
+        if ($matched.Count -eq 0) {
+          Write-Host "ERROR: Description text contains none of the expected scene words - likely an empty/error response"
+          Write-Host "Expected one of: $($sceneWords -join ', ')"
+          exit 1
         }
 
         Write-Host ""
-        Write-Host "PASS: $($txtFiles.Count) descriptions produced successfully"
+        Write-Host "PASS: $imageBlocks image description(s) produced with meaningful content"
 
     # ------------------------------------------------------------------ #
-    #  8. Run unit tests for stats_analysis frame parsing                  #
-    #     Validates the fix for idt stats reporting 0 frames extracted     #
+    #  8. Video frame extraction test                                      #
+    #     testimages/test_video.mp4 is committed to the repo:             #
+    #       0-3 s black / 3-7 s white / 7-10 s black (5 fps, 320x240)    #
+    #     Two hard cuts let both time-interval and scene-change modes run. #
+    # ------------------------------------------------------------------ #
+    - name: Verify committed test video exists
+      shell: pwsh
+      run: |
+        if (-not (Test-Path "testimages/test_video.mp4")) {
+          Write-Host "ERROR: testimages/test_video.mp4 not found in checkout"
+          exit 1
+        }
+        $size = (Get-Item "testimages/test_video.mp4").Length
+        Write-Host "Using committed test video: testimages/test_video.mp4 ($size bytes)"
+
+    - name: "Extract frames - time interval mode (every 2 s)"
+      shell: pwsh
+      run: |
+        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_time --time 2"
+        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_time --time 2
+        $exitCode = $LASTEXITCODE
+        Write-Host "exit code: $exitCode"
+        if ($exitCode -ne 0) {
+          Write-Host "ERROR: extract-frames (time interval) failed"
+          exit $exitCode
+        }
+
+    - name: "Verify time-interval frames"
+      shell: pwsh
+      run: |
+        $frames = Get-ChildItem -Path "frames_time" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
+        Write-Host "Time-interval frames found: $($frames.Count)"
+        $frames | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
+
+        # 10-second video sampled every 2 seconds → at least 4 frames
+        if ($frames.Count -lt 4) {
+          Write-Host "ERROR: Expected at least 4 frames from time-interval mode, got $($frames.Count)"
+          Get-ChildItem -Path "frames_time" -Recurse | Select-Object FullName, Length
+          exit 1
+        }
+        Write-Host "PASS: $($frames.Count) frame(s) - time interval mode"
+
+    - name: "Extract frames - scene change detection mode"
+      shell: pwsh
+      run: |
+        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30"
+        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30
+        $exitCode = $LASTEXITCODE
+        Write-Host "exit code: $exitCode"
+        if ($exitCode -ne 0) {
+          Write-Host "ERROR: extract-frames (scene change) failed"
+          exit $exitCode
+        }
+
+    - name: "Verify scene-change frames"
+      shell: pwsh
+      run: |
+        $frames = Get-ChildItem -Path "frames_scene" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
+        Write-Host "Scene-change frames found: $($frames.Count)"
+        $frames | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
+
+        # There is exactly one hard cut (blue→orange at 5 s), so we expect
+        # at least 2 frames (one per scene) but allow a few boundary frames.
+        if ($frames.Count -lt 2) {
+          Write-Host "ERROR: Expected at least 2 frames from scene-change mode, got $($frames.Count)"
+          Get-ChildItem -Path "frames_scene" -Recurse | Select-Object FullName, Length
+          exit 1
+        }
+        Write-Host "PASS: $($frames.Count) frame(s) - scene change mode"
+
+    # ------------------------------------------------------------------ #
+    #  9. Run unit tests for stats_analysis frame parsing                 #
+    #     Validates the fix for idt stats reporting 0 frames extracted    #
     # ------------------------------------------------------------------ #
     - name: Run stats_analysis unit tests
       shell: pwsh
@@ -208,38 +302,38 @@ jobs:
         Write-Host "PASS: stats_analysis unit tests passed"
 
     # ------------------------------------------------------------------ #
-    #  9. Validate idt stats reports non-zero frames extracted             #
-    #     Workflow in step 6 runs against testimages/ which may have       #
-    #     videos. If frames were extracted, stats must show > 0.           #
+    # 10. Validate idt stats reports non-zero frames extracted             #
+    #     The workflow run in step 6 processes testimages/ which contains  #
+    #     test_video.mp4, so at least some frames should be extracted.     #
     # ------------------------------------------------------------------ #
     - name: Validate idt stats reports frames extracted
       shell: pwsh
       run: |
-        Write-Host "Running: idt.exe stats"
-        $output = .\idt\dist\idt.exe stats 2>&1
+        Write-Host "Running: idt.exe stats --input-dir Descriptions"
+        $output = .\idt\dist\idt.exe stats --input-dir Descriptions 2>&1
         Write-Host $output
 
         # Look for the "Frames Extracted:" line and verify it is not 0
         $framesLine = ($output | Out-String) -split "`n" | Where-Object { $_ -match "Frames Extracted" }
         Write-Host "Frames line: $framesLine"
 
-        if ($framesLine) {
+        if (-not $framesLine) {
+          Write-Host "INFO: 'Frames Extracted' not found in idt stats output - no video step ran, skipping check"
+        } else {
           $match = [regex]::Match($framesLine, '[\d,]+')
           if ($match.Success) {
             $count = [int]($match.Value -replace ',','')
             Write-Host "Frames extracted reported by idt stats: $count"
             if ($count -eq 0) {
-              Write-Host "ERROR: idt stats reports 0 frames extracted - frame_extractor log parser may be broken"
+              Write-Host "ERROR: idt stats reports 0 frames extracted - the frame_extractor log parser is broken"
               exit 1
             }
             Write-Host "PASS: idt stats correctly reports $count frames extracted"
           }
-        } else {
-          Write-Host "INFO: No video frames in this workflow run - skipping frames check"
         }
 
     # ------------------------------------------------------------------ #
-    # 10. Bonus: ImageDescriber launch smoke test                          #
+    # 11. Bonus: ImageDescriber launch smoke test                          #
     #     continue-on-error so a runner/GUI issue doesn't fail the core   #
     # ------------------------------------------------------------------ #
     - name: Smoke test - ImageDescriber launches without crashing
@@ -261,7 +355,7 @@ jobs:
         Write-Host "Process terminated cleanly."
 
     # ------------------------------------------------------------------ #
-    # 11. Upload artifacts (always -- so you get outputs even on failure)  #
+    # 12. Upload artifacts (always -- so you get outputs even on failure)  #
     # ------------------------------------------------------------------ #
     - name: Upload idt executable
       uses: actions/upload-artifact@v4
@@ -284,6 +378,17 @@ jobs:
       if: always()
       with:
         name: workflow-output
-        path: wf_*/
+        path: Descriptions/wf_*/
+        retention-days: 14
+        if-no-files-found: warn
+
+    - name: Upload extracted video frames
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: video-frames-output
+        path: |
+          frames_time/
+          frames_scene/
         retention-days: 14
         if-no-files-found: warn

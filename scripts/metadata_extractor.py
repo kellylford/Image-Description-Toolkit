@@ -12,6 +12,12 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+# Import config_loader for frozen mode compatibility
+try:
+    from config_loader import load_json_config
+except ImportError:
+    load_json_config = None
+
 # Import PIL for EXIF extraction
 try:
     from PIL import Image
@@ -248,7 +254,7 @@ class MetadataExtractor:
                 # Extract all available metadata
                 dt = self._extract_datetime(exif_dict)
                 if dt:
-                    metadata['datetime'] = dt
+                    metadata['datetime'] = dt.isoformat()
                     metadata['datetime_str'] = self._format_mdy_ampm(dt)
                     metadata['date_short'] = self._format_short_date(dt)
                 
@@ -272,7 +278,7 @@ class MetadataExtractor:
         try:
             mtime = datetime.fromtimestamp(image_path.stat().st_mtime)
             if 'datetime' not in metadata:
-                metadata['datetime'] = mtime
+                metadata['datetime'] = mtime.isoformat()
                 metadata['datetime_str'] = self._format_mdy_ampm(mtime)
                 metadata['date_short'] = self._format_short_date(mtime)
         except Exception:
@@ -384,8 +390,12 @@ class NominatimGeocoder:
         # Load cache if available
         if self.cache_path and self.cache_path.exists():
             try:
-                with open(self.cache_path, 'r', encoding='utf-8') as f:
-                    self.cache = json.load(f)
+                # Try config_loader first for frozen mode compatibility
+                if load_json_config:
+                    self.cache, _, _ = load_json_config(explicit=str(self.cache_path))
+                else:
+                    with open(self.cache_path, 'r', encoding='utf-8') as f:
+                        self.cache = json.load(f)
             except Exception:
                 self.cache = {}
         
@@ -437,6 +447,7 @@ class NominatimGeocoder:
                 'lon': longitude,
                 'format': 'json',
                 'addressdetails': 1,
+                'accept-language': 'en',  # Request English names
             }
             headers = {
                 'User-Agent': self.user_agent

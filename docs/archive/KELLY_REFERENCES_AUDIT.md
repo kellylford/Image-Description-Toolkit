@@ -134,7 +134,7 @@ cd c:\Users\kelly\GitHub\idt\imagedescriber
 
 #### 5. `instructions.md` (Line 8)
 ```markdown
-6. Keep a running log of chat conversations in c:\users\kelly\onedrive\VSCodeAIChat.md
+6. Keep a running log of chat conversations in ~/your_secure_location/VSCodeAIChat.md
 ```
 **Fix**: This is AI instruction file - probably keep as-is since it's internal
 
@@ -204,7 +204,7 @@ Copyright (c) 2025 kellylford
 
 **`instructions.md` (Line 8)**:
 ```
-6. Keep a running log of chat conversations in c:\users\kelly\onedrive\VSCodeAIChat.md
+6. Keep a running log of chat conversations in ~/your_secure_location/VSCodeAIChat.md
 ```
 
 **Purpose**: Internal AI instructions for development  

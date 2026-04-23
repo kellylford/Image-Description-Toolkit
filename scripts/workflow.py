@@ -35,14 +35,9 @@ import shutil
 import shlex
 from urllib.parse import urlparse
 
-# Set UTF-8 encoding for console output on Windows
-if sys.platform.startswith('win'):
-    import codecs
-    # Fix for PyInstaller executable - only detach if method exists
-    if hasattr(sys.stdout, 'detach'):
-        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    if hasattr(sys.stderr, 'detach'):
-        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+# Suppress console windows when spawning child processes from a GUI app on Windows
+_SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+
 import logging
 import json
 import platform
@@ -62,6 +57,13 @@ try:
     from config_loader import load_json_config
 except ImportError:
     load_json_config = None
+
+# Import shared utility functions
+try:
+    from shared.utility_functions import sanitize_name
+except ImportError:
+    # Fallback for development mode - use local implementation
+    sanitize_name = None
 import re
 try:
     # Versioning utilities for logging banner
@@ -70,23 +72,22 @@ except Exception:
     log_build_banner = None
 
 
-def sanitize_name(name: str, preserve_case: bool = True) -> str:
-    """Convert model/prompt names to filesystem-safe strings
+# Note: sanitize_name is now imported from shared.utility_functions above.
+# This fallback implementation is only used if the shared import fails.
+def _sanitize_name_fallback(name: str, preserve_case: bool = True) -> str:
+    """Fallback sanitize_name implementation (used if shared import fails).
     
-    Args:
-        name: The name to sanitize
-        preserve_case: If True, preserve the original case. If False, convert to lowercase.
-    
-    Returns:
-        Sanitized name safe for filesystem use
+    See shared.utility_functions.sanitize_name for full documentation.
     """
     if not name:
         return "unknown"
-    # Remove characters that are not letters, numbers, underscore, hyphen, or dot
-    # Spaces and punctuation are removed (not replaced) to satisfy naming tests
     safe_name = re.sub(r'[^A-Za-z0-9_\-.]', '', str(name))
-    # Convert to lowercase unless case preservation is requested
     return safe_name if preserve_case else safe_name.lower()
+
+
+# Use shared version if available, fallback otherwise
+if sanitize_name is None:
+    sanitize_name = _sanitize_name_fallback
 
 
 def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
@@ -121,28 +122,22 @@ def get_effective_model(args, config_file: str = "workflow_config.json") -> str:
         pass
     
     # Fall back to default image_describer_config.json
+    # Use config_loader for PyInstaller-compatible path resolution
+    if load_json_config is None:
+        # config_loader not available (module-level import failed)
+        return "unknown"
+    
     try:
-        import json
-        # Try different possible paths for the config file
-        config_paths = [
-            "image_describer_config.json",
-            "scripts/image_describer_config.json"
-        ]
-        
-        for config_path in config_paths:
-            try:
-                with open(config_path, 'r') as f:
-                    img_config = json.load(f)
-                    default_model = img_config.get("default_model")
-                    if default_model:
-                        return sanitize_name(default_model)
-                    # Fallback to old structure
-                    model = img_config.get("model_settings", {}).get("model")
-                    if model:
-                        return sanitize_name(model)
-            except FileNotFoundError:
-                continue
-                
+        cfg, path, source = load_json_config('image_describer_config.json',
+                                              env_var_file='IDT_IMAGE_DESCRIBER_CONFIG')
+        if cfg:
+            default_model = cfg.get("default_model")
+            if default_model:
+                return sanitize_name(default_model)
+            # Fallback to old structure
+            model = cfg.get("model_settings", {}).get("model")
+            if model:
+                return sanitize_name(model)
     except Exception:
         pass
         
@@ -157,17 +152,12 @@ def validate_prompt_style(style: str, config_file: str = "image_describer_config
     if not style:
         return "detailed"
     
-    try:
-        # Import at module level to avoid repeated imports
-        from scripts.config_loader import load_json_config
-    except ImportError:
-        try:
-            from config_loader import load_json_config
-        except ImportError:
-            # Fallback: config_loader not available, return style as-is if it looks valid
-            if style and len(style) > 0:
-                return style
-            return "detailed"
+    # Use module-level load_json_config
+    if load_json_config is None:
+        # Fallback: config_loader not available, return style as-is if it looks valid
+        if style and len(style) > 0:
+            return style
+        return "detailed"
     
     try:
         cfg, path, source = load_json_config('image_describer_config.json', 
@@ -487,18 +477,42 @@ def validate_redescribe_args(args, source_dir: Path) -> Dict[str, Any]:
             f"Hint: Use 'idt list' to see available workflows"
         )
     
-    # Check for required directories - at least one must exist
-    converted_images = source_dir / "converted_images"
-    extracted_frames = source_dir / "extracted_frames"
-    
-    has_images = converted_images.exists() and any(converted_images.iterdir())
-    has_frames = extracted_frames.exists() and any(extracted_frames.iterdir())
-    
-    if not has_images and not has_frames:
+    # Check that the workflow has images to redescribe.
+    # Primary check: file_path_mapping.json is written by describe_images after each
+    # successful run and lists every image that was processed. If it exists and is
+    # non-empty, we know exactly which files are available.
+    mapping_file = source_dir / "descriptions" / "file_path_mapping.json"
+    has_images = False
+    if mapping_file.exists():
+        try:
+            import json as _json
+            with open(mapping_file, 'r', encoding='utf-8') as _f:
+                _mapping = _json.load(_f)
+            if _mapping:
+                has_images = True
+        except Exception:
+            pass  # fall through to directory scan below
+
+    # Fallback: scan known image subdirectories (handles old workflows without mapping)
+    if not has_images:
+        def _has_images(d: Path) -> bool:
+            return d.exists() and (
+                any(d.rglob("*.jpg")) or any(d.rglob("*.jpeg")) or
+                any(d.rglob("*.png")) or any(d.rglob("*.webp"))
+            )
+        dirs_to_check = [
+            source_dir / "converted_images",
+            source_dir / "extracted_frames",
+            source_dir / "image_download",
+            source_dir / "input_images",
+        ]
+        has_images = any(_has_images(d) for d in dirs_to_check)
+
+    if not has_images:
         raise ValueError(
-            f"Source workflow has no processed images:\n"
-            f"  Missing or empty: converted_images/\n"
-            f"  Missing or empty: extracted_frames/\n"
+            f"Source workflow has no processed images.\n"
+            f"Expected file_path_mapping.json or at least one of:\n"
+            f"  converted_images/  extracted_frames/  image_download/  input_images/\n"
             f"Run the source workflow to completion before redescribing."
         )
     
@@ -554,6 +568,17 @@ def determine_reusable_steps(source_dir: Path, source_metadata: Dict) -> List[st
             reusable.append("convert")
             print(f"  ✓ Found {len(image_files)} converted images")
     
+    # Check for downloaded images (URL-based workflows)
+    image_download = source_dir / "image_download"
+    if image_download.exists():
+        dl_files = (list(image_download.rglob("*.jpg")) +
+                    list(image_download.rglob("*.jpeg")) +
+                    list(image_download.rglob("*.png")) +
+                    list(image_download.rglob("*.webp")))
+        if dl_files:
+            reusable.append("download")
+            print(f"  ✓ Found {len(dl_files)} downloaded images")
+
     # Check for input images (regular images copied to workflow)
     input_images = source_dir / "input_images"
     if input_images.exists():
@@ -635,6 +660,11 @@ def reuse_images(source_dir: Path, dest_dir: Path, method: str = "auto") -> str:
     if source_converted.exists() and any(source_converted.iterdir()):
         image_dirs_to_copy.append(("converted_images", source_converted))
     
+    # Check for downloaded images (URL-based workflows)
+    source_download = source_dir / "image_download"
+    if source_download.exists() and any(source_download.rglob("*.jpg") or source_download.rglob("*.png")):
+        image_dirs_to_copy.append(("image_download", source_download))
+
     # Check for input images (regular images copied to workflow)
     source_input = source_dir / "input_images"
     if source_input.exists() and any(source_input.iterdir()):
@@ -755,7 +785,8 @@ class WorkflowOrchestrator:
                  timeout: int = 90, enable_metadata: bool = True, enable_geocoding: bool = True, 
                  geocode_cache: str = "geocode_cache.json", url: str = None, min_size: str = None,
                  max_images: int = None, progress_status: bool = False,
-                 image_describer_config: Optional[str] = None, video_config: Optional[str] = None):
+                 image_describer_config: Optional[str] = None, video_config: Optional[str] = None,
+                 no_alt_text: bool = False, show_descriptions: bool = False):
         """
         Initialize the workflow orchestrator
         
@@ -813,6 +844,8 @@ class WorkflowOrchestrator:
         self.min_size = min_size
         self.max_images = max_images
         self.progress_status = progress_status
+        self.no_alt_text = no_alt_text
+        self.show_descriptions = show_descriptions
         
         # Available workflow steps
         self.available_steps = {
@@ -1023,7 +1056,11 @@ class WorkflowOrchestrator:
         Returns:
             Dict containing download results and statistics
         """
-        from scripts.web_image_downloader import WebImageDownloader
+        try:
+            from scripts.web_image_downloader import WebImageDownloader
+        except ImportError:
+            # Frozen mode - scripts package doesn't exist
+            from web_image_downloader import WebImageDownloader
         
         if not self.url:
             raise ValueError("URL is required for download step")
@@ -1223,7 +1260,20 @@ class WorkflowOrchestrator:
             
             self.logger.info(f"Running: {' '.join(cmd)}")
             # Stream output directly to terminal for real-time progress feedback
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace',
+                                    creationflags=_SUBPROCESS_FLAGS)
+            
+            # Stop monitoring
+            if 'video' in self.step_results:
+                self.step_results['video']['in_progress'] = False
+            
+            # Final progress update
+            if progress_file and progress_file.exists():
+                with open(progress_file, 'r', encoding='utf-8') as f:
+                    lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+                    final_count = len(lines)
+                if 'video' in self.step_results:
+                    self.step_results['video']['processed'] = final_count
             
             # Stop monitoring
             if 'video' in self.step_results:
@@ -1374,7 +1424,8 @@ class WorkflowOrchestrator:
 
             self.logger.info(f"Running: {' '.join(cmd)}")
             # Stream output directly to terminal for real-time progress feedback (conversion tool runs quiet)
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace',
+                                    creationflags=_SUBPROCESS_FLAGS)
             
             # Mark conversion as no longer in progress and final update
             if 'convert' in self.step_results:
@@ -1433,9 +1484,14 @@ class WorkflowOrchestrator:
                 self.logger.warning(f"Config file not found: {config_path}, skipping metadata configuration")
                 return
             
-            # Load current config
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
+            # Load current config using config_loader for frozen mode compatibility
+            if load_json_config:
+                config, actual_config_path, _ = load_json_config(filename=config_file)
+            else:
+                # Fallback to direct loading if config_loader not available
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                actual_config_path = config_path
             
             # Update metadata settings
             if 'metadata' not in config:
@@ -1457,7 +1513,7 @@ class WorkflowOrchestrator:
             config['processing_options']['extract_metadata'] = self.enable_metadata
             
             # Save updated config
-            with open(config_path, 'w', encoding='utf-8') as f:
+            with open(actual_config_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
                 f.flush()  # Ensure buffer is written
                 os.fsync(f.fileno())  # Force OS to write to disk
@@ -1524,6 +1580,7 @@ class WorkflowOrchestrator:
         converted_dir = self.config.get_step_output_dir("image_conversion")
         frames_dir = self.config.get_step_output_dir("video_extraction")
         input_images_dir = self.config.base_output_dir / "input_images"
+        download_dir = self.config.get_step_output_dir("image_download")
         
         # Check if we're in a workflow directory (redescribe/resume mode)
         # In this case, input_dir == base_output_dir (user pointed at workflow dir, not source)
@@ -1543,7 +1600,8 @@ class WorkflowOrchestrator:
             has_workflow_structure = (
                 (converted_dir.exists() and any(converted_dir.iterdir())) or
                 (frames_dir.exists() and any(frames_dir.iterdir())) or
-                (input_images_dir.exists() and any(input_images_dir.iterdir()))
+                (input_images_dir.exists() and any(input_images_dir.iterdir())) or
+                (download_dir.exists() and any(download_dir.iterdir()))
             )
             if not has_workflow_structure:
                 self.logger.warning(
@@ -1553,35 +1611,53 @@ class WorkflowOrchestrator:
         
         # Build the list of images to process
         all_image_files = []
-        unique_source_count = 0  # Track unique source images
-        conversion_count = 0  # Track format conversions
         
         if is_workflow_dir:
-            # We're processing a workflow directory (redescribe mode)
-            # Scan the three possible image directories directly
-            self.logger.info("Scanning workflow directory for images...")
-            
-            # Check input_images directory
-            if input_images_dir.exists() and any(input_images_dir.iterdir()):
-                existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
-                all_image_files.extend(existing_images)
-                unique_source_count += len(existing_images)
-                self.logger.info(f"Found {len(existing_images)} image(s) in: {input_images_dir}")
-            
-            # Check converted_images directory
-            if converted_dir.exists() and any(converted_dir.iterdir()):
-                converted_images = self.discovery.find_files_by_type(converted_dir, "images")
-                all_image_files.extend(converted_images)
-                unique_source_count += len(converted_images)
-                conversion_count = len(converted_images)
-                self.logger.info(f"Found {len(converted_images)} converted image(s) in: {converted_dir}")
-            
-            # Check extracted_frames directory
-            if frames_dir.exists() and any(frames_dir.iterdir()):
-                frame_images = self.discovery.find_files_by_type(frames_dir, "images")
-                all_image_files.extend(frame_images)
-                unique_source_count += len(frame_images)
-                self.logger.info(f"Found {len(frame_images)} extracted frame(s) in: {frames_dir}")
+            # We're processing a workflow directory (redescribe mode).
+            # Primary: use file_path_mapping.json — it lists every image from the
+            # original describe run, regardless of which subdirectory they lived in.
+            mapping_file = Path(self.config.base_output_dir) / "descriptions" / "file_path_mapping.json"
+            used_mapping = False
+            if mapping_file.exists():
+                try:
+                    import json as _json
+                    with open(mapping_file, 'r', encoding='utf-8') as _f:
+                        _mapping = _json.load(_f)
+                    if _mapping:
+                        for orig_path_str in _mapping.values():
+                            p = Path(orig_path_str)
+                            if p.exists() and p.is_file():
+                                all_image_files.append(p)
+                        self.logger.info(
+                            f"Loaded {len(all_image_files)} image(s) from file_path_mapping.json"
+                        )
+                        used_mapping = True
+                except Exception as e:
+                    self.logger.warning(f"Could not read file_path_mapping.json: {e}; falling back to directory scan")
+
+            if not used_mapping:
+                # Fallback: scan known image subdirectories (handles old workflows without mapping)
+                self.logger.info("file_path_mapping.json not found; scanning workflow subdirectories...")
+
+                if input_images_dir.exists() and any(input_images_dir.iterdir()):
+                    existing_images = self.discovery.find_files_by_type(input_images_dir, "images")
+                    all_image_files.extend(existing_images)
+                    self.logger.info(f"Found {len(existing_images)} image(s) in: {input_images_dir}")
+
+                if converted_dir.exists() and any(converted_dir.iterdir()):
+                    converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+                    all_image_files.extend(converted_images)
+                    self.logger.info(f"Found {len(converted_images)} converted image(s) in: {converted_dir}")
+
+                if frames_dir.exists() and any(frames_dir.iterdir()):
+                    frame_images = self.discovery.find_files_by_type(frames_dir, "images")
+                    all_image_files.extend(frame_images)
+                    self.logger.info(f"Found {len(frame_images)} extracted frame(s) in: {frames_dir}")
+
+                if download_dir.exists() and any(download_dir.iterdir()):
+                    downloaded_images = self.discovery.find_files_by_type(download_dir, "images", recursive=True)
+                    all_image_files.extend(downloaded_images)
+                    self.logger.info(f"Found {len(downloaded_images)} downloaded image(s) in: {download_dir}")
         
         else:
             # Normal mode: process original input directory
@@ -1610,36 +1686,46 @@ class WorkflowOrchestrator:
                     dest = input_images_dir / img.name
                     shutil.copy2(str(img), str(dest))
                     all_image_files.append(dest)
-                unique_source_count += len(regular_input_images)
                 self.logger.info(f"Copied {len(regular_input_images)} images to: {input_images_dir}")
             
             # Add converted images OR HEIC files (not both)
             if has_conversions:
                 converted_images = self.discovery.find_files_by_type(converted_dir, "images")
                 all_image_files.extend(converted_images)
-                unique_source_count += len(converted_images)
-                conversion_count = len(converted_images)
                 self.logger.info(f"Including {len(converted_images)} converted image(s) from: {converted_dir}")
             elif heic_files_in_input:
                 # If conversion hasn't run yet, include HEIC files directly
                 all_image_files.extend(heic_files_in_input)
-                unique_source_count += len(heic_files_in_input)
                 self.logger.info(f"Found {len(heic_files_in_input)} HEIC image(s) in input directory (not yet converted)")
             
             # Add extracted frames from videos
             if frames_dir.exists() and any(frames_dir.iterdir()):
                 frame_images = self.discovery.find_files_by_type(frames_dir, "images")
                 all_image_files.extend(frame_images)
-                unique_source_count += len(frame_images)
                 self.logger.info(f"Including {len(frame_images)} extracted frame(s) from: {frames_dir}")
         
         if not all_image_files:
             self.logger.info("No image files found to describe")
-            return {"success": True, "processed": 0, "unique_images": 0, "conversions": 0, "output_dir": output_dir}
+            return {"success": True, "processed": 0, "output_dir": output_dir}
         
-        self.logger.info(f"Total unique images to describe: {unique_source_count}")
-        if conversion_count > 0:
-            self.logger.info(f"Format conversions included: {conversion_count} (HEIC to JPG)")
+        # Log total count and check for duplicates
+        total_images = len(all_image_files)
+        unique_images = len(set(all_image_files))
+        
+        self.logger.info(f"Total images to describe: {total_images}")
+        if total_images != unique_images:
+            self.logger.warning(f"Duplicate images detected: {total_images} total, {unique_images} unique")
+            # Remove duplicates
+            all_image_files = list(set(all_image_files))
+            self.logger.info(f"Removed {total_images - unique_images} duplicates, proceeding with {len(all_image_files)} images")
+        
+        # Count conversions for reporting
+        conversion_count = 0
+        if converted_dir.exists():
+            converted_images = self.discovery.find_files_by_type(converted_dir, "images")
+            conversion_count = len([f for f in all_image_files if f in converted_images])
+            if conversion_count > 0:
+                self.logger.info(f"Format conversions included: {conversion_count} (HEIC to JPG)")
         
         try:
             # Get description settings
@@ -1770,14 +1856,15 @@ class WorkflowOrchestrator:
             if getattr(sys, 'frozen', False):
                 # In frozen mode rely on dispatcher supporting 'image_describer' alias
                 cmd = [sys.executable, 'image_describer', str(temp_combined_dir), '--recursive',
-                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs'),
-                       '--quiet']  # Suppress subprocess console output to avoid duplicates
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
             else:
                 scripts_dir = Path(__file__).parent
                 image_describer_path = scripts_dir / 'image_describer.py'
                 cmd = [sys.executable, str(image_describer_path), str(temp_combined_dir), '--recursive',
-                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs'),
-                       '--quiet']  # Suppress subprocess console output to avoid duplicates
+                       '--output-dir', str(output_dir), '--log-dir', str(self.config.base_output_dir / 'logs')]
+            # Suppress subprocess console noise unless --show-descriptions is active
+            if not self.show_descriptions:
+                cmd.append('--quiet')
             
             # Add provider parameter
             if self.provider:
@@ -1870,6 +1957,10 @@ class WorkflowOrchestrator:
             if self.workflow_name:
                 cmd.extend(["--workflow-name", self.workflow_name])
             
+            # Add source URL if available (for downloaded images)
+            if self.url:
+                cmd.extend(["--source-url", self.url])
+            
             # Add metadata configuration
             # Note: The config file controls metadata by default; we update it dynamically before running
             # This allows the workflow to control metadata settings
@@ -1877,6 +1968,29 @@ class WorkflowOrchestrator:
                 # If metadata explicitly disabled, we could pass a custom config
                 # For now, metadata is handled via the config file which defaults to enabled
                 pass
+            
+            # Add alt text mapping if available and not disabled.
+            # When images are downloaded from the web, alt_text_mapping.json is saved
+            # in the image_download/ subfolder by web_image_downloader.py.  input_dir
+            # here is the user's original source (or temp_combined_dir), so we must
+            # also check the workflow's image_download directory explicitly.
+            if not self.no_alt_text:
+                alt_text_mapping_path = None
+                candidates = [
+                    input_dir / "alt_text_mapping.json",
+                    self.config.get_step_output_dir("image_download", create=False) / "alt_text_mapping.json",
+                ]
+                for candidate in candidates:
+                    if candidate.exists():
+                        alt_text_mapping_path = candidate
+                        break
+                if alt_text_mapping_path:
+                    cmd.extend(["--alt-text-mapping", str(alt_text_mapping_path)])
+                    self.logger.info(f"Including website alt text from: {alt_text_mapping_path}")
+            
+            # Pass --show-descriptions flag to image_describer subprocess
+            if self.show_descriptions:
+                cmd.extend(["--show-descriptions", "on"])
             
             # Single call to image_describer.py with all images
             self.logger.info(f"Running single image description process: {' '.join(cmd)}")
@@ -1972,8 +2086,33 @@ class WorkflowOrchestrator:
             progress_thread = threading.Thread(target=monitor_progress, daemon=True)
             progress_thread.start()
             
-            # Stream output directly to terminal for real-time progress feedback
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            # Run command, capturing output for logging
+            # When --show-descriptions is active, let stdout flow to the terminal
+            # so descriptions are visible as they arrive; stderr is always captured.
+            # Note: explicit console output is suppressed by capture_output=True, 
+            # but we have the progress monitoring thread for feedback.
+            if self.show_descriptions:
+                result = subprocess.run(
+                    cmd,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    stderr=subprocess.PIPE
+                )
+            else:
+                result = subprocess.run(
+                    cmd, 
+                    text=True, 
+                    encoding='utf-8', 
+                    errors='replace',
+                    capture_output=True
+                )
+            
+            # Log the captured output to the workflow log for debugging
+            if result.stdout:
+                self.logger.info(f"[ImageDescriber STDOUT]:\n{result.stdout}")
+            if result.stderr:
+                self.logger.warning(f"[ImageDescriber STDERR]:\n{result.stderr}")
             
             # Mark description as no longer in progress
             if 'describe' in self.step_results:
@@ -1989,9 +2128,9 @@ class WorkflowOrchestrator:
                         self.logger.debug(f"Error reading final progress count: {e}")
                 self._update_status_log()
             
-            # Mark description as no longer in progress
-            if 'describe' in self.step_results:
-                self.step_results['describe']['in_progress'] = False
+            if result.returncode != 0:
+                error_msg = result.stderr if result.stderr else "Unknown output (check logs)"
+                raise RuntimeError(f"Image description process failed: {error_msg}")
             
             # Save file path mapping before cleaning up temp directory
             # This allows import tools to map temp paths back to originals
@@ -2026,16 +2165,16 @@ class WorkflowOrchestrator:
                 total_processed = len(combined_image_list)
                 
                 # Validate that we described the expected number of images
-                if total_processed != unique_source_count:
-                    self.logger.warning(f"Description count mismatch: processed {total_processed} but expected {unique_source_count} unique images")
+                if total_processed != unique_images:
+                    self.logger.warning(f"Description count mismatch: processed {total_processed} but expected {unique_images} unique images")
                 else:
-                    self.logger.info(f"Validation: All {unique_source_count} unique images were described")
+                    self.logger.info(f"Validation: All {unique_images} unique images were described")
             else:
                 self.logger.error(f"Image description failed: {result.stderr}")
                 return {
                     "success": False, 
                     "error": f"Image description process failed: {result.stderr}",
-                    "unique_images": unique_source_count,
+                    "unique_images": unique_images,
                     "conversions": conversion_count
                 }
             
@@ -2048,7 +2187,7 @@ class WorkflowOrchestrator:
                 return {
                     "success": True,
                     "processed": total_processed,
-                    "unique_images": unique_source_count,
+                    "unique_images": unique_images,
                     "conversions": conversion_count,
                     "output_dir": output_dir,
                     "description_file": target_desc_file
@@ -2058,7 +2197,7 @@ class WorkflowOrchestrator:
                 return {
                     "success": False, 
                     "error": "Description file not created",
-                    "unique_images": unique_source_count,
+                    "unique_images": unique_images,
                     "conversions": conversion_count
                 }
                 
@@ -2067,7 +2206,7 @@ class WorkflowOrchestrator:
             return {
                 "success": False, 
                 "error": str(e),
-                "unique_images": unique_source_count if 'unique_source_count' in locals() else 0,
+                "unique_images": unique_images if 'unique_images' in locals() else 0,
                 "conversions": conversion_count if 'conversion_count' in locals() else 0
             }
     
@@ -2140,7 +2279,8 @@ class WorkflowOrchestrator:
                 cmd.append("--full")
             
             self.logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace')
+            result = subprocess.run(cmd, text=True, encoding='utf-8', errors='replace',
+                                    creationflags=_SUBPROCESS_FLAGS)
             
             if result.returncode == 0:
                 self.logger.info("HTML generation completed successfully")
@@ -2195,9 +2335,10 @@ class WorkflowOrchestrator:
         # Create workflow directory structure
         workflow_paths = create_workflow_paths(output_dir)
         
-        # Create helper batch files immediately (view_results.bat and resume_workflow.bat)
+        # Create helper scripts immediately (platform-specific: .bat for Windows, .sh/.command for macOS)
         create_workflow_helper_files(output_dir)
-        self.logger.info("Created workflow helper files: view_results.bat and resume_workflow.bat")
+        script_type = "batch files (.bat)" if sys.platform == 'win32' else "shell scripts (.sh/.command)"
+        self.logger.info(f"Created workflow helper {script_type}: view_results, resume_workflow, run_stats")
         
         # Save workflow metadata if provided
         if workflow_metadata:
@@ -2238,9 +2379,15 @@ class WorkflowOrchestrator:
                         desc_file = self.step_results["describe"]["description_file"]
                     step_result = step_method(current_input_dir, step_output_dir, desc_file)
                 elif step == "describe":
-                    # Description step needs ORIGINAL input_dir to detect workflow mode correctly
-                    # and find regular images that haven't been processed yet
-                    step_result = step_method(input_dir, step_output_dir)
+                    # Description step logic:
+                    # - For URL workflows (download step completed): use current_input_dir (downloaded images location)
+                    # - For regular workflows: use ORIGINAL input_dir to avoid scanning converted_images subdirectory
+                    if "download" in self.step_results and self.step_results["download"].get("success"):
+                        # URL workflow - images were downloaded, use current_input_dir
+                        step_result = step_method(current_input_dir, step_output_dir)
+                    else:
+                        # Regular workflow - use original input_dir
+                        step_result = step_method(input_dir, step_output_dir)
                 elif step == "convert":
                     # Convert step should always work on original input directory
                     step_result = step_method(input_dir, step_output_dir)
@@ -2390,15 +2537,20 @@ class WorkflowOrchestrator:
             output_dir: Desired output directory
         """
         try:
-            # Load current config
-            with open(config_file, 'r') as f:
-                config = json.load(f)
+            # Load current config using config_loader for frozen mode compatibility
+            if load_json_config:
+                config, actual_config_path, _ = load_json_config(explicit=config_file)
+            else:
+                # Fallback to direct loading if config_loader not available
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                actual_config_path = Path(config_file)
             
             # Update output directory
             config["output_directory"] = str(output_dir)
             
             # Save updated config
-            with open(config_file, 'w') as f:
+            with open(actual_config_path, 'w') as f:
                 json.dump(config, f, indent=4)
                 
             self.logger.debug(f"Updated frame extractor config: {config_file}")
@@ -2605,74 +2757,49 @@ def prompt_view_results() -> bool:
 
 def launch_viewer(output_dir, logger: logging.Logger) -> None:
     """
-    Launch the viewer application with the specified output directory.
-    Also creates a reusable .bat file for future viewing.
+    DEPRECATED: Viewer.exe no longer exists (merged into ImageDescriber).
+    This function is kept for backward compatibility but does nothing.
+    
+    Helper scripts (resume_workflow.bat, run_stats.bat) are still created
+    by create_workflow_helper_files() which is called elsewhere.
     
     Args:
         output_dir: Path to the workflow output directory (Path object or string)
         logger: Logger instance for recording actions
     """
-    try:
-        # Ensure output_dir is a Path object
-        if not isinstance(output_dir, Path):
-            output_dir = Path(output_dir)
-        
-        # Get the base path (for both dev and executable scenarios)
-        if getattr(sys, 'frozen', False):
-            # Running as executable
-            base_dir = Path(sys.executable).parent
-            viewer_exe = base_dir / "viewer" / "viewer.exe"
-        else:
-            # Running from source
-            base_dir = Path(__file__).parent.parent
-            viewer_exe = base_dir / "viewer" / "viewer.py"
-        
-        # Create a reusable .bat file in the output directory
-        bat_file = output_dir / "view_results.bat"
-        try:
-            with open(bat_file, 'w', encoding='utf-8') as f:
-                f.write("@echo off\n")
-                f.write("REM Auto-generated batch file to view workflow results\n")
-                f.write("REM Double-click this file to reopen the results in the viewer\n\n")
-                
-                if getattr(sys, 'frozen', False):
-                    # For executable deployment
-                    f.write(f'"{viewer_exe}" "{output_dir}"\n')
-                else:
-                    # For development (need Python)
-                    python_exe = sys.executable
-                    f.write(f'"{python_exe}" "{viewer_exe}" "{output_dir}"\n')
-                
-                f.write("\nREM If viewer closes immediately, run this from a command prompt to see any errors\n")
-            
-            logger.info(f"Created reusable viewer launcher: {bat_file}")
-            print(f"INFO: Created reusable launcher: {bat_file}")
-            print("      Double-click this file anytime to view results again.")
-        except Exception as e:
-            logger.warning(f"Failed to create .bat file: {e}")
-        
-        # Launch the viewer
-        if viewer_exe.exists():
-            logger.info(f"Launching viewer with directory: {output_dir}")
-            print(f"\nINFO: Launching viewer...")
-            
-            if getattr(sys, 'frozen', False):
-                # Launch executable
-                subprocess.Popen([str(viewer_exe), str(output_dir)], 
-                               creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
-            else:
-                # Launch Python script
-                subprocess.Popen([sys.executable, str(viewer_exe), str(output_dir)])
-            
-            logger.info("Viewer launched successfully")
-            print("INFO: Viewer launched successfully")
-        else:
-            logger.error(f"Viewer not found at: {viewer_exe}")
-            print(f"ERROR: Viewer not found at: {viewer_exe}")
+    # Note: view_results.bat/sh is no longer created
+    # Standalone Viewer was merged into ImageDescriber
+    # When ImageDescriber supports CLI opening in viewer mode, we can re-enable this
+    logger.info("Viewer launch skipped - use ImageDescriber to view results")
+    print("\nINFO: Workflow complete!")
+    print(f"      Results saved to: {output_dir}")
+    print("      To view results: Open ImageDescriber and switch to Viewer Mode tab")
+    return
+
+
+def normalize_model_name(model: str, provider: str) -> str:
+    """
+    Normalize model name by stripping provider prefix if present.
     
-    except Exception as e:
-        logger.error(f"Failed to launch viewer: {e}")
-        print(f"ERROR: Failed to launch viewer: {e}")
+    Users might specify: ollama:llama3.2-vision:11b
+    But Ollama API expects: llama3.2-vision:11b
+    
+    Args:
+        model: Model name that may include provider prefix
+        provider: Provider name (ollama, openai, claude, huggingface)
+    
+    Returns:
+        Model name with provider prefix stripped if it matches the provider
+    """
+    if not model:
+        return model
+    
+    # Strip provider prefix if present (e.g., "ollama:llama3.2-vision:11b" -> "llama3.2-vision:11b")
+    prefix = f"{provider}:"
+    if model.startswith(prefix):
+        return model[len(prefix):]
+    
+    return model
 
 
 def normalize_model_name(model: str, provider: str) -> str:
@@ -2702,6 +2829,17 @@ def normalize_model_name(model: str, provider: str) -> str:
 
 def main():
     """Main function for command-line usage"""
+    # Set UTF-8 encoding for console output on Windows.
+    # Must be done inside main() (not at module level) to avoid interfering
+    # with pytest's capture streams, which replace sys.stdout/sys.stderr.
+    if sys.platform.startswith('win'):
+        for _stream in (sys.stdout, sys.stderr):
+            if hasattr(_stream, 'reconfigure'):
+                try:
+                    _stream.reconfigure(encoding='utf-8', errors='replace')
+                except Exception:
+                    pass  # Frozen/non-TextIOWrapper streams: leave untouched
+
     parser = argparse.ArgumentParser(
         description="Image Description Toolkit - Complete Workflow",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2719,13 +2857,17 @@ Examples:
   idt workflow photos --steps describe,html
   idt workflow videos --steps video,describe,html --model llava:7b
   
-  # OpenAI
+  # OpenAI (API key from file)
   idt workflow photos --provider openai --model gpt-4o-mini --api-key-file openai.txt
+  
+  # OpenAI (API key from config)
   idt workflow media --provider openai --model gpt-4o --steps describe,html
   
-  # Claude (Anthropic)
+  # Claude (API key from file)
   idt workflow photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file claude.txt
-  idt workflow media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html
+  
+  # Claude (API key from config)
+  idt workflow media --provider claude --model claude-haiku-4-5-20251001 --steps describe,html
   
   # Custom Configuration Files
   idt workflow photos --config-image-describer scripts/my_prompts.json --prompt-style artistic
@@ -2736,10 +2878,11 @@ Resume Examples:
   idt workflow --resume workflow_output_20250919_153443
   idt workflow --resume /path/to/interrupted/workflow
   
-  # ⚠️ Cloud providers require API key when resuming:
+  # Cloud providers: API key from file (explicit)
   idt workflow --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file openai.txt
-  idt workflow --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file claude.txt
-  # See docs/WORKFLOW_RESUME_API_KEY.md for details
+  
+  # Cloud providers: API key from config (uses image_describer_config.json)
+  idt workflow --resume wf_claude_sonnet-4-5_20251005_150328
 
 Redescribe Examples (reuse images with different AI settings):
   # Compare different models on same images (skips video/convert steps)
@@ -2759,13 +2902,12 @@ Redescribe Examples (reuse images with different AI settings):
     --provider claude --model claude-sonnet-4-5 --link-images
   
 Viewing Results:
-  # Launch viewer automatically at workflow start (recommended for long batches):
+  # Show results path and ImageDescriber instructions at completion:
   idt workflow photos --view-results
   idt workflow --resume wf_photos --view-results
-  
-  # Or you'll be prompted after successful completion
-  # Or launch it manually anytime:
-  idt viewer [workflow_directory]
+
+  # Or you'll be prompted after successful completion.
+  # To browse results: open ImageDescriber and use the Viewer Mode tab.
         """
     )
     
@@ -2850,14 +2992,16 @@ Viewing Results:
     
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "claude", "huggingface"],
+        choices=["ollama", "openai", "claude", "huggingface", "mlx"],
         default=None,
         help="AI provider to use for image description (default: ollama for new workflows, auto-detected for resume)"
     )
     
     parser.add_argument(
         "--api-key-file",
-        help="Path to file containing API key for cloud providers (OpenAI, Claude, HuggingFace)"
+        help="Path to file containing API key for cloud providers (OpenAI, Claude). "
+             "If not specified, checks config file (image_describer_config.json), "
+             "environment variables (OPENAI_API_KEY/ANTHROPIC_API_KEY), or .txt files."
     )
     
     parser.add_argument(
@@ -2900,7 +3044,12 @@ Viewing Results:
         action="store_true",
         help="Automatically launch viewer to monitor workflow progress in real-time"
     )
-    
+    parser.add_argument(
+        "--show-descriptions",
+        choices=["on", "off"],
+        default="off",
+        help="Print each AI description to the console as it is generated (default: off)"
+    )
     parser.add_argument(
         "--batch",
         action="store_true",
@@ -2947,6 +3096,12 @@ Viewing Results:
         "--max-images",
         type=int,
         help="Maximum number of images to download"
+    )
+    
+    parser.add_argument(
+        "--no-alt-text",
+        action="store_true",
+        help="Do not include website alt text in image descriptions (default: include when available)"
     )
     
     parser.add_argument(
@@ -3430,7 +3585,9 @@ Viewing Results:
             max_images=args.max_images,
             progress_status=args.progress_status,
             image_describer_config=image_describer_config,  # NEW: explicit image describer config
-            video_config=video_config  # NEW: explicit video config
+            video_config=video_config,  # NEW: explicit video config
+            no_alt_text=args.no_alt_text,
+            show_descriptions=(args.show_descriptions == 'on')
         )
         
         if args.dry_run:
@@ -3486,7 +3643,9 @@ Viewing Results:
             # Save custom config paths for resume (only if non-default)
             "config_workflow": args.config_workflow if args.config_workflow != "workflow_config.json" else None,
             "config_image_describer": args.config_image_describer,
-            "config_video": args.config_video
+            "config_video": args.config_video,
+            # Add source URL if this was a web download
+            "source_url": url if url else None
         }
         
         # Launch viewer if requested (before workflow starts for real-time monitoring)

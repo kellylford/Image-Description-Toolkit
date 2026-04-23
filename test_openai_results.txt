@@ -1,0 +1,45 @@
+OpenAI Model Test Results
+Run: 2026-02-23 13:40:40
+Models tested: 17
+
+Model                          Img                                           Status     Sec   Out  Description
+------------------------------------------------------------------------------------------------------------------------
+gpt-5.2                        IMG_4087_0.00s.jpg                            ok         3.2    62  The image shows the interior of the Roman Colosseum, with it
+gpt-5.2                        mcp_video-17096_singular_display_0.00s.jpg    ok         2.6    76  The image shows the inside of a crowded subway or metro car 
+gpt-5.2-pro                    IMG_4087_0.00s.jpg                            error      0.5     0  Model not found (404) — model ID may not exist
+gpt-5.2-pro                    mcp_video-17096_singular_display_0.00s.jpg    error      0.5     0  Model not found (404) — model ID may not exist
+gpt-5.1                        IMG_4087_0.00s.jpg                            ok         3.6    77  The image shows the interior of the Colosseum in Rome, with 
+gpt-5.1                        mcp_video-17096_singular_display_0.00s.jpg    ok         3.2    71  The image shows a crowded subway car with several people sit
+gpt-5                          IMG_4087_0.00s.jpg                            empty      7.7   300  (empty response)
+gpt-5                          mcp_video-17096_singular_display_0.00s.jpg    empty      6.5   300  (empty response)
+gpt-5-pro                      IMG_4087_0.00s.jpg                            error      0.5     0  Model not found (404) — model ID may not exist
+gpt-5-pro                      mcp_video-17096_singular_display_0.00s.jpg    error      0.3     0  Model not found (404) — model ID may not exist
+gpt-5-mini                     IMG_4087_0.00s.jpg                            empty      6.0   300  (empty response)
+gpt-5-mini                     mcp_video-17096_singular_display_0.00s.jpg    empty      6.5   300  (empty response)
+gpt-5-nano                     IMG_4087_0.00s.jpg                            empty      4.2   300  (empty response)
+gpt-5-nano                     mcp_video-17096_singular_display_0.00s.jpg    empty      4.0   300  (empty response)
+o4-mini                        IMG_4087_0.00s.jpg                            empty      4.4   300  (empty response)
+o4-mini                        mcp_video-17096_singular_display_0.00s.jpg    empty      4.4   300  (empty response)
+o3                             IMG_4087_0.00s.jpg                            ok         4.0    98  A large crowd of tourists stands inside the ancient stone am
+o3                             mcp_video-17096_singular_display_0.00s.jpg    ok         6.9   224  Inside a busy subway car, several passengers sit on a blue b
+o3-mini                        IMG_4087_0.00s.jpg                            error      0.5     0  Bad request: Error code: 400 - {'error': {'message': 'Invali
+o3-mini                        mcp_video-17096_singular_display_0.00s.jpg    error      0.3     0  Bad request: Error code: 400 - {'error': {'message': 'Invali
+o1                             IMG_4087_0.00s.jpg                            empty     13.4   300  (empty response)
+o1                             mcp_video-17096_singular_display_0.00s.jpg    empty     15.7   300  (empty response)
+gpt-4o                         IMG_4087_0.00s.jpg                            ok         3.5    48  The image shows a large group of tourists inside the ancient
+gpt-4o                         mcp_video-17096_singular_display_0.00s.jpg    ok         3.8    57  The image shows a busy train interior with several people si
+gpt-4o-mini                    IMG_4087_0.00s.jpg                            ok         3.8    83  The image depicts the iconic Roman Colosseum, an ancient amp
+gpt-4o-mini                    mcp_video-17096_singular_display_0.00s.jpg    ok         2.8    70  The image depicts a crowded subway car, where several people
+gpt-4.1                        IMG_4087_0.00s.jpg                            ok         3.3    57  This image shows the interior of the ancient Roman Colosseum
+gpt-4.1                        mcp_video-17096_singular_display_0.00s.jpg    ok         2.8    72  This photo shows a group of people sitting on a subway or tr
+gpt-4.1-mini                   IMG_4087_0.00s.jpg                            ok         2.3    60  The image shows a large crowd of tourists inside the ancient
+gpt-4.1-mini                   mcp_video-17096_singular_display_0.00s.jpg    ok         2.4    55  The image shows a group of people sitting inside a subway tr
+gpt-4.1-nano                   IMG_4087_0.00s.jpg                            ok         2.2    70  The image shows the interior of the ancient Roman Colosseum 
+gpt-4.1-nano                   mcp_video-17096_singular_display_0.00s.jpg    ok         2.0   102  This image shows a group of people sitting on a train, likel
+gpt-4-turbo                    IMG_4087_0.00s.jpg                            error      0.3     0  Bad request: Error code: 400 - {'error': {'message': 'Invali
+gpt-4-turbo                    mcp_video-17096_singular_display_0.00s.jpg    error      0.2     0  Bad request: Error code: 400 - {'error': {'message': 'Invali
+
+======================================================================
+WORKING: gpt-5.2, gpt-5.1, o3, gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
+NOT FOUND: gpt-5.2-pro, gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, o4-mini, o1
+BROKEN/EMPTY: o3-mini, gpt-4-turbo

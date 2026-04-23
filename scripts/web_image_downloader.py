@@ -16,10 +16,13 @@ Examples:
 
 import sys
 import os
+import re
+import json
 import argparse
 import requests
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
+from datetime import datetime
 from typing import List, Set, Optional, Tuple
 import logging
 import time
@@ -111,6 +114,40 @@ class WebImageDownloader:
         # Supported image extensions
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'}
         
+    def _get_page_title(self, soup) -> Optional[str]:
+        """Extract and sanitize the <title> text from a parsed page."""
+        tag = soup.find('title')
+        if not tag:
+            return None
+        title = tag.get_text(separator=' ')
+        # Collapse whitespace and strip
+        title = re.sub(r'\s+', ' ', title).strip()
+        if not title:
+            return None
+        # Truncate at word boundary to keep folder names manageable
+        if len(title) > 60:
+            truncated = title[:60]
+            last_space = truncated.rfind(' ')
+            title = truncated[:last_space] if last_space > 0 else truncated
+        return title
+
+    def _build_subfolder_name(self, url: str, title: Optional[str]) -> str:
+        """Build a filesystem-safe subfolder name from domain and page title."""
+        parsed = urlparse(url)
+        netloc = parsed.netloc or parsed.path
+        # Strip www. and port
+        domain = re.sub(r'^www\.', '', netloc).split(':')[0]
+        # Sanitize domain: keep alphanumeric, dots, hyphens
+        domain = re.sub(r'[^\w.\-]', '_', domain).strip('_')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        if title:
+            # Sanitize title: keep alphanumeric, spaces, hyphens
+            safe_title = re.sub(r'[^\w\s\-]', ' ', title)
+            safe_title = re.sub(r'\s+', ' ', safe_title).strip()
+            if safe_title:
+                return f"{domain} - {safe_title} - {timestamp}"
+        return f"{domain} - {timestamp}"
+
     def _get_image_hash(self, image_data: bytes) -> str:
         """Calculate hash of image data to detect duplicates"""
         return hashlib.md5(image_data).hexdigest()
@@ -140,9 +177,9 @@ class WebImageDownloader:
         
         return filename
     
-    def _download_image(self, img_url: str, index: int) -> Optional[Path]:
+    def _download_image_to(self, img_url: str, index: int, output_dir: Path) -> Optional[Path]:
         """
-        Download a single image
+        Download a single image to the specified output directory.
         
         Returns:
             Path to downloaded image if successful, None otherwise
@@ -184,13 +221,13 @@ class WebImageDownloader:
             
             # Save image
             filename = self._get_safe_filename(img_url, index)
-            output_path = self.output_dir / filename
+            output_path = output_dir / filename
             
             # Ensure unique filename
             counter = 1
             while output_path.exists():
                 name, ext = os.path.splitext(filename)
-                output_path = self.output_dir / f"{name}_{counter}{ext}"
+                output_path = output_dir / f"{name}_{counter}{ext}"
                 counter += 1
             
             # Write image to file
@@ -211,21 +248,22 @@ class WebImageDownloader:
             self.logger.warning(f"Error processing {img_url}: {e}")
             return None
     
-    def _extract_image_urls(self, html_content: str, base_url: str) -> List[str]:
+    def _extract_image_urls(self, html_content: str, base_url: str) -> List[Tuple[str, str]]:
         """
-        Extract image URLs from HTML content
+        Extract image URLs from HTML content, including alt text where available.
         
         Args:
             html_content: HTML content to parse
             base_url: Base URL for resolving relative URLs
             
         Returns:
-            List of absolute image URLs
+            List of (absolute_url, alt_text) tuples. alt_text is an empty string
+            when no alt attribute is present or applicable.
         """
         soup = BeautifulSoup(html_content, 'html.parser')
-        image_urls = []
+        image_entries: List[Tuple[str, str]] = []  # (url, alt_text)
         
-        # Find all img tags
+        # Find all img tags — capture alt text here
         for img in soup.find_all('img'):
             # Get src or data-src (for lazy loading)
             src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
@@ -236,10 +274,11 @@ class WebImageDownloader:
                 
                 # Add if it looks like an image
                 if self._is_valid_image_url(absolute_url):
-                    image_urls.append(absolute_url)
-                    self.logger.debug(f"Found image URL: {absolute_url}")
+                    alt_text = (img.get('alt') or '').strip()
+                    image_entries.append((absolute_url, alt_text))
+                    self.logger.debug(f"Found image URL: {absolute_url} (alt={repr(alt_text[:60])})")
         
-        # Also check for picture elements
+        # Also check for picture elements — <source> has no alt; inherit empty
         for picture in soup.find_all('picture'):
             for source in picture.find_all('source'):
                 srcset = source.get('srcset')
@@ -249,26 +288,26 @@ class WebImageDownloader:
                     for url in urls:
                         absolute_url = urljoin(base_url, url)
                         if self._is_valid_image_url(absolute_url):
-                            image_urls.append(absolute_url)
+                            image_entries.append((absolute_url, ''))
                             self.logger.debug(f"Found image URL in picture: {absolute_url}")
         
-        # Also check for links to images
+        # Also check for links to images — no alt text available
         for link in soup.find_all('a'):
             href = link.get('href')
             if href and self._is_valid_image_url(href):
                 absolute_url = urljoin(base_url, href)
-                image_urls.append(absolute_url)
+                image_entries.append((absolute_url, ''))
                 self.logger.debug(f"Found image URL in link: {absolute_url}")
         
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_urls = []
-        for url in image_urls:
+        # Remove duplicates by URL while preserving order and first-seen alt text
+        seen: Set[str] = set()
+        unique_entries: List[Tuple[str, str]] = []
+        for url, alt in image_entries:
             if url not in seen:
                 seen.add(url)
-                unique_urls.append(url)
+                unique_entries.append((url, alt))
         
-        return unique_urls
+        return unique_entries
     
     def download(self) -> Tuple[int, int]:
         """
@@ -279,8 +318,10 @@ class WebImageDownloader:
         """
         self.logger.info(f"Starting image download from: {self.url}")
         
-        # Create output directory
+        # Create base output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # actual_output_dir will be set to the subfolder once we know the page title
+        self.actual_output_dir = self.output_dir
         
         try:
             # Fetch the web page
@@ -288,11 +329,21 @@ class WebImageDownloader:
             response = self.session.get(self.url, timeout=self.timeout)
             response.raise_for_status()
             
-            # Extract image URLs
+            # Parse page once so we can extract both images and title
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Build a timestamped subfolder named after the domain + page title
+            page_title = self._get_page_title(soup)
+            subfolder_name = self._build_subfolder_name(self.url, page_title)
+            self.actual_output_dir = self.output_dir / subfolder_name
+            self.actual_output_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Download subfolder: {self.actual_output_dir.name}")
+
+            # Extract image URLs (returns list of (url, alt_text) tuples)
             self.logger.info(f"Extracting image URLs...")
-            image_urls = self._extract_image_urls(response.text, self.url)
+            image_entries = self._extract_image_urls(response.text, self.url)
             
-            total_found = len(image_urls)
+            total_found = len(image_entries)
             self.logger.info(f"Found {total_found} potential image URLs")
             
             if total_found == 0:
@@ -302,8 +353,10 @@ class WebImageDownloader:
             # Download images
             successful = 0
             failed = 0
+            url_mapping = {}      # filename → original URL
+            alt_text_mapping = {}  # filename → alt text (only non-empty entries)
             
-            for i, img_url in enumerate(image_urls, 1):
+            for i, (img_url, alt_text) in enumerate(image_entries, 1):
                 # Check if we've reached max images
                 if self.max_images and successful >= self.max_images:
                     self.logger.info(f"Reached maximum image limit ({self.max_images})")
@@ -316,11 +369,16 @@ class WebImageDownloader:
                     except Exception as e:
                         self.logger.debug(f"Progress callback error: {e}")
                 
-                # Download the image
-                result = self._download_image(img_url, i)
+                # Download the image (write to subfolder)
+                result = self._download_image_to(img_url, i, self.actual_output_dir)
                 
                 if result:
                     successful += 1
+                    # Store URL mapping (filename to original URL)
+                    url_mapping[result.name] = img_url
+                    # Store alt text if non-empty
+                    if alt_text:
+                        alt_text_mapping[result.name] = alt_text
                 else:
                     failed += 1
                 
@@ -337,6 +395,27 @@ class WebImageDownloader:
                     time.sleep(0.5)
             
             self.logger.info(f"Download complete: {successful} successful, {failed} failed/skipped")
+            
+            # Save URL mapping to JSON file for ImageDescriber to use
+            if url_mapping:
+                try:
+                    mapping_file = self.actual_output_dir / 'url_mapping.json'
+                    with open(mapping_file, 'w', encoding='utf-8') as f:
+                        json.dump(url_mapping, f, indent=2, ensure_ascii=False)
+                    self.logger.info(f"Saved URL mapping with {len(url_mapping)} entries")
+                except Exception as e:
+                    self.logger.warning(f"Could not save URL mapping: {e}")
+            
+            # Save alt text mapping if any images had alt text
+            if alt_text_mapping:
+                try:
+                    alt_mapping_file = self.actual_output_dir / 'alt_text_mapping.json'
+                    with open(alt_mapping_file, 'w', encoding='utf-8') as f:
+                        json.dump(alt_text_mapping, f, indent=2, ensure_ascii=False)
+                    self.logger.info(f"Saved alt text mapping with {len(alt_text_mapping)} entries")
+                except Exception as e:
+                    self.logger.warning(f"Could not save alt text mapping: {e}")
+            
             return successful, failed
             
         except requests.exceptions.RequestException as e:

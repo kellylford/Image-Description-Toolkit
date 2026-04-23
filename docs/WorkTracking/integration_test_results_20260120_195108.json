@@ -1,0 +1,355 @@
+{
+  "timestamp": "2026-01-20T19:50:36.596936",
+  "tests": [
+    {
+      "test_name": "dev_version",
+      "command": "python idt/idt_cli.py version",
+      "result": {
+        "success": true,
+        "exit_code": 0,
+        "stdout": "Image Description Toolkit 4.0 bld003\nCommit: 525458a (dirty)\nMode: Dev\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": true,
+        "has_version_string": true,
+        "no_exceptions": true
+      },
+      "passed": true
+    },
+    {
+      "test_name": "dev_help",
+      "command": "python idt/idt_cli.py --help",
+      "result": {
+        "success": true,
+        "exit_code": 0,
+        "stdout": "\nImage Description Toolkit - Unified CLI\n\nUSAGE:\n    idt_cli.py <command> [options]\n\nCOMMANDS:\n    guideme               Interactive wizard to build and run workflows\n    workflow              Run image description workflow\n    viewer (or view)      Launch the GUI viewer for browsing results\n    prompteditor          Launch the prompt editor to manage prompts\n    imagedescriber        Launch the image describer GUI\n    configure (or config) Launch the configuration manager\n    stats                 Analyze workflow performance statistics\n    contentreview         Analyze description content and quality\n    combinedescriptions   Combine descriptions from multiple workflows\n    results-list          List available workflow results with viewer commands\n    check-models          Check installed Ollama models\n    prompt-list           List available prompt styles\n    extract-frames        Extract frames from video files\n    convert-images        Convert HEIC images to JPG\n    version               Show version information\n    help                  Show this help message\n\nGLOBAL OPTIONS:\n    --config-workflow, --config-wf <file>     Workflow orchestration config (default: workflow_config.json)\n    --config-image-describer, --config-id <file>  Image describer config (prompts, AI, metadata)\n    --config-video <file>                     Video extraction config\n    --config <file>                           [DEPRECATED] Use --config-image-describer instead\n\nEXAMPLES:\n    # Interactive guided workflow (recommended for beginners)\n    idt_cli.py guideme\n\n    # Run workflow with Ollama\n    idt_cli.py workflow --provider ollama --model llava\n\n    # Run workflow with custom prompts and metadata settings\n    idt_cli.py workflow photos --config-id my_prompts.json --prompt-style detailed\n\n    # Run workflow with multiple custom configs (advanced)\n    idt_cli.py workflow photos --config-wf production.json --config-id artistic.json\n\n    # Launch viewer (empty)\n    idt_cli.py viewer\n\n    # Launch viewer with specific directory\n    idt_cli.py viewer C:\\path\\to\\workflow_output\n\n    # Launch viewer with directory picker\n    idt_cli.py viewer --open\n\n    # Launch prompt editor\n    idt_cli.py prompteditor\n\n    # Launch image describer GUI\n    idt_cli.py imagedescriber\n\n    # Launch configuration manager\n    idt_cli.py configure\n\n    # Run workflow with Claude\n    idt_cli.py workflow --provider claude --model claude-opus-4\n\n    # Analyze statistics\n    idt_cli.py stats\n\n    # Analyze content quality\n    idt_cli.py contentreview\n\n    # Combine descriptions to CSV\n    idt_cli.py combinedescriptions --output results.csv\n\n    # List available workflow results\n    idt_cli.py results-list\n    idt_cli.py results-list --input-dir c:\\path\\to\\descriptions\n\n    # Check available models\n    idt_cli.py check-models\n\n    # List available prompt styles\n    idt_cli.py prompt-list\n    idt_cli.py prompt-list --verbose\n\nNOTES:\n    - Requires Ollama to be installed for Ollama models\n    - Requires API keys for OpenAI and Anthropic (set via environment variables)\n    - GUI tools (viewer, prompteditor, imagedescriber, configure) must be built separately\n    - All commands support --help for detailed options\n\nFor detailed documentation, see the docs/ folder.\n\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": true,
+        "has_usage": true,
+        "has_commands": true
+      },
+      "passed": true
+    },
+    {
+      "test_name": "dev_workflow_help",
+      "command": "python idt/idt_cli.py workflow --help",
+      "result": {
+        "success": false,
+        "exit_code": 1,
+        "stdout": "ERROR: PIL (Pillow) not installed\nInstall with: pip install Pillow\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": false,
+        "has_usage": false,
+        "has_model_arg": false
+      },
+      "passed": false
+    },
+    {
+      "test_name": "dev_list_prompts",
+      "command": "python idt/idt_cli.py list-prompts",
+      "result": {
+        "success": false,
+        "exit_code": 1,
+        "stdout": "Error: Unknown command 'list-prompts'\n\n\nImage Description Toolkit - Unified CLI\n\nUSAGE:\n    idt_cli.py <command> [options]\n\nCOMMANDS:\n    guideme               Interactive wizard to build and run workflows\n    workflow              Run image description workflow\n    viewer (or view)      Launch the GUI viewer for browsing results\n    prompteditor          Launch the prompt editor to manage prompts\n    imagedescriber        Launch the image describer GUI\n    configure (or config) Launch the configuration manager\n    stats                 Analyze workflow performance statistics\n    contentreview         Analyze description content and quality\n    combinedescriptions   Combine descriptions from multiple workflows\n    results-list          List available workflow results with viewer commands\n    check-models          Check installed Ollama models\n    prompt-list           List available prompt styles\n    extract-frames        Extract frames from video files\n    convert-images        Convert HEIC images to JPG\n    version               Show version information\n    help                  Show this help message\n\nGLOBAL OPTIONS:\n    --config-workflow, --config-wf <file>     Workflow orchestration config (default: workflow_config.json)\n    --config-image-describer, --config-id <file>  Image describer config (prompts, AI, metadata)\n    --config-video <file>                     Video extraction config\n    --config <file>                           [DEPRECATED] Use --config-image-describer instead\n\nEXAMPLES:\n    # Interactive guided workflow (recommended for beginners)\n    idt_cli.py guideme\n\n    # Run workflow with Ollama\n    idt_cli.py workflow --provider ollama --model llava\n\n    # Run workflow with custom prompts and metadata settings\n    idt_cli.py workflow photos --config-id my_prompts.json --prompt-style detailed\n\n    # Run workflow with multiple custom configs (advanced)\n    idt_cli.py workflow photos --config-wf production.json --config-id artistic.json\n\n    # Launch viewer (empty)\n    idt_cli.py viewer\n\n    # Launch viewer with specific directory\n    idt_cli.py viewer C:\\path\\to\\workflow_output\n\n    # Launch viewer with directory picker\n    idt_cli.py viewer --open\n\n    # Launch prompt editor\n    idt_cli.py prompteditor\n\n    # Launch image describer GUI\n    idt_cli.py imagedescriber\n\n    # Launch configuration manager\n    idt_cli.py configure\n\n    # Run workflow with Claude\n    idt_cli.py workflow --provider claude --model claude-opus-4\n\n    # Analyze statistics\n    idt_cli.py stats\n\n    # Analyze content quality\n    idt_cli.py contentreview\n\n    # Combine descriptions to CSV\n    idt_cli.py combinedescriptions --output results.csv\n\n    # List available workflow results\n    idt_cli.py results-list\n    idt_cli.py results-list --input-dir c:\\path\\to\\descriptions\n\n    # Check available models\n    idt_cli.py check-models\n\n    # List available prompt styles\n    idt_cli.py prompt-list\n    idt_cli.py prompt-list --verbose\n\nNOTES:\n    - Requires Ollama to be installed for Ollama models\n    - Requires API keys for OpenAI and Anthropic (set via environment variables)\n    - GUI tools (viewer, prompteditor, imagedescriber, configure) must be built separately\n    - All commands support --help for detailed options\n\nFor detailed documentation, see the docs/ folder.\n\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": false,
+        "has_output": true,
+        "no_errors": true
+      },
+      "passed": false
+    },
+    {
+      "test_name": "dev_check_models",
+      "command": "python idt/idt_cli.py check-models",
+      "result": {
+        "success": true,
+        "exit_code": 0,
+        "stdout": "=== Image Description Toolkit - Model Status ===\n(Install colorama for colored output: pip install colorama)\n\n\nOllama (Local Models)\n  [OK] Status: OK\n  Models: 7 available\n    \ufffd qwen3-vl:latest\n    \ufffd moondream:latest\n    \ufffd qwen3-coder:480b-cloud\n    \ufffd glm-4.6:cloud\n    \ufffd qwen3-vl:235b-cloud\n    \ufffd llava:latest\n    \ufffd gemma3:latest\n\nOllama Cloud\n  [OK] Status: OK\n  Models: 2 available\n    \ufffd qwen3-coder:480b-cloud\n    \ufffd qwen3-vl:235b-cloud\n\nOpenAI\n  [--] Status: API key not configured (need openai.txt or OPENAI_API_KEY)\n  -> Add OpenAI API key to 'openai.txt' or OPENAI_API_KEY env var\n\nClaude (Anthropic)\n  [--] Status: API key not configured (need claude.txt or ANTHROPIC_API_KEY)\n  -> Add Claude API key to 'claude.txt' or ANTHROPIC_API_KEY env var\n\n=== Recommendations ===\n  \ufffd [OK] Ollama is ready with 7 models\n  \ufffd Optional: Configure OpenAI for cloud-based models\n  \ufffd Optional: Configure Claude (Anthropic) for cloud-based models\n\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": true,
+        "has_output": true
+      },
+      "passed": true
+    },
+    {
+      "test_name": "dev_results_list",
+      "command": "python idt/idt_cli.py results-list",
+      "result": {
+        "success": false,
+        "exit_code": 1,
+        "stdout": "Scanning for workflow results in: C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\scripts\\Descriptions\nError: Directory does not exist: C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\scripts\\Descriptions\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": false,
+        "no_crash": true
+      },
+      "passed": false
+    },
+    {
+      "test_name": "dev_stats",
+      "command": "idt stats <workflow_dir>",
+      "result": {
+        "success": false,
+        "exit_code": -1,
+        "stdout": "",
+        "stderr": "No workflow directories found for testing",
+        "exception": "NoTestData"
+      },
+      "validation": {
+        "skipped": true
+      },
+      "passed": false,
+      "skipped": true
+    },
+    {
+      "test_name": "dev_contentreview",
+      "command": "idt contentreview <workflow_dir>",
+      "result": {
+        "success": false,
+        "exit_code": -1,
+        "stdout": "",
+        "stderr": "No workflow directories found for testing",
+        "exception": "NoTestData"
+      },
+      "validation": {
+        "skipped": true
+      },
+      "passed": false,
+      "skipped": true
+    },
+    {
+      "test_name": "dev_combinedescriptions",
+      "command": "idt combinedescriptions",
+      "result": {
+        "success": false,
+        "exit_code": -1,
+        "stdout": "",
+        "stderr": "No workflow directories found for testing",
+        "exception": "NoTestData"
+      },
+      "validation": {
+        "skipped": true
+      },
+      "passed": false,
+      "skipped": true
+    },
+    {
+      "test_name": "frozen_version",
+      "command": "idt/dist/idt.exe version",
+      "result": {
+        "success": true,
+        "exit_code": 0,
+        "stdout": "Image Description Toolkit 4.0 bld001\nCommit: unknown\nMode: Frozen\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": true,
+        "has_version_string": true,
+        "no_exceptions": true
+      },
+      "passed": true
+    },
+    {
+      "test_name": "frozen_help",
+      "command": "idt/dist/idt.exe --help",
+      "result": {
+        "success": true,
+        "exit_code": 0,
+        "stdout": "\nImage Description Toolkit - Unified CLI\n\nUSAGE:\n    idt.exe <command> [options]\n\nCOMMANDS:\n    guideme               Interactive wizard to build and run workflows\n    workflow              Run image description workflow\n    viewer (or view)      Launch the GUI viewer for browsing results\n    prompteditor          Launch the prompt editor to manage prompts\n    imagedescriber        Launch the image describer GUI\n    configure (or config) Launch the configuration manager\n    stats                 Analyze workflow performance statistics\n    contentreview         Analyze description content and quality\n    combinedescriptions   Combine descriptions from multiple workflows\n    results-list          List available workflow results with viewer commands\n    check-models          Check installed Ollama models\n    prompt-list           List available prompt styles\n    extract-frames        Extract frames from video files\n    convert-images        Convert HEIC images to JPG\n    version               Show version information\n    help                  Show this help message\n\nGLOBAL OPTIONS:\n    --config-workflow, --config-wf <file>     Workflow orchestration config (default: workflow_config.json)\n    --config-image-describer, --config-id <file>  Image describer config (prompts, AI, metadata)\n    --config-video <file>                     Video extraction config\n    --config <file>                           [DEPRECATED] Use --config-image-describer instead\n\nEXAMPLES:\n    # Interactive guided workflow (recommended for beginners)\n    idt.exe guideme\n\n    # Run workflow with Ollama\n    idt.exe workflow --provider ollama --model llava\n\n    # Run workflow with custom prompts and metadata settings\n    idt.exe workflow photos --config-id my_prompts.json --prompt-style detailed\n\n    # Run workflow with multiple custom configs (advanced)\n    idt.exe workflow photos --config-wf production.json --config-id artistic.json\n\n    # Launch viewer (empty)\n    idt.exe viewer\n\n    # Launch viewer with specific directory\n    idt.exe viewer C:\\path\\to\\workflow_output\n\n    # Launch viewer with directory picker\n    idt.exe viewer --open\n\n    # Launch prompt editor\n    idt.exe prompteditor\n\n    # Launch image describer GUI\n    idt.exe imagedescriber\n\n    # Launch configuration manager\n    idt.exe configure\n\n    # Run workflow with Claude\n    idt.exe workflow --provider claude --model claude-opus-4\n\n    # Analyze statistics\n    idt.exe stats\n\n    # Analyze content quality\n    idt.exe contentreview\n\n    # Combine descriptions to CSV\n    idt.exe combinedescriptions --output results.csv\n\n    # List available workflow results\n    idt.exe results-list\n    idt.exe results-list --input-dir c:\\path\\to\\descriptions\n\n    # Check available models\n    idt.exe check-models\n\n    # List available prompt styles\n    idt.exe prompt-list\n    idt.exe prompt-list --verbose\n\nNOTES:\n    - Requires Ollama to be installed for Ollama models\n    - Requires API keys for OpenAI and Anthropic (set via environment variables)\n    - GUI tools (viewer, prompteditor, imagedescriber, configure) must be built separately\n    - All commands support --help for detailed options\n\nFor detailed documentation, see the docs/ folder.\n\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": true,
+        "has_usage": true,
+        "has_commands": true
+      },
+      "passed": true
+    },
+    {
+      "test_name": "frozen_workflow_help",
+      "command": "idt/dist/idt.exe workflow --help",
+      "result": {
+        "success": true,
+        "exit_code": 0,
+        "stdout": "usage: workflow.py [-h] [--download DOWNLOAD] [--resume RESUME]\n                   [--redescribe REDESCRIBE] [--preserve-descriptions]\n                   [--link-images] [--force-copy] [--output-dir OUTPUT_DIR]\n                   [--steps STEPS] [--config-workflow CONFIG_WORKFLOW]\n                   [--config-image-describer CONFIG_IMAGE_DESCRIBER]\n                   [--config-video CONFIG_VIDEO] [--config _DEPRECATED_CONFIG]\n                   [--model MODEL]\n                   [--provider {ollama,openai,claude,huggingface}]\n                   [--api-key-file API_KEY_FILE] [--prompt-style PROMPT_STYLE]\n                   [--timeout TIMEOUT] [--name NAME] [--verbose]\n                   [--progress-status] [--dry-run] [--view-results] [--batch]\n                   [--metadata] [--no-metadata] [--no-geocode]\n                   [--geocode-cache GEOCODE_CACHE] [--url URL]\n                   [--min-size MIN_SIZE] [--max-images MAX_IMAGES]\n                   [input_source]\n\nImage Description Toolkit - Complete Workflow\n\npositional arguments:\n  input_source          Input directory containing media files, or URL to\n                        download images from (e.g., https://example.com)\n\noptions:\n  -h, --help            show this help message and exit\n  --download, -d DOWNLOAD\n                        Explicitly download images from this URL (alternative\n                        to providing URL as input_source)\n  --resume, -r RESUME   Resume an interrupted workflow from the specified\n                        output directory\n  --redescribe REDESCRIBE\n                        Re-describe images from an existing workflow with\n                        different AI settings, skipping video/image conversion\n  --preserve-descriptions\n                        When resuming, preserve existing descriptions and skip\n                        describe step if substantial progress exists\n  --link-images         When redescribing, use symlinks/hardlinks instead of\n                        copying images (faster, no space duplication)\n  --force-copy          When redescribing, always copy images even if linking\n                        is available\n  --output-dir, -o OUTPUT_DIR\n                        Output directory for workflow results (default:\n                        workflow_output)\n  --steps, -s STEPS     Comma-separated list of workflow steps (default:\n                        video,convert,describe,html)\n  --config-workflow, --config-wf CONFIG_WORKFLOW\n                        Path to workflow orchestration config file (default:\n                        workflow_config.json)\n  --config-image-describer, --config-id CONFIG_IMAGE_DESCRIBER\n                        Path to image describer config file (prompts, AI\n                        settings, metadata)\n  --config-video CONFIG_VIDEO\n                        Path to video frame extraction config file\n  --config _DEPRECATED_CONFIG\n                        [DEPRECATED] Use --config-image-describer instead.\n                        This alias will be removed in v4.0.\n  --model MODEL         Override AI model for image description\n  --provider {ollama,openai,claude,huggingface}\n                        AI provider to use for image description (default:\n                        ollama for new workflows, auto-detected for resume)\n  --api-key-file API_KEY_FILE\n                        Path to file containing API key for cloud providers\n                        (OpenAI, Claude, HuggingFace)\n  --prompt-style PROMPT_STYLE\n                        Override prompt style for image description\n  --timeout TIMEOUT     Timeout in seconds for Ollama API requests (default:\n                        90). Increase for slower hardware or large models.\n  --name NAME           Custom workflow name identifier (e.g.,\n                        'VacationPhotos' or 'TestingExample'). Case is\n                        preserved in metadata/display. If not provided, auto-\n                        generates from input directory path.\n  --verbose, -v         Enable verbose logging\n  --progress-status     Enable live progress status updates in console (shows\n                        all INFO messages and status.log updates)\n  --dry-run             Show what would be done without executing\n  --view-results        Automatically launch viewer to monitor workflow\n                        progress in real-time\n  --batch               Non-interactive mode - skip prompts (useful for\n                        running multiple workflows sequentially)\n  --metadata            Enable metadata extraction (GPS, dates, camera info).\n                        Enabled by default if not specified.\n  --no-metadata         Disable metadata extraction\n  --no-geocode          Disable reverse geocoding (geocoding is enabled by\n                        default to convert GPS coordinates to\n                        city/state/country)\n  --geocode-cache GEOCODE_CACHE\n                        Path to geocoding cache file (default:\n                        geocode_cache.json)\n  --url URL             URL to download images from (enables web download\n                        step)\n  --min-size MIN_SIZE   Minimum image size filter (e.g. '100KB', '1MB')\n  --max-images MAX_IMAGES\n                        Maximum number of images to download\n\nWorkflow Steps:\n  video   - Extract frames from video files\n  convert - Convert HEIC images to JPG\n  describe - Generate AI descriptions for images  \n  html    - Create HTML report from descriptions\n\nExamples:\n  # Ollama (default)\n  idt workflow media_folder\n  idt workflow media_folder --output-dir results\n  idt workflow photos --steps describe,html\n  idt workflow videos --steps video,describe,html --model llava:7b\n  \n  # OpenAI\n  idt workflow photos --provider openai --model gpt-4o-mini --api-key-file openai.txt\n  idt workflow media --provider openai --model gpt-4o --steps describe,html\n  \n  # Claude (Anthropic)\n  idt workflow photos --provider claude --model claude-sonnet-4-5-20250929 --api-key-file claude.txt\n  idt workflow media --provider claude --model claude-3-5-haiku-20241022 --steps describe,html\n  \n  # Custom Configuration Files\n  idt workflow photos --config-image-describer scripts/my_prompts.json --prompt-style artistic\n  idt workflow photos --config-id scripts/my_prompts.json  # Short form\n  idt workflow photos --config scripts/my_prompts.json     # Deprecated but still works\n  \nResume Examples:\n  idt workflow --resume workflow_output_20250919_153443\n  idt workflow --resume /path/to/interrupted/workflow\n  \n  # \u26a0\ufe0f Cloud providers require API key when resuming:\n  idt workflow --resume wf_openai_gpt-4o-mini_20251005_122700 --api-key-file openai.txt\n  idt workflow --resume wf_claude_sonnet-4-5_20251005_150328 --api-key-file claude.txt\n  # See docs/WORKFLOW_RESUME_API_KEY.md for details\n\nRedescribe Examples (reuse images with different AI settings):\n  # Compare different models on same images (skips video/convert steps)\n  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\\n    --provider openai --model gpt-4o\n  \n  # Try different prompt styles\n  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\\n    --prompt-style technical\n  \n  # Test local HuggingFace model vs cloud\n  idt workflow --redescribe wf_photos_openai_gpt-4o_narrative_20251115_100000 \\\n    --provider huggingface --model microsoft/Florence-2-base\n  \n  # Use symlinks to save disk space (faster, 0 MB used)\n  idt workflow --redescribe wf_photos_ollama_llava_narrative_20251115_100000 \\\n    --provider claude --model claude-sonnet-4-5 --link-images\n  \nViewing Results:\n  # Launch viewer automatically at workflow start (recommended for long batches):\n  idt workflow photos --view-results\n  idt workflow --resume wf_photos --view-results\n  \n  # Or you'll be prompted after successful completion\n  # Or launch it manually anytime:\n  idt viewer [workflow_directory]\n        \n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": true,
+        "has_usage": true,
+        "has_model_arg": true
+      },
+      "passed": true
+    },
+    {
+      "test_name": "frozen_list_prompts",
+      "command": "idt/dist/idt.exe list-prompts",
+      "result": {
+        "success": false,
+        "exit_code": 1,
+        "stdout": "Error: Unknown command 'list-prompts'\n\n\nImage Description Toolkit - Unified CLI\n\nUSAGE:\n    idt.exe <command> [options]\n\nCOMMANDS:\n    guideme               Interactive wizard to build and run workflows\n    workflow              Run image description workflow\n    viewer (or view)      Launch the GUI viewer for browsing results\n    prompteditor          Launch the prompt editor to manage prompts\n    imagedescriber        Launch the image describer GUI\n    configure (or config) Launch the configuration manager\n    stats                 Analyze workflow performance statistics\n    contentreview         Analyze description content and quality\n    combinedescriptions   Combine descriptions from multiple workflows\n    results-list          List available workflow results with viewer commands\n    check-models          Check installed Ollama models\n    prompt-list           List available prompt styles\n    extract-frames        Extract frames from video files\n    convert-images        Convert HEIC images to JPG\n    version               Show version information\n    help                  Show this help message\n\nGLOBAL OPTIONS:\n    --config-workflow, --config-wf <file>     Workflow orchestration config (default: workflow_config.json)\n    --config-image-describer, --config-id <file>  Image describer config (prompts, AI, metadata)\n    --config-video <file>                     Video extraction config\n    --config <file>                           [DEPRECATED] Use --config-image-describer instead\n\nEXAMPLES:\n    # Interactive guided workflow (recommended for beginners)\n    idt.exe guideme\n\n    # Run workflow with Ollama\n    idt.exe workflow --provider ollama --model llava\n\n    # Run workflow with custom prompts and metadata settings\n    idt.exe workflow photos --config-id my_prompts.json --prompt-style detailed\n\n    # Run workflow with multiple custom configs (advanced)\n    idt.exe workflow photos --config-wf production.json --config-id artistic.json\n\n    # Launch viewer (empty)\n    idt.exe viewer\n\n    # Launch viewer with specific directory\n    idt.exe viewer C:\\path\\to\\workflow_output\n\n    # Launch viewer with directory picker\n    idt.exe viewer --open\n\n    # Launch prompt editor\n    idt.exe prompteditor\n\n    # Launch image describer GUI\n    idt.exe imagedescriber\n\n    # Launch configuration manager\n    idt.exe configure\n\n    # Run workflow with Claude\n    idt.exe workflow --provider claude --model claude-opus-4\n\n    # Analyze statistics\n    idt.exe stats\n\n    # Analyze content quality\n    idt.exe contentreview\n\n    # Combine descriptions to CSV\n    idt.exe combinedescriptions --output results.csv\n\n    # List available workflow results\n    idt.exe results-list\n    idt.exe results-list --input-dir c:\\path\\to\\descriptions\n\n    # Check available models\n    idt.exe check-models\n\n    # List available prompt styles\n    idt.exe prompt-list\n    idt.exe prompt-list --verbose\n\nNOTES:\n    - Requires Ollama to be installed for Ollama models\n    - Requires API keys for OpenAI and Anthropic (set via environment variables)\n    - GUI tools (viewer, prompteditor, imagedescriber, configure) must be built separately\n    - All commands support --help for detailed options\n\nFor detailed documentation, see the docs/ folder.\n\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": false,
+        "has_output": true,
+        "no_errors": true
+      },
+      "passed": false
+    },
+    {
+      "test_name": "frozen_check_models",
+      "command": "idt/dist/idt.exe check-models",
+      "result": {
+        "success": true,
+        "exit_code": 0,
+        "stdout": "=== Image Description Toolkit - Model Status ===\n\nOllama (Local Models)\n  [OK] Status: OK\n  Models: 7 available\n    \ufffd qwen3-vl:latest\n    \ufffd moondream:latest\n    \ufffd qwen3-coder:480b-cloud\n    \ufffd glm-4.6:cloud\n    \ufffd qwen3-vl:235b-cloud\n    \ufffd llava:latest\n    \ufffd gemma3:latest\n\nOllama Cloud\n  [OK] Status: OK\n  Models: 2 available\n    \ufffd qwen3-coder:480b-cloud\n    \ufffd qwen3-vl:235b-cloud\n\nOpenAI\n  [--] Status: API key not configured (need openai.txt or OPENAI_API_KEY)\n  -> Add OpenAI API key to 'openai.txt' or OPENAI_API_KEY env var\n\nClaude (Anthropic)\n  [--] Status: API key not configured (need claude.txt or ANTHROPIC_API_KEY)\n  -> Add Claude API key to 'claude.txt' or ANTHROPIC_API_KEY env var\n\n=== Recommendations ===\n  \ufffd [OK] Ollama is ready with 7 models\n  \ufffd Optional: Configure OpenAI for cloud-based models\n  \ufffd Optional: Configure Claude (Anthropic) for cloud-based models\n\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": true,
+        "has_output": true
+      },
+      "passed": true
+    },
+    {
+      "test_name": "frozen_results_list",
+      "command": "idt/dist/idt.exe results-list",
+      "result": {
+        "success": false,
+        "exit_code": 1,
+        "stdout": "Scanning for workflow results in: C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\Descriptions\nError: Directory does not exist: C:\\Users\\kelly\\GitHub\\Image-Description-Toolkit\\Descriptions\n",
+        "stderr": "",
+        "timed_out": false,
+        "exception": null
+      },
+      "validation": {
+        "exit_code_0": false,
+        "no_crash": true
+      },
+      "passed": false
+    },
+    {
+      "test_name": "frozen_stats",
+      "command": "idt stats <workflow_dir>",
+      "result": {
+        "success": false,
+        "exit_code": -1,
+        "stdout": "",
+        "stderr": "No workflow directories found for testing",
+        "exception": "NoTestData"
+      },
+      "validation": {
+        "skipped": true
+      },
+      "passed": false,
+      "skipped": true
+    },
+    {
+      "test_name": "frozen_contentreview",
+      "command": "idt contentreview <workflow_dir>",
+      "result": {
+        "success": false,
+        "exit_code": -1,
+        "stdout": "",
+        "stderr": "No workflow directories found for testing",
+        "exception": "NoTestData"
+      },
+      "validation": {
+        "skipped": true
+      },
+      "passed": false,
+      "skipped": true
+    },
+    {
+      "test_name": "frozen_combinedescriptions",
+      "command": "idt combinedescriptions",
+      "result": {
+        "success": false,
+        "exit_code": -1,
+        "stdout": "",
+        "stderr": "No workflow directories found for testing",
+        "exception": "NoTestData"
+      },
+      "validation": {
+        "skipped": true
+      },
+      "passed": false,
+      "skipped": true
+    }
+  ],
+  "summary": {
+    "total": 18,
+    "passed": 7,
+    "failed": 5,
+    "errors": [
+      {
+        "test": "dev_workflow_help",
+        "command": "python idt/idt_cli.py workflow --help",
+        "exit_code": 1,
+        "stderr": "",
+        "exception": null
+      },
+      {
+        "test": "dev_list_prompts",
+        "command": "python idt/idt_cli.py list-prompts",
+        "exit_code": 1,
+        "stderr": "",
+        "exception": null
+      },
+      {
+        "test": "dev_results_list",
+        "command": "python idt/idt_cli.py results-list",
+        "exit_code": 1,
+        "stderr": "",
+        "exception": null
+      },
+      {
+        "test": "frozen_list_prompts",
+        "command": "idt/dist/idt.exe list-prompts",
+        "exit_code": 1,
+        "stderr": "",
+        "exception": null
+      },
+      {
+        "test": "frozen_results_list",
+        "command": "idt/dist/idt.exe results-list",
+        "exit_code": 1,
+        "stderr": "",
+        "exception": null
+      }
+    ]
+  }
+}

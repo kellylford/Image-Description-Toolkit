@@ -21,92 +21,115 @@ class TestGuidedWorkflowCommandGeneration:
     def test_basic_command_no_metadata_no_geocoding(self):
         """Test command generation with metadata and geocoding disabled"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])  # sys.argv[0] is 'workflow.py'
+
         # Mock all the interactive prompts
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
              patch('guided_workflow.validate_directory') as mock_validate_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
-            # Setup mock responses
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
+            # Provider, Model, Prompt style (skip), Metadata (No), Action, Output dir
             mock_choice.side_effect = [
-                'ollama',  # Provider
-                'moondream:latest',  # Model
-                'No (recommended)',  # Metadata
-                'Run this command now',  # Action
-                'Use default (Descriptions)'  # Output dir
+                'ollama',
+                'moondream:latest',
+                'Skip (use default)',  # Prompt style
+                'No',                  # Metadata disabled
+                'Run this command now',
+                'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',  # Image directory
-                '',  # Workflow name (empty = skip)
-                ''   # Prompt style (empty = skip)
+                '',              # Workflow name (empty = skip)
             ]
             mock_validate_dir.return_value = (True, None)
-            
-            # Run guideme
+
             guided_workflow()
-            
+
             # Check that workflow was called with correct args
             mock_workflow.assert_called_once()
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should have --no-metadata, should NOT have --geocode or --no-geocode
-            assert '--no-metadata' in args
-            assert '--geocode' not in args
-            assert '--no-geocode' not in args
+            assert '--no-metadata' in captured_args
+            assert '--geocode' not in captured_args
+            assert '--no-geocode' not in captured_args
     
     def test_metadata_enabled_geocoding_enabled(self):
         """Test command with metadata and geocoding both enabled (default behavior)"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
+            # Provider, Model, Prompt style (skip), Metadata (Yes), Geocoding (Yes), Action, Output dir
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',  # Enable metadata
-                'Yes',  # Enable geocoding
+                'Skip (use default)',   # Prompt style
+                'Yes (recommended)',    # Enable metadata
+                'Yes',                  # Enable geocoding
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',  # Workflow name
-                '',  # Prompt style
-                ''   # Geocode cache (use default)
+                '',   # Workflow name
+                '',   # Geocode cache (empty = use default, which is omitted)
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should NOT have --no-metadata, should NOT have --no-geocode (both default ON)
             # Should NOT have --geocode (old flag that no longer exists)
-            assert '--no-metadata' not in args
-            assert '--no-geocode' not in args
-            assert '--geocode' not in args
-            assert '--geocode-cache' not in args  # Using default, shouldn't be specified
+            assert '--no-metadata' not in captured_args
+            assert '--no-geocode' not in captured_args
+            assert '--geocode' not in captured_args
+            assert '--geocode-cache' not in captured_args  # Using default, shouldn't be specified
     
     def test_metadata_enabled_geocoding_disabled(self):
         """Test command with metadata enabled but geocoding explicitly disabled"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
+            # Provider, Model, Prompt style (skip), Metadata (Yes), Geocoding (No), Action, Output dir
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',  # Enable metadata
+                'Skip (use default)',   # Prompt style
+                'Yes (recommended)',    # Enable metadata
                 'No (skip geocoding)',  # Disable geocoding
                 'Run this command now',
                 'Use default (Descriptions)'
@@ -114,233 +137,267 @@ class TestGuidedWorkflowCommandGeneration:
             mock_input.side_effect = [
                 '/test/images',
                 '',  # Workflow name
-                ''   # Prompt style
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should have --no-geocode to explicitly disable it
-            assert '--no-geocode' in args
-            assert '--no-metadata' not in args
-            assert '--geocode' not in args
+            assert '--no-geocode' in captured_args
+            assert '--no-metadata' not in captured_args
+            assert '--geocode' not in captured_args
     
     def test_custom_geocode_cache(self):
         """Test that custom geocode cache location is properly added"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',
-                'Yes',
+                'Skip (use default)',   # Prompt style
+                'Yes (recommended)',    # Metadata
+                'Yes',                  # Geocoding
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',
-                '',
+                '',                  # Workflow name
                 'custom_cache.json'  # Custom cache file
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should have --geocode-cache with custom value
-            assert '--geocode-cache' in args
-            cache_idx = args.index('--geocode-cache')
-            assert args[cache_idx + 1] == 'custom_cache.json'
+            assert '--geocode-cache' in captured_args
+            cache_idx = captured_args.index('--geocode-cache')
+            assert captured_args[cache_idx + 1] == 'custom_cache.json'
     
     def test_default_geocode_cache_not_added(self):
         """Test that default geocode cache is NOT added to command (workflow.py default)"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',
-                'Yes',
+                'Skip (use default)',  # Prompt style
+                'Yes (recommended)',   # Metadata
+                'Yes',                 # Geocoding
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',
-                '',
-                ''  # Empty = use default geocode_cache.json
+                '',  # Workflow name
+                '',  # Geocode cache empty = use default (not added)
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should NOT have --geocode-cache when using default
-            assert '--geocode-cache' not in args
+            assert '--geocode-cache' not in captured_args
     
     def test_extra_workflow_args_passthrough(self):
         """Test that extra workflow args like --timeout are passed through"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow, \
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow, \
              patch.object(sys, 'argv', ['guideme', '--timeout', '300']):
-            
+
+            mock_workflow.side_effect = capture_workflow_args
+
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'No (recommended)',
+                'Skip (use default)',  # Prompt style
+                'No',                  # Metadata disabled
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',
-                ''
+                '',   # Workflow name
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should have --timeout 300 passed through
-            assert '--timeout' in args
-            timeout_idx = args.index('--timeout')
-            assert args[timeout_idx + 1] == '300'
+            assert '--timeout' in captured_args
+            timeout_idx = captured_args.index('--timeout')
+            assert captured_args[timeout_idx + 1] == '300'
     
     def test_no_geocode_flag_passthrough(self):
         """Test that --no-geocode can be passed through from command line"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow, \
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow, \
              patch.object(sys, 'argv', ['guideme', '--no-geocode']):
-            
+
+            mock_workflow.side_effect = capture_workflow_args
+
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',  # Enable metadata
-                'No (skip geocoding)',  # Disable geocoding (should be redundant with --no-geocode)
+                'Skip (use default)',   # Prompt style
+                'Yes (recommended)',    # Enable metadata
+                'No (skip geocoding)',  # Disable geocoding (redundant with --no-geocode)
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',
-                ''
+                '',   # Workflow name
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should have --no-geocode
-            assert '--no-geocode' in args
+            assert '--no-geocode' in captured_args
             # Should NOT have old --geocode flag
-            assert '--geocode' not in args
+            assert '--geocode' not in captured_args
     
     def test_old_geocode_flag_not_accepted(self):
         """Test that the old --geocode flag is NOT in the allowed passthrough list"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow, \
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow, \
              patch.object(sys, 'argv', ['guideme', '--geocode']):  # Old flag
-            
+
+            mock_workflow.side_effect = capture_workflow_args
+
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',
-                'Yes',
+                'Skip (use default)',  # Prompt style
+                'Yes (recommended)',   # Metadata
+                'Yes',                 # Geocoding
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',
-                '',
-                ''
+                '',   # Workflow name
+                '',   # Geocode cache
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Old --geocode flag should NOT be passed through
-            assert '--geocode' not in args
+            assert '--geocode' not in captured_args
     
     def test_all_workflow_options(self):
         """Test command with all options specified"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'colorful', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
+            # Provider, Model, Prompt style (colorful), Metadata (Yes), Geocoding (Yes), Action, Output dir
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',
-                'Yes',
+                'colorful',           # Prompt style
+                'Yes (recommended)',  # Metadata
+                'Yes',                # Geocoding
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                'MyWorkflow',  # Custom workflow name
-                'colorful',  # Custom prompt style
-                'my_cache.json'  # Custom cache
+                'MyWorkflow',    # Custom workflow name
+                'my_cache.json'  # Custom geocode cache
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Check all expected args are present
-            assert args[0] == '/test/images'  # Input dir
-            assert '--provider' in args and 'ollama' in args
-            assert '--model' in args and 'moondream:latest' in args
-            assert '--name' in args and 'MyWorkflow' in args
-            assert '--prompt-style' in args and 'colorful' in args
-            assert '--geocode-cache' in args and 'my_cache.json' in args
-            assert '--output-dir' in args and 'Descriptions' in args
-            
+            assert captured_args[0] == '/test/images'  # Input dir is first arg
+            assert '--provider' in captured_args and 'ollama' in captured_args
+            assert '--model' in captured_args and 'moondream:latest' in captured_args
+            assert '--name' in captured_args and 'MyWorkflow' in captured_args
+            assert '--prompt-style' in captured_args and 'colorful' in captured_args
+            assert '--geocode-cache' in captured_args and 'my_cache.json' in captured_args
+            assert '--output-dir' in captured_args and 'Descriptions' in captured_args
+
             # Should NOT have flags for defaults
-            assert '--no-metadata' not in args
-            assert '--no-geocode' not in args
-            assert '--geocode' not in args
+            assert '--no-metadata' not in captured_args
+            assert '--no-geocode' not in captured_args
+            assert '--geocode' not in captured_args
 
 
 class TestGuidedWorkflowFlagCompatibility:
@@ -392,68 +449,80 @@ class TestGuidedWorkflowEdgeCases:
     def test_empty_geocode_cache_not_added(self):
         """Test that empty geocode cache string doesn't add flag"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',
-                'Yes',
+                'Skip (use default)',  # Prompt style
+                'Yes (recommended)',   # Metadata
+                'Yes',                 # Geocoding
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',
-                '',
+                '',    # Workflow name
                 '   '  # Whitespace only - should be treated as empty
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should NOT add --geocode-cache with empty/whitespace value
-            assert '--geocode-cache' not in args
+            assert '--geocode-cache' not in captured_args
     
     def test_geocode_cache_without_geocoding_enabled(self):
         """Test that geocode cache is not added if geocoding is disabled"""
         from guided_workflow import guided_workflow
-        
+
+        captured_args = []
+        def capture_workflow_args():
+            captured_args[:] = list(sys.argv[1:])
+
         with patch('guided_workflow.get_choice') as mock_choice, \
              patch('guided_workflow.get_input') as mock_input, \
-             patch('guided_workflow.check_directory') as mock_check_dir, \
+             patch('guided_workflow.validate_directory') as mock_check_dir, \
              patch('guided_workflow.create_view_results_bat'), \
-             patch('guided_workflow.workflow_main') as mock_workflow:
-            
+             patch('guided_workflow.check_ollama_models', return_value=['moondream:latest']), \
+             patch('guided_workflow.get_available_prompt_styles', return_value=(['descriptions', 'general'], 'descriptions')), \
+             patch('workflow.main') as mock_workflow:
+
+            mock_workflow.side_effect = capture_workflow_args
+
             mock_choice.side_effect = [
                 'ollama',
                 'moondream:latest',
-                'Yes (recommended)',  # Metadata enabled
+                'Skip (use default)',   # Prompt style
+                'Yes (recommended)',    # Metadata enabled
                 'No (skip geocoding)',  # Geocoding disabled
                 'Run this command now',
                 'Use default (Descriptions)'
             ]
             mock_input.side_effect = [
                 '/test/images',
-                '',
-                ''
+                '',   # Workflow name
             ]
             mock_check_dir.return_value = (True, None)
-            
+
             guided_workflow()
-            
-            args = mock_workflow.call_args[0][0]
-            
+
             # Should have --no-geocode, should NOT have --geocode-cache
-            assert '--no-geocode' in args
-            assert '--geocode-cache' not in args
+            assert '--no-geocode' in captured_args
+            assert '--geocode-cache' not in captured_args
 
 
 if __name__ == '__main__':

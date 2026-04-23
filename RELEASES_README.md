@@ -7,8 +7,7 @@ This folder contains all the release packages for the Image Description Toolkit 
 1. Download all files with matching version numbers:
    - `ImageDescriptionToolkit_v[VERSION].zip`
    - `viewer_v[VERSION].zip`
-   - `prompt_editor_v[VERSION].zip`
-   - `imagedescriber_v[VERSION].zip`
+   - `imagedescriber_v[VERSION].zip` (includes integrated prompt editor and configuration)
    - `install_idt.bat`
 
 2. Place all files in an empty folder
@@ -34,10 +33,8 @@ idt\
 ├── scripts\                   Configuration files
 ├── Viewer\
 │   └── viewer.exe            Standalone viewer application
-├── ImageDescriber\
-│   └── imagedescriber.exe    GUI for describing images
-└── PromptEditor\
-    └── prompteditor.exe      Prompt configuration tool
+└── ImageDescriber\
+    └── imagedescriber.exe    GUI for describing images (includes prompt editor and configuration)
 ```
 
 ## Manual Installation (Alternative)
@@ -49,13 +46,11 @@ If you prefer to install manually or the batch installer doesn't work:
    idt\
    idt\Viewer\
    idt\ImageDescriber\
-   idt\PromptEditor\
    ```
 
 2. Extract each package:
    - `ImageDescriptionToolkit_v*.zip` → Extract to `idt\`
    - `viewer_v*.zip` → Extract to `idt\Viewer\`
-   - `prompt_editor_v*.zip` → Extract to `idt\PromptEditor\`
    - `imagedescriber_v*.zip` → Extract to `idt\ImageDescriber\`
 
 ## Next Steps After Installation
@@ -83,8 +78,7 @@ If you prefer to install manually or the batch installer doesn't work:
 4. **Explore the Tools**
    - `idt.exe` - Main CLI toolkit (see `idt --help`)
    - `Viewer\viewer.exe` - Browse image descriptions
-   - `ImageDescriber\imagedescriber.exe` - GUI for batch processing
-   - `PromptEditor\prompteditor.exe` - Customize AI prompts
+   - `ImageDescriber\imagedescriber.exe` - GUI for batch processing (Tools menu includes prompt editor and configuration)
 
 ## Package Contents
 
