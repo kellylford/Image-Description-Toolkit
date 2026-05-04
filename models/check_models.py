@@ -180,7 +180,7 @@ def get_model_metadata(model_name: str) -> Dict:
                 models_info = config.get('available_models', {})
                 if model_name in models_info:
                     return models_info[model_name]
-        except:
+        except Exception:
             pass
     
     return {}

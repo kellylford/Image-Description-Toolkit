@@ -20,7 +20,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -182,7 +182,7 @@ def log_build_banner(logger=None, stream=None) -> None:
     full = f"{base} {format_build(num)}"
     sha, dirty = get_git_info()
     mode = 'Frozen' if is_frozen() else 'Dev'
-    ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%SZ')
+    ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')
 
     lines = [
         "Image Description Toolkit",

@@ -32,27 +32,12 @@ from io import BytesIO
 try:
     from bs4 import BeautifulSoup
 except ImportError as e:
-    print(f"ERROR: BeautifulSoup4 import failed: {e}")
-    print("Install with: pip install beautifulsoup4")
-    # Check if we're in a frozen executable
-    import sys
-    if getattr(sys, 'frozen', False):
-        print("Running in frozen mode - checking available modules...")
-        import os
-        meipass = getattr(sys, '_MEIPASS', '')
-        if meipass:
-            bs4_path = os.path.join(meipass, 'bs4')
-            print(f"bs4 path exists: {os.path.exists(bs4_path)}")
-            if os.path.exists(bs4_path):
-                print(f"bs4 directory contents: {os.listdir(bs4_path)[:10]}")
-    sys.exit(1)
+    raise ImportError("beautifulsoup4 is required. Install with: pip install beautifulsoup4") from e
 
 try:
     from PIL import Image
-except ImportError:
-    print("ERROR: Pillow not installed")
-    print("Install with: pip install Pillow")
-    sys.exit(1)
+except ImportError as e:
+    raise ImportError("Pillow is required. Install with: pip install Pillow") from e
 
 
 class WebImageDownloader:

@@ -22,10 +22,8 @@ except ImportError:
 try:
     from PIL import Image
     from PIL.ExifTags import TAGS, GPSTAGS
-except ImportError:
-    print("ERROR: PIL (Pillow) not installed")
-    print("Install with: pip install Pillow")
-    sys.exit(1)
+except ImportError as e:
+    raise ImportError("PIL (Pillow) is required. Install with: pip install Pillow") from e
 
 # Try to enable HEIC support
 HEIC_SUPPORT = False

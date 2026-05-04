@@ -306,7 +306,7 @@ def get_installed_ollama_models() -> List[str]:
         if response.status_code == 200:
             data = response.json()
             return [m['name'] for m in data.get('models', [])]
-    except:
+    except Exception:
         pass
     return []
 
@@ -317,7 +317,7 @@ def is_ollama_running() -> bool:
         import requests
         response = requests.get("http://localhost:11434/api/tags", timeout=2)
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 
