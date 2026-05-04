@@ -1940,7 +1940,7 @@ class ImageDescriber:
             minutes = float(coord_tuple[1])
             seconds = float(coord_tuple[2])
             return degrees + (minutes / 60.0) + (seconds / 3600.0)
-        except:
+        except Exception:
             return 0.0
     
     def format_metadata(self, metadata: Dict[str, Any]) -> str:
@@ -2172,7 +2172,7 @@ def get_available_prompt_styles(config_file: str = "image_describer_config.json"
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             return list(config.get('prompt_variations', {}).keys())
-    except:
+    except Exception:
         pass
     
     # Default fallback

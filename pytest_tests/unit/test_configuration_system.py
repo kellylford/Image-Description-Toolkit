@@ -142,16 +142,16 @@ class TestBasicConfigResolution:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             
-            config_file = tmp_path / "test_cwd_config.json"
+            config_file = tmp_path.resolve() / "test_cwd_config.json"
             config_file.write_text('{"test": "cwd"}')
-            
+
             original_cwd = Path.cwd()
             try:
                 os.chdir(tmp_path)
-                
+
                 path, source = resolve_config("test_cwd_config.json")
-                
-                assert path == config_file, "Should find config in cwd"
+
+                assert path.resolve() == config_file, "Should find config in cwd"
                 assert source == "cwd", "Source should be 'cwd'"
                 
             finally:

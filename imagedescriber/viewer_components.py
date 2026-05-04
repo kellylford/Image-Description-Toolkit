@@ -73,7 +73,7 @@ class WorkflowMonitor(threading.Thread):
                         self.last_modified = stat.st_mtime
                         # Notify window to refresh via thread-safe event
                         wx.PostEvent(self.callback_window, LiveUpdateEvent())
-            except:
+            except Exception:
                 pass
             
             time.sleep(2)  # Check every 2 seconds
@@ -513,7 +513,7 @@ class ViewerPanel(wx.Panel):
                     self.image_preview_bitmap = bitmap
                 else:
                     self.image_preview_bitmap = None
-            except:
+            except Exception:
                 self.image_preview_bitmap = None
             
             self.image_preview_panel.Refresh()
@@ -537,7 +537,7 @@ class ViewerPanel(wx.Panel):
             img = img.Scale(new_w, new_h, wx.IMAGE_QUALITY_HIGH)
             self.image_preview_bitmap = wx.Bitmap(img)
             self.image_preview_panel.Refresh()
-        except:
+        except Exception:
             # Silently create placeholder for any loading errors
             self.image_preview_bitmap = None
             self.image_preview_panel.Refresh()

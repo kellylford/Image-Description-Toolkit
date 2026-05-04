@@ -124,7 +124,7 @@ class VideoFrameExtractor:
                 from workflow_utils import WorkflowConfig
                 config = WorkflowConfig()
                 logs_dir = config.base_output_dir / "logs"
-            except:
+            except Exception:
                 # Fallback to relative path
                 logs_dir = Path("workflow_output") / "logs"
                 

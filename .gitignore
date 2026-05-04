@@ -36,6 +36,9 @@ env/
 ENV/
 .winenv/
 
+# Claude Code worktrees (temporary session working directories)
+.claude/worktrees/
+
 # IDE files
 .vscode/
 .idea/
@@ -70,11 +73,9 @@ test_config.json
 build/
 dist/
 *.egg-info/
-idt/
+idt/dist/
+idt/build/
 BuildAndRelease/WinBuilds/
-
-# Local development build counter (preserve across git pulls)
-build/BUILD_TRACKER.json
 
 # Local development build counter (preserve across git pulls)
 build/BUILD_TRACKER.json
@@ -152,7 +153,6 @@ test_onnx*.py
 test_directml*.py
 dist_macos/
 BuildAndRelease/WinBuilds/dist_all/
-/BuildAndRelease
 imagedescriber/build_log_debug.txt
 
 # Video frame extraction output (test artifacts from CI and local runs)

@@ -429,7 +429,7 @@ class VideoDescriber:
         try:
             if hasattr(provider, 'generate_text'):
                 return provider.generate_text(summary_prompt, model)
-        except:
+        except Exception:
             pass
         
         # Fallback: return combined descriptions
@@ -594,6 +594,9 @@ Examples:
     print(f"Failed: {describer.statistics['failed']}")
     total_time = describer.statistics['end_time'] - describer.statistics['start_time'] if describer.statistics['end_time'] else 0
     print(f"Total time: {total_time:.1f}s")
+
+    if describer.statistics['failed'] > 0:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

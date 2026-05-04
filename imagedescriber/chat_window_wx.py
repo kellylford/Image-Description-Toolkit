@@ -447,7 +447,7 @@ class ChatWindow(wx.Dialog):
                 try:
                     dt = datetime.fromisoformat(timestamp)
                     time_str = dt.strftime("%I:%M %p")
-                except:
+                except Exception:
                     pass
             
             # Format message for ListBox display
