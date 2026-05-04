@@ -153,6 +153,7 @@ test_onnx*.py
 test_directml*.py
 dist_macos/
 BuildAndRelease/WinBuilds/dist_all/
+BuildAndRelease/MacBuilds/dist_all/
 imagedescriber/build_log_debug.txt
 
 # Video frame extraction output (test artifacts from CI and local runs)
