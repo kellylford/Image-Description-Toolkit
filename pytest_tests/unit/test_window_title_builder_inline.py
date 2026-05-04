@@ -172,9 +172,13 @@ def test_window_title_builder():
     print(f"\n{'=' * 50}")
     print(f"Results: {tests_passed} passed, {tests_failed} failed")
     print(f"{'=' * 50}")
-    
-    return tests_failed == 0
+
+    assert tests_failed == 0, f"{tests_failed} inline window title test(s) failed"
 
 if __name__ == "__main__":
-    success = test_window_title_builder()
-    sys.exit(0 if success else 1)
+    try:
+        test_window_title_builder()
+        sys.exit(0)
+    except AssertionError as e:
+        print(f"FAILED: {e}")
+        sys.exit(1)
