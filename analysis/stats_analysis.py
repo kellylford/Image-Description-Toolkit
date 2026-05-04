@@ -379,7 +379,7 @@ def parse_workflow_log(log_path: Path) -> Dict:
             start_dt = datetime.strptime(conversion_start, '%Y-%m-%d %H:%M:%S')
             end_dt = datetime.strptime(conversion_end, '%Y-%m-%d %H:%M:%S')
             stats['conversion_duration'] = (end_dt - start_dt).total_seconds()
-        except:
+        except Exception:
             pass
     
     # Also check frame_extractor log for video/frame counts

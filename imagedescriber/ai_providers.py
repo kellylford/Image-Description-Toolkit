@@ -387,7 +387,7 @@ class OllamaProvider(AIProvider):
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             return response.status_code == 200
-        except:
+        except Exception:
             return False
     
     def get_available_models(self) -> List[str]:
@@ -414,7 +414,7 @@ class OllamaProvider(AIProvider):
                 self._models_cache = local_models
                 self._models_cache_time = current_time
                 return local_models
-        except:
+        except Exception:
             pass
         return []
     
@@ -692,7 +692,7 @@ class OpenAIProvider(AIProvider):
             # Sort to match our preferred order
             vision_models.sort(key=lambda m: DEV_OPENAI_MODELS.index(m) if m in DEV_OPENAI_MODELS else 999)
             return vision_models if vision_models else DEV_OPENAI_MODELS.copy()
-        except:
+        except Exception:
             pass
         
         # Fallback to known vision models (in preference order)
@@ -881,9 +881,9 @@ class OpenAIProvider(AIProvider):
                 try:
                     response_text = e.response.text if hasattr(e.response, 'text') else str(e.response)
                     error_details['response_text'] = response_text
-                except:
+                except Exception:
                     pass
-            
+
             # Log to console with structured format for easy parsing
             print(f"[ERROR] OpenAI API failure - {timestamp}")
             print(f"  Image: {Path(image_path).name}")
@@ -1177,9 +1177,9 @@ class ClaudeProvider(AIProvider):
                 try:
                     response_text = e.response.text if hasattr(e.response, 'text') else str(e.response)
                     error_details['response_text'] = response_text
-                except:
+                except Exception:
                     pass
-            
+
             # Log to console with structured format for easy parsing
             print(f"[ERROR] Claude API failure - {timestamp}")
             print(f"  Image: {Path(image_path).name}")
@@ -1256,8 +1256,8 @@ class OllamaCloudProvider(AIProvider):
                     return True
             
             return False
-            
-        except:
+
+        except Exception:
             return False
     
     def get_available_models(self) -> List[str]:
@@ -1286,7 +1286,7 @@ class OllamaCloudProvider(AIProvider):
                 self._models_cache = cloud_models
                 self._models_cache_time = current_time
                 return cloud_models
-        except:
+        except Exception:
             pass
         return []
     

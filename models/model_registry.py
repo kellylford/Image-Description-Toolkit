@@ -127,7 +127,7 @@ class ModelRegistry:
                     data = response.json()
                     installed = [m['name'] for m in data.get('models', [])]
                     return model_name in installed
-            except:
+            except Exception:
                 pass
         
         # For other providers, assume available if configured

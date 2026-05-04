@@ -2213,7 +2213,7 @@ class SaveWorkspaceWorker(threading.Thread):
                     try:
                         if self.old_ws_dir.exists() and not any(self.old_ws_dir.iterdir()):
                             self.old_ws_dir.rmdir()
-                    except:
+                    except Exception:
                         pass  # Ignore cleanup errors
             
             # Save to file with proper JSON encoding

@@ -152,7 +152,7 @@ except ImportError as e:
         with open('chat_import_error.log', 'w') as f:
             f.write(f"CHAT IMPORT ERROR: {e}\n")
             f.write(traceback.format_exc())
-    except:
+    except Exception:
         pass
     print(f"CHAT IMPORT ERROR: {e}")
     print(traceback.format_exc())
@@ -6866,7 +6866,7 @@ if __name__ == "__main__":
             with open(crash_log_path, "w") as f:
                 f.write(error_msg)
             print(f"Error logged to {crash_log_path}")
-        except:
+        except Exception:
             print("Could not write crash log")
 
         # Show error dialog for GUI mode (don't use input() - breaks windowed executables)
@@ -6878,5 +6878,5 @@ if __name__ == "__main__":
                 "Critical Error",
                 wx.OK | wx.ICON_ERROR
             )
-        except:
+        except Exception:
             pass  # If wx fails too, just exit
