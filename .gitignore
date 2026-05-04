@@ -36,6 +36,9 @@ env/
 ENV/
 .winenv/
 
+# Claude Code worktrees (temporary session working directories)
+.claude/worktrees/
+
 # IDE files
 .vscode/
 .idea/
