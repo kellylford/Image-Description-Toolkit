@@ -1317,3 +1317,159 @@ class VideoExtractionDialog(wx.Dialog):
             settings["scene_change_threshold"] = self.scene_input.GetValue()
         
         return settings
+
+
+class ExportHtmlGalleryDialog(wx.Dialog):
+    """Dialog for configuring and initiating an HTML gallery export.
+
+    Collects output folder, gallery title, layout style, and display options.
+    The OK button is disabled until a valid output folder is entered.
+    """
+
+    _STYLES = [
+        ('card_grid',     '&Card Grid',
+         'Responsive thumbnail grid — ideal for browsing large collections'),
+        ('photo_essay',   '&Photo Essay',
+         'Full-width alternating image and description — magazine-style layout'),
+        ('lightbox_grid', '&Lightbox Grid',
+         'Thumbnail grid with keyboard-accessible full-size image viewer'),
+        ('simple_list',   '&Simple List',
+         'Linear list with full images and descriptions — maximum accessibility, no JavaScript'),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(
+            parent,
+            title='Export HTML Gallery',
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+        )
+        self._style_radios: dict = {}
+        self._init_ui()
+        self.SetSize((580, 600))
+        self.Centre()
+        wx.CallAfter(self._browse_btn.SetFocus)
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _init_ui(self):
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # ---- Output folder ----
+        out_box = wx.StaticBox(self, label='Output Folder')
+        out_sizer = wx.StaticBoxSizer(out_box, wx.VERTICAL)
+
+        path_row = wx.BoxSizer(wx.HORIZONTAL)
+        self._path_ctrl = wx.TextCtrl(self, name='Output folder path')
+        set_accessible_name(self._path_ctrl, 'Output folder path')
+        set_accessible_description(
+            self._path_ctrl,
+            'Type or browse to the folder where the gallery will be saved'
+        )
+        path_row.Add(self._path_ctrl, 1, wx.EXPAND | wx.RIGHT, 6)
+
+        self._browse_btn = wx.Button(self, label='&Browse...')
+        set_accessible_name(self._browse_btn, 'Browse for output folder')
+        self._browse_btn.Bind(wx.EVT_BUTTON, self._on_browse)
+        path_row.Add(self._browse_btn, 0)
+
+        out_sizer.Add(path_row, 0, wx.ALL | wx.EXPAND, 6)
+        main_sizer.Add(out_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
+        # ---- Gallery title ----
+        title_box = wx.StaticBox(self, label='Gallery Title')
+        title_sizer = wx.StaticBoxSizer(title_box, wx.VERTICAL)
+
+        self._title_ctrl = wx.TextCtrl(self, value='Image Gallery', name='Gallery title')
+        set_accessible_name(self._title_ctrl, 'Gallery title')
+        title_sizer.Add(self._title_ctrl, 0, wx.ALL | wx.EXPAND, 6)
+
+        main_sizer.Add(title_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
+        # ---- Gallery style ----
+        style_box = wx.StaticBox(self, label='Gallery Style')
+        style_sizer = wx.StaticBoxSizer(style_box, wx.VERTICAL)
+
+        for i, (value, label, description) in enumerate(self._STYLES):
+            rb_style = wx.RB_GROUP if i == 0 else 0
+            rb = wx.RadioButton(self, label=label, style=rb_style,
+                                name=f'Style: {label.replace("&", "")}')
+            set_accessible_name(rb, f'Gallery style: {label.replace("&", "")}')
+            rb.SetToolTip(description)
+            style_sizer.Add(rb, 0, wx.LEFT | wx.TOP, 6)
+
+            hint = wx.StaticText(self, label=f'    {description}')
+            hint.SetForegroundColour(wx.Colour(108, 117, 125))
+            style_sizer.Add(hint, 0, wx.LEFT | wx.BOTTOM, 14)
+
+            self._style_radios[value] = rb
+
+        self._style_radios['card_grid'].SetValue(True)
+        main_sizer.Add(style_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
+        # ---- Options ----
+        opts_box = wx.StaticBox(self, label='Options')
+        opts_sizer = wx.StaticBoxSizer(opts_box, wx.VERTICAL)
+
+        self._metadata_cb = wx.CheckBox(
+            self, label='&Include photo metadata (date, location, camera)',
+            name='Include photo metadata'
+        )
+        set_accessible_name(self._metadata_cb, 'Include photo metadata (date, location, camera)')
+        opts_sizer.Add(self._metadata_cb, 0, wx.ALL, 6)
+
+        self._open_browser_cb = wx.CheckBox(
+            self, label='&Open in browser after export',
+            name='Open in browser after export'
+        )
+        set_accessible_name(self._open_browser_cb, 'Open in browser after export')
+        self._open_browser_cb.SetValue(True)
+        opts_sizer.Add(self._open_browser_cb, 0, wx.ALL, 6)
+
+        main_sizer.Add(opts_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
+        # ---- Buttons ----
+        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        main_sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
+        self.SetSizer(main_sizer)
+
+        self._path_ctrl.Bind(wx.EVT_TEXT, self._on_path_changed)
+        self._update_ok_button()
+
+    # ------------------------------------------------------------------
+    # Event handlers
+    # ------------------------------------------------------------------
+
+    def _on_browse(self, event):
+        dir_path = select_directory_dialog(self, 'Select Output Folder for HTML Gallery')
+        if dir_path:
+            self._path_ctrl.SetValue(dir_path)
+
+    def _on_path_changed(self, event):
+        self._update_ok_button()
+
+    def _update_ok_button(self):
+        ok_btn = self.FindWindowById(wx.ID_OK)
+        if ok_btn:
+            ok_btn.Enable(bool(self._path_ctrl.GetValue().strip()))
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+
+    def get_options(self) -> dict:
+        """Return the user's selections as a dict ready for gallery_exporter."""
+        selected_style = 'card_grid'
+        for value, rb in self._style_radios.items():
+            if rb.GetValue():
+                selected_style = value
+                break
+        return {
+            'output_dir':       self._path_ctrl.GetValue().strip(),
+            'title':            self._title_ctrl.GetValue().strip() or 'Image Gallery',
+            'style':            selected_style,
+            'include_metadata': self._metadata_cb.GetValue(),
+            'open_in_browser':  self._open_browser_cb.GetValue(),
+        }

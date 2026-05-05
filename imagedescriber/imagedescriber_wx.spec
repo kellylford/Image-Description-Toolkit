@@ -86,6 +86,7 @@ a = Analysis(
         'scripts.versioning',
         'scripts.config_loader',
         'scripts.descriptions_to_html',  # HTML export functionality
+        'scripts.gallery_exporter',       # HTML gallery export
         'scripts.web_image_downloader',  # URL image downloader
         'scripts.video_describer',       # Video description feature
         'scripts.enhanced_scene_detector',  # Enhanced scene detection

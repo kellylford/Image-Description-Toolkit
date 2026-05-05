@@ -142,6 +142,15 @@ try:
 except ImportError:
     WorkspaceStatsDialog = None
 
+# Gallery HTML exporter
+try:
+    import gallery_exporter
+except ImportError:
+    try:
+        import scripts.gallery_exporter as gallery_exporter
+    except ImportError:
+        gallery_exporter = None
+
 # Import chat feature components
 try:
     from chat_window_wx import ChatDialog, ChatWindow
@@ -204,6 +213,7 @@ if getattr(sys, 'frozen', False):
         ProcessingOptionsDialog,
         ImageDetailDialog,
         VideoExtractionDialog,
+        ExportHtmlGalleryDialog,
     )
     from workers_wx import (
         ProcessingWorker,
@@ -248,6 +258,7 @@ else:
             ProcessingOptionsDialog,
             ImageDetailDialog,
             VideoExtractionDialog,
+            ExportHtmlGalleryDialog,
         )
         from .workers_wx import (
             ProcessingWorker,
@@ -291,6 +302,7 @@ else:
             ProcessingOptionsDialog,
             ImageDetailDialog,
             VideoExtractionDialog,
+            ExportHtmlGalleryDialog,
         )
         from workers_wx import (
             ProcessingWorker,
@@ -1414,6 +1426,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
+
+        export_gallery_item = file_menu.Append(wx.ID_ANY, "Export &HTML Gallery...\tCtrl+Shift+G")
+        self.Bind(wx.EVT_MENU, self.on_export_html_gallery, export_gallery_item)
 
         self.workspace_stats_item = file_menu.Append(wx.ID_ANY, "Workspace &Statistics...\tCtrl+I")
         self.Bind(wx.EVT_MENU, self.on_workspace_stats, self.workspace_stats_item)
@@ -4077,6 +4092,56 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, f"Successfully exported descriptions to:\n{file_path}")
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
+
+    def on_export_html_gallery(self, event):
+        """Export described images as a self-contained HTML gallery folder."""
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace. Load a directory first.")
+            return
+
+        if gallery_exporter is None:
+            show_error(self, "Gallery exporter module is not available.")
+            return
+
+        has_descriptions = any(
+            item.descriptions for item in self.workspace.items.values()
+        )
+        if not has_descriptions:
+            show_warning(
+                self,
+                "No descriptions found.\n\nProcess your images first, then export the gallery."
+            )
+            return
+
+        dlg = ExportHtmlGalleryDialog(self)
+        if dlg.ShowModal() != wx.ID_OK:
+            dlg.Destroy()
+            return
+        options = dlg.get_options()
+        dlg.Destroy()
+
+        try:
+            with wx.BusyCursor():
+                result = gallery_exporter.export_gallery(self.workspace.items, options)
+        except Exception as e:
+            show_error(self, f"Error exporting gallery:\n{e}")
+            return
+
+        msg = (
+            f"Gallery exported successfully!\n\n"
+            f"Images: {result['images_copied']}\n"
+            f"Descriptions: {result['descriptions_included']}\n"
+            f"Location: {result['output_file']}"
+        )
+        if result.get('warnings'):
+            shown = result['warnings'][:5]
+            msg += "\n\nWarnings:\n" + '\n'.join(shown)
+            if len(result['warnings']) > 5:
+                msg += f"\n\u2026 and {len(result['warnings']) - 5} more"
+        show_info(self, msg)
+
+        if options.get('open_in_browser'):
+            wx.LaunchDefaultBrowser(Path(result['output_file']).as_uri())
 
     def on_workspace_stats(self, event):
         """Show the Workspace Statistics dialog (File → Workspace Statistics)."""
