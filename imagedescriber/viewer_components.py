@@ -637,8 +637,16 @@ class ViewerPanel(wx.Panel):
         path = self._get_current_image_path()
         if not path:
             return
-        bmp = wx.Bitmap(str(path), wx.BITMAP_TYPE_ANY)
-        if bmp.IsOk() and wx.TheClipboard.Open():
+        try:
+            from PIL import Image as PILImage
+            img = PILImage.open(str(path)).convert('RGB')
+            w, h = img.size
+            wx_image = wx.Image(w, h)
+            wx_image.SetData(img.tobytes())
+            bmp = wx_image.ConvertToBitmap()
+        except Exception:
+            return
+        if wx.TheClipboard.Open():
             wx.TheClipboard.SetData(wx.BitmapDataObject(bmp))
             wx.TheClipboard.Close()
 

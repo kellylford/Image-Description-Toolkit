@@ -6126,14 +6126,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         resolved = _Path(str(resolved))
         return resolved if resolved.exists() else None
 
+    def _load_bitmap_for_clipboard(self, path):
+        """Load an image file as wx.Bitmap using PIL (avoids needing wx image handlers).
+
+        Returns a valid wx.Bitmap or None on failure.
+        """
+        try:
+            from PIL import Image as PILImage
+            img = PILImage.open(str(path)).convert('RGB')
+            w, h = img.size
+            wx_image = wx.Image(w, h)
+            wx_image.SetData(img.tobytes())
+            return wx_image.ConvertToBitmap()
+        except Exception:
+            return None
+
     def on_copy_image(self, event):
         """Copy current image to clipboard as a bitmap"""
         path = self._get_copyable_image_path()
         if not path:
             show_warning(self, "No image available to copy")
             return
-        bmp = wx.Bitmap(str(path), wx.BITMAP_TYPE_ANY)
-        if not bmp.IsOk():
+        bmp = self._load_bitmap_for_clipboard(path)
+        if not bmp:
             show_warning(self, "Could not load image for clipboard")
             return
         if wx.TheClipboard.Open():
@@ -6154,8 +6169,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if not self.current_image_item or not self.current_image_item.descriptions:
             show_warning(self, "No description to copy")
             return
-        bmp = wx.Bitmap(str(path), wx.BITMAP_TYPE_ANY)
-        if not bmp.IsOk():
+        bmp = self._load_bitmap_for_clipboard(path)
+        if not bmp:
             show_warning(self, "Could not load image for clipboard")
             return
         desc = self.current_image_item.descriptions[-1].text
