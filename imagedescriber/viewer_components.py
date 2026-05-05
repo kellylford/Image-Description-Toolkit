@@ -270,6 +270,10 @@ class ViewerPanel(wx.Panel):
         self.copy_btn = wx.Button(right_panel, label="Copy Text")
         self.copy_btn.Bind(wx.EVT_BUTTON, self.on_copy_text)
         btn_sizer.Add(self.copy_btn, 0, wx.ALL, 5)
+
+        self.copy_image_btn = wx.Button(right_panel, label="Copy Image")
+        self.copy_image_btn.Bind(wx.EVT_BUTTON, self.on_copy_image)
+        btn_sizer.Add(self.copy_image_btn, 0, wx.ALL, 5)
         
         right_sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 5)
         
@@ -616,7 +620,28 @@ class ViewerPanel(wx.Panel):
             if wx.TheClipboard.Open():
                 wx.TheClipboard.SetData(wx.TextDataObject(text))
                 wx.TheClipboard.Close()
-    
+
+    def _get_current_image_path(self):
+        """Return resolved Path for the currently selected entry's image, or None."""
+        sel = self.desc_list.GetSelection()
+        if sel == wx.NOT_FOUND or sel >= len(self.entries):
+            return None
+        file_path = self.entries[sel].get('file_path', '')
+        if not file_path:
+            return None
+        resolved = self.resolve_image_path(file_path)
+        return resolved if resolved.exists() else None
+
+    def on_copy_image(self, event):
+        """Copy the currently selected image to the clipboard as a bitmap"""
+        path = self._get_current_image_path()
+        if not path:
+            return
+        bmp = wx.Bitmap(str(path), wx.BITMAP_TYPE_ANY)
+        if bmp.IsOk() and wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.BitmapDataObject(bmp))
+            wx.TheClipboard.Close()
+
     def get_workflow_progress(self):
         """Get workflow progress - same approach as image_describer.py.
         Returns (described_count, total_images) tuple.

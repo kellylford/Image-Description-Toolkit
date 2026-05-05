@@ -304,6 +304,8 @@ The **GUI ImageDescriber** (`imagedescriber.exe`) provides an intuitive, visual 
 - **Delete Description** - Remove a description (keep at least one)
 - **Copy Description** - Copy the selected description to clipboard
 - **Copy Image Path** - Copy the full file path to clipboard
+- **Copy Image** - Copy the image itself to clipboard as a bitmap (paste into Word, Keynote, Slack, etc.)
+- **Copy Image + Description** - Copy both the image and the description in one operation; apps that understand only one format receive whichever they request
 - **Show All Descriptions** - View all descriptions for the selected image in one dialog
 
 **View Menu:**

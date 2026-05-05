@@ -313,6 +313,14 @@ For more detail on web download behaviour and options, see `docs/WEB_DOWNLOAD_GU
 
 **All Descriptions dialog:** Browse every description across all images in the workspace in one place — use `Descriptions → Show All Descriptions...` to open it. Useful for comparing results across models and prompts.
 
+**Copying to the clipboard:** The Descriptions menu offers four clipboard options for the selected image:
+- **Copy Description** — copies the description text only
+- **Copy Image Path** — copies the full file path as text
+- **Copy Image** — copies the image itself as a bitmap (paste directly into Word, Keynote, Slack, etc.)
+- **Copy Image + Description** — copies both the image and the description text in a single clipboard operation; apps that understand only one format will receive whichever they request (e.g. a text editor gets the description, an image editor gets the bitmap)
+
+The **Copy Image** button in the viewer panel provides the same single-image copy without opening the menu. For video items, the first extracted frame is used.
+
 **Saving your workspace:** Press `Ctrl+S` to save a `.idw` workspace file. This persists all descriptions and processing state. Reopen the file later and pick up exactly where you left off. Workspace files are valuable for large batch jobs — save frequently.
 
 ---
