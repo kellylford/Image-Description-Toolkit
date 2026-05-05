@@ -639,6 +639,11 @@ class ViewerPanel(wx.Panel):
             return
         try:
             from PIL import Image as PILImage
+            try:
+                import pillow_heif
+                pillow_heif.register_heif_opener()
+            except ImportError:
+                pass
             img = PILImage.open(str(path)).convert('RGB')
             w, h = img.size
             wx_image = wx.Image(w, h)
