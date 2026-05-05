@@ -1539,6 +1539,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         copy_path_item = desc_menu.Append(wx.ID_ANY, "Copy Image &Path")
         self.Bind(wx.EVT_MENU, self.on_copy_image_path, copy_path_item)
 
+        copy_image_item = desc_menu.Append(wx.ID_ANY, "Copy &Image")
+        self.Bind(wx.EVT_MENU, self.on_copy_image, copy_image_item)
+
+        copy_image_desc_item = desc_menu.Append(wx.ID_ANY, "Copy Image + &Description")
+        self.Bind(wx.EVT_MENU, self.on_copy_image_and_description, copy_image_desc_item)
+
         desc_menu.AppendSeparator()
 
         show_all_item = desc_menu.Append(wx.ID_ANY, "&Show All Descriptions...")
@@ -6099,6 +6105,67 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             wx.TheClipboard.SetData(wx.TextDataObject(self.current_image_item.file_path))
             wx.TheClipboard.Close()
             self.SetStatusText("Image path copied to clipboard", 0)
+
+    def _get_copyable_image_path(self):
+        """Return the resolved display path for the current image (handles videos and HEIC).
+
+        For video items, returns the first extracted frame path.
+        For regular images, returns the file_path resolved through the workspace.
+        Returns None if no image is selected or path cannot be resolved.
+        """
+        if not self.current_image_item:
+            return None
+        if self.current_image_item.item_type == "video":
+            frame_path = self._get_video_preview_frame(self.current_image_item)
+            if not frame_path:
+                return None
+            resolved = self.resolve_image_path(frame_path)
+        else:
+            resolved = self.resolve_image_path(self.current_image_item.file_path)
+        from pathlib import Path as _Path
+        resolved = _Path(str(resolved))
+        return resolved if resolved.exists() else None
+
+    def on_copy_image(self, event):
+        """Copy current image to clipboard as a bitmap"""
+        path = self._get_copyable_image_path()
+        if not path:
+            show_warning(self, "No image available to copy")
+            return
+        bmp = wx.Bitmap(str(path), wx.BITMAP_TYPE_ANY)
+        if not bmp.IsOk():
+            show_warning(self, "Could not load image for clipboard")
+            return
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.BitmapDataObject(bmp))
+            wx.TheClipboard.Close()
+            self.SetStatusText("Image copied to clipboard", 0)
+
+    def on_copy_image_and_description(self, event):
+        """Copy both the current image and its description to the clipboard.
+
+        Uses wx.DataObjectComposite so apps that understand only one format
+        (e.g. a plain text editor) receive whichever they request.
+        """
+        path = self._get_copyable_image_path()
+        if not path:
+            show_warning(self, "No image available to copy")
+            return
+        if not self.current_image_item or not self.current_image_item.descriptions:
+            show_warning(self, "No description to copy")
+            return
+        bmp = wx.Bitmap(str(path), wx.BITMAP_TYPE_ANY)
+        if not bmp.IsOk():
+            show_warning(self, "Could not load image for clipboard")
+            return
+        desc = self.current_image_item.descriptions[-1].text
+        composite = wx.DataObjectComposite()
+        composite.Add(wx.BitmapDataObject(bmp))
+        composite.Add(wx.TextDataObject(desc))
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(composite)
+            wx.TheClipboard.Close()
+            self.SetStatusText("Image and description copied to clipboard", 0)
 
     def on_show_all_descriptions(self, event):
         """Show all descriptions across all images"""
