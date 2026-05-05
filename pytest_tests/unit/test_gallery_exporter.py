@@ -27,14 +27,15 @@ import gallery_exporter as ge
 # ---------------------------------------------------------------------------
 
 def make_description(text='A scenic mountain landscape.', provider='openai',
-                     model='gpt-4o', prompt_style='narrative', metadata=None):
+                     model='gpt-4o', prompt_style='narrative', metadata=None,
+                     created='2026-05-05T12:00:00'):
     """Return a minimal mock ImageDescription."""
     desc = MagicMock()
     desc.text = text
     desc.provider = provider
     desc.model = model
     desc.prompt_style = prompt_style
-    desc.created = '2026-05-05T12:00:00'
+    desc.created = created
     desc.metadata = metadata or {}
     return desc
 
@@ -44,6 +45,19 @@ def make_item(file_path='images/photo.jpg', description_text='A test description
     item = MagicMock()
     item.file_path = file_path
     item.descriptions = [make_description(text=description_text)]
+    return item
+
+
+def make_multi_item(file_path='images/photo.jpg'):
+    """Return a mock ImageItem with two descriptions from different models."""
+    item = MagicMock()
+    item.file_path = file_path
+    item.descriptions = [
+        make_description(text='First description.', model='gpt-4o',
+                         created='2026-05-01T10:00:00'),
+        make_description(text='Second description.', model='claude-3-5-sonnet-20241022',
+                         created='2026-05-03T14:00:00'),
+    ]
     return item
 
 
@@ -143,8 +157,165 @@ class TestHelpers:
 
 
 # ---------------------------------------------------------------------------
-# Shared HTML structural requirements (WCAG 2.2 AA)
+# Description selection helpers
 # ---------------------------------------------------------------------------
+
+class TestDescriptionSelection:
+    def test_desc_label_with_model_and_date(self):
+        d = make_description(model='gpt-4o', created='2026-05-03T14:30:00')
+        label = ge._desc_label(d)
+        assert 'gpt-4o' in label
+        assert '5/3/2026' in label
+
+    def test_desc_label_model_only(self):
+        d = make_description(model='gpt-4o', created='')
+        d.created = ''
+        label = ge._desc_label(d)
+        assert label == 'gpt-4o'
+
+    def test_desc_label_empty(self):
+        d = make_description(model='', created='')
+        d.model = ''
+        d.created = ''
+        label = ge._desc_label(d)
+        assert label == ''
+
+    def test_desc_label_invalid_date_falls_back_to_model(self):
+        d = make_description(model='gpt-4o', created='not-a-date')
+        label = ge._desc_label(d)
+        assert label == 'gpt-4o'
+
+    def test_get_descriptions_newest_returns_last(self):
+        item = make_multi_item()
+        result = ge._get_descriptions(item, 'newest')
+        assert len(result) == 1
+        assert result[0]['text'] == 'Second description.'
+        assert result[0]['label'] == ''
+
+    def test_get_descriptions_oldest_returns_first(self):
+        item = make_multi_item()
+        result = ge._get_descriptions(item, 'oldest')
+        assert len(result) == 1
+        assert result[0]['text'] == 'First description.'
+        assert result[0]['label'] == ''
+
+    def test_get_descriptions_all_returns_all(self):
+        item = make_multi_item()
+        result = ge._get_descriptions(item, 'all')
+        assert len(result) == 2
+        assert result[0]['text'] == 'First description.'
+        assert result[1]['text'] == 'Second description.'
+        # Labels should contain model names
+        assert 'gpt-4o' in result[0]['label']
+        assert 'claude' in result[1]['label']
+
+    def test_get_descriptions_empty_item(self):
+        item = MagicMock()
+        item.descriptions = []
+        result = ge._get_descriptions(item, 'newest')
+        assert len(result) == 1
+        assert result[0]['text'] == ''
+
+    def test_get_descriptions_unknown_selection_defaults_to_newest(self):
+        item = make_multi_item()
+        result = ge._get_descriptions(item, 'bogus')
+        assert result[0]['text'] == 'Second description.'
+
+    def test_render_single_unlabeled_is_plain_p(self):
+        descs = [{'text': 'Hello world.', 'label': ''}]
+        html = ge._render_descriptions_html(descs, 'my-class')
+        assert html == '<p class="my-class">Hello world.</p>'
+
+    def test_render_multiple_has_desc_blocks(self):
+        descs = [
+            {'text': 'First.', 'label': 'GPT-4o'},
+            {'text': 'Second.', 'label': 'Claude'},
+        ]
+        html = ge._render_descriptions_html(descs, 'my-class')
+        assert html.count('class="desc-block"') == 2
+        assert 'GPT-4o' in html
+        assert 'Claude' in html
+        assert 'First.' in html
+        assert 'Second.' in html
+
+    def test_render_escapes_user_text(self):
+        descs = [{'text': '<script>alert(1)</script>', 'label': ''}]
+        html = ge._render_descriptions_html(descs, 'c')
+        assert '<script>' not in html
+        assert '&lt;script&gt;' in html
+
+    def test_render_escapes_label(self):
+        descs = [{'text': 'ok', 'label': '<evil>'}]
+        html = ge._render_descriptions_html(descs, 'c')
+        assert '<evil>' not in html
+        assert '&lt;evil&gt;' in html
+
+    def test_all_descriptions_appear_in_simple_list(self):
+        item = make_multi_item()
+        described = [('img/photo.jpg', item)]
+        image_paths = {'img/photo.jpg': 'images/photo.jpg'}
+        html = ge._generate_simple_list(described, image_paths, 'Gallery', False, 'all')
+        assert 'First description.' in html
+        assert 'Second description.' in html
+        assert 'gpt-4o' in html
+
+    def test_all_descriptions_appear_in_card_grid(self):
+        item = make_multi_item()
+        described = [('img/photo.jpg', item)]
+        image_paths = {'img/photo.jpg': 'images/photo.jpg'}
+        html = ge._generate_card_grid(described, image_paths, 'Gallery', False, 'all')
+        assert 'First description.' in html
+        assert 'Second description.' in html
+
+    def test_all_descriptions_appear_in_photo_essay(self):
+        item = make_multi_item()
+        described = [('img/photo.jpg', item)]
+        image_paths = {'img/photo.jpg': 'images/photo.jpg'}
+        html = ge._generate_photo_essay(described, image_paths, 'Gallery', False, 'all')
+        assert 'First description.' in html
+        assert 'Second description.' in html
+
+    def test_all_descriptions_appear_in_lightbox(self):
+        """All descriptions are embedded in the JS GALLERY array."""
+        item = make_multi_item()
+        described = [('img/photo.jpg', item)]
+        image_paths = {'img/photo.jpg': 'images/photo.jpg'}
+        html = ge._generate_lightbox_grid(described, image_paths, 'Gallery', False, 'all')
+        # Both descriptions should appear in the script block
+        import re
+        scripts = re.findall(r'<script>(.*?)</script>', html, re.DOTALL)
+        combined = '\n'.join(scripts)
+        # Descriptions are Unicode-escaped by _js_str; check unescaped content is present
+        assert 'First description.' in html or 'First description.' in combined
+        assert 'Second description.' in html or 'Second description.' in combined
+
+    def test_oldest_shows_only_first(self):
+        item = make_multi_item()
+        described = [('img/photo.jpg', item)]
+        image_paths = {'img/photo.jpg': 'images/photo.jpg'}
+        html = ge._generate_card_grid(described, image_paths, 'Gallery', False, 'oldest')
+        assert 'First description.' in html
+        assert 'Second description.' not in html
+
+    def test_newest_shows_only_last(self):
+        item = make_multi_item()
+        described = [('img/photo.jpg', item)]
+        image_paths = {'img/photo.jpg': 'images/photo.jpg'}
+        html = ge._generate_card_grid(described, image_paths, 'Gallery', False, 'newest')
+        assert 'Second description.' in html
+        assert 'First description.' not in html
+
+    def test_lightbox_uses_innerHTML_not_textcontent(self):
+        """Lightbox JS must use innerHTML so HTML desc blocks render correctly."""
+        item = make_item()
+        described = [('img/photo.jpg', item)]
+        image_paths = {'img/photo.jpg': 'images/photo.jpg'}
+        html = ge._generate_lightbox_grid(described, image_paths, 'Gallery', False)
+        assert 'innerHTML = item.desc' in html
+        assert 'textContent = item.desc' not in html
+
+
+
 
 @pytest.mark.parametrize('style', STYLE_NAMES)
 class TestWcagStructure:

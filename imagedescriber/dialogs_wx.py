@@ -1345,7 +1345,7 @@ class ExportHtmlGalleryDialog(wx.Dialog):
         )
         self._style_radios: dict = {}
         self._init_ui()
-        self.SetSize((580, 600))
+        self.SetSize((580, 700))
         self.Centre()
         wx.CallAfter(self._browse_btn.SetFocus)
 
@@ -1408,6 +1408,34 @@ class ExportHtmlGalleryDialog(wx.Dialog):
         self._style_radios['card_grid'].SetValue(True)
         main_sizer.Add(style_sizer, 0, wx.ALL | wx.EXPAND, 10)
 
+        # ---- Descriptions ----
+        desc_sel_box = wx.StaticBox(self, label='Descriptions')
+        desc_sel_sizer = wx.StaticBoxSizer(desc_sel_box, wx.VERTICAL)
+
+        self._desc_newest_rb = wx.RadioButton(
+            self, label='&Newest only', style=wx.RB_GROUP,
+            name='Show newest description only'
+        )
+        self._desc_newest_rb.SetValue(True)
+        set_accessible_name(self._desc_newest_rb, 'Show newest description only')
+        desc_sel_sizer.Add(self._desc_newest_rb, 0, wx.LEFT | wx.TOP, 6)
+
+        self._desc_oldest_rb = wx.RadioButton(
+            self, label='O&ldest only',
+            name='Show oldest description only'
+        )
+        set_accessible_name(self._desc_oldest_rb, 'Show oldest description only')
+        desc_sel_sizer.Add(self._desc_oldest_rb, 0, wx.LEFT | wx.TOP, 4)
+
+        self._desc_all_rb = wx.RadioButton(
+            self, label='&All descriptions (show all with attribution)',
+            name='Show all descriptions with attribution'
+        )
+        set_accessible_name(self._desc_all_rb, 'Show all descriptions with attribution')
+        desc_sel_sizer.Add(self._desc_all_rb, 0, wx.LEFT | wx.TOP | wx.BOTTOM, 6)
+
+        main_sizer.Add(desc_sel_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
         # ---- Options ----
         opts_box = wx.StaticBox(self, label='Options')
         opts_sizer = wx.StaticBoxSizer(opts_box, wx.VERTICAL)
@@ -1466,10 +1494,17 @@ class ExportHtmlGalleryDialog(wx.Dialog):
             if rb.GetValue():
                 selected_style = value
                 break
+        if self._desc_all_rb.GetValue():
+            desc_sel = 'all'
+        elif self._desc_oldest_rb.GetValue():
+            desc_sel = 'oldest'
+        else:
+            desc_sel = 'newest'
         return {
-            'output_dir':       self._path_ctrl.GetValue().strip(),
-            'title':            self._title_ctrl.GetValue().strip() or 'Image Gallery',
-            'style':            selected_style,
-            'include_metadata': self._metadata_cb.GetValue(),
-            'open_in_browser':  self._open_browser_cb.GetValue(),
+            'output_dir':            self._path_ctrl.GetValue().strip(),
+            'title':                 self._title_ctrl.GetValue().strip() or 'Image Gallery',
+            'style':                 selected_style,
+            'include_metadata':      self._metadata_cb.GetValue(),
+            'open_in_browser':       self._open_browser_cb.GetValue(),
+            'description_selection': desc_sel,
         }

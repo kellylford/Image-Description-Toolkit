@@ -62,6 +62,7 @@ def export_gallery(items: dict, options: dict) -> dict:
     title = (options.get('title') or 'Image Gallery').strip() or 'Image Gallery'
     style = options.get('style', 'card_grid')
     include_metadata = bool(options.get('include_metadata', False))
+    description_selection = options.get('description_selection', 'newest')
 
     output_dir.mkdir(parents=True, exist_ok=True)
     images_dir = output_dir / 'images'
@@ -102,7 +103,7 @@ def export_gallery(items: dict, options: dict) -> dict:
         'simple_list':   _generate_simple_list,
     }
     generator = generators.get(style, _generate_card_grid)
-    html_content = generator(described_items, image_paths, title, include_metadata)
+    html_content = generator(described_items, image_paths, title, include_metadata, description_selection)
 
     index_path = output_dir / 'index.html'
     index_path.write_text(html_content, encoding='utf-8')
@@ -182,6 +183,62 @@ def _get_primary_description(item) -> str:
     if not item.descriptions:
         return ''
     return item.descriptions[-1].text
+
+
+def _desc_label(desc) -> str:
+    """Format a short attribution label: 'model · M/D/YYYY'."""
+    parts = []
+    model = getattr(desc, 'model', '')
+    if model:
+        parts.append(str(model))
+    created = getattr(desc, 'created', '')
+    if created:
+        try:
+            dt = datetime.fromisoformat(str(created))
+            parts.append(f'{dt.month}/{dt.day}/{dt.year}')
+        except (ValueError, TypeError):
+            pass
+    return ' \u00b7 '.join(parts)
+
+
+def _get_descriptions(item, selection: str) -> List[dict]:
+    """Return list of {'text': str, 'label': str} based on selection.
+
+    selection: 'newest' | 'oldest' | 'all'
+    """
+    if not item.descriptions:
+        return [{'text': '', 'label': ''}]
+    if selection == 'oldest':
+        d = item.descriptions[0]
+        return [{'text': d.text, 'label': ''}]
+    if selection == 'all':
+        return [{'text': d.text, 'label': _desc_label(d)} for d in item.descriptions]
+    # Default: newest
+    d = item.descriptions[-1]
+    return [{'text': d.text, 'label': ''}]
+
+
+def _render_descriptions_html(descriptions: List[dict], text_class: str) -> str:
+    """Render description block(s) to HTML.
+
+    Single unlabeled description  → plain <p class=text_class>.
+    Multiple or labelled           → <div class="desc-block"> wrappers with attribution.
+    """
+    if len(descriptions) == 1 and not descriptions[0]['label']:
+        return f'<p class="{text_class}">{_esc(descriptions[0]["text"])}</p>'
+    parts = []
+    for d in descriptions:
+        label_html = (
+            f'<span class="desc-label">{_esc(d["label"])}</span>\n'
+            if d['label'] else ''
+        )
+        parts.append(
+            f'<div class="desc-block">'
+            f'{label_html}'
+            f'<p class="{text_class}">{_esc(d["text"])}</p>'
+            f'</div>'
+        )
+    return '\n'.join(parts)
 
 
 def _get_metadata_html(item, include_metadata: bool) -> str:
@@ -371,6 +428,17 @@ main { padding: 1.5rem 2rem 3rem; }
 }
 .img-meta dt { font-weight: 600; white-space: nowrap; }
 .img-meta dd { margin: 0; }
+.desc-block { margin-bottom: .75rem; }
+.desc-block:last-child { margin-bottom: 0; }
+.desc-label {
+    display: block;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .2rem;
+}
 """
 
 
@@ -505,6 +573,7 @@ def _generate_card_grid(
     image_paths: Dict[str, str],
     title: str,
     include_metadata: bool,
+    description_selection: str = 'newest',
 ) -> str:
     toc = _build_toc(described_items)
     cards = []
@@ -512,7 +581,9 @@ def _generate_card_grid(
         rel = _esc(image_paths.get(fp, ''))
         alt = _esc(_get_alt_text(fp))
         filename = _esc(Path(fp).name)
-        desc_text = _esc(_get_primary_description(item))
+        descs_html = _render_descriptions_html(
+            _get_descriptions(item, description_selection), 'card-desc'
+        )
         meta_html = _get_metadata_html(item, include_metadata)
         cards.append(
             f'<li>\n'
@@ -522,7 +593,7 @@ def _generate_card_grid(
             f'    </div>\n'
             f'    <div class="card-body">\n'
             f'      <h2 class="card-title">{filename}</h2>\n'
-            f'      <p class="card-desc">{desc_text}</p>\n'
+            f'      {descs_html}\n'
             f'      <div class="card-meta">{meta_html}</div>\n'
             f'    </div>\n'
             f'  </article>\n'
@@ -612,6 +683,7 @@ def _generate_photo_essay(
     image_paths: Dict[str, str],
     title: str,
     include_metadata: bool,
+    description_selection: str = 'newest',
 ) -> str:
     toc = _build_toc(described_items)
     entries = []
@@ -619,7 +691,9 @@ def _generate_photo_essay(
         rel = _esc(image_paths.get(fp, ''))
         alt = _esc(_get_alt_text(fp))
         filename = _esc(Path(fp).name)
-        desc_text = _esc(_get_primary_description(item))
+        descs_html = _render_descriptions_html(
+            _get_descriptions(item, description_selection), 'essay-desc'
+        )
         meta_html = _get_metadata_html(item, include_metadata)
         entries.append(
             f'<li>\n'
@@ -630,7 +704,7 @@ def _generate_photo_essay(
             f'      </div>\n'
             f'      <div class="essay-text">\n'
             f'        <h2 class="essay-title">{filename}</h2>\n'
-            f'        <p class="essay-desc">{desc_text}</p>\n'
+            f'        {descs_html}\n'
             f'        <div class="essay-meta">{meta_html}</div>\n'
             f'      </div>\n'
             f'    </div>\n'
@@ -762,10 +836,13 @@ _LIGHTBOX_GRID_CSS = """\
     margin: 0 0 .75rem 0;
     word-break: break-word;
 }
-#lightbox-desc {
+#lb-desc {
     font-size: .9rem;
     line-height: 1.6;
     color: #343a40;
+    margin: 0;
+}
+#lb-desc .lb-desc-text {
     margin: 0;
     white-space: pre-wrap;
 }
@@ -804,7 +881,7 @@ _LIGHTBOX_JS = """\
         document.getElementById('lb-img').src = item.src;
         document.getElementById('lb-img').alt = item.alt;
         document.getElementById('lb-filename').textContent = item.filename;
-        document.getElementById('lb-desc').textContent = item.desc;
+        document.getElementById('lb-desc').innerHTML = item.desc;
         document.getElementById('lb-meta').innerHTML = item.meta;
         document.getElementById('lightbox-counter').textContent =
             (currentIndex + 1) + ' of ' + GALLERY.length;
@@ -867,17 +944,21 @@ def _generate_lightbox_grid(
     image_paths: Dict[str, str],
     title: str,
     include_metadata: bool,
+    description_selection: str = 'newest',
 ) -> str:
     # Build JS data array
     js_entries = []
     for fp, item in described_items:
         rel = image_paths.get(fp, '')
+        descs_html = _render_descriptions_html(
+            _get_descriptions(item, description_selection), 'lb-desc-text'
+        )
         js_entries.append(
             '{'
             f'src:{_js_str(rel)},'
             f'alt:{_js_str(_get_alt_text(fp))},'
             f'filename:{_js_str(Path(fp).name)},'
-            f'desc:{_js_str(_get_primary_description(item))},'
+            f'desc:{_js_str(descs_html)},'
             f'meta:{_js_str(_get_metadata_html(item, include_metadata))}'
             '}'
         )
@@ -918,7 +999,7 @@ def _generate_lightbox_grid(
         '      </div>\n'
         '      <div id="lightbox-caption-area" aria-live="polite" aria-atomic="true">\n'
         '        <h2 id="lb-filename"></h2>\n'
-        '        <p id="lb-desc"></p>\n'
+        '        <div id="lb-desc"></div>\n'
         '        <div id="lb-meta"></div>\n'
         '      </div>\n'
         '    </div>\n'
@@ -996,6 +1077,7 @@ def _generate_simple_list(
     image_paths: Dict[str, str],
     title: str,
     include_metadata: bool,
+    description_selection: str = 'newest',
 ) -> str:
     toc = _build_toc(described_items)
     entries = []
@@ -1003,7 +1085,9 @@ def _generate_simple_list(
         rel = _esc(image_paths.get(fp, ''))
         alt = _esc(_get_alt_text(fp))
         filename = _esc(Path(fp).name)
-        desc_text = _esc(_get_primary_description(item))
+        descs_html = _render_descriptions_html(
+            _get_descriptions(item, description_selection), 'entry-desc'
+        )
         meta_html = _get_metadata_html(item, include_metadata)
         entries.append(
             f'<li>\n'
@@ -1012,7 +1096,7 @@ def _generate_simple_list(
             f'    <div class="entry-body">\n'
             f'      <h2 class="entry-title">{filename}</h2>\n'
             f'      <h3 class="entry-desc-heading">Description</h3>\n'
-            f'      <p class="entry-desc">{desc_text}</p>\n'
+            f'      {descs_html}\n'
             f'      <div class="entry-meta">{meta_html}</div>\n'
             f'    </div>\n'
             f'  </article>\n'
