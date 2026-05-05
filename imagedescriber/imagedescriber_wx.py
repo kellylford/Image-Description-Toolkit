@@ -6090,9 +6090,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
 
         desc = self.current_image_item.descriptions[-1].text
-        if wx.TheClipboard.Open():
-            wx.TheClipboard.SetData(wx.TextDataObject(desc))
-            wx.TheClipboard.Close()
+        if self._copy_text_to_clipboard(desc):
             self.SetStatusText("Description copied to clipboard", 0)
 
     def on_copy_image_path(self, event):
@@ -6101,10 +6099,37 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, "No image selected")
             return
 
-        if wx.TheClipboard.Open():
-            wx.TheClipboard.SetData(wx.TextDataObject(self.current_image_item.file_path))
-            wx.TheClipboard.Close()
+        if self._copy_text_to_clipboard(self.current_image_item.file_path):
             self.SetStatusText("Image path copied to clipboard", 0)
+
+    @staticmethod
+    def _copy_text_to_clipboard(text):
+        """Copy text to the clipboard with correct encoding on every platform.
+
+        wx.TextDataObject on macOS puts text as public.utf16-plain-text (raw
+        UTF-16 bytes). Native macOS apps like Messages expect NSPasteboardTypeString
+        and display the raw bytes as spaced-out characters. pbcopy writes
+        proper UTF-8 which macOS converts to NSPasteboardTypeString automatically.
+        On Windows, wx.TextDataObject works correctly and is used directly.
+
+        Returns True on success, False on failure.
+        """
+        import sys
+        if sys.platform == 'darwin':
+            try:
+                import subprocess
+                subprocess.run(['pbcopy'], input=text.encode('utf-8'), check=True)
+                return True
+            except Exception:
+                pass  # fall through to wx fallback
+        try:
+            if wx.TheClipboard.Open():
+                wx.TheClipboard.SetData(wx.TextDataObject(text))
+                wx.TheClipboard.Close()
+                return True
+        except Exception:
+            pass
+        return False
 
     def _get_copyable_image_path(self):
         """Return the resolved display path for the current image (handles videos and HEIC).
@@ -6179,9 +6204,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, "Could not load image for clipboard")
             return
         desc = self.current_image_item.descriptions[-1].text
+        import sys
         composite = wx.DataObjectComposite()
         composite.Add(wx.BitmapDataObject(bmp))
-        composite.Add(wx.TextDataObject(desc))
+        if sys.platform == 'darwin':
+            # wx.TextDataObject puts public.utf16-plain-text which macOS apps
+            # can misread as raw bytes. Use public.utf8-plain-text explicitly.
+            utf8_obj = wx.CustomDataObject(wx.DataFormat('public.utf8-plain-text'))
+            utf8_obj.SetData(desc.encode('utf-8'))
+            composite.Add(utf8_obj)
+        else:
+            composite.Add(wx.TextDataObject(desc))
         if wx.TheClipboard.Open():
             wx.TheClipboard.SetData(composite)
             wx.TheClipboard.Close()
@@ -6435,9 +6468,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 elif result == wx.ID_NO:
                     # Copy command to clipboard
                     install_cmd = "curl -fsSL https://ollama.ai/install.sh | sh"
-                    if wx.TheClipboard.Open():
-                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
-                        wx.TheClipboard.Close()
+                    if self._copy_text_to_clipboard(install_cmd):
                         from shared.wx_common import show_info
                         show_info(self, "Command Copied",
                                  f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
@@ -6480,9 +6511,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 elif result == wx.ID_NO:
                     # Copy command to clipboard
                     install_cmd = "winget install ollama"
-                    if wx.TheClipboard.Open():
-                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
-                        wx.TheClipboard.Close()
+                    if self._copy_text_to_clipboard(install_cmd):
                         from shared.wx_common import show_info
                         show_info(self, "Command Copied",
                                  f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
@@ -6547,9 +6576,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                 if result == wx.ID_YES:
                     install_cmd = "brew install ffmpeg"
-                    if wx.TheClipboard.Open():
-                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
-                        wx.TheClipboard.Close()
+                    self._copy_text_to_clipboard(install_cmd)
                     show_info(self, "Command Copied",
                              f"Copied to clipboard:\n\n{install_cmd}\n\n"
                              "1. Open Terminal\n"
@@ -6580,9 +6607,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                 if result == wx.ID_YES:
                     install_cmd = "winget install Gyan.FFmpeg"
-                    if wx.TheClipboard.Open():
-                        wx.TheClipboard.SetData(wx.TextDataObject(install_cmd))
-                        wx.TheClipboard.Close()
+                    self._copy_text_to_clipboard(install_cmd)
                     show_info(self, "Command Copied",
                              f"Copied to clipboard:\n\n{install_cmd}\n\n"
                              "1. Open Command Prompt or PowerShell\n"

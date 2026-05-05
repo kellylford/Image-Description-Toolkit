@@ -617,6 +617,14 @@ class ViewerPanel(wx.Panel):
         """Copy description to clipboard"""
         text = self.desc_text.GetValue()
         if text:
+            import sys
+            if sys.platform == 'darwin':
+                try:
+                    import subprocess
+                    subprocess.run(['pbcopy'], input=text.encode('utf-8'), check=True)
+                    return
+                except Exception:
+                    pass
             if wx.TheClipboard.Open():
                 wx.TheClipboard.SetData(wx.TextDataObject(text))
                 wx.TheClipboard.Close()
