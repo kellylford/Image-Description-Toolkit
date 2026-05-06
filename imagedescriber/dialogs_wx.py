@@ -314,6 +314,14 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
                 "Google Gemma 3 · 4 B params · ~2.5 GB download · QAT quantization\n"
                 "Quantization-Aware Training gives better accuracy at 4-bit than standard PTQ. "
                 "Produces natural, fluent English prose. Strong at scene and context description.",
+            "mlx-community/gemma-3-12b-it-4bit":
+                "Google Gemma 3 · 12 B params · ~8.0 GB download\n"
+                "Noticeably richer descriptions than the 4B with still-reasonable speed. "
+                "Recommended for 16 GB+ Apple Silicon Macs wanting better quality without cloud cost.",
+            "mlx-community/gemma-3-27b-it-4bit":
+                "Google Gemma 3 · 27 B params · ~16.8 GB download\n"
+                "Highest quality Gemma option for on-device inference. Requires 32 GB+ Apple Silicon. "
+                "Best choice when description quality is the top priority and cloud cost should be zero.",
             "mlx-community/phi-3.5-vision-instruct-4bit":
                 "Microsoft Phi-3.5 Vision · 3.8 B params · ~2.5 GB download\n"
                 "Excels at reading text within images (signs, labels, documents) and producing "

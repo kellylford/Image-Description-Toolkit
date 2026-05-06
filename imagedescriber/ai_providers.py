@@ -1643,6 +1643,8 @@ class MLXProvider(AIProvider):
         "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",            # ~4.5 GB, best Qwen quality
         # -- Gemma family (Google) --
         "mlx-community/gemma-3-4b-it-qat-4bit",                 # ~2.5 GB, QAT quantization, strong English
+        "mlx-community/gemma-3-12b-it-4bit",                    # ~8.0 GB, 16 GB Mac recommended
+        "mlx-community/gemma-3-27b-it-4bit",                    # ~16.8 GB, 32 GB+ Mac required
         # -- Phi family (Microsoft) --
         "mlx-community/phi-3.5-vision-instruct-4bit",           # ~2.5 GB, good at text/detail
         # -- SmolVLM (HuggingFace) --

@@ -346,11 +346,148 @@ The Prompt Editor and Configuration Manager are built into ImageDescriber's Tool
 
 ## 12. Exporting Descriptions
 
+### Automatic Outputs (Created by Every Workflow Run)
+
 **HTML report:** Created automatically in each `wf_*` directory. Open `image_descriptions.html` in any browser. Images appear with thumbnails and their descriptions side by side.
 
 **Plain text:** `image_descriptions.txt` in each `wf_*` directory. One block per image, with a metadata header (timestamp, model, prompt style, EXIF information). Copy and paste into any application.
 
 **CSV or spreadsheet export:** Use `idt combinedescriptions` in a directory that contains one or more `wf_*` subdirectories. This merges all workflow runs into a single spreadsheet — see [Section 16](#16-analysis-and-export-commands) for full details.
+
+---
+
+### Exporting an HTML Gallery
+
+The HTML Gallery export creates a **self-contained, shareable website** from your current ImageDescriber workspace — a folder containing `index.html` and an `images/` subfolder. You can copy this folder to a USB drive, share it with someone, or publish it to a web server without any additional tools or dependencies. All CSS and JavaScript are embedded directly in the page; nothing is loaded from the internet.
+
+**How to export:**
+1. Load your images and ensure at least some of them have been described.
+2. Choose `File → Export HTML Gallery…` or press `Ctrl+Shift+G`.
+3. The export dialog opens. Fill in the options below, then press OK.
+4. The gallery folder is created. If **Open in browser after export** is checked, your default browser opens the finished gallery automatically.
+
+> **Note:** Only images that have at least one AI description are included in the gallery. Images that are loaded but not yet described are skipped.
+
+#### Export Dialog Options
+
+| Option | What It Does |
+|---|---|
+| **Output Folder** | The folder where the gallery will be created. Click Browse to choose a location. |
+| **Gallery Title** | The title that appears at the top of the page and in the browser tab. Defaults to `Image Gallery`. |
+| **Gallery Style** | The visual layout of the page. Four options — see [Gallery Styles](#gallery-styles) below. |
+| **Descriptions** | Which description to show when an image has more than one. See [Multiple Descriptions](#multiple-descriptions) below. |
+| **Include photo metadata** | When checked, each image entry shows its photo date, GPS location (if available), and camera model from EXIF data. |
+| **Open in browser after export** | Opens the finished `index.html` in your default browser. Checked by default. |
+
+#### Gallery Styles
+
+All four styles meet WCAG 2.2 AA accessibility requirements. Every image has an `alt` attribute, all text uses scalable font sizes, and keyboard navigation works throughout. The styles differ in how they visually organise the images and descriptions.
+
+---
+
+##### Card Grid
+
+**Best for:** Browsing large collections where you want a quick overview of many images at once.
+
+The page is a grid of rectangular cards, arranged in columns that adjust automatically to the browser window width. On a typical desktop display you see three or four columns; on a phone, one column.
+
+Each card has two parts:
+
+- **Top half — the photo.** The image is displayed as a square-ish thumbnail (aspect ratio 4 wide by 3 tall) that fills the card width edge to edge. If the photo is not that shape, it is cropped to fit rather than letterboxed, so taller photos will be cropped at the top and bottom. The thumbnail is decorative; no link is attached to it.
+- **Lower half — the text.** The filename appears as a heading in bold. Below it, the description is shown. If the description is long, it is visually trimmed to about four lines and the rest is hidden from view — but the full text is always present in the page source, so screen readers read the complete description without truncation. If photo metadata is enabled, the date, location, and camera appear in small text at the bottom of the card.
+
+Cards have a white background, a subtle light-grey border, and slightly rounded corners. The page background is light grey so the white cards stand out.
+
+---
+
+##### Photo Essay
+
+**Best for:** Sharing a curated set of photos where you want the description to be read carefully alongside each image — similar to a magazine article or a photo book.
+
+Images are presented one by one in a full-width vertical list, with generous spacing between entries. Each entry is a wide panel containing the photo and the description text side by side.
+
+- **Odd-numbered entries** (first, third, fifth…): photo on the left, text on the right.
+- **Even-numbered entries** (second, fourth, sixth…): text on the left, photo on the right.
+
+This left-right alternation is purely visual; the reading order in the document is always image then description, so screen readers and keyboard navigation are not affected by the alternation.
+
+The photo occupies half the panel width and is cropped to fill a rectangular frame. The text side shows the filename as a heading and the full description below it, with no truncation.
+
+On narrow screens (phones), the two-column layout collapses to a single column: photo on top, text below, with the alternation removed.
+
+---
+
+##### Lightbox Grid
+
+**Best for:** Galleries where you want a compact thumbnail overview and the ability to view each image at full size with its description — similar to a photography portfolio site.
+
+The page shows a dense grid of small square thumbnails (approximately 180 pixels wide). Each thumbnail is a focusable button; pressing Enter or Space on it (or clicking it) opens the **lightbox viewer**.
+
+**The lightbox viewer** is an overlay panel that covers the page:
+- The left side shows the full-size image.
+- The right side shows the filename as a heading and the full description below it.
+- A toolbar at the top shows the current position (e.g. `3 of 12`), a Previous button (left arrow), a Next button (right arrow), and a Close button (×).
+
+**Keyboard navigation in the lightbox:**
+- `Escape` — close the lightbox and return focus to the thumbnail that opened it.
+- `Left arrow` — go to the previous image.
+- `Right arrow` — go to the next image.
+- `Tab` / `Shift+Tab` — cycle focus among the toolbar buttons only; focus cannot escape the lightbox while it is open.
+
+When the lightbox closes, focus returns to the thumbnail that opened it, so you do not lose your place in the grid.
+
+The lightbox requires JavaScript. If JavaScript is disabled, the thumbnails are still visible but the viewer will not open. Use **Simple List** if JavaScript must be avoided.
+
+---
+
+##### Simple List
+
+**Best for:** Maximum accessibility, lowest-tech sharing, or situations where JavaScript cannot be used. Also the best choice when descriptions are long and you want them to be easy to read sequentially.
+
+Images and descriptions are presented as a plain vertical list, one entry at a time, flowing top to bottom down the page. There are no interactive elements, no JavaScript, and no visual tricks.
+
+Each entry contains:
+- The photo displayed at full page width. Tall images are capped at 520 pixels in height and letterboxed (padded with grey) if necessary so the full image is visible without cropping.
+- The filename as a heading.
+- A small uppercase label reading `DESCRIPTION`.
+- The full description text, with line breaks preserved.
+- Photo metadata (date, location, camera) if enabled.
+
+For galleries with more than five images, a **table of contents** is inserted at the top of the page. It lists every image filename as a link that jumps directly to that entry in the page.
+
+All four heading levels are used correctly (h1 for the gallery title, h2 for each image filename, h3 for the Description label), which makes navigating by heading in a screen reader straightforward.
+
+---
+
+#### Multiple Descriptions
+
+When you have described the same image more than once — for example with different AI models or different prompt styles — the export dialog lets you choose which description or descriptions to include:
+
+| Option | What Is Shown |
+|---|---|
+| **Newest only** (default) | Only the most recently added description. |
+| **Oldest only** | Only the first description that was ever added. |
+| **All descriptions** | Every description for each image, shown in the order they were added. Each one is labelled with the model name and the date it was created (for example: `gpt-4o · 5/3/2026`). |
+
+When **All descriptions** is selected, each description block is clearly attributed so you can compare results from different models or prompts side by side in the exported gallery.
+
+---
+
+#### What the Export Produces
+
+After export, the output folder contains:
+
+```
+index.html          ← Open this in any browser
+images/
+    photo1.jpg
+    photo2.jpg
+    …
+```
+
+The `images/` subfolder contains copies of the source images — the originals are not moved or modified. If two source images happen to share the same filename (from different source directories), the second is renamed automatically (e.g. `photo_1.jpg`) to avoid overwriting.
+
+To share the gallery, zip the entire output folder and send it, or copy it to any web server. The page requires no server-side processing and no internet connection to view.
 
 ---
 
@@ -1170,6 +1307,7 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 | `Ctrl+U` | Load images from a URL |
 | `Ctrl+S` | Save workspace |
 | `Ctrl+V` | Paste image from clipboard |
+| `Ctrl+Shift+G` | Export HTML Gallery |
 
 ---
 
