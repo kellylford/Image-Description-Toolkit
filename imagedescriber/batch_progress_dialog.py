@@ -140,7 +140,8 @@ class BatchProgressDialog(wx.Dialog):
                        last_image: str = None, last_description: str = None,
                        token_stats: dict = None,
                        batch_provider: str = None, batch_model: str = None,
-                       batch_prompt: str = None):
+                       batch_prompt: str = None,
+                       status_message: str = None):
         """Update progress display
         
         Args:
@@ -158,6 +159,8 @@ class BatchProgressDialog(wx.Dialog):
             batch_provider: Override stored batch provider (optional)
             batch_model: Override stored batch model (optional)
             batch_prompt: Override stored batch prompt (optional)
+            status_message: Optional status line shown at the top of the list
+                (e.g. "Loading MLX model…"). Cleared automatically when None.
         """
         # Allow callers to update stored batch settings
         if batch_provider is not None:
@@ -175,6 +178,12 @@ class BatchProgressDialog(wx.Dialog):
 
         # Rebuild stats list
         self.stats_list.Clear()
+
+        # ── Optional status message (e.g. MLX model loading / download) ─────
+        if status_message:
+            self.stats_list.Append(f"⏳ Status:                   {status_message}")
+            self.stats_list.Append("─" * 44)
+            self.separator_indices.add(self.stats_list.GetCount() - 1)
 
         # ── Processing Progress section ──────────────────────────────────────
         self.stats_list.Append(f"Items Processed:            {current} / {total}")

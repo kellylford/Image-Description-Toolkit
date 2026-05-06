@@ -3260,6 +3260,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             }
 
         logger.info("CHECKPOINT 7: Starting to scan workspace items for processing")
+        # Pre-flight: warn if an MLX model isn't cached yet (a first-time download can
+        # take several minutes and the UI would look completely frozen otherwise).
+        if not self._check_mlx_model_ready(options['provider'], options['model']):
+            return
+
         # Phase 5: Use skip_existing parameter instead of options
         # Get files to process - handle videos separately
         images_to_process = []
@@ -3401,6 +3406,64 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.batch_worker.start()
 
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
+
+    def _check_mlx_model_ready(self, provider: str, model: str) -> bool:
+        """Check if an MLX model is ready to use; warn the user if not yet downloaded.
+
+        Returns True if processing should continue, False if the user cancelled.
+        """
+        if provider.lower() != 'mlx':
+            return True
+
+        # Check if already loaded into Metal memory (instant re-use)
+        try:
+            try:
+                from ai_providers import MLXProvider, _mlx_provider  # type: ignore
+            except ImportError:
+                from imagedescriber.ai_providers import MLXProvider, _mlx_provider  # type: ignore
+            if (_mlx_provider._loaded_model_id == model and
+                    getattr(_mlx_provider, '_model', None) is not None):
+                return True  # Already in memory — no warning needed
+        except Exception:
+            pass  # Can't inspect provider state; fall through to cache check
+
+        # Check if the model weights exist in the local HuggingFace cache
+        try:
+            import huggingface_hub
+            cached = huggingface_hub.try_to_load_from_cache(model, "config.json")
+            # Returns a path string when cached, None or a sentinel when not
+            if isinstance(cached, str):
+                return True  # Weights are on disk — load ~30s, no download warning needed
+        except Exception:
+            pass  # huggingface_hub unavailable or unusual cache layout — fall through
+
+        # Model is not downloaded yet: show a size warning so the user isn't surprised
+        _SIZE_ESTIMATES = {
+            "mlx-community/SmolVLM-Instruct-4bit": "~0.5 GB",
+            "mlx-community/Qwen2-VL-2B-Instruct-4bit": "~1.5 GB",
+            "mlx-community/Qwen2.5-VL-3B-Instruct-4bit": "~2.0 GB",
+            "mlx-community/gemma-3-4b-it-qat-4bit": "~2.5 GB",
+            "mlx-community/phi-3.5-vision-instruct-4bit": "~2.5 GB",
+            "mlx-community/Qwen2.5-VL-7B-Instruct-4bit": "~4.5 GB",
+            "mlx-community/Llama-3.2-11B-Vision-Instruct-4bit": "~6.5 GB",
+            "mlx-community/gemma-3-12b-it-4bit": "~8.0 GB",
+            "mlx-community/gemma-3-27b-it-4bit": "~16.8 GB",
+        }
+        size_str = _SIZE_ESTIMATES.get(model, "several GB")
+        model_display = model.split("/")[-1] if "/" in model else model
+
+        result = wx.MessageBox(
+            f"The MLX model '{model_display}' ({size_str}) has not been downloaded yet.\n\n"
+            f"Downloading may take several minutes depending on your connection speed. "
+            f"The app will look unresponsive while the download proceeds — this is normal.\n\n"
+            f"After the first download, the model is cached locally and loads in about "
+            f"30 seconds.\n\n"
+            f"Continue?",
+            "MLX Model Download Required",
+            wx.YES_NO | wx.ICON_INFORMATION,
+            self
+        )
+        return result == wx.YES
 
     def _run_batch_for_paths(self, event, to_process: list, context_label: str = "folder"):
         """Start batch processing for an explicit list of file paths.
@@ -4513,6 +4576,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 )
         else:
             self.batch_progress = None
+            # current == 0 is a "status" event (e.g. MLX model loading/download).
+            # Update the progress dialog so it doesn't look completely frozen.
+            if (hasattr(event, 'total') and event.total > 0 and
+                    getattr(self, '_batch_provider', '').lower() == 'mlx' and
+                    self.batch_progress_dialog and
+                    not self.batch_progress_dialog.IsBeingDeleted()):
+                self.batch_progress_dialog.update_progress(
+                    current=0,
+                    total=event.total,
+                    batch_provider=self._batch_provider,
+                    batch_model=self._batch_model,
+                    batch_prompt=self._batch_prompt,
+                    status_message="Loading MLX model into Metal memory — please wait…"
+                )
 
     def on_worker_complete(self, event):
         """Handle successful processing completion"""

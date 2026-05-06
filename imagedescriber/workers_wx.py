@@ -1268,7 +1268,18 @@ class BatchProcessingWorker(threading.Thread):
             total = len(self.file_paths)
             completed = 0
             failed = 0
-            
+
+            # For MLX: post a "loading" status event immediately so the progress
+            # dialog doesn't look frozen during model load / first-time download.
+            if self.provider.lower() == 'mlx':
+                evt = ProgressUpdateEventData(
+                    file_path="",
+                    message="⏳ Loading MLX model into Metal memory — please wait…",
+                    current=0,
+                    total=total
+                )
+                wx.PostEvent(self.parent_window, evt)
+
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():
