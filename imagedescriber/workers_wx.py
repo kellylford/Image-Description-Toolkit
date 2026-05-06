@@ -929,6 +929,8 @@ class ChatProcessingWorker(threading.Thread):
                 self._chat_with_openai()
             elif self.provider == 'claude':
                 self._chat_with_claude()
+            elif self.provider == 'mlx':
+                self._chat_with_mlx()
             else:
                 raise Exception(f"Unsupported chat provider: {self.provider}")
                 
@@ -1208,6 +1210,141 @@ class ChatProcessingWorker(threading.Thread):
             
         except Exception as e:
             raise Exception(f"Claude chat error: {str(e)}")
+
+    def _chat_with_mlx(self):
+        """Handle MLX (Apple Metal) chat with conversation history.
+
+        MLX does not stream tokens, so the full response is emitted as a
+        single ChatUpdateEvent followed by ChatCompleteEvent.
+
+        Multi-turn is supported: the processor's apply_chat_template formats
+        the full message history.  The image (if any) is included only in the
+        first user turn; subsequent turns are text-only.
+        """
+        try:
+            # Import MLX internals from the provider module
+            try:
+                from .ai_providers import (
+                    _mlx_provider,
+                    _mlx_generate,
+                    _mlx_apply_chat_template,
+                    HAS_MLX_VLM,
+                )
+            except ImportError:
+                from ai_providers import (
+                    _mlx_provider,
+                    _mlx_generate,
+                    _mlx_apply_chat_template,
+                    HAS_MLX_VLM,
+                )
+
+            if not HAS_MLX_VLM:
+                raise Exception(
+                    "mlx-vlm is not installed. Install it with: pip install mlx-vlm"
+                )
+            if not _mlx_provider.is_available():
+                raise Exception(
+                    "MLX is not available. Requires macOS with Apple Silicon."
+                )
+
+            # Ensure the requested model is loaded into Metal memory
+            _mlx_provider._ensure_model_loaded(self.model)
+            processor = _mlx_provider._processor
+            config = _mlx_provider._mlx_config
+
+            # Prepare a temp JPEG for the image (first turn only)
+            temp_jpeg = None
+            if self.image_path:
+                temp_jpeg = _mlx_provider._to_jpeg_tempfile(self.image_path)
+
+            try:
+                # Build a HuggingFace-style messages list for apply_chat_template.
+                # The image is embedded in the first user message only.
+                hf_messages = []
+                image_assigned = False
+
+                for msg in self.messages:
+                    if (
+                        msg['role'] == 'user'
+                        and not image_assigned
+                        and temp_jpeg
+                    ):
+                        hf_messages.append({
+                            'role': 'user',
+                            'content': [
+                                {'type': 'image'},
+                                {'type': 'text', 'text': msg['content']},
+                            ],
+                        })
+                        image_assigned = True
+                    else:
+                        hf_messages.append({
+                            'role': msg['role'],
+                            'content': msg['content'],
+                        })
+
+                # Format the full conversation into a single prompt string.
+                # Prefer processor.apply_chat_template (handles multi-turn natively);
+                # fall back to the mlx-vlm single-prompt helper if unavailable.
+                try:
+                    formatted_prompt = processor.apply_chat_template(
+                        hf_messages,
+                        tokenize=False,
+                        add_generation_prompt=True,
+                    )
+                except Exception:
+                    # Fallback: format only the latest user message
+                    last_user_text = next(
+                        (m['content'] for m in reversed(self.messages)
+                         if m['role'] == 'user'),
+                        '',
+                    )
+                    english_prompt = f"Please respond in English only. {last_user_text}"
+                    formatted_prompt = _mlx_apply_chat_template(
+                        processor, config, english_prompt,
+                        num_images=1 if temp_jpeg else 0,
+                    )
+
+                # Run Metal inference (blocking, no streaming)
+                output = _mlx_generate(
+                    _mlx_provider._model,
+                    processor,
+                    formatted_prompt,
+                    image=[temp_jpeg] if temp_jpeg else [],
+                    max_tokens=_mlx_provider.MAX_TOKENS,
+                    verbose=False,
+                )
+
+                text = getattr(output, 'text', None) or str(output)
+                response = text.strip() if text else "MLX returned an empty response."
+
+                # Emit the full response as a single update (no streaming)
+                evt = ChatUpdateEvent(message_chunk=response)
+                wx.PostEvent(self.parent_window, evt)
+
+                tokens_in = getattr(output, 'prompt_tokens', 0) or 0
+                tokens_out = getattr(output, 'generation_tokens', 0) or 0
+                metadata = {
+                    'provider': 'mlx',
+                    'model': self.model,
+                    'tokens': {
+                        'input_tokens': tokens_in,
+                        'output_tokens': tokens_out,
+                        'total_tokens': tokens_in + tokens_out,
+                    },
+                }
+                evt = ChatCompleteEvent(full_response=response, metadata=metadata)
+                wx.PostEvent(self.parent_window, evt)
+
+            finally:
+                if temp_jpeg:
+                    try:
+                        Path(temp_jpeg).unlink()
+                    except Exception:
+                        pass
+
+        except Exception as e:
+            raise Exception(f"MLX chat error: {str(e)}")
 
 
 class BatchProcessingWorker(threading.Thread):

@@ -88,7 +88,7 @@ class ChatDialog(wx.Dialog):
         provider_label.SetMinSize((100, -1))
         provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
-        self.provider_choice = wx.Choice(self, choices=['Ollama', 'OpenAI', 'Claude', 'HuggingFace', 'MLX'])
+        self.provider_choice = wx.Choice(self, choices=['Ollama', 'OpenAI', 'Claude', 'MLX'])
         self.provider_choice.SetSelection(0)  # Default to Ollama
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         provider_sizer.Add(self.provider_choice, 1, wx.ALL | wx.EXPAND, 5)
@@ -183,14 +183,6 @@ class ChatDialog(wx.Dialog):
                 if self.model_combo.GetCount() > 0:
                     self.model_combo.SetSelection(0)
                 
-            elif provider == 'huggingface':
-                # HuggingFace models
-                models = ['Salesforce/blip-image-captioning-large', 'microsoft/git-large-coco']
-                for model in models:
-                    self.model_combo.Append(model, model)
-                if models:
-                    self.model_combo.SetSelection(0)
-
             elif provider == 'mlx':
                 # Apple MLX Metal GPU inference (macOS only) — no API key required
                 try:
