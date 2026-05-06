@@ -111,6 +111,12 @@ class ImageItem:
         # e.g. "Vacation", "Vacation/Beach", or None for root-level items.
         # Used by the tree view to group items under folder nodes.
         self.subfolder: Optional[str] = None
+
+        # Missing file indicator: set True when the file no longer exists on disk
+        # (detected during a Refresh Folder from Disk scan).  Descriptions are
+        # preserved so no work is lost; the item appears with a [!] prefix in the
+        # tree until the file reappears or the user removes it.
+        self.is_missing: bool = False
         
     def add_description(self, description: ImageDescription):
         self.descriptions.append(description)
@@ -140,7 +146,9 @@ class ImageItem:
             "exif_datetime": self.exif_datetime,
             "file_mtime": self.file_mtime,
             # Subfolder grouping for tree view
-            "subfolder": self.subfolder
+            "subfolder": self.subfolder,
+            # Missing file indicator
+            "is_missing": self.is_missing
         }
     
     @classmethod
@@ -172,6 +180,8 @@ class ImageItem:
         item.file_mtime = data.get("file_mtime", None)
         # Subfolder grouping - backward compatible default (None = root level)
         item.subfolder = data.get("subfolder", None)
+        # Missing file indicator - backward compatible default (False = file present)
+        item.is_missing = data.get("is_missing", False)
         return item
 
 
@@ -203,6 +213,10 @@ class ImageWorkspace:
         # }
         self.batch_state: Optional[dict] = None
         self.load_failures: List[tuple] = []  # Track items that failed to load from workspace file
+
+        # Maps directory path string → bool recording whether it was loaded recursively.
+        # Persisted so that Refresh Folder from Disk can default to the same setting.
+        self.directory_scan_recursive: Dict[str, bool] = {}
         
     def add_directory(self, directory_path: str):
         """Add a directory to the workspace"""
@@ -347,6 +361,7 @@ class ImageWorkspace:
             "imported_workflow_dir": getattr(self, 'imported_workflow_dir', None),  # Track workflow imports
             "cached_ollama_models": getattr(self, 'cached_ollama_models', None),  # Cached Ollama models
             "batch_state": getattr(self, 'batch_state', None),  # Batch processing state (Phase 1: Batch Management)
+            "directory_scan_recursive": getattr(self, 'directory_scan_recursive', {}),
             "created": self.created,
             "modified": self.modified
         }
@@ -387,6 +402,7 @@ class ImageWorkspace:
         workspace.imported_workflow_dir = data.get("imported_workflow_dir", None)  # Load workflow dir
         workspace.cached_ollama_models = data.get("cached_ollama_models", None)  # Load cached models
         workspace.batch_state = data.get("batch_state", None)  # Load batch state (Phase 1: Batch Management)
+        workspace.directory_scan_recursive = data.get("directory_scan_recursive", {})
         workspace.created = data.get("created", workspace.created)
         workspace.modified = data.get("modified", workspace.modified)
         workspace.saved = True

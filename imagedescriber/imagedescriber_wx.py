@@ -214,6 +214,7 @@ if getattr(sys, 'frozen', False):
         ImageDetailDialog,
         VideoExtractionDialog,
         ExportHtmlGalleryDialog,
+        RescanFolderDialog,
     )
     from workers_wx import (
         ProcessingWorker,
@@ -224,6 +225,7 @@ if getattr(sys, 'frozen', False):
         HEICConversionWorker,
         DirectoryScanWorker,
         SaveWorkspaceWorker,
+        FolderRescanWorker,
         EVT_PROGRESS_UPDATE,
         EVT_PROCESSING_COMPLETE,
         EVT_PROCESSING_FAILED,
@@ -239,6 +241,8 @@ if getattr(sys, 'frozen', False):
         EVT_WORKSPACE_SAVE_FAILED,
         EVT_VIDEO_DESCRIPTION_COMPLETE,
         EVT_VIDEO_DESCRIPTION_FAILED,
+        EVT_RESCAN_COMPLETE,
+        EVT_RESCAN_FAILED,
     )
 else:
     # Development: try relative imports first, fall back to absolute
@@ -259,6 +263,7 @@ else:
             ImageDetailDialog,
             VideoExtractionDialog,
             ExportHtmlGalleryDialog,
+            RescanFolderDialog,
         )
         from .workers_wx import (
             ProcessingWorker,
@@ -269,6 +274,7 @@ else:
             HEICConversionWorker,
             DirectoryScanWorker,
             SaveWorkspaceWorker,
+            FolderRescanWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -284,6 +290,8 @@ else:
             EVT_WORKSPACE_SAVE_FAILED,
             EVT_VIDEO_DESCRIPTION_COMPLETE,
             EVT_VIDEO_DESCRIPTION_FAILED,
+            EVT_RESCAN_COMPLETE,
+            EVT_RESCAN_FAILED,
         )
     except ImportError as e_rel:
         print(f"[DEBUG] Relative import failed, trying absolute: {e_rel}")
@@ -303,6 +311,7 @@ else:
             ImageDetailDialog,
             VideoExtractionDialog,
             ExportHtmlGalleryDialog,
+            RescanFolderDialog,
         )
         from workers_wx import (
             ProcessingWorker,
@@ -313,6 +322,7 @@ else:
             HEICConversionWorker,
             DirectoryScanWorker,
             SaveWorkspaceWorker,
+            FolderRescanWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
             EVT_PROCESSING_FAILED,
@@ -328,6 +338,8 @@ else:
             EVT_WORKSPACE_SAVE_FAILED,
             EVT_VIDEO_DESCRIPTION_COMPLETE,
             EVT_VIDEO_DESCRIPTION_FAILED,
+            EVT_RESCAN_COMPLETE,
+            EVT_RESCAN_FAILED,
         )
 
 # Import provider capabilities
@@ -716,6 +728,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heic'}
         self.video_extensions = {'.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts'}
 
+        # Maps subfolder_key string -> absolute directory path for Refresh Folder feature
+        # Populated during refresh_image_list(); keyed by the subfolder string used in the tree
+        self._folder_abs_paths: dict = {}
+
         # Configuration
         self.load_config()
 
@@ -761,6 +777,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.Bind(EVT_WORKSPACE_SAVE_COMPLETE, self.on_workspace_save_complete)
         if EVT_WORKSPACE_SAVE_FAILED:
             self.Bind(EVT_WORKSPACE_SAVE_FAILED, self.on_workspace_save_failed)
+
+        # Folder rescan events
+        if EVT_RESCAN_COMPLETE:
+            self.Bind(EVT_RESCAN_COMPLETE, self.on_rescan_complete)
+        if EVT_RESCAN_FAILED:
+            self.Bind(EVT_RESCAN_FAILED, self.on_rescan_failed)
 
         # Video description events
         if EVT_VIDEO_DESCRIPTION_COMPLETE:
@@ -1275,6 +1297,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_list = _DataViewTreeCtrlAdapter(panel, name="Images in workspace")
             self._image_tree_root = self.image_list.AddRoot("Images")
             self.image_list.Bind(_wx_dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_image_selected)
+            # Context menu for folder nodes (macOS: EVT_DATAVIEW_ITEM_CONTEXT_MENU)
+            self.image_list.Bind(_wx_dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_tree_context_menu)
         else:
             # Windows / other: native TreeCtrl with expand/collapse
             self.image_list = wx.TreeCtrl(
@@ -1285,6 +1309,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             )
             self._image_tree_root = self.image_list.AddRoot("Images")
             self.image_list.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_image_selected)
+            # Context menu for folder nodes (Windows: EVT_TREE_ITEM_RIGHT_CLICK)
+            self.image_list.Bind(wx.EVT_TREE_ITEM_RIGHT_CLICK, self.on_tree_context_menu)
 
         self.image_list.Bind(wx.EVT_CHAR_HOOK, self.on_image_list_key)
         sizer.Add(self.image_list, 1, wx.EXPAND | wx.ALL, 5)
@@ -1417,6 +1443,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         load_dir_item = file_menu.Append(wx.ID_ANY, "&Load Directory\tCtrl+L")
         self.Bind(wx.EVT_MENU, self.on_load_directory, load_dir_item)
+
+        self.rescan_folder_item = file_menu.Append(wx.ID_ANY, "Refresh &Folder from Disk...\tCtrl+Shift+R")
+        self.Bind(wx.EVT_MENU, self.on_rescan_folder, self.rescan_folder_item)
+        self.rescan_folder_item.Enable(False)  # Enabled only when a folder node is selected
 
         load_url_item = file_menu.Append(wx.ID_ANY, "Load Images From &URL...\tCtrl+U")
         self.Bind(wx.EVT_MENU, self.on_load_from_url, load_url_item)
@@ -1699,7 +1729,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # file_path is None for folder nodes — clicking a folder just focuses it,
             # it does not change the current image or load a preview.
             if file_path is None:
+                # Enable Refresh Folder menu item when a folder node is selected
+                if hasattr(self, 'rescan_folder_item'):
+                    self.rescan_folder_item.Enable(True)
                 return
+            # Enable Refresh Folder only for folder nodes; disable for file nodes
+            if hasattr(self, 'rescan_folder_item'):
+                self.rescan_folder_item.Enable(False)
             if file_path and self.workspace and file_path in self.workspace.items:
                 self.current_image_item = self.workspace.items[file_path]
                 self.display_image_info(self.current_image_item)
@@ -2605,6 +2641,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Add directory to workspace
             self.workspace.add_directory(str(dir_path))
 
+            # Persist recursive flag so Refresh Folder from Disk can reuse the same setting
+            if hasattr(self.workspace, 'directory_scan_recursive'):
+                self.workspace.directory_scan_recursive[str(dir_path.resolve())] = recursive
+
             # Update status bar to show scanning in progress
             self.SetStatusText(f"Scanning {dir_path.name}...", 0)
             self.SetStatusText("0 files found", 1)
@@ -2768,6 +2808,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             base_name = Path(file_path).name
             prefix_parts = []
 
+            # 0. Missing file indicator (highest priority — shows before desc count)
+            if getattr(item, 'is_missing', False):
+                prefix_parts.append("[!]")
+
             # 1. Description count
             desc_count = len(item.descriptions)
             if desc_count > 0:
@@ -2824,6 +2868,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if key not in subfolder_groups:
                 subfolder_groups[key] = []
             subfolder_groups[key].append((file_path, item))
+
+        # Build subfolder_key → absolute_path mapping for the right-click Refresh feature.
+        # For each known subfolder, we derive its absolute path from the first item in that
+        # group and also populate intermediate parent folder paths.
+        # Example: subfolder_key="Photos/2024/Beach", first_file="/Users/k/Photos/2024/Beach/img.jpg"
+        #   i=0  → "Photos"       = parents[2] = "/Users/k/Photos"
+        #   i=1  → "Photos/2024"  = parents[1] = "/Users/k/Photos/2024"
+        #   i=2  → "Photos/2024/Beach" = parents[0] = "/Users/k/Photos/2024/Beach"
+        self._folder_abs_paths: dict = {}
+        for _sf_key, _sf_items in subfolder_groups.items():
+            if not _sf_key or not _sf_items:
+                continue
+            _first_file = _sf_items[0][0]
+            _sf_parts = Path(_sf_key).parts
+            for _i in range(len(_sf_parts)):
+                _acc = str(Path(*_sf_parts[:_i + 1]))
+                if _acc not in self._folder_abs_paths:
+                    _depth_diff = len(_sf_parts) - (_i + 1)
+                    try:
+                        _abs_dir = str(Path(_first_file).parents[_depth_diff])
+                        self._folder_abs_paths[_acc] = _abs_dir
+                    except IndexError:
+                        pass
 
         # Map of subfolder string -> tree node (created lazily as items are added)
         folder_nodes: dict = {}
@@ -5050,6 +5117,188 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         logger.error(f"Workspace save failed: {event.error}")
         show_error(self, f"Error saving workspace:\n{event.error}")
 
+    # ------------------------------------------------------------------
+    # Refresh Folder from Disk
+    # ------------------------------------------------------------------
+
+    def _get_selected_folder_abs_path(self):
+        """Return the absolute path of the currently selected folder node, or None.
+
+        Returns None if the selection is empty, a file node, or if the folder path
+        cannot be resolved (e.g. workspace was not rebuilt yet).
+        """
+        if not self.workspace:
+            return None
+        selected = self.image_list.GetSelection()
+        if not selected.IsOk():
+            return None
+        data = self.image_list.GetItemData(selected)
+        if data is not None:
+            # File node (data is a file path string) — not a folder
+            return None
+        # Folder node (data is None).  Reconstruct the full subfolder key by
+        # walking up the tree, then look up the abs path we built during refresh.
+        parts = []
+        node = selected
+        root = self.image_list.GetRootItem()
+        while node.IsOk() and node != root:
+            parts.insert(0, self.image_list.GetItemText(node))
+            node = self.image_list.GetItemParent(node)
+        subfolder_key = str(Path(*parts)) if parts else ""
+        return self._folder_abs_paths.get(subfolder_key)
+
+    def on_tree_context_menu(self, event):
+        """Show context menu on folder tree nodes (right-click / Shift+F10)."""
+        # Determine which node was right-clicked
+        # On Windows TreeCtrl, GetItem() gives the clicked node.
+        # On macOS DataViewCtrl, GetItem() also works.
+        try:
+            clicked_item = event.GetItem()
+        except AttributeError:
+            clicked_item = self.image_list.GetSelection()
+
+        if not clicked_item.IsOk():
+            return
+
+        data = self.image_list.GetItemData(clicked_item)
+        if data is not None:
+            # File node — no context menu in v1
+            return
+
+        # Folder node: select it so _get_selected_folder_abs_path() works
+        self.image_list.SelectItem(clicked_item)
+
+        # Check we can resolve the path
+        abs_path = self._get_selected_folder_abs_path()
+        if not abs_path:
+            return
+
+        menu = wx.Menu()
+        rescan_item = menu.Append(wx.ID_ANY, "Refresh Folder from Disk\u2026")
+        self.Bind(wx.EVT_MENU, self.on_rescan_folder, rescan_item)
+        self.PopupMenu(menu)
+        menu.Destroy()
+
+    def on_rescan_folder(self, event):
+        """Open the Refresh Folder from Disk dialog for the selected folder node."""
+        if not self.workspace:
+            show_info(self, "No workspace is open.")
+            return
+
+        abs_path = self._get_selected_folder_abs_path()
+        if not abs_path:
+            show_info(self, "Please select a folder in the image list first.")
+            return
+
+        try:
+            dlg = RescanFolderDialog(self, abs_path, self.workspace.items)
+            if dlg.ShowModal() == wx.ID_OK:
+                self._apply_rescan_results(
+                    abs_path,
+                    dlg.new_files,
+                    dlg.missing_paths,
+                    dlg.handle_missing,
+                )
+            dlg.Destroy()
+        except Exception as exc:
+            logger.error(f"on_rescan_folder error: {exc}", exc_info=True)
+            show_error(self, f"Error refreshing folder:\n{exc}")
+
+    def _apply_rescan_results(self, folder_path: str, new_files: list,
+                               missing_paths: list, handle_missing: str):
+        """Apply the results from a RescanFolderDialog to the workspace.
+
+        Args:
+            folder_path:   Absolute path of the folder that was rescanned.
+            new_files:     List[Path] — files found on disk but not in workspace.
+            missing_paths: List[str]  — file paths in workspace but absent from disk.
+            handle_missing: 'keep' or 'remove'.
+        """
+        video_exts = {'.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm',
+                      '.m4v', '.mpg', '.mpeg', '.3gp', '.3g2', '.mts', '.m2ts'}
+
+        newly_added: list = []
+
+        # --- Add new files ---
+        for fpath in new_files:
+            fpath_str = str(fpath)
+            if fpath_str in self.workspace.items:
+                continue  # Already present (race condition guard)
+            item_type = "video" if fpath.suffix.lower() in video_exts else "image"
+            item = ImageItem(fpath_str, item_type)
+
+            # Compute subfolder relative to folder_path's parent (same logic as on_files_discovered)
+            try:
+                folder_parent = Path(folder_path).parent
+                relative = fpath.relative_to(folder_parent)
+                parent_rel = relative.parent
+                if str(parent_rel) not in ('', '.'):
+                    item.subfolder = str(parent_rel)
+            except ValueError:
+                pass
+
+            # Cache mtime (fast, no network round-trip for sort)
+            try:
+                item.file_mtime = fpath.stat().st_mtime
+            except Exception:
+                pass
+
+            self.workspace.items[fpath_str] = item
+            newly_added.append(fpath_str)
+
+        # --- Handle missing files ---
+        for mp in missing_paths:
+            if mp not in self.workspace.items:
+                continue
+            if handle_missing == "remove":
+                del self.workspace.items[mp]
+            else:  # "keep"
+                self.workspace.items[mp].is_missing = True
+
+        # Mark workspace dirty and rebuild tree
+        self.workspace.mark_modified()
+        self.mark_modified()
+        self.refresh_image_list()
+
+        n_new = len(newly_added)
+        n_miss = len(missing_paths)
+        parts = []
+        if n_new:
+            parts.append(f"{n_new} new image{'s' if n_new != 1 else ''} added")
+        if n_miss:
+            action = "removed" if handle_missing == "remove" else "flagged as missing"
+            parts.append(f"{n_miss} file{'s' if n_miss != 1 else ''} {action}")
+        summary = ", ".join(parts) if parts else "No changes"
+        self.SetStatusText(summary, 0)
+
+        # Offer to describe newly added images
+        if newly_added:
+            msg = (
+                f"{n_new} new image{'s were' if n_new != 1 else ' was'} added to the workspace.\n\n"
+                "Would you like to describe them now?"
+            )
+            dlg = wx.MessageDialog(
+                self, msg, "New Images Added",
+                wx.YES_NO | wx.ICON_QUESTION | wx.NO_DEFAULT
+            )
+            if dlg.ShowModal() == wx.ID_YES:
+                # Mark only the new items for batch processing
+                for fp in newly_added:
+                    if fp in self.workspace.items:
+                        self.workspace.items[fp].batch_marked = True
+                self._run_batch_for_paths(None, newly_added, "new images")
+            dlg.Destroy()
+
+    def on_rescan_complete(self, event):
+        """Handle RescanCompleteEvent posted directly to the main frame (not dialog)."""
+        # This is a safety handler; the RescanFolderDialog handles the event itself.
+        # If the event somehow reaches the frame (e.g. dialog was destroyed), ignore it.
+        pass
+
+    def on_rescan_failed(self, event):
+        """Handle RescanFailedEvent posted directly to the main frame."""
+        logger.error(f"Folder rescan failed: {event.error}")
+
     # Phase 3: Batch control handlers
     def on_pause_batch(self):
         """Pause batch processing"""
@@ -5775,7 +6024,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # Open chat window with selected settings (no image required)
                 chat_window = ChatWindow(
                     parent=self,
-                    workspace=self.workspace,
+                                    workspace=self.workspace,
                     image_item=None,  # Chat doesn't require an image
                     provider=selections['provider'],
                     model=selections['model']

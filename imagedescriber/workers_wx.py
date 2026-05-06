@@ -109,6 +109,10 @@ ScanFailedEvent, EVT_SCAN_FAILED = wx.lib.newevent.NewEvent()
 WorkspaceSaveCompleteEvent, EVT_WORKSPACE_SAVE_COMPLETE = wx.lib.newevent.NewEvent()
 WorkspaceSaveFailedEvent, EVT_WORKSPACE_SAVE_FAILED = wx.lib.newevent.NewEvent()
 
+# Folder rescan event types (for Refresh Folder from Disk feature)
+RescanCompleteEvent, EVT_RESCAN_COMPLETE = wx.lib.newevent.NewEvent()
+RescanFailedEvent, EVT_RESCAN_FAILED = wx.lib.newevent.NewEvent()
+
 
 # Custom event classes that properly store attributes
 class ProcessingCompleteEventData(ProcessingCompleteEvent):
@@ -2441,4 +2445,89 @@ class VideoDescriptionWorker(threading.Thread):
                 video_path=self.video_path,
                 error=str(e)
             )
+            wx.PostEvent(self.parent_window, evt)
+
+
+# ---------------------------------------------------------------------------
+# Folder rescan event data classes and worker thread
+# ---------------------------------------------------------------------------
+
+class RescanCompleteEventData(RescanCompleteEvent):
+    """Event data posted by FolderRescanWorker on completion."""
+    def __init__(self, new_files, missing_paths, unchanged_count):
+        RescanCompleteEvent.__init__(self)
+        self.new_files: list = new_files           # List[Path] of newly discovered files
+        self.missing_paths: list = missing_paths   # List[str] of paths no longer on disk
+        self.unchanged_count: int = unchanged_count
+
+
+class RescanFailedEventData(RescanFailedEvent):
+    """Event data posted by FolderRescanWorker on error."""
+    def __init__(self, error):
+        RescanFailedEvent.__init__(self)
+        self.error = error
+
+
+class FolderRescanWorker(threading.Thread):
+    """Background thread that compares a folder's current contents against the
+    workspace's known items and reports additions / removals.
+
+    Posts:
+        RescanCompleteEvent  — scan succeeded; carries new_files, missing_paths, unchanged_count
+        RescanFailedEvent    — scan raised an exception
+    """
+
+    IMAGE_EXTENSIONS = DirectoryScanWorker.IMAGE_EXTENSIONS
+    VIDEO_EXTENSIONS = DirectoryScanWorker.VIDEO_EXTENSIONS
+
+    def __init__(self, parent_window, folder_path: str, existing_items: dict, recursive: bool = True):
+        """
+        Args:
+            parent_window: wx.Window that will receive the posted event.
+            folder_path: Absolute path of the folder to rescan.
+            existing_items: Dict[str, ImageItem] from the current workspace.
+            recursive: Whether to scan sub-folders (always True in v1).
+        """
+        super().__init__(daemon=True)
+        self.parent_window = parent_window
+        self.folder_path = str(folder_path)
+        self.existing_items = existing_items
+        self.recursive = recursive
+
+    def run(self):
+        try:
+            folder = Path(self.folder_path)
+            pattern = '**/*' if self.recursive else '*'
+
+            # Discover files currently on disk
+            found_paths: set = set()
+            for p in folder.glob(pattern):
+                if p.is_dir():
+                    continue
+                if (p.suffix.lower() in self.IMAGE_EXTENSIONS
+                        or p.suffix.lower() in self.VIDEO_EXTENSIONS):
+                    found_paths.add(str(p))
+
+            # Build set of workspace items that live under this folder
+            # (excluding extracted frames — they are derived, not source files)
+            workspace_paths: set = {
+                path for path, item in self.existing_items.items()
+                if (path.startswith(self.folder_path)
+                    and item.item_type != "extracted_frame")
+            }
+
+            new_path_strs = found_paths - workspace_paths
+            missing_path_strs = workspace_paths - found_paths
+            unchanged = len(workspace_paths) - len(missing_path_strs)
+
+            evt = RescanCompleteEventData(
+                new_files=[Path(p) for p in sorted(new_path_strs)],
+                missing_paths=sorted(missing_path_strs),
+                unchanged_count=unchanged,
+            )
+            wx.PostEvent(self.parent_window, evt)
+
+        except Exception as exc:
+            logger.error(f"FolderRescanWorker error: {exc}", exc_info=True)
+            evt = RescanFailedEventData(error=str(exc))
             wx.PostEvent(self.parent_window, evt)

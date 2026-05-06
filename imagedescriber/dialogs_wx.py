@@ -1516,3 +1516,219 @@ class ExportHtmlGalleryDialog(wx.Dialog):
             'open_in_browser':       self._open_browser_cb.GetValue(),
             'description_selection': desc_sel,
         }
+
+
+# ---------------------------------------------------------------------------
+# Refresh Folder from Disk dialog
+# ---------------------------------------------------------------------------
+
+# Lazy import of workers to avoid circular deps (dialogs <-> workers).
+# FolderRescanWorker and EVT_RESCAN_COMPLETE are imported at first use.
+_rescan_imports_done = False
+FolderRescanWorker = None
+EVT_RESCAN_COMPLETE = None
+EVT_RESCAN_FAILED = None
+
+
+def _ensure_rescan_imports():
+    global _rescan_imports_done, FolderRescanWorker, EVT_RESCAN_COMPLETE, EVT_RESCAN_FAILED
+    if _rescan_imports_done:
+        return
+    _rescan_imports_done = True
+    try:
+        from .workers_wx import FolderRescanWorker as _FRW, EVT_RESCAN_COMPLETE as _ERC, EVT_RESCAN_FAILED as _ERF
+        FolderRescanWorker = _FRW
+        EVT_RESCAN_COMPLETE = _ERC
+        EVT_RESCAN_FAILED = _ERF
+    except ImportError:
+        try:
+            from workers_wx import FolderRescanWorker as _FRW, EVT_RESCAN_COMPLETE as _ERC, EVT_RESCAN_FAILED as _ERF
+            FolderRescanWorker = _FRW
+            EVT_RESCAN_COMPLETE = _ERC
+            EVT_RESCAN_FAILED = _ERF
+        except ImportError:
+            logger.error("Could not import FolderRescanWorker")
+
+
+class RescanFolderDialog(wx.Dialog):
+    """Dialog for rescanning a folder to detect new/missing images.
+
+    Shows a summary of changes found (new files, missing files, unchanged)
+    and lets the user choose what to do about missing files before applying.
+
+    Attributes after ShowModal() == wx.ID_OK:
+        new_files:      List[Path]  — files on disk but not yet in workspace
+        missing_paths:  List[str]   — paths in workspace but no longer on disk
+        handle_missing: str         — 'keep' or 'remove'
+    """
+
+    def __init__(self, parent, folder_path: str, existing_items: dict):
+        super().__init__(
+            parent,
+            title="Refresh Folder from Disk",
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
+        )
+        _ensure_rescan_imports()
+
+        self.folder_path = folder_path
+        self.existing_items = existing_items
+
+        # Results populated by the worker
+        self.new_files: list = []
+        self.missing_paths: list = []
+        self.handle_missing: str = "keep"
+
+        self._build_ui()
+        self.SetSize((520, 360))
+        self.Centre()
+
+        # Start the scan immediately
+        self._start_scan()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _build_ui(self):
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Folder path display
+        folder_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        folder_sizer.Add(
+            wx.StaticText(self, label="Folder:"),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4
+        )
+        path_label = wx.StaticText(self, label=self.folder_path)
+        path_label.Wrap(460)
+        folder_sizer.Add(path_label, 1, wx.ALIGN_CENTER_VERTICAL)
+        sizer.Add(folder_sizer, 0, wx.ALL, 10)
+
+        # Status / results text
+        self._status_label = wx.StaticText(self, label="Scanning…")
+        sizer.Add(self._status_label, 0, wx.LEFT | wx.RIGHT, 10)
+
+        # Indeterminate gauge shown while scanning
+        self._gauge = wx.Gauge(self, range=100, style=wx.GA_HORIZONTAL | wx.GA_SMOOTH,
+                               name="Scan progress")
+        sizer.Add(self._gauge, 0, wx.EXPAND | wx.ALL, 10)
+
+        # ---- Options (hidden until scan completes) ----
+        self._options_panel = wx.Panel(self)
+        opt_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        missing_box = wx.StaticBox(self._options_panel, label="Missing files")
+        missing_sizer = wx.StaticBoxSizer(missing_box, wx.VERTICAL)
+
+        self._keep_rb = wx.RadioButton(
+            self._options_panel,
+            label="Keep in workspace with [!] indicator (recommended)",
+            style=wx.RB_GROUP,
+            name="Keep missing files"
+        )
+        self._remove_rb = wx.RadioButton(
+            self._options_panel,
+            label="Remove from workspace",
+            name="Remove missing files"
+        )
+        self._keep_rb.SetValue(True)
+        missing_sizer.Add(self._keep_rb, 0, wx.ALL, 4)
+        missing_sizer.Add(self._remove_rb, 0, wx.ALL, 4)
+        opt_sizer.Add(missing_sizer, 0, wx.EXPAND | wx.ALL, 4)
+        self._options_panel.SetSizer(opt_sizer)
+        self._options_panel.Show(False)
+        sizer.Add(self._options_panel, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
+
+        # Spacer
+        sizer.Add((0, 0), 1)
+
+        # Button row
+        btn_sizer = wx.StdDialogButtonSizer()
+        self._apply_btn = wx.Button(self, wx.ID_OK, label="Apply")
+        self._apply_btn.Enable(False)
+        cancel_btn = wx.Button(self, wx.ID_CANCEL)
+        btn_sizer.AddButton(self._apply_btn)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 10)
+
+        self.SetSizer(sizer)
+
+        # Wire up Apply button
+        self._apply_btn.Bind(wx.EVT_BUTTON, self._on_apply)
+        # Bind rescan events (the worker posts to parent_window = self)
+        if EVT_RESCAN_COMPLETE:
+            self.Bind(EVT_RESCAN_COMPLETE, self._on_rescan_complete)
+        if EVT_RESCAN_FAILED:
+            self.Bind(EVT_RESCAN_FAILED, self._on_rescan_failed)
+
+    # ------------------------------------------------------------------
+    # Scanning
+    # ------------------------------------------------------------------
+
+    def _start_scan(self):
+        if FolderRescanWorker is None:
+            self._status_label.SetLabel("Error: rescan worker unavailable.")
+            return
+        self._gauge_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._on_timer, self._gauge_timer)
+        self._gauge_timer.Start(80)  # Pulse every 80 ms
+        worker = FolderRescanWorker(
+            parent_window=self,
+            folder_path=self.folder_path,
+            existing_items=self.existing_items,
+            recursive=True,
+        )
+        worker.start()
+
+    def _on_timer(self, event):
+        self._gauge.Pulse()
+
+    def _on_rescan_complete(self, event):
+        self._gauge_timer.Stop()
+        self._gauge.Show(False)
+
+        self.new_files = event.new_files
+        self.missing_paths = event.missing_paths
+        unchanged = event.unchanged_count
+
+        n_new = len(self.new_files)
+        n_miss = len(self.missing_paths)
+
+        parts = []
+        if n_new:
+            noun = "image" if n_new == 1 else "images"
+            parts.append(f"{n_new} new {noun}")
+        if n_miss:
+            noun = "file" if n_miss == 1 else "files"
+            parts.append(f"{n_miss} missing {noun}")
+        if unchanged:
+            noun = "file" if unchanged == 1 else "files"
+            parts.append(f"{unchanged} unchanged {noun}")
+        if not parts:
+            parts.append("No changes found")
+
+        self._status_label.SetLabel(", ".join(parts) + ".")
+
+        # Show options if there are missing files
+        if n_miss > 0:
+            self._options_panel.Show(True)
+            self.Layout()
+
+        # Always enable Apply so user can click OK even when there's nothing to do
+        self._apply_btn.Enable(True)
+        self._apply_btn.SetFocus()
+        self.Fit()
+
+    def _on_rescan_failed(self, event):
+        self._gauge_timer.Stop()
+        self._gauge.Show(False)
+        self._status_label.SetLabel(f"Scan error: {event.error}")
+        self.Layout()
+
+    # ------------------------------------------------------------------
+    # Apply
+    # ------------------------------------------------------------------
+
+    def _on_apply(self, event):
+        self.handle_missing = "remove" if self._remove_rb.GetValue() else "keep"
+        self.EndModal(wx.ID_OK)
