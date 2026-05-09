@@ -6123,11 +6123,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 selections = chat_dialog.get_selections()
                 chat_dialog.Destroy()
 
-                # Prompt to save unsaved changes before opening chat (mirrors batch save pattern)
+                # Ensure a workspace exists before opening chat
                 if self.workspace is None:
-                    show_error(self, "No workspace is open. Load a folder first.")
-                    return
-                if self.is_modified():
+                    dlg = wx.MessageDialog(
+                        self,
+                        "A workspace is required to use chat.\n\nWould you like to save a workspace now?",
+                        "Save Workspace",
+                        wx.YES_NO | wx.ICON_QUESTION
+                    )
+                    result = dlg.ShowModal()
+                    dlg.Destroy()
+                    if result == wx.ID_YES:
+                        self.on_save_workspace_as(None)
+                    # If workspace still not created (user cancelled), abort
+                    if self.workspace is None:
+                        return
+
+                # Prompt to save unsaved changes before opening chat
+                if self.modified:
                     dlg = wx.MessageDialog(
                         self,
                         "Save workspace changes before starting chat?",
@@ -6139,7 +6152,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if result == wx.ID_CANCEL:
                         return
                     if result == wx.ID_YES:
-                        self.save_workspace()
+                        self.on_save_workspace(None)
 
                 # Create a new chat ImageItem in the workspace
                 from datetime import datetime as _dt
@@ -6170,7 +6183,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 chat_window.Destroy()
 
                 # Save workspace after chat closes and refresh tree
-                self.save_workspace()
+                if self.workspace_file:
+                    self.save_workspace(self.workspace_file)
                 self.refresh_image_list()
             else:
                 chat_dialog.Destroy()
