@@ -387,12 +387,26 @@ class ChatWindow(wx.Dialog):
         history_label = wx.StaticText(panel, label="Conversation History:")
         main_sizer.Add(history_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         
-        self.history_list = wx.ListBox(panel, 
-                                       style=wx.LB_SINGLE | wx.LB_NEEDED_SB | wx.LB_HSCROLL,
+        self.history_list = wx.ListBox(panel,
+                                       style=wx.LB_SINGLE | wx.LB_NEEDED_SB,
                                        name="Conversation history")
-        self.history_list.SetMinSize((-1, 300))
+        self.history_list.SetMinSize((-1, 180))
         main_sizer.Add(self.history_list, 1, wx.EXPAND | wx.ALL, 10)
-        
+
+        # Message detail — shows full text of the selected history item.
+        # Editable so the user can select/copy text and navigate with cursor keys.
+        # Changes are intentionally not saved back to the session.
+        detail_label = wx.StaticText(panel, label="Selected message:")
+        main_sizer.Add(detail_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+
+        self.message_detail = wx.TextCtrl(
+            panel,
+            style=wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_RICH2,
+            name="Selected message"
+        )
+        self.message_detail.SetMinSize((-1, 130))
+        main_sizer.Add(self.message_detail, 0, wx.EXPAND | wx.ALL, 10)
+
         # Status/typing indicator
         self.status_text = wx.StaticText(panel, label="")
         main_sizer.Add(self.status_text, 0, wx.LEFT | wx.RIGHT, 10)
@@ -563,7 +577,37 @@ class ChatWindow(wx.Dialog):
         # Scroll to bottom (most recent message)
         if self.history_list.GetCount() > 0:
             self.history_list.SetSelection(self.history_list.GetCount() - 1)
-            
+            self._update_message_detail()
+
+    def on_history_selected(self, event):
+        """Update message detail when the user clicks or arrows to a history item."""
+        self._update_message_detail()
+
+    def _update_message_detail(self):
+        """Populate message_detail with the full text of the currently selected
+        history item.
+
+        Source priority:
+          1. chat_item.descriptions[idx].text  (new flow - full untruncated text)
+          2. session['messages'][idx]['content'] (legacy flow)
+
+        Changes the user makes in message_detail are intentionally not persisted.
+        """
+        idx = self.history_list.GetSelection()
+        if idx == wx.NOT_FOUND:
+            return
+        try:
+            if self.chat_item is not None:
+                descs = self.chat_item.descriptions
+                if 0 <= idx < len(descs):
+                    self.message_detail.SetValue(descs[idx].text)
+            else:
+                msgs = self.session.get('messages', [])
+                if 0 <= idx < len(msgs):
+                    self.message_detail.SetValue(msgs[idx].get('content', ''))
+        except Exception:
+            pass  # Best-effort; guard against race conditions
+
     def _bind_events(self):
         """Bind event handlers"""
         self.send_btn.Bind(wx.EVT_BUTTON, self.on_send_message)
@@ -572,6 +616,8 @@ class ChatWindow(wx.Dialog):
         self.input_text.Bind(wx.EVT_TEXT_ENTER, self.on_send_message)
         self.attach_btn.Bind(wx.EVT_BUTTON, self.on_attach_files)
         self.remove_attach_btn.Bind(wx.EVT_BUTTON, self.on_remove_attachment)
+        # History list selection drives the message detail area
+        self.history_list.Bind(wx.EVT_LISTBOX, self.on_history_selected)
         # Intercept Ctrl/Cmd+V at window level for clipboard image paste
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_down)
         
@@ -634,7 +680,8 @@ class ChatWindow(wx.Dialog):
         
         # Scroll to show new message
         self.history_list.SetSelection(self.history_list.GetCount() - 1)
-        
+        self._update_message_detail()
+
         # Clear input
         self.input_text.Clear()
         
@@ -886,7 +933,8 @@ class ChatWindow(wx.Dialog):
         
         # Select the new message (screen readers will announce it)
         self.history_list.SetSelection(self.history_list.GetCount() - 1)
-        
+        self._update_message_detail()
+
         # Force screen reader announcement by setting focus briefly then returning it
         wx.CallAfter(self._announce_new_message, display_text)
         
