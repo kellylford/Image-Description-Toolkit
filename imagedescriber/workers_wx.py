@@ -919,9 +919,26 @@ class ChatProcessingWorker(threading.Thread):
         self.image_path = image_path
         self.provider = provider.lower()
         self.model = model
-        self.messages = messages
         self.api_key = api_key
         self._full_response = ""
+
+        # Deep-copy messages so we never mutate the caller's session data.
+        # Backward compat: if image_path was provided and the first user message
+        # has no explicit 'attachments', inject image_path as a single attachment
+        # so per-message attachment encoding handles it uniformly.
+        import copy
+        self.messages = copy.deepcopy(messages)
+        if image_path:
+            first_user = next((m for m in self.messages if m['role'] == 'user'), None)
+            if first_user is not None and not first_user.get('attachments'):
+                ext = Path(image_path).suffix.lower()
+                _media_map = {
+                    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                    '.png': 'image/png', '.gif': 'image/gif',
+                    '.webp': 'image/webp', '.bmp': 'image/bmp',
+                }
+                media_type = _media_map.get(ext, 'image/jpeg')
+                first_user['attachments'] = [{'path': image_path, 'media_type': media_type}]
     
     def run(self):
         """Execute chat processing in background thread"""
@@ -942,26 +959,91 @@ class ChatProcessingWorker(threading.Thread):
             evt = ChatErrorEvent(error=str(e))
             wx.PostEvent(self.parent_window, evt)
     
+    def _get_first_image_path(self) -> Optional[str]:
+        """Return the path of the first image attachment found in any message, or None."""
+        for msg in self.messages:
+            for att in msg.get('attachments', []):
+                if att['media_type'].startswith('image/'):
+                    return att['path']
+        return None
+
+    def _encode_image_ollama(self, path: str) -> str:
+        """Base64-encode an image file for Ollama's 'images' list."""
+        import base64
+        with open(path, 'rb') as f:
+            return base64.b64encode(f.read()).decode('utf-8')
+
+    def _encode_image_openai(self, path: str) -> dict:
+        """Encode an image for the OpenAI chat completions API.
+
+        Resizes to at most 1600px on the longest dimension (mirrors
+        ai_providers.py batch logic) then returns a base64 JPEG data-URL dict.
+        Falls back to raw base64 if PIL is unavailable.
+        """
+        try:
+            from PIL import Image
+            import io, base64
+            img = Image.open(path)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            max_dim = 1600
+            if max(img.size) > max_dim:
+                ratio = max_dim / max(img.size)
+                new_size = (int(img.width * ratio), int(img.height * ratio))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format='JPEG', quality=85)
+            b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        except Exception:
+            import base64
+            with open(path, 'rb') as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+        return {
+            'type': 'image_url',
+            'image_url': {'url': f'data:image/jpeg;base64,{b64}'}
+        }
+
+    def _encode_attachment_claude(self, att: dict) -> dict:
+        """Encode an image or PDF attachment for the Anthropic messages API.
+
+        Images → 'image' content block with base64 source.
+        PDFs   → 'document' content block with base64 source.
+        """
+        import base64
+        path = att['path']
+        media_type = att['media_type']
+        with open(path, 'rb') as f:
+            data = base64.b64encode(f.read()).decode('utf-8')
+        if media_type == 'application/pdf':
+            return {
+                'type': 'document',
+                'source': {'type': 'base64', 'media_type': 'application/pdf', 'data': data}
+            }
+        return {
+            'type': 'image',
+            'source': {'type': 'base64', 'media_type': media_type, 'data': data}
+        }
+
     def _chat_with_ollama(self):
         """Handle Ollama chat with conversation history"""
         try:
             import ollama
-            
-            # Format messages for Ollama
-            # If image_path provided: First message includes image, subsequent messages are text only
-            # If no image_path: All messages are text only
+
+            # Format messages for Ollama.
+            # Any message that has image attachments gets an 'images' list
+            # (Ollama accepts base64-encoded image strings).
             ollama_messages = []
-            
-            for i, msg in enumerate(self.messages):
-                if i == 0 and msg['role'] == 'user' and self.image_path:
-                    # First user message with image - include image
+
+            for msg in self.messages:
+                image_atts = [a for a in msg.get('attachments', [])
+                              if a['media_type'].startswith('image/')]
+                if image_atts:
                     ollama_messages.append({
-                        'role': 'user',
+                        'role': msg['role'],
                         'content': msg['content'],
-                        'images': [self.image_path]
+                        'images': [self._encode_image_ollama(a['path']) for a in image_atts]
                     })
                 else:
-                    # Subsequent messages or text-only mode - text only
                     ollama_messages.append({
                         'role': msg['role'],
                         'content': msg['content']
@@ -1020,33 +1102,20 @@ class ChatProcessingWorker(threading.Thread):
             else:
                 client = openai.OpenAI()  # Uses OPENAI_API_KEY env var
             
-            # Format messages for OpenAI
+            # Format messages for OpenAI.
+            # Any message with image attachments gets a content array with image_url blocks.
             openai_messages = []
-            
-            for i, msg in enumerate(self.messages):
-                if i == 0 and msg['role'] == 'user' and self.image_path:
-                    # First user message with image - include image as base64
-                    with open(self.image_path, 'rb') as f:
-                        image_data = base64.b64encode(f.read()).decode('utf-8')
-                    
-                    openai_messages.append({
-                        'role': 'user',
-                        'content': [
-                            {'type': 'text', 'text': msg['content']},
-                            {
-                                'type': 'image_url',
-                                'image_url': {
-                                    'url': f'data:image/jpeg;base64,{image_data}'
-                                }
-                            }
-                        ]
-                    })
+
+            for msg in self.messages:
+                image_atts = [a for a in msg.get('attachments', [])
+                              if a['media_type'].startswith('image/')]
+                if image_atts:
+                    content = [{'type': 'text', 'text': msg['content']}]
+                    for att in image_atts:
+                        content.append(self._encode_image_openai(att['path']))
+                    openai_messages.append({'role': msg['role'], 'content': content})
                 else:
-                    # Subsequent messages or text-only mode - text only
-                    openai_messages.append({
-                        'role': msg['role'],
-                        'content': msg['content']
-                    })
+                    openai_messages.append({'role': msg['role'], 'content': msg['content']})
             
             # Stream response from OpenAI
             response_stream = client.chat.completions.create(
@@ -1142,46 +1211,20 @@ class ChatProcessingWorker(threading.Thread):
             else:
                 client = anthropic.Anthropic()  # Uses ANTHROPIC_API_KEY env var
             
-            # Format messages for Claude
+            # Format messages for Claude.
+            # Any message with attachments gets a content array (images, PDFs, then text).
             claude_messages = []
-            
-            for i, msg in enumerate(self.messages):
-                if i == 0 and msg['role'] == 'user' and self.image_path:
-                    # First user message with image - include image as base64
-                    with open(self.image_path, 'rb') as f:
-                        image_data = base64.b64encode(f.read()).decode('utf-8')
-                    
-                    # Determine media type
-                    ext = Path(self.image_path).suffix.lower()
-                    media_types = {
-                        '.jpg': 'image/jpeg',
-                        '.jpeg': 'image/jpeg',
-                        '.png': 'image/png',
-                        '.gif': 'image/gif',
-                        '.webp': 'image/webp'
-                    }
-                    media_type = media_types.get(ext, 'image/jpeg')
-                    
-                    claude_messages.append({
-                        'role': 'user',
-                        'content': [
-                            {
-                                'type': 'image',
-                                'source': {
-                                    'type': 'base64',
-                                    'media_type': media_type,
-                                    'data': image_data
-                                }
-                            },
-                            {'type': 'text', 'text': msg['content']}
-                        ]
-                    })
+
+            for msg in self.messages:
+                attachments = msg.get('attachments', [])
+                if attachments:
+                    content = []
+                    for att in attachments:
+                        content.append(self._encode_attachment_claude(att))
+                    content.append({'type': 'text', 'text': msg['content']})
+                    claude_messages.append({'role': msg['role'], 'content': content})
                 else:
-                    # Subsequent messages or text-only mode - text only
-                    claude_messages.append({
-                        'role': msg['role'],
-                        'content': msg['content']
-                    })
+                    claude_messages.append({'role': msg['role'], 'content': msg['content']})
             
             # Stream response from Claude
             with client.messages.stream(
@@ -1256,10 +1299,25 @@ class ChatProcessingWorker(threading.Thread):
             processor = _mlx_provider._processor
             config = _mlx_provider._mlx_config
 
-            # Prepare a temp JPEG for the image (first turn only)
+            # Prepare a temp JPEG from the first image attachment (any message).
+            # MLX only supports a single image in the context; additional images
+            # are silently ignored and the user is notified in the response text.
             temp_jpeg = None
-            if self.image_path:
-                temp_jpeg = _mlx_provider._to_jpeg_tempfile(self.image_path)
+            _first_image_path = self._get_first_image_path()
+            if _first_image_path:
+                temp_jpeg = _mlx_provider._to_jpeg_tempfile(_first_image_path)
+
+            # Count total image attachments so we can warn if > 1
+            _total_images = sum(
+                1 for m in self.messages
+                for a in m.get('attachments', [])
+                if a['media_type'].startswith('image/')
+            )
+            _mlx_image_warning = (
+                "[Note: MLX only supports 1 image per conversation. "
+                "Only the first image was used.]\n\n"
+                if _total_images > 1 else ""
+            )
 
             try:
                 # Build a HuggingFace-style messages list for apply_chat_template.
@@ -1321,6 +1379,8 @@ class ChatProcessingWorker(threading.Thread):
 
                 text = getattr(output, 'text', None) or str(output)
                 response = text.strip() if text else "MLX returned an empty response."
+                if _mlx_image_warning:
+                    response = _mlx_image_warning + response
 
                 # Emit the full response as a single update (no streaming)
                 evt = ChatUpdateEvent(message_chunk=response)

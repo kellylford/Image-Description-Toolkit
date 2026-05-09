@@ -49,6 +49,20 @@ from workers_wx import (
 )
 from data_models import ImageItem, ImageWorkspace
 
+# Import provider attachment capabilities (models/ added to sys.path for frozen compat)
+try:
+    if getattr(sys, 'frozen', False):
+        _models_path = Path(sys.executable).parent / 'models'
+    else:
+        _models_path = Path(__file__).parent.parent / 'models'
+    if str(_models_path) not in sys.path:
+        sys.path.insert(0, str(_models_path))
+    from provider_configs import get_supported_attachments, supports_attachments, get_attachment_wildcard
+except ImportError:
+    def get_supported_attachments(p): return []
+    def supports_attachments(p): return False
+    def get_attachment_wildcard(p): return "All files (*.*)|*.*"
+
 
 class ChatDialog(wx.Dialog):
     """Simple dialog to select AI provider and model for chat session
@@ -273,6 +287,7 @@ class ChatWindow(wx.Dialog):
         self.session_id = session_id or self._create_session_id()
         self.current_response_chunks = []  # Buffer for streaming response
         self.is_processing = False
+        self.pending_attachments: List[Dict[str, str]] = []  # [{path, media_type}, ...]
         
         # Load or create session
         if self.session_id in workspace.chat_sessions:
@@ -345,6 +360,26 @@ class ChatWindow(wx.Dialog):
                                       size=(-1, 100))
         main_sizer.Add(self.input_text, 0, wx.EXPAND | wx.ALL, 10)
         
+        # Pending attachments panel — hidden until files are queued
+        self.attach_panel = wx.Panel(panel)
+        attach_panel_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        attach_label = wx.StaticText(self.attach_panel, label="Attachments:")
+        attach_panel_sizer.Add(attach_label, 0, wx.LEFT | wx.TOP, 5)
+
+        self.attach_list = wx.ListBox(self.attach_panel,
+                                      style=wx.LB_SINGLE | wx.LB_NEEDED_SB,
+                                      name="Pending attachments",
+                                      size=(-1, 60))
+        attach_panel_sizer.Add(self.attach_list, 0, wx.EXPAND | wx.ALL, 5)
+
+        self.remove_attach_btn = wx.Button(self.attach_panel, label="Remove Selected")
+        attach_panel_sizer.Add(self.remove_attach_btn, 0, wx.LEFT | wx.BOTTOM, 5)
+
+        self.attach_panel.SetSizer(attach_panel_sizer)
+        self.attach_panel.Show(False)
+        main_sizer.Add(self.attach_panel, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
@@ -354,6 +389,9 @@ class ChatWindow(wx.Dialog):
         
         self.clear_btn = wx.Button(panel, label="Clear Input")
         button_sizer.Add(self.clear_btn, 0, wx.ALL, 5)
+
+        self.attach_btn = wx.Button(panel, label="Attach Files...")
+        button_sizer.Add(self.attach_btn, 0, wx.ALL, 5)
         
         button_sizer.AddStretchSpacer()
         
@@ -366,6 +404,9 @@ class ChatWindow(wx.Dialog):
         
         # Set initial focus to input
         wx.CallAfter(self.input_text.SetFocus)
+        
+        # Set initial attach button state based on provider
+        self._update_attach_button_state()
         
     def _create_header(self, parent) -> wx.BoxSizer:
         """Create header with image thumbnail and session info"""
@@ -445,6 +486,10 @@ class ChatWindow(wx.Dialog):
             # Format message for ListBox display
             # Each message is a single list item for screen reader friendliness
             display_text = f"{role} ({time_str}): {msg['content']}"
+            attachments = msg.get('attachments', [])
+            if attachments:
+                filenames = ', '.join(Path(a['path']).name for a in attachments)
+                display_text += f"\n[Attachments: {filenames}]"
             self.history_list.Append(display_text)
         
         # Scroll to bottom (most recent message)
@@ -457,6 +502,8 @@ class ChatWindow(wx.Dialog):
         self.clear_btn.Bind(wx.EVT_BUTTON, self.on_clear_input)
         self.close_btn.Bind(wx.EVT_BUTTON, self.on_close)
         self.input_text.Bind(wx.EVT_TEXT_ENTER, self.on_send_message)
+        self.attach_btn.Bind(wx.EVT_BUTTON, self.on_attach_files)
+        self.remove_attach_btn.Bind(wx.EVT_BUTTON, self.on_remove_attachment)
         
         # Bind chat worker events
         self.Bind(EVT_CHAT_UPDATE, self.on_chat_update)
@@ -473,19 +520,35 @@ class ChatWindow(wx.Dialog):
             show_warning(self, "Please wait for the AI response to complete.")
             return
         
-        # Add user message to session
+        # Validate any queued attachments still exist on disk
+        missing = [a for a in self.pending_attachments if not Path(a['path']).exists()]
+        if missing:
+            names = ', '.join(Path(a['path']).name for a in missing)
+            show_error(self, f"Attachment file(s) not found and cannot be sent:\n{names}")
+            return
+
+        # Add user message to session (with any pending attachments)
         timestamp = datetime.now().isoformat()
         user_msg = {
             'role': 'user',
             'content': message,
             'timestamp': timestamp
         }
+        if self.pending_attachments:
+            user_msg['attachments'] = list(self.pending_attachments)
         self.session['messages'].append(user_msg)
         
         # Display in history ListBox
         time_str = datetime.fromisoformat(timestamp).strftime("%I:%M %p")
         display_text = f"You ({time_str}): {message}"
+        if self.pending_attachments:
+            filenames = ', '.join(Path(a['path']).name for a in self.pending_attachments)
+            display_text += f"\n[Attachments: {filenames}]"
         self.history_list.Append(display_text)
+        
+        # Clear pending attachments now that they are part of the message
+        self.pending_attachments = []
+        self._refresh_attachment_panel()
         
         # Scroll to show new message
         self.history_list.SetSelection(self.history_list.GetCount() - 1)
@@ -807,6 +870,11 @@ class ChatWindow(wx.Dialog):
             provider_text = f"Provider: {self.provider} ({self.model})"
             self.provider_label.SetLabel(provider_text)
             
+            # Clear pending attachments — they may not be valid for the new provider
+            self.pending_attachments = []
+            self._refresh_attachment_panel()
+            self._update_attach_button_state()
+            
             # Add system message to history
             timestamp = datetime.now().isoformat()
             time_str = datetime.fromisoformat(timestamp).strftime("%I:%M %p")
@@ -816,9 +884,74 @@ class ChatWindow(wx.Dialog):
             self.workspace.save()
             
         chat_dialog.Destroy()
-        
+
+    # ------------------------------------------------------------------
+    # File attachment support
+    # ------------------------------------------------------------------
+
+    def _infer_media_type(self, path: str) -> str:
+        """Infer MIME type from file extension."""
+        ext = Path(path).suffix.lower()
+        _ext_to_mime = {
+            '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+            '.bmp': 'image/bmp',
+            '.tif': 'image/tiff', '.tiff': 'image/tiff',
+            '.pdf': 'application/pdf',
+        }
+        return _ext_to_mime.get(ext, 'application/octet-stream')
+
+    def _update_attach_button_state(self):
+        """Show/hide the attach button based on whether the current provider supports attachments."""
+        can_attach = supports_attachments(self.provider)
+        self.attach_btn.Show(can_attach)
+        # Ensure layout reflects visibility change
+        self.attach_btn.GetParent().Layout()
+
+    def on_attach_files(self, event):
+        """Open file picker and queue selected files as pending attachments."""
+        wildcard = get_attachment_wildcard(self.provider)
+        with wx.FileDialog(self, "Attach files",
+                           wildcard=wildcard,
+                           style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                for path in dlg.GetPaths():
+                    media_type = self._infer_media_type(path)
+                    # Guard: enforce per-provider file size limits before queuing
+                    try:
+                        size_bytes = Path(path).stat().st_size
+                        if self.provider == 'claude':
+                            if media_type == 'application/pdf' and size_bytes > 32 * 1024 * 1024:
+                                show_error(self, f"PDF exceeds Claude's 32 MB limit:\n{Path(path).name}")
+                                continue
+                            elif media_type.startswith('image/') and size_bytes > 5 * 1024 * 1024:
+                                show_error(self, f"Image exceeds Claude's 5 MB limit:\n{Path(path).name}")
+                                continue
+                    except Exception:
+                        pass  # Size check is best-effort; let the API report errors
+                    self.pending_attachments.append({'path': path, 'media_type': media_type})
+                self._refresh_attachment_panel()
+
+    def on_remove_attachment(self, event):
+        """Remove the selected attachment from the pending queue."""
+        idx = self.attach_list.GetSelection()
+        if idx != wx.NOT_FOUND and idx < len(self.pending_attachments):
+            self.pending_attachments.pop(idx)
+            self._refresh_attachment_panel()
+
+    def _refresh_attachment_panel(self):
+        """Repopulate the pending attachments ListBox and show/hide the panel."""
+        self.attach_list.Clear()
+        for att in self.pending_attachments:
+            label = f"{Path(att['path']).name}  ({att['media_type']})"
+            self.attach_list.Append(label)
+        show = bool(self.pending_attachments)
+        self.attach_panel.Show(show)
+        self.Layout()
+
     def on_close(self, event):
-        # Handle window close and save workspace
         try:
             self.workspace.save()
         except Exception as e:
