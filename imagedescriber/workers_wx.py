@@ -939,6 +939,10 @@ class ChatProcessingWorker(threading.Thread):
                 }
                 media_type = _media_map.get(ext, 'image/jpeg')
                 first_user['attachments'] = [{'path': image_path, 'media_type': media_type}]
+
+        # Apply token-budget truncation then image dedup before sending to any provider.
+        self.messages = self._truncate_to_token_budget(self.messages)
+        self.messages = self._dedup_image_attachments(self.messages)
     
     def run(self):
         """Execute chat processing in background thread"""
@@ -966,6 +970,145 @@ class ChatProcessingWorker(threading.Thread):
                 if att['media_type'].startswith('image/'):
                     return att['path']
         return None
+
+    # ------------------------------------------------------------------
+    # 1b: Token budget helpers
+    # ------------------------------------------------------------------
+
+    # Conservative context-window sizes (tokens) per provider.
+    # Ollama is model-dependent; 32 768 matches many common open-weight models.
+    _CONTEXT_WINDOWS: Dict[str, int] = {
+        'openai': 128_000,
+        'claude': 200_000,
+        'ollama':  32_768,
+        'mlx':     32_768,
+    }
+
+    def _get_context_window(self) -> int:
+        """Return the context window (tokens) for the current provider."""
+        return self._CONTEXT_WINDOWS.get(self.provider, 32_768)
+
+    @staticmethod
+    def _estimate_tokens(messages: list) -> int:
+        """Rough token estimate for a list of message dicts.
+
+        Heuristic: 1 token ≈ 4 text characters; each image attachment ≈ 1 000 tokens.
+        Intentionally over-estimates to stay safely under the limit.
+        """
+        total = 0
+        for msg in messages:
+            content = msg.get('content', '')
+            if isinstance(content, str):
+                total += max(1, len(content) // 4)
+            elif isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict):
+                        total += max(1, len(str(block.get('text', ''))) // 4)
+            for att in msg.get('attachments', []):
+                if att.get('media_type', '').startswith('image/'):
+                    total += 1_000  # Conservative per-image token cost
+        return total
+
+    def _truncate_to_token_budget(self, messages: list) -> list:
+        """Trim message history so the conversation fits within 80 % of the
+        model's context window.
+
+        Dropping order (oldest first):
+          Phase 1 – text-only turn pairs (user + assistant, no images)
+          Phase 2 – individual leading text-only messages
+          Phase 3 – image-bearing pairs
+          Phase 4 – last resort: single messages until only the most recent remains
+        The most recent message is never dropped.
+        """
+        limit = self._get_context_window()
+        target = int(limit * 0.80)
+
+        if self._estimate_tokens(messages) <= target:
+            return messages
+
+        def _has_image(msg: dict) -> bool:
+            return any(
+                a.get('media_type', '').startswith('image/')
+                for a in msg.get('attachments', [])
+            )
+
+        msgs = list(messages)
+
+        # Phase 1: drop oldest text-only pairs
+        while len(msgs) > 2 and self._estimate_tokens(msgs) > target:
+            if not _has_image(msgs[0]) and not _has_image(msgs[1]):
+                msgs = msgs[2:]
+            else:
+                break
+
+        # Phase 2: drop individual leading text-only messages
+        while len(msgs) > 1 and self._estimate_tokens(msgs) > target:
+            if not _has_image(msgs[0]):
+                msgs = msgs[1:]
+            else:
+                break
+
+        # Phase 3: drop oldest image-bearing pairs
+        while len(msgs) > 2 and self._estimate_tokens(msgs) > target:
+            msgs = msgs[2:]
+
+        # Phase 4: last resort — drop everything except the most recent message
+        while len(msgs) > 1 and self._estimate_tokens(msgs) > target:
+            msgs = msgs[1:]
+
+        dropped = len(messages) - len(msgs)
+        if dropped:
+            print(
+                f"[chat] Token budget: dropped {dropped} oldest message(s) "
+                f"({self._estimate_tokens(messages):,} → {self._estimate_tokens(msgs):,} "
+                f"est. tokens; limit {limit:,})"
+            )
+        return msgs
+
+    # ------------------------------------------------------------------
+    # 1c: Image de-duplication helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _dedup_image_attachments(messages: list) -> list:
+        """Remove duplicate image attachments across turns.
+
+        When the same image file path appears in more than one message, only
+        the FIRST occurrence retains the attachment.  Subsequent references to
+        the same path are silently dropped (text content is preserved).
+
+        This prevents re-encoding and re-transmitting large base64 image payloads
+        on every API call in long multi-turn sessions.
+        """
+        seen_paths: set = set()
+        result = []
+
+        for msg in messages:
+            attachments = msg.get('attachments', [])
+            if not attachments:
+                result.append(msg)
+                continue
+
+            new_attachments = []
+            for att in attachments:
+                path = att.get('path', '')
+                if path and path in seen_paths:
+                    continue   # duplicate — skip
+                if path:
+                    seen_paths.add(path)
+                new_attachments.append(att)
+
+            if len(new_attachments) == len(attachments):
+                result.append(msg)   # nothing changed
+            else:
+                modified = dict(msg)
+                if new_attachments:
+                    modified['attachments'] = new_attachments
+                else:
+                    modified.pop('attachments', None)
+                result.append(modified)
+
+        return result
 
     def _encode_image_ollama(self, path: str) -> str:
         """Base64-encode an image file for Ollama's 'images' list."""

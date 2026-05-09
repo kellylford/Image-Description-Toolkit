@@ -1314,6 +1314,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_list.Bind(_wx_dv.EVT_DATAVIEW_SELECTION_CHANGED, self.on_image_selected)
             # Context menu for folder nodes (macOS: EVT_DATAVIEW_ITEM_CONTEXT_MENU)
             self.image_list.Bind(_wx_dv.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.on_tree_context_menu)
+            # Double-click / Enter activation (macOS DataViewTreeCtrl)
+            self.image_list.Bind(_wx_dv.EVT_DATAVIEW_ITEM_ACTIVATED, self.on_item_activated)
         else:
             # Windows / other: native TreeCtrl with expand/collapse
             self.image_list = wx.TreeCtrl(
@@ -1326,6 +1328,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.image_list.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_image_selected)
             # Context menu for folder nodes (Windows: EVT_TREE_ITEM_RIGHT_CLICK)
             self.image_list.Bind(wx.EVT_TREE_ITEM_RIGHT_CLICK, self.on_tree_context_menu)
+            # Double-click / Enter activation (Windows TreeCtrl)
+            self.image_list.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_item_activated)
 
         self.image_list.Bind(wx.EVT_CHAR_HOOK, self.on_image_list_key)
         sizer.Add(self.image_list, 1, wx.EXPAND | wx.ALL, 5)
@@ -1780,6 +1784,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if keycode == wx.WXK_TAB and not event.ShiftDown():
             if self.desc_list:
                 self.desc_list.SetFocus()
+            return
+        # Enter / numpad-Enter: activate the selected item (e.g. resume a chat session)
+        if keycode in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
+            self.on_item_activated(event)
             return
         if keycode in (wx.WXK_UP, wx.WXK_DOWN):
             if sys.platform == 'darwin':
@@ -6192,6 +6200,59 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             import traceback
             error_msg = f"Error opening chat:\n{str(e)}\n\n{traceback.format_exc()}"
             show_error(self, error_msg)
+
+    def on_item_activated(self, event):
+        """Handle double-click or Enter key on a tree item.
+
+        For chat items: reopen the existing saved session (resume).
+        For all other item types: pass the event through unchanged.
+        """
+        if (self.current_image_item is not None
+                and self.current_image_item.item_type == ImageItem.ITEM_TYPE_CHAT):
+            self.on_resume_chat(self.current_image_item)
+        else:
+            event.Skip()
+
+    def on_resume_chat(self, chat_item: ImageItem):
+        """Reopen an existing saved chat session for continuation.
+
+        Rebuilds the full conversation history from the ImageDescription objects
+        stored on the chat item and opens ChatWindow so the user can continue
+        the dialogue.  The provider/model are inferred from the most recent turn
+        that has both fields set.
+        """
+        if ChatWindow is None or ChatDialog is None:
+            show_error(self, "Chat feature is not available.")
+            return
+
+        # Determine provider and model from the most recent description that has both
+        provider = 'ollama'
+        model = 'llava:latest'
+        for desc in reversed(chat_item.descriptions):
+            if desc.provider and desc.model:
+                provider = desc.provider
+                model = desc.model
+                break
+
+        try:
+            chat_window = ChatWindow(
+                parent=self,
+                workspace=self.workspace,
+                image_item=None,        # General chat item — no single image context
+                provider=provider,
+                model=model,
+                chat_item=chat_item     # Existing session: history rebuilt from descriptions
+            )
+            chat_window.ShowModal()
+            chat_window.Destroy()
+
+            # Persist any new turns added in this session
+            if self.workspace_file:
+                self.save_workspace(self.workspace_file)
+            self.refresh_image_list()
+        except Exception as e:
+            import traceback
+            show_error(self, f"Error resuming chat:\n{e}\n\n{traceback.format_exc()}")
 
     def on_followup_question(self, event):
         """Ask followup question (F key)"""
