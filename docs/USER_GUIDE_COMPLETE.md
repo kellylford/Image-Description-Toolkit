@@ -274,17 +274,83 @@ This approach is more efficient than crafting one giant prompt upfront. Start wi
 
 ## 8. AI Chat
 
-ImageDescriber includes a general-purpose AI chat interface. It does not require any images to be loaded.
+ImageDescriber has a full-featured AI chat interface. Chat sessions are first-class workspace items — they are saved with your workspace, appear in the image tree, can be renamed, and are included when you export descriptions. Chat works with or without images attached.
 
-**How to use it:**
+### Starting a Chat Session
+
 1. Press `C`, or choose `Processing → Chat`.
-2. Select your model.
-3. Type your question and receive a response.
-4. Press `Shift+Tab` to move to the chat history.
+2. If your workspace has not been saved yet, IDT will prompt you to save it first. Chat sessions are stored in the workspace file, so a saved workspace is required. You can save to a custom location or let IDT create an Untitled workspace automatically.
+3. Choose your AI provider and model, then press OK.
+4. The chat window opens. Type a message and press Enter (or click Send) to start the conversation.
 
-**Saving a chat session:** Press `Ctrl+A` to select all, then `Ctrl+C` to copy everything and paste it into another application. Full chat-to-workspace save is planned for a future release.
+Chat sessions do not require any images — you can have a free-form conversation with any AI model. If you want to discuss a specific image, attach it using the Attach Files button (see [Attaching Images](#attaching-images-to-chat) below).
 
-Chat is useful for testing a model's capabilities, asking general questions while working, or getting AI assistance without involving specific images.
+### The Chat Window
+
+- **Conversation history** — the upper list shows all messages in the session. Each turn shows who sent it ("You" or "AI"), the time, and for AI responses the number of tokens used (e.g. `[↙ 312 tok]`).
+- **Your message** — the text field at the bottom. Press Enter or click Send to submit.
+- **Change Model** — switch the provider or model mid-conversation. A note is added to the history when you switch.
+- **Attach Files** — attach one or more images to the next message (available when the selected provider supports image input).
+- **Close** — closes the window and saves the session. The session remains in your workspace.
+
+If the AI is still generating a response when you close the window, IDT will ask whether to wait or close and discard the in-progress reply.
+
+### Chat Sessions in the Workspace Tree
+
+Each chat session appears in the image tree under a **Chats** parent node, alongside your images and videos. Sessions use a default name based on the provider, model, and date:
+
+```
+Chat, Claude claude-opus-4-6 5/9/2026 2:30P
+Chat, OpenAI gpt-4o 5/9/2026 10:15A
+```
+
+To **resume a session**, double-click it in the tree (or press Enter with it selected). The chat window reopens with the full conversation history.
+
+To **rename a session**, select it and press `R` or `F2`. Choose a name that reflects the conversation topic.
+
+To **delete a session**, right-click it and choose Delete Session.
+
+### Attaching Images to Chat
+
+Click **Attach Files** to attach an image to your next message. The provider must support image input (OpenAI, Claude, and Ollama with a vision model all support this).
+
+**HEIC/HEIF files** are converted to JPEG automatically before attaching — the same conversion used for batch processing. You do not need to convert them first.
+
+**Clipboard paste:** Press `Ctrl+V` (or `Cmd+V` on macOS) when the chat window is open. If your clipboard contains an image (copied from another application, a screenshot, etc.), it is added as a pending attachment automatically. If the current provider does not support image attachments, a message explains why the paste was not attached.
+
+Attached files appear in a panel below the message field before you send. You can remove an attachment before sending by selecting it and clicking Remove Selected.
+
+### Token Usage
+
+The number of completion tokens for each AI response is shown in the conversation history (e.g. `[↙ 312 tok]`). When you select an AI response in the description panel, a full breakdown is shown:
+
+```
+Token usage: 1,847 prompt + 312 completion = 2,159 total
+```
+
+This helps you understand model usage patterns and estimate cost when using cloud providers. See [Section 26](#26-monitoring-costs-for-cloud-models) for cost reference tables.
+
+### Filtering to Show Only Chats
+
+Use **View → Filter: Chats Only** to show only chat sessions in the tree and hide all images and videos. This is useful when reviewing previous conversations or finding a session to rename. Switch back to **Filter: All Items** (`F5`) to see everything together.
+
+### Exporting Chat Sessions
+
+When you use **File → Export Descriptions**, chat sessions are included as conversation transcripts in the output:
+
+```
+Chat Session: Chat, Claude claude-opus-4-6 5/9/2026 2:30P
+Provider/Model: Claude / claude-opus-4-6
+Messages: 3 turns
+
+You: What is in this photo?
+
+AI: The photo shows a coastal town…
+   [Token usage: 312 completion, 1,847 prompt]
+...
+```
+
+Chat sessions are **not** included in HTML Gallery exports — galleries are image-only.
 
 ---
 
@@ -307,7 +373,7 @@ For more detail on web download behaviour and options, see `docs/WEB_DOWNLOAD_GU
 
 ## 10. Viewing and Managing Results
 
-**Filter bar (View menu):** Switch between viewing all images, described images only, undescribed images only, or videos only.
+**Filter bar (View menu):** Switch between viewing all items, described images only, undescribed images only, videos only, or **chats only**. Chat sessions are shown in the tree alongside images and videos; use Filter: Chats Only to focus on just your conversations.
 
 **Tree view:** Video files appear as parent items with their extracted frames as children. You can expand/collapse the tree to focus on specific videos.
 
@@ -321,7 +387,7 @@ For more detail on web download behaviour and options, see `docs/WEB_DOWNLOAD_GU
 
 The **Copy Image** button in the viewer panel provides the same single-image copy without opening the menu. For video items, the first extracted frame is used.
 
-**Saving your workspace:** Press `Ctrl+S` to save a `.idw` workspace file. This persists all descriptions and processing state. Reopen the file later and pick up exactly where you left off. Workspace files are valuable for large batch jobs — save frequently.
+**Saving your workspace:** Press `Ctrl+S` to save a `.idw` workspace file. This persists all descriptions, chat sessions, and processing state. Reopen the file later and pick up exactly where you left off — including resuming any chat conversation. Workspace files are valuable for large batch jobs and ongoing chat sessions — save frequently.
 
 ---
 
@@ -355,6 +421,10 @@ The Prompt Editor and Configuration Manager are built into ImageDescriber's Tool
 **CSV or spreadsheet export:** Use `idt combinedescriptions` in a directory that contains one or more `wf_*` subdirectories. This merges all workflow runs into a single spreadsheet — see [Section 16](#16-analysis-and-export-commands) for full details.
 
 ---
+
+### Exporting Descriptions (Text or HTML)
+
+Use `File → Export Descriptions…` to export all image descriptions and chat transcripts as a single text or HTML file. Chat sessions appear as clearly marked conversation transcripts, separate from image entries. Token usage is included per AI turn.
 
 ### Exporting an HTML Gallery
 
@@ -1306,7 +1376,7 @@ Multiple runs on the same folder produce independent `wf_*` directories. Nothing
 | `Ctrl+L` | Load a folder |
 | `Ctrl+U` | Load images from a URL |
 | `Ctrl+S` | Save workspace |
-| `Ctrl+V` | Paste image from clipboard |
+| `Ctrl+V` | Paste image from clipboard (in chat window: attaches clipboard image as a file; in main window: standard paste) |
 | `Ctrl+Shift+G` | Export HTML Gallery |
 
 ---

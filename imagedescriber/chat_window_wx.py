@@ -47,7 +47,7 @@ from workers_wx import (
     EVT_CHAT_COMPLETE,
     EVT_CHAT_ERROR
 )
-from data_models import ImageItem, ImageWorkspace
+from data_models import ImageItem, ImageWorkspace, ImageDescription
 
 # Import provider attachment capabilities (models/ added to sys.path for frozen compat)
 try:
@@ -254,19 +254,23 @@ class ChatWindow(wx.Dialog):
     """
     
     def __init__(self, parent, workspace: ImageWorkspace, image_item: Optional[ImageItem], 
-                 provider: str, model: str, session_id: Optional[str] = None):
+                 provider: str, model: str, session_id: Optional[str] = None,
+                 chat_item: Optional[ImageItem] = None):
         """Initialize chat window
         
         Args:
             parent: Parent window
             workspace: ImageWorkspace instance for persistence
-            image_item: Optional ImageItem (None for general chat)
+            image_item: Optional ImageItem being discussed (None for general chat)
             provider: AI provider name (ollama, openai, claude)
             model: Model name
-            session_id: Optional existing session ID to resume
+            session_id: Optional legacy session ID (deprecated; prefer chat_item)
+            chat_item: Optional ImageItem with item_type='chat' that stores this session
         """
-        # Set window title based on whether we have an image
-        if image_item:
+        # Set window title based on whether we have a named chat item or image
+        if chat_item and chat_item.display_name:
+            title = f"Chat: {chat_item.display_name}"
+        elif image_item:
             title = f"Chat: {Path(image_item.file_path).name}"
         else:
             title = f"Chat with AI: {provider.title()} ({model})"
@@ -279,22 +283,41 @@ class ChatWindow(wx.Dialog):
         self.image_item = image_item
         self.provider = provider
         self.model = model
+        self.chat_item = chat_item  # workspace item storing this chat (new flow)
         
         # Try to get config and cache from parent (ImageDescriber)
         self.config = getattr(parent, 'config', {})
         self.cached_ollama_models = getattr(parent, 'cached_ollama_models', None)
         
-        self.session_id = session_id or self._create_session_id()
         self.current_response_chunks = []  # Buffer for streaming response
         self.is_processing = False
         self.pending_attachments: List[Dict[str, str]] = []  # [{path, media_type}, ...]
+        # Temp file tracking for HEIC conversion and clipboard paste cleanup
+        self._temp_files: List[str] = []
+        self._temp_dirs: List[str] = []
         
-        # Load or create session
-        if self.session_id in workspace.chat_sessions:
-            self.session = workspace.chat_sessions[self.session_id]
+        if chat_item is not None:
+            # New flow: chat_item stores the session in workspace.items
+            self.session_id = chat_item.file_path.replace('chat:', '')
+            # Build runtime session dict from chat_item and rebuild message history
+            self.session = {
+                'id': self.session_id,
+                'name': chat_item.display_name or title,
+                'image_path': str(image_item.file_path) if image_item else None,
+                'provider': provider,
+                'model': model,
+                'created': datetime.now().isoformat(),
+                'modified': datetime.now().isoformat(),
+                'messages': self._build_messages_from_descriptions(chat_item)
+            }
         else:
-            self.session = self._create_new_session()
-            workspace.chat_sessions[self.session_id] = self.session
+            # Legacy flow: use workspace.chat_sessions dict
+            self.session_id = session_id or self._create_session_id()
+            if self.session_id in workspace.chat_sessions:
+                self.session = workspace.chat_sessions[self.session_id]
+            else:
+                self.session = self._create_new_session()
+                workspace.chat_sessions[self.session_id] = self.session
         
         self._create_ui()
         self._bind_events()
@@ -305,6 +328,30 @@ class ChatWindow(wx.Dialog):
     def _create_session_id(self) -> str:
         """Create unique session ID"""
         return f"chat_{int(time.time() * 1000)}"
+
+    def _build_messages_from_descriptions(self, chat_item: ImageItem) -> list:
+        """Reconstruct conversation messages list from ImageDescription objects.
+
+        Used when resuming an existing chat session so the AI worker receives
+        the full conversation history for context.
+        Attachments are not restored (path may not exist anymore) — only text.
+        """
+        messages = []
+        for desc in chat_item.descriptions:
+            if desc.prompt_style == 'user_question':
+                messages.append({
+                    'role': 'user',
+                    'content': desc.text,
+                    'timestamp': desc.created
+                })
+            elif desc.prompt_style == 'ai_response':
+                messages.append({
+                    'role': 'assistant',
+                    'content': desc.text,
+                    'timestamp': desc.created,
+                    'metadata': desc.metadata
+                })
+        return messages
         
     def _create_new_session(self) -> dict:
         """Create new chat session data structure"""
@@ -467,31 +514,52 @@ class ChatWindow(wx.Dialog):
             return None
         
     def _load_history(self):
-        """Load conversation history into ListBox"""
+        """Load conversation history into ListBox.
+
+        When a chat_item is available (new flow), reads from chat_item.descriptions
+        to show 'You' / 'AI' labels and token counts.
+        Falls back to session['messages'] for legacy sessions.
+        """
         self.history_list.Clear()
-        
-        for msg in self.session['messages']:
-            timestamp = msg.get('timestamp', '')
-            role = "You" if msg['role'] == 'user' else "AI"
-            
-            # Format timestamp (show time only)
-            time_str = ""
-            if timestamp:
+
+        if self.chat_item is not None:
+            # New flow: read from ImageDescription objects
+            for desc in self.chat_item.descriptions:
+                role = "You" if desc.prompt_style == "user_question" else "AI"
+                time_str = ""
                 try:
-                    dt = datetime.fromisoformat(timestamp)
-                    time_str = dt.strftime("%I:%M %p")
+                    dt = datetime.fromisoformat(desc.created)
+                    hour = dt.hour % 12 or 12
+                    ampm = "A" if dt.hour < 12 else "P"
+                    time_str = f"{hour}:{dt.minute:02d}{ampm}"
                 except Exception:
                     pass
-            
-            # Format message for ListBox display
-            # Each message is a single list item for screen reader friendliness
-            display_text = f"{role} ({time_str}): {msg['content']}"
-            attachments = msg.get('attachments', [])
-            if attachments:
-                filenames = ', '.join(Path(a['path']).name for a in attachments)
-                display_text += f"\n[Attachments: {filenames}]"
-            self.history_list.Append(display_text)
-        
+                token_str = ""
+                if desc.prompt_style == "ai_response" and desc.token_usage:
+                    ct = desc.token_usage.get('completion_tokens', 0)
+                    if ct:
+                        token_str = f" [\u2199 {ct:,} tok]"
+                display_text = f"{role} ({time_str}){token_str}: {desc.text}"
+                self.history_list.Append(display_text)
+        else:
+            # Legacy flow: read from session messages dict
+            for msg in self.session['messages']:
+                timestamp = msg.get('timestamp', '')
+                role = "You" if msg['role'] == 'user' else "AI"
+                time_str = ""
+                if timestamp:
+                    try:
+                        dt = datetime.fromisoformat(timestamp)
+                        time_str = dt.strftime("%I:%M %p")
+                    except Exception:
+                        pass
+                display_text = f"{role} ({time_str}): {msg['content']}"
+                attachments = msg.get('attachments', [])
+                if attachments:
+                    filenames = ', '.join(Path(a['path']).name for a in attachments)
+                    display_text += f"\n[Attachments: {filenames}]"
+                self.history_list.Append(display_text)
+
         # Scroll to bottom (most recent message)
         if self.history_list.GetCount() > 0:
             self.history_list.SetSelection(self.history_list.GetCount() - 1)
@@ -504,6 +572,8 @@ class ChatWindow(wx.Dialog):
         self.input_text.Bind(wx.EVT_TEXT_ENTER, self.on_send_message)
         self.attach_btn.Bind(wx.EVT_BUTTON, self.on_attach_files)
         self.remove_attach_btn.Bind(wx.EVT_BUTTON, self.on_remove_attachment)
+        # Intercept Ctrl/Cmd+V at window level for clipboard image paste
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_key_down)
         
         # Bind chat worker events
         self.Bind(EVT_CHAT_UPDATE, self.on_chat_update)
@@ -537,6 +607,18 @@ class ChatWindow(wx.Dialog):
         if self.pending_attachments:
             user_msg['attachments'] = list(self.pending_attachments)
         self.session['messages'].append(user_msg)
+
+        # New flow: persist user turn to chat_item as an ImageDescription
+        if self.chat_item is not None:
+            user_desc = ImageDescription(
+                text=message,
+                prompt_style="user_question",
+                provider=self.provider,
+                model=self.model,
+                created=timestamp
+            )
+            self.chat_item.add_description(user_desc)
+            self.workspace.mark_modified()
         
         # Display in history ListBox
         time_str = datetime.fromisoformat(timestamp).strftime("%I:%M %p")
@@ -765,12 +847,41 @@ class ChatWindow(wx.Dialog):
         }
         self.session['messages'].append(ai_msg)
         
+        # New flow: persist AI turn to chat_item as an ImageDescription
+        if self.chat_item is not None:
+            token_usage = getattr(event, 'token_usage', {}) or {}
+            ai_desc = ImageDescription(
+                text=full_response,
+                prompt_style="ai_response",
+                provider=self.provider,
+                model=self.model,
+                created=timestamp,
+                completion_tokens=token_usage.get('completion_tokens', 0),
+                metadata=event.metadata,
+                token_usage=token_usage
+            )
+            self.chat_item.add_description(ai_desc)
+            self.workspace.mark_modified()
+        
         # Update session modified time
         self.session['modified'] = timestamp
         
-        # Display in history ListBox
+        # Display in history ListBox with token count for new flow
         time_str = datetime.fromisoformat(timestamp).strftime("%I:%M %p")
-        display_text = f"AI ({time_str}): {full_response}"
+        token_usage_for_display = getattr(event, 'token_usage', {}) or {}
+        if self.chat_item is not None:
+            # New flow: use consistent "You/AI" format with token count
+            dt = datetime.fromisoformat(timestamp)
+            hour = dt.hour % 12 or 12
+            ampm = "A" if dt.hour < 12 else "P"
+            time_str_new = f"{hour}:{dt.minute:02d}{ampm}"
+            token_str = ""
+            ct = token_usage_for_display.get('completion_tokens', 0)
+            if ct:
+                token_str = f" [\u2199 {ct:,} tok]"
+            display_text = f"AI ({time_str_new}){token_str}: {full_response}"
+        else:
+            display_text = f"AI ({time_str}): {full_response}"
         self.history_list.Append(display_text)
         
         # Select the new message (screen readers will announce it)
@@ -912,13 +1023,39 @@ class ChatWindow(wx.Dialog):
 
     def on_attach_files(self, event):
         """Open file picker and queue selected files as pending attachments."""
+        # Build wildcard: start with provider-specific images, then add HEIC
         wildcard = get_attachment_wildcard(self.provider)
+        # Add HEIC/HEIF to the wildcard if not already present
+        if 'heic' not in wildcard.lower():
+            wildcard = wildcard.rstrip('|') + '|HEIC/HEIF images (*.heic;*.heif)|*.heic;*.heif'
         with wx.FileDialog(self, "Attach files",
                            wildcard=wildcard,
                            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as dlg:
             if dlg.ShowModal() == wx.ID_OK:
                 for path in dlg.GetPaths():
-                    media_type = self._infer_media_type(path)
+                    # Convert HEIC/HEIF to JPEG before attaching (providers can't read HEIC directly)
+                    if Path(path).suffix.lower() in ('.heic', '.heif'):
+                        try:
+                            try:
+                                from ConvertImage import convert_heic_to_jpg
+                            except ImportError:
+                                from scripts.ConvertImage import convert_heic_to_jpg
+                            import tempfile
+                            tmp_dir = tempfile.mkdtemp(prefix="idt_chat_")
+                            jpg_path = str(Path(tmp_dir) / (Path(path).stem + ".jpg"))
+                            convert_heic_to_jpg(path, jpg_path)
+                            self._temp_files.append(jpg_path)
+                            self._temp_dirs.append(tmp_dir)
+                            path = jpg_path
+                            media_type = 'image/jpeg'
+                            self.status_text.SetLabel(
+                                f"HEIC converted to JPEG: {Path(jpg_path).name}"
+                            )
+                        except Exception as e:
+                            show_error(self, f"Could not convert HEIC file: {e}")
+                            continue
+                    else:
+                        media_type = self._infer_media_type(path)
                     # Guard: enforce per-provider file size limits before queuing
                     try:
                         size_bytes = Path(path).stat().st_size
@@ -951,10 +1088,70 @@ class ChatWindow(wx.Dialog):
         self.attach_panel.Show(show)
         self.Layout()
 
+    def on_key_down(self, event):
+        """Handle Ctrl/Cmd+V to paste a clipboard image as an attachment."""
+        # Let the normal event chain run for everything except Ctrl+V
+        is_ctrl = event.ControlDown() or event.CmdDown()
+        if is_ctrl and event.GetKeyCode() == ord('V'):
+            if wx.TheClipboard.Open():
+                if wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP)):
+                    bmp_data = wx.BitmapDataObject()
+                    if wx.TheClipboard.GetData(bmp_data):
+                        wx.TheClipboard.Close()
+                        # Save bitmap to a temp PNG file and queue it
+                        try:
+                            import tempfile
+                            tmp_dir = tempfile.mkdtemp(prefix="idt_paste_")
+                            self._temp_dirs.append(tmp_dir)
+                            png_path = str(Path(tmp_dir) / "pasted_image.png")
+                            img = bmp_data.GetBitmap().ConvertToImage()
+                            img.SaveFile(png_path, wx.BITMAP_TYPE_PNG)
+                            self._temp_files.append(png_path)
+                            self.pending_attachments.append(
+                                {'path': png_path, 'media_type': 'image/png'}
+                            )
+                            self._refresh_attachment_panel()
+                            self.status_text.SetLabel("Clipboard image added as attachment.")
+                            return  # Consumed — don't propagate further
+                        except Exception as e:
+                            wx.TheClipboard.Close() if wx.TheClipboard.IsOpened() else None
+                            self.status_text.SetLabel(f"Clipboard paste failed: {e}")
+                            return
+                wx.TheClipboard.Close()
+        event.Skip()  # Let normal Ctrl+V text paste work in TextCtrl
+
     def on_close(self, event):
+        """Handle close — guard if AI is mid-response, then cleanup and save."""
+        if self.is_processing:
+            dlg = wx.MessageDialog(
+                self,
+                "The AI is still responding. Close anyway and lose the current response?",
+                "Close Chat",
+                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
+            )
+            result = dlg.ShowModal()
+            dlg.Destroy()
+            if result != wx.ID_YES:
+                return
+        self._cleanup_temp_files()
         try:
             self.workspace.save()
         except Exception as e:
             print(f"Warning: Failed to save workspace on close: {e}")
-        
         self.EndModal(wx.ID_CLOSE)
+
+    def _cleanup_temp_files(self):
+        """Remove any temp files created for HEIC conversion or clipboard paste."""
+        import shutil
+        for f in list(self._temp_files):
+            try:
+                Path(f).unlink(missing_ok=True)
+            except Exception:
+                pass
+        for d in list(self._temp_dirs):
+            try:
+                shutil.rmtree(d, ignore_errors=True)
+            except Exception:
+                pass
+        self._temp_files = []
+        self._temp_dirs = []

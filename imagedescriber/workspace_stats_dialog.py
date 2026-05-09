@@ -155,17 +155,23 @@ def compute_workspace_stats(workspace) -> Tuple[List[str], Set[int]]:
     videos    = [i for i in all_items if i.item_type == "video"]
     frames    = [i for i in all_items if i.item_type == "extracted_frame"]
     downloaded = [i for i in all_items if i.item_type == "downloaded_image"]
+    chats     = [i for i in all_items if i.item_type == "chat"]
 
-    described   = [i for i in all_items if i.descriptions]
-    undescribed = [i for i in all_items if not i.descriptions and i.processing_state != "failed"]
-    failed      = [i for i in all_items if i.processing_state == "failed"]
+    # Processable items: exclude chat sessions from image/video stats
+    processable_items = [i for i in all_items if i.item_type != "chat"]
+
+    described   = [i for i in processable_items if i.descriptions]
+    undescribed = [i for i in processable_items if not i.descriptions and i.processing_state != "failed"]
+    failed      = [i for i in processable_items if i.processing_state == "failed"]
 
     all_descs = [d for i in all_items for d in i.descriptions]
-    pct = len(described) / len(all_items) * 100
+    pct = len(described) / len(processable_items) * 100 if processable_items else 0.0
 
     # ── Section 1: Workspace Overview ─────────────────────────────────────────
     H("Workspace Overview")
-    R("Total items:",                f"{len(all_items):,}")
+    R("Total items:",                f"{len(processable_items):,}")
+    if chats:
+        R("Chat sessions:",          f"{len(chats):,}")
     R("Described:",                  f"{len(described):,}  ({pct:.0f}% complete)")
     R("Awaiting description:",       f"{len(undescribed):,}")
     if failed:
@@ -184,10 +190,11 @@ def compute_workspace_stats(workspace) -> Tuple[List[str], Set[int]]:
     if len(type_parts) > 1:
         R("Item types:", "  ·  ".join(type_parts))
 
-    # Extension summary
+    # Extension summary — skip chat items (file_path is a URI, not a real path)
     ext_counts = Counter(
         Path(i.file_path).suffix.lower().lstrip('.') or 'no-ext'
         for i in all_items
+        if i.item_type != "chat"
     )
     ext_str = "  ·  ".join(f"{e.upper()} {c}" for e, c in ext_counts.most_common())
     R("File types:", ext_str)
@@ -197,7 +204,9 @@ def compute_workspace_stats(workspace) -> Tuple[List[str], Set[int]]:
     if total_frames_extracted or frames:
         R("Frames extracted from videos:", f"{total_frames_extracted or len(frames):,}")
 
-    heic_items = [i for i in all_items if Path(i.file_path).suffix.lower() in ('.heic', '.heif')]
+    heic_items = [i for i in all_items
+                  if i.item_type != "chat"
+                  and Path(i.file_path).suffix.lower() in ('.heic', '.heif')]
     if heic_items:
         R("HEIC/HEIF files in workspace:", f"{len(heic_items)}")
 
@@ -216,9 +225,11 @@ def compute_workspace_stats(workspace) -> Tuple[List[str], Set[int]]:
 
         if multi:
             champ = max(described, key=lambda i: len(i.descriptions))
+            champ_name = (champ.display_name if champ.item_type == "chat"
+                          else Path(champ.file_path).name)
             R("Items with multiple descriptions:", f"{len(multi)}")
             R("Most descriptions on one item:",
-              f"{len(champ.descriptions)}  ({Path(champ.file_path).name})")
+              f"{len(champ.descriptions)}  ({champ_name})")
 
     # ── Section 3: Content Analysis ────────────────────────────────────────────
     # Build (text, item) pairs for analysis — strip metadata affixes first
@@ -238,8 +249,12 @@ def compute_workspace_stats(workspace) -> Tuple[List[str], Set[int]]:
 
         idx_min = word_counts.index(min(word_counts))
         idx_max = word_counts.index(max(word_counts))
-        min_name = Path(desc_pairs[idx_min][1].file_path).name
-        max_name = Path(desc_pairs[idx_max][1].file_path).name
+        _min_item = desc_pairs[idx_min][1]
+        _max_item = desc_pairs[idx_max][1]
+        min_name = (_min_item.display_name if _min_item.item_type == "chat"
+                    else Path(_min_item.file_path).name)
+        max_name = (_max_item.display_name if _max_item.item_type == "chat"
+                    else Path(_max_item.file_path).name)
 
         R("Total words written:",         f"{total_words:,}")
         R("Average words / description:", f"{avg_words:.0f}")

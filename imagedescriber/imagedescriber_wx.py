@@ -369,6 +369,21 @@ ProcessingProgressEvent, EVT_PROCESSING_PROGRESS = wx.lib.newevent.NewEvent()
 ProcessingErrorEvent, EVT_PROCESSING_ERROR = wx.lib.newevent.NewEvent()
 
 
+def _format_chat_name(provider: str, model: str, dt=None) -> str:
+    """Return a display name for a new chat session.
+
+    Format: 'Chat - <Provider> - M/D/YYYY H:MMP'
+    Follows the project date/time standard (no leading zeros, A/P suffix).
+    """
+    if dt is None:
+        from datetime import datetime as _dt
+        dt = _dt.now()
+    hour = dt.hour % 12 or 12
+    ampm = "A" if dt.hour < 12 else "P"
+    date_str = f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{ampm}"
+    return f"Chat - {provider.title()} - {date_str}"
+
+
 def format_image_metadata(metadata: dict) -> list:
     """Format image metadata (GPS, EXIF) for display
 
@@ -1623,6 +1638,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         filter_videos_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Videos Only")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("videos"), filter_videos_item)
 
+        filter_chats_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Chats Only")
+        self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("chats"), filter_chats_item)
+
         filter_all_item.Check(True)  # Default to all items
 
         view_menu.AppendSeparator()
@@ -1741,7 +1759,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.display_image_info(self.current_image_item)
                 # Load preview image or video frame placeholder
                 self.update_preview_for_item(self.current_image_item)
-                self.process_btn.Enable(True)
+                # Chat items cannot be "processed" — disable the process button
+                is_chat = (self.current_image_item.item_type == "chat")
+                self.process_btn.Enable(not is_chat)
                 self.save_desc_btn.Enable(True)
         else:
             # No selection - clear current item and disable buttons
@@ -1824,6 +1844,36 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         2. Descriptions list with all descriptions for this image
         3. Editor with the first (or selected) description text
         """
+        # Chat items use a URI ("chat:...") not a real filesystem path — guard all Path() calls
+        if image_item.item_type == "chat":
+            session_name = image_item.display_name or image_item.file_path
+            turn_count = len([d for d in image_item.descriptions
+                               if d.prompt_style in ("user_question", "ai_response")])
+            providers = set(d.provider for d in image_item.descriptions if d.provider)
+            models = set(d.model for d in image_item.descriptions if d.model)
+            info = f"Chat: {session_name}"
+            if turn_count:
+                exchanges = turn_count // 2
+                info += f" ({exchanges} exchange{'s' if exchanges != 1 else ''})"
+            if providers:
+                info += f"\nProvider: {', '.join(sorted(providers))}"
+            if models:
+                info += f"\nModel: {', '.join(sorted(models))}"
+            self.image_info_label.SetLabel(info)
+            # Show chat history in the descriptions list
+            if image_item.descriptions:
+                desc_texts = []
+                for desc in image_item.descriptions:
+                    role = "You" if desc.prompt_style == "user_question" else "AI"
+                    desc_texts.append(f"{role}: {desc.text}")
+                self.desc_list.Set(desc_texts)
+                self.desc_list.SetSelection(len(desc_texts) - 1)
+                self.description_text.SetValue(image_item.descriptions[-1].text)
+            else:
+                self.desc_list.Set(["(no messages yet)"])
+                self.description_text.SetValue("")
+            return
+
         file_path = Path(image_item.file_path)
 
         # Update info label
@@ -2117,6 +2167,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def update_preview_for_item(self, image_item: Optional[ImageItem]):
         """Update preview for selected item, with special handling for videos."""
         if not self.show_image_previews or image_item is None:
+            return
+
+        # Chat items have no associated image — show a placeholder
+        if image_item.item_type == "chat":
+            self.show_preview_message("Chat session")
             return
 
         if image_item.item_type == "video":
@@ -2745,6 +2800,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         videos = []
         frames = {}  # parent_video -> list of frames
         regular_images = []
+        chat_items = []  # items with item_type == "chat"
 
         for file_path, item in self.workspace.items.items():
             if item.item_type == "video":
@@ -2754,6 +2810,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if parent not in frames:
                     frames[parent] = []
                 frames[parent].append((file_path, item))
+            elif item.item_type == "chat":
+                chat_items.append((file_path, item))
             else:
                 regular_images.append((file_path, item))
 
@@ -2765,6 +2823,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             CRITICAL FOR PERFORMANCE: During initial load from network share, SKIP EXIF extraction!
             Use mtime for initial sort (instant), then extract EXIF in background later.
             """
+            # Chat URIs (e.g. "chat:chat_1234") are not filesystem paths — guard here
+            if isinstance(file_path, str) and file_path.startswith('chat:'):
+                if file_path in self.workspace.items:
+                    chat_it = self.workspace.items[file_path]
+                    if chat_it.descriptions:
+                        try:
+                            return datetime.fromisoformat(chat_it.descriptions[0].created)
+                        except Exception:
+                            pass
+                return datetime.fromtimestamp(0)
             try:
                 # Check if we have cached data in the workspace item
                 if file_path in self.workspace.items:
@@ -2803,8 +2871,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         mixed_items = videos + regular_images
         mixed_items.sort(key=lambda x: get_sort_date(x[0]))
 
+        # When filter is "chats", skip the entire mixed_items/subfolder section
+        _show_mixed = (self.current_filter != "chats")
+
         def _build_display_name(file_path, item):
             """Return the label shown in the tree for a single item."""
+            # Chat items use their display_name directly — file_path is not a real filesystem path
+            if item.item_type == "chat":
+                return item.display_name or file_path
             base_name = Path(file_path).name
             prefix_parts = []
 
@@ -2863,11 +2937,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # is already sorted by date).
         from collections import OrderedDict
         subfolder_groups: OrderedDict = OrderedDict()  # subfolder_str -> [(file_path, item)]
-        for file_path, item in mixed_items:
-            key = item.subfolder or ""  # "" = root level
-            if key not in subfolder_groups:
-                subfolder_groups[key] = []
-            subfolder_groups[key].append((file_path, item))
+        if _show_mixed:
+            for file_path, item in mixed_items:
+                key = item.subfolder or ""  # "" = root level
+                if key not in subfolder_groups:
+                    subfolder_groups[key] = []
+                subfolder_groups[key].append((file_path, item))
 
         # Build subfolder_key → absolute_path mapping for the right-click Refresh feature.
         # For each known subfolder, we derive its absolute path from the first item in that
@@ -3000,6 +3075,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         for subfolder_str, folder_node in list(folder_nodes.items()):
             if folder_node.IsOk() and not self.image_list.ItemHasChildren(folder_node):
                 self.image_list.Delete(folder_node)
+
+        # Add "Chats" section when filter is "all" or "chats"
+        if self.current_filter in ("all", "chats") and chat_items:
+            # Sort chats oldest first
+            chat_items.sort(key=lambda x: get_sort_date(x[0]))
+            chats_node = self.image_list.AppendItem(root, "Chats")
+            self.image_list.SetItemData(chats_node, None)  # None = folder-like node
+            _append_leaf_fn = getattr(self.image_list, 'AppendLeafItem', self.image_list.AppendItem)
+            for file_path, item in chat_items:
+                if self.search_filter_text and not self._matches_search(item, self.search_filter_text):
+                    continue
+                display_name = _build_display_name(file_path, item)
+                chat_node = _append_leaf_fn(chats_node, display_name)
+                self.image_list.SetItemData(chat_node, file_path)
+                displayed_count += 1
+                type_filter_count += 1
+                if current_file_path and file_path == current_file_path:
+                    new_selection_item = chat_node
+            # Always auto-expand the Chats node so sessions are visible
+            if self.image_list.ItemHasChildren(chats_node):
+                self.image_list.Expand(chats_node)
+            else:
+                # All chats filtered out — remove the empty node
+                self.image_list.Delete(chats_node)
 
         # Update label with result count when text search is active
         if hasattr(self, 'image_list_label'):
@@ -5955,8 +6054,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, "No image selected")
             return
 
-        # Get current name
-        current_name = self.current_image_item.display_name or Path(self.current_image_item.file_path).stem
+        # Get current name — chat items use display_name; others use Path stem
+        if self.current_image_item.item_type == "chat":
+            current_name = self.current_image_item.display_name or self.current_image_item.file_path
+        else:
+            current_name = self.current_image_item.display_name or Path(self.current_image_item.file_path).stem
 
         # Show input dialog
         dlg = wx.TextEntryDialog(
@@ -6021,19 +6123,55 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 selections = chat_dialog.get_selections()
                 chat_dialog.Destroy()
 
-                # Open chat window with selected settings (no image required)
+                # Prompt to save unsaved changes before opening chat (mirrors batch save pattern)
+                if self.workspace is None:
+                    show_error(self, "No workspace is open. Load a folder first.")
+                    return
+                if self.is_modified():
+                    dlg = wx.MessageDialog(
+                        self,
+                        "Save workspace changes before starting chat?",
+                        "Unsaved Changes",
+                        wx.YES_NO | wx.CANCEL | wx.ICON_QUESTION
+                    )
+                    result = dlg.ShowModal()
+                    dlg.Destroy()
+                    if result == wx.ID_CANCEL:
+                        return
+                    if result == wx.ID_YES:
+                        self.save_workspace()
+
+                # Create a new chat ImageItem in the workspace
+                from datetime import datetime as _dt
+                from data_models import ImageItem as _ImageItem
+                now = _dt.now()
+                session_id = f"chat_{int(now.timestamp() * 1000)}"
+                chat_name = _format_chat_name(
+                    selections['provider'], selections['model'], now
+                )
+                chat_item = _ImageItem(
+                    file_path=f"chat:{session_id}",
+                    item_type="chat"
+                )
+                chat_item.display_name = chat_name
+                self.workspace.add_item(chat_item)
+                self.mark_modified()
+
+                # Open chat window with the new chat_item
                 chat_window = ChatWindow(
                     parent=self,
-                                    workspace=self.workspace,
-                    image_item=None,  # Chat doesn't require an image
+                    workspace=self.workspace,
+                    image_item=None,  # General chat; no specific image
                     provider=selections['provider'],
-                    model=selections['model']
+                    model=selections['model'],
+                    chat_item=chat_item
                 )
                 chat_window.ShowModal()
                 chat_window.Destroy()
 
-                # TODO: Refresh image list to show new chat session
-                # self.load_workspace()  # This will reload all items including new chat
+                # Save workspace after chat closes and refresh tree
+                self.save_workspace()
+                self.refresh_image_list()
             else:
                 chat_dialog.Destroy()
         except Exception as e:
@@ -6680,7 +6818,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Build searchable text: filename + all description texts
         from pathlib import Path as _Path
-        parts = [_Path(image_item.file_path).stem.lower()]
+        # Chat items use display_name instead of Path(file_path).stem (URI is not a real path)
+        if image_item.item_type == "chat":
+            stem = (image_item.display_name or image_item.file_path).lower()
+        else:
+            stem = _Path(image_item.file_path).stem.lower()
+        parts = [stem]
         for desc in image_item.descriptions:
             if desc.text:
                 parts.append(desc.text.lower())

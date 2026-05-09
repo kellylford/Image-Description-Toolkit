@@ -22,7 +22,8 @@ class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
                  created: str = "", custom_prompt: str = "", provider: str = "", detection_data: List[dict] = None,
-                 metadata: Dict[str, any] = None, finish_reason: str = "", completion_tokens: int = 0, response_id: str = ""):
+                 metadata: Dict[str, any] = None, finish_reason: str = "", completion_tokens: int = 0, response_id: str = "",
+                 token_usage: Optional[dict] = None):
         self.text = text
         self.model = model
         self.prompt_style = prompt_style
@@ -37,6 +38,8 @@ class ImageDescription:
         self.finish_reason = finish_reason  # API finish_reason (e.g., "stop", "length", "content_filter")
         self.completion_tokens = completion_tokens  # Number of tokens in response
         self.response_id = response_id  # API response ID for support debugging
+        # Token usage dict {prompt_tokens, completion_tokens, total_tokens} — used by chat sessions
+        self.token_usage: dict = token_usage if token_usage is not None else {}
     
     def to_dict(self) -> dict:
         result = {
@@ -58,6 +61,8 @@ class ImageDescription:
             result["completion_tokens"] = self.completion_tokens
         if self.response_id:
             result["response_id"] = self.response_id
+        if self.token_usage:
+            result["token_usage"] = self.token_usage
         
         return result
     
@@ -74,7 +79,8 @@ class ImageDescription:
             metadata=data.get("metadata", {}),
             finish_reason=data.get("finish_reason", ""),
             completion_tokens=data.get("completion_tokens", 0),
-            response_id=data.get("response_id", "")
+            response_id=data.get("response_id", ""),
+            token_usage=data.get("token_usage", {})
         )
         desc.id = data.get("id", desc.id)
         return desc
@@ -82,6 +88,9 @@ class ImageDescription:
 
 class ImageItem:
     """Represents an image or video in the workspace"""
+    # Symbolic constant for chat session items (file_path starts with 'chat:')
+    ITEM_TYPE_CHAT = "chat"
+
     def __init__(self, file_path: str, item_type: str = "image"):
         self.file_path = file_path
         self.item_type = item_type  # "image", "video", "extracted_frame", "downloaded_image"
@@ -334,7 +343,40 @@ class ImageWorkspace:
             self.chat_sessions[session_id]['name'] = new_name
             self.chat_sessions[session_id]['modified'] = datetime.now().isoformat()
             self.mark_modified()
-        
+
+    def migrate_chat_sessions(self):
+        """Convert legacy chat_sessions dict entries into ImageItem/ImageDescription objects.
+
+        Called automatically from from_dict() after workspace items are loaded.
+        This is idempotent: items that already have a 'chat:' file_path are skipped.
+        After migration, chat_sessions is cleared so future saves use the items dict.
+        """
+        for session_id, session in list(self.chat_sessions.items()):
+            file_path = f"chat:{session_id}"
+            if file_path in self.items:
+                continue  # Already migrated
+
+            item = ImageItem(file_path=file_path, item_type=ImageItem.ITEM_TYPE_CHAT)
+            item.display_name = session.get('name', f"Chat {session_id}")
+
+            for msg in session.get('messages', []):
+                style = "user_question" if msg.get('role') == 'user' else "ai_response"
+                desc = ImageDescription(
+                    text=msg.get('content', ''),
+                    prompt_style=style,
+                    provider=session.get('provider', ''),
+                    model=session.get('model', ''),
+                    created=msg.get('timestamp', ''),
+                    metadata=msg.get('metadata', {}),
+                    token_usage=msg.get('token_usage', {})
+                )
+                item.add_description(desc)
+
+            self.items[file_path] = item
+
+        # Clear the legacy dict — going forward, chat items live in self.items
+        self.chat_sessions = {}
+
     def add_item(self, item: ImageItem):
         self.items[item.file_path] = item
         self.mark_modified()
@@ -398,7 +440,7 @@ class ImageWorkspace:
                 failed_items.append((path, str(e)))
                 # Skip this item but continue loading others
         
-        workspace.chat_sessions = data.get("chat_sessions", {})  # Load chat sessions
+        workspace.chat_sessions = data.get("chat_sessions", {})  # Load chat sessions (legacy)
         workspace.imported_workflow_dir = data.get("imported_workflow_dir", None)  # Load workflow dir
         workspace.cached_ollama_models = data.get("cached_ollama_models", None)  # Load cached models
         workspace.batch_state = data.get("batch_state", None)  # Load batch state (Phase 1: Batch Management)
@@ -412,5 +454,8 @@ class ImageWorkspace:
         
         if failed_items:
             logger.warning(f"Workspace loaded with {len(failed_items)} failed items out of {len(items_data)} total")
+        
+        # Migrate any legacy chat_sessions dict entries into ImageItem objects
+        workspace.migrate_chat_sessions()
         
         return workspace

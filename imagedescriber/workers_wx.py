@@ -1067,12 +1067,14 @@ class ChatProcessingWorker(threading.Thread):
                     wx.PostEvent(self.parent_window, evt)
             
             # Emit completion event
+            # Note: Ollama streaming doesn't reliably provide token counts
+            token_usage = {}
             metadata = {
                 'provider': 'ollama',
                 'model': self.model,
                 'tokens': {}  # Ollama doesn't provide token counts in streaming
             }
-            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata)
+            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata, token_usage=token_usage)
             wx.PostEvent(self.parent_window, evt)
             
         except Exception as e:
@@ -1135,6 +1137,8 @@ class ChatProcessingWorker(threading.Thread):
                     wx.PostEvent(self.parent_window, evt)
             
             # Emit completion event
+            # Note: OpenAI streaming doesn't expose token counts in chunk data
+            token_usage = {}
             metadata = {
                 'provider': 'openai',
                 'model': self.model,
@@ -1143,7 +1147,7 @@ class ChatProcessingWorker(threading.Thread):
                     # Would need separate API call to get usage
                 }
             }
-            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata)
+            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata, token_usage=token_usage)
             wx.PostEvent(self.parent_window, evt)
             
         except Exception as e:
@@ -1242,6 +1246,13 @@ class ChatProcessingWorker(threading.Thread):
             # Get final message for metadata
             final_message = stream.get_final_message()
             
+            # Normalize token usage to standard form
+            token_usage = {
+                'prompt_tokens': final_message.usage.input_tokens,
+                'completion_tokens': final_message.usage.output_tokens,
+                'total_tokens': final_message.usage.input_tokens + final_message.usage.output_tokens
+            }
+            
             # Emit completion event
             metadata = {
                 'provider': 'claude',
@@ -1252,7 +1263,7 @@ class ChatProcessingWorker(threading.Thread):
                     'total_tokens': final_message.usage.input_tokens + final_message.usage.output_tokens
                 }
             }
-            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata)
+            evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata, token_usage=token_usage)
             wx.PostEvent(self.parent_window, evt)
             
         except Exception as e:
@@ -1388,6 +1399,12 @@ class ChatProcessingWorker(threading.Thread):
 
                 tokens_in = getattr(output, 'prompt_tokens', 0) or 0
                 tokens_out = getattr(output, 'generation_tokens', 0) or 0
+                # Normalize token usage to standard form
+                token_usage = {
+                    'prompt_tokens': tokens_in,
+                    'completion_tokens': tokens_out,
+                    'total_tokens': tokens_in + tokens_out
+                }
                 metadata = {
                     'provider': 'mlx',
                     'model': self.model,
@@ -1397,7 +1414,7 @@ class ChatProcessingWorker(threading.Thread):
                         'total_tokens': tokens_in + tokens_out,
                     },
                 }
-                evt = ChatCompleteEvent(full_response=response, metadata=metadata)
+                evt = ChatCompleteEvent(full_response=response, metadata=metadata, token_usage=token_usage)
                 wx.PostEvent(self.parent_window, evt)
 
             finally:
