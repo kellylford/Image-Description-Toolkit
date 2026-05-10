@@ -421,7 +421,10 @@ class ChatWindow(wx.Dialog):
             style=wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_RICH2,
             name="Selected message"
         )
-        self.message_detail.SetAccessible(_NamedTextAccessible(self.message_detail, "Selected message"))
+        try:
+            self.message_detail.SetAccessible(_NamedTextAccessible(self.message_detail, "Selected message"))
+        except NotImplementedError:
+            pass  # wx.Accessible not supported on this platform (macOS)
         self.message_detail.SetMinSize((-1, 130))
         main_sizer.Add(self.message_detail, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -437,7 +440,10 @@ class ChatWindow(wx.Dialog):
                                       style=wx.TE_MULTILINE | wx.TE_PROCESS_ENTER,
                                       name="Your message",
                                       size=(-1, 100))
-        self.input_text.SetAccessible(_NamedTextAccessible(self.input_text, "Your message"))
+        try:
+            self.input_text.SetAccessible(_NamedTextAccessible(self.input_text, "Your message"))
+        except NotImplementedError:
+            pass  # wx.Accessible not supported on this platform (macOS)
         main_sizer.Add(self.input_text, 0, wx.EXPAND | wx.ALL, 10)
         
         # Pending attachments panel — hidden until files are queued
