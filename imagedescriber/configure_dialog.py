@@ -770,7 +770,12 @@ class ConfigureDialog(wx.Dialog):
         # Add special API Keys tab
         api_keys_tab = self.create_api_keys_tab(self.notebook)
         self.notebook.AddPage(api_keys_tab, "API Keys")
-        
+
+        # Add MLX Models tab (macOS only — hidden on other platforms)
+        if platform.system() == "Darwin":
+            mlx_tab = self.create_mlx_models_tab(self.notebook)
+            self.notebook.AddPage(mlx_tab, "MLX Models")
+
         main_sizer.Add(self.notebook, 1, wx.EXPAND | wx.ALL, 5)
         
         # Dialog buttons
@@ -1380,3 +1385,158 @@ class ConfigureDialog(wx.Dialog):
                 self.add_key_btn.SetFocus()
             return
         event.Skip()
+
+    # ------------------------------------------------------------------
+    # MLX Models tab — lets users add/remove custom HuggingFace model IDs
+    # without needing a new build.  Persisted in image_describer_config.json
+    # under the key "mlx_extra_models".
+    # ------------------------------------------------------------------
+
+    def create_mlx_models_tab(self, parent) -> wx.Panel:
+        """Create the MLX Models management tab (macOS only)."""
+        panel = wx.Panel(parent)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        desc = wx.StaticText(
+            panel,
+            label="Add extra MLX model IDs from the mlx-community HuggingFace hub.\n"
+                  "These supplement the built-in model list without requiring a new build.\n"
+                  "Example: mlx-community/gemma-4-26b-a4b-it-4bit"
+        )
+        desc.Wrap(580)
+        sizer.Add(desc, 0, wx.ALL, 10)
+
+        # --- Built-in models (read-only reference) ---
+        builtin_label = wx.StaticText(panel, label="Built-in models (read-only):")
+        sizer.Add(builtin_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+
+        self.mlx_builtin_list = wx.ListBox(
+            panel,
+            style=wx.LB_SINGLE | wx.LB_NEEDED_SB,
+            name="Built-in MLX models"
+        )
+        self.mlx_builtin_list.Enable(False)
+        sizer.Add(self.mlx_builtin_list, 1, wx.EXPAND | wx.ALL, 10)
+
+        # --- User-defined extra models ---
+        extra_label = wx.StaticText(panel, label="Your extra models:")
+        sizer.Add(extra_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+
+        self.mlx_extra_list = wx.ListBox(
+            panel,
+            style=wx.LB_SINGLE | wx.LB_NEEDED_SB,
+            name="User MLX models"
+        )
+        self.mlx_extra_list.Bind(wx.EVT_LISTBOX, self.on_mlx_extra_selected)
+        sizer.Add(self.mlx_extra_list, 1, wx.EXPAND | wx.ALL, 10)
+
+        # --- Buttons ---
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.mlx_add_btn = wx.Button(panel, label="Add Model")
+        self.mlx_add_btn.Bind(wx.EVT_BUTTON, self.on_mlx_add)
+        btn_sizer.Add(self.mlx_add_btn, 0, wx.ALL, 5)
+
+        self.mlx_remove_btn = wx.Button(panel, label="Remove Model")
+        self.mlx_remove_btn.Bind(wx.EVT_BUTTON, self.on_mlx_remove)
+        self.mlx_remove_btn.Enable(False)
+        btn_sizer.Add(self.mlx_remove_btn, 0, wx.ALL, 5)
+
+        sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
+        help_text = wx.StaticText(
+            panel,
+            label="Changes are saved immediately. The model will appear in the MLX "
+                  "model dropdown the next time you open the processing options."
+        )
+        help_text.SetForegroundColour(wx.Colour(100, 100, 100))
+        help_text.Wrap(580)
+        sizer.Add(help_text, 0, wx.ALL, 10)
+
+        panel.SetSizer(sizer)
+
+        # Populate lists
+        self._load_mlx_lists()
+
+        return panel
+
+    def _load_mlx_lists(self):
+        """Populate both MLX list boxes from code defaults and config."""
+        # Built-in list
+        self.mlx_builtin_list.Clear()
+        try:
+            from ai_providers import MLXProvider
+            for m in MLXProvider.KNOWN_MODELS:
+                self.mlx_builtin_list.Append(m)
+        except Exception:
+            pass
+
+        # User extras from config
+        self.mlx_extra_list.Clear()
+        config = self.configs.get("image_describer", {})
+        for m in config.get("mlx_extra_models", []):
+            self.mlx_extra_list.Append(m)
+
+        self.mlx_remove_btn.Enable(False)
+
+    def on_mlx_extra_selected(self, event):
+        """Enable Remove button when an extra model is selected."""
+        self.mlx_remove_btn.Enable(self.mlx_extra_list.GetSelection() != wx.NOT_FOUND)
+
+    def on_mlx_add(self, event):
+        """Prompt user for a model ID and add it to the extra list."""
+        dlg = wx.TextEntryDialog(
+            self,
+            "Enter the full HuggingFace model ID:\n(e.g. mlx-community/gemma-4-26b-a4b-it-4bit)",
+            caption="Add MLX Model",
+            value="mlx-community/"
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            model_id = dlg.GetValue().strip()
+            dlg.Destroy()
+            if not model_id:
+                return
+
+            # Guard against duplicates (built-in or already in extra list)
+            try:
+                from ai_providers import MLXProvider
+                builtin = MLXProvider.KNOWN_MODELS
+            except Exception:
+                builtin = []
+            config = self.configs.get("image_describer", {})
+            extras = config.get("mlx_extra_models", [])
+
+            if model_id in builtin:
+                show_warning(self, f"'{model_id}' is already in the built-in model list.")
+                return
+            if model_id in extras:
+                show_warning(self, f"'{model_id}' is already in your extra models.")
+                return
+
+            extras.append(model_id)
+            config["mlx_extra_models"] = extras
+            self._save_image_describer_config()
+            self._load_mlx_lists()
+        else:
+            dlg.Destroy()
+
+    def on_mlx_remove(self, event):
+        """Remove the selected extra model after confirmation."""
+        selection = self.mlx_extra_list.GetSelection()
+        if selection == wx.NOT_FOUND:
+            return
+
+        model_id = self.mlx_extra_list.GetString(selection)
+
+        from shared.wx_common import ask_yes_no
+        if not ask_yes_no(self, f"Remove '{model_id}' from your extra models?", "Confirm Remove"):
+            return
+
+        config = self.configs.get("image_describer", {})
+        extras = config.get("mlx_extra_models", [])
+        if model_id in extras:
+            extras.remove(model_id)
+        config["mlx_extra_models"] = extras
+        self._save_image_describer_config()
+        self._load_mlx_lists()
+

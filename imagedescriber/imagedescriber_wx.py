@@ -372,7 +372,7 @@ ProcessingErrorEvent, EVT_PROCESSING_ERROR = wx.lib.newevent.NewEvent()
 def _format_chat_name(provider: str, model: str, dt=None) -> str:
     """Return a display name for a new chat session.
 
-    Format: 'Chat - <Provider> - M/D/YYYY H:MMP'
+    Format: 'Chat - <Provider> <Model> - M/D/YYYY H:MMP'
     Follows the project date/time standard (no leading zeros, A/P suffix).
     """
     if dt is None:
@@ -381,7 +381,7 @@ def _format_chat_name(provider: str, model: str, dt=None) -> str:
     hour = dt.hour % 12 or 12
     ampm = "A" if dt.hour < 12 else "P"
     date_str = f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{ampm}"
-    return f"Chat - {provider.title()} - {date_str}"
+    return f"Chat - {provider.title()} {model} - {date_str}"
 
 
 def format_image_metadata(metadata: dict) -> list:
@@ -1706,6 +1706,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         claude_usage_item = ai_info_menu.Append(wx.ID_ANY, "&Claude Usage Dashboard...")
         self.Bind(wx.EVT_MENU, self.on_claude_usage_info, claude_usage_item)
 
+        mlx_models_item = ai_info_menu.Append(wx.ID_ANY, "&MLX Community Models (HuggingFace)...")
+        self.Bind(wx.EVT_MENU, self.on_mlx_models_info, mlx_models_item)
+
         tools_menu.AppendSubMenu(ai_info_menu, "AI &Info")
 
         menubar.Append(tools_menu, "&Tools")
@@ -2553,7 +2556,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                     self.load_directory(
                         selection['directory'],
-                        recursive=selection['recursive']
+                        recursive=selection['recursive'],
+                        append=selection['add_to_existing']
                     )
                 else:
                     dlg.Destroy()
@@ -7350,6 +7354,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             webbrowser.open(url)
         except Exception as e:
             show_error(self, f"Could not open Claude usage dashboard:\n{e}")
+
+    def on_mlx_models_info(self, event):
+        """Open MLX Community HuggingFace page to browse available MLX vision models"""
+        url = "https://huggingface.co/mlx-community?search=vlm"
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            show_error(self, f"Could not open MLX Community page:\n{e}")
 
     def on_report_issue(self, event):
         """Open GitHub new issue page in web browser"""

@@ -64,6 +64,23 @@ except ImportError:
     def get_attachment_wildcard(p): return "All files (*.*)|*.*"
 
 
+class _NamedTextAccessible(wx.Accessible):
+    """Provides an accessible name for wx.TextCtrl so VoiceOver reads the label.
+
+    On macOS, wx.TextCtrl.SetName() does not map to NSAccessibility label, so
+    VoiceOver announces every text field as just "edit".  Subclassing
+    wx.Accessible and overriding GetName() feeds the correct label through the
+    Cocoa NSAccessibility bridge.
+    """
+
+    def __init__(self, win: wx.TextCtrl, label: str):
+        super().__init__(win)
+        self._label = label
+
+    def GetName(self, childId):
+        return (wx.ACC_OK, self._label)
+
+
 class ChatDialog(wx.Dialog):
     """Simple dialog to select AI provider and model for chat session
     
@@ -404,6 +421,7 @@ class ChatWindow(wx.Dialog):
             style=wx.TE_MULTILINE | wx.TE_WORDWRAP | wx.TE_RICH2,
             name="Selected message"
         )
+        self.message_detail.SetAccessible(_NamedTextAccessible(self.message_detail, "Selected message"))
         self.message_detail.SetMinSize((-1, 130))
         main_sizer.Add(self.message_detail, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -419,6 +437,7 @@ class ChatWindow(wx.Dialog):
                                       style=wx.TE_MULTILINE | wx.TE_PROCESS_ENTER,
                                       name="Your message",
                                       size=(-1, 100))
+        self.input_text.SetAccessible(_NamedTextAccessible(self.input_text, "Your message"))
         main_sizer.Add(self.input_text, 0, wx.EXPAND | wx.ALL, 10)
         
         # Pending attachments panel — hidden until files are queued

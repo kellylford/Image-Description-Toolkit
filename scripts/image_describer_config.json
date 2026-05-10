@@ -4,7 +4,6 @@
   "default_prompt_style": "narrative",
   "version": "3.1",
   "last_updated": "2026-04-08",
-  
   "model_settings": {
     "model": "moondream",
     "temperature": 0.1,
@@ -13,35 +12,21 @@
     "top_p": 0.9,
     "repeat_penalty": 1.3
   },
-
   "prompt_template": "Provide a narrative description including objects, colors and detail. Avoid interpretation, just describe.",
-  
   "prompt_variations": {
     "narrative": "Describe this image in a narrative style. Start with the overall scene, then describe specific objects and people from left to right. Include colors, clothing details, and spatial relationships. Mention what's in the foreground, middle ground, and background. Use concrete, specific language without metaphor or interpretation.",
-    
     "detailed": "Provide a structured description of this image:\n\nSUBJECT: Identify the main subject(s) and what they're doing\nSETTING: Describe the environment/location/background\nCOLORS: Note dominant colors, lighting conditions, and color contrasts\nCOMPOSITION: Mention perspective, depth, framing, and spatial relationships\nDETAILS: Include notable textures, patterns, or distinctive features\n\nKeep descriptions informative and organized. Avoid flowery language.",
-    
     "concise": "In 2-3 sentences, describe: what's in this image, where it is, and what's happening. Be brief but specific.",
-    
-    "artistic": "Describe this image with attention to its visual qualities:\n\n• What draws the eye first and why\n• How light and shadow interact\n• Color relationships and their effect\n• The overall visual mood or feeling\n• What makes this image visually compelling\n\nUse clear, accessible language. No art jargon unless it's genuinely helpful.",
-    
+    "artistic": "Describe this image with attention to its visual qualities:\n\n\u2022 What draws the eye first and why\n\u2022 How light and shadow interact\n\u2022 Color relationships and their effect\n\u2022 The overall visual mood or feeling\n\u2022 What makes this image visually compelling\n\nUse clear, accessible language. No art jargon unless it's genuinely helpful.",
     "technical": "Provide a concise technical evaluation of this image:\n- Subject identification: What is shown and its apparent purpose\n- Orientation and alignment: Whether the image is level, tilted, or crooked. Note if horizons are slanted or vertical lines are leaning\n- Lighting characteristics: Quality, direction, natural/artificial source, contrast\n- Composition approach: Framing, spatial organization, visual hierarchy\n- Image clarity and detail: Sharpness, resolution, exposure quality\n- Notable strengths or limitations: What works well or presents challenges (including if image needs straightening)\nSkip camera equipment speculation entirely.",
-    
     "colorful": "Describe this image with visual accuracy. State what the image depicts, then detail the color palette using specific names (crimson, navy, ivory, slate, amber, charcoal, ochre, teal, coral, emerald). Mention lighting direction and quality. End with one sentence about the atmosphere. Keep it grounded and concrete. Avoid words like 'stunning', 'breathtaking', 'mesmerizing', or 'ethereal'.",
-    
     "simple": "Provide a simple, brief description of this image in one sentence.",
-    
     "accessibility": "Describe this image for a screen reader user. Start with the main subject and overall scene. Then describe objects and people from left to right, including their colors, sizes, and positions relative to each other. Mention foreground, middle ground, and background elements. Use concrete, specific language without metaphor or visual-only references.",
-    
     "comparison": "Describe this image by comparing elements to familiar everyday objects, experiences, or well-known references. Use analogies like 'shaped like a...', 'resembles...', 'similar to...', 'about the size of...' to help someone understand what they're seeing. Make space imagery and abstract concepts relatable.",
-    
     "mood": "Describe the emotional atmosphere and mood of this image. What feelings does it evoke? What is the psychological tone? Describe the emotional quality of the lighting, the mood conveyed by the composition, and the overall feeling or atmosphere in rich, evocative language.",
-    
     "functional": "Describe what is happening in this image by focusing on function, purpose, and action. What are the objects FOR? What are they DOING? What is their utility or role? Describe actions, processes, relationships of use, and functional meaning. Focus on verbs: illuminates, supports, connects, transforms, protects, enables.",
-
     "aialttext": "Generate three instances of website alt text for this image of differing lengths:\n- 25 words\n- 50 words\n- 100 words"
   },
-
   "prompt_model_settings": {
     "narrative": {
       "temperature": 0.15,
@@ -50,7 +35,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.3
     },
-    
     "detailed": {
       "temperature": 0.15,
       "num_predict": 500,
@@ -58,7 +42,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.2
     },
-    
     "concise": {
       "temperature": 0.1,
       "num_predict": 200,
@@ -66,7 +49,6 @@
       "top_p": 0.85,
       "repeat_penalty": 1.3
     },
-    
     "artistic": {
       "temperature": 0.25,
       "num_predict": 450,
@@ -74,7 +56,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.2
     },
-    
     "technical": {
       "temperature": 0.15,
       "num_predict": 500,
@@ -82,7 +63,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.3
     },
-    
     "colorful": {
       "temperature": 0.2,
       "num_predict": 350,
@@ -90,7 +70,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.3
     },
-    
     "simple": {
       "temperature": 0.1,
       "num_predict": 150,
@@ -98,7 +77,6 @@
       "top_p": 0.85,
       "repeat_penalty": 1.3
     },
-    
     "accessibility": {
       "temperature": 0.1,
       "num_predict": 550,
@@ -106,7 +84,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.3
     },
-    
     "comparison": {
       "temperature": 0.25,
       "num_predict": 500,
@@ -114,7 +91,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.3
     },
-    
     "mood": {
       "temperature": 0.35,
       "num_predict": 450,
@@ -122,7 +98,6 @@
       "top_p": 0.95,
       "repeat_penalty": 1.2
     },
-    
     "functional": {
       "temperature": 0.15,
       "num_predict": 500,
@@ -130,7 +105,6 @@
       "top_p": 0.9,
       "repeat_penalty": 1.3
     },
-
     "aialttext": {
       "temperature": 0.1,
       "num_predict": 750,
@@ -139,7 +113,6 @@
       "repeat_penalty": 1.3
     }
   },
-
   "output_format": {
     "include_timestamp": true,
     "include_model_info": true,
@@ -148,7 +121,6 @@
     "separator": "-",
     "include_prompt_style": true
   },
-
   "processing_options": {
     "default_max_image_size": 1024,
     "default_batch_delay": 2.0,
@@ -169,7 +141,6 @@
       ".heic"
     ]
   },
-
   "metadata": {
     "enabled": true,
     "include_location_prefix": true,
@@ -180,7 +151,6 @@
       "cache_file": "geocode_cache.json"
     }
   },
-
   "available_models": {
     "description": "Any Ollama vision model can be used. Install models with 'ollama pull MODEL_NAME'.",
     "default": "moondream:latest",
@@ -188,26 +158,46 @@
       {
         "name": "moondream:latest",
         "description": "Fastest, lightweight local model. Good for quick descriptions and batch processing. Default for out-of-the-box functionality.",
-        "best_for": ["simple", "concise", "narrative"],
+        "best_for": [
+          "simple",
+          "concise",
+          "narrative"
+        ],
         "temperature_default": 0.1,
         "install": "ollama pull moondream"
       },
       {
         "name": "kimi-k2.5:cloud",
         "description": "High quality, detailed descriptions. Best for narrative, detailed, artistic, and technical styles. Requires cloud provider setup.",
-        "best_for": ["narrative", "detailed", "artistic", "technical", "accessibility", "aialttext"],
+        "best_for": [
+          "narrative",
+          "detailed",
+          "artistic",
+          "technical",
+          "accessibility",
+          "aialttext"
+        ],
         "temperature_default": 0.15
       },
       {
         "name": "gemma4:31b-cloud",
         "description": "Fast, good quality, excellent at following structured prompts. Best for colorful, concise, comparison. Requires cloud provider setup.",
-        "best_for": ["colorful", "concise", "comparison", "simple", "aialttext"],
+        "best_for": [
+          "colorful",
+          "concise",
+          "comparison",
+          "simple",
+          "aialttext"
+        ],
         "temperature_default": 0.2
       },
       {
         "name": "qwen3.5:cloud",
         "description": "Good quality, balanced speed and detail. Requires cloud provider setup.",
-        "best_for": ["narrative", "detailed"],
+        "best_for": [
+          "narrative",
+          "detailed"
+        ],
         "temperature_default": 0.15
       }
     ],
@@ -221,11 +211,9 @@
     ],
     "documentation": "See bat/ directory for ready-to-use model scripts, or visit https://ollama.com/library for full model list"
   },
-
   "api_keys": {
-    "description": "API keys for cloud AI providers. Managed via Tools → Configure Settings → API Keys tab."
+    "description": "API keys for cloud AI providers. Managed via Tools \u2192 Configure Settings \u2192 API Keys tab."
   },
-
   "documentation": {
     "overview": "This configuration file controls all aspects of the image description process. Version 3.1 includes extensively researched prompt improvements.",
     "version": "3.2",
@@ -242,7 +230,7 @@
       "comparison": "Analogies to familiar objects - makes abstract images relatable",
       "mood": "Emotional atmosphere and psychological tone",
       "functional": "Focus on purpose, action, utility - what things DO",
-      "aialttext": "Three website alt text options at 25, 50, and 100 words — ready for human review before publishing"
+      "aialttext": "Three website alt text options at 25, 50, and 100 words \u2014 ready for human review before publishing"
     },
     "prompt_style_recommendations": {
       "general_use": "narrative",
@@ -274,5 +262,6 @@
       "workspace/idt_narrative_prompt_research_report.md - Narrative improvements",
       "workspace/IDT_PROMPT_RESEARCH_REPORT.md - Detailed, artistic, concise improvements"
     ]
-  }
+  },
+  "mlx_extra_models": []
 }

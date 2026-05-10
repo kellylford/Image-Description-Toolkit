@@ -1642,6 +1642,7 @@ class MLXProvider(AIProvider):
         "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",            # ~2.0 GB
         "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",            # ~4.5 GB, best Qwen quality
         # -- Gemma family (Google) --
+        "mlx-community/gemma-4-26b-a4b-it-4bit",                # ~14 GB, multimodal (text+image), 16 GB+ Mac recommended
         "mlx-community/gemma-3-4b-it-qat-4bit",                 # ~2.5 GB, QAT quantization, strong English
         "mlx-community/gemma-3-12b-it-4bit",                    # ~8.0 GB, 16 GB Mac recommended
         "mlx-community/gemma-3-27b-it-4bit",                    # ~16.8 GB, 32 GB+ Mac required
@@ -1679,7 +1680,37 @@ class MLXProvider(AIProvider):
     def get_available_models(self) -> List[str]:
         if not self.is_available():
             return []
-        return list(self.KNOWN_MODELS)
+        models = list(self.KNOWN_MODELS)
+        for m in self._load_extra_models_from_config():
+            if m not in models:
+                models.append(m)
+        return models
+
+    def _load_extra_models_from_config(self) -> List[str]:
+        """Return user-defined MLX model IDs from image_describer_config.json.
+
+        The config key ``mlx_extra_models`` holds a list of HuggingFace model
+        repo IDs (e.g. ``["mlx-community/gemma-4-26b-a4b-it-4bit"]``).
+        Returns an empty list if the key is absent or the config cannot be read.
+        """
+        try:
+            load_json_config = None
+            try:
+                from config_loader import load_json_config
+            except ImportError:
+                try:
+                    from scripts.config_loader import load_json_config
+                except ImportError:
+                    pass
+            if load_json_config is None:
+                return []
+            config, _, _ = load_json_config('image_describer_config.json')
+            if not config:
+                return []
+            extras = config.get('mlx_extra_models', [])
+            return [m for m in extras if isinstance(m, str) and m.strip()]
+        except Exception:
+            return []
 
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         """Run Metal-accelerated vision inference and return a description string."""
