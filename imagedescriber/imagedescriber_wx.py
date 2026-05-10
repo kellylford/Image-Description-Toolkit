@@ -6135,21 +6135,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 selections = chat_dialog.get_selections()
                 chat_dialog.Destroy()
 
-                # Ensure a workspace exists before opening chat
+                # Ensure a workspace exists before opening chat.
+                # Create a transient in-memory workspace automatically — no
+                # images are required to start a chat session.
                 if self.workspace is None:
-                    dlg = wx.MessageDialog(
-                        self,
-                        "A workspace is required to use chat.\n\nWould you like to save a workspace now?",
-                        "Save Workspace",
-                        wx.YES_NO | wx.ICON_QUESTION
-                    )
-                    result = dlg.ShowModal()
-                    dlg.Destroy()
-                    if result == wx.ID_YES:
-                        self.on_save_workspace_as(None)
-                    # If workspace still not created (user cancelled), abort
-                    if self.workspace is None:
-                        return
+                    self.workspace = ImageWorkspace(new_workspace=True)
 
                 # Prompt to save unsaved changes before opening chat
                 if self.modified:
