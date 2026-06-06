@@ -1199,23 +1199,30 @@ class ChatProcessingWorker(threading.Thread):
                 stream=True
             )
             
-            # Process streaming response
+            # Process streaming response; final chunk (done=True) carries token counts
+            _prompt_tokens = 0
+            _output_tokens = 0
             for chunk in response_stream:
                 if 'message' in chunk and 'content' in chunk['message']:
                     content = chunk['message']['content']
                     self._full_response += content
-                    
-                    # Emit update event for each chunk
                     evt = ChatUpdateEvent(message_chunk=content)
                     wx.PostEvent(self.parent_window, evt)
-            
-            # Emit completion event
-            # Note: Ollama streaming doesn't reliably provide token counts
+                if chunk.get('done'):
+                    _prompt_tokens = chunk.get('prompt_eval_count', 0) or 0
+                    _output_tokens = chunk.get('eval_count', 0) or 0
+
             token_usage = {}
+            if _prompt_tokens or _output_tokens:
+                token_usage = {
+                    'input_tokens': _prompt_tokens,
+                    'output_tokens': _output_tokens,
+                    'total_tokens': _prompt_tokens + _output_tokens,
+                }
             metadata = {
                 'provider': 'ollama',
                 'model': self.model,
-                'tokens': {}  # Ollama doesn't provide token counts in streaming
+                'tokens': token_usage.copy(),
             }
             evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata, token_usage=token_usage)
             wx.PostEvent(self.parent_window, evt)
@@ -1262,33 +1269,35 @@ class ChatProcessingWorker(threading.Thread):
                 else:
                     openai_messages.append({'role': msg['role'], 'content': msg['content']})
             
-            # Stream response from OpenAI
+            # Stream response from OpenAI; include_usage delivers counts in the final chunk
             response_stream = client.chat.completions.create(
                 model=self.model,
                 messages=openai_messages,
-                stream=True
+                stream=True,
+                stream_options={'include_usage': True},
             )
-            
-            # Process streaming response
+
+            _usage_data = None
             for chunk in response_stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     self._full_response += content
-                    
-                    # Emit update event for each chunk
                     evt = ChatUpdateEvent(message_chunk=content)
                     wx.PostEvent(self.parent_window, evt)
-            
-            # Emit completion event
-            # Note: OpenAI streaming doesn't expose token counts in chunk data
+                if getattr(chunk, 'usage', None) is not None:
+                    _usage_data = chunk.usage
+
             token_usage = {}
+            if _usage_data is not None:
+                token_usage = {
+                    'input_tokens': _usage_data.prompt_tokens,
+                    'output_tokens': _usage_data.completion_tokens,
+                    'total_tokens': _usage_data.total_tokens,
+                }
             metadata = {
                 'provider': 'openai',
                 'model': self.model,
-                'tokens': {
-                    # Note: Streaming doesn't provide token counts
-                    # Would need separate API call to get usage
-                }
+                'tokens': token_usage.copy(),
             }
             evt = ChatCompleteEvent(full_response=self._full_response, metadata=metadata, token_usage=token_usage)
             wx.PostEvent(self.parent_window, evt)
@@ -1389,11 +1398,10 @@ class ChatProcessingWorker(threading.Thread):
             # Get final message for metadata
             final_message = stream.get_final_message()
             
-            # Normalize token usage to standard form
             token_usage = {
-                'prompt_tokens': final_message.usage.input_tokens,
-                'completion_tokens': final_message.usage.output_tokens,
-                'total_tokens': final_message.usage.input_tokens + final_message.usage.output_tokens
+                'input_tokens': final_message.usage.input_tokens,
+                'output_tokens': final_message.usage.output_tokens,
+                'total_tokens': final_message.usage.input_tokens + final_message.usage.output_tokens,
             }
             
             # Emit completion event

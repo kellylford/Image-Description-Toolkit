@@ -312,6 +312,11 @@ class ChatWindow(wx.Dialog):
         # Temp file tracking for HEIC conversion and clipboard paste cleanup
         self._temp_files: List[str] = []
         self._temp_dirs: List[str] = []
+        # Token/context window tracking
+        self._session_input_tokens = 0
+        self._session_output_tokens = 0
+        self._context_window_size = 0   # Populated async; 0 = not yet known
+        self._compact_pending = False   # Set True during Summarize & Compact
         
         if chat_item is not None:
             # New flow: chat_item stores the session in workspace.items
@@ -339,8 +344,9 @@ class ChatWindow(wx.Dialog):
         self._create_ui()
         self._bind_events()
         self._load_history()
-        
+
         self.Centre()
+        wx.CallAfter(self._init_token_tracking)
         
     def _create_session_id(self) -> str:
         """Create unique session ID"""
@@ -400,6 +406,17 @@ class ChatWindow(wx.Dialog):
         header_sizer = self._create_header(panel)
         main_sizer.Add(header_sizer, 0, wx.EXPAND | wx.ALL, 10)
         
+        # Token / context window strip — thin bar showing session usage vs model limit
+        self._token_strip_panel = wx.Panel(panel)
+        _ts_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.token_gauge = wx.Gauge(self._token_strip_panel, range=100, size=(-1, 8))
+        _ts_sizer.Add(self.token_gauge, 1, wx.EXPAND | wx.RIGHT, 8)
+        self.token_label = wx.StaticText(self._token_strip_panel, label="Tokens: —",
+                                         name="Token usage")
+        _ts_sizer.Add(self.token_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        self._token_strip_panel.SetSizer(_ts_sizer)
+        main_sizer.Add(self._token_strip_panel, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
         # Conversation history (ListBox for accessibility)
         history_label = wx.StaticText(panel, label="Conversation History:")
         main_sizer.Add(history_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
@@ -478,7 +495,10 @@ class ChatWindow(wx.Dialog):
 
         self.attach_btn = wx.Button(panel, label="Attach Files...")
         button_sizer.Add(self.attach_btn, 0, wx.ALL, 5)
-        
+
+        self.commands_btn = wx.Button(panel, label="Session ▾")
+        button_sizer.Add(self.commands_btn, 0, wx.ALL, 5)
+
         button_sizer.AddStretchSpacer()
         
         self.close_btn = wx.Button(panel, wx.ID_CLOSE, label="Close")
@@ -575,7 +595,8 @@ class ChatWindow(wx.Dialog):
                     pass
                 token_str = ""
                 if desc.prompt_style == "ai_response" and desc.token_usage:
-                    ct = desc.token_usage.get('completion_tokens', 0)
+                    ct = (desc.token_usage.get('output_tokens')
+                          or desc.token_usage.get('completion_tokens', 0))
                     if ct:
                         token_str = f" [\u2199 {ct:,} tok]"
                 display_text = f"{role} ({time_str}){token_str}: {desc.text}"
@@ -649,6 +670,7 @@ class ChatWindow(wx.Dialog):
         self.input_text.Bind(wx.EVT_TEXT_ENTER, self.on_send_message)
         self.attach_btn.Bind(wx.EVT_BUTTON, self.on_attach_files)
         self.remove_attach_btn.Bind(wx.EVT_BUTTON, self.on_remove_attachment)
+        self.commands_btn.Bind(wx.EVT_BUTTON, self.on_commands_menu)
         # History list selection drives the message detail area
         self.history_list.Bind(wx.EVT_LISTBOX, self.on_history_selected)
         # Intercept Ctrl/Cmd+V at window level for clipboard image paste
@@ -915,8 +937,18 @@ class ChatWindow(wx.Dialog):
         
     def on_chat_complete(self, event):
         """Handle completed AI response"""
-        # Get full response
         full_response = event.full_response
+
+        # Compact mode: replace history with the summary instead of appending
+        if self._compact_pending:
+            self._compact_pending = False
+            self._apply_compact(full_response)
+            self.is_processing = False
+            self.input_text.Enable(True)
+            self.send_btn.Enable(True)
+            self.input_text.SetFocus()
+            self.status_text.SetLabel("")
+            return
         
         # Save AI response to session
         timestamp = datetime.now().isoformat()
@@ -931,18 +963,28 @@ class ChatWindow(wx.Dialog):
         # New flow: persist AI turn to chat_item as an ImageDescription
         if self.chat_item is not None:
             token_usage = getattr(event, 'token_usage', {}) or {}
+            output_tok = (token_usage.get('output_tokens')
+                          or token_usage.get('completion_tokens', 0))
             ai_desc = ImageDescription(
                 text=full_response,
                 prompt_style="ai_response",
                 provider=self.provider,
                 model=self.model,
                 created=timestamp,
-                completion_tokens=token_usage.get('completion_tokens', 0),
+                completion_tokens=output_tok,
                 metadata=event.metadata,
                 token_usage=token_usage
             )
             self.chat_item.add_description(ai_desc)
             self.workspace.mark_modified()
+
+        # Accumulate session token totals and refresh the strip
+        token_usage = getattr(event, 'token_usage', {}) or {}
+        self._session_input_tokens += (token_usage.get('input_tokens')
+                                        or token_usage.get('prompt_tokens', 0))
+        self._session_output_tokens += (token_usage.get('output_tokens')
+                                         or token_usage.get('completion_tokens', 0))
+        self._update_token_strip()
         
         # Update session modified time
         self.session['modified'] = timestamp
@@ -957,7 +999,8 @@ class ChatWindow(wx.Dialog):
             ampm = "A" if dt.hour < 12 else "P"
             time_str_new = f"{hour}:{dt.minute:02d}{ampm}"
             token_str = ""
-            ct = token_usage_for_display.get('completion_tokens', 0)
+            ct = (token_usage_for_display.get('output_tokens')
+                  or token_usage_for_display.get('completion_tokens', 0))
             if ct:
                 token_str = f" [\u2199 {ct:,} tok]"
             display_text = f"AI ({time_str_new}){token_str}: {full_response}"
@@ -1222,6 +1265,255 @@ class ChatWindow(wx.Dialog):
         except Exception as e:
             print(f"Warning: Failed to save workspace on close: {e}")
         self.EndModal(wx.ID_CLOSE)
+
+    # ------------------------------------------------------------------
+    # Token / context window tracking
+    # ------------------------------------------------------------------
+
+    def _init_token_tracking(self):
+        """Sum tokens from existing descriptions (resumed session) and start context fetch."""
+        if self.chat_item is not None:
+            for desc in self.chat_item.descriptions:
+                if desc.prompt_style == 'ai_response' and desc.token_usage:
+                    tu = desc.token_usage
+                    self._session_input_tokens += (
+                        tu.get('input_tokens') or tu.get('prompt_tokens', 0)
+                    )
+                    self._session_output_tokens += (
+                        tu.get('output_tokens') or tu.get('completion_tokens', 0)
+                    )
+        self._update_token_strip()
+        import threading
+        t = threading.Thread(target=self._fetch_context_window_bg, daemon=True)
+        t.start()
+
+    def _fetch_context_window_bg(self):
+        """Background thread: look up context window size for the current model."""
+        size = 0
+        try:
+            if self.provider == 'claude':
+                try:
+                    from models.claude_models import CLAUDE_MODEL_METADATA
+                except ImportError:
+                    try:
+                        from claude_models import CLAUDE_MODEL_METADATA
+                    except ImportError:
+                        CLAUDE_MODEL_METADATA = {}
+                size = CLAUDE_MODEL_METADATA.get(self.model, {}).get('context_window', 200_000)
+            elif self.provider == 'openai':
+                try:
+                    from models.openai_models import OPENAI_MODEL_METADATA
+                except ImportError:
+                    try:
+                        from openai_models import OPENAI_MODEL_METADATA
+                    except ImportError:
+                        OPENAI_MODEL_METADATA = {}
+                size = OPENAI_MODEL_METADATA.get(self.model, {}).get('context_window', 128_000)
+            elif self.provider == 'ollama':
+                try:
+                    import ollama
+                    info = ollama.show(self.model)
+                    # Newer Ollama versions expose model_info with architecture-prefixed keys
+                    model_info = getattr(info, 'model_info', None) or {}
+                    for key, val in model_info.items():
+                        if 'context_length' in key.lower() or 'context_window' in key.lower():
+                            size = int(val)
+                            break
+                    # Fall back to parsing the parameters string (num_ctx N)
+                    if not size:
+                        params_str = getattr(info, 'parameters', '') or ''
+                        for line in params_str.splitlines():
+                            parts = line.strip().lower().split()
+                            if parts and parts[0] == 'num_ctx' and len(parts) >= 2:
+                                size = int(parts[1])
+                                break
+                except Exception:
+                    size = 32_768
+            elif self.provider == 'mlx':
+                size = 32_768
+        except Exception:
+            pass
+        wx.CallAfter(self._on_context_window_fetched, size)
+
+    def _on_context_window_fetched(self, size: int):
+        if not self or not self.IsShown():
+            return
+        self._context_window_size = size
+        self._update_token_strip()
+
+    def _update_token_strip(self):
+        """Refresh the token gauge and label."""
+        if not hasattr(self, 'token_gauge'):
+            return
+        total = self._session_input_tokens + self._session_output_tokens
+        if self._context_window_size > 0:
+            pct = min(100, round(total * 100 / self._context_window_size))
+            if pct < 60:
+                colour = wx.Colour(34, 139, 34)    # green
+            elif pct < 85:
+                colour = wx.Colour(200, 150, 0)    # amber
+            else:
+                colour = wx.Colour(200, 30, 30)    # red
+            self.token_gauge.SetForegroundColour(colour)
+            self.token_gauge.SetValue(pct)
+            self.token_label.SetLabel(
+                f"Tokens: {total:,} / {self._context_window_size:,} ({pct}%)"
+            )
+        else:
+            self.token_gauge.SetValue(0)
+            self.token_label.SetLabel(f"Tokens: {total:,}" if total else "Tokens: —")
+        self._token_strip_panel.Layout()
+
+    # ------------------------------------------------------------------
+    # Session commands menu
+    # ------------------------------------------------------------------
+
+    def on_commands_menu(self, event):
+        """Show the Session commands popup menu."""
+        menu = wx.Menu()
+        compact_item = menu.Append(wx.ID_ANY, "Summarize && Compact",
+                                    "Ask AI to summarize, then replace context with summary")
+        export_item = menu.Append(wx.ID_ANY, "Export Conversation...",
+                                   "Save full conversation history to a text file")
+        self.Bind(wx.EVT_MENU, self.on_summarize_compact, compact_item)
+        self.Bind(wx.EVT_MENU, self.on_export_conversation, export_item)
+        self.PopupMenu(menu)
+        menu.Destroy()
+
+    def on_summarize_compact(self, event):
+        """Ask the AI to summarize; on response, replace context with that summary."""
+        if self.is_processing:
+            show_warning(self, "Please wait for the current response to complete.")
+            return
+        if len(self.session['messages']) < 2:
+            show_info(self, "Nothing to compact yet — start chatting first.")
+            return
+
+        msg_count = len(self.session['messages'])
+        dlg = wx.MessageDialog(
+            self,
+            f"This sends a summarization request to the AI ({msg_count} messages in context), "
+            "then replaces the active context with that summary to free up token budget.\n\n"
+            "Your full history is preserved in the workspace file.\n\nContinue?",
+            "Summarize & Compact",
+            wx.YES_NO | wx.ICON_QUESTION,
+        )
+        result = dlg.ShowModal()
+        dlg.Destroy()
+        if result != wx.ID_YES:
+            return
+
+        self._compact_pending = True
+        summarize_msg = (
+            "Please provide a comprehensive summary of our entire conversation so far. "
+            "Include all topics discussed, decisions made, questions asked and answered, "
+            "and any important context or conclusions. Be thorough — this summary will "
+            "replace the full conversation history."
+        )
+        self.session['messages'].append({
+            'role': 'user',
+            'content': summarize_msg,
+            'timestamp': datetime.now().isoformat(),
+        })
+
+        self.status_text.SetLabel("Summarizing conversation…")
+        self.send_btn.Enable(False)
+        self.input_text.Enable(False)
+        self.is_processing = True
+
+        api_key = self.config.get('api_keys', {}).get(self.provider, '')
+        worker = ChatProcessingWorker(
+            parent_window=self,
+            image_path=None,
+            provider=self.provider,
+            model=self.model,
+            messages=self.session['messages'],
+            api_key=api_key,
+        )
+        worker.start()
+
+    def _apply_compact(self, summary: str):
+        """Replace active context with the given summary; preserve full history on disk."""
+        timestamp = datetime.now().isoformat()
+        self.session['messages'] = [
+            {
+                'role': 'user',
+                'content': f'[Conversation summary — full history preserved in workspace]:\n{summary}',
+                'timestamp': timestamp,
+            },
+            {
+                'role': 'assistant',
+                'content': 'Got it. How can I continue helping you?',
+                'timestamp': timestamp,
+            },
+        ]
+        self.session['modified'] = timestamp
+
+        if self.chat_item is not None:
+            compact_desc = ImageDescription(
+                text=f"[COMPACT] {summary}",
+                prompt_style='compact_summary',
+                provider=self.provider,
+                model=self.model,
+                created=timestamp,
+            )
+            self.chat_item.add_description(compact_desc)
+            self.workspace.mark_modified()
+
+        self._session_input_tokens = 0
+        self._session_output_tokens = 0
+        self._update_token_strip()
+
+        self.history_list.Append("─── Conversation compacted ───")
+        last_idx = self.history_list.GetCount() - 1
+        self.history_list.SetSelection(last_idx)
+        self._update_message_detail(last_idx)
+        self.message_count_label.SetLabel(f"Messages: {len(self.session['messages'])}")
+
+        try:
+            self.workspace.save()
+        except Exception:
+            pass
+
+    def on_export_conversation(self, event):
+        """Save full conversation history to a plain-text file."""
+        default_name = f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with wx.FileDialog(
+            self, "Export Conversation",
+            wildcard="Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+            defaultFile=default_name,
+        ) as dlg:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            path = dlg.GetPath()
+
+        try:
+            lines = [f"Chat Export: {self.session.get('name', 'Chat Session')}", ""]
+            if self.chat_item is not None:
+                for desc in self.chat_item.descriptions:
+                    if desc.prompt_style not in ('user_question', 'ai_response'):
+                        continue
+                    role = "You" if desc.prompt_style == "user_question" else "AI"
+                    try:
+                        dt = datetime.fromisoformat(desc.created)
+                        m, d, y = dt.month, dt.day, dt.year
+                        hr = dt.hour % 12 or 12
+                        ampm = "A" if dt.hour < 12 else "P"
+                        time_str = f"{m}/{d}/{y} {hr}:{dt.minute:02d}{ampm}"
+                    except Exception:
+                        time_str = desc.created
+                    lines += [f"[{role} — {time_str}]", desc.text, ""]
+            else:
+                for msg in self.session['messages']:
+                    role = "You" if msg['role'] == 'user' else "AI"
+                    lines += [f"[{role}]", msg['content'], ""]
+
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+            self.status_text.SetLabel(f"Exported to {Path(path).name}")
+        except Exception as e:
+            show_error(self, f"Export failed:\n{e}")
 
     def _cleanup_temp_files(self):
         """Remove any temp files created for HEIC conversion or clipboard paste."""
