@@ -425,7 +425,7 @@ class ChatWindow(wx.Dialog):
             self.message_detail.SetAccessible(_NamedTextAccessible(self.message_detail, "Selected message"))
         except NotImplementedError:
             pass  # wx.Accessible not supported on this platform (macOS)
-        self.message_detail.SetMinSize((-1, 130))
+        self.message_detail.SetMinSize((-1, 200))
         main_sizer.Add(self.message_detail, 0, wx.EXPAND | wx.ALL, 10)
 
         # Status/typing indicator
@@ -601,16 +601,23 @@ class ChatWindow(wx.Dialog):
 
         # Scroll to bottom (most recent message)
         if self.history_list.GetCount() > 0:
-            self.history_list.SetSelection(self.history_list.GetCount() - 1)
-            self._update_message_detail()
+            last_idx = self.history_list.GetCount() - 1
+            self.history_list.SetSelection(last_idx)
+            self._update_message_detail(last_idx)
 
     def on_history_selected(self, event):
         """Update message detail when the user clicks or arrows to a history item."""
         self._update_message_detail()
 
-    def _update_message_detail(self):
+    def _update_message_detail(self, idx: Optional[int] = None):
         """Populate message_detail with the full text of the currently selected
         history item.
+
+        Args:
+            idx: Explicit list index to display. When None, reads GetSelection().
+                 Callers that just called SetSelection() should pass the index
+                 directly because GetSelection() can return a stale value on macOS
+                 when the ListBox does not have focus.
 
         Source priority:
           1. chat_item.descriptions[idx].text  (new flow - full untruncated text)
@@ -618,8 +625,9 @@ class ChatWindow(wx.Dialog):
 
         Changes the user makes in message_detail are intentionally not persisted.
         """
-        idx = self.history_list.GetSelection()
-        if idx == wx.NOT_FOUND:
+        if idx is None:
+            idx = self.history_list.GetSelection()
+        if idx == wx.NOT_FOUND or idx < 0:
             return
         try:
             if self.chat_item is not None:
@@ -704,8 +712,9 @@ class ChatWindow(wx.Dialog):
         self._refresh_attachment_panel()
         
         # Scroll to show new message
-        self.history_list.SetSelection(self.history_list.GetCount() - 1)
-        self._update_message_detail()
+        last_idx = self.history_list.GetCount() - 1
+        self.history_list.SetSelection(last_idx)
+        self._update_message_detail(last_idx)
 
         # Clear input
         self.input_text.Clear()
@@ -957,8 +966,9 @@ class ChatWindow(wx.Dialog):
         self.history_list.Append(display_text)
         
         # Select the new message (screen readers will announce it)
-        self.history_list.SetSelection(self.history_list.GetCount() - 1)
-        self._update_message_detail()
+        last_idx = self.history_list.GetCount() - 1
+        self.history_list.SetSelection(last_idx)
+        self._update_message_detail(last_idx)
 
         # Force screen reader announcement by setting focus briefly then returning it
         wx.CallAfter(self._announce_new_message, display_text)
