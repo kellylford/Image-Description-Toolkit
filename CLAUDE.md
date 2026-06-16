@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Image Description Toolkit (IDT) is an AI-powered batch image/video description tool with two standalone applications:
 - **`idt`** — CLI dispatcher (`idt/idt_cli.py`) routing to all sub-commands
-- **`ImageDescriber`** — wxPython batch processing GUI (`imagedescriber/imagedescriber_wx.py`) with integrated viewer, prompt editor, and configuration manager
+- **`ImageDescriber`** — wxPython batch processing GUI (`imagedescriber/imagedescriber_wx.py`) with integrated viewer (`viewer_components.py`), chat (`chat_window_wx.py`), workspace manager (`workspace_manager.py`), prompt editor, and configuration manager
 
 Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic), HuggingFace Florence-2.
 
@@ -81,6 +81,7 @@ Imported by CLI, GUI, and chat features. Never duplicate model lists elsewhere.
 
 ### Key Shared Utilities
 - `scripts/list_results.py` — `find_workflow_directories()`, `count_descriptions()`, `format_timestamp()`, `parse_directory_name()`
+- `scripts/workflow_utils.py` — `save_workflow_metadata()`, `load_workflow_metadata()` for `workflow_metadata.json` in each workflow dir
 - `analysis/combine_workflow_descriptions.py` — `get_image_date_for_sorting()` (EXIF priority order)
 - `shared/wx_common.py` — wxPython helpers
 - `scripts/workflow.py` — `sanitize_name()` for filesystem-safe names
@@ -100,9 +101,12 @@ except ImportError:
 ### wx Silent Failures
 wxPython **swallows all exceptions** in event handlers. When a button/menu/handler silently does nothing, run in dev mode first:
 ```bash
-cd imagedescriber && .winenv/Scripts/python imagedescriber_wx.py
+cd imagedescriber && .winenv/Scripts/python imagedescriber_wx.py   # Windows
+cd imagedescriber && python imagedescriber_wx.py                    # macOS
 ```
 Reproduce the action — the exception prints to stderr immediately. Do not investigate architecture before doing this.
+
+**Instructive example (8 hours wasted, April 2026):** A commit moved `logger = logging.getLogger(__name__)` from module scope into `main()`. Every event handler calling `logger.info(...)` silently raised `NameError`. `on_close`, `on_process_single`, and all other handlers appeared to do nothing; Alt+F4 was broken. Fix: 1 line. Discovery time in dev mode: under 30 seconds.
 
 ### Before Any Code Change
 1. `grep -r "name"` to find ALL usages before renaming/changing signatures
@@ -111,7 +115,7 @@ Reproduce the action — the exception prints to stderr immediately. Do not inve
 4. Functions >500 lines require extra scrutiny
 
 ### After Core File Changes
-For changes to `scripts/workflow.py`, `scripts/image_describer.py`, `idt/idt_cli.py`, or any file in `.spec` `hiddenimports`:
+For changes to `scripts/workflow.py`, `scripts/image_describer.py`, `idt/idt_cli.py`, or any file listed in `hiddenimports` in the per-app `.spec` files (e.g., `imagedescriber/imagedescriber_wx.spec`, `idt/idt.spec`):
 1. `python -m py_compile <file>`
 2. Build the exe
 3. Run with test data: `dist\idt.exe workflow testimages`
@@ -151,6 +155,5 @@ Create `docs/worktracking/YYYY-MM-DD-session-summary.md` for non-trivial session
 ## Additional Reference
 - `.github/copilot-instructions.md` — full agent guidelines and protocols
 - `docs/worktracking/PRE_COMMIT_VERIFICATION_CHECKLIST.md` — pre-commit checklist
-- `docs/AI_ONBOARDING.md` — current development status and active issues
 - `BuildAndRelease/BUILD_SYSTEM_REFERENCE.md` — build troubleshooting
 - `docs/archive/AI_AGENT_REFERENCE.md` — CLI reference, image optimization math, provider limits
