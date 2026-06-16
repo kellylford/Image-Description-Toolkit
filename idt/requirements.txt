@@ -37,7 +37,7 @@ beautifulsoup4>=4.9.0   # HTML parsing for web image extraction
 # ----------------------------------------------------------------------------
 # VIDEO PROCESSING (scripts/video_frame_extractor.py only)
 # ----------------------------------------------------------------------------
-opencv-python>=4.8.0    # Video frame extraction
+opencv-python>=4.13.0.92    # Video frame extraction
 numpy>=1.24.0           # Array operations (required by opencv-python)
 
 # ----------------------------------------------------------------------------
