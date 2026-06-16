@@ -1,0 +1,46 @@
+version: 2
+updates:
+  # Root requirements (core CLI/scripts)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # IDT CLI app
+  - package-ecosystem: "pip"
+    directory: "/idt"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # ImageDescriber GUI app
+  - package-ecosystem: "pip"
+    directory: "/imagedescriber"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # show_metadata tool
+  - package-ecosystem: "pip"
+    directory: "/tools/show_metadata"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
