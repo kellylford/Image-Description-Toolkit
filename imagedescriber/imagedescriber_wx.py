@@ -215,6 +215,7 @@ if getattr(sys, 'frozen', False):
         VideoExtractionDialog,
         ExportHtmlGalleryDialog,
         RescanFolderDialog,
+        EmbedDescriptionsDialog,
     )
     from workers_wx import (
         ProcessingWorker,
@@ -264,6 +265,7 @@ else:
             VideoExtractionDialog,
             ExportHtmlGalleryDialog,
             RescanFolderDialog,
+            EmbedDescriptionsDialog,
         )
         from .workers_wx import (
             ProcessingWorker,
@@ -312,6 +314,7 @@ else:
             VideoExtractionDialog,
             ExportHtmlGalleryDialog,
             RescanFolderDialog,
+            EmbedDescriptionsDialog,
         )
         from workers_wx import (
             ProcessingWorker,
@@ -1475,6 +1478,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
+
+        embed_item = file_menu.Append(wx.ID_ANY, "Em&bed Descriptions into Images...")
+        self.Bind(wx.EVT_MENU, self.on_embed_descriptions, embed_item)
 
         export_gallery_item = file_menu.Append(wx.ID_ANY, "Export &HTML Gallery...\tCtrl+Shift+G")
         self.Bind(wx.EVT_MENU, self.on_export_html_gallery, export_gallery_item)
@@ -4335,6 +4341,90 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, f"Successfully exported descriptions to:\n{file_path}")
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
+
+    def on_embed_descriptions(self, event):
+        """Embed AI descriptions into image metadata (EXIF/PNG tEXt chunk)."""
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace. Load a directory and process images first.")
+            return
+
+        described_items = [
+            item for item in self.workspace.items.values()
+            if item.descriptions
+        ]
+        if not described_items:
+            show_warning(self, "No described images found. Process your images first.")
+            return
+
+        dlg = EmbedDescriptionsDialog(self, len(described_items))
+        if dlg.ShowModal() != wx.ID_OK:
+            dlg.Destroy()
+            return
+
+        mode = dlg.get_mode()          # 'copy' or 'inplace'
+        output_dir = dlg.get_output_dir()  # Path or None
+        dlg.Destroy()
+
+        try:
+            from embed_descriptions import EmbedDescriptions
+        except ImportError:
+            try:
+                import sys as _sys
+                scripts_dir = Path(__file__).parent.parent / 'scripts'
+                if str(scripts_dir) not in _sys.path:
+                    _sys.path.insert(0, str(scripts_dir))
+                from embed_descriptions import EmbedDescriptions
+            except ImportError:
+                show_error(self, "embed_descriptions module is not available.")
+                return
+
+        in_place = (mode == 'inplace')
+
+        try:
+            with wx.BusyCursor():
+                workspace_data = self.workspace.to_dict()
+                embedder = EmbedDescriptions()
+                result = embedder.embed_from_workspace(
+                    workspace_data,
+                    output_dir=output_dir,
+                    in_place=in_place
+                )
+        except Exception as e:
+            show_error(self, f"Error embedding descriptions:\n{e}")
+            return
+
+        summary_lines = [result.summary()]
+        if output_dir and not in_place:
+            summary_lines.append(f"\nOutput folder:\n{output_dir}")
+
+        if result.errors:
+            summary_lines.append("\nErrors:")
+            summary_lines.extend(f"  {err}" for err in result.errors[:5])
+            if len(result.errors) > 5:
+                summary_lines.append(f"  ...and {len(result.errors) - 5} more")
+
+        msg = '\n'.join(summary_lines)
+
+        if result.embedded > 0 and output_dir and not in_place:
+            answer = wx.MessageBox(
+                msg + "\n\nOpen output folder?",
+                "Embed Complete",
+                wx.YES_NO | wx.ICON_INFORMATION,
+                self
+            )
+            if answer == wx.YES:
+                try:
+                    import subprocess as _sp
+                    if sys.platform == 'win32':
+                        _sp.Popen(['explorer', str(output_dir)])
+                    elif sys.platform == 'darwin':
+                        _sp.Popen(['open', str(output_dir)])
+                    else:
+                        _sp.Popen(['xdg-open', str(output_dir)])
+                except Exception:
+                    pass
+        else:
+            show_info(self, msg)
 
     def on_export_html_gallery(self, event):
         """Export described images as a self-contained HTML gallery folder."""

@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 """
-EXIF Embedder for Video Frames
-Converts video metadata to EXIF format and embeds in extracted frame JPEGs
+EXIF Embedder
+Embeds metadata (video provenance and AI-generated descriptions) into image files.
 """
 
 import piexif
+import piexif.helper
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
-from PIL import Image
+from PIL import Image, PngImagePlugin
+
+
+class UnsupportedFormatError(Exception):
+    """Raised when the image format does not support metadata embedding."""
+    pass
 
 
 class ExifEmbedder:
@@ -163,10 +169,10 @@ class ExifEmbedder:
     def _decimal_to_dms(self, decimal_degrees: float) -> tuple:
         """
         Convert decimal degrees to degrees, minutes, seconds for EXIF.
-        
+
         Args:
             decimal_degrees: Decimal degree value (e.g., 37.7749)
-        
+
         Returns:
             Tuple of three rationals: ((deg, 1), (min, 1), (sec, 100))
         """
@@ -174,13 +180,135 @@ class ExifEmbedder:
         minutes_decimal = (decimal_degrees - degrees) * 60
         minutes = int(minutes_decimal)
         seconds = (minutes_decimal - minutes) * 60
-        
+
         # Return as rational numbers (numerator, denominator)
         return (
             (degrees, 1),
             (minutes, 1),
             (int(seconds * 100), 100)  # Store seconds with 2 decimal places
         )
+
+    def embed_ai_description(self, image_path: Path, description: str,
+                             model: Optional[str] = None,
+                             timestamp: Optional[str] = None) -> bool:
+        """
+        Embed an AI-generated description into image file metadata.
+
+        Writes to EXIF ImageDescription (JPEG/TIFF), PNG tEXt chunk, or WebP EXIF.
+        All existing metadata is preserved. For JPEG/TIFF uses lossless EXIF insertion
+        (no image re-encoding). For HEIC/HEIF raises UnsupportedFormatError — caller
+        should convert to JPEG first.
+
+        Args:
+            image_path: Path to the image file to modify.
+            description: AI-generated description text to embed.
+            model: AI model name used for generating the description (attribution).
+            timestamp: Timestamp string for attribution.
+
+        Returns:
+            True on success.
+
+        Raises:
+            UnsupportedFormatError: Format cannot accept embedded metadata.
+            RuntimeError: Write failed for a supported format.
+        """
+        image_path = Path(image_path)
+        suffix = image_path.suffix.lower()
+
+        parts = ['IDT']
+        if model:
+            parts.append(model)
+        if timestamp:
+            parts.append(timestamp)
+        attribution = ' | '.join(parts)
+
+        if suffix in ('.jpg', '.jpeg', '.tiff', '.tif'):
+            return self._embed_jpeg_tiff(image_path, description, attribution)
+        elif suffix == '.png':
+            return self._embed_png(image_path, description)
+        elif suffix == '.webp':
+            return self._embed_webp(image_path, description, attribution)
+        elif suffix in ('.heic', '.heif'):
+            raise UnsupportedFormatError(
+                f"{image_path.name}: HEIC/HEIF cannot be written to directly. "
+                "Convert to JPEG first, then embed."
+            )
+        else:
+            raise UnsupportedFormatError(
+                f"{image_path.name}: format {suffix!r} is not supported for embedding."
+            )
+
+    def _embed_jpeg_tiff(self, image_path: Path, description: str, attribution: str) -> bool:
+        """Lossless EXIF update for JPEG/TIFF using piexif.insert (no image re-encoding)."""
+        try:
+            try:
+                exif_dict = piexif.load(str(image_path))
+            except Exception:
+                exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
+
+            exif_dict['0th'][piexif.ImageIFD.ImageDescription] = description.encode('utf-8')
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
+                attribution, encoding='unicode'
+            )
+
+            exif_bytes = piexif.dump(exif_dict)
+
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+            new_image_data = piexif.insert(exif_bytes, image_data)
+            with open(image_path, 'wb') as f:
+                f.write(new_image_data)
+
+            return True
+        except Exception as e:
+            raise RuntimeError(f"Failed to embed description in {image_path.name}: {e}") from e
+
+    def _embed_png(self, image_path: Path, description: str) -> bool:
+        """Embed description into PNG tEXt metadata chunk, preserving existing text chunks."""
+        try:
+            img = Image.open(image_path)
+            meta = PngImagePlugin.PngInfo()
+
+            existing_text = getattr(img, 'text', {}) or {}
+            for key, val in existing_text.items():
+                if key != 'Description':
+                    try:
+                        meta.add_text(key, val)
+                    except Exception:
+                        pass
+
+            meta.add_text('Description', description)
+            img.save(image_path, 'PNG', pnginfo=meta)
+            return True
+        except Exception as e:
+            raise RuntimeError(f"Failed to embed description in {image_path.name}: {e}") from e
+
+    def _embed_webp(self, image_path: Path, description: str, attribution: str) -> bool:
+        """Embed description into WebP via EXIF blob (requires re-save at high quality)."""
+        try:
+            try:
+                exif_dict = piexif.load(str(image_path))
+            except Exception:
+                exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
+
+            exif_dict['0th'][piexif.ImageIFD.ImageDescription] = description.encode('utf-8')
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
+                attribution, encoding='unicode'
+            )
+
+            exif_bytes = piexif.dump(exif_dict)
+
+            img = Image.open(image_path)
+            lossless = img.info.get('lossless', False)
+            save_kwargs: Dict[str, Any] = {'exif': exif_bytes}
+            if lossless:
+                save_kwargs['lossless'] = True
+            else:
+                save_kwargs['quality'] = 95
+            img.save(image_path, 'WEBP', **save_kwargs)
+            return True
+        except Exception as e:
+            raise RuntimeError(f"Failed to embed description in {image_path.name}: {e}") from e
 
 
 def main():

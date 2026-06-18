@@ -17,7 +17,7 @@
 9. [Downloading Images from the Web](#9-downloading-images-from-the-web)
 10. [Viewing and Managing Results](#10-viewing-and-managing-results)
 11. [Built-In Tools (Prompt Editor and Configuration Manager)](#11-built-in-tools-prompt-editor-and-configuration-manager)
-12. [Exporting Descriptions](#12-exporting-descriptions)
+12. [Exporting and Embedding Descriptions](#12-exporting-and-embedding-descriptions)
 13. [CLI Fundamentals](#13-cli-fundamentals)
 14. [Running Workflows from the CLI](#14-running-workflows-from-the-cli)
 15. [CLI Utility Commands](#15-cli-utility-commands)
@@ -410,7 +410,7 @@ The Prompt Editor and Configuration Manager are built into ImageDescriber's Tool
 
 ---
 
-## 12. Exporting Descriptions
+## 12. Exporting and Embedding Descriptions
 
 ### Automatic Outputs (Created by Every Workflow Run)
 
@@ -561,6 +561,88 @@ To share the gallery, zip the entire output folder and send it, or copy it to an
 
 ---
 
+### Embedding Descriptions into Image Metadata
+
+The **Embed Descriptions into Images** feature writes AI-generated descriptions directly into the metadata of the image files themselves — as standard EXIF fields (JPEG/TIFF), PNG text chunks, or WebP EXIF data. Once embedded, the description travels with the image whenever it is copied, attached to an email, posted, or moved between folders. Any application that reads image metadata (File Explorer, macOS Finder, Lightroom, Photos, etc.) can see it.
+
+> **This is the permanent association step.** Descriptions stored in IDT's sidecar files stay with the IDT workspace. Descriptions embedded into the image stay with the image file forever, regardless of where it goes.
+
+#### What Gets Written
+
+| Format | Where the Description Is Stored |
+|--------|--------------------------------|
+| JPEG, TIFF | EXIF `Image Description` field (standard caption field) + attribution in `User Comment` |
+| PNG | `tEXt` metadata chunk with the key `Description` |
+| WebP | EXIF `Image Description` field |
+| HEIC | Copy mode: produces a JPEG copy with the description embedded. In-place mode: skipped (HEIC write-back is not supported). |
+
+For JPEG and TIFF, embedding is **lossless** — the image pixel data is not re-encoded.
+
+When an image has more than one AI description, the most recent description is embedded.
+
+---
+
+#### Embedding from ImageDescriber (GUI)
+
+1. Open a workspace that contains described images.
+2. Choose **File → Embed Descriptions into Images…**
+3. The embed dialog opens with two mode options:
+
+   **Create copies with descriptions embedded** *(recommended — default)*
+   Copies of your images are written to an output folder you choose. Your original files are not touched. The default output folder is `~/Pictures/IDT_Embedded`.
+
+   **Embed into original files**
+   Writes the description directly into each original image file. You must check the confirmation box ("I understand this modifies my original image files") to enable this mode.
+
+4. Click **Embed**. A progress cursor appears while IDT works.
+5. When complete, a summary shows how many images were embedded, any skipped files (unsupported format), and any errors. If you used copy mode, you are offered the option to open the output folder.
+
+---
+
+#### Embedding from the CLI (`idt embed`)
+
+The `idt embed` command reads descriptions from a completed workflow directory and embeds them into the original source images (resolved via the workflow's `file_path_mapping.json`).
+
+```bash
+# Create copies with descriptions embedded (safe default — originals untouched)
+idt embed wf_2026-06-18_143022_claude_Detailed/
+
+# Specify a custom output folder for the copies
+idt embed wf_2026-06-18_143022_claude_Detailed/ --output-dir ~/Pictures/WithDescriptions/
+
+# Preview what would happen without writing anything
+idt embed wf_2026-06-18_143022_claude_Detailed/ --dry-run
+
+# Embed directly into original files (modifies originals)
+idt embed wf_2026-06-18_143022_claude_Detailed/ --in-place
+```
+
+**Output (copy mode):** A folder named `embedded_images/` is created inside the workflow directory (or the folder you specify with `--output-dir`). It contains copies of each original image with the description embedded. Originals are not modified.
+
+**Output (in-place):** The original source images are updated in place. No copies are made.
+
+**`--dry-run`:** Reports exactly which images would be embedded and where, without writing any files. Use this first when working with important photo libraries.
+
+#### Supported Image Formats
+
+| Format | Support |
+|--------|---------|
+| JPEG, JPG | Full support — lossless EXIF update |
+| TIFF, TIF | Full support — lossless EXIF update |
+| PNG | Full support — tEXt chunk |
+| WebP | Supported — requires image re-save at quality 95 |
+| HEIC, HEIF | Copy mode only (produces a JPEG copy); in-place not supported |
+
+#### Verifying the Embedded Description
+
+**On macOS:** Select the image in Finder, press `Cmd+I` (Get Info), and look in the **Comments** section. Or open the image in Preview and choose **Tools → Show Inspector → EXIF**.
+
+**On Windows:** Right-click the image, choose Properties → Details tab. Look for **Description** or **Comment** under the Image section.
+
+**With any photo app:** Applications that respect the EXIF `Image Description` field (Lightroom Classic, Adobe Bridge, Photos on macOS) will display the embedded text in their metadata panels.
+
+---
+
 ## 13. CLI Fundamentals
 
 ```
@@ -699,6 +781,18 @@ idt convert-images ~/Photos/iPhone
 
 # Convert recursively with custom quality
 idt convert-images ~/Photos/iPhone --recursive --quality 90
+
+# Embed descriptions into image file metadata (creates copies by default — originals untouched)
+idt embed wf_2026-03-28_ollama_moondream_narrative_120000/
+
+# Embed with a specific output folder
+idt embed wf_2026-03-28_ollama_moondream_narrative_120000/ --output-dir ~/Pictures/WithDescriptions/
+
+# Dry-run: see what would be embedded without writing anything
+idt embed wf_2026-03-28_ollama_moondream_narrative_120000/ --dry-run
+
+# Embed directly into original files (modifies originals — use with care)
+idt embed wf_2026-03-28_ollama_moondream_narrative_120000/ --in-place
 
 # Regenerate the HTML report from existing descriptions (no new AI calls)
 idt descriptions-to-html Descriptions/wf_2026-03-28_ollama_moondream_narrative_120000/image_descriptions.txt

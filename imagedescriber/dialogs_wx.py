@@ -1742,3 +1742,166 @@ class RescanFolderDialog(wx.Dialog):
     def _on_apply(self, event):
         self.handle_missing = "remove" if self._remove_rb.GetValue() else "keep"
         self.EndModal(wx.ID_OK)
+
+
+class EmbedDescriptionsDialog(wx.Dialog):
+    """Dialog for embedding AI descriptions into image file metadata.
+
+    Presents two modes:
+      - Copy mode (default): creates copies of images in an output folder with
+        descriptions embedded. Originals are never modified.
+      - In-place mode: embeds directly into the original image files.
+        Requires an explicit confirmation checkbox.
+    """
+
+    def __init__(self, parent, image_count: int):
+        super().__init__(
+            parent,
+            title='Embed Descriptions into Images',
+            style=wx.DEFAULT_DIALOG_STYLE,
+        )
+        self._image_count = image_count
+        self._output_dir: Optional[Path] = None
+        self._init_ui()
+        self.SetSize((520, -1))
+        self.Fit()
+        self.Centre()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _init_ui(self):
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        intro = wx.StaticText(
+            self,
+            label=f"Embed AI descriptions as metadata in {self._image_count} image(s).\n"
+                  "The description text will be stored in the image file so it travels\n"
+                  "with the image when copied, shared, or posted.\n\n"
+                  "Supported formats: JPEG, TIFF, PNG, WebP",
+        )
+        main_sizer.Add(intro, 0, wx.ALL, 12)
+
+        # ---- Mode selection ----
+        mode_box = wx.StaticBox(self, label='Write Mode')
+        mode_sizer = wx.StaticBoxSizer(mode_box, wx.VERTICAL)
+
+        self._copy_rb = wx.RadioButton(
+            self, label='&Create copies with descriptions embedded (recommended)',
+            style=wx.RB_GROUP, name='Copy mode'
+        )
+        self._copy_rb.SetValue(True)
+        mode_sizer.Add(self._copy_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
+
+        copy_note = wx.StaticText(
+            self,
+            label="   Copies are saved to an output folder. Your original files\n"
+                  "   are not modified.",
+        )
+        mode_sizer.Add(copy_note, 0, wx.LEFT | wx.BOTTOM, 8)
+
+        self._inplace_rb = wx.RadioButton(
+            self, label='&Embed into original files', name='In-place mode'
+        )
+        mode_sizer.Add(self._inplace_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
+
+        self._confirm_check = wx.CheckBox(
+            self,
+            label='I understand this modifies my original image files',
+            name='Confirm in-place modification'
+        )
+        self._confirm_check.Enable(False)
+        mode_sizer.Add(self._confirm_check, 0, wx.LEFT | wx.BOTTOM, 24)
+
+        main_sizer.Add(mode_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
+        # ---- Output folder (copy mode only) ----
+        self._out_box = wx.StaticBox(self, label='Output Folder')
+        out_sizer = wx.StaticBoxSizer(self._out_box, wx.VERTICAL)
+
+        default_out = str(Path.home() / 'Pictures' / 'IDT_Embedded')
+        path_row = wx.BoxSizer(wx.HORIZONTAL)
+        self._path_ctrl = wx.TextCtrl(self, value=default_out, name='Output folder path')
+        set_accessible_name(self._path_ctrl, 'Output folder path')
+        path_row.Add(self._path_ctrl, 1, wx.EXPAND | wx.RIGHT, 6)
+
+        self._browse_btn = wx.Button(self, label='&Browse...')
+        set_accessible_name(self._browse_btn, 'Browse for output folder')
+        self._browse_btn.Bind(wx.EVT_BUTTON, self._on_browse)
+        path_row.Add(self._browse_btn, 0)
+
+        out_sizer.Add(path_row, 0, wx.ALL | wx.EXPAND, 6)
+        main_sizer.Add(out_sizer, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
+
+        # ---- Buttons ----
+        btn_sizer = wx.StdDialogButtonSizer()
+        self._ok_btn = wx.Button(self, wx.ID_OK, label='&Embed')
+        self._ok_btn.SetDefault()
+        btn_sizer.AddButton(self._ok_btn)
+        cancel_btn = wx.Button(self, wx.ID_CANCEL)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        main_sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 10)
+
+        self.SetSizer(main_sizer)
+
+        # Bindings
+        self._copy_rb.Bind(wx.EVT_RADIOBUTTON, self._on_mode_change)
+        self._inplace_rb.Bind(wx.EVT_RADIOBUTTON, self._on_mode_change)
+        self._confirm_check.Bind(wx.EVT_CHECKBOX, self._on_confirm_change)
+        self._ok_btn.Bind(wx.EVT_BUTTON, self._on_ok)
+
+    # ------------------------------------------------------------------
+    # Event handlers
+    # ------------------------------------------------------------------
+
+    def _on_mode_change(self, event):
+        in_place = self._inplace_rb.GetValue()
+        self._confirm_check.Enable(in_place)
+        self._path_ctrl.Enable(not in_place)
+        self._browse_btn.Enable(not in_place)
+        if in_place:
+            self._confirm_check.SetValue(False)
+            self._ok_btn.Enable(False)
+        else:
+            self._ok_btn.Enable(True)
+
+    def _on_confirm_change(self, event):
+        if self._inplace_rb.GetValue():
+            self._ok_btn.Enable(self._confirm_check.GetValue())
+
+    def _on_browse(self, event):
+        dlg = wx.DirDialog(
+            self, 'Choose output folder for embedded image copies',
+            defaultPath=self._path_ctrl.GetValue(),
+            style=wx.DD_DEFAULT_STYLE | wx.DD_NEW_DIR_BUTTON
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            self._path_ctrl.SetValue(dlg.GetPath())
+        dlg.Destroy()
+
+    def _on_ok(self, event):
+        if self._copy_rb.GetValue():
+            path_str = self._path_ctrl.GetValue().strip()
+            if not path_str:
+                wx.MessageBox(
+                    "Please enter an output folder path.",
+                    "Output folder required",
+                    wx.OK | wx.ICON_WARNING, self
+                )
+                return
+            self._output_dir = Path(path_str)
+        self.EndModal(wx.ID_OK)
+
+    # ------------------------------------------------------------------
+    # Result accessors
+    # ------------------------------------------------------------------
+
+    def get_mode(self) -> str:
+        """Return 'copy' or 'inplace'."""
+        return 'inplace' if self._inplace_rb.GetValue() else 'copy'
+
+    def get_output_dir(self) -> Optional[Path]:
+        """Return the chosen output directory (copy mode only, else None)."""
+        return self._output_dir

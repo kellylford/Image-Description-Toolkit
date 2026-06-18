@@ -653,6 +653,36 @@ def main():
             result = subprocess.run(cmd, cwd=str(script_path.parent))
             return result.returncode
     
+    elif command == 'embed':
+        # Embed AI descriptions into image metadata
+        if getattr(sys, 'frozen', False):
+            try:
+                scripts_path = get_resource_path('scripts')
+                if str(scripts_path) not in sys.path:
+                    sys.path.insert(0, str(scripts_path))
+                import embed_descriptions as ed
+                original_argv = sys.argv[:]
+                sys.argv = ['idt embed'] + sys.argv[2:]
+                try:
+                    return ed.main()
+                except SystemExit as e:
+                    return e.code if e.code is not None else 0
+                finally:
+                    sys.argv = original_argv
+            except ImportError as e:
+                print(f"Error: Could not import embed_descriptions module: {e}")
+                return 1
+        else:
+            script_path = get_resource_path('scripts/embed_descriptions.py')
+            if not script_path.exists():
+                print(f"Error: embed_descriptions.py not found at {script_path}")
+                return 1
+            import subprocess
+            args = sys.argv[2:]
+            cmd = [sys.executable, str(script_path)] + args
+            result = subprocess.run(cmd, cwd=str(script_path.parent))
+            return result.returncode
+
     elif command == 'convert-images':
         # Convert HEIC images to JPG (ConvertImage.py)
         if getattr(sys, 'frozen', False):
@@ -808,6 +838,7 @@ COMMANDS:
     describe-video        Generate an AI description for a standalone video file
     convert-images        Convert HEIC/HEIF images to JPEG
     descriptions-to-html  Generate HTML report from a workflow descriptions file
+    embed                 Embed AI descriptions into image file metadata
     version               Show version information
     help                  Show this help message
 
@@ -905,6 +936,19 @@ CONVERT IMAGES OPTIONS (idt convert-images):
     --log-dir <dir>                           Directory for log files
     --verbose, -v                             Enable verbose logging
     --quiet                                   Suppress console output
+
+EMBED OPTIONS (idt embed):
+    workflow_dir                              Workflow output directory (wf_*/)
+    --output-dir, -o <dir>                    Directory for embedded copies
+                                              (default: workflow_dir/embedded_images/)
+    --in-place                                Embed into original files directly
+                                              (modifies your original image files)
+    --dry-run                                 Show what would be embedded without writing
+    --verbose, -v                             Enable verbose logging
+
+  By default, copies of each image are created with the description embedded in the
+  metadata (EXIF ImageDescription for JPEG/TIFF, tEXt chunk for PNG). Originals are
+  not modified. Use --in-place to embed into originals directly.
 
 DESCRIPTIONS TO HTML OPTIONS (idt descriptions-to-html):
     input_file                                Descriptions text file
@@ -1015,6 +1059,18 @@ EXAMPLES:
 
     # Convert HEIC images recursively with custom quality
     {base_call} convert-images photos/ --recursive --quality 90
+
+    # Embed descriptions into image copies (safe default — originals untouched)
+    {base_call} embed wf_2025-01-15_143022_llava_Simple/
+
+    # Embed into a specific output folder
+    {base_call} embed wf_2025-01-15_143022_llava_Simple/ --output-dir ~/Pictures/WithDescriptions/
+
+    # Preview what would be embedded without writing
+    {base_call} embed wf_2025-01-15_143022_llava_Simple/ --dry-run
+
+    # Embed directly into original files (modifies originals)
+    {base_call} embed wf_2025-01-15_143022_llava_Simple/ --in-place
 
     # Generate HTML report from a workflow's descriptions file
     {base_call} descriptions-to-html wf_2025-01-15_143022_llava_Simple/image_descriptions.txt
