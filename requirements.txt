@@ -76,9 +76,12 @@ pillow-heif>=1.4.0     # HEIC/HEIF image format conversion
 # Enables --provider mlx for on-device AI descriptions via scripts/workflow.py
 # and scripts/image_describer.py. Automatically installed on macOS by macsetup.sh.
 # If not installed, the MLX provider is silently disabled at import time.
-mlx-vlm>=0.3.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'
+# 0.6.x is required to LOAD the Qwen3-VL models in the known-good list: 0.4.x
+# fails at runtime with "Unrecognized video processor" on transformers 5.x.
+# Verified working: mlx-vlm 0.6.3 + transformers 5.5.0 (older Qwen2.x/Gemma still load).
+mlx-vlm>=0.6.3 ; sys_platform == 'darwin' and platform_machine == 'arm64'
 # Required for models whose transformers processors use return_tensors="pt"
-# (e.g. phi-3.5-vision). Qwen2-VL models work without torch.
+# (e.g. phi-3.5-vision). Qwen2-VL / Qwen3-VL models work without torch.
 torch>=2.0.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'
 torchvision ; sys_platform == 'darwin' and platform_machine == 'arm64'
 

@@ -298,6 +298,15 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
 
     if provider == "mlx":
         _mlx_descriptions = {
+            "mlx-community/Qwen3-VL-4B-Instruct-4bit":
+                "★ Recommended · Alibaba Qwen3-VL · 4 B params · ~3.1 GB download\n"
+                "Current best quality/speed balance for on-device captioning (2026). "
+                "Upgraded visual perception, OCR and spatial reasoning over Qwen2.5-VL. "
+                "Runs comfortably on 16 GB Apple Silicon. Best default for most users.",
+            "mlx-community/Qwen3-VL-8B-Instruct-4bit":
+                "Alibaba Qwen3-VL · 8 B params · ~5.8 GB download\n"
+                "Higher quality than the 4B with richer, more accurate descriptions. "
+                "16 GB+ Apple Silicon recommended. Choose when quality matters more than speed.",
             "mlx-community/Qwen2-VL-2B-Instruct-4bit":
                 "Alibaba Qwen2-VL · 2 B params · ~1.5 GB download\n"
                 "Fastest Qwen option (~35 tok/s on M-series). Solid all-round descriptions "
@@ -967,10 +976,11 @@ class ProcessingOptionsDialog(wx.Dialog):
                     except ImportError:
                         _MLXProvider = None
                 mlx_models = _MLXProvider.KNOWN_MODELS if _MLXProvider else [
+                    "mlx-community/Qwen3-VL-4B-Instruct-4bit",
+                    "mlx-community/Qwen3-VL-8B-Instruct-4bit",
                     "mlx-community/Qwen2-VL-2B-Instruct-4bit",
                     "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",
                     "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
-                    "mlx-community/llava-1.5-7b-4bit",
                 ]
                 default_mlx = self.config.get('default_model', mlx_models[0])
                 for model in mlx_models:
