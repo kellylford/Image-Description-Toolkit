@@ -253,11 +253,8 @@ class ExifEmbedder:
 
             exif_bytes = piexif.dump(exif_dict)
 
-            with open(image_path, 'rb') as f:
-                image_data = f.read()
-            new_image_data = piexif.insert(exif_bytes, image_data)
-            with open(image_path, 'wb') as f:
-                f.write(new_image_data)
+            # piexif.insert with a filename reads and writes back in place (lossless)
+            piexif.insert(exif_bytes, str(image_path))
 
             return True
         except Exception as e:
