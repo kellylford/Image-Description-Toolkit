@@ -114,7 +114,7 @@ def export_html(project: Project, filename: str = "descriptions.html") -> Path:
         raise ValueError("No described images to export.")
 
     folder_name = project.source_dir.name
-    generated = datetime.now().strftime("%-m/%-d/%Y %-I:%M %p")
+    generated = _format_datetime(datetime.now())
     n = len(items)
     models_used = sorted({i.active_description.model for i in items if i.active_description})
 
@@ -289,3 +289,10 @@ def export_txt(project: Project, filename: str = "descriptions.txt") -> Path:
 def _h(text: str) -> str:
     """HTML-escape a string."""
     return _html.escape(str(text), quote=True)
+
+
+def _format_datetime(dt: datetime) -> str:
+    """Format a datetime as M/D/YYYY H:MMA/P — no leading zeros, cross-platform."""
+    hour = dt.hour % 12 or 12
+    ampm = "A" if dt.hour < 12 else "P"
+    return f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{ampm}"

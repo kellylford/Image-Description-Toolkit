@@ -49,8 +49,12 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
         from idt_core.providers.openai_provider import OpenAIProvider, DEFAULT_MODEL
         return OpenAIProvider(model=model or DEFAULT_MODEL)
 
+    if provider == "florence":
+        from idt_core.providers.florence import FlorenceProvider, DEFAULT_MODEL
+        return FlorenceProvider(model=model or DEFAULT_MODEL)
+
     print(f"Unknown provider: {provider!r}", file=sys.stderr)
-    print("Valid providers: anthropic, ollama, openai", file=sys.stderr)
+    print("Valid providers: anthropic, ollama, openai, florence", file=sys.stderr)
     sys.exit(1)
 
 
@@ -79,6 +83,14 @@ def cmd_describe(args):
     from idt_core.pipeline import Pipeline, RunOptions
     from idt_core.progress import Progress
     from idt_core.config import UserConfig
+
+    # ---- stdin mode ----
+    # idt describe - [--project <dir>]  or  some_cmd | idt describe --stdin
+    stdin_mode = getattr(args, "stdin", False) or args.source == "-"
+
+    if stdin_mode:
+        _cmd_describe_stdin(args)
+        return
 
     source = Path(args.source).resolve()
     if not source.is_dir():
@@ -141,6 +153,123 @@ def cmd_describe(args):
     progress.summary(described=described, errors=errors)
 
 
+def _cmd_describe_stdin(args):
+    """
+    Describe a list of image paths read from stdin, one per line.
+    All images must share a common ancestor directory (the project root).
+    Use --project to specify where the .idt/ mirror should live if paths
+    don't share an obvious common root.
+
+    Pipeline use case:
+      get_nyt_images.sh | idt describe - --prompt news --provider anthropic
+    """
+    from idt_core.project import Project
+    from idt_core.image_item import ImageItem
+    from idt_core.pipeline import Pipeline, RunOptions, PipelineEvent
+    from idt_core.progress import Progress
+    from idt_core.config import UserConfig
+    from idt_core.converter import load_for_api
+    from idt_core.image_item import Description
+
+    paths = [
+        Path(line.strip()).resolve()
+        for line in sys.stdin
+        if line.strip() and not line.startswith("#")
+    ]
+    if not paths:
+        print("No image paths received on stdin.", file=sys.stderr)
+        sys.exit(1)
+
+    missing = [p for p in paths if not p.exists()]
+    if missing:
+        for p in missing:
+            print(f"Warning: not found: {p}", file=sys.stderr)
+        paths = [p for p in paths if p.exists()]
+        if not paths:
+            sys.exit(1)
+
+    # Determine project root: explicit --project, or common ancestor of all paths
+    if getattr(args, "project", None):
+        source = Path(args.project).resolve()
+    else:
+        source = _common_ancestor(paths)
+
+    project = Project.open(source)
+    user_cfg = UserConfig.load()
+
+    provider_name = args.provider or project.config.default_provider or user_cfg.default_provider
+    model = args.model or project.config.default_model or user_cfg.default_model
+    prompt_name, prompt_text = _resolve_prompt(args, project.config)
+    provider = _make_provider(provider_name, model, args.ollama_host)
+
+    if not args.quiet:
+        print(f"Project:  {project.idt_dir}")
+        print(f"Provider: {provider_name}  model: {model}")
+        print(f"Images:   {len(paths)} from stdin")
+        print()
+
+    progress = Progress(total=len(paths), quiet=args.quiet)
+    described = errors = 0
+
+    for img_path in paths:
+        # Build or load the ImageItem for this specific file
+        try:
+            rel = img_path.relative_to(source)
+        except ValueError:
+            print(f"Warning: {img_path} is outside project root {source} — skipping", file=sys.stderr)
+            continue
+
+        sidecar = project.sidecar_path(img_path)
+        if sidecar.exists():
+            item = ImageItem.load(sidecar)
+        else:
+            item = ImageItem(source_path=img_path, sidecar_path=sidecar)
+
+        if item.described and not args.redescribe:
+            progress.skip(img_path.name, "already described")
+            continue
+
+        try:
+            image_bytes, mime_type = load_for_api(img_path)
+            result = provider.describe(image_bytes, mime_type, prompt_text)
+            desc = Description.create(
+                text=result.text,
+                model=result.model,
+                provider=result.provider,
+                prompt_name=prompt_name,
+                prompt_text=prompt_text,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+            )
+            item.add_description(desc)
+            item.save()
+            described += 1
+            progress.update(img_path.name, success=True)
+
+            # In quiet mode, print filename TAB description for piping
+            if args.quiet:
+                print(f"{img_path}\t{result.text}")
+
+        except Exception as exc:
+            errors += 1
+            progress.update(img_path.name, success=False, error=str(exc))
+
+    progress.summary(described=described, errors=errors)
+
+
+def _common_ancestor(paths: list[Path]) -> Path:
+    """Return the deepest common directory ancestor of a list of paths."""
+    if not paths:
+        raise ValueError("No paths given")
+    if len(paths) == 1:
+        return paths[0].parent
+    common = paths[0].parent
+    for p in paths[1:]:
+        while common != p and not str(p).startswith(str(common)):
+            common = common.parent
+    return common
+
+
 def cmd_status(args):
     from idt_core.project import Project
 
@@ -168,7 +297,9 @@ def cmd_status(args):
         from datetime import datetime, timezone
         try:
             dt = datetime.fromisoformat(st["last_run"]).astimezone()
-            last = dt.strftime("%-m/%-d/%Y %-I:%M%p").lower().replace("am", "A").replace("pm", "P")
+            hour = dt.hour % 12 or 12
+            ampm = "A" if dt.hour < 12 else "P"
+            last = f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{ampm}"
         except Exception:
             last = st["last_run"]
         print(f"Last run:    {last}")
@@ -478,6 +609,8 @@ Examples:
   idt export ~/Pictures/Vacation/ --format csv
   idt watch ~/Downloads/NYT/ --interval 60 --prompt news
   idt watch ~/Downloads/NYT/ --quiet >> ~/nyt_descriptions.tsv
+  get_nyt_images.sh | idt describe - --prompt news --provider anthropic
+  idt describe - --provider florence < image_list.txt
   idt prompts
   idt config --set default_provider=anthropic
 
@@ -498,9 +631,20 @@ Supported providers:
         description="Describe images in a directory. Creates a .idt/ mirror directory next to "
                     "the source to store descriptions. Originals are never modified.",
     )
-    p_desc.add_argument("source", help="Directory containing images to describe")
     p_desc.add_argument(
-        "--provider", choices=["anthropic", "ollama", "openai"],
+        "source",
+        help="Directory containing images, or '-' to read image paths from stdin",
+    )
+    p_desc.add_argument(
+        "--stdin", action="store_true",
+        help="Read image file paths from stdin (one per line). Same as passing '-' as source.",
+    )
+    p_desc.add_argument(
+        "--project", metavar="DIR",
+        help="Project directory to use when reading from stdin (default: common ancestor of input paths)",
+    )
+    p_desc.add_argument(
+        "--provider", choices=["anthropic", "ollama", "openai", "florence"],
         help="AI provider (default: from project config, then ~/.idt/config.json, then anthropic)",
     )
     p_desc.add_argument("--model", metavar="NAME", help="Model name")
@@ -602,7 +746,7 @@ Supported providers:
         help="Polling interval in seconds (default: 30)",
     )
     p_watch.add_argument(
-        "--provider", choices=["anthropic", "ollama", "openai"],
+        "--provider", choices=["anthropic", "ollama", "openai", "florence"],
         help="AI provider",
     )
     p_watch.add_argument("--model", metavar="NAME", help="Model name")
