@@ -3,6 +3,7 @@
 idt — Image Description Toolkit CLI
 
 Usage:
+  idt guide                         Interactive setup wizard (start here)
   idt describe <directory> [options]
   idt download <url> [directory] [options]
   idt status   <directory>
@@ -1045,6 +1046,116 @@ def cmd_prompts(args):
 # config                                                               #
 # ------------------------------------------------------------------ #
 
+def cmd_stats(args):
+    """
+    Show token usage and cost estimates across a project.
+
+    idt stats ~/Pictures/Vacation/
+    idt stats ~/Pictures/ --all
+    idt stats ~/Pictures/Vacation/ --json
+    """
+    from idt_core.project import Project
+
+    root = Path(args.source).resolve()
+
+    if args.all:
+        idt_dirs = sorted(root.rglob("*.idt"))
+        projects = []
+        for idt_dir in idt_dirs:
+            source = idt_dir.parent / idt_dir.stem
+            if source.is_dir():
+                try:
+                    projects.append(Project.open(source))
+                except Exception:
+                    pass
+        if not projects:
+            print(f"No IDT projects found under: {root}")
+            return
+    else:
+        if not root.is_dir():
+            print(f"Error: not a directory: {root}", file=sys.stderr)
+            sys.exit(1)
+        projects = [Project.open(root)]
+
+    # Accumulate stats per provider+model
+    totals: dict = {}  # (provider, model) -> {images, input_tokens, output_tokens}
+    grand_images = grand_in = grand_out = 0
+    no_token_count = 0
+
+    for project in projects:
+        for item in project.described():
+            desc = item.active_description
+            if not desc:
+                continue
+            key = (desc.provider or "unknown", desc.model or "unknown")
+            if key not in totals:
+                totals[key] = {"images": 0, "input_tokens": 0, "output_tokens": 0}
+            totals[key]["images"] += 1
+            grand_images += 1
+            if desc.input_tokens:
+                totals[key]["input_tokens"] += desc.input_tokens
+                grand_in += desc.input_tokens
+            else:
+                no_token_count += 1
+            if desc.output_tokens:
+                totals[key]["output_tokens"] += desc.output_tokens
+                grand_out += desc.output_tokens
+
+    if not totals:
+        print("No described images found.")
+        return
+
+    # Rough cost table (USD per 1M tokens, input/output)
+    COST_TABLE = {
+        "claude-opus-4-8":             (15.0,  75.0),
+        "claude-opus-4-6":             (15.0,  75.0),
+        "claude-sonnet-4-6":           (3.0,   15.0),
+        "claude-haiku-4-5-20251001":   (0.8,   4.0),
+        "claude-haiku-3-5-20241022":   (0.8,   4.0),
+        "gpt-4o":                      (2.5,   10.0),
+        "gpt-4o-mini":                 (0.15,  0.6),
+    }
+
+    if args.json_out:
+        rows = []
+        for (prov, model), d in sorted(totals.items()):
+            cost_in, cost_out = COST_TABLE.get(model, (0, 0))
+            cost = (d["input_tokens"] / 1_000_000 * cost_in +
+                    d["output_tokens"] / 1_000_000 * cost_out)
+            rows.append({
+                "provider": prov, "model": model,
+                "images": d["images"],
+                "input_tokens": d["input_tokens"],
+                "output_tokens": d["output_tokens"],
+                "estimated_cost_usd": round(cost, 4) if cost else None,
+            })
+        print(json.dumps(rows, indent=2))
+        return
+
+    print(f"Described images: {grand_images}")
+    if no_token_count:
+        print(f"  (Token data missing for {no_token_count} images — local models don't report tokens)")
+    print()
+    print(f"{'Provider':<12} {'Model':<35} {'Images':>7} {'Input tok':>10} {'Output tok':>11} {'Est. cost':>10}")
+    print("-" * 90)
+
+    for (prov, model), d in sorted(totals.items()):
+        cost_in_rate, cost_out_rate = COST_TABLE.get(model, (0, 0))
+        cost = (d["input_tokens"] / 1_000_000 * cost_in_rate +
+                d["output_tokens"] / 1_000_000 * cost_out_rate)
+        cost_str = f"${cost:.4f}" if cost else "n/a"
+        in_str = f"{d['input_tokens']:,}" if d["input_tokens"] else "n/a"
+        out_str = f"{d['output_tokens']:,}" if d["output_tokens"] else "n/a"
+        print(f"{prov:<12} {model:<35} {d['images']:>7} {in_str:>10} {out_str:>11} {cost_str:>10}")
+
+    if len(totals) > 1:
+        total_cost_str = ""
+        total_in_str = f"{grand_in:,}" if grand_in else "n/a"
+        total_out_str = f"{grand_out:,}" if grand_out else "n/a"
+        print("-" * 90)
+        print(f"{'TOTAL':<12} {'':<35} {grand_images:>7} {total_in_str:>10} {total_out_str:>11} {total_cost_str:>10}")
+
+
 def cmd_config(args):
     from idt_core.config import UserConfig
 
@@ -1077,6 +1188,15 @@ def cmd_config(args):
 
 
 # ------------------------------------------------------------------ #
+# guide                                                                #
+# ------------------------------------------------------------------ #
+
+def cmd_guide(args):
+    from cli.guide import run_guide
+    run_guide()
+
+
+# ------------------------------------------------------------------ #
 # Argument parser                                                      #
 # ------------------------------------------------------------------ #
 
@@ -1087,6 +1207,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  idt guide                                              # start here — interactive wizard
   idt describe ~/Pictures/Vacation/
   idt describe ~/Pictures/Vacation/ --provider anthropic --model claude-opus-4-6
   idt describe ~/Pictures/Vacation/ --provider ollama --model llava
@@ -1114,6 +1235,8 @@ Examples:
   idt models
   idt models --provider ollama
   idt prompts
+  idt stats ~/Pictures/Vacation/
+  idt stats ~/Pictures/ --all                           # across entire photo library
   idt config --set default_provider=anthropic
   idt config --set default_model=claude-opus-4-6
 
@@ -1346,12 +1469,46 @@ Supported providers:
     p_prompts.set_defaults(func=cmd_prompts)
 
     # ---------------------------------------------------------------- #
+    # stats                                                              #
+    # ---------------------------------------------------------------- #
+    p_stats = sub.add_parser(
+        "stats",
+        help="Show token usage and cost estimates for a project",
+        description=(
+            "Summarise token counts and estimated API costs across all described "
+            "images, broken down by provider and model. Local models (Ollama, "
+            "Florence) do not report tokens so no cost is shown for them."
+        ),
+    )
+    p_stats.add_argument("source", help="Source directory (or parent directory with --all)")
+    p_stats.add_argument("--all", action="store_true",
+                         help="Scan entire directory tree for IDT projects")
+    p_stats.add_argument("--json", dest="json_out", action="store_true",
+                         help="Output as JSON")
+    p_stats.set_defaults(func=cmd_stats)
+
+    # ---------------------------------------------------------------- #
     # config                                                             #
     # ---------------------------------------------------------------- #
     p_config = sub.add_parser("config", help="View or set default configuration")
     p_config.add_argument("--set", dest="set_value", metavar="KEY=VALUE",
                           help="Set a config value")
     p_config.set_defaults(func=cmd_config)
+
+    # ---------------------------------------------------------------- #
+    # guide                                                              #
+    # ---------------------------------------------------------------- #
+    p_guide = sub.add_parser(
+        "guide",
+        help="Interactive setup wizard — pick provider, model, directory, and run",
+        description=(
+            "Step-by-step wizard that asks you to choose a provider, model, image "
+            "source, prompt style, and metadata options, then shows you the exact "
+            "command and optionally runs it. Screen-reader friendly — no ANSI, no "
+            "spinners, numbered choices throughout."
+        ),
+    )
+    p_guide.set_defaults(func=cmd_guide)
 
     return parser
 
