@@ -401,6 +401,10 @@ def format_image_metadata(metadata: dict) -> list:
 
     lines = []
 
+    # EXIF context injected into the AI prompt (idt_core path)
+    if metadata.get('prompt_context'):
+        lines.append(f"AI context: {metadata['prompt_context']}")
+
     # DateTime information
     if 'datetime_str' in metadata and metadata['datetime_str']:
         lines.append(f"Captured: {metadata['datetime_str']}")

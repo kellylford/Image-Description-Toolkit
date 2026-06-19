@@ -72,6 +72,17 @@ except ImportError:
     except ImportError:
         pass
 
+# idt_core metadata — used for prompt context injection (date/location/camera → AI prompt)
+# Kept separate from the legacy MetadataExtractor above so the GUI's existing metadata
+# display/geocoding pipeline is not disturbed.
+_IDTCoreMetadataExtractor = None
+_IDTCoreNominatimGeocoder = None
+try:
+    from idt_core.metadata import MetadataExtractor as _IDTCoreMetadataExtractor
+    from idt_core.metadata import NominatimGeocoder as _IDTCoreNominatimGeocoder
+except ImportError:
+    pass
+
 # Import video metadata extractor and EXIF embedder (GPS embedding into extracted frames)
 VideoMetadataExtractor = None
 ExifEmbedder = None
@@ -261,14 +272,22 @@ class ProcessingWorker(threading.Thread):
             
             # Emit progress
             self._post_progress(f"Processing with {self.provider} {self.model}...")
-            
+
             # Extract metadata from image
             metadata = self._extract_metadata(self.file_path)
-            
+
+            # Inject EXIF context into the prompt before the AI call so the model
+            # knows when/where/with-what the photo was taken.  Uses idt_core's
+            # MetadataExtractor which returns a clean ImageMetadata with
+            # prompt_context() → "Munich, Germany  Sep 12, 2025  iPhone 14 Pro".
+            # Falls back gracefully when idt_core is unavailable (frozen builds
+            # that haven't been updated yet).
+            prompt_text, exif_context_str = self._inject_exif_context(prompt_text)
+
             # Track processing time
             import time
             start_time = time.time()
-            
+
             # Process the image with selected provider (passing API key)
             # Returns tuple: (description, provider_instance)
             description, provider_obj = self._process_with_ai(self.file_path, prompt_text, api_key=self.api_key)
@@ -276,6 +295,8 @@ class ProcessingWorker(threading.Thread):
             # Calculate processing duration
             processing_duration = time.time() - start_time
             metadata['processing_time_seconds'] = round(processing_duration, 2)
+            if exif_context_str:
+                metadata['prompt_context'] = exif_context_str
             
             # Extract diagnostic info from provider (for debugging empty responses - Issue #91)
             if hasattr(provider_obj, 'last_usage') and provider_obj.last_usage:
@@ -808,6 +829,52 @@ class ProcessingWorker(threading.Thread):
                 ProcessingWorker._geocoder_instance = None
         
         return ProcessingWorker._geocoder_instance
+
+    # Class-level idt_core metadata extractor and geocoder (shared across images for perf)
+    _idt_extractor = None
+    _idt_geocoder = None
+    _idt_geocoder_init = False  # True once we've tried to init (avoids retrying on every image)
+
+    def _inject_exif_context(self, prompt_text: str) -> tuple:
+        """
+        Prepend EXIF context to the prompt so the AI knows when/where/with-what
+        the photo was taken.
+
+        Returns (enriched_prompt, context_str) where context_str is the short
+        context line that was injected ("Munich, Germany  Sep 12, 2025  iPhone 14 Pro"),
+        or ("", "") if extraction failed or idt_core is unavailable.  Never raises.
+        """
+        if not _IDTCoreMetadataExtractor:
+            return prompt_text, ""
+
+        try:
+            # Lazy-init extractor (cheap — no I/O)
+            if ProcessingWorker._idt_extractor is None:
+                ProcessingWorker._idt_extractor = _IDTCoreMetadataExtractor()
+
+            meta = ProcessingWorker._idt_extractor.extract(Path(self.file_path))
+
+            # Lazy-init geocoder (opt-in: only if idt_core geocoder is available)
+            if _IDTCoreNominatimGeocoder and not ProcessingWorker._idt_geocoder_init:
+                ProcessingWorker._idt_geocoder_init = True
+                try:
+                    cache = Path.home() / ".idt" / "geocode_cache.json"
+                    ProcessingWorker._idt_geocoder = _IDTCoreNominatimGeocoder(cache_path=cache)
+                except Exception:
+                    ProcessingWorker._idt_geocoder = None
+
+            if ProcessingWorker._idt_geocoder and (meta.latitude is not None):
+                meta = ProcessingWorker._idt_geocoder.enrich(meta)
+
+            ctx = meta.prompt_context()
+            if ctx:
+                logging.info(f"EXIF context injected into prompt: {ctx}")
+                return f"Context: {ctx}\n\n{prompt_text}", ctx
+
+        except Exception as exc:
+            logging.warning(f"EXIF context injection failed for {self.file_path}: {exc}")
+
+        return prompt_text, ""
 
 
 class WorkflowProcessWorker(threading.Thread):
