@@ -171,10 +171,14 @@ def _cmd_describe_stdin(args):
     from idt_core.converter import load_for_api
     from idt_core.image_item import Description
 
+    # utf-8-sig automatically strips a UTF-8 BOM that PowerShell adds to
+    # the first piped line on Windows
+    import io
+    stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8-sig')
     paths = [
         Path(line.strip()).resolve()
-        for line in sys.stdin
-        if line.strip() and not line.startswith("#")
+        for line in stdin
+        if line.strip() and not line.strip().startswith("#")
     ]
     if not paths:
         print("No image paths received on stdin.", file=sys.stderr)
