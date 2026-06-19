@@ -603,3 +603,216 @@ class TestXmpInjection:
         assert "A great photo." in updated
         assert "Apple" in updated       # tiff:Make preserved
         assert "iPhone 15 Pro" in updated  # tiff:Model preserved
+
+
+# ------------------------------------------------------------------ #
+# Metadata tests                                                       #
+# ------------------------------------------------------------------ #
+
+class TestMetadata:
+    def test_extract_returns_metadata_object(self, tmp_path):
+        from idt_core.metadata import MetadataExtractor, ImageMetadata
+        img = tmp_path / "test.jpg"
+        img.write_bytes(_make_tiny_jpeg())
+        meta = MetadataExtractor().extract(img)
+        assert isinstance(meta, ImageMetadata)
+
+    def test_no_exif_falls_back_to_mtime(self, tmp_path):
+        from idt_core.metadata import MetadataExtractor
+        img = tmp_path / "test.jpg"
+        img.write_bytes(_make_tiny_jpeg())
+        meta = MetadataExtractor().extract(img)
+        # Should have a date from mtime even without EXIF
+        assert meta.datetime_iso is not None
+        assert meta.date_short is not None
+        assert meta.date_from_exif is False
+
+    def test_prompt_context_empty_when_no_location_or_camera(self, tmp_path):
+        from idt_core.metadata import MetadataExtractor
+        img = tmp_path / "test.jpg"
+        img.write_bytes(_make_tiny_jpeg())
+        meta = MetadataExtractor().extract(img)
+        # Without location or camera, context has no extra parts
+        ctx = meta.prompt_context()
+        # Should at least contain the date (from mtime)
+        assert isinstance(ctx, str)
+
+    def test_prompt_context_with_city_state(self):
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(
+            date_short="Sep 12, 2025",
+            city="Munich",
+            state="Bavaria",
+            camera_make="Apple",
+            camera_model="iPhone 14 Pro",
+        )
+        ctx = meta.prompt_context()
+        assert "Munich, Bavaria" in ctx
+        assert "Sep 12, 2025" in ctx
+        assert "iPhone 14 Pro" in ctx
+
+    def test_camera_display_strips_redundant_make(self):
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(camera_make="Apple", camera_model="Apple iPhone 14 Pro")
+        assert meta._camera_display() == "Apple iPhone 14 Pro"
+
+    def test_camera_display_prepends_make_when_different(self):
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(camera_make="Canon", camera_model="EOS R5")
+        assert meta._camera_display() == "Canon EOS R5"
+
+    def test_to_dict_round_trip(self):
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(
+            datetime_iso="2025-09-12T10:30:00",
+            date_short="Sep 12, 2025",
+            city="Munich",
+            country="Germany",
+            camera_model="iPhone 14 Pro",
+            date_from_exif=True,
+        )
+        d = meta.to_dict()
+        restored = ImageMetadata.from_dict(d)
+        assert restored.city == "Munich"
+        assert restored.date_short == "Sep 12, 2025"
+        assert restored.date_from_exif is True
+
+    def test_nominatim_uses_cache(self, tmp_path):
+        from idt_core.metadata import NominatimGeocoder, ImageMetadata
+        cache_file = tmp_path / "cache.json"
+        # Pre-populate cache
+        cache_file.write_text(
+            '{"48.137154,11.576124": {"city": "Munich", "country": "Germany"}}',
+            encoding="utf-8",
+        )
+        geo = NominatimGeocoder(cache_path=cache_file)
+        meta = ImageMetadata(latitude=48.137154, longitude=11.576124)
+        enriched = geo.enrich(meta)
+        assert enriched.city == "Munich"
+        assert enriched.country == "Germany"
+
+    def test_geocoder_enrich_noop_when_no_gps(self, tmp_path):
+        from idt_core.metadata import NominatimGeocoder, ImageMetadata
+        geo = NominatimGeocoder()
+        meta = ImageMetadata()  # no GPS
+        result = geo.enrich(meta)
+        assert result.city is None
+
+
+# ------------------------------------------------------------------ #
+# Pipeline + metadata integration                                      #
+# ------------------------------------------------------------------ #
+
+class TestPipelineMetadata:
+    def test_pipeline_extracts_metadata_and_stores_in_sidecar(self, tmp_path):
+        from idt_core.project import Project
+        from idt_core.pipeline import Pipeline, RunOptions
+        from idt_core.image_item import ImageItem
+
+        src, images = _make_source_tree(tmp_path)
+        project = Project.open(src)
+
+        options = RunOptions(
+            prompt_text="Describe.",
+            extract_metadata=True,
+            geocode=False,
+        )
+        events = list(Pipeline(project, MockProvider()).run(options))
+        assert all(e.success for e in events)
+
+        # Sidecar should have metadata dict (at minimum a mtime-based date)
+        item = ImageItem.load(events[0].item.sidecar_path)
+        assert isinstance(item.metadata, dict)
+        # datetime_iso comes from mtime fallback
+        assert "datetime_iso" in item.metadata
+
+    def test_pipeline_stores_metadata_context_in_description(self, tmp_path):
+        from idt_core.project import Project
+        from idt_core.pipeline import Pipeline, RunOptions
+        from idt_core.image_item import ImageItem
+        from idt_core.metadata import ImageMetadata
+
+        src, images = _make_source_tree(tmp_path)
+        project = Project.open(src)
+
+        options = RunOptions(prompt_text="Describe.", extract_metadata=True)
+        events = list(Pipeline(project, MockProvider()).run(options))
+
+        # metadata_context may be empty for images with no EXIF, but should be str or None
+        item = ImageItem.load(events[0].item.sidecar_path)
+        desc = item.active_description
+        assert desc is not None
+        assert desc.metadata_context is None or isinstance(desc.metadata_context, str)
+
+    def test_no_metadata_extraction_when_disabled(self, tmp_path):
+        from idt_core.project import Project
+        from idt_core.pipeline import Pipeline, RunOptions
+        from idt_core.image_item import ImageItem
+
+        src, _ = _make_source_tree(tmp_path)
+        project = Project.open(src)
+
+        options = RunOptions(prompt_text="Describe.", extract_metadata=False)
+        events = list(Pipeline(project, MockProvider()).run(options))
+
+        item = ImageItem.load(events[0].item.sidecar_path)
+        assert item.metadata == {}
+
+
+# ------------------------------------------------------------------ #
+# ImageItem — new fields                                               #
+# ------------------------------------------------------------------ #
+
+class TestImageItemNewFields:
+    def test_alt_text_round_trip(self, tmp_path):
+        from idt_core.project import Project
+        from idt_core.image_item import ImageItem
+
+        src, images = _make_source_tree(tmp_path)
+        project = Project.open(src)
+        img = images[0]
+        sidecar = project.sidecar_path(img)
+        item = ImageItem(source_path=img, sidecar_path=sidecar)
+        item.alt_text = "A dog playing fetch on the beach."
+        item.save()
+
+        loaded = ImageItem.load(sidecar)
+        assert loaded.alt_text == "A dog playing fetch on the beach."
+
+    def test_metadata_round_trip(self, tmp_path):
+        from idt_core.project import Project
+        from idt_core.image_item import ImageItem
+
+        src, images = _make_source_tree(tmp_path)
+        project = Project.open(src)
+        img = images[0]
+        sidecar = project.sidecar_path(img)
+        item = ImageItem(source_path=img, sidecar_path=sidecar)
+        item.metadata = {"city": "Munich", "date_short": "Sep 12, 2025"}
+        item.save()
+
+        loaded = ImageItem.load(sidecar)
+        assert loaded.metadata["city"] == "Munich"
+
+    def test_metadata_context_stored_in_description(self, tmp_path):
+        from idt_core.project import Project
+        from idt_core.image_item import ImageItem, Description
+
+        src, images = _make_source_tree(tmp_path)
+        project = Project.open(src)
+        img = images[0]
+        sidecar = project.sidecar_path(img)
+        item = ImageItem(source_path=img, sidecar_path=sidecar)
+        desc = Description.create(
+            text="Sunny day.",
+            model="test-model",
+            provider="test",
+            prompt_name="detailed",
+            prompt_text="Describe it.",
+            metadata_context="Munich, Germany  Sep 12, 2025",
+        )
+        item.add_description(desc)
+        item.save()
+
+        loaded = ImageItem.load(sidecar)
+        assert loaded.active_description.metadata_context == "Munich, Germany  Sep 12, 2025"

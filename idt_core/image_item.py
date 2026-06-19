@@ -23,6 +23,8 @@ class Description:
     timestamp: str
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
+    # The metadata context string that was prepended to the prompt ("Munich, Germany  Sep 12, 2025")
+    metadata_context: Optional[str] = None
 
     @classmethod
     def create(
@@ -34,6 +36,7 @@ class Description:
         prompt_text: str,
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
+        metadata_context: Optional[str] = None,
     ) -> Description:
         return cls(
             id=str(uuid.uuid4()),
@@ -45,10 +48,11 @@ class Description:
             timestamp=datetime.now(timezone.utc).isoformat(),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            metadata_context=metadata_context,
         )
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "id": self.id,
             "text": self.text,
             "model": self.model,
@@ -59,6 +63,9 @@ class Description:
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
         }
+        if self.metadata_context:
+            d["metadata_context"] = self.metadata_context
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> Description:
@@ -72,6 +79,7 @@ class Description:
             timestamp=d["timestamp"],
             input_tokens=d.get("input_tokens"),
             output_tokens=d.get("output_tokens"),
+            metadata_context=d.get("metadata_context"),
         )
 
 
@@ -91,6 +99,12 @@ class ImageItem:
 
     tags: list[str] = field(default_factory=list)
     notes: str = ""
+
+    # Extracted EXIF metadata (serialized dict from ImageMetadata.to_dict())
+    metadata: dict = field(default_factory=dict)
+
+    # Alt text from website when image was downloaded via `idt download`
+    alt_text: Optional[str] = None
 
     # ------------------------------------------------------------------ #
     # Properties                                                           #
@@ -135,7 +149,7 @@ class ImageItem:
 
     def save(self) -> None:
         self.sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-        data = {
+        data: dict = {
             "source": str(self.source_path),
             "converted_path": str(self.converted_path) if self.converted_path else None,
             "descriptions": [d.to_dict() for d in self.descriptions],
@@ -144,6 +158,10 @@ class ImageItem:
             "tags": self.tags,
             "notes": self.notes,
         }
+        if self.metadata:
+            data["metadata"] = self.metadata
+        if self.alt_text:
+            data["alt_text"] = self.alt_text
         self.sidecar_path.write_text(
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
@@ -160,4 +178,6 @@ class ImageItem:
             embedded_at=data.get("embedded_at"),
             tags=data.get("tags", []),
             notes=data.get("notes", ""),
+            metadata=data.get("metadata", {}),
+            alt_text=data.get("alt_text"),
         )

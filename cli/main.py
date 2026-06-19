@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-idt — Image Description Toolkit
+idt — Image Description Toolkit CLI
 
 Usage:
   idt describe <directory> [options]
+  idt download <url> [directory] [options]
   idt status   <directory>
   idt show     <directory|image>
   idt embed    <directory> [options]
   idt export   <directory> [options]
   idt watch    <directory> [options]
+  idt combine  <directory> [options]
+  idt video    <directory> [options]
+  idt models   [--provider NAME]
   idt prompts
   idt config   [--set key=value]
   idt --help
@@ -34,9 +38,7 @@ if str(_here) not in sys.path:
 # ------------------------------------------------------------------ #
 
 def _make_provider(provider: str, model: Optional[str], ollama_host: str):
-    """Instantiate the requested provider, giving a clear error if deps are missing."""
-    from idt_core.config import BUILT_IN_PROMPTS  # noqa: side-effect free import check
-
+    """Instantiate the requested provider with a clear error if deps are missing."""
     if provider == "anthropic":
         from idt_core.providers.claude import ClaudeProvider, DEFAULT_MODEL
         return ClaudeProvider(model=model or DEFAULT_MODEL)
@@ -65,17 +67,53 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
     """
     from idt_core.config import UserConfig, BUILT_IN_PROMPTS
 
-    if args.prompt_text:
+    if getattr(args, "prompt_text", None):
         return ("custom", args.prompt_text)
 
     user_cfg = UserConfig.load()
-    name = getattr(args, "prompt", None) or project_config.default_prompt_name or user_cfg.default_prompt_name
+    name = (
+        getattr(args, "prompt", None)
+        or (project_config.default_prompt_name if project_config else None)
+        or user_cfg.default_prompt_name
+    )
     text = user_cfg.get_prompt_text(name) or BUILT_IN_PROMPTS.get("detailed", "")
     return (name, text)
 
 
+def _provider_args(p: argparse.ArgumentParser) -> None:
+    """Add the standard provider/model/ollama-host arguments."""
+    p.add_argument(
+        "--provider", choices=["anthropic", "ollama", "openai", "florence"],
+        help="AI provider (default: from config, else ollama)",
+    )
+    p.add_argument("--model", metavar="NAME", help="Model name")
+    p.add_argument(
+        "--ollama-host", metavar="URL", default="http://localhost:11434",
+        help="Ollama server URL (default: http://localhost:11434)",
+    )
+
+
+def _prompt_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--prompt", metavar="NAME",
+                   help="Named prompt to use (see 'idt prompts')")
+    p.add_argument("--prompt-text", metavar="TEXT",
+                   help="Custom prompt text (overrides --prompt)")
+
+
+def _metadata_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--no-metadata", dest="extract_metadata", action="store_false",
+        default=True,
+        help="Disable EXIF metadata extraction (don't inject date/location context into prompt)",
+    )
+    p.add_argument(
+        "--geocode", action="store_true",
+        help="Reverse-geocode GPS coordinates to city/state (requires internet; adds 1s/photo delay)",
+    )
+
+
 # ------------------------------------------------------------------ #
-# Commands                                                             #
+# describe                                                             #
 # ------------------------------------------------------------------ #
 
 def cmd_describe(args):
@@ -84,10 +122,7 @@ def cmd_describe(args):
     from idt_core.progress import Progress
     from idt_core.config import UserConfig
 
-    # ---- stdin mode ----
-    # idt describe - [--project <dir>]  or  some_cmd | idt describe --stdin
     stdin_mode = getattr(args, "stdin", False) or args.source == "-"
-
     if stdin_mode:
         _cmd_describe_stdin(args)
         return
@@ -105,10 +140,13 @@ def cmd_describe(args):
     prompt_name, prompt_text = _resolve_prompt(args, project.config)
 
     if not args.quiet:
-        print(f"Source:   {source}")
-        print(f"Project:  {project.idt_dir}")
-        print(f"Provider: {provider_name}  model: {model}")
-        print(f"Prompt:   {prompt_name}")
+        print(f"Source:    {source}")
+        print(f"Project:   {project.idt_dir}")
+        print(f"Provider:  {provider_name}  model: {model}")
+        print(f"Prompt:    {prompt_name}")
+        if args.extract_metadata:
+            gcstr = " + geocoding" if args.geocode else ""
+            print(f"Metadata:  EXIF extraction enabled{gcstr}")
         print()
 
     provider = _make_provider(provider_name, model, args.ollama_host)
@@ -118,6 +156,8 @@ def cmd_describe(args):
         prompt_text=prompt_text,
         redescribe=args.redescribe,
         limit=args.limit,
+        extract_metadata=args.extract_metadata,
+        geocode=args.geocode,
     )
 
     queue = list(
@@ -129,10 +169,8 @@ def cmd_describe(args):
     if not queue:
         if not args.quiet:
             st = project.status()
-            print(
-                f"All {st['described']} image{'s are' if st['described'] != 1 else ' is'} "
-                f"already described."
-            )
+            n = st["described"]
+            print(f"All {n} image{'s are' if n != 1 else ' is'} already described.")
             print("Use --redescribe to generate additional descriptions.")
         return
 
@@ -145,36 +183,39 @@ def cmd_describe(args):
     for event in pipeline.run(options):
         if event.success:
             described += 1
-            progress.update(event.item.display_name, success=True)
+            # Show metadata context when available in verbose mode
+            extra = ""
+            if not args.quiet and event.metadata:
+                ctx = event.metadata.prompt_context()
+                if ctx:
+                    extra = f"  [{ctx}]"
+            progress.update(event.item.display_name, success=True, note=extra)
         else:
             errors += 1
             progress.update(event.item.display_name, success=False, error=event.error)
 
     progress.summary(described=described, errors=errors)
 
+    # Auto-embed if requested
+    if args.embed and described > 0:
+        print()
+        _do_embed(project, force=False, dry_run=False, quiet=args.quiet)
+
 
 def _cmd_describe_stdin(args):
     """
-    Describe a list of image paths read from stdin, one per line.
-    All images must share a common ancestor directory (the project root).
-    Use --project to specify where the .idt/ mirror should live if paths
-    don't share an obvious common root.
-
-    Pipeline use case:
-      get_nyt_images.sh | idt describe - --prompt news --provider anthropic
+    Describe image paths read from stdin, one per line.
+    Pipeline use: get_nyt_images.sh | idt describe - --prompt news
     """
     from idt_core.project import Project
-    from idt_core.image_item import ImageItem
-    from idt_core.pipeline import Pipeline, RunOptions, PipelineEvent
+    from idt_core.image_item import ImageItem, Description
     from idt_core.progress import Progress
     from idt_core.config import UserConfig
     from idt_core.converter import load_for_api
-    from idt_core.image_item import Description
+    from idt_core.metadata import MetadataExtractor, NominatimGeocoder
 
-    # utf-8-sig automatically strips a UTF-8 BOM that PowerShell adds to
-    # the first piped line on Windows
     import io
-    stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8-sig')
+    stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8-sig")
     paths = [
         Path(line.strip()).resolve()
         for line in stdin
@@ -185,19 +226,13 @@ def _cmd_describe_stdin(args):
         sys.exit(1)
 
     missing = [p for p in paths if not p.exists()]
-    if missing:
-        for p in missing:
-            print(f"Warning: not found: {p}", file=sys.stderr)
-        paths = [p for p in paths if p.exists()]
-        if not paths:
-            sys.exit(1)
+    for p in missing:
+        print(f"Warning: not found: {p}", file=sys.stderr)
+    paths = [p for p in paths if p.exists()]
+    if not paths:
+        sys.exit(1)
 
-    # Determine project root: explicit --project, or common ancestor of all paths
-    if getattr(args, "project", None):
-        source = Path(args.project).resolve()
-    else:
-        source = _common_ancestor(paths)
-
+    source = Path(getattr(args, "project", None) or "").resolve() if getattr(args, "project", None) else _common_ancestor(paths)
     project = Project.open(source)
     user_cfg = UserConfig.load()
 
@@ -206,17 +241,23 @@ def _cmd_describe_stdin(args):
     prompt_name, prompt_text = _resolve_prompt(args, project.config)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
+    extractor = MetadataExtractor() if args.extract_metadata else None
+    geocoder = None
+    if extractor and args.geocode:
+        geocoder = NominatimGeocoder(
+            cache_path=Path.home() / ".idt" / "geocode_cache.json"
+        )
+
     if not args.quiet:
-        print(f"Project:  {project.idt_dir}")
-        print(f"Provider: {provider_name}  model: {model}")
-        print(f"Images:   {len(paths)} from stdin")
+        print(f"Project:   {project.idt_dir}")
+        print(f"Provider:  {provider_name}  model: {model}")
+        print(f"Images:    {len(paths)} from stdin")
         print()
 
     progress = Progress(total=len(paths), quiet=args.quiet)
     described = errors = 0
 
     for img_path in paths:
-        # Build or load the ImageItem for this specific file
         try:
             rel = img_path.relative_to(source)
         except ValueError:
@@ -224,18 +265,30 @@ def _cmd_describe_stdin(args):
             continue
 
         sidecar = project.sidecar_path(img_path)
-        if sidecar.exists():
-            item = ImageItem.load(sidecar)
-        else:
-            item = ImageItem(source_path=img_path, sidecar_path=sidecar)
+        item = ImageItem.load(sidecar) if sidecar.exists() else ImageItem(source_path=img_path, sidecar_path=sidecar)
 
         if item.described and not args.redescribe:
             progress.skip(img_path.name, "already described")
             continue
 
         try:
+            # Metadata extraction
+            meta_context = ""
+            if extractor:
+                meta = extractor.extract(img_path)
+                if geocoder:
+                    meta = geocoder.enrich(meta)
+                meta_context = meta.prompt_context()
+                item.metadata = meta.to_dict()
+
+            effective_prompt = prompt_text
+            if meta_context and effective_prompt:
+                effective_prompt = f"Context: {meta_context}\n\n{effective_prompt}"
+            elif meta_context:
+                effective_prompt = f"Context: {meta_context}\n\n"
+
             image_bytes, mime_type = load_for_api(img_path)
-            result = provider.describe(image_bytes, mime_type, prompt_text)
+            result = provider.describe(image_bytes, mime_type, effective_prompt)
             desc = Description.create(
                 text=result.text,
                 model=result.model,
@@ -244,13 +297,13 @@ def _cmd_describe_stdin(args):
                 prompt_text=prompt_text,
                 input_tokens=result.input_tokens,
                 output_tokens=result.output_tokens,
+                metadata_context=meta_context or None,
             )
             item.add_description(desc)
             item.save()
             described += 1
             progress.update(img_path.name, success=True)
 
-            # In quiet mode, print filename TAB description for piping
             if args.quiet:
                 print(f"{img_path}\t{result.text}")
 
@@ -262,7 +315,6 @@ def _cmd_describe_stdin(args):
 
 
 def _common_ancestor(paths: list[Path]) -> Path:
-    """Return the deepest common directory ancestor of a list of paths."""
     if not paths:
         raise ValueError("No paths given")
     if len(paths) == 1:
@@ -274,10 +326,248 @@ def _common_ancestor(paths: list[Path]) -> Path:
     return common
 
 
+# ------------------------------------------------------------------ #
+# download                                                             #
+# ------------------------------------------------------------------ #
+
+def cmd_download(args):
+    """
+    Download images from a URL and optionally describe them.
+
+    idt download https://www.nytimes.com/ --max 20 --describe --prompt news
+    """
+    from idt_core.project import Project
+    from idt_core.downloader import Downloader
+
+    # Determine target directory
+    target = Path(args.directory).resolve() if args.directory else Path.cwd()
+    target.mkdir(parents=True, exist_ok=True)
+    project = Project.open(target)
+
+    if not args.quiet:
+        print(f"URL:       {args.url}")
+        print(f"Project:   {project.idt_dir}")
+        print()
+
+    min_w = min_h = 0
+    if args.min_size:
+        parts = args.min_size.lower().split("x")
+        if len(parts) == 2:
+            try:
+                min_w, min_h = int(parts[0]), int(parts[1])
+            except ValueError:
+                print(f"Invalid --min-size format (use WIDTHxHEIGHT, e.g. 200x200)", file=sys.stderr)
+                sys.exit(1)
+
+    total_started = [0]
+    def _on_progress(i: int, total: int, url: str) -> None:
+        if not args.quiet:
+            pct = int(i / total * 100) if total else 0
+            print(f"  {i} of {total}  {pct}%  {url[:60]}", end="\r", flush=True)
+        total_started[0] = total
+
+    downloader = Downloader(
+        project=project,
+        min_width=min_w,
+        min_height=min_h,
+        timeout=args.timeout,
+        on_progress=_on_progress,
+    )
+
+    try:
+        result = downloader.download(args.url, max_images=args.max_images)
+    except ImportError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        print("Install with: pip install requests beautifulsoup4", file=sys.stderr)
+        sys.exit(1)
+
+    if not args.quiet:
+        print()  # clear progress line
+
+    print(f"Downloaded: {result.downloaded} images  skipped: {result.skipped}  failed: {result.failed}")
+    print(f"Location:  {result.download_dir}")
+
+    if result.alt_texts and not args.quiet:
+        print(f"Alt texts: {len(result.alt_texts)} images had existing alt text from the site")
+
+    # Auto-describe the downloaded images if requested
+    if args.describe and result.downloaded > 0:
+        print()
+        # Treat the download dir as a new project source
+        dl_project = Project.open(result.download_dir)
+
+        # Seed alt text into sidecars before describing
+        if result.alt_texts:
+            from idt_core.image_item import ImageItem
+            for fname, alt in result.alt_texts.items():
+                img_path = result.download_dir / fname
+                if img_path.exists():
+                    sp = dl_project.sidecar_path(img_path)
+                    item = ImageItem.load(sp) if sp.exists() else ImageItem(source_path=img_path, sidecar_path=sp)
+                    item.alt_text = alt
+                    item.save()
+
+        from idt_core.pipeline import Pipeline, RunOptions
+        from idt_core.progress import Progress
+        from idt_core.config import UserConfig
+
+        user_cfg = UserConfig.load()
+        provider_name = args.provider or user_cfg.default_provider
+        model = args.model or user_cfg.default_model
+        prompt_name, prompt_text = _resolve_prompt(args, dl_project.config)
+        provider = _make_provider(provider_name, model, args.ollama_host)
+
+        if not args.quiet:
+            print(f"Describing {result.downloaded} images with {provider_name} / {model}...")
+            print()
+
+        options = RunOptions(
+            prompt_name=prompt_name,
+            prompt_text=prompt_text,
+            extract_metadata=False,  # downloaded images don't have EXIF
+        )
+        progress = Progress(total=result.downloaded, quiet=args.quiet)
+        described = errors = 0
+        pipeline = Pipeline(dl_project, provider)
+
+        for event in pipeline.run(options):
+            if event.success:
+                described += 1
+                progress.update(event.item.display_name, success=True)
+            else:
+                errors += 1
+                progress.update(event.item.display_name, success=False, error=event.error)
+
+        progress.summary(described=described, errors=errors)
+
+        if described > 0 and args.embed:
+            print()
+            _do_embed(dl_project, force=False, dry_run=False, quiet=args.quiet)
+
+
+# ------------------------------------------------------------------ #
+# video                                                                #
+# ------------------------------------------------------------------ #
+
+def cmd_video(args):
+    """
+    Extract frames from video files and optionally describe them.
+
+    idt video ~/Movies/concert.mp4 --interval 5 --describe
+    idt video ~/Movies/events/ --scene 30 --describe --prompt detailed
+    """
+    from idt_core.project import Project
+    from idt_core.video import VideoExtractor, VideoExtractionOptions, scan_videos
+    from idt_core.scanner import is_video
+
+    source = Path(args.source).resolve()
+    if not source.exists():
+        print(f"Error: not found: {source}", file=sys.stderr)
+        sys.exit(1)
+
+    project = Project.open(source if source.is_dir() else source.parent)
+
+    # Find videos to process
+    if source.is_file():
+        if not is_video(source):
+            print(f"Error: not a video file: {source}", file=sys.stderr)
+            sys.exit(1)
+        videos = [source]
+    else:
+        videos = list(scan_videos(source))
+        if not videos:
+            print(f"No video files found in: {source}", file=sys.stderr)
+            sys.exit(1)
+
+    mode = "scene" if args.scene else "interval"
+    opts = VideoExtractionOptions(
+        mode=mode,
+        interval_seconds=args.interval,
+        scene_threshold=args.scene,
+        max_frames=args.max_frames,
+    )
+
+    if not args.quiet:
+        print(f"Source:    {source}")
+        print(f"Videos:    {len(videos)}")
+        print(f"Mode:      {mode}  ({'every ' + str(args.interval) + 's' if mode == 'interval' else 'threshold ' + str(args.scene)})")
+        print()
+
+    extractor = VideoExtractor(project)
+    all_frame_paths = []
+    all_frame_dirs = []
+
+    for video in videos:
+        if not args.quiet:
+            print(f"  Extracting frames: {video.name}")
+        try:
+            result = extractor.extract(video, opts)
+            all_frame_paths.extend(result.frame_paths)
+            all_frame_dirs.append(result.frames_dir)
+            if not args.quiet:
+                print(f"    {len(result.frame_paths)} frames → {result.frames_dir}")
+        except ImportError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            print("Install with: pip install opencv-python", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"  Error processing {video.name}: {e}", file=sys.stderr)
+
+    total_frames = len(all_frame_paths)
+    if not args.quiet:
+        print(f"\nExtracted {total_frames} frames total.")
+
+    if args.describe and total_frames > 0:
+        print()
+        from idt_core.pipeline import Pipeline, RunOptions
+        from idt_core.progress import Progress
+        from idt_core.config import UserConfig
+
+        user_cfg = UserConfig.load()
+        provider_name = args.provider or user_cfg.default_provider
+        model = args.model or user_cfg.default_model
+        prompt_name, prompt_text = _resolve_prompt(args, project.config)
+        provider = _make_provider(provider_name, model, args.ollama_host)
+
+        if not args.quiet:
+            print(f"Describing {total_frames} frames with {provider_name} / {model}...")
+            print()
+
+        described = errors = 0
+
+        for frames_dir in all_frame_dirs:
+            frame_project = Project.open(frames_dir)
+            options = RunOptions(
+                prompt_name=prompt_name,
+                prompt_text=prompt_text,
+                extract_metadata=False,
+            )
+            progress = Progress(total=len(list(frame_project.undescribed())), quiet=args.quiet)
+            pipeline = Pipeline(frame_project, provider)
+            for event in pipeline.run(options):
+                if event.success:
+                    described += 1
+                    progress.update(event.item.display_name, success=True)
+                else:
+                    errors += 1
+                    progress.update(event.item.display_name, success=False, error=event.error)
+            progress.summary(described=described, errors=errors)
+
+
+# ------------------------------------------------------------------ #
+# status                                                               #
+# ------------------------------------------------------------------ #
+
 def cmd_status(args):
     from idt_core.project import Project
 
     source = Path(args.source).resolve()
+
+    # If given a parent dir, scan for all .idt/ projects underneath it
+    if args.all:
+        _cmd_status_all(source, args)
+        return
+
     if not source.is_dir():
         print(f"Error: not a directory: {source}", file=sys.stderr)
         sys.exit(1)
@@ -290,15 +580,13 @@ def cmd_status(args):
         return
 
     pct = int(st["described"] / st["total"] * 100) if st["total"] else 0
-
     print(f"Source:      {st['source']}")
     print(f"Project:     {st['idt_dir']}")
     print(f"Total:       {st['total']}")
     print(f"Described:   {st['described']}  ({pct}%)")
     print(f"Remaining:   {st['undescribed']}")
     if st["last_run"]:
-        # Convert ISO timestamp to readable local form
-        from datetime import datetime, timezone
+        from datetime import datetime
         try:
             dt = datetime.fromisoformat(st["last_run"]).astimezone()
             hour = dt.hour % 12 or 12
@@ -308,6 +596,46 @@ def cmd_status(args):
             last = st["last_run"]
         print(f"Last run:    {last}")
 
+
+def _cmd_status_all(root: Path, args) -> None:
+    """Find all .idt/ directories under root and summarize them."""
+    from idt_core.project import Project
+
+    idt_dirs = sorted(root.rglob("*.idt"))
+    if not idt_dirs:
+        print(f"No IDT projects found under: {root}")
+        return
+
+    rows = []
+    for idt_dir in idt_dirs:
+        source = idt_dir.parent / idt_dir.stem
+        if not source.is_dir():
+            continue
+        try:
+            project = Project.open(source)
+            st = project.status()
+            rows.append(st)
+        except Exception:
+            continue
+
+    if args.json_out:
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return
+
+    total_images = sum(r["total"] for r in rows)
+    total_desc = sum(r["described"] for r in rows)
+    print(f"Projects found: {len(rows)}  under {root}")
+    print(f"Total images:   {total_images}  Described: {total_desc}  ({int(total_desc/total_images*100) if total_images else 0}%)")
+    print()
+    for r in rows:
+        pct = int(r["described"] / r["total"] * 100) if r["total"] else 0
+        src = Path(r["source"])
+        print(f"  {src.name:40s}  {r['described']:5d}/{r['total']:5d}  {pct:3d}%")
+
+
+# ------------------------------------------------------------------ #
+# show                                                                 #
+# ------------------------------------------------------------------ #
 
 def cmd_show(args):
     from idt_core.project import Project
@@ -328,7 +656,6 @@ def _show_file(target: Path, args):
     from idt_core.project import Project
     from idt_core.image_item import ImageItem
 
-    # Walk up to find the source directory that has a matching .idt/ mirror
     candidate = target.parent
     while True:
         idt_dir = candidate.parent / (candidate.name + ".idt")
@@ -366,8 +693,6 @@ def _show_directory(target: Path, args):
 
 
 def _print_item(item, args):
-    from idt_core.image_item import ImageItem
-
     desc = item.active_description
     if args.json_out:
         out = {
@@ -378,7 +703,12 @@ def _print_item(item, args):
             "model": desc.model if desc else None,
             "provider": desc.provider if desc else None,
             "timestamp": desc.timestamp if desc else None,
+            "metadata_context": desc.metadata_context if desc else None,
         }
+        if item.metadata:
+            out["metadata"] = item.metadata
+        if item.alt_text:
+            out["alt_text"] = item.alt_text
         print(json.dumps(out, ensure_ascii=False))
         return
 
@@ -388,6 +718,10 @@ def _print_item(item, args):
 
     print(f"File:      {item.display_name}")
     print(f"Model:     {desc.model}  ({desc.provider})")
+    if desc.metadata_context:
+        print(f"Context:   {desc.metadata_context}")
+    if item.alt_text:
+        print(f"Alt text:  {item.alt_text}")
     print(f"Date:      {desc.timestamp[:10]}")
     if desc.output_tokens:
         print(f"Tokens:    {desc.output_tokens} out")
@@ -395,29 +729,28 @@ def _print_item(item, args):
     print(desc.text)
 
 
-def cmd_prompts(args):
-    from idt_core.config import UserConfig, BUILT_IN_PROMPTS
+# ------------------------------------------------------------------ #
+# embed                                                                #
+# ------------------------------------------------------------------ #
 
-    user_cfg = UserConfig.load()
-    all_prompts = user_cfg.list_prompts()
+def _do_embed(project, force: bool, dry_run: bool, quiet: bool) -> None:
+    from idt_core.embedder import Embedder
 
-    if args.json_out:
-        print(json.dumps(all_prompts, indent=2, ensure_ascii=False))
-        return
+    embedder = Embedder(project)
+    result = embedder.embed_all(force=force, dry_run=dry_run)
 
-    print("Available prompts:\n")
-    for name, text in all_prompts.items():
-        marker = " (custom)" if name in user_cfg.custom_prompts else ""
-        print(f"  {name}{marker}")
-        # Show first 80 chars of prompt text as a preview
-        preview = text[:80] + ("..." if len(text) > 80 else "")
-        print(f"    {preview}")
-        print()
+    n = len(result.embedded)
+    verb = "Would embed" if dry_run else "Embedded"
+    print(f"{verb} {n} image{'s' if n != 1 else ''}.", end="")
+    if result.errors:
+        print(f"  {len(result.errors)} error(s).", end="")
+    print()
+    if not dry_run and not quiet and n > 0:
+        print(f"Embedded copies: {project.idt_dir / 'embedded'}")
 
 
 def cmd_embed(args):
     from idt_core.project import Project
-    from idt_core.embedder import Embedder
 
     source = Path(args.source).resolve()
     if not source.is_dir():
@@ -425,8 +758,6 @@ def cmd_embed(args):
         sys.exit(1)
 
     project = Project.open(source)
-    embedder = Embedder(project)
-
     described = list(project.described())
     if not described:
         print("No described images found. Run 'idt describe' first.")
@@ -439,34 +770,17 @@ def cmd_embed(args):
         print(f"Output:    {project.idt_dir / 'embedded'}")
         print(f"To embed:  {len(pending)}")
         if already:
-            print(f"Already embedded (skipping): {already}  (use --force to re-embed)")
+            print(f"Already embedded: {already}  (use --force to re-embed)")
         if args.dry_run:
             print("\nDry run — no files will be written.")
         print()
 
-    result = embedder.embed_all(force=args.force, dry_run=args.dry_run)
+    _do_embed(project, force=args.force, dry_run=args.dry_run, quiet=args.quiet)
 
-    if not args.quiet:
-        for path in result.embedded:
-            verb = "would embed" if args.dry_run else "embedded"
-            print(f"  {verb}: {path.name}")
-        for path, reason in result.skipped:
-            if not reason.startswith("already"):
-                print(f"  skipped: {path.name}  ({reason})")
-        for path, msg in result.errors:
-            print(f"  error: {path.name}  {msg}", file=sys.stderr)
-        print()
 
-    n = len(result.embedded)
-    verb = "Would embed" if args.dry_run else "Embedded"
-    print(f"{verb} {n} image{'s' if n != 1 else ''}.", end="")
-    if result.errors:
-        print(f"  {len(result.errors)} error(s).", end="")
-    print()
-
-    if not args.dry_run and not args.quiet and n > 0:
-        print(f"\nEmbedded copies: {project.idt_dir / 'embedded'}")
-
+# ------------------------------------------------------------------ #
+# export                                                               #
+# ------------------------------------------------------------------ #
 
 def cmd_export(args):
     from idt_core.project import Project
@@ -494,11 +808,161 @@ def cmd_export(args):
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    if not args.quiet:
-        print(f"Exported {fmt.upper()}: {out}")
-    else:
-        print(str(out))
+    print(str(out)) if args.quiet else print(f"Exported {fmt.upper()}: {out}")
 
+
+# ------------------------------------------------------------------ #
+# combine                                                              #
+# ------------------------------------------------------------------ #
+
+def cmd_combine(args):
+    """
+    Merge descriptions from multiple .idt/ projects into a single CSV or TSV.
+
+    Walks the input directory looking for *.idt/ project mirrors.
+    Useful for building a complete picture across many directories.
+
+    idt combine ~/Pictures/ --output all_descriptions.csv
+    idt combine ~/Pictures/ --format tsv | sort -k3 > sorted.tsv
+    """
+    import csv
+    from idt_core.project import Project
+
+    root = Path(args.directory).resolve()
+    if not root.is_dir():
+        print(f"Error: not a directory: {root}", file=sys.stderr)
+        sys.exit(1)
+
+    idt_dirs = sorted(root.rglob("*.idt"))
+    if not idt_dirs:
+        print(f"No IDT projects found under: {root}")
+        sys.exit(1)
+
+    rows = []
+    for idt_dir in idt_dirs:
+        source = idt_dir.parent / idt_dir.stem
+        if not source.is_dir():
+            continue
+        try:
+            project = Project.open(source)
+            for item in project.described():
+                desc = item.active_description
+                if not desc:
+                    continue
+                rows.append({
+                    "file": item.display_name,
+                    "source_path": str(item.source_path),
+                    "project": str(source),
+                    "description": desc.text,
+                    "model": desc.model,
+                    "provider": desc.provider,
+                    "prompt_name": desc.prompt_name,
+                    "timestamp": desc.timestamp,
+                    "metadata_context": desc.metadata_context or "",
+                    "input_tokens": desc.input_tokens or "",
+                    "output_tokens": desc.output_tokens or "",
+                    "alt_text": item.alt_text or "",
+                })
+        except Exception as e:
+            print(f"Warning: could not read {idt_dir}: {e}", file=sys.stderr)
+
+    if not rows:
+        print("No described images found.")
+        return
+
+    # Sort by timestamp or metadata date
+    sort_key = args.sort
+    if sort_key == "date":
+        rows.sort(key=lambda r: r.get("metadata_context", "") or r.get("timestamp", ""))
+    elif sort_key == "file":
+        rows.sort(key=lambda r: r["file"].lower())
+    else:
+        rows.sort(key=lambda r: r["timestamp"])
+
+    delimiter = "\t" if args.format == "tsv" else ","
+
+    if args.output:
+        out_path = Path(args.output).resolve()
+        with open(out_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()), delimiter=delimiter)
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"Combined {len(rows)} descriptions → {out_path}")
+    else:
+        # Stdout
+        import sys as _sys
+        writer = csv.DictWriter(_sys.stdout, fieldnames=list(rows[0].keys()), delimiter=delimiter)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+# ------------------------------------------------------------------ #
+# models                                                               #
+# ------------------------------------------------------------------ #
+
+def cmd_models(args):
+    """
+    Check which AI models are available.
+
+    idt models                     — check all providers
+    idt models --provider ollama   — list Ollama models
+    idt models --provider anthropic — verify Claude API access
+    """
+    results = {}
+
+    # Ollama
+    if not args.provider or args.provider == "ollama":
+        try:
+            from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
+            provider_inst = OllamaProvider(model=DEFAULT_MODEL, host=args.ollama_host)
+            models = provider_inst.list_models()
+            results["ollama"] = {"status": "ok", "models": models}
+        except Exception as e:
+            results["ollama"] = {"status": "error", "error": str(e)}
+
+    # Anthropic
+    if not args.provider or args.provider == "anthropic":
+        import os
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            from idt_core.providers.claude import CLAUDE_MODELS
+            results["anthropic"] = {"status": "key_found", "models": CLAUDE_MODELS}
+        else:
+            results["anthropic"] = {"status": "no_key", "models": []}
+
+    # OpenAI
+    if not args.provider or args.provider == "openai":
+        import os
+        if os.environ.get("OPENAI_API_KEY"):
+            from idt_core.providers.openai_provider import OPENAI_MODELS
+            results["openai"] = {"status": "key_found", "models": OPENAI_MODELS}
+        else:
+            results["openai"] = {"status": "no_key", "models": []}
+
+    if args.json_out:
+        print(json.dumps(results, indent=2))
+        return
+
+    for provider, info in results.items():
+        status = info["status"]
+        models = info.get("models", [])
+        if status == "ok":
+            print(f"\n{provider} ({len(models)} models available):")
+            for m in models:
+                print(f"    {m}")
+        elif status == "key_found":
+            print(f"\n{provider} (API key found, {len(models)} known models):")
+            for m in models:
+                print(f"    {m}")
+        elif status == "no_key":
+            key = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
+            print(f"\n{provider}: no API key ({key} not set)")
+        else:
+            print(f"\n{provider}: error — {info.get('error', 'unknown')}")
+
+
+# ------------------------------------------------------------------ #
+# watch                                                                #
+# ------------------------------------------------------------------ #
 
 def cmd_watch(args):
     from idt_core.project import Project
@@ -519,9 +983,9 @@ def cmd_watch(args):
     provider = _make_provider(provider_name, model, args.ollama_host)
 
     if not args.quiet:
-        print(f"Watching: {source}")
-        print(f"Provider: {provider_name}  model: {model}")
-        print(f"Interval: {args.interval}s  prompt: {prompt_name}")
+        print(f"Watching:  {source}")
+        print(f"Provider:  {provider_name}  model: {model}")
+        print(f"Interval:  {args.interval}s  prompt: {prompt_name}")
         print("Press Ctrl+C to stop.\n")
 
     def _on_poll(remaining: int) -> None:
@@ -543,10 +1007,9 @@ def cmd_watch(args):
                 if not args.quiet:
                     print(f"Described: {event.item.display_name}")
                     if desc:
-                        print(f"  {desc.text[:120]}{'...' if len(desc.text) > 120 else ''}")
-                        print()
+                        preview = desc.text[:120] + ("..." if len(desc.text) > 120 else "")
+                        print(f"  {preview}\n")
                 else:
-                    # --quiet: print just the filename and description for piping
                     if desc:
                         print(f"{event.item.display_name}\t{desc.text}")
             else:
@@ -555,6 +1018,32 @@ def cmd_watch(args):
         if not args.quiet:
             print("\nWatcher stopped.")
 
+
+# ------------------------------------------------------------------ #
+# prompts                                                              #
+# ------------------------------------------------------------------ #
+
+def cmd_prompts(args):
+    from idt_core.config import UserConfig
+
+    user_cfg = UserConfig.load()
+    all_prompts = user_cfg.list_prompts()
+
+    if args.json_out:
+        print(json.dumps(all_prompts, indent=2, ensure_ascii=False))
+        return
+
+    print("Available prompts:\n")
+    for name, text in all_prompts.items():
+        marker = " (custom)" if name in user_cfg.custom_prompts else ""
+        print(f"  {name}{marker}")
+        preview = text[:80] + ("..." if len(text) > 80 else "")
+        print(f"    {preview}\n")
+
+
+# ------------------------------------------------------------------ #
+# config                                                               #
+# ------------------------------------------------------------------ #
 
 def cmd_config(args):
     from idt_core.config import UserConfig
@@ -579,7 +1068,6 @@ def cmd_config(args):
         print(f"Set {key} = {value}")
         return
 
-    # Show current config
     print(f"Config file:      {Path.home() / '.idt' / 'config.json'}")
     print(f"default_provider: {cfg.default_provider}")
     print(f"default_model:    {cfg.default_model}")
@@ -600,182 +1088,269 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   idt describe ~/Pictures/Vacation/
-  idt describe ~/Pictures/Vacation/ --model claude-opus-4-6
+  idt describe ~/Pictures/Vacation/ --provider anthropic --model claude-opus-4-6
   idt describe ~/Pictures/Vacation/ --provider ollama --model llava
-  idt describe ~/Pictures/Vacation/ --prompt brief --limit 10
+  idt describe ~/Pictures/Vacation/ --prompt brief --limit 10 --embed
+  idt describe ~/Pictures/Vacation/ --geocode            # add city/state to prompt context
   idt describe ~/Pictures/NYT/ --prompt news --quiet
+  idt download https://www.nytimes.com/ --max 20 --describe --prompt news
+  idt download https://example.com/gallery ~/Photos/web --max 50
   idt status ~/Pictures/Vacation/
+  idt status ~/Pictures/ --all                          # show all projects under a directory
   idt show ~/Pictures/Vacation/morning.jpg
-  idt show ~/Pictures/Vacation/ --json | grep -i "sunset"
+  idt show ~/Pictures/Vacation/ --json | python -c "import sys,json; [print(r['description']) for r in map(json.loads, sys.stdin)]"
   idt embed ~/Pictures/Vacation/
   idt embed ~/Pictures/Vacation/ --dry-run
   idt export ~/Pictures/Vacation/
   idt export ~/Pictures/Vacation/ --format csv
+  idt combine ~/Pictures/ --output all_descriptions.csv
+  idt combine ~/Pictures/ --sort date --format tsv > by_date.tsv
+  idt video ~/Movies/concert.mp4 --interval 5 --describe
+  idt video ~/Movies/ --scene 30 --describe --prompt detailed
   idt watch ~/Downloads/NYT/ --interval 60 --prompt news
-  idt watch ~/Downloads/NYT/ --quiet >> ~/nyt_descriptions.tsv
+  idt watch ~/Downloads/NYT/ --quiet >> ~/nyt.tsv
   get_nyt_images.sh | idt describe - --prompt news --provider anthropic
   idt describe - --provider florence < image_list.txt
+  idt models
+  idt models --provider ollama
   idt prompts
   idt config --set default_provider=anthropic
+  idt config --set default_model=claude-opus-4-6
 
 Supported providers:
-  anthropic  Claude (requires ANTHROPIC_API_KEY environment variable)
-  openai     GPT-4o (requires OPENAI_API_KEY environment variable)
-  ollama     Local models via Ollama (no API key needed)
+  anthropic  Claude (requires ANTHROPIC_API_KEY)
+  openai     GPT-4o (requires OPENAI_API_KEY)
+  ollama     Local models via Ollama (no API key)
+  florence   Microsoft Florence-2 local model (no API key, GPU recommended)
         """,
     )
 
     sub = parser.add_subparsers(dest="command", metavar="command")
     sub.required = True
 
-    # ---- describe ---- #
+    # ---------------------------------------------------------------- #
+    # describe                                                           #
+    # ---------------------------------------------------------------- #
     p_desc = sub.add_parser(
         "describe",
         help="Generate AI descriptions for images in a directory",
-        description="Describe images in a directory. Creates a .idt/ mirror directory next to "
-                    "the source to store descriptions. Originals are never modified.",
+        description=(
+            "Describe images in a directory. Creates a .idt/ mirror next to "
+            "the source to store descriptions. Originals are never modified."
+        ),
     )
     p_desc.add_argument(
         "source",
         help="Directory containing images, or '-' to read image paths from stdin",
     )
-    p_desc.add_argument(
-        "--stdin", action="store_true",
-        help="Read image file paths from stdin (one per line). Same as passing '-' as source.",
-    )
-    p_desc.add_argument(
-        "--project", metavar="DIR",
-        help="Project directory to use when reading from stdin (default: common ancestor of input paths)",
-    )
-    p_desc.add_argument(
-        "--provider", choices=["anthropic", "ollama", "openai", "florence"],
-        help="AI provider (default: from project config, then ~/.idt/config.json, then anthropic)",
-    )
-    p_desc.add_argument("--model", metavar="NAME", help="Model name")
-    p_desc.add_argument(
-        "--prompt", metavar="NAME",
-        help=f"Named prompt to use (see 'idt prompts' for options)",
-    )
-    p_desc.add_argument(
-        "--prompt-text", metavar="TEXT",
-        help="Prompt text (overrides --prompt)",
-    )
-    p_desc.add_argument(
-        "--ollama-host", metavar="URL", default="http://localhost:11434",
-        help="Ollama server URL (default: http://localhost:11434)",
-    )
-    p_desc.add_argument(
-        "--redescribe", action="store_true",
-        help="Generate a new description for images that already have one",
-    )
-    p_desc.add_argument(
-        "--limit", type=int, metavar="N",
-        help="Stop after describing N images",
-    )
-    p_desc.add_argument(
-        "--quiet", "-q", action="store_true",
-        help="Minimal output — only errors",
-    )
+    p_desc.add_argument("--stdin", action="store_true",
+                        help="Read image paths from stdin (same as passing '-' as source)")
+    p_desc.add_argument("--project", metavar="DIR",
+                        help="Project root when reading from stdin")
+    _provider_args(p_desc)
+    _prompt_args(p_desc)
+    _metadata_args(p_desc)
+    p_desc.add_argument("--redescribe", action="store_true",
+                        help="Generate a new description even for already-described images")
+    p_desc.add_argument("--limit", type=int, metavar="N",
+                        help="Stop after describing N images")
+    p_desc.add_argument("--embed", action="store_true",
+                        help="Automatically embed descriptions into image copies after describing")
+    p_desc.add_argument("--quiet", "-q", action="store_true",
+                        help="Minimal output; in stdin mode, prints filename TAB description")
     p_desc.set_defaults(func=cmd_describe)
 
-    # ---- status ---- #
-    p_status = sub.add_parser(
-        "status",
-        help="Show how many images have been described",
+    # ---------------------------------------------------------------- #
+    # download                                                           #
+    # ---------------------------------------------------------------- #
+    p_dl = sub.add_parser(
+        "download",
+        help="Download images from a URL",
+        description=(
+            "Download images from a web page into the .idt/downloads/ directory. "
+            "Captures HTML alt text alongside each image. Use --describe to "
+            "describe downloaded images immediately."
+        ),
     )
+    p_dl.add_argument("url", help="URL to download images from")
+    p_dl.add_argument("directory", nargs="?",
+                      help="Target directory (default: current directory)")
+    p_dl.add_argument("--max", dest="max_images", type=int, metavar="N",
+                      help="Maximum number of images to download")
+    p_dl.add_argument("--min-size", metavar="WxH",
+                      help="Minimum image size to download (e.g. 200x200)")
+    p_dl.add_argument("--timeout", type=int, default=30,
+                      help="Request timeout in seconds (default: 30)")
+    p_dl.add_argument("--describe", action="store_true",
+                      help="Describe downloaded images immediately")
+    p_dl.add_argument("--embed", action="store_true",
+                      help="Embed descriptions after describing (requires --describe)")
+    _provider_args(p_dl)
+    _prompt_args(p_dl)
+    p_dl.add_argument("--quiet", "-q", action="store_true", help="Minimal output")
+    p_dl.set_defaults(func=cmd_download)
+
+    # ---------------------------------------------------------------- #
+    # video                                                              #
+    # ---------------------------------------------------------------- #
+    p_vid = sub.add_parser(
+        "video",
+        help="Extract frames from video files and optionally describe them",
+        description=(
+            "Extract frames from video files into .idt/frames/. "
+            "Supports interval mode (one frame every N seconds) and scene-change "
+            "detection. Use --describe to describe the extracted frames."
+        ),
+    )
+    p_vid.add_argument("source", help="Video file or directory containing video files")
+    p_vid.add_argument(
+        "--interval", type=float, default=5.0, metavar="SECONDS",
+        help="Extract one frame every N seconds (default: 5.0)",
+    )
+    p_vid.add_argument(
+        "--scene", type=float, default=0.0, metavar="THRESHOLD",
+        help="Scene-change extraction; threshold 0-100, lower=more sensitive (e.g. --scene 30). "
+             "Mutually exclusive with --interval.",
+    )
+    p_vid.add_argument("--max-frames", type=int, metavar="N",
+                       help="Maximum frames to extract per video")
+    p_vid.add_argument("--describe", action="store_true",
+                       help="Describe extracted frames after extraction")
+    _provider_args(p_vid)
+    _prompt_args(p_vid)
+    p_vid.add_argument("--quiet", "-q", action="store_true", help="Minimal output")
+    p_vid.set_defaults(func=cmd_video)
+
+    # ---------------------------------------------------------------- #
+    # status                                                             #
+    # ---------------------------------------------------------------- #
+    p_status = sub.add_parser("status", help="Show description progress for a project")
     p_status.add_argument("source", help="Source directory")
-    p_status.add_argument("--json", dest="json_out", action="store_true", help="Output as JSON")
+    p_status.add_argument("--all", action="store_true",
+                          help="Show all IDT projects found under this directory")
+    p_status.add_argument("--json", dest="json_out", action="store_true",
+                          help="Output as JSON")
     p_status.set_defaults(func=cmd_status)
 
-    # ---- show ---- #
+    # ---------------------------------------------------------------- #
+    # show                                                               #
+    # ---------------------------------------------------------------- #
     p_show = sub.add_parser(
         "show",
         help="Print descriptions to stdout",
-        description="Print the description for one image file, or all described images in a directory.",
+        description="Print the description for one image or all images in a directory.",
     )
     p_show.add_argument("target", help="Image file or source directory")
-    p_show.add_argument(
-        "--json", dest="json_out", action="store_true",
-        help="Output as JSON (one object per line — pipeable to jq)",
-    )
-    p_show.add_argument("--quiet", "-q", action="store_true", help="Suppress informational messages")
+    p_show.add_argument("--json", dest="json_out", action="store_true",
+                        help="Output as JSON (one object per line)")
+    p_show.add_argument("--quiet", "-q", action="store_true")
     p_show.set_defaults(func=cmd_show)
 
-    # ---- embed ---- #
+    # ---------------------------------------------------------------- #
+    # embed                                                              #
+    # ---------------------------------------------------------------- #
     p_embed = sub.add_parser(
         "embed",
         help="Write descriptions into image metadata copies",
-        description="Copy described images to .idt/embedded/ and write the description into "
-                    "both EXIF ImageDescription and XMP dc:description. Source files are never "
-                    "modified. HEIC files are converted to JPEG in the copy.",
+        description=(
+            "Copy described images to .idt/embedded/ and write the description "
+            "into EXIF ImageDescription and XMP dc:description. Source files are "
+            "never modified. HEIC files are converted to JPEG in the copy."
+        ),
     )
-    p_embed.add_argument("source", help="Source directory (must already have described images)")
-    p_embed.add_argument(
-        "--force", action="store_true",
-        help="Re-embed even if images were already embedded",
-    )
-    p_embed.add_argument(
-        "--dry-run", action="store_true",
-        help="Show what would be embedded without writing anything",
-    )
-    p_embed.add_argument("--quiet", "-q", action="store_true", help="Minimal output")
+    p_embed.add_argument("source", help="Source directory")
+    p_embed.add_argument("--force", action="store_true",
+                         help="Re-embed even for already-embedded images")
+    p_embed.add_argument("--dry-run", action="store_true",
+                         help="Show what would be embedded without writing")
+    p_embed.add_argument("--quiet", "-q", action="store_true")
     p_embed.set_defaults(func=cmd_embed)
 
-    # ---- export ---- #
+    # ---------------------------------------------------------------- #
+    # export                                                             #
+    # ---------------------------------------------------------------- #
     p_export = sub.add_parser(
         "export",
         help="Export descriptions to HTML, CSV, or plain text",
         description="Generate a report from described images. Output goes to .idt/reports/.",
     )
     p_export.add_argument("source", help="Source directory")
-    p_export.add_argument(
-        "--format", choices=["html", "csv", "txt"], default="html",
-        help="Output format (default: html)",
-    )
+    p_export.add_argument("--format", choices=["html", "csv", "txt"], default="html",
+                          help="Output format (default: html)")
     p_export.add_argument("--quiet", "-q", action="store_true",
                           help="Print only the output file path")
     p_export.set_defaults(func=cmd_export)
 
-    # ---- watch ---- #
+    # ---------------------------------------------------------------- #
+    # combine                                                            #
+    # ---------------------------------------------------------------- #
+    p_combine = sub.add_parser(
+        "combine",
+        help="Merge descriptions from multiple projects into one CSV",
+        description=(
+            "Walk a directory tree, find all .idt/ project mirrors, and merge "
+            "every described image into a single CSV or TSV file. "
+            "Useful for analysis across a whole photo library."
+        ),
+    )
+    p_combine.add_argument("directory", help="Root directory to search for IDT projects")
+    p_combine.add_argument("--output", metavar="FILE",
+                           help="Output file (default: stdout)")
+    p_combine.add_argument("--format", choices=["csv", "tsv"], default="csv",
+                           help="Output format (default: csv)")
+    p_combine.add_argument("--sort", choices=["date", "file", "timestamp"],
+                           default="timestamp",
+                           help="Sort order (default: timestamp)")
+    p_combine.set_defaults(func=cmd_combine)
+
+    # ---------------------------------------------------------------- #
+    # models                                                             #
+    # ---------------------------------------------------------------- #
+    p_models = sub.add_parser(
+        "models",
+        help="Show available AI models for each provider",
+    )
+    p_models.add_argument("--provider", choices=["anthropic", "ollama", "openai"],
+                          help="Show only this provider")
+    p_models.add_argument("--ollama-host", metavar="URL",
+                          default="http://localhost:11434")
+    p_models.add_argument("--json", dest="json_out", action="store_true",
+                          help="Output as JSON")
+    p_models.set_defaults(func=cmd_models)
+
+    # ---------------------------------------------------------------- #
+    # watch                                                              #
+    # ---------------------------------------------------------------- #
     p_watch = sub.add_parser(
         "watch",
         help="Monitor a directory and describe new images automatically",
-        description="Describes existing undescribed images, then polls for new arrivals. "
-                    "Useful for automation pipelines (e.g. download NYT images, auto-describe). "
-                    "Press Ctrl+C to stop.",
+        description=(
+            "Describes undescribed images, then polls for new arrivals. "
+            "Press Ctrl+C to stop."
+        ),
     )
     p_watch.add_argument("source", help="Directory to watch")
-    p_watch.add_argument(
-        "--interval", type=int, default=30, metavar="SECONDS",
-        help="Polling interval in seconds (default: 30)",
-    )
-    p_watch.add_argument(
-        "--provider", choices=["anthropic", "ollama", "openai", "florence"],
-        help="AI provider",
-    )
-    p_watch.add_argument("--model", metavar="NAME", help="Model name")
-    p_watch.add_argument("--prompt", metavar="NAME", help="Named prompt")
-    p_watch.add_argument("--prompt-text", metavar="TEXT", help="Prompt text")
-    p_watch.add_argument(
-        "--ollama-host", metavar="URL", default="http://localhost:11434",
-    )
-    p_watch.add_argument(
-        "--quiet", "-q", action="store_true",
-        help="Output tab-separated filename/description lines (for piping)",
-    )
+    p_watch.add_argument("--interval", type=int, default=30, metavar="SECONDS",
+                         help="Polling interval in seconds (default: 30)")
+    _provider_args(p_watch)
+    _prompt_args(p_watch)
+    p_watch.add_argument("--quiet", "-q", action="store_true",
+                         help="Output tab-separated filename/description for piping")
     p_watch.set_defaults(func=cmd_watch)
 
-    # ---- prompts ---- #
+    # ---------------------------------------------------------------- #
+    # prompts                                                            #
+    # ---------------------------------------------------------------- #
     p_prompts = sub.add_parser("prompts", help="List available prompts")
-    p_prompts.add_argument("--json", dest="json_out", action="store_true", help="Output as JSON")
+    p_prompts.add_argument("--json", dest="json_out", action="store_true")
     p_prompts.set_defaults(func=cmd_prompts)
 
-    # ---- config ---- #
+    # ---------------------------------------------------------------- #
+    # config                                                             #
+    # ---------------------------------------------------------------- #
     p_config = sub.add_parser("config", help="View or set default configuration")
-    p_config.add_argument(
-        "--set", dest="set_value", metavar="KEY=VALUE",
-        help="Set a config value (e.g. --set default_provider=anthropic)",
-    )
+    p_config.add_argument("--set", dest="set_value", metavar="KEY=VALUE",
+                          help="Set a config value")
     p_config.set_defaults(func=cmd_config)
 
     return parser

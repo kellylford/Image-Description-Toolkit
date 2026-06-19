@@ -30,13 +30,22 @@ class Progress:
             msg += f"  ({label})"
         print(msg, file=self._out, flush=True)
 
-    def update(self, name: str, success: bool = True, error: Optional[str] = None) -> None:
+    def update(
+        self,
+        name: str,
+        success: bool = True,
+        error: Optional[str] = None,
+        note: str = "",
+    ) -> None:
         self.current += 1
         if self.quiet:
             return
         pct = int(self.current / self.total * 100) if self.total else 0
         status = "done" if success else "error"
-        print(f"{self.current} of {self.total}  {pct}%  {name}: {status}", file=self._out, flush=True)
+        line = f"{self.current} of {self.total}  {pct}%  {name}: {status}"
+        if note:
+            line += note
+        print(line, file=self._out, flush=True)
         if not success and error:
             print(f"  Error: {error}", file=self._out, flush=True)
 
