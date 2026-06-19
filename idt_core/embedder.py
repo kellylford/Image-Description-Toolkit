@@ -68,6 +68,51 @@ class EmbedResult:
 # Public API                                                           #
 # ------------------------------------------------------------------ #
 
+def embed_image_file(
+    source: Path,
+    description: str,
+    dest: Path,
+    *,
+    overwrite: bool = True,
+) -> None:
+    """
+    Copy *source* to *dest* and embed *description* into the metadata of the copy.
+
+    Works without a Project object — suitable for the GUI workspace model or
+    any context where the caller already knows the source and destination paths.
+
+    Supported formats: JPEG/TIFF (.jpg .jpeg .tif .tiff),
+                       PNG (.png), WebP (.webp).
+    Other formats: copy is made but no metadata is written.
+
+    Raises RuntimeError if the copy or embed fails.
+    """
+    if dest == source:
+        # In-place mode: embed directly, no copy step
+        suffix = source.suffix.lower()
+        if suffix in (".jpg", ".jpeg", ".tif", ".tiff"):
+            _embed_jpeg(source, description)
+        elif suffix == ".png":
+            _embed_png(source, description)
+        elif suffix == ".webp":
+            _embed_webp(source, description)
+        return
+
+    if not overwrite and dest.exists():
+        raise FileExistsError(f"Destination already exists: {dest}")
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, dest)
+
+    suffix = dest.suffix.lower()
+    if suffix in (".jpg", ".jpeg", ".tif", ".tiff"):
+        _embed_jpeg(dest, description)
+    elif suffix == ".png":
+        _embed_png(dest, description)
+    elif suffix == ".webp":
+        _embed_webp(dest, description)
+
+
 class Embedder:
     """Copies images to .idt/embedded/ and writes description metadata into the copies."""
 

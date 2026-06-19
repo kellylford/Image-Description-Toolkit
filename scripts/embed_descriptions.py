@@ -33,6 +33,13 @@ try:
 except ImportError:
     from scripts.descriptions_to_html import DescriptionsParser
 
+# idt_core provides better embedding (EXIF + XMP dc:description) when available.
+# Falls back to the piexif-only ExifEmbedder otherwise.
+try:
+    from idt_core.embedder import embed_image_file as _idt_embed_image_file
+except ImportError:
+    _idt_embed_image_file = None
+
 logger = logging.getLogger(__name__)
 
 HEIC_SUFFIXES = {'.heic', '.heif'}
@@ -232,9 +239,8 @@ class EmbedDescriptions:
                     logger.info("Skipping HEIC in-place embed: %s", orig.name)
                     result.skipped_format.append(str(orig))
                     return
-                target = orig
                 if not dry_run:
-                    embedder.embed_ai_description(target, description, model, timestamp)
+                    self._do_embed(orig, orig, description, model, timestamp, embedder)
             else:
                 # Copy mode
                 if is_heic:
@@ -253,8 +259,7 @@ class EmbedDescriptions:
                     if is_heic:
                         self._convert_heic_and_embed(orig, dest, description, model, timestamp, embedder)
                     else:
-                        shutil.copy2(orig, dest)
-                        embedder.embed_ai_description(dest, description, model, timestamp)
+                        self._do_embed(orig, dest, description, model, timestamp, embedder)
 
             result.embedded += 1
             action = "Would embed" if dry_run else "Embedded"
@@ -267,6 +272,25 @@ class EmbedDescriptions:
             logger.error("Error embedding %s: %s", orig.name, e)
             result.errors.append(f"{orig.name}: {e}")
 
+    def _do_embed(self, source: Path, dest: Path, description: str,
+                  model: str, timestamp: str, embedder: ExifEmbedder) -> None:
+        """Write description into dest.
+
+        Uses idt_core.embed_image_file (EXIF + XMP) when available, otherwise
+        falls back to the piexif-only ExifEmbedder path.
+        """
+        if _idt_embed_image_file is not None:
+            try:
+                _idt_embed_image_file(source, description, dest)
+                return
+            except Exception as exc:
+                logger.warning("idt_core embed failed, falling back to ExifEmbedder: %s", exc)
+
+        # Fallback: piexif-only path (no XMP dc:description)
+        if source != dest:
+            shutil.copy2(source, dest)
+        embedder.embed_ai_description(dest, description, model, timestamp)
+
     def _convert_heic_and_embed(self, heic_path: Path, dest: Path, description: str,
                                  model: str, timestamp: str, embedder: ExifEmbedder) -> None:
         """Convert a HEIC file to JPEG copy, then embed the description."""
@@ -277,7 +301,7 @@ class EmbedDescriptions:
 
         dest.parent.mkdir(parents=True, exist_ok=True)
         convert_heic_to_jpg(heic_path, dest)
-        embedder.embed_ai_description(dest, description, model, timestamp)
+        self._do_embed(dest, dest, description, model, timestamp, embedder)
 
 
 def main():

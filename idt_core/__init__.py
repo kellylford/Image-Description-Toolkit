@@ -11,7 +11,7 @@ from .config import UserConfig, BUILT_IN_PROMPTS
 from .metadata import MetadataExtractor, NominatimGeocoder, ImageMetadata
 from .downloader import Downloader, DownloadResult
 from .video import VideoExtractor, VideoExtractionOptions, VideoExtractionResult, scan_videos
-from .embedder import Embedder
+from .embedder import Embedder, embed_image_file
 from .exporter import export_html, export_csv, export_txt
 from .progress import Progress
 
@@ -26,7 +26,7 @@ __all__ = [
     "MetadataExtractor", "NominatimGeocoder", "ImageMetadata",
     "Downloader", "DownloadResult",
     "VideoExtractor", "VideoExtractionOptions", "VideoExtractionResult",
-    "Embedder",
+    "Embedder", "embed_image_file",
     "export_html", "export_csv", "export_txt",
     "Progress",
 ]

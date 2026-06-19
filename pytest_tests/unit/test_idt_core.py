@@ -540,6 +540,48 @@ class TestEmbedder:
         assert len(result2.embedded) == 3
 
 
+class TestEmbedImageFile:
+    """Tests for the standalone embed_image_file() public helper."""
+
+    def test_copy_mode_creates_dest_with_xmp(self, tmp_path):
+        from idt_core.embedder import embed_image_file, _extract_xmp_from_jpeg
+        src = tmp_path / "photo.jpg"
+        src.write_bytes(_make_tiny_jpeg())
+        dest = tmp_path / "out" / "photo.jpg"
+        embed_image_file(src, "A lovely sunset.", dest)
+        assert dest.exists()
+        assert src.stat().st_mtime != dest.stat().st_mtime or src != dest
+        xmp = _extract_xmp_from_jpeg(dest.read_bytes())
+        assert xmp is not None
+        assert b"A lovely sunset." in xmp
+
+    def test_source_not_modified_in_copy_mode(self, tmp_path):
+        from idt_core.embedder import embed_image_file
+        src = tmp_path / "photo.jpg"
+        src.write_bytes(_make_tiny_jpeg())
+        mtime_before = src.stat().st_mtime
+        dest = tmp_path / "copy.jpg"
+        embed_image_file(src, "Unchanged.", dest)
+        assert src.stat().st_mtime == mtime_before
+
+    def test_inplace_mode_same_path(self, tmp_path):
+        from idt_core.embedder import embed_image_file, _extract_xmp_from_jpeg
+        p = tmp_path / "inplace.jpg"
+        p.write_bytes(_make_tiny_jpeg())
+        embed_image_file(p, "Embedded in place.", p)
+        xmp = _extract_xmp_from_jpeg(p.read_bytes())
+        assert xmp is not None
+        assert b"Embedded in place." in xmp
+
+    def test_creates_dest_parent_dirs(self, tmp_path):
+        from idt_core.embedder import embed_image_file
+        src = tmp_path / "a.jpg"
+        src.write_bytes(_make_tiny_jpeg())
+        dest = tmp_path / "deep" / "nested" / "dir" / "a.jpg"
+        embed_image_file(src, "Deep copy.", dest)
+        assert dest.exists()
+
+
 # ------------------------------------------------------------------ #
 # XMP injection tests                                                  #
 # ------------------------------------------------------------------ #
