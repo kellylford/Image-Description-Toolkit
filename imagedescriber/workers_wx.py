@@ -1670,7 +1670,8 @@ class BatchProcessingWorker(threading.Thread):
                  prompt_config_path: Optional[str] = None,
                  skip_existing: bool = False,
                  progress_offset: int = 0,
-                 geocode: bool = False):
+                 geocode: bool = False,
+                 logs_dir: Optional[Path] = None):
         """Initialize batch worker
 
         Args:
@@ -1698,7 +1699,8 @@ class BatchProcessingWorker(threading.Thread):
         self.skip_existing = skip_existing
         self.progress_offset = progress_offset
         self.geocode = geocode
-        
+        self.logs_dir = logs_dir
+
         # Phase 2: Pause/Resume/Stop controls using threading.Event
         self._stop_event = threading.Event()  # Set = stopped
         self._pause_event = threading.Event()  # Set = running, cleared = paused
@@ -1706,10 +1708,24 @@ class BatchProcessingWorker(threading.Thread):
     
     def run(self):
         """Process all images sequentially"""
+        run_log = None
+        if self.logs_dir:
+            try:
+                from idt_core.logger import open_run_log
+                run_log = open_run_log(self.logs_dir, label="run")
+            except Exception as _le:
+                logger.warning(f"Could not open workspace run log: {_le}")
+
         try:
             total = len(self.file_paths)
             completed = 0
             failed = 0
+
+            if run_log:
+                run_log.info(
+                    f"GUI batch run — provider={self.provider}  model={self.model}"
+                    f"  prompt={self.prompt_style}  images={total}"
+                )
 
             # For MLX: post a "loading" status event immediately so the progress
             # dialog doesn't look frozen during model load / first-time download.
@@ -1725,15 +1741,19 @@ class BatchProcessingWorker(threading.Thread):
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():
+                    if run_log:
+                        run_log.info(f"run stopped by user after {completed} images")
                     break
-                
+
                 # Phase 2: Wait if paused (blocks here until resume)
                 self._pause_event.wait()
-                
+
                 # Phase 2: Double-check stop after unpause
                 if self._stop_event.is_set():
+                    if run_log:
+                        run_log.info(f"run stopped by user after {completed} images")
                     break
-                
+
                 # Post progress with current/total counts (add offset for continuing from video extraction)
                 current_progress = i + self.progress_offset
                 total_progress = total + self.progress_offset
@@ -1744,7 +1764,10 @@ class BatchProcessingWorker(threading.Thread):
                     total=total_progress
                 )
                 wx.PostEvent(self.parent_window, evt)
-                
+
+                if run_log:
+                    run_log.info(f"{i}/{total}  {Path(file_path).name}: processing")
+
                 # Create worker for this image
                 worker = ProcessingWorker(
                     self.parent_window,
@@ -1757,21 +1780,24 @@ class BatchProcessingWorker(threading.Thread):
                     self.prompt_config_path,
                     geocode=self.geocode,
                 )
-                
+
                 # Run synchronously and wait
                 worker.start()
                 worker.join()  # Wait for completion
-                
+
                 # Track completion (events are posted by ProcessingWorker)
                 completed += 1
-            
+
+            if run_log:
+                run_log.info(f"done  completed={completed}  total={total}")
+
             # Post final completion
             evt = WorkflowCompleteEventData(
                 input_dir=f"{completed}/{total} images",
                 output_dir=""
             )
             wx.PostEvent(self.parent_window, evt)
-            
+
         except Exception as e:
             # Comprehensive error logging for debugging frozen executables
             error_msg = f"FATAL ERROR in BatchProcessingWorker: {type(e).__name__}: {e}"
@@ -1799,10 +1825,20 @@ class BatchProcessingWorker(threading.Thread):
             except Exception as log_error:
                 logger.error(f"Failed to write crash log: {log_error}")
             
+            if run_log:
+                run_log.error(f"batch aborted: {error_msg}")
+
             # Post failure event
             evt = WorkflowFailedEventData(error=f"Batch processing failed: {str(e)}")
             wx.PostEvent(self.parent_window, evt)
-    
+        finally:
+            if run_log:
+                try:
+                    from idt_core.logger import close_run_log
+                    close_run_log(run_log)
+                except Exception:
+                    pass
+
     def pause(self):
         """Pause batch processing after current image completes"""
         self._pause_event.clear()

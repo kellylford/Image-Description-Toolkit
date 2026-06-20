@@ -12,6 +12,7 @@ Design:
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -184,6 +185,8 @@ class WorkspacePipeline:
         self._geocoder: Optional[NominatimGeocoder] = None
 
     def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
+        from .logger import open_run_log, close_run_log
+
         if options.extract_metadata:
             self._extractor = MetadataExtractor()
             if options.geocode:
@@ -196,10 +199,38 @@ class WorkspacePipeline:
             queue = queue[: options.limit]
 
         total = len(queue)
-        for index, item in enumerate(queue, start=1):
-            yield self._process(item, index, total, options)
+        log = open_run_log(self.workspace.logs_dir)
+        log.info(
+            f"provider={self.provider.provider_name}  model={self.provider.model_name}"
+            f"  prompt={options.prompt_name}  images={total}"
+        )
+        t0 = time.monotonic()
+        described = errors = 0
 
-        self.workspace.save_manifest()
+        try:
+            for index, item in enumerate(queue, start=1):
+                event = self._process(item, index, total, options)
+                if event.success:
+                    described += 1
+                    tokens = ""
+                    if item.descriptions:
+                        last = item.descriptions[-1]
+                        if last.input_tokens or last.output_tokens:
+                            tokens = f"  ({last.input_tokens} in, {last.output_tokens} out)"
+                    log.info(f"{index}/{total}  {item.image}: described{tokens}")
+                else:
+                    errors += 1
+                    log.error(f"{index}/{total}  {item.image}: ERROR — {event.error}")
+                yield event
+
+            elapsed = time.monotonic() - t0
+            log.info(f"done  described={described}  errors={errors}  elapsed={elapsed:.1f}s")
+            self.workspace.save_manifest()
+        except BaseException:
+            log.exception("run aborted")
+            raise
+        finally:
+            close_run_log(log)
 
     def _process(self, item: WorkspaceItem, index: int, total: int,
                  options: RunOptions) -> WorkspaceEvent:

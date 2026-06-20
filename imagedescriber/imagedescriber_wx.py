@@ -3680,6 +3680,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing,
             progress_offset=0,
             geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
 
         # Phase 3: Initialize timing
@@ -3840,6 +3841,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             True,   # skip_existing
             progress_offset=0,
             geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
 
         self.batch_start_time = time.time()
@@ -4057,6 +4059,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing,
             progress_offset=progress_offset,
             geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
@@ -4317,6 +4320,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return Workspace.is_bundle(Path(self.workspace_file))
         except ImportError:
             return False
+
+    def _workspace_logs_dir(self):
+        """Return the logs/ dir inside the .idtw bundle, or None for non-bundle workspaces."""
+        if self._workspace_file_is_bundle():
+            return Path(self.workspace_file) / "logs"
+        return None
 
     def save_workspace(self, file_path):
         """Save workspace to file (runs in background thread)"""
@@ -6066,6 +6075,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
             skip_existing=True,  # Always skip completed
             geocode=batch_state.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
@@ -6330,6 +6340,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('skip_existing', True),
             progress_offset=0,
             geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
@@ -6402,6 +6413,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
             skip_existing=True,
             geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
