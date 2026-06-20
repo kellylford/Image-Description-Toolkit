@@ -61,6 +61,7 @@ a = Analysis(
         ('../scripts/workflow_config.json', 'scripts'),
         ('../scripts/image_describer_config.json', 'scripts'),
         ('../scripts/video_frame_extractor_config.json', 'scripts'),
+        ('../scripts/embed_descriptions.py', 'scripts'),
         # Include models and analysis directories
         ('../models', 'models'),
         ('../analysis', 'analysis'),
@@ -92,6 +93,8 @@ a = Analysis(
         'scripts.config_loader',
         'scripts.list_prompts',
         'scripts.list_results',
+        'scripts.embed_descriptions',
+        'embed_descriptions',  # frozen mode bare name
         # Models and analysis
         'models.check_models',
         'models.manage_models',

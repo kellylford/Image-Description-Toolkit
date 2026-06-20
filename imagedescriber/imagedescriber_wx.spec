@@ -51,6 +51,7 @@ a = Analysis(
         (str(project_root / 'scripts' / '*.json'), 'scripts'),
         (str(project_root / 'scripts' / 'video_describer.py'), 'scripts'),
         (str(project_root / 'scripts' / 'enhanced_scene_detector.py'), 'scripts'),
+        (str(project_root / 'scripts' / 'embed_descriptions.py'), 'scripts'),
         (str(project_root / 'VERSION'), '.'),
     ] + wx_datas + cv2_datas + mlx_vlm_datas + mlx_datas + torch_datas,
     hiddenimports=[
@@ -85,6 +86,29 @@ a = Analysis(
         'scripts.metadata_extractor',
         'scripts.versioning',
         'scripts.config_loader',
+        'scripts.embed_descriptions',
+        'embed_descriptions',  # frozen mode bare name
+        # idt_core package — EXIF context injection, Save/Import idt Project, XMP embed
+        'idt_core',
+        'idt_core.project',
+        'idt_core.image_item',
+        'idt_core.pipeline',
+        'idt_core.scanner',
+        'idt_core.metadata',
+        'idt_core.embedder',
+        'idt_core.exporter',
+        'idt_core.config',
+        'idt_core.converter',
+        'idt_core.progress',
+        'idt_core.watcher',
+        'idt_core.downloader',
+        'idt_core.video',
+        'idt_core.providers',
+        'idt_core.providers.base',
+        'idt_core.providers.claude',
+        'idt_core.providers.ollama',
+        'idt_core.providers.openai_provider',
+        'idt_core.providers.florence',
         'scripts.descriptions_to_html',  # HTML export functionality
         'scripts.gallery_exporter',       # HTML gallery export
         'scripts.web_image_downloader',  # URL image downloader
