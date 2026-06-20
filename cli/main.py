@@ -72,9 +72,17 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
         return ("custom", args.prompt_text)
 
     user_cfg = UserConfig.load()
+    # Accept either a WorkspaceDefaults (.prompt_name) or legacy ProjectConfig
+    # (.default_prompt_name).
+    cfg_default = None
+    if project_config is not None:
+        cfg_default = (
+            getattr(project_config, "prompt_name", None)
+            or getattr(project_config, "default_prompt_name", None)
+        )
     name = (
         getattr(args, "prompt", None)
-        or (project_config.default_prompt_name if project_config else None)
+        or cfg_default
         or user_cfg.default_prompt_name
     )
     text = user_cfg.get_prompt_text(name) or BUILT_IN_PROMPTS.get("detailed", "")
@@ -114,12 +122,51 @@ def _metadata_args(p: argparse.ArgumentParser) -> None:
 
 
 # ------------------------------------------------------------------ #
+# Workspace resolution                                                 #
+# ------------------------------------------------------------------ #
+
+def _open_or_create_workspace(source: Path, workspace_arg: Optional[str]):
+    """
+    Resolve the .idtw bundle for a describe run.
+      --workspace PATH  (contains a separator or ends in .idtw) -> that exact path
+      --workspace NAME  (bare name)                              -> NAME.idtw next to source
+      (omitted)                                                  -> <source>.idtw next to source
+    """
+    from idt_core.workspace import Workspace, BUNDLE_EXT
+
+    if workspace_arg:
+        wp = Path(workspace_arg).expanduser()
+        is_bare_name = (wp.parent == Path(".")) and (BUNDLE_EXT not in workspace_arg)
+        if is_bare_name:
+            wp = source.parent / workspace_arg
+    else:
+        wp = source.parent / source.name  # Workspace.open appends .idtw
+    return Workspace.open(wp)
+
+
+def _find_workspace(arg: str):
+    """
+    For read commands: locate an existing bundle from a user-supplied path.
+    Accepts a .idtw bundle directly, or a source folder whose sibling bundle exists.
+    Returns a Workspace or None.
+    """
+    from idt_core.workspace import Workspace
+
+    p = Path(arg).expanduser().resolve()
+    if Workspace.is_bundle(p):
+        return Workspace.open(p)
+    sibling = p.parent / (p.name + ".idtw")
+    if Workspace.is_bundle(sibling):
+        return Workspace.open(sibling)
+    return None
+
+
+# ------------------------------------------------------------------ #
 # describe                                                             #
 # ------------------------------------------------------------------ #
 
 def cmd_describe(args):
-    from idt_core.project import Project
-    from idt_core.pipeline import Pipeline, RunOptions
+    from idt_core.pipeline import WorkspacePipeline, RunOptions
     from idt_core.progress import Progress
     from idt_core.config import UserConfig
 
@@ -133,22 +180,33 @@ def cmd_describe(args):
         print(f"Error: not a directory: {source}", file=sys.stderr)
         sys.exit(1)
 
-    project = Project.open(source)
+    ws = _open_or_create_workspace(source, getattr(args, "workspace", None))
     user_cfg = UserConfig.load()
 
-    provider_name = args.provider or project.config.default_provider or user_cfg.default_provider
-    model = args.model or project.config.default_model or user_cfg.default_model
-    prompt_name, prompt_text = _resolve_prompt(args, project.config)
+    provider_name = args.provider or ws.defaults.provider or user_cfg.default_provider
+    model = args.model or ws.defaults.model or user_cfg.default_model
+    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
 
+    # Copy this run's source images into the bundle (idempotent; originals untouched)
     if not args.quiet:
-        print(f"Source:    {source}")
-        print(f"Project:   {project.idt_dir}")
-        print(f"Provider:  {provider_name}  model: {model}")
-        print(f"Prompt:    {prompt_name}")
+        print(f"Source:     {source}")
+        print(f"Workspace:  {ws.path}")
+    added = ws.add_source_folder(source, recursive=True)
+    if not args.quiet:
+        print(f"Images:     {len(added)} in workspace")
+        print(f"Provider:   {provider_name}  model: {model}")
+        print(f"Prompt:     {prompt_name}")
         if args.extract_metadata:
             gcstr = " + geocoding" if args.geocode else ""
-            print(f"Metadata:  EXIF extraction enabled{gcstr}")
+            print(f"Metadata:   EXIF extraction enabled{gcstr}")
         print()
+
+    # Persist the chosen defaults on the workspace
+    ws.defaults.provider = provider_name
+    ws.defaults.model = model
+    ws.defaults.prompt_name = prompt_name
+    ws.geocode_enabled = bool(args.geocode)
+    ws.save_manifest()
 
     provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -161,15 +219,14 @@ def cmd_describe(args):
         geocode=args.geocode,
     )
 
-    queue = list(
-        project.items() if args.redescribe else project.undescribed()
-    )
+    all_items = ws.items()
+    queue = all_items if args.redescribe else [i for i in all_items if not i.described]
     if args.limit:
         queue = queue[: args.limit]
 
     if not queue:
         if not args.quiet:
-            st = project.status()
+            st = ws.status()
             n = st["described"]
             print(f"All {n} image{'s are' if n != 1 else ' is'} already described.")
             print("Use --redescribe to generate additional descriptions.")
@@ -179,12 +236,11 @@ def cmd_describe(args):
     progress.start(f"{provider_name} / {model}")
 
     described = errors = 0
-    pipeline = Pipeline(project, provider)
+    pipeline = WorkspacePipeline(ws, provider)
 
     for event in pipeline.run(options):
         if event.success:
             described += 1
-            # Show metadata context when available in verbose mode
             extra = ""
             if not args.quiet and event.metadata:
                 ctx = event.metadata.prompt_context()
@@ -197,10 +253,9 @@ def cmd_describe(args):
 
     progress.summary(described=described, errors=errors)
 
-    # Auto-embed if requested
     if args.embed and described > 0:
         print()
-        _do_embed(project, force=False, dry_run=False, quiet=args.quiet)
+        _do_embed_workspace(ws, force=False, dry_run=False, quiet=args.quiet)
 
 
 def _cmd_describe_stdin(args):
@@ -560,64 +615,79 @@ def cmd_video(args):
 # ------------------------------------------------------------------ #
 
 def cmd_status(args):
-    from idt_core.project import Project
-
     source = Path(args.source).resolve()
 
-    # If given a parent dir, scan for all .idt/ projects underneath it
+    # If given a parent dir, scan for all workspaces/projects underneath it
     if args.all:
         _cmd_status_all(source, args)
         return
 
-    if not source.is_dir():
-        print(f"Error: not a directory: {source}", file=sys.stderr)
-        sys.exit(1)
+    ws = _find_workspace(args.source)
+    if ws is not None:
+        st = ws.status()
+        if args.json_out:
+            print(json.dumps(st, indent=2, ensure_ascii=False))
+            return
+        pct = int(st["described"] / st["total"] * 100) if st["total"] else 0
+        print(f"Workspace:   {st['path']}")
+        if st["sources"]:
+            print(f"Sources:     {', '.join(st['sources'])}")
+        print(f"Total:       {st['total']}")
+        print(f"Described:   {st['described']}  ({pct}%)")
+        print(f"Remaining:   {st['undescribed']}")
+        return
 
+    # Legacy fallback: an old sibling .idt/ project
+    from idt_core.project import Project
+    if not source.is_dir():
+        print(f"Error: no workspace found at: {source}", file=sys.stderr)
+        sys.exit(1)
     project = Project.open(source)
     st = project.status()
-
     if args.json_out:
         print(json.dumps(st, indent=2, ensure_ascii=False))
         return
-
     pct = int(st["described"] / st["total"] * 100) if st["total"] else 0
     print(f"Source:      {st['source']}")
-    print(f"Project:     {st['idt_dir']}")
+    print(f"Project:     {st['idt_dir']}  (legacy .idt — re-run 'idt describe' to migrate)")
     print(f"Total:       {st['total']}")
     print(f"Described:   {st['described']}  ({pct}%)")
     print(f"Remaining:   {st['undescribed']}")
-    if st["last_run"]:
-        from datetime import datetime
-        try:
-            dt = datetime.fromisoformat(st["last_run"]).astimezone()
-            hour = dt.hour % 12 or 12
-            ampm = "A" if dt.hour < 12 else "P"
-            last = f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{ampm}"
-        except Exception:
-            last = st["last_run"]
-        print(f"Last run:    {last}")
 
 
 def _cmd_status_all(root: Path, args) -> None:
-    """Find all .idt/ directories under root and summarize them."""
+    """Find all .idtw bundles (and legacy .idt/ projects) under root and summarize them."""
     from idt_core.project import Project
-
-    idt_dirs = sorted(root.rglob("*.idt"))
-    if not idt_dirs:
-        print(f"No IDT projects found under: {root}")
-        return
+    from idt_core.workspace import Workspace
 
     rows = []
-    for idt_dir in idt_dirs:
+
+    # New-style .idtw bundles
+    for bundle in sorted(root.rglob("*.idtw")):
+        if not Workspace.is_bundle(bundle):
+            continue
+        try:
+            st = Workspace.open(bundle).status()
+            # normalize keys to match the legacy rows used below
+            rows.append({"total": st["total"], "described": st["described"],
+                         "source": st["path"]})
+        except Exception:
+            continue
+
+    # Legacy sibling .idt/ projects
+    for idt_dir in sorted(root.rglob("*.idt")):
         source = idt_dir.parent / idt_dir.stem
         if not source.is_dir():
             continue
         try:
-            project = Project.open(source)
-            st = project.status()
+            st = Project.open(source).status()
             rows.append(st)
         except Exception:
             continue
+
+    if not rows:
+        print(f"No IDT workspaces found under: {root}")
+        return
 
     if args.json_out:
         print(json.dumps(rows, indent=2, ensure_ascii=False))
@@ -639,14 +709,11 @@ def _cmd_status_all(root: Path, args) -> None:
 # ------------------------------------------------------------------ #
 
 def cmd_show(args):
-    from idt_core.project import Project
-    from idt_core.image_item import ImageItem
-
     target = Path(args.target).resolve()
 
     if target.is_file():
         _show_file(target, args)
-    elif target.is_dir():
+    elif target.is_dir() or Path(args.target).suffix.lower() == ".idtw":
         _show_directory(target, args)
     else:
         print(f"Error: not found: {target}", file=sys.stderr)
@@ -654,18 +721,29 @@ def cmd_show(args):
 
 
 def _show_file(target: Path, args):
+    from idt_core.workspace import Workspace
     from idt_core.project import Project
     from idt_core.image_item import ImageItem
 
+    # Prefer a .idtw bundle: walk up looking for a sibling bundle whose items
+    # have this original as their source_path.
     candidate = target.parent
+    target_str = str(target)
     while True:
+        sibling = candidate.parent / (candidate.name + ".idtw")
+        if Workspace.is_bundle(sibling):
+            ws = Workspace.open(sibling)
+            for item in ws.items():
+                if item.source_path == target_str or item.image == target.name:
+                    _print_item(item, args)
+                    return
+        # Legacy sibling .idt/ project
         idt_dir = candidate.parent / (candidate.name + ".idt")
         if idt_dir.is_dir():
             project = Project.open(candidate)
             sidecar = project.sidecar_path(target)
             if sidecar.exists():
-                item = ImageItem.load(sidecar)
-                _print_item(item, args)
+                _print_item(ImageItem.load(sidecar), args)
                 return
         if candidate == candidate.parent:
             break
@@ -677,8 +755,23 @@ def _show_file(target: Path, args):
 
 
 def _show_directory(target: Path, args):
-    from idt_core.project import Project
+    # Prefer a .idtw bundle (the target itself, or its sibling)
+    ws = _find_workspace(str(target))
+    if ws is not None:
+        items = [i for i in ws.items() if i.described]
+        if not items:
+            if not args.quiet:
+                print("No described images in this workspace yet.")
+                print(f"Run:  idt describe {target}")
+            return
+        for item in items:
+            _print_item(item, args)
+            if not args.json_out:
+                print()
+        return
 
+    # Legacy fallback
+    from idt_core.project import Project
     project = Project.open(target)
     items = list(project.described())
     if not items:
@@ -693,6 +786,12 @@ def _show_directory(target: Path, args):
             print()
 
 
+def _desc_when(desc) -> str:
+    """Timestamp accessor that works for both Description (.timestamp) and
+    WorkspaceDescription (.created)."""
+    return getattr(desc, "timestamp", None) or getattr(desc, "created", "") or ""
+
+
 def _print_item(item, args):
     desc = item.active_description
     if args.json_out:
@@ -703,7 +802,7 @@ def _print_item(item, args):
             "description": desc.text if desc else None,
             "model": desc.model if desc else None,
             "provider": desc.provider if desc else None,
-            "timestamp": desc.timestamp if desc else None,
+            "timestamp": _desc_when(desc) if desc else None,
             "metadata_context": desc.metadata_context if desc else None,
         }
         if item.metadata:
@@ -723,7 +822,9 @@ def _print_item(item, args):
         print(f"Context:   {desc.metadata_context}")
     if item.alt_text:
         print(f"Alt text:  {item.alt_text}")
-    print(f"Date:      {desc.timestamp[:10]}")
+    when = _desc_when(desc)
+    if when:
+        print(f"Date:      {when[:10]}")
     if desc.output_tokens:
         print(f"Tokens:    {desc.output_tokens} out")
     print()
@@ -734,32 +835,53 @@ def _print_item(item, args):
 # embed                                                                #
 # ------------------------------------------------------------------ #
 
-def _do_embed(project, force: bool, dry_run: bool, quiet: bool) -> None:
-    from idt_core.embedder import Embedder
+def _do_embed_workspace(ws, force: bool, dry_run: bool, quiet: bool) -> None:
+    """Embed each described image's active description into a copy in <bundle>/embedded/."""
+    from datetime import datetime, timezone
+    from idt_core.embedder import embed_image_file
 
-    embedder = Embedder(project)
-    result = embedder.embed_all(force=force, dry_run=dry_run)
+    out_dir = ws.path / "embedded"
+    described = [i for i in ws.items() if i.described]
+    pending = [i for i in described if force or not i.embedded_at]
 
-    n = len(result.embedded)
+    n = 0
+    errors = []
+    for item in pending:
+        desc = item.active_description
+        if not desc:
+            continue
+        if dry_run:
+            n += 1
+            continue
+        try:
+            embed_image_file(ws.image_path(item), desc.text, out_dir / item.image)
+            item.embedded_at = datetime.now(timezone.utc).isoformat()
+            ws.save_item(item)
+            n += 1
+        except Exception as exc:
+            errors.append(f"{item.display_name}: {exc}")
+
     verb = "Would embed" if dry_run else "Embedded"
     print(f"{verb} {n} image{'s' if n != 1 else ''}.", end="")
-    if result.errors:
-        print(f"  {len(result.errors)} error(s).", end="")
+    if errors:
+        print(f"  {len(errors)} error(s).", end="")
     print()
     if not dry_run and not quiet and n > 0:
-        print(f"Embedded copies: {project.idt_dir / 'embedded'}")
+        print(f"Embedded copies: {out_dir}")
 
 
 def cmd_embed(args):
-    from idt_core.project import Project
-
     source = Path(args.source).resolve()
-    if not source.is_dir():
-        print(f"Error: not a directory: {source}", file=sys.stderr)
+    ws = _find_workspace(args.source)
+    if ws is None and not source.is_dir():
+        print(f"Error: not a workspace or directory: {source}", file=sys.stderr)
         sys.exit(1)
+    if ws is None:
+        # Source folder given but no bundle exists yet — describe must run first
+        print("No workspace found. Run 'idt describe' on this folder first.")
+        return
 
-    project = Project.open(source)
-    described = list(project.described())
+    described = [i for i in ws.items() if i.described]
     if not described:
         print("No described images found. Run 'idt describe' first.")
         return
@@ -767,8 +889,8 @@ def cmd_embed(args):
     if not args.quiet:
         pending = [i for i in described if args.force or not i.embedded_at]
         already = len(described) - len(pending)
-        print(f"Source:    {source}")
-        print(f"Output:    {project.idt_dir / 'embedded'}")
+        print(f"Workspace: {ws.path}")
+        print(f"Output:    {ws.path / 'embedded'}")
         print(f"To embed:  {len(pending)}")
         if already:
             print(f"Already embedded: {already}  (use --force to re-embed)")
@@ -776,7 +898,7 @@ def cmd_embed(args):
             print("\nDry run — no files will be written.")
         print()
 
-    _do_embed(project, force=args.force, dry_run=args.dry_run, quiet=args.quiet)
+    _do_embed_workspace(ws, force=args.force, dry_run=args.dry_run, quiet=args.quiet)
 
 
 # ------------------------------------------------------------------ #
@@ -1258,14 +1380,19 @@ Supported providers:
         "describe",
         help="Generate AI descriptions for images in a directory",
         description=(
-            "Describe images in a directory. Creates a .idt/ mirror next to "
-            "the source to store descriptions. Originals are never modified."
+            "Describe images in a directory. Creates a self-contained .idtw "
+            "workspace bundle that holds copies of the images and their "
+            "descriptions. Your original files are never modified. By default "
+            "the bundle is named '<folder>.idtw' next to the source folder; use "
+            "--workspace to choose a different name or location."
         ),
     )
     p_desc.add_argument(
         "source",
         help="Directory containing images, or '-' to read image paths from stdin",
     )
+    p_desc.add_argument("--workspace", "-w", metavar="NAME|PATH",
+                        help="Workspace bundle to create/use (default: <source>.idtw next to the folder)")
     p_desc.add_argument("--stdin", action="store_true",
                         help="Read image paths from stdin (same as passing '-' as source)")
     p_desc.add_argument("--project", metavar="DIR",

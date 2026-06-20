@@ -158,6 +158,12 @@ class WorkspaceItem:
 
     # ----- properties ----- #
     @property
+    def display_name(self) -> str:
+        if self.source_path:
+            return Path(self.source_path).name
+        return self.image
+
+    @property
     def described(self) -> bool:
         return len(self.descriptions) > 0
 

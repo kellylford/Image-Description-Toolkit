@@ -23,6 +23,7 @@ from .metadata import ImageMetadata, MetadataExtractor, NominatimGeocoder
 from .project import Project
 from .providers.base import BaseProvider
 from .scanner import is_heic
+from .workspace import Workspace, WorkspaceItem, WorkspaceDescription
 
 
 @dataclass
@@ -131,3 +132,113 @@ class Pipeline:
 
         except Exception as exc:
             return PipelineEvent(item=item, index=index, total=total, error=str(exc))
+
+
+# --------------------------------------------------------------------------- #
+# Shared per-image describe helper (used by both pipelines)                     #
+# --------------------------------------------------------------------------- #
+
+def _extract_and_build_prompt(extractor, geocoder, exif_path, prompt_text):
+    """
+    Extract EXIF (optionally geocode) and prepend a context line to the prompt.
+    Returns (ImageMetadata|None, context_str, enriched_prompt).
+    """
+    meta: Optional[ImageMetadata] = None
+    meta_context = ""
+    if extractor:
+        meta = extractor.extract(exif_path)
+        if geocoder and meta:
+            meta = geocoder.enrich(meta)
+        if meta:
+            meta_context = meta.prompt_context()
+    prompt = prompt_text
+    if meta_context:
+        prompt = f"Context: {meta_context}\n\n{prompt_text}"
+    return meta, meta_context, prompt
+
+
+# --------------------------------------------------------------------------- #
+# WorkspacePipeline — same logic, but runs over a unified .idtw bundle          #
+# --------------------------------------------------------------------------- #
+
+@dataclass
+class WorkspaceEvent:
+    item: WorkspaceItem
+    index: int
+    total: int
+    error: Optional[str] = None
+    metadata: Optional[ImageMetadata] = None
+
+    @property
+    def success(self) -> bool:
+        return self.error is None
+
+
+class WorkspacePipeline:
+    """Describe the images inside a `.idtw` bundle. Reads the bundle's image copies."""
+
+    def __init__(self, workspace: Workspace, provider: BaseProvider):
+        self.workspace = workspace
+        self.provider = provider
+        self._extractor: Optional[MetadataExtractor] = None
+        self._geocoder: Optional[NominatimGeocoder] = None
+
+    def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
+        if options.extract_metadata:
+            self._extractor = MetadataExtractor()
+            if options.geocode:
+                cache = options.geocode_cache or (Path.home() / ".idt" / "geocode_cache.json")
+                self._geocoder = NominatimGeocoder(cache_path=cache)
+
+        all_items = self.workspace.items()
+        queue = all_items if options.redescribe else [i for i in all_items if not i.described]
+        if options.limit is not None:
+            queue = queue[: options.limit]
+
+        total = len(queue)
+        for index, item in enumerate(queue, start=1):
+            yield self._process(item, index, total, options)
+
+        self.workspace.save_manifest()
+
+    def _process(self, item: WorkspaceItem, index: int, total: int,
+                 options: RunOptions) -> WorkspaceEvent:
+        try:
+            bundle_image = self.workspace.image_path(item)
+            read_path = bundle_image
+
+            # HEIC: convert into derived/converted (inside the bundle) and read that
+            if is_heic(bundle_image):
+                if item.converted:
+                    read_path = self.workspace.path / item.converted
+                else:
+                    conv = save_heic_copy(bundle_image, self.workspace.derived_dir("converted"))
+                    item.converted = str(conv.relative_to(self.workspace.path))
+                    read_path = conv
+
+            # EXIF is read from the bundle copy (copy2 preserved it)
+            meta, meta_context, prompt = _extract_and_build_prompt(
+                self._extractor, self._geocoder, bundle_image, options.prompt_text
+            )
+            if meta:
+                item.metadata = meta.to_dict()
+
+            image_bytes, mime_type = load_for_api(read_path)
+            result = self.provider.describe(image_bytes, mime_type, prompt)
+
+            desc = WorkspaceDescription.create(
+                text=result.text,
+                provider=result.provider,
+                model=result.model,
+                prompt_name=options.prompt_name,
+                prompt_text=options.prompt_text,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                metadata_context=meta_context or None,
+            )
+            item.add_description(desc)
+            self.workspace.save_item(item)
+            return WorkspaceEvent(item=item, index=index, total=total, metadata=meta)
+
+        except Exception as exc:
+            return WorkspaceEvent(item=item, index=index, total=total, error=str(exc))

@@ -4,7 +4,7 @@ idt_core — Image Description Toolkit engine
 Public API surface for use by CLI and future GUI integration.
 """
 from .project import Project
-from .pipeline import Pipeline, RunOptions, PipelineEvent
+from .pipeline import Pipeline, RunOptions, PipelineEvent, WorkspacePipeline, WorkspaceEvent
 from .image_item import ImageItem, Description
 from .scanner import scan_images, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from .config import UserConfig, BUILT_IN_PROMPTS
@@ -21,6 +21,7 @@ __version__ = "4.5.0"
 __all__ = [
     "Project",
     "Pipeline", "RunOptions", "PipelineEvent",
+    "WorkspacePipeline", "WorkspaceEvent",
     "ImageItem", "Description",
     "scan_images", "scan_videos", "IMAGE_EXTENSIONS", "VIDEO_EXTENSIONS",
     "UserConfig", "BUILT_IN_PROMPTS",
