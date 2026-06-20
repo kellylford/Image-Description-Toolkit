@@ -12,7 +12,10 @@ from .metadata import MetadataExtractor, NominatimGeocoder, ImageMetadata
 from .downloader import Downloader, DownloadResult
 from .video import VideoExtractor, VideoExtractionOptions, VideoExtractionResult, scan_videos
 from .embedder import Embedder, embed_image_file
-from .exporter import export_html, export_csv, export_txt
+from .exporter import (
+    export_html, export_csv, export_txt,
+    export_workspace_html, export_workspace_csv, export_workspace_txt,
+)
 from .progress import Progress
 from .workspace import Workspace, WorkspaceItem, WorkspaceDescription, BUNDLE_EXT
 
@@ -30,6 +33,7 @@ __all__ = [
     "VideoExtractor", "VideoExtractionOptions", "VideoExtractionResult",
     "Embedder", "embed_image_file",
     "export_html", "export_csv", "export_txt",
+    "export_workspace_html", "export_workspace_csv", "export_workspace_txt",
     "Progress",
     "Workspace", "WorkspaceItem", "WorkspaceDescription", "BUNDLE_EXT",
 ]

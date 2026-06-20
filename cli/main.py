@@ -906,27 +906,34 @@ def cmd_embed(args):
 # ------------------------------------------------------------------ #
 
 def cmd_export(args):
-    from idt_core.project import Project
-    from idt_core.exporter import export_html, export_csv, export_txt
-
-    source = Path(args.source).resolve()
-    if not source.is_dir():
-        print(f"Error: not a directory: {source}", file=sys.stderr)
-        sys.exit(1)
-
-    project = Project.open(source)
     fmt = args.format
+    ws = _find_workspace(args.source)
 
     try:
-        if fmt == "html":
-            out = export_html(project)
-        elif fmt == "csv":
-            out = export_csv(project)
-        elif fmt == "txt":
-            out = export_txt(project)
+        if ws is not None:
+            from idt_core.exporter import (
+                export_workspace_html, export_workspace_csv, export_workspace_txt,
+            )
+            exporters = {"html": export_workspace_html, "csv": export_workspace_csv,
+                         "txt": export_workspace_txt}
+            if fmt not in exporters:
+                print(f"Unknown format: {fmt!r}", file=sys.stderr)
+                sys.exit(1)
+            out = exporters[fmt](ws)
         else:
-            print(f"Unknown format: {fmt!r}", file=sys.stderr)
-            sys.exit(1)
+            # Legacy .idt/ project fallback
+            from idt_core.project import Project
+            from idt_core.exporter import export_html, export_csv, export_txt
+            source = Path(args.source).resolve()
+            if not source.is_dir():
+                print(f"Error: no workspace found at: {source}", file=sys.stderr)
+                sys.exit(1)
+            project = Project.open(source)
+            exporters = {"html": export_html, "csv": export_csv, "txt": export_txt}
+            if fmt not in exporters:
+                print(f"Unknown format: {fmt!r}", file=sys.stderr)
+                sys.exit(1)
+            out = exporters[fmt](project)
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -950,47 +957,57 @@ def cmd_combine(args):
     """
     import csv
     from idt_core.project import Project
+    from idt_core.workspace import Workspace
 
     root = Path(args.directory).resolve()
     if not root.is_dir():
         print(f"Error: not a directory: {root}", file=sys.stderr)
         sys.exit(1)
 
-    idt_dirs = sorted(root.rglob("*.idt"))
-    if not idt_dirs:
-        print(f"No IDT projects found under: {root}")
-        sys.exit(1)
-
     rows = []
-    for idt_dir in idt_dirs:
+
+    def _add(item, desc, container):
+        rows.append({
+            "file": item.display_name,
+            "source_path": str(item.source_path),
+            "workspace": str(container),
+            "description": desc.text,
+            "model": desc.model,
+            "provider": desc.provider,
+            "prompt_name": desc.prompt_name,
+            "timestamp": _desc_when(desc),
+            "metadata_context": desc.metadata_context or "",
+            "input_tokens": desc.input_tokens or "",
+            "output_tokens": desc.output_tokens or "",
+            "alt_text": getattr(item, "alt_text", "") or "",
+        })
+
+    # New-style .idtw bundles
+    for bundle in sorted(root.rglob("*.idtw")):
+        if not Workspace.is_bundle(bundle):
+            continue
+        try:
+            ws = Workspace.open(bundle)
+            for item in ws.items():
+                if item.described:
+                    _add(item, item.active_description, bundle)
+        except Exception as e:
+            print(f"Warning: could not read {bundle}: {e}", file=sys.stderr)
+
+    # Legacy .idt/ projects
+    for idt_dir in sorted(root.rglob("*.idt")):
         source = idt_dir.parent / idt_dir.stem
         if not source.is_dir():
             continue
         try:
-            project = Project.open(source)
-            for item in project.described():
-                desc = item.active_description
-                if not desc:
-                    continue
-                rows.append({
-                    "file": item.display_name,
-                    "source_path": str(item.source_path),
-                    "project": str(source),
-                    "description": desc.text,
-                    "model": desc.model,
-                    "provider": desc.provider,
-                    "prompt_name": desc.prompt_name,
-                    "timestamp": desc.timestamp,
-                    "metadata_context": desc.metadata_context or "",
-                    "input_tokens": desc.input_tokens or "",
-                    "output_tokens": desc.output_tokens or "",
-                    "alt_text": item.alt_text or "",
-                })
+            for item in Project.open(source).described():
+                if item.active_description:
+                    _add(item, item.active_description, source)
         except Exception as e:
             print(f"Warning: could not read {idt_dir}: {e}", file=sys.stderr)
 
     if not rows:
-        print("No described images found.")
+        print(f"No described images found under: {root}")
         return
 
     # Sort by timestamp or metadata date
@@ -1177,51 +1194,68 @@ def cmd_stats(args):
     idt stats ~/Pictures/Vacation/ --json
     """
     from idt_core.project import Project
+    from idt_core.workspace import Workspace
 
     root = Path(args.source).resolve()
 
+    # Gather described items from .idtw bundles (and legacy .idt/ projects)
+    described_items = []
+
+    def _collect_ws(ws):
+        described_items.extend(i for i in ws.items() if i.described)
+
+    def _collect_proj(pr):
+        described_items.extend(pr.described())
+
     if args.all:
-        idt_dirs = sorted(root.rglob("*.idt"))
-        projects = []
-        for idt_dir in idt_dirs:
+        for bundle in sorted(root.rglob("*.idtw")):
+            if Workspace.is_bundle(bundle):
+                try:
+                    _collect_ws(Workspace.open(bundle))
+                except Exception:
+                    pass
+        for idt_dir in sorted(root.rglob("*.idt")):
             source = idt_dir.parent / idt_dir.stem
             if source.is_dir():
                 try:
-                    projects.append(Project.open(source))
+                    _collect_proj(Project.open(source))
                 except Exception:
                     pass
-        if not projects:
-            print(f"No IDT projects found under: {root}")
+        if not described_items:
+            print(f"No IDT workspaces found under: {root}")
             return
     else:
-        if not root.is_dir():
-            print(f"Error: not a directory: {root}", file=sys.stderr)
-            sys.exit(1)
-        projects = [Project.open(root)]
+        ws = _find_workspace(args.source)
+        if ws is not None:
+            _collect_ws(ws)
+        else:
+            if not root.is_dir():
+                print(f"Error: not a directory: {root}", file=sys.stderr)
+                sys.exit(1)
+            _collect_proj(Project.open(root))
 
     # Accumulate stats per provider+model
     totals: dict = {}  # (provider, model) -> {images, input_tokens, output_tokens}
     grand_images = grand_in = grand_out = 0
     no_token_count = 0
 
-    for project in projects:
-        for item in project.described():
-            desc = item.active_description
-            if not desc:
-                continue
-            key = (desc.provider or "unknown", desc.model or "unknown")
-            if key not in totals:
-                totals[key] = {"images": 0, "input_tokens": 0, "output_tokens": 0}
-            totals[key]["images"] += 1
-            grand_images += 1
-            if desc.input_tokens:
-                totals[key]["input_tokens"] += desc.input_tokens
-                grand_in += desc.input_tokens
-            else:
-                no_token_count += 1
-            if desc.output_tokens:
-                totals[key]["output_tokens"] += desc.output_tokens
-                grand_out += desc.output_tokens
+    for item in described_items:
+        desc = item.active_description
+        if not desc:
+            continue
+        key = (desc.provider or "unknown", desc.model or "unknown")
+        if key not in totals:
+            totals[key] = {"images": 0, "input_tokens": 0, "output_tokens": 0}
+        totals[key]["images"] += 1
+        grand_images += 1
+        if desc.input_tokens:
+            totals[key]["input_tokens"] += desc.input_tokens
+            grand_in += desc.input_tokens
+        else:
+            no_token_count += 1
+        if desc.output_tokens:
+            totals[key]["output_tokens"] += desc.output_tokens
+            grand_out += desc.output_tokens
 
     if not totals:
         print("No described images found.")
