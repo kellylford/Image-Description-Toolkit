@@ -66,7 +66,7 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
     Return (prompt_name, prompt_text).
     Priority: --prompt-text > --prompt > project default > user config default.
     """
-    from idt_core.config import UserConfig, BUILT_IN_PROMPTS
+    from idt_core.config import UserConfig, BUILT_IN_PROMPTS, DEFAULT_PROMPT_NAME
 
     if getattr(args, "prompt_text", None):
         return ("custom", args.prompt_text)
@@ -85,7 +85,11 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
         or cfg_default
         or user_cfg.default_prompt_name
     )
-    text = user_cfg.get_prompt_text(name) or BUILT_IN_PROMPTS.get("detailed", "")
+    text = (
+        user_cfg.get_prompt_text(name)
+        or BUILT_IN_PROMPTS.get(DEFAULT_PROMPT_NAME, "")
+        or next(iter(BUILT_IN_PROMPTS.values()), "")
+    )
     return (name, text)
 
 

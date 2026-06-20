@@ -10,36 +10,54 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-# Built-in prompts available by name on the CLI (--prompt <name>)
-BUILT_IN_PROMPTS: dict[str, str] = {
-    "detailed": (
-        "Describe this image in detail for someone who cannot see it. "
-        "Include the main subjects, their positions and appearance, the setting, "
-        "colors, lighting, any visible text, and the overall mood or context."
-    ),
-    "brief": (
-        "In one or two sentences, describe the main subject and setting of this image "
-        "for someone who cannot see it."
-    ),
-    "technical": (
-        "Describe this image with technical precision. Cover subjects, composition, "
-        "camera angle, lighting, color palette, depth of field, and notable qualities."
-    ),
-    "social": (
-        "Write a 2–3 sentence description of this image suitable for use as alt text "
-        "when sharing on social media. Be specific and engaging."
-    ),
-    "document": (
-        "This image may contain text, charts, or structured data. "
-        "Transcribe all visible text. Describe any charts, diagrams, tables, or "
-        "illustrations with enough detail that someone could understand the content."
-    ),
-    "news": (
-        "Describe this image as you would for a news article caption. "
-        "Include who or what is shown, what is happening, where it appears to be, "
-        "and any contextual details visible in the image."
+# ---------------------------------------------------------------------------
+# Prompt library — SINGLE SOURCE OF TRUTH.
+#
+# IDT's researched prompt set lives in scripts/image_describer_config.json
+# (key "prompt_variations"). The GUI, the legacy CLI, and idt_core all read
+# that one file so every surface offers the exact same named prompts. Do NOT
+# hardcode a prompt list here — that is what caused the CLI and GUI to drift
+# apart in v4.5. The fallback below is an emergency net only, used solely if
+# the shared config cannot be loaded (missing/corrupt); it is intentionally
+# tiny so a silent fallback is obvious rather than masquerading as the real set.
+# ---------------------------------------------------------------------------
+_FALLBACK_PROMPTS: dict[str, str] = {
+    "narrative": (
+        "Describe this image in a narrative style. Start with the overall scene, "
+        "then describe specific objects and people from left to right. Include colors, "
+        "clothing details, and spatial relationships. Use concrete, specific language."
     ),
 }
+_FALLBACK_DEFAULT_PROMPT = "narrative"
+
+
+def _load_prompt_library() -> tuple[dict[str, str], str]:
+    """Load the canonical prompt set from image_describer_config.json.
+
+    Returns (prompts, default_prompt_name). This is the shared, researched
+    prompt library used everywhere; the GUI reads the same file directly.
+    """
+    try:
+        from config_loader import load_json_config          # frozen mode
+    except ImportError:
+        try:
+            from scripts.config_loader import load_json_config  # dev mode
+        except ImportError:
+            return dict(_FALLBACK_PROMPTS), _FALLBACK_DEFAULT_PROMPT
+
+    config, _path, _src = load_json_config('image_describer_config.json')
+    variations = dict(config.get("prompt_variations") or {}) if config else {}
+    if not variations:
+        return dict(_FALLBACK_PROMPTS), _FALLBACK_DEFAULT_PROMPT
+    default = (config.get("default_prompt_style") or "").strip()
+    if default not in variations:
+        default = "narrative" if "narrative" in variations else next(iter(variations))
+    return variations, default
+
+
+# Built-in prompts available by name on the CLI (--prompt <name>), loaded from
+# the shared config at import time.
+BUILT_IN_PROMPTS, DEFAULT_PROMPT_NAME = _load_prompt_library()
 
 _CONFIG_FILE = Path.home() / ".idt" / "config.json"
 
@@ -48,7 +66,7 @@ _CONFIG_FILE = Path.home() / ".idt" / "config.json"
 class UserConfig:
     default_provider: str = "anthropic"
     default_model: str = "claude-opus-4-6"
-    default_prompt_name: str = "detailed"
+    default_prompt_name: str = DEFAULT_PROMPT_NAME
     custom_prompts: dict[str, str] = field(default_factory=dict)
 
     @classmethod

@@ -89,6 +89,8 @@ a = Analysis(
         'idt_core.providers.florence',
 
         # ---- scripts still used by idt_core helpers ----
+        'scripts.config_loader',   # idt_core.config loads the shared prompt library
+        'config_loader',           # frozen bare-name import
         'scripts.embed_descriptions',
         'scripts.exif_embedder',
         'scripts.ConvertImage',

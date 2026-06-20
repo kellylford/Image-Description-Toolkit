@@ -7,7 +7,7 @@ from .project import Project
 from .pipeline import Pipeline, RunOptions, PipelineEvent, WorkspacePipeline, WorkspaceEvent
 from .image_item import ImageItem, Description
 from .scanner import scan_images, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
-from .config import UserConfig, BUILT_IN_PROMPTS
+from .config import UserConfig, BUILT_IN_PROMPTS, DEFAULT_PROMPT_NAME
 from .metadata import MetadataExtractor, NominatimGeocoder, ImageMetadata
 from .downloader import Downloader, DownloadResult
 from .video import VideoExtractor, VideoExtractionOptions, VideoExtractionResult, scan_videos
@@ -28,7 +28,7 @@ __all__ = [
     "WorkspacePipeline", "WorkspaceEvent",
     "ImageItem", "Description",
     "scan_images", "scan_videos", "IMAGE_EXTENSIONS", "VIDEO_EXTENSIONS",
-    "UserConfig", "BUILT_IN_PROMPTS",
+    "UserConfig", "BUILT_IN_PROMPTS", "DEFAULT_PROMPT_NAME",
     "MetadataExtractor", "NominatimGeocoder", "ImageMetadata",
     "Downloader", "DownloadResult",
     "VideoExtractor", "VideoExtractionOptions", "VideoExtractionResult",

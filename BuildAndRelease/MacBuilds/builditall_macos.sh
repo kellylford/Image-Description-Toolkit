@@ -202,7 +202,7 @@ if [ $BUILD_ERRORS -eq 0 ]; then
 fi
 
 # Post-build validation: Test the built executable
-if [ -f "dist/idt" ]; then
+if [ -f "idt/dist/idt" ]; then
     echo ""
     echo "[Post-Build Check] Validating built executable..."
     if ! python3 BuildAndRelease/validate_build.py; then
