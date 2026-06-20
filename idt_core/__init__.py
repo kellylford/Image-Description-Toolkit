@@ -14,6 +14,7 @@ from .video import VideoExtractor, VideoExtractionOptions, VideoExtractionResult
 from .embedder import Embedder, embed_image_file
 from .exporter import export_html, export_csv, export_txt
 from .progress import Progress
+from .workspace import Workspace, WorkspaceItem, WorkspaceDescription, BUNDLE_EXT
 
 __version__ = "4.5.0"
 
@@ -29,4 +30,5 @@ __all__ = [
     "Embedder", "embed_image_file",
     "export_html", "export_csv", "export_txt",
     "Progress",
+    "Workspace", "WorkspaceItem", "WorkspaceDescription", "BUNDLE_EXT",
 ]
