@@ -1483,6 +1483,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
 
+        save_idt_item = file_menu.Append(wx.ID_ANY, "Save as &idt Project (for CLI use)...")
+        self.Bind(wx.EVT_MENU, self.on_save_as_idt_project, save_idt_item)
+
         embed_item = file_menu.Append(wx.ID_ANY, "Em&bed Descriptions into Images...")
         self.Bind(wx.EVT_MENU, self.on_embed_descriptions, embed_item)
 
@@ -4351,6 +4354,112 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, f"Successfully exported descriptions to:\n{file_path}")
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
+
+    def on_save_as_idt_project(self, event):
+        """Export GUI workspace descriptions as idt_core sidecar JSON files.
+
+        This writes <source_dir>.idt/<image.jpg>.json for every described image
+        so that the CLI commands (idt status, idt stats, idt combine, idt embed,
+        idt export) can work on images described through the GUI.
+        """
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace. Load a directory and process images first.")
+            return
+
+        described = [
+            item for item in self.workspace.items.values()
+            if item.descriptions and not item.file_path.startswith("chat:")
+        ]
+        if not described:
+            show_warning(self, "No described images found. Process your images first.")
+            return
+
+        try:
+            from idt_core.project import Project
+            from idt_core.image_item import ImageItem as IdtImageItem, Description as IdtDescription
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.\n"
+                             "This feature requires idt_core to be installed.")
+            return
+
+        # Group images by parent directory so each directory gets its own .idt/ mirror
+        from collections import defaultdict
+        by_dir = defaultdict(list)
+        skipped_missing = []
+        for item in described:
+            p = Path(item.file_path)
+            if not p.exists():
+                skipped_missing.append(item.file_path)
+                continue
+            by_dir[p.parent].append(item)
+
+        if not by_dir:
+            show_warning(self,
+                "None of the described images could be found on disk.\n"
+                "The files may have been moved or deleted.")
+            return
+
+        total_written = 0
+        project_dirs = []
+
+        with wx.BusyCursor():
+            for source_dir, items in by_dir.items():
+                try:
+                    project = Project.open(source_dir)
+                except Exception as exc:
+                    logging.warning(f"Could not open idt project for {source_dir}: {exc}")
+                    continue
+
+                project_dirs.append(project.idt_dir)
+
+                for gui_item in items:
+                    src = Path(gui_item.file_path)
+                    sidecar = project.sidecar_path(src)
+                    sidecar.parent.mkdir(parents=True, exist_ok=True)
+
+                    # Load existing sidecar or create fresh ImageItem
+                    if sidecar.exists():
+                        try:
+                            idt_item = IdtImageItem.load(sidecar)
+                        except Exception:
+                            idt_item = IdtImageItem(source_path=src, sidecar_path=sidecar)
+                    else:
+                        idt_item = IdtImageItem(source_path=src, sidecar_path=sidecar)
+
+                    # Map GUI descriptions → idt_core Description objects
+                    for gui_desc in gui_item.descriptions:
+                        tu = gui_desc.token_usage or {}
+                        idt_desc = IdtDescription(
+                            text=gui_desc.text,
+                            provider=gui_desc.provider or "",
+                            model=gui_desc.model or "",
+                            timestamp=gui_desc.created or "",
+                            prompt_name=gui_desc.prompt_style or "",
+                            input_tokens=tu.get("prompt_tokens") or tu.get("input_tokens"),
+                            output_tokens=tu.get("completion_tokens") or tu.get("output_tokens"),
+                            metadata_context=gui_desc.metadata.get("prompt_context") if gui_desc.metadata else None,
+                        )
+                        # Avoid duplicating descriptions already in the sidecar
+                        existing_ts = {d.timestamp for d in idt_item.descriptions}
+                        if idt_desc.timestamp not in existing_ts:
+                            idt_item.descriptions.append(idt_desc)
+
+                    idt_item.save()
+                    total_written += 1
+
+        lines = [f"Exported {total_written} image(s) to idt project format."]
+        if project_dirs:
+            lines.append("\nProject mirror(s) created:")
+            for d in sorted(project_dirs):
+                lines.append(f"  {d}")
+        if skipped_missing:
+            lines.append(f"\nSkipped {len(skipped_missing)} image(s) not found on disk.")
+        lines.append("\nYou can now use the idt CLI on these images:")
+        lines.append("  idt status <folder>")
+        lines.append("  idt stats <folder>")
+        lines.append("  idt embed <folder>")
+
+        show_info(self, "\n".join(lines))
 
     def on_embed_descriptions(self, event):
         """Embed AI descriptions into image metadata (EXIF/PNG tEXt chunk)."""
