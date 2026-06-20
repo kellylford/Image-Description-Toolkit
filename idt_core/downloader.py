@@ -36,6 +36,23 @@ _UA = (
 )
 
 
+def normalize_url(url: str) -> str:
+    """
+    Accept bare domains like 'www.nytimes.com' by defaulting to https://.
+
+    requests raises 'No scheme supplied' for a URL with no scheme, so we
+    prepend https:// when the user didn't type one. A leading '//' is treated
+    as scheme-relative and also gets https.
+    """
+    url = (url or "").strip()
+    if not url:
+        return url
+    parsed = urlparse(url)
+    if not parsed.scheme:
+        return "https://" + url.lstrip("/")
+    return url
+
+
 @dataclass
 class DownloadResult:
     download_dir: Path              # where images landed (.idt/downloads/<subfolder>/)
@@ -88,6 +105,8 @@ class Downloader:
             from PIL import Image as _PILImage
         except ImportError:
             raise ImportError("Pillow is required: pip install Pillow")
+
+        url = normalize_url(url)
 
         session = requests.Session()
         session.headers["User-Agent"] = _UA

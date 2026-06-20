@@ -3,7 +3,7 @@
 idt — Image Description Toolkit CLI
 
 Usage:
-  idt guide                         Interactive setup wizard (start here)
+  idt guideme                       Interactive setup wizard (start here)
   idt describe <directory> [options]
   idt download <url> [directory] [options]
   idt status   <directory>
@@ -1344,10 +1344,10 @@ def cmd_config(args):
 
 
 # ------------------------------------------------------------------ #
-# guide                                                                #
+# guideme                                                              #
 # ------------------------------------------------------------------ #
 
-def cmd_guide(args):
+def cmd_guideme(args):
     from cli.guide import run_guide
     run_guide()
 
@@ -1363,7 +1363,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  idt guide                                              # start here — interactive wizard
+  idt guideme                                            # start here — interactive wizard
   idt describe ~/Pictures/Vacation/
   idt describe ~/Pictures/Vacation/ --provider anthropic --model claude-opus-4-6
   idt describe ~/Pictures/Vacation/ --provider ollama --model llava
@@ -1657,10 +1657,10 @@ Supported providers:
     p_config.set_defaults(func=cmd_config)
 
     # ---------------------------------------------------------------- #
-    # guide                                                              #
+    # guideme                                                            #
     # ---------------------------------------------------------------- #
-    p_guide = sub.add_parser(
-        "guide",
+    p_guideme = sub.add_parser(
+        "guideme",
         help="Interactive setup wizard — pick provider, model, directory, and run",
         description=(
             "Step-by-step wizard that asks you to choose a provider, model, image "
@@ -1669,7 +1669,7 @@ Supported providers:
             "spinners, numbered choices throughout."
         ),
     )
-    p_guide.set_defaults(func=cmd_guide)
+    p_guideme.set_defaults(func=cmd_guideme)
 
     return parser
 

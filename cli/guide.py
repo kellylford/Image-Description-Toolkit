@@ -1,5 +1,5 @@
 """
-idt guide — interactive wizard for building and running describe commands.
+idt guideme — interactive wizard for building and running describe commands.
 
 Screen-reader-first design:
   - Numbered choices, no Unicode art, no ANSI
@@ -91,16 +91,25 @@ def get_input(prompt: str, default: str = "", allow_empty: bool = False) -> str:
 
 
 def get_yes_no(prompt: str, default: bool = True) -> bool:
-    yn = "Y/n" if default else "y/N"
+    """
+    Ask a yes/no question as a numbered choice, for consistency with the rest
+    of the wizard (screen-reader-first: everything is numbered).
+    Returns True for Yes, False for No.
+    """
+    default_idx = 1 if default else 2
+    print(prompt)
+    print(f"  1. Yes{' (default)' if default_idx == 1 else ''}")
+    print(f"  2. No{' (default)' if default_idx == 2 else ''}")
+    print()
     while True:
-        raw = input(f"{prompt} [{yn}]: ").strip().lower()
+        raw = input(f"Enter choice (1-2, default={default_idx}): ").strip().lower()
         if not raw:
             return default
-        if raw in ("y", "yes"):
+        if raw == "1":
             return True
-        if raw in ("n", "no"):
+        if raw == "2":
             return False
-        print("Please enter 'y' for yes or 'n' for no.")
+        print("Please enter 1 for Yes or 2 for No.")
 
 
 def _fix_win_encoding() -> None:
