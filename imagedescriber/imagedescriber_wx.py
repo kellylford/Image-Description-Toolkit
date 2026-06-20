@@ -1480,6 +1480,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         import_workflow_item = file_menu.Append(wx.ID_ANY, "&Import Workflow (to Workspace)...")
         self.Bind(wx.EVT_MENU, self.on_import_workflow, import_workflow_item)
 
+        import_idt_item = file_menu.Append(wx.ID_ANY, "Import from &idt Project (CLI results)...")
+        self.Bind(wx.EVT_MENU, self.on_import_from_idt_project, import_idt_item)
+
         export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
 
@@ -2539,6 +2542,119 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if progress_dlg:
                 progress_dlg.Destroy()
             show_error(self, f"Error importing workflow:\n{str(e)}")
+
+    def on_import_from_idt_project(self, event):
+        """Import descriptions from an idt_core project (.idt/ mirror directory).
+
+        Lets the user open images that were described via 'idt describe' into the
+        GUI for viewing, browsing, and chat.
+        """
+        try:
+            from idt_core.project import Project
+            from idt_core.image_item import ImageItem as IdtImageItem
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.\n"
+                             "This feature requires idt_core to be installed.")
+            return
+
+        source_dir = select_directory_dialog(
+            self,
+            "Select the image folder (the idt project's source directory)"
+        )
+        if not source_dir:
+            return
+
+        source_path = Path(source_dir)
+        idt_dir = source_path.parent / (source_path.name + ".idt")
+        if not idt_dir.exists():
+            # Try as the .idt/ dir itself
+            if source_path.name.endswith(".idt") and source_path.exists():
+                idt_dir = source_path
+                source_path = source_path.parent / source_path.stem
+            else:
+                show_error(
+                    self,
+                    f"No idt project found for that folder.\n\n"
+                    f"Expected: {idt_dir}\n\n"
+                    "Run 'idt describe <folder>' first to create the project."
+                )
+                return
+
+        try:
+            project = Project.open(source_path)
+        except Exception as exc:
+            show_error(self, f"Could not open idt project:\n{exc}")
+            return
+
+        described = list(project.described())
+        if not described:
+            show_warning(self, f"No described images found in:\n{idt_dir}\n\nRun 'idt describe <folder>' to generate descriptions.")
+            return
+
+        if not self.workspace:
+            self.workspace = ImageWorkspace(new_workspace=True)
+
+        imported = 0
+        duplicates = 0
+
+        with wx.BusyCursor():
+            for idt_item in described:
+                file_path = str(idt_item.source_path)
+
+                # Create or retrieve GUI workspace item
+                if file_path not in self.workspace.items:
+                    gui_item = ImageItem(file_path=file_path)
+                    self.workspace.items[file_path] = gui_item
+                else:
+                    gui_item = self.workspace.items[file_path]
+
+                existing_ts = {d.created for d in gui_item.descriptions}
+
+                for idt_desc in idt_item.descriptions:
+                    if idt_desc.timestamp in existing_ts:
+                        duplicates += 1
+                        continue
+
+                    token_usage = {}
+                    if idt_desc.input_tokens:
+                        token_usage["prompt_tokens"] = idt_desc.input_tokens
+                    if idt_desc.output_tokens:
+                        token_usage["completion_tokens"] = idt_desc.output_tokens
+
+                    metadata = {}
+                    if idt_item.metadata:
+                        metadata = dict(idt_item.metadata)
+                    if idt_desc.metadata_context:
+                        metadata["prompt_context"] = idt_desc.metadata_context
+
+                    gui_desc = ImageDescription(
+                        text=idt_desc.text,
+                        provider=idt_desc.provider or "",
+                        model=idt_desc.model or "",
+                        created=idt_desc.timestamp or "",
+                        prompt_style=idt_desc.prompt_name or "",
+                        metadata=metadata,
+                        token_usage=token_usage if token_usage else {},
+                    )
+                    gui_item.descriptions.append(gui_desc)
+                    imported += 1
+
+        # Update directories list if not already tracked
+        if str(source_path) not in (self.workspace.directory_paths or []):
+            if not self.workspace.directory_paths:
+                self.workspace.directory_paths = []
+            self.workspace.directory_paths.append(str(source_path))
+            self.workspace.directory_path = str(source_path)
+
+        self.refresh_image_list()
+
+        show_info(self,
+            f"Import complete.\n\n"
+            f"Imported: {imported} description(s)\n"
+            f"Duplicates skipped: {duplicates}\n"
+            f"Total images with descriptions: {len([i for i in self.workspace.items.values() if i.descriptions])}\n\n"
+            f"Source: {source_path}"
+        )
 
     def on_open_workflow_result(self, event):
         """Open a workflow directory in Viewer Mode"""
