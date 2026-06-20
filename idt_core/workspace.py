@@ -65,6 +65,9 @@ class WorkspaceDescription:
     detection_data: list = field(default_factory=list)
     finish_reason: str = ""
     response_id: str = ""
+    # Tool-specific fields preserved verbatim for lossless round-trips
+    # (e.g. the GUI's per-description EXIF metadata dict and token_usage).
+    extra: dict = field(default_factory=dict)
 
     @classmethod
     def create(cls, text: str, *, provider: str = "", model: str = "",
@@ -103,6 +106,8 @@ class WorkspaceDescription:
             d["finish_reason"] = self.finish_reason
         if self.response_id:
             d["response_id"] = self.response_id
+        if self.extra:
+            d["extra"] = self.extra
         return d
 
     @classmethod
@@ -121,6 +126,7 @@ class WorkspaceDescription:
             detection_data=d.get("detection_data", []),
             finish_reason=d.get("finish_reason", ""),
             response_id=d.get("response_id", ""),
+            extra=d.get("extra", {}),
         )
 
 
@@ -153,6 +159,10 @@ class WorkspaceItem:
     tags: list = field(default_factory=list)
     notes: str = ""
     is_missing: bool = False
+
+    # Tool-specific fields not part of the core schema (e.g. GUI batch state),
+    # preserved verbatim so a GUI<->bundle round-trip is lossless.
+    extra: dict = field(default_factory=dict)
 
     descriptions: list = field(default_factory=list)  # list[WorkspaceDescription]
 
@@ -206,6 +216,8 @@ class WorkspaceItem:
             "is_missing": self.is_missing,
             "descriptions": [d.to_dict() for d in self.descriptions],
         }
+        if self.extra:
+            d["extra"] = self.extra
         return d
 
     @classmethod
@@ -230,6 +242,7 @@ class WorkspaceItem:
             tags=d.get("tags", []),
             notes=d.get("notes", ""),
             is_missing=d.get("is_missing", False),
+            extra=d.get("extra", {}),
             descriptions=[WorkspaceDescription.from_dict(x) for x in d.get("descriptions", [])],
         )
 

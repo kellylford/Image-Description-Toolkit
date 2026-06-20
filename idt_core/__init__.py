@@ -18,6 +18,7 @@ from .exporter import (
 )
 from .progress import Progress
 from .workspace import Workspace, WorkspaceItem, WorkspaceDescription, BUNDLE_EXT
+from .gui_bridge import gui_workspace_to_bundle, bundle_to_gui_workspace_dict
 
 __version__ = "4.5.0"
 
@@ -36,4 +37,5 @@ __all__ = [
     "export_workspace_html", "export_workspace_csv", "export_workspace_txt",
     "Progress",
     "Workspace", "WorkspaceItem", "WorkspaceDescription", "BUNDLE_EXT",
+    "gui_workspace_to_bundle", "bundle_to_gui_workspace_dict",
 ]
