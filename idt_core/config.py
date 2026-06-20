@@ -64,8 +64,8 @@ _CONFIG_FILE = Path.home() / ".idt" / "config.json"
 
 @dataclass
 class UserConfig:
-    default_provider: str = "anthropic"
-    default_model: str = "claude-opus-4-6"
+    default_provider: str = "ollama"
+    default_model: str = "moondream"
     default_prompt_name: str = DEFAULT_PROMPT_NAME
     custom_prompts: dict[str, str] = field(default_factory=dict)
 

@@ -196,8 +196,14 @@ def cmd_describe(args):
         print(f"Source:     {source}")
         print(f"Workspace:  {ws.path}")
     added = ws.add_source_folder(source, recursive=True)
+
+    # Extract video frames and add them to the workspace (default on; opt out with --no-video)
+    if not getattr(args, "no_video", False):
+        _extract_videos_into_workspace(ws, source, args)
+
     if not args.quiet:
-        print(f"Images:     {len(added)} in workspace")
+        total_items = len(ws.items())
+        print(f"Images:     {total_items} in workspace")
         print(f"Provider:   {provider_name}  model: {model}")
         print(f"Prompt:     {prompt_name}")
         if args.extract_metadata:
@@ -260,6 +266,60 @@ def cmd_describe(args):
     if args.embed and described > 0:
         print()
         _do_embed_workspace(ws, force=False, dry_run=False, quiet=args.quiet)
+
+    # Auto-export HTML report (default on; opt out with --no-export)
+    if not getattr(args, "no_export", False) and described > 0:
+        _auto_export_workspace(ws, args.quiet)
+
+
+def _extract_videos_into_workspace(ws, source: Path, args) -> None:
+    """Scan source for videos, extract frames, and add them to the workspace."""
+    from idt_core.video import scan_videos, extract_frames_to_dir, VideoExtractionOptions
+    videos = list(scan_videos(source))
+    if not videos:
+        return
+    if not args.quiet:
+        print(f"Videos:     {len(videos)} file(s) found — extracting frames")
+    interval = getattr(args, "video_interval", 5.0)
+    opts = VideoExtractionOptions(mode="interval", interval_seconds=interval)
+    total_frames = 0
+    cv_missing = False
+    for video in videos:
+        frames_dir = ws.derived_dir("frames") / video.stem
+        try:
+            result = extract_frames_to_dir(video, frames_dir, opts)
+            for frame_path in result.frame_paths:
+                ws.add_image(frame_path, subfolder=f"frames/{video.stem}")
+            total_frames += len(result.frame_paths)
+            if not args.quiet:
+                print(f"  {video.name}: {len(result.frame_paths)} frames")
+        except ImportError:
+            cv_missing = True
+            break
+        except Exception as exc:
+            if not args.quiet:
+                print(f"  {video.name}: skipped ({exc})")
+    if cv_missing and not args.quiet:
+        print("  Skipping video extraction: opencv-python not installed")
+        print("  Install with: pip install opencv-python")
+    elif total_frames and not args.quiet:
+        print(f"  {total_frames} frames added to workspace")
+    if not args.quiet:
+        print()
+
+
+def _auto_export_workspace(ws, quiet: bool) -> None:
+    """Generate HTML report and tell the user where to find it."""
+    try:
+        from idt_core.exporter import export_workspace_html
+        html_path = export_workspace_html(ws)
+        if not quiet:
+            print()
+            print(f"Report:     {html_path}")
+            print(f"Logs:       {ws.logs_dir}")
+    except Exception as exc:
+        if not quiet:
+            print(f"\nWarning: could not generate HTML report: {exc}")
 
 
 def _cmd_describe_stdin(args):
@@ -1444,6 +1504,12 @@ Supported providers:
                         help="Stop after describing N images")
     p_desc.add_argument("--embed", action="store_true",
                         help="Automatically embed descriptions into image copies after describing")
+    p_desc.add_argument("--no-video", action="store_true",
+                        help="Skip automatic video frame extraction (videos are included by default)")
+    p_desc.add_argument("--video-interval", type=float, default=5.0, metavar="SECONDS",
+                        help="Seconds between extracted video frames (default: 5.0)")
+    p_desc.add_argument("--no-export", action="store_true",
+                        help="Skip automatic HTML report generation after describing")
     p_desc.add_argument("--quiet", "-q", action="store_true",
                         help="Minimal output; in stdin mode, prints filename TAB description")
     p_desc.set_defaults(func=cmd_describe)

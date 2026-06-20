@@ -9,7 +9,7 @@ from typing import Optional
 
 from .base import BaseProvider, DescriptionResult
 
-DEFAULT_MODEL = "llava"
+DEFAULT_MODEL = "moondream"
 DEFAULT_HOST = "http://localhost:11434"
 
 

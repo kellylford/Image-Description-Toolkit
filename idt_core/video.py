@@ -128,6 +128,86 @@ class VideoExtractor:
         )
 
 
+def extract_frames_to_dir(
+    video_path: Path,
+    output_dir: Path,
+    options: Optional[VideoExtractionOptions] = None,
+) -> VideoExtractionResult:
+    """
+    Extract frames from video_path into output_dir.
+    Standalone — does not require a Project object.
+    Frames are named frame_0001.jpg, frame_0002.jpg, …
+    """
+    try:
+        import cv2
+    except ImportError:
+        raise ImportError(
+            "opencv-python is required for video support: pip install opencv-python"
+        )
+
+    opts = options or VideoExtractionOptions()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise ValueError(f"Cannot open video: {video_path}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = total_frames / fps if fps else 0.0
+
+    frame_paths: List[Path] = []
+    prev_gray = None
+    frame_number = 0
+    saved_count = 0
+    interval_frames = max(1, int(fps * opts.interval_seconds))
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        should_save = False
+
+        if opts.mode == "interval":
+            should_save = (frame_number % interval_frames == 0)
+        elif opts.mode == "scene":
+            import numpy as np
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if prev_gray is None:
+                should_save = True
+            else:
+                diff = cv2.absdiff(gray, prev_gray)
+                score = float(np.mean(diff))
+                should_save = score > opts.scene_threshold
+            prev_gray = gray
+
+        if should_save:
+            if opts.max_frames and saved_count >= opts.max_frames:
+                break
+            filename = f"frame_{saved_count + 1:04d}.jpg"
+            dest = output_dir / filename
+            cv2.imwrite(str(dest), frame)
+            frame_paths.append(dest)
+            saved_count += 1
+            if opts.on_progress:
+                ts = frame_number / fps
+                opts.on_progress(saved_count, f"{ts:.1f}s")
+
+        frame_number += 1
+
+    cap.release()
+
+    return VideoExtractionResult(
+        video_path=video_path,
+        frames_dir=output_dir,
+        frame_paths=frame_paths,
+        duration_seconds=duration,
+        fps=fps,
+    )
+
+
 def scan_videos(directory: Path) -> Iterator[Path]:
     """Yield all video files under directory, excluding .idt/ and hidden dirs."""
     from .scanner import VIDEO_EXTENSIONS, _is_excluded

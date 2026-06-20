@@ -262,13 +262,23 @@ def _step_source() -> tuple[str, str]:
             if not get_yes_no("Try again?"):
                 return "EXIT", ""
             continue
-        # Check for images
-        from idt_core.scanner import scan_images, IMAGE_EXTENSIONS
+        # Check for images and videos
+        from idt_core.scanner import scan_images
+        from idt_core.video import scan_videos
         try:
-            first = next(scan_images(p))
-            print(f"Found images (e.g. {first.name})")
+            first_img = next(scan_images(p))
+            print(f"Found images (e.g. {first_img.name})")
         except StopIteration:
-            print("No image files found in that folder.")
+            first_img = None
+
+        try:
+            first_vid = next(scan_videos(p))
+            print(f"Found videos (e.g. {first_vid.name}) — frames will be extracted automatically")
+        except StopIteration:
+            first_vid = None
+
+        if first_img is None and first_vid is None:
+            print("No image or video files found in that folder.")
             if not get_yes_no("Use it anyway?", default=False):
                 continue
         return "dir", str(p)
@@ -562,6 +572,32 @@ def run_guide() -> None:
             return
 
 
+def _offer_open_report(source_str: str) -> None:
+    """After a describe run, find the HTML report and offer to open it."""
+    import os
+    source = Path(source_str).resolve()
+    html_path = source.parent / (source.name + ".idtw") / "reports" / "descriptions.html"
+    if not html_path.exists():
+        return
+    print()
+    open_it = get_yes_no("Open the description report in your browser?", default=True)
+    if not open_it:
+        print(f"Report is at: {html_path}")
+        return
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(html_path))
+        elif sys.platform == "darwin":
+            import subprocess
+            subprocess.run(["open", str(html_path)], check=False)
+        else:
+            import subprocess
+            subprocess.run(["xdg-open", str(html_path)], check=False)
+    except Exception as exc:
+        print(f"Could not open browser automatically: {exc}")
+        print(f"Report is at: {html_path}")
+
+
 def _run_command(parts: list[str], state: dict) -> None:
     """Execute the built command by directly calling the CLI handlers."""
     # Import here to avoid circular import
@@ -612,6 +648,10 @@ def _run_command(parts: list[str], state: dict) -> None:
             redescribe=extra.get("redescribe", False),
             limit=extra.get("limit"),
             embed=extra.get("embed", False),
+            no_video=False,
+            video_interval=5.0,
+            no_export=False,
             quiet=False,
         )
         cmd_describe(args)
+        _offer_open_report(state["source"])
