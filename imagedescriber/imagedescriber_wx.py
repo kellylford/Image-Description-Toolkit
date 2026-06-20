@@ -1480,14 +1480,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         import_workflow_item = file_menu.Append(wx.ID_ANY, "&Import Workflow (to Workspace)...")
         self.Bind(wx.EVT_MENU, self.on_import_workflow, import_workflow_item)
 
-        import_idt_item = file_menu.Append(wx.ID_ANY, "Import from &idt Project (CLI results)...")
-        self.Bind(wx.EVT_MENU, self.on_import_from_idt_project, import_idt_item)
+        open_bundle_item = file_menu.Append(wx.ID_ANY, "Open Workspace &Bundle (.idtw)...")
+        self.Bind(wx.EVT_MENU, self.on_open_workspace_bundle, open_bundle_item)
 
         export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
 
-        save_idt_item = file_menu.Append(wx.ID_ANY, "Save as &idt Project (for CLI use)...")
-        self.Bind(wx.EVT_MENU, self.on_save_as_idt_project, save_idt_item)
+        save_bundle_item = file_menu.Append(wx.ID_ANY, "Save as Workspace B&undle (.idtw)...")
+        self.Bind(wx.EVT_MENU, self.on_save_workspace_bundle, save_bundle_item)
 
         embed_item = file_menu.Append(wx.ID_ANY, "Em&bed Descriptions into Images...")
         self.Bind(wx.EVT_MENU, self.on_embed_descriptions, embed_item)
@@ -4170,11 +4170,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.load_workspace(file_path)
 
     def load_workspace(self, file_path):
-        """Load workspace from file"""
+        """Load workspace from a legacy .idw file or a .idtw bundle directory."""
         try:
             logger.info(f"Loading workspace from: {file_path}")
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+
+            # A .idtw bundle is a directory; convert it to the GUI document shape.
+            data = None
+            try:
+                from idt_core.workspace import Workspace
+                from idt_core.gui_bridge import bundle_to_gui_workspace_dict
+                if Workspace.is_bundle(Path(file_path)):
+                    bundle = Workspace.open(Path(file_path))
+                    data = bundle_to_gui_workspace_dict(bundle)
+            except ImportError:
+                pass  # idt_core unavailable; fall through to .idw loading
+
+            if data is None:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
 
             # Create workspace from data
             self.workspace = ImageWorkspace.from_dict(data)
@@ -4275,11 +4288,35 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.save_workspace(str(new_path))
 
     def on_save_workspace(self, event):
-        """Save current workspace"""
+        """Save current workspace (to its .idtw bundle, or legacy .idw file)."""
+        # If this workspace was opened as a .idtw bundle, save back into it.
+        if self.workspace_file and self._workspace_file_is_bundle():
+            try:
+                from idt_core.gui_bridge import gui_workspace_to_bundle
+                with wx.BusyCursor():
+                    gui_workspace_to_bundle(self.workspace.to_dict(), Path(self.workspace_file))
+                self.clear_modified()
+                self.SetStatusText(f"Saved bundle: {Path(self.workspace_file).name}", 0)
+                return
+            except Exception as exc:
+                logger.error(f"Error saving workspace bundle: {exc}", exc_info=True)
+                show_error(self, f"Error saving workspace bundle:\n{exc}")
+                return
+
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
         else:
             self.on_save_workspace_as(event)
+
+    def _workspace_file_is_bundle(self) -> bool:
+        """True if the current workspace_file points at a .idtw bundle directory."""
+        if not self.workspace_file:
+            return False
+        try:
+            from idt_core.workspace import Workspace
+            return Workspace.is_bundle(Path(self.workspace_file))
+        except ImportError:
+            return False
 
     def save_workspace(self, file_path):
         """Save workspace to file (runs in background thread)"""
@@ -4470,6 +4507,92 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, f"Successfully exported descriptions to:\n{file_path}")
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
+
+    def on_open_workspace_bundle(self, event):
+        """Open a .idtw workspace bundle — the unified format shared with the idt CLI."""
+        if not self.confirm_unsaved_changes():
+            return
+
+        dlg = wx.DirDialog(
+            self, "Open Workspace Bundle (.idtw folder)",
+            style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            path = dlg.GetPath()
+        finally:
+            dlg.Destroy()
+
+        try:
+            from idt_core.workspace import Workspace
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.")
+            return
+
+        if not Workspace.is_bundle(Path(path)):
+            show_error(
+                self,
+                "That folder is not a workspace bundle (no manifest.json was found).\n\n"
+                "Choose a .idtw folder created by ImageDescriber or the idt CLI.",
+            )
+            return
+
+        self.load_workspace(path)
+
+    def on_save_workspace_bundle(self, event):
+        """Save the current workspace as a .idtw bundle shared with the idt CLI.
+
+        Images are COPIED into the bundle; your original files are not modified.
+        """
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace. Load a directory and process images first.")
+            return
+
+        try:
+            from idt_core.gui_bridge import gui_workspace_to_bundle
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.\n"
+                             "This feature requires idt_core.")
+            return
+
+        default_name = self._propose_workspace_name_from_content()
+
+        dir_dlg = wx.DirDialog(self, "Choose where to create the workspace bundle",
+                               style=wx.DD_DEFAULT_STYLE)
+        try:
+            if dir_dlg.ShowModal() != wx.ID_OK:
+                return
+            parent_dir = dir_dlg.GetPath()
+        finally:
+            dir_dlg.Destroy()
+
+        name_dlg = wx.TextEntryDialog(self, "Workspace bundle name:",
+                                      "Save as Workspace Bundle", default_name)
+        try:
+            if name_dlg.ShowModal() != wx.ID_OK:
+                return
+            name = (name_dlg.GetValue() or "").strip() or default_name
+        finally:
+            name_dlg.Destroy()
+
+        dest = Path(parent_dir) / name
+        try:
+            with wx.BusyCursor():
+                bundle = gui_workspace_to_bundle(self.workspace.to_dict(), dest)
+        except Exception as exc:
+            logger.error(f"Error saving workspace bundle: {exc}", exc_info=True)
+            show_error(self, f"Error saving workspace bundle:\n{exc}")
+            return
+
+        show_info(
+            self,
+            f"Workspace bundle saved:\n{bundle.path}\n\n"
+            f"Both ImageDescriber and the idt CLI can open this bundle. From a "
+            f"terminal:\n  idt status \"{bundle.path}\"\n\n"
+            f"Your original image files were not modified.",
+            "Workspace Bundle Saved",
+        )
 
     def on_save_as_idt_project(self, event):
         """Export GUI workspace descriptions as idt_core sidecar JSON files.
