@@ -4,6 +4,25 @@
 
 ---
 
+> **⚠️ v4.5 update — workspaces have changed.** As of v4.5, both `idt` and
+> ImageDescriber store everything in a single **workspace bundle** (a `.idtw`
+> folder you name) that holds copies of your images, their descriptions, chats,
+> and generated files. Your originals are never modified. This replaces the older
+> `wf_…` workflow folders, the `.idw` file + `WorkspaceFiles` split, and the
+> `temp_combined_images` scratch folder described in some sections below.
+>
+> - CLI: `idt describe <folder>` now creates `<folder>.idtw` (or use
+>   `--workspace NAME`). `idt status`, `show`, `export`, `embed`, `stats`, and
+>   `combine` all operate on bundles.
+> - GUI: **File → Open / Save as Workspace Bundle (.idtw)**.
+>
+> See **`docs/release-notes-v4.5.md`** for the full v4.5 overview and
+> **`docs/design/unified-workspace.md`** for the format reference. Sections below
+> that mention `wf_…` directories or `guideme`/`workflow` describe pre-v4.5
+> behavior and are being revised.
+
+---
+
 ## Table of Contents
 
 1. [What IDT Is (and Is Not)](#1-what-idt-is-and-is-not)
