@@ -3281,7 +3281,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('custom_prompt', ''),
             None,  # detection_settings
             None,  # prompt_config_path
-            api_key  # API key for cloud providers
+            api_key,
+            geocode=options.get('geocode_enabled', False),
         )
 
         # Mark as processing with provider/model info
@@ -3542,6 +3543,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
             "detection_settings": options.get('detection_settings'),
+            "geocode_enabled": options.get('geocode_enabled', False),
             "total_queued": len(to_process),
             "started": datetime.now().isoformat()
         }
@@ -3556,8 +3558,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('custom_prompt', ''),
             None,  # detection_settings
             None,  # prompt_config_path
-            skip_existing,  # Phase 5: Use parameter instead of options
-            progress_offset=0  # No offset when processing without video extraction
+            skip_existing,
+            progress_offset=0,
+            geocode=options.get('geocode_enabled', False),
         )
 
         # Phase 3: Initialize timing
@@ -3716,7 +3719,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,   # detection_settings
             None,   # prompt_config_path
             True,   # skip_existing
-            progress_offset=0
+            progress_offset=0,
+            geocode=options.get('geocode_enabled', False),
         )
 
         self.batch_start_time = time.time()
@@ -3913,6 +3917,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
             "detection_settings": options.get('detection_settings'),
+            "geocode_enabled": options.get('geocode_enabled', False),
             "total_queued": len(to_process),
             "started": datetime.now().isoformat()
         }
@@ -3931,7 +3936,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,  # detection_settings
             None,  # prompt_config_path
             skip_existing,
-            progress_offset=progress_offset
+            progress_offset=progress_offset,
+            geocode=options.get('geocode_enabled', False),
         )
         self.batch_worker.start()
 
@@ -5710,7 +5716,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             custom_prompt=custom_prompt,
             detection_settings=detection_settings,
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
-            skip_existing=True  # Always skip completed
+            skip_existing=True,  # Always skip completed
+            geocode=batch_state.get('geocode_enabled', False),
         )
         self.batch_worker.start()
 
@@ -5973,7 +5980,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,  # detection_settings
             None,  # prompt_config_path
             options.get('skip_existing', True),
-            progress_offset=0
+            progress_offset=0,
+            geocode=options.get('geocode_enabled', False),
         )
         self.batch_worker.start()
 
@@ -6044,7 +6052,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             custom_prompt=options.get('custom_prompt'),
             detection_settings=options.get('detection_settings'),
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
-            skip_existing=True
+            skip_existing=True,
+            geocode=options.get('geocode_enabled', False),
         )
         self.batch_worker.start()
 

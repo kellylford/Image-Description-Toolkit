@@ -772,9 +772,33 @@ class ProcessingOptionsDialog(wx.Dialog):
         self.skip_existing_cb.SetValue(self.config.get('skip_existing', False))
         set_accessible_name(self.skip_existing_cb, "Skip images that already have descriptions")
         batch_sizer.Add(self.skip_existing_cb, 0, wx.ALL, 5)
-        
+
         sizer.Add(batch_sizer, 0, wx.ALL | wx.EXPAND, 10)
-        
+
+        # Context enrichment
+        context_box = wx.StaticBox(panel, label="Context Enrichment")
+        context_sizer = wx.StaticBoxSizer(context_box, wx.VERTICAL)
+
+        self.geocode_cb = wx.CheckBox(
+            panel,
+            label="&Geocode GPS coordinates to city/state (requires internet)",
+            name="Geocode GPS coordinates to city/state"
+        )
+        self.geocode_cb.SetValue(self.config.get('geocode_enabled', False))
+        self.geocode_cb.SetToolTip(
+            "When an image has GPS coordinates, look up the city and state via OpenStreetMap "
+            "and include them in the AI prompt context. Results are cached locally."
+        )
+        context_sizer.Add(self.geocode_cb, 0, wx.ALL, 5)
+
+        context_note = wx.StaticText(
+            panel,
+            label="Date and camera are always included when available — no internet needed."
+        )
+        context_sizer.Add(context_note, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        sizer.Add(context_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
         panel.SetSizer(sizer)
         return panel
     
@@ -1070,6 +1094,7 @@ class ProcessingOptionsDialog(wx.Dialog):
             model = self.model_combo.GetStringSelection()
         return {
             'skip_existing': self.skip_existing_cb.GetValue(),
+            'geocode_enabled': self.geocode_cb.GetValue(),
             'provider': self.provider_choice.GetStringSelection().lower(),
             'model': model,
             'prompt_style': self.prompt_choice.GetStringSelection(),

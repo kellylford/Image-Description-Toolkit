@@ -217,13 +217,14 @@ class ProcessingWorker(threading.Thread):
         ProcessingFailedEvent: Error during processing
     """
     
-    def __init__(self, parent_window, file_path: str, provider: str, model: str, 
-                 prompt_style: str, custom_prompt: str = "", 
-                 detection_settings: dict = None, 
+    def __init__(self, parent_window, file_path: str, provider: str, model: str,
+                 prompt_style: str, custom_prompt: str = "",
+                 detection_settings: dict = None,
                  prompt_config_path: Optional[str] = None,
-                 api_key: Optional[str] = None):
+                 api_key: Optional[str] = None,
+                 geocode: bool = False):
         """Initialize worker
-        
+
         Args:
             parent_window: wxWindow to receive events
             file_path: Path to image file
@@ -234,6 +235,7 @@ class ProcessingWorker(threading.Thread):
             detection_settings: Optional settings for object detection models
             prompt_config_path: Optional path to prompt config file
             api_key: Optional API key for cloud providers
+            geocode: Whether to reverse-geocode GPS coordinates (requires internet)
         """
         super().__init__(daemon=True)
         self.parent_window = parent_window
@@ -244,6 +246,7 @@ class ProcessingWorker(threading.Thread):
         self.custom_prompt = custom_prompt
         self.detection_settings = detection_settings or {}
         self.api_key = api_key
+        self.geocode = geocode
         
         try:
             self._prompt_config_path = Path(prompt_config_path) if prompt_config_path else None
@@ -854,8 +857,8 @@ class ProcessingWorker(threading.Thread):
 
             meta = ProcessingWorker._idt_extractor.extract(Path(self.file_path))
 
-            # Lazy-init geocoder (opt-in: only if idt_core geocoder is available)
-            if _IDTCoreNominatimGeocoder and not ProcessingWorker._idt_geocoder_init:
+            # Lazy-init geocoder only when this batch has geocoding enabled
+            if self.geocode and _IDTCoreNominatimGeocoder and not ProcessingWorker._idt_geocoder_init:
                 ProcessingWorker._idt_geocoder_init = True
                 try:
                     cache = Path.home() / ".idt" / "geocode_cache.json"
@@ -863,7 +866,7 @@ class ProcessingWorker(threading.Thread):
                 except Exception:
                     ProcessingWorker._idt_geocoder = None
 
-            if ProcessingWorker._idt_geocoder and (meta.latitude is not None):
+            if self.geocode and ProcessingWorker._idt_geocoder and (meta.latitude is not None):
                 meta = ProcessingWorker._idt_geocoder.enrich(meta)
 
             ctx = meta.prompt_context()
@@ -1666,9 +1669,10 @@ class BatchProcessingWorker(threading.Thread):
                  detection_settings: dict = None,
                  prompt_config_path: Optional[str] = None,
                  skip_existing: bool = False,
-                 progress_offset: int = 0):
+                 progress_offset: int = 0,
+                 geocode: bool = False):
         """Initialize batch worker
-        
+
         Args:
             parent_window: wxWindow to receive events
             file_paths: List of image file paths to process
@@ -1680,6 +1684,7 @@ class BatchProcessingWorker(threading.Thread):
             prompt_config_path: Optional path to prompt config file
             skip_existing: Skip images that already have descriptions
             progress_offset: Offset to add to progress counter (for continuing after video extraction)
+            geocode: Whether to reverse-geocode GPS coordinates (requires internet)
         """
         super().__init__(daemon=True)
         self.parent_window = parent_window
@@ -1692,6 +1697,7 @@ class BatchProcessingWorker(threading.Thread):
         self.prompt_config_path = prompt_config_path
         self.skip_existing = skip_existing
         self.progress_offset = progress_offset
+        self.geocode = geocode
         
         # Phase 2: Pause/Resume/Stop controls using threading.Event
         self._stop_event = threading.Event()  # Set = stopped
@@ -1748,7 +1754,8 @@ class BatchProcessingWorker(threading.Thread):
                     self.prompt_style,
                     self.custom_prompt,
                     self.detection_settings,
-                    self.prompt_config_path
+                    self.prompt_config_path,
+                    geocode=self.geocode,
                 )
                 
                 # Run synchronously and wait
