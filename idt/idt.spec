@@ -81,6 +81,8 @@ a = Analysis(
         'idt_core.watcher',
         'idt_core.downloader',
         'idt_core.video',
+        'idt_core.workspace',
+        'idt_core.logger',
         'idt_core.providers',
         'idt_core.providers.base',
         'idt_core.providers.claude',

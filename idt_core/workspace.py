@@ -253,8 +253,8 @@ class WorkspaceItem:
 
 @dataclass
 class WorkspaceDefaults:
-    provider: str = "anthropic"
-    model: str = "claude-opus-4-6"
+    provider: str = "ollama"
+    model: str = "moondream"
     prompt_name: str = "detailed"
     prompt_text: str = ""
 
@@ -272,6 +272,10 @@ class Workspace:
         self.batch_state: Optional[dict] = None
         self.cached_ollama_models: Optional[list] = None
         self.geocode_enabled: bool = False
+        # True once at least one image has been successfully described.
+        # Guards provider/model resolution so a failed run can't poison the defaults
+        # for the next run (workspace provider is only honored when there ARE descriptions).
+        self.has_any_descriptions: bool = False
         # lazy index of source_path -> bundle image name, for idempotent adds
         self._source_index: Optional[dict] = None
 
@@ -342,11 +346,12 @@ class Workspace:
         ws.sources = data.get("sources", [])
         defs = data.get("defaults", {})
         ws.defaults = WorkspaceDefaults(
-            provider=defs.get("provider", "anthropic"),
-            model=defs.get("model", "claude-opus-4-6"),
+            provider=defs.get("provider", "ollama"),
+            model=defs.get("model", "moondream"),
             prompt_name=defs.get("prompt_name", "detailed"),
             prompt_text=defs.get("prompt_text", ""),
         )
+        ws.has_any_descriptions = data.get("has_any_descriptions", False)
         ws.batch_state = data.get("batch_state")
         ws.cached_ollama_models = data.get("cached_ollama_models")
         ws.geocode_enabled = data.get("geocode_enabled", False)
@@ -368,6 +373,7 @@ class Workspace:
                 "prompt_name": self.defaults.prompt_name,
                 "prompt_text": self.defaults.prompt_text,
             },
+            "has_any_descriptions": self.has_any_descriptions,
             "batch_state": self.batch_state,
             "cached_ollama_models": self.cached_ollama_models,
             "geocode_enabled": self.geocode_enabled,
@@ -484,7 +490,9 @@ class Workspace:
         return out
 
     def image_path(self, item: WorkspaceItem) -> Path:
-        """Absolute path to the bundle's copy of an item's image."""
+        """Absolute path to the item's image (bundle copy or original reference)."""
+        if item.storage == "reference" and item.source_path:
+            return Path(item.source_path)
         return self.images_dir / item.image
 
     # ----- chats ----- #

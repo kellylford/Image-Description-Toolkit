@@ -95,6 +95,7 @@ a = Analysis(
         'idt_core.project',
         'idt_core.image_item',
         'idt_core.workspace',
+        'idt_core.logger',
         'idt_core.gui_bridge',
         'idt_core.pipeline',
         'idt_core.scanner',

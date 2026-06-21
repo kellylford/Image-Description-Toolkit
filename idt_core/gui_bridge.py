@@ -149,8 +149,16 @@ def _gui_image_item_to_bundle(ws: Workspace, file_path: str, item: dict,
 
     if copy_images and src.exists():
         wi = ws.add_image(src, subfolder=item.get("subfolder"))
+    elif src.exists():
+        # Reference mode: record source path in a sidecar, don't copy the file.
+        wi = WorkspaceItem(
+            image=src.name,
+            source_path=str(src),
+            storage="reference",
+            subfolder=item.get("subfolder"),
+        )
     else:
-        # File not on disk: register a sidecar without a copy, keyed by basename.
+        # File not on disk: register a missing sidecar.
         wi = WorkspaceItem(
             image=src.name,
             source_path=str(src),
@@ -205,6 +213,8 @@ def bundle_to_gui_workspace_dict(ws: Workspace) -> dict:
     items: dict = {}
 
     for wi in ws.items():
+        # For reference-mode items, point the GUI at the original file so it
+        # can display the image without requiring a copy inside the bundle.
         gui_path = str(ws.image_path(wi))
         gui_item = {
             "file_path": gui_path,

@@ -1456,7 +1456,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         new_item = file_menu.Append(wx.ID_NEW, "&New Workspace\tCtrl+N")
         self.Bind(wx.EVT_MENU, self.on_new_workspace, new_item)
 
-        open_item = file_menu.Append(wx.ID_OPEN, "&Open Workspace\tCtrl+O")
+        open_item = file_menu.Append(wx.ID_OPEN, "&Open Workspace or Bundle...\tCtrl+O")
         self.Bind(wx.EVT_MENU, self.on_open_workspace, open_item)
 
         save_item = file_menu.Append(wx.ID_SAVE, "&Save Workspace\tCtrl+S")
@@ -3456,17 +3456,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         logger.info(f"CHECKPOINT 3: Checking workspace file status - workspace_file={self.workspace_file}")
         if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
             logger.info("CHECKPOINT 3: Workspace is None or Untitled - showing save dialog")
-            # Inform user they need to save first
-            # CRITICAL: Must pass parent=self so the dialog is attached to the main window.
-            # Without a parent the dialog is parentless and appears hidden behind the main
-            # window on both macOS and Windows, silently blocking all further UI actions
-            # (including Quit) while the app waits indefinitely for a response.
+            # CRITICAL: Must Raise() before showing modal dialogs — without it the dialog
+            # can appear hidden behind the main window and block all further UI actions.
             self.Raise()
             result = wx.MessageBox(
-                "Batch processing requires a named workspace.\n\n"
-                "Please save your workspace with a descriptive name before processing.\n\n"
-                "Would you like to save the workspace now?",
-                "Save Workspace Required",
+                "Before processing, please choose where to save the workspace bundle.\n\n"
+                "A .idtw workspace bundle will be created next to your images so that "
+                "both ImageDescriber and the idt CLI can share the same results.\n\n"
+                "Continue?",
+                "Save Workspace Bundle",
                 wx.YES_NO | wx.ICON_QUESTION,
                 self
             )
@@ -3474,47 +3472,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if result != wx.YES:
                 return
 
-            # Propose a name based on workspace content
-            proposed_name = self._propose_workspace_name_from_content()
-
-            # Show save dialog
-            save_dialog = wx.FileDialog(
-                self,
-                message="Save workspace before batch processing",
-                defaultDir=str(get_default_workspaces_root()),
-                defaultFile=f"{proposed_name}.idw",
-                wildcard="IDT Workspace (*.idw)|*.idw",
-                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
-            )
-
-            if save_dialog.ShowModal() == wx.ID_OK:
-                new_path = Path(save_dialog.GetPath())
-                save_dialog.Destroy()
-
-                # Create/rename workspace depending on current state
-                new_name = new_path.stem
-
-                if self.workspace_file:
-                    # Rename existing Untitled workspace
-                    if not self.rename_workspace(new_name):
-                        show_error(self, "Failed to rename workspace. Processing cancelled.")
-                        return
-                else:
-                    # Create new workspace structure (no previous workspace)
-                    workspace_file, workspace_data_dir = create_workspace_structure(new_name)
-                    self.workspace_file = workspace_file
-                    # Create workspace object if it doesn't exist
-                    if not self.workspace:
-                        self.workspace = ImageWorkspace(new_workspace=True)
-                    self.workspace.directory_path = str(workspace_data_dir)
-                    self.workspace.directory_paths = [str(workspace_data_dir)]
-                    self.current_directory = workspace_data_dir
-                    # Save workspace to new file
-                    self.save_workspace(self.workspace_file)
-                    self.update_window_title("ImageDescriber", new_name)
-            else:
-                save_dialog.Destroy()
-                # User cancelled the file dialog
+            if not self._prompt_and_create_bundle("Save Workspace Bundle"):
+                # User cancelled the bundle creation dialog
                 return
         logger.info("CHECKPOINT 3 PASSED: Workspace file is valid (not None/Untitled)")
 
@@ -4152,25 +4111,41 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.clear_modified()
 
     def on_open_workspace(self, event):
-        """Open existing workspace"""
+        """Open an existing workspace (.idw file) or .idtw bundle.
+
+        To open a .idtw bundle: navigate inside the bundle folder and select
+        manifest.json.  ImageDescriber will detect it and load the bundle.
+        """
         if not self.confirm_unsaved_changes():
             return
 
-        default_dir = ""
-        default_file = ""
-        if self.workspace_file:
-            default_dir = str(Path(self.workspace_file).parent)
+        default_dir = str(Path(self.workspace_file).parent) if self.workspace_file else ""
 
         file_path = open_file_dialog(
             self,
-            "Open Workspace",
-            "ImageDescriber Workspace (*.idw)|*.idw|All files (*.*)|*.*",
+            "Open Workspace (.idw) or Bundle (open bundle folder → select manifest.json)",
+            "Workspace files (*.idw, manifest.json)|*.idw;manifest.json"
+            "|ImageDescriber Workspace (*.idw)|*.idw"
+            "|Workspace Bundle — select manifest.json inside .idtw folder|manifest.json"
+            "|All files (*.*)|*.*",
             default_dir,
-            default_file
+            ""
         )
 
-        if file_path:
-            self.load_workspace(file_path)
+        if not file_path:
+            return
+
+        # If user selected manifest.json inside a .idtw bundle, open the bundle.
+        p = Path(file_path)
+        if p.name == "manifest.json":
+            try:
+                from idt_core.workspace import Workspace
+                if Workspace.is_bundle(p.parent):
+                    file_path = str(p.parent)
+            except ImportError:
+                pass
+
+        self.load_workspace(file_path)
 
     def load_workspace(self, file_path):
         """Load workspace from a legacy .idw file or a .idtw bundle directory."""
@@ -4243,15 +4218,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, f"Error loading workspace:\n{e}")
 
     def on_save_workspace_as(self, event):
-        """Save workspace to new file"""
-        # Use default workspaces directory
-        default_dir = str(get_default_workspaces_root())
+        """Save workspace to a new location.
 
-        # Propose a sensible default name
-        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
-            default_file = f"{self._propose_workspace_name_from_content()}.idw"
-        else:
-            default_file = self.workspace_file.name
+        New (unsaved) workspaces default to a .idtw bundle next to the source folder.
+        Existing .idw workspaces are saved as .idw (rename/move flow is unchanged).
+        """
+        # New workspace with no file yet: default to .idtw bundle.
+        if not self.workspace_file:
+            self._prompt_and_create_bundle("Save Workspace As Bundle")
+            return
+
+        # Existing workspace that is already a bundle: save to a different bundle location.
+        if self._workspace_file_is_bundle():
+            self._prompt_and_create_bundle("Save Bundle As")
+            return
+
+        # Legacy .idw workspace: keep the existing rename/file-dialog flow.
+        default_dir = str(get_default_workspaces_root())
+        default_file = (
+            self.workspace_file.name
+            if not is_untitled_workspace(self.workspace_file.stem)
+            else f"{self._propose_workspace_name_from_content()}.idw"
+        )
 
         file_path = save_file_dialog(
             self,
@@ -4264,30 +4252,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if file_path:
             new_path = Path(file_path)
             new_name = new_path.stem
-
-            # If name changed (or creating new), use rename/create (moves data directory too)
-            if not self.workspace_file:
-                # Create new workspace structure in the canonical Workspaces directory.
-                # We use the name from the dialog but always persist the .idw file to
-                # the standard location so "Open Workspace" can find it reliably.
-                # (Previously the .idw was written to wherever the file dialog happened
-                # to be browsed to, e.g. OneDrive, leaving the Workspaces folder empty.)
-                workspace_file, workspace_data_dir = create_workspace_structure(new_name)
-                self.workspace_file = workspace_file
-                # Create workspace object if it doesn't exist
-                if not self.workspace:
-                    self.workspace = ImageWorkspace(new_workspace=True)
-                self.workspace.directory_path = str(workspace_data_dir)
-                self.workspace.directory_paths = [str(workspace_data_dir)]
-                self.current_directory = workspace_data_dir
-                # Always save to the canonical workspace_file path, not new_path.
-                # save_workspace() would overwrite self.workspace_file with its
-                # file_path argument, so we must pass the canonical path here.
-                self.save_workspace(str(workspace_file))
-            elif new_name != self.workspace_file.stem:
+            if new_name != self.workspace_file.stem:
                 self.rename_workspace(new_name)
             else:
-                # Same name, different location - just save
                 self.save_workspace(str(new_path))
 
     def on_save_workspace(self, event):
@@ -4516,6 +4483,95 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, f"Successfully exported descriptions to:\n{file_path}")
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
+
+    def _auto_save_bundle(self) -> None:
+        """Auto-create a reference-mode .idtw bundle after batch completes with no saved workspace.
+
+        Uses reference mode (no image copy) so the bundle is lightweight — just
+        manifest.json + description sidecars.  The original images stay where they are.
+        """
+        if not self.workspace or not self.workspace.directory_paths:
+            return
+        try:
+            from idt_core.gui_bridge import gui_workspace_to_bundle
+        except ImportError:
+            return
+
+        source = Path(self.workspace.directory_paths[0])
+        bundle_path = source.parent / (source.name + ".idtw")
+        try:
+            bundle = gui_workspace_to_bundle(
+                self.workspace.to_dict(), bundle_path, copy_images=False
+            )
+            self.workspace_file = bundle.path
+            self.update_window_title("ImageDescriber", bundle.path.name)
+            self.clear_modified()
+            self.SetStatusText(f"Saved to {bundle.path}", 0)
+            logger.info(f"Auto-saved workspace bundle: {bundle.path}")
+        except Exception as exc:
+            logger.error(f"Auto-bundle save failed: {exc}", exc_info=True)
+
+    def _prompt_and_create_bundle(self, title: str = "Save Workspace Bundle") -> bool:
+        """Prompt user for a .idtw bundle location and save the workspace there.
+
+        Defaults to placing the bundle next to the source folder.
+        Returns True if saved successfully, False if the user cancelled or it failed.
+        """
+        try:
+            from idt_core.gui_bridge import gui_workspace_to_bundle
+        except ImportError:
+            show_error(self, "idt_core is not available — cannot create workspace bundle.\n"
+                             "Use File > Save Workspace As... to save as a .idw file instead.")
+            return False
+
+        proposed_name = self._propose_workspace_name_from_content()
+        if self.workspace and self.workspace.directory_paths:
+            source = Path(self.workspace.directory_paths[0])
+            proposed_name = source.name
+            default_parent = str(source.parent)
+        else:
+            default_parent = str(get_default_workspaces_root())
+
+        dir_dlg = wx.DirDialog(
+            self, f"{title} — choose the folder to create the bundle inside",
+            defaultPath=default_parent,
+            style=wx.DD_DEFAULT_STYLE
+        )
+        try:
+            if dir_dlg.ShowModal() != wx.ID_OK:
+                return False
+            parent_dir = dir_dlg.GetPath()
+        finally:
+            dir_dlg.Destroy()
+
+        name_dlg = wx.TextEntryDialog(
+            self,
+            "Bundle name (a folder named <name>.idtw will be created):",
+            title, proposed_name
+        )
+        try:
+            if name_dlg.ShowModal() != wx.ID_OK:
+                return False
+            name = (name_dlg.GetValue() or "").strip() or proposed_name
+        finally:
+            name_dlg.Destroy()
+
+        bundle_path = Path(parent_dir) / name
+        try:
+            with wx.BusyCursor():
+                bundle = gui_workspace_to_bundle(
+                    self.workspace.to_dict(), bundle_path, copy_images=False
+                )
+            self.workspace_file = bundle.path
+            self.update_window_title("ImageDescriber", bundle.path.name)
+            self.clear_modified()
+            self.SetStatusText(f"Saved to bundle: {bundle.path}", 0)
+            logger.info(f"Saved workspace bundle: {bundle.path}")
+            return True
+        except Exception as exc:
+            logger.error(f"Error creating bundle: {exc}", exc_info=True)
+            show_error(self, f"Error creating workspace bundle:\n{exc}")
+            return False
 
     def on_open_workspace_bundle(self, event):
         """Open a .idtw workspace bundle — the unified format shared with the idt CLI."""
@@ -5557,9 +5613,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
         self.update_window_title("ImageDescriber", doc_name)
 
-        # Save workspace
+        # Save workspace (or auto-create a .idtw bundle next to the source folder)
         if self.workspace_file:
             self.save_workspace(self.workspace_file)
+        else:
+            self._auto_save_bundle()
 
         # Return keyboard focus to image list
         self.image_list.SetFocus()

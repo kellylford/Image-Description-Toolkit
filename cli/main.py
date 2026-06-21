@@ -187,8 +187,14 @@ def cmd_describe(args):
     ws = _open_or_create_workspace(source, getattr(args, "workspace", None))
     user_cfg = UserConfig.load()
 
-    provider_name = args.provider or ws.defaults.provider or user_cfg.default_provider
-    model = args.model or ws.defaults.model or user_cfg.default_model
+    # Only inherit provider/model from the workspace manifest if this workspace
+    # has previously had at least one successful description.  Without this guard,
+    # a completely-failed run that already saved its provider would override the
+    # user's default on every subsequent run — even after changing the default.
+    _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
+    _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
+    provider_name = args.provider or _ws_provider or user_cfg.default_provider
+    model         = args.model    or _ws_model    or user_cfg.default_model
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
 
     # Copy this run's source images into the bundle (idempotent; originals untouched)
@@ -211,9 +217,8 @@ def cmd_describe(args):
             print(f"Metadata:   EXIF extraction enabled{gcstr}")
         print()
 
-    # Persist the chosen defaults on the workspace
-    ws.defaults.provider = provider_name
-    ws.defaults.model = model
+    # Save prompt/geocode now; provider+model only saved after a successful run
+    # so a completely-failed run doesn't poison the workspace with a bad provider.
     ws.defaults.prompt_name = prompt_name
     ws.geocode_enabled = bool(args.geocode)
     ws.save_manifest()
@@ -262,6 +267,12 @@ def cmd_describe(args):
             progress.update(event.item.display_name, success=False, error=event.error)
 
     progress.summary(described=described, errors=errors)
+
+    if described > 0:
+        ws.defaults.provider = provider_name
+        ws.defaults.model = model
+        ws.has_any_descriptions = True
+        ws.save_manifest()
 
     if args.embed and described > 0:
         print()
