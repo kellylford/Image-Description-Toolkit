@@ -20,6 +20,7 @@ Layout:
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import uuid
 from dataclasses import dataclass, field
@@ -263,7 +264,7 @@ class Workspace:
     """A `.idtw` bundle on disk. Open or create one, then add images and descriptions."""
 
     def __init__(self, path: Path):
-        self.path = Path(path).resolve()
+        self.path = Path(os.path.abspath(path))
         self.name: str = self.path.stem
         self.created: str = _now()
         self.modified: str = self.created
@@ -318,7 +319,7 @@ class Workspace:
         path = Path(path)
         if path.suffix.lower() != BUNDLE_EXT:
             path = path.with_name(path.name + BUNDLE_EXT)
-        path = path.resolve()
+        path = Path(os.path.abspath(path))
         ws = cls(path)
         if name:
             ws.name = name
@@ -335,7 +336,7 @@ class Workspace:
         path = Path(path)
         if path.suffix.lower() != BUNDLE_EXT and not cls.is_bundle(path):
             path = path.with_name(path.name + BUNDLE_EXT)
-        path = path.resolve()
+        path = Path(os.path.abspath(path))
         if not cls.is_bundle(path):
             return cls.create(path)
         ws = cls(path)
@@ -412,7 +413,7 @@ class Workspace:
         Idempotent: adding the same source path twice returns the existing item.
         The original file is never modified.
         """
-        source_path = Path(source_path).resolve()
+        source_path = Path(os.path.abspath(source_path))
         if self._source_index is None:
             self._source_index = self._build_source_index()
 
@@ -438,7 +439,7 @@ class Workspace:
     def add_source_folder(self, folder: Path, recursive: bool = True,
                           include_videos: bool = False) -> list[WorkspaceItem]:
         """Scan a folder and add every image. Records the folder in manifest.sources."""
-        folder = Path(folder).resolve()
+        folder = Path(os.path.abspath(folder))
         added: list[WorkspaceItem] = []
         if recursive:
             paths = list(scan_images(folder, include_videos=include_videos))
