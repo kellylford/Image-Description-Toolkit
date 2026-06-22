@@ -153,22 +153,20 @@ class EmbedDescriptions:
         return result
 
     def embed_from_workspace(self, workspace_data: dict, output_dir: Optional[Path] = None,
-                             in_place: bool = False, dry_run: bool = False) -> EmbedResult:
+                             in_place: bool = False, dry_run: bool = False,
+                             source_root: Optional[Path] = None) -> EmbedResult:
         """
-        Embed descriptions from a deserialized ImageDescriber workspace (.idw) into images.
+        Embed descriptions from a deserialized ImageDescriber workspace into images.
 
-        ImageItem.file_path is the true original on-disk path. Uses the most recent
-        description for each image.
+        Uses the most recent description for each image.
 
         Args:
-            workspace_data: Deserialized workspace dict (from json.load of an .idw file,
-                            or ImageWorkspace.to_dict()).
+            workspace_data: From ImageWorkspace.to_dict().
             output_dir: Where to write embedded copies (copy mode).
             in_place: If True, embed directly into original files.
             dry_run: Report what would happen without writing anything.
-
-        Returns:
-            EmbedResult with counts and skipped/error lists.
+            source_root: Base directory used to mirror source subfolder structure
+                         under output_dir. If None, all copies land flat in output_dir.
         """
         result = EmbedResult(dry_run=dry_run)
         items = workspace_data.get('items', {})
@@ -187,7 +185,6 @@ class EmbedDescriptions:
             if not descriptions:
                 continue
 
-            # Use most recent description
             latest = descriptions[-1]
             description_text = latest.get('text', '')
             if not description_text:
@@ -204,7 +201,8 @@ class EmbedDescriptions:
 
             self._embed_one(
                 orig, description_text, model, created,
-                output_dir, in_place, dry_run, embedder, result
+                output_dir, in_place, dry_run, embedder, result,
+                source_root=source_root,
             )
 
         return result
@@ -229,7 +227,8 @@ class EmbedDescriptions:
 
     def _embed_one(self, orig: Path, description: str, model: str, timestamp: str,
                    output_dir: Optional[Path], in_place: bool, dry_run: bool,
-                   embedder: ExifEmbedder, result: EmbedResult) -> None:
+                   embedder: ExifEmbedder, result: EmbedResult,
+                   source_root: Optional[Path] = None) -> None:
         """Perform the copy (or in-place) embed for a single image."""
         is_heic = orig.suffix.lower() in HEIC_SUFFIXES
 
@@ -242,20 +241,25 @@ class EmbedDescriptions:
                 if not dry_run:
                     self._do_embed(orig, orig, description, model, timestamp, embedder)
             else:
-                # Copy mode
-                if is_heic:
-                    # Convert to JPEG copy first, then embed
-                    dest_name = orig.stem + '.jpg'
+                # Compute the relative path for mirroring, falling back to flat.
+                if source_root is not None:
+                    try:
+                        rel = orig.relative_to(source_root)
+                    except ValueError:
+                        rel = Path(orig.name)
                 else:
-                    dest_name = orig.name
+                    rel = Path(orig.name)
+
+                if is_heic:
+                    rel = rel.with_suffix('.jpg')
 
                 if output_dir is None:
-                    # output_dir unset means same directory as original (side-by-side copy)
                     dest = orig.parent / f"{orig.stem}_described{orig.suffix}"
                 else:
-                    dest = output_dir / dest_name
+                    dest = output_dir / rel
 
                 if not dry_run:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
                     if is_heic:
                         self._convert_heic_and_embed(orig, dest, description, model, timestamp, embedder)
                     else:

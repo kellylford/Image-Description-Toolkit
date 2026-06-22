@@ -4487,7 +4487,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, "No described images found. Process your images first.")
             return
 
-        dlg = EmbedDescriptionsDialog(self, len(described_items))
+        # Default output to bundle/embedded/ when a bundle is open.
+        default_embed_dir = (
+            Path(self.workspace_file) / "embedded" if self.workspace_file else None
+        )
+        # Source root for mirroring subfolder structure.
+        source_root = None
+        if self.workspace_file:
+            bundle_images = Path(self.workspace_file) / "images"
+            if bundle_images.exists():
+                source_root = bundle_images
+            elif self.workspace and self.workspace.directory_paths:
+                source_root = Path(self.workspace.directory_paths[0])
+
+        dlg = EmbedDescriptionsDialog(self, len(described_items),
+                                      default_output_dir=default_embed_dir)
         if dlg.ShowModal() != wx.ID_OK:
             dlg.Destroy()
             return
@@ -4518,7 +4532,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 result = embedder.embed_from_workspace(
                     workspace_data,
                     output_dir=output_dir,
-                    in_place=in_place
+                    in_place=in_place,
+                    source_root=source_root,
                 )
         except Exception as e:
             show_error(self, f"Error embedding descriptions:\n{e}")

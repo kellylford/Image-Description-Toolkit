@@ -1779,13 +1779,15 @@ class EmbedDescriptionsDialog(wx.Dialog):
         Requires an explicit confirmation checkbox.
     """
 
-    def __init__(self, parent, image_count: int):
+    def __init__(self, parent, image_count: int,
+                 default_output_dir: Optional[Path] = None):
         super().__init__(
             parent,
             title='Embed Descriptions into Images',
             style=wx.DEFAULT_DIALOG_STYLE,
         )
         self._image_count = image_count
+        self._default_output_dir = default_output_dir
         self._output_dir: Optional[Path] = None
         self._init_ui()
         self.SetSize((520, -1))
@@ -1845,7 +1847,11 @@ class EmbedDescriptionsDialog(wx.Dialog):
         self._out_box = wx.StaticBox(self, label='Output Folder')
         out_sizer = wx.StaticBoxSizer(self._out_box, wx.VERTICAL)
 
-        default_out = str(Path.home() / 'Pictures' / 'IDT_Embedded')
+        default_out = str(
+            self._default_output_dir
+            if self._default_output_dir
+            else Path.home() / 'Pictures' / 'IDT_Embedded'
+        )
         path_row = wx.BoxSizer(wx.HORIZONTAL)
         self._path_ctrl = wx.TextCtrl(self, value=default_out, name='Output folder path')
         set_accessible_name(self._path_ctrl, 'Output folder path')
