@@ -3,6 +3,7 @@ updates:
   # Root requirements (core CLI/scripts)
   - package-ecosystem: "pip"
     directory: "/"
+    target-branch: "v4.5"
     schedule:
       interval: "weekly"
     labels:
@@ -12,6 +13,7 @@ updates:
   # IDT CLI app
   - package-ecosystem: "pip"
     directory: "/idt"
+    target-branch: "v4.5"
     schedule:
       interval: "weekly"
     labels:
@@ -21,6 +23,7 @@ updates:
   # ImageDescriber GUI app
   - package-ecosystem: "pip"
     directory: "/imagedescriber"
+    target-branch: "v4.5"
     schedule:
       interval: "weekly"
     labels:
@@ -30,6 +33,7 @@ updates:
   # show_metadata tool
   - package-ecosystem: "pip"
     directory: "/tools/show_metadata"
+    target-branch: "v4.5"
     schedule:
       interval: "weekly"
     labels:
@@ -39,6 +43,7 @@ updates:
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "v4.5"
     schedule:
       interval: "weekly"
     labels:

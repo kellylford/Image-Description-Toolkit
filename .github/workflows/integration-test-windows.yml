@@ -1,4 +1,4 @@
-name: "Integration Test: Windows (Ollama + moondream)"
+name: "Integration Test: Windows (Ollama + minicpm-v4.6)"
 
 # Runs automatically on every push to v4.5 and main.
 # Manual trigger also available via workflow_dispatch.
@@ -8,7 +8,6 @@ on:
     branches:
       - v4.5
       - main
-      - feature/video-description
 
 jobs:
   integration-test:
@@ -101,13 +100,13 @@ jobs:
         ollama --version
 
     # ------------------------------------------------------------------ #
-    #  4. Pull moondream (the default IDT model)                          #
+    #  4. Pull minicpm-v4.6 (the default IDT model)                      #
     # ------------------------------------------------------------------ #
-    - name: Pull moondream model
+    - name: Pull minicpm-v4.6 model
       shell: pwsh
       run: |
-        Write-Host "Pulling moondream -- may take a few minutes on first run..."
-        ollama pull moondream
+        Write-Host "Pulling minicpm-v4.6 -- may take a few minutes on first run..."
+        ollama pull minicpm-v4.6
         Write-Host ""
         Write-Host "--- Installed models ---"
         ollama list
@@ -140,12 +139,12 @@ jobs:
     #     This auto-extracts video frames, describes all images+frames,   #
     #     and generates an HTML report in testimages.idtw/reports/.        #
     # ------------------------------------------------------------------ #
-    - name: Run idt describe with moondream
+    - name: Run idt describe with minicpm-v4.6
       shell: pwsh
       run: |
-        Write-Host "Running: idt.exe describe testimages --provider ollama --model moondream"
+        Write-Host "Running: idt.exe describe testimages --provider ollama --model minicpm-v4.6"
         Write-Host ""
-        .\idt\dist\idt.exe describe testimages --provider ollama --model moondream
+        .\idt\dist\idt.exe describe testimages --provider ollama --model minicpm-v4.6
         $exitCode = $LASTEXITCODE
         Write-Host ""
         Write-Host "idt describe exit code: $exitCode"

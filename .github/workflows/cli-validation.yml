@@ -4,7 +4,7 @@ name: "CLI Validation"
 # No build required — tests run in dev mode.
 on:
   push:
-    branches: [ v4.5, main, master, develop, WXMigration, feature/video-description ]
+    branches: [ v4.5, main ]
     paths:
       - 'cli/**'
       - 'idt_core/**'
@@ -15,7 +15,7 @@ on:
       - 'pytest_tests/**'
       - '.github/workflows/cli-validation.yml'
   pull_request:
-    branches: [ v4.5, main, master, develop, WXMigration, feature/video-description ]
+    branches: [ v4.5, main ]
   workflow_dispatch:
 
 env:
