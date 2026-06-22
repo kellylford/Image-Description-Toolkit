@@ -891,15 +891,32 @@ def guided_workflow(custom_config_path=None):
     # Add metadata flags to extra_workflow_args
     if not enable_metadata:
         extra_workflow_args.append("--no-metadata")
-    
+
     # Geocoding is now enabled by default in workflow.py, so we only need to pass --no-geocode if disabled
     if enable_metadata and not enable_geocoding:
         extra_workflow_args.append("--no-geocode")
-    
+
     # Only add custom geocode cache location if specified and different from default
     if enable_geocoding and geocode_cache_file and geocode_cache_file.strip() and geocode_cache_file != "geocode_cache.json":
         extra_workflow_args.extend(["--geocode-cache", geocode_cache_file])
-    
+
+    # Ask whether to echo descriptions to the terminal during the run
+    print()
+    print("Show descriptions in terminal:")
+    print("  Each description is printed as it finishes so you can spot quality")
+    print("  problems and stop the run early if needed. Off by default.")
+    print()
+    show_desc_choice = get_choice(
+        "Print each description to the screen as it is generated?",
+        ["No (silent run)", "Yes (echo descriptions)"],
+        default=1,
+        allow_back=True
+    )
+    if show_desc_choice == "back":
+        return None
+    if show_desc_choice == "Yes (echo descriptions)":
+        extra_workflow_args.extend(["--show-descriptions", "on"])
+
     # Build the command
     print_header("Command Summary")
     
