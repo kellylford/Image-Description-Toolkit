@@ -5,19 +5,16 @@ Source files are NEVER modified. Copies go to <project>.idt/embedded/,
 mirroring the source directory structure.
 
 For JPEG (the primary format):
-  - EXIF ImageDescription  → read by Windows "Title" and "Subject" columns in
-                             Explorer, macOS Preview EXIF tab, Lightroom Caption
-  - EXIF UserComment       → read by Windows "Comments" column in Explorer
-  - XMP dc:description     → read by Apple Photos, Lightroom Description field,
-                             modern accessibility tools
-  All three fields are populated with the AI description text.
+  - EXIF UserComment   → Windows "Comments" column in Explorer
+  - XMP dc:description → Apple Photos (caption), Lightroom Description,
+                         macOS Spotlight (kMDItemDescription), modern tools
 
 For PNG:
   - tEXt chunk "Description"  → basic description
   - iTXt chunk "XML:com.adobe.xmp" → XMP dc:description for modern apps
 
 For WebP:
-  - EXIF ImageDescription (EXIF blob re-save)
+  - EXIF UserComment + XMP dc:description
 
 HEIC originals in copy mode use the .idt/ JPEG conversion if available;
 otherwise they are converted fresh and that copy is embedded into.
@@ -206,7 +203,6 @@ def _embed_jpeg(path: Path, description: str) -> None:
             exif_dict = piexif.load(str(path))
         except Exception:
             exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
-        exif_dict["0th"][piexif.ImageIFD.ImageDescription] = description.encode("utf-8")
         exif_dict["Exif"][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
             description, encoding="unicode"
         )
@@ -421,7 +417,7 @@ def _embed_png(path: Path, description: str) -> None:
 # ------------------------------------------------------------------ #
 
 def _embed_webp(path: Path, description: str) -> None:
-    """Write EXIF ImageDescription into a WebP (requires re-save)."""
+    """Write EXIF UserComment into a WebP (requires re-save)."""
     try:
         import piexif
         import piexif.helper
@@ -432,7 +428,6 @@ def _embed_webp(path: Path, description: str) -> None:
         except Exception:
             exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
 
-        exif_dict["0th"][piexif.ImageIFD.ImageDescription] = description.encode("utf-8")
         exif_dict["Exif"][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
             description, encoding="unicode"
         )
