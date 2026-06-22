@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 from pathlib import Path
 from typing import Optional
@@ -216,6 +217,10 @@ def cmd_describe(args):
             gcstr = " + geocoding" if args.geocode else ""
             print(f"Metadata:   EXIF extraction enabled{gcstr}")
         print()
+
+    # Record this invocation so users can find the exact command later.
+    _parts = ["idt"] + sys.argv[1:]
+    ws.cli_commands.append({"command": shlex.join(_parts), "timestamp": _now()})
 
     # Save prompt/geocode now; provider+model only saved after a successful run
     # so a completely-failed run doesn't poison the workspace with a bad provider.
@@ -710,6 +715,12 @@ def cmd_status(args):
         print(f"Total:       {st['total']}")
         print(f"Described:   {st['described']}  ({pct}%)")
         print(f"Remaining:   {st['undescribed']}")
+        if ws.cli_commands:
+            print()
+            print("Commands run:")
+            for entry in ws.cli_commands:
+                ts = entry.get("timestamp", "")[:16].replace("T", " ")
+                print(f"  [{ts}]  {entry.get('command', '')}")
         return
 
     # Legacy fallback: an old sibling .idt/ project

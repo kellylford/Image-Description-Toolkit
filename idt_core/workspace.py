@@ -277,6 +277,8 @@ class Workspace:
         # Guards provider/model resolution so a failed run can't poison the defaults
         # for the next run (workspace provider is only honored when there ARE descriptions).
         self.has_any_descriptions: bool = False
+        # Each entry: {"command": "idt describe ...", "timestamp": "..."}
+        self.cli_commands: list = []
         # lazy index of source_path -> bundle image name, for idempotent adds
         self._source_index: Optional[dict] = None
 
@@ -356,6 +358,7 @@ class Workspace:
         ws.batch_state = data.get("batch_state")
         ws.cached_ollama_models = data.get("cached_ollama_models")
         ws.geocode_enabled = data.get("geocode_enabled", False)
+        ws.cli_commands = data.get("cli_commands", [])
         return ws
 
     # ----- manifest ----- #
@@ -378,6 +381,7 @@ class Workspace:
             "batch_state": self.batch_state,
             "cached_ollama_models": self.cached_ollama_models,
             "geocode_enabled": self.geocode_enabled,
+            "cli_commands": self.cli_commands or [],
         }
         _atomic_write_text(self.manifest_path, json.dumps(data, indent=2, ensure_ascii=False))
 

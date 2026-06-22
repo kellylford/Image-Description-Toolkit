@@ -3630,6 +3630,58 @@ Viewing Results:
                 if hasattr(handler, 'stream') and handler.stream.name == '<stdout>':
                     handler.setLevel(logging.INFO)
         
+        # Build the equivalent idt describe command for this run so users can find and reuse it.
+        _cli = ["idt", "describe"]
+        if args.redescribe:
+            _cli += ["--redescribe", str(args.redescribe)]
+        elif args.resume:
+            _cli += ["--resume", str(args.resume)]
+        elif url:
+            _cli += [url]
+        elif input_dir:
+            _cli += [str(input_dir)]
+        if args.output_dir:
+            _cli += ["--output-dir", args.output_dir]
+        if args.steps != "video,convert,describe,html":
+            _cli += ["--steps", args.steps]
+        if args.provider:
+            _cli += ["--provider", args.provider]
+        if args.model:
+            _cli += ["--model", args.model]
+        if args.prompt_style:
+            _cli += ["--prompt-style", args.prompt_style]
+        if args.timeout != 90:
+            _cli += ["--timeout", str(args.timeout)]
+        if args.name:
+            _cli += ["--name", args.name]
+        if args.show_descriptions == "on":
+            _cli += ["--show-descriptions", "on"]
+        if args.no_metadata:
+            _cli += ["--no-metadata"]
+        if args.no_geocode:
+            _cli += ["--no-geocode"]
+        if args.geocode_cache and args.geocode_cache != "geocode_cache.json":
+            _cli += ["--geocode-cache", args.geocode_cache]
+        if args.api_key_file:
+            _cli += ["--api-key-file", args.api_key_file]
+        if args.config_image_describer and args.config_image_describer != "image_describer_config.json":
+            _cli += ["--config-image-describer", args.config_image_describer]
+        if args.config_workflow and args.config_workflow != "workflow_config.json":
+            _cli += ["--config-workflow", args.config_workflow]
+        if args.config_video and args.config_video != "video_frame_extractor_config.json":
+            _cli += ["--config-video", args.config_video]
+        if args.min_size:
+            _cli += ["--min-size", str(args.min_size)]
+        if args.max_images:
+            _cli += ["--max-images", str(args.max_images)]
+        if args.no_alt_text:
+            _cli += ["--no-alt-text"]
+        if args.verbose:
+            _cli += ["--verbose"]
+        if args.dry_run:
+            _cli += ["--dry-run"]
+        cli_command_str = shlex.join(_cli)
+
         # Prepare workflow metadata
         metadata = {
             "workflow_name": workflow_name_display,  # Use case-preserved name for display
@@ -3645,7 +3697,9 @@ Viewing Results:
             "config_image_describer": args.config_image_describer,
             "config_video": args.config_video,
             # Add source URL if this was a web download
-            "source_url": url if url else None
+            "source_url": url if url else None,
+            # Full idt describe command so the user can reproduce or modify this run.
+            "cli_command": cli_command_str,
         }
         
         # Launch viewer if requested (before workflow starts for real-time monitoring)
@@ -3656,37 +3710,9 @@ Viewing Results:
         # Run workflow
         results = orchestrator.run_workflow(input_dir, output_dir, steps, workflow_metadata=metadata)
         
-        # Log original command for resume functionality
-        if not args.resume:  # Only log original command for new workflows
-            # For redescribe, log the --redescribe argument; for normal workflows, log input_dir
-            if args.redescribe:
-                original_cmd = ["python", "workflow.py", "--redescribe", str(args.redescribe)]
-            else:
-                original_cmd = ["python", "workflow.py", str(input_dir)]
-            
-            if args.output_dir:
-                original_cmd.extend(["--output-dir", args.output_dir])
-            if args.steps != "video,convert,describe,html":
-                original_cmd.extend(["--steps", args.steps])
-            if args.provider and args.provider != "ollama":
-                original_cmd.extend(["--provider", args.provider])
-            if args.model:
-                original_cmd.extend(["--model", args.model])
-            if args.prompt_style:
-                original_cmd.extend(["--prompt-style", args.prompt_style])
-            # Log config arguments (use new explicit names)
-            if args.config_image_describer and args.config_image_describer != "image_describer_config.json":
-                original_cmd.extend(["--config-image-describer", args.config_image_describer])
-            if args.config_workflow and args.config_workflow != "workflow_config.json":
-                original_cmd.extend(["--config-workflow", args.config_workflow])
-            if args.config_video and args.config_video != "video_frame_extractor_config.json":
-                original_cmd.extend(["--config-video", args.config_video])
-            if args.verbose:
-                original_cmd.append("--verbose")
-            if args.progress_status:
-                original_cmd.append("--progress-status")
-            
-            orchestrator.logger.info(f"Original command: {' '.join(original_cmd)}")
+        # Log command (also stored in workflow_metadata.json under "cli_command")
+        if not args.resume:
+            orchestrator.logger.info(f"Command: {metadata.get('cli_command', '')}")
         else:
             orchestrator.logger.info(f"Resuming workflow from: {resume_dir}")
             orchestrator.logger.info(f"Original input directory: {input_dir}")
