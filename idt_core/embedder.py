@@ -5,11 +5,12 @@ Source files are NEVER modified. Copies go to <project>.idt/embedded/,
 mirroring the source directory structure.
 
 For JPEG (the primary format):
-  - EXIF ImageDescription  → read by Windows "Title", macOS Preview EXIF tab,
-                             Lightroom Caption field, legacy viewers
-  - XMP dc:description     → read by Windows "Description" column in Explorer,
-                             Apple Photos, Lightroom Description field,
+  - EXIF ImageDescription  → read by Windows "Title" and "Subject" columns in
+                             Explorer, macOS Preview EXIF tab, Lightroom Caption
+  - EXIF UserComment       → read by Windows "Comments" column in Explorer
+  - XMP dc:description     → read by Apple Photos, Lightroom Description field,
                              modern accessibility tools
+  All three fields are populated with the AI description text.
 
 For PNG:
   - tEXt chunk "Description"  → basic description
@@ -207,7 +208,7 @@ def _embed_jpeg(path: Path, description: str) -> None:
             exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
         exif_dict["0th"][piexif.ImageIFD.ImageDescription] = description.encode("utf-8")
         exif_dict["Exif"][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
-            "IDT", encoding="unicode"
+            description, encoding="unicode"
         )
         exif_bytes = piexif.dump(exif_dict)
         piexif.insert(exif_bytes, str(path))
@@ -433,7 +434,7 @@ def _embed_webp(path: Path, description: str) -> None:
 
         exif_dict["0th"][piexif.ImageIFD.ImageDescription] = description.encode("utf-8")
         exif_dict["Exif"][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(
-            "IDT", encoding="unicode"
+            description, encoding="unicode"
         )
         exif_bytes = piexif.dump(exif_dict)
 
