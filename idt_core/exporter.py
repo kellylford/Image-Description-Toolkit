@@ -92,8 +92,8 @@ figcaption {
   margin: 1rem 0;
 }
 .desc-block + .desc-block { margin-top: 1.5rem; }
-.desc-label {
-  font-size: 0.8125rem;
+h4 {
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--meta-fg);
   margin: 0 0 0.35rem;
@@ -364,7 +364,7 @@ def export_workspace_html(ws, filename: str = "descriptions.html") -> Path:
                 label += f"  ·  {desc.output_tokens} tokens"
             a('      <div class="desc-block">')
             if multi:
-                a(f'        <p class="desc-label">{_h(label)}</p>')
+                a(f'        <h4>{_h(label)}</h4>')
             text_html = _h(desc.text).replace("\n", "<br>\n")
             a(f"        <p>{text_html}</p>")
             a("      </div>")
