@@ -98,6 +98,23 @@ h4 {
   color: var(--meta-fg);
   margin: 0 0 0.35rem;
 }
+h5 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--meta-fg);
+  margin: 1rem 0 0.25rem;
+}
+.img-exif {
+  font-size: 0.8125rem;
+  color: var(--meta-fg);
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.1rem;
+}
+.img-exif dt { font-weight: 600; white-space: nowrap; }
+.img-exif dd { margin: 0; }
 footer {
   max-width: var(--max-width);
   margin: 3rem auto 1rem;
@@ -368,6 +385,8 @@ def export_workspace_html(ws, filename: str = "descriptions.html") -> Path:
             text_html = _h(desc.text).replace("\n", "<br>\n")
             a(f"        <p>{text_html}</p>")
             a("      </div>")
+        if item.metadata:
+            _render_item_metadata(a, item.metadata)
         a("    </article>")
     a("  </main>")
     a("  <footer>")
@@ -447,6 +466,49 @@ def export_workspace_txt(ws, filename: str = "descriptions.txt") -> Path:
 # ------------------------------------------------------------------ #
 # Helper                                                               #
 # ------------------------------------------------------------------ #
+
+def _render_item_metadata(a, meta: dict, indent: str = "      ") -> None:
+    """Emit h5 + dl.img-exif for an item's EXIF/geocode metadata. No-op when empty."""
+    if not meta:
+        return
+
+    rows: list[tuple[str, str]] = []
+
+    date = meta.get("date_short") or (meta.get("datetime_iso") or "")[:10]
+    if date:
+        rows.append(("Date", date))
+
+    cam_make = (meta.get("camera_make") or "").strip()
+    cam_model = (meta.get("camera_model") or "").strip()
+    if cam_model:
+        camera = cam_model if cam_model.lower().startswith(cam_make.lower()) else f"{cam_make} {cam_model}".strip()
+        rows.append(("Camera", camera))
+    if meta.get("camera_lens"):
+        rows.append(("Lens", meta["camera_lens"]))
+
+    city = meta.get("city") or ""
+    state = meta.get("state") or ""
+    country = meta.get("country") or ""
+    loc_parts = [p for p in [city, state, country] if p]
+    if loc_parts:
+        rows.append(("Location", ", ".join(loc_parts)))
+    elif meta.get("latitude") is not None and meta.get("longitude") is not None:
+        rows.append(("GPS", f"{meta['latitude']:.4f}, {meta['longitude']:.4f}"))
+
+    if meta.get("source_video"):
+        rows.append(("Source video", meta["source_video"]))
+    if meta.get("source_timestamp"):
+        rows.append(("Timestamp", meta["source_timestamp"]))
+
+    if not rows:
+        return
+
+    a(f"{indent}<h5>Metadata</h5>")
+    a(f'{indent}<dl class="img-exif">')
+    for label, value in rows:
+        a(f"{indent}  <dt>{_h(label)}</dt><dd>{_h(str(value))}</dd>")
+    a(f"{indent}</dl>")
+
 
 def _h(text: str) -> str:
     """HTML-escape a string."""
