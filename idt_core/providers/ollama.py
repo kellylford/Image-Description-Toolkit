@@ -9,7 +9,13 @@ from typing import Optional
 
 from .base import BaseProvider, DescriptionResult
 
-DEFAULT_MODEL = "moondream"
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL as DEFAULT_MODEL  # dev
+except ImportError:
+    try:
+        from config import DEFAULT_OLLAMA_MODEL as DEFAULT_MODEL        # frozen
+    except ImportError:
+        DEFAULT_MODEL = "llama3.2-vision"                               # fallback
 DEFAULT_HOST = "http://localhost:11434"
 
 

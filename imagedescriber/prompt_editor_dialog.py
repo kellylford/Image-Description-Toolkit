@@ -84,6 +84,11 @@ except ImportError as e:
     CLAUDE_MODEL_METADATA = {}
     print(f"Warning: AI providers not available: {e}")
 
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
+
 
 class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
     """Dialog for editing image description prompts"""
@@ -356,7 +361,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 "technical": "Provide a technical analysis of this image including photographic technique, lighting, and image quality."
             },
             "model_settings": {
-                "model": "moondream",
+                "model": DEFAULT_OLLAMA_MODEL,
                 "temperature": 0.1,
                 "num_predict": 600,
                 "top_k": 40,

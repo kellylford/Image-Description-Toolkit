@@ -35,6 +35,17 @@ if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
 
 
+def _set_console_title(title: str) -> None:
+    """Update the Windows console title bar. No-op on non-Windows or on error."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetConsoleTitleW(title)
+    except Exception:
+        pass
+
+
 # ------------------------------------------------------------------ #
 # Provider factory                                                     #
 # ------------------------------------------------------------------ #
@@ -130,39 +141,75 @@ def _metadata_args(p: argparse.ArgumentParser) -> None:
 # Workspace resolution                                                 #
 # ------------------------------------------------------------------ #
 
+def _mirror_source_path(source: Path, root: Path) -> Path:
+    """
+    Derive the workspace path for a source directory.
+
+    Uses just the leaf name of the source, placed flat under root:
+      C:\\Photos\\Vacation\\2026\\06   → root/06
+      \\\\ford\\home\\Photos\\06       → root/06
+      /home/kelly/Photos/Vacation      → root/Vacation
+
+    This keeps workspace paths short and human-readable. The idt root
+    (~/Documents/idt/) acts as the organizer; the bundle name comes from
+    the most specific part of the source path.
+    """
+    name = source.resolve().name or source.name
+    if not name:
+        name = "workspace"
+    return root / name
+
+
 def _open_or_create_workspace(source: Path, workspace_arg: Optional[str]):
     """
     Resolve the .idtw bundle for a describe run.
-      --workspace PATH  (contains a separator or ends in .idtw) -> that exact path
-      --workspace NAME  (bare name)                              -> NAME.idtw next to source
-      (omitted)                                                  -> <source>.idtw next to source
+      --workspace PATH  (contains separator or ends in .idtw) → that exact path
+      --workspace NAME  (bare name)                           → NAME.idtw in default workspace root
+      (omitted)                                               → mirrored path under ~/Documents/idt
     """
     from idt_core.workspace import Workspace, BUNDLE_EXT
+    from idt_core.config import UserConfig
 
     if workspace_arg:
         wp = Path(workspace_arg).expanduser()
         is_bare_name = (wp.parent == Path(".")) and (BUNDLE_EXT not in workspace_arg)
         if is_bare_name:
-            wp = source.parent / workspace_arg
+            root = UserConfig.load().workspace_root_path()
+            wp = root / workspace_arg
     else:
-        wp = source.parent / source.name  # Workspace.open appends .idtw
+        root = UserConfig.load().workspace_root_path()
+        wp = _mirror_source_path(source, root)
     return Workspace.open(wp)
 
 
 def _find_workspace(arg: str):
     """
     For read commands: locate an existing bundle from a user-supplied path.
-    Accepts a .idtw bundle directly, or a source folder whose sibling bundle exists.
+    Accepts a .idtw bundle directly, a source folder with a sibling bundle,
+    or a source folder whose mirrored bundle exists under ~/Documents/idt.
     Returns a Workspace or None.
     """
     from idt_core.workspace import Workspace
+    from idt_core.config import UserConfig
 
     p = Path(arg).expanduser().resolve()
+
+    # Direct bundle path
     if Workspace.is_bundle(p):
         return Workspace.open(p)
+
+    # Old-style sibling bundle (backwards compatibility)
     sibling = p.parent / (p.name + ".idtw")
     if Workspace.is_bundle(sibling):
         return Workspace.open(sibling)
+
+    # New default: mirrored path under workspace root
+    root = UserConfig.load().workspace_root_path()
+    mirrored = _mirror_source_path(p, root)
+    candidate = mirrored.with_name(mirrored.name + ".idtw")
+    if Workspace.is_bundle(candidate):
+        return Workspace.open(candidate)
+
     return None
 
 
@@ -219,8 +266,11 @@ def cmd_describe(args):
         print()
 
     # Record this invocation so users can find the exact command later.
-    _parts = ["idt"] + sys.argv[1:]
-    ws.cli_commands.append({"command": shlex.join(_parts), "timestamp": _now()})
+    # When called from guideme, _command_parts holds the full built command.
+    from datetime import datetime, timezone
+    _parts = getattr(args, "_command_parts", None) or (["idt"] + sys.argv[1:])
+    _ts = datetime.now(timezone.utc).isoformat()
+    ws.cli_commands.append({"command": shlex.join(_parts), "timestamp": _ts})
 
     # Save prompt/geocode now; provider+model only saved after a successful run
     # so a completely-failed run doesn't poison the workspace with a bad provider.
@@ -255,9 +305,13 @@ def cmd_describe(args):
     progress = Progress(total=len(queue), quiet=args.quiet)
     progress.start(f"{provider_name} / {model}")
 
+    _total = len(queue)
+    _set_console_title(f"IDT - Describing Images (0%, 0 of {_total})")
+
     described = errors = 0
     pipeline = WorkspacePipeline(ws, provider)
 
+    _show = getattr(args, "show_descriptions", False)
     for event in pipeline.run(options):
         if event.success:
             described += 1
@@ -267,11 +321,18 @@ def cmd_describe(args):
                 if ctx:
                     extra = f"  [{ctx}]"
             progress.update(event.item.display_name, success=True, note=extra)
+            if _show and event.item.descriptions:
+                print(event.item.descriptions[-1].text)
+                print()
         else:
             errors += 1
             progress.update(event.item.display_name, success=False, error=event.error)
+        _done = described + errors
+        _pct = int(_done / _total * 100) if _total else 0
+        _set_console_title(f"IDT - Describing Images ({_pct}%, {_done} of {_total})")
 
     progress.summary(described=described, errors=errors)
+    _set_console_title(f"IDT - Image Description Complete ({described} of {_total})")
 
     if described > 0:
         ws.defaults.provider = provider_name
@@ -341,7 +402,7 @@ def _auto_export_workspace(ws, quiet: bool) -> None:
 def _cmd_describe_stdin(args):
     """
     Describe image paths read from stdin, one per line.
-    Pipeline use: get_nyt_images.sh | idt describe - --prompt news
+    Pipeline use: get_nyt_images.bat | idt describe - --prompt aialttext
     """
     from idt_core.project import Project
     from idt_core.image_item import ImageItem, Description
@@ -470,7 +531,7 @@ def cmd_download(args):
     """
     Download images from a URL and optionally describe them.
 
-    idt download https://www.nytimes.com/ --max 20 --describe --prompt news
+    idt download https://www.nytimes.com/ --max 20 --describe --prompt aialttext
     """
     from idt_core.project import Project
     from idt_core.downloader import Downloader
@@ -931,6 +992,8 @@ def _do_embed_workspace(ws, force: bool, dry_run: bool, quiet: bool) -> None:
     pending = [i for i in described if force or not i.embedded_at]
 
     n = 0
+    from idt_core.scanner import is_heic
+
     errors = []
     for item in pending:
         desc = item.active_description
@@ -940,7 +1003,16 @@ def _do_embed_workspace(ws, force: bool, dry_run: bool, quiet: bool) -> None:
             n += 1
             continue
         try:
-            embed_image_file(ws.image_path(item), desc.text, out_dir / item.image)
+            src = ws.image_path(item)
+            dst = out_dir / item.image
+            # HEIC can't carry JPEG-style metadata — use the converted JPEG copy
+            # instead (already in derived/converted/ from the describe run).
+            if is_heic(src):
+                converted = ws.derived_dir("converted") / Path(item.image).with_suffix(".jpg").name
+                if converted.exists():
+                    src = converted
+                dst = dst.with_suffix(".jpg")
+            embed_image_file(src, desc.text, dst)
             item.embedded_at = datetime.now(timezone.utc).isoformat()
             ws.save_item(item)
             n += 1
@@ -1413,9 +1485,11 @@ def cmd_config(args):
             cfg.default_model = value
         elif key == "default_prompt_name":
             cfg.default_prompt_name = value
+        elif key == "workspace_root":
+            cfg.workspace_root = value or None
         else:
             print(f"Unknown config key: {key!r}", file=sys.stderr)
-            print("Valid keys: default_provider, default_model, default_prompt_name", file=sys.stderr)
+            print("Valid keys: default_provider, default_model, default_prompt_name, workspace_root", file=sys.stderr)
             sys.exit(1)
         cfg.save()
         print(f"Set {key} = {value}")
@@ -1425,6 +1499,7 @@ def cmd_config(args):
     print(f"default_provider: {cfg.default_provider}")
     print(f"default_model:    {cfg.default_model}")
     print(f"default_prompt:   {cfg.default_prompt_name}")
+    print(f"workspace_root:   {cfg.workspace_root_path()}")
     if cfg.custom_prompts:
         print(f"custom_prompts:   {', '.join(cfg.custom_prompts.keys())}")
 
@@ -1453,10 +1528,10 @@ Examples:
   idt describe ~/Pictures/Vacation/
   idt describe ~/Pictures/Vacation/ --provider anthropic --model claude-opus-4-6
   idt describe ~/Pictures/Vacation/ --provider ollama --model llava
-  idt describe ~/Pictures/Vacation/ --prompt brief --limit 10 --embed
+  idt describe ~/Pictures/Vacation/ --prompt concise --limit 10 --embed
   idt describe ~/Pictures/Vacation/ --geocode            # add city/state to prompt context
-  idt describe ~/Pictures/NYT/ --prompt news --quiet
-  idt download https://www.nytimes.com/ --max 20 --describe --prompt news
+  idt describe ~/Pictures/Web/ --prompt aialttext --quiet
+  idt download https://www.nytimes.com/ --max 20 --describe --prompt aialttext
   idt download https://example.com/gallery ~/Photos/web --max 50
   idt status ~/Pictures/Vacation/
   idt status ~/Pictures/ --all                          # show all projects under a directory
@@ -1470,9 +1545,8 @@ Examples:
   idt combine ~/Pictures/ --sort date --format tsv > by_date.tsv
   idt video ~/Movies/concert.mp4 --interval 5 --describe
   idt video ~/Movies/ --scene 30 --describe --prompt detailed
-  idt watch ~/Downloads/NYT/ --interval 60 --prompt news
-  idt watch ~/Downloads/NYT/ --quiet >> ~/nyt.tsv
-  get_nyt_images.sh | idt describe - --prompt news --provider anthropic
+  idt watch ~/Downloads/ --interval 60 --prompt aialttext
+  get_nyt_images.bat | idt describe - --prompt aialttext --provider anthropic
   idt describe - --provider florence < image_list.txt
   idt models
   idt models --provider ollama
@@ -1532,6 +1606,8 @@ Supported providers:
                         help="Seconds between extracted video frames (default: 5.0)")
     p_desc.add_argument("--no-export", action="store_true",
                         help="Skip automatic HTML report generation after describing")
+    p_desc.add_argument("--show-descriptions", action="store_true", dest="show_descriptions",
+                        help="Print each description to the screen as it is generated")
     p_desc.add_argument("--quiet", "-q", action="store_true",
                         help="Minimal output; in stdin mode, prints filename TAB description")
     p_desc.set_defaults(func=cmd_describe)
@@ -1771,8 +1847,22 @@ Supported providers:
 # ------------------------------------------------------------------ #
 
 def main():
+    _set_console_title("IDT - Image Description Toolkit")
     parser = build_parser()
     args = parser.parse_args()
+    _cmd_titles = {
+        "describe": "IDT - Describing Images",
+        "download": "IDT - Downloading Images",
+        "video":    "IDT - Extracting Video Frames",
+        "export":   "IDT - Exporting Descriptions",
+        "embed":    "IDT - Embedding Descriptions",
+        "combine":  "IDT - Combining Descriptions",
+        "watch":    "IDT - Watching for New Images",
+        "guideme":  "IDT - Setup Wizard",
+    }
+    cmd = getattr(args, "command", None)
+    if cmd and cmd in _cmd_titles:
+        _set_console_title(_cmd_titles[cmd])
     try:
         args.func(args)
     except KeyboardInterrupt:

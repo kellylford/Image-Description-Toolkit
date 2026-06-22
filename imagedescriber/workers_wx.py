@@ -42,6 +42,11 @@ try:
 except ImportError:
     load_json_config = None
 
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
+
 # Import web image downloader for URL downloads
 try:
     from web_image_downloader import WebImageDownloader
@@ -2753,7 +2758,7 @@ class VideoDescriptionWorker(threading.Thread):
             # Create describer with options
             config = {
                 "provider": self.options.get('provider', 'ollama'),
-                "model": self.options.get('model', 'llava'),
+                "model": self.options.get('model', DEFAULT_OLLAMA_MODEL),
                 "prompt_style": self.options.get('prompt_style', 'video_description'),
                 "custom_prompt": self.options.get('custom_prompt', ''),
                 "num_frames": 5,

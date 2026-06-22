@@ -1,11 +1,11 @@
 {
-  "default_model": "moondream:latest",
+  "default_model": "minicpm-v4.6",
   "default_provider": "ollama",
   "default_prompt_style": "narrative",
   "version": "3.1",
   "last_updated": "2026-04-08",
   "model_settings": {
-    "model": "moondream",
+    "model": "minicpm-v4.6",
     "temperature": 0.1,
     "num_predict": 600,
     "top_k": 40,
@@ -153,15 +153,49 @@
   },
   "available_models": {
     "description": "Any Ollama vision model can be used. Install models with 'ollama pull MODEL_NAME'.",
-    "default": "moondream:latest",
+    "default": "minicpm-v4.6",
     "recommended": [
       {
+        "name": "minicpm-v4.6",
+        "description": "Default local model. Excellent accuracy at 1.6 GB — fastest of the quality models. Works on all platforms including ARM Windows (Qualcomm). Pull with: ollama pull minicpm-v4.6",
+        "best_for": [
+          "narrative",
+          "detailed",
+          "concise",
+          "accessibility",
+          "colorful"
+        ],
+        "temperature_default": 0.15,
+        "install": "ollama pull minicpm-v4.6"
+      },
+      {
+        "name": "llava",
+        "description": "Universal fallback. 7B parameters, solid accuracy, works on CPU or any GPU across all platforms. Pull with: ollama pull llava",
+        "best_for": [
+          "narrative",
+          "concise"
+        ],
+        "temperature_default": 0.15,
+        "install": "ollama pull llava"
+      },
+      {
+        "name": "llama3.2-vision",
+        "description": "Higher quality than llava but requires x86 with CUDA or Apple Silicon. Not supported on ARM Windows (Snapdragon/Qualcomm).",
+        "best_for": [
+          "narrative",
+          "detailed",
+          "concise",
+          "accessibility"
+        ],
+        "temperature_default": 0.15,
+        "install": "ollama pull llama3.2-vision"
+      },
+      {
         "name": "moondream:latest",
-        "description": "Fastest, lightweight local model. Good for quick descriptions and batch processing. Default for out-of-the-box functionality.",
+        "description": "Smallest, fastest local model (1.8B). Runs on minimal hardware including CPU-only. Lower accuracy on complex scenes. Use if llama3.2-vision is too slow.",
         "best_for": [
           "simple",
-          "concise",
-          "narrative"
+          "concise"
         ],
         "temperature_default": 0.1,
         "install": "ollama pull moondream"

@@ -31,11 +31,13 @@ _FALLBACK_PROMPTS: dict[str, str] = {
 _FALLBACK_DEFAULT_PROMPT = "narrative"
 
 
-def _load_prompt_library() -> tuple[dict[str, str], str]:
-    """Load the canonical prompt set from image_describer_config.json.
+def _load_shared_config() -> tuple[dict[str, str], str, str]:
+    """Load prompts and defaults from image_describer_config.json.
 
-    Returns (prompts, default_prompt_name). This is the shared, researched
-    prompt library used everywhere; the GUI reads the same file directly.
+    Returns (prompts, default_prompt_name, default_ollama_model).
+    Single source of truth for all surfaces: CLI, GUI, and idt_core.
+    To change the default Ollama model, edit image_describer_config.json
+    → "default_model". All Python code reads from there at import time.
     """
     try:
         from config_loader import load_json_config          # frozen mode
@@ -43,21 +45,25 @@ def _load_prompt_library() -> tuple[dict[str, str], str]:
         try:
             from scripts.config_loader import load_json_config  # dev mode
         except ImportError:
-            return dict(_FALLBACK_PROMPTS), _FALLBACK_DEFAULT_PROMPT
+            return dict(_FALLBACK_PROMPTS), _FALLBACK_DEFAULT_PROMPT, "llama3.2-vision"
 
     config, _path, _src = load_json_config('image_describer_config.json')
     variations = dict(config.get("prompt_variations") or {}) if config else {}
     if not variations:
-        return dict(_FALLBACK_PROMPTS), _FALLBACK_DEFAULT_PROMPT
-    default = (config.get("default_prompt_style") or "").strip()
-    if default not in variations:
-        default = "narrative" if "narrative" in variations else next(iter(variations))
-    return variations, default
+        return dict(_FALLBACK_PROMPTS), _FALLBACK_DEFAULT_PROMPT, "llama3.2-vision"
+    default_prompt = (config.get("default_prompt_style") or "").strip()
+    if default_prompt not in variations:
+        default_prompt = "narrative" if "narrative" in variations else next(iter(variations))
+    # Strip tag suffix (e.g. "llama3.2-vision:latest" → "llama3.2-vision") for
+    # consistency with how the CLI and workspace record model names.
+    raw_model = (config.get("default_model") or "llama3.2-vision").strip()
+    default_model = raw_model.split(":")[0] if ":" in raw_model else raw_model
+    return variations, default_prompt, default_model
 
 
-# Built-in prompts available by name on the CLI (--prompt <name>), loaded from
-# the shared config at import time.
-BUILT_IN_PROMPTS, DEFAULT_PROMPT_NAME = _load_prompt_library()
+# Loaded once at import time from the shared config JSON.
+# To change defaults project-wide, edit scripts/image_describer_config.json.
+BUILT_IN_PROMPTS, DEFAULT_PROMPT_NAME, DEFAULT_OLLAMA_MODEL = _load_shared_config()
 
 _CONFIG_FILE = Path.home() / ".idt" / "config.json"
 
@@ -65,12 +71,19 @@ _CONFIG_FILE = Path.home() / ".idt" / "config.json"
 @dataclass
 class UserConfig:
     default_provider: str = "ollama"
-    default_model: str = "moondream"
+    default_model: str = DEFAULT_OLLAMA_MODEL
     default_prompt_name: str = DEFAULT_PROMPT_NAME
     custom_prompts: dict[str, str] = field(default_factory=dict)
+    workspace_root: Optional[str] = None  # None → ~/Documents/idt
+
+    def workspace_root_path(self) -> Path:
+        """Resolved workspace root. Defaults to ~/Documents/idt."""
+        if self.workspace_root:
+            return Path(self.workspace_root).expanduser().resolve()
+        return Path.home() / "Documents" / "idt"
 
     @classmethod
-    def load(cls) -> UserConfig:
+    def load(cls) -> "UserConfig":
         if not _CONFIG_FILE.exists():
             return cls()
         try:
@@ -78,7 +91,7 @@ class UserConfig:
         except Exception:
             return cls()
         obj = cls()
-        for key in ("default_provider", "default_model", "default_prompt_name"):
+        for key in ("default_provider", "default_model", "default_prompt_name", "workspace_root"):
             if key in data:
                 setattr(obj, key, data[key])
         obj.custom_prompts = data.get("custom_prompts", {})
@@ -92,6 +105,8 @@ class UserConfig:
             "default_prompt_name": self.default_prompt_name,
             "custom_prompts": self.custom_prompts,
         }
+        if self.workspace_root:
+            data["workspace_root"] = self.workspace_root
         _CONFIG_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def get_prompt_text(self, name: str) -> Optional[str]:

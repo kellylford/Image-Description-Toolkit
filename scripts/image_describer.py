@@ -82,6 +82,11 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from ConvertImage import optimize_image_size, TARGET_MAX_SIZE, CLAUDE_MAX_SIZE, OPENAI_MAX_SIZE
 
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
+
 # Import AI providers from the main application
 # Add parent directory to path to import from imagedescriber module
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -187,7 +192,7 @@ class ImageDescriber:
         # 1. Parameter (command-line argument)
         # 2. Config default_model (preferred)
         # 3. Config model_settings.model (legacy)
-        # 4. Fallback to 'moondream'
+        # 4. Fallback to 'llama3.2-vision'
         if model_name is not None:
             self.model_name = model_name
         else:
@@ -198,7 +203,7 @@ class ImageDescriber:
                 self.model_name = self.config.get('model_settings', {}).get('model')
             if not self.model_name:
                 # Final fallback
-                self.model_name = 'moondream'
+                self.model_name = DEFAULT_OLLAMA_MODEL
         
         # Set prompt style - parameter has already been resolved by argparse
         # (argparse loads config default if not specified on command line)
@@ -484,7 +489,7 @@ class ImageDescriber:
         """
         return {
             "model_settings": {
-                "model": "moondream",
+                "model": "minicpm-v4.6",
                 "temperature": 0.1,
                 "num_predict": 600,
                 "top_k": 40,

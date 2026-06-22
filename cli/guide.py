@@ -174,6 +174,51 @@ def _step_api_key(provider: str) -> bool:
     return cont
 
 
+def _ollama_pull(model: str) -> bool:
+    """Pull an Ollama model, streaming progress to stdout. Returns True on success."""
+    import subprocess
+    print(f"Pulling {model} from Ollama (this may take a few minutes)...")
+    print()
+    try:
+        result = subprocess.run(
+            ["ollama", "pull", model],
+            check=False,
+        )
+        if result.returncode == 0:
+            print(f"\nModel {model!r} is ready.")
+            return True
+        else:
+            print(f"\nollama pull returned exit code {result.returncode}.")
+            return False
+    except FileNotFoundError:
+        print("Could not find 'ollama' on PATH.")
+        return False
+    except Exception as exc:
+        print(f"Pull failed: {exc}")
+        return False
+
+
+def _ensure_ollama_model(model: str, installed: list[str]) -> bool:
+    """
+    Check if *model* is in the installed list. If not, offer to pull it.
+    Returns True if the model is ready (already installed or successfully pulled),
+    False if the user declined or the pull failed.
+    """
+    # Normalize: strip tag for comparison
+    base = model.split(":")[0]
+    for m in installed:
+        if m == model or m.split(":")[0] == base:
+            return True  # already installed
+
+    print()
+    print(f"Model '{model}' is not currently installed in Ollama.")
+    pull = get_yes_no(f"Pull '{model}' now?", default=True)
+    if not pull:
+        print("Skipping pull. The run will fail if the model is not available.")
+        return False
+    return _ollama_pull(model)
+
+
 def _step_model(provider: str) -> str:
     _header("Step 3: Model")
 
@@ -182,21 +227,24 @@ def _step_model(provider: str) -> str:
         try:
             from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
             inst = OllamaProvider(model=DEFAULT_MODEL)
-            models = inst.list_models()
+            installed = inst.list_models()
         except Exception:
-            models = []
+            installed = []
 
-        if models:
-            print(f"Found {len(models)} installed model(s).")
+        if installed:
+            print(f"Found {len(installed)} installed model(s).")
             print()
-            choice = get_choice("Select a model", models, default=1, allow_back=True)
+            choice = get_choice("Select a model", installed, default=1, allow_back=True)
             if choice in ("BACK", "EXIT"):
                 return choice
-            return choice
         else:
             print("No models found or Ollama is not running.")
-            print("Common vision-capable models: llava, llava:7b, qwen2-vl:7b, moondream")
-            return get_input("Enter model name", default="llava")
+            print("Common vision-capable models: minicpm-v4.6, llava, qwen2-vl:7b, moondream")
+            from idt_core.config import DEFAULT_OLLAMA_MODEL
+            choice = get_input("Enter model name", default=DEFAULT_OLLAMA_MODEL)
+
+        _ensure_ollama_model(choice, installed)
+        return choice
 
     if provider == "anthropic":
         from idt_core.providers.claude import CLAUDE_MODELS
@@ -343,7 +391,7 @@ def _step_metadata() -> tuple[bool, bool]:
 
 
 def _step_extra_options(source_type: str) -> dict:
-    """Return dict of extra flags: limit, embed, redescribe."""
+    """Return dict of extra flags: limit, show_descriptions, embed, redescribe."""
     _header("Step 7: Additional Options")
     opts: dict = {}
 
@@ -356,6 +404,10 @@ def _step_extra_options(source_type: str) -> dict:
             opts["limit"] = int(limit_str)
         except ValueError:
             print("Invalid number, no limit will be set.")
+
+    opts["show_descriptions"] = get_yes_no(
+        "Print each description to the screen as it is generated?", default=False
+    )
 
     if source_type == "dir":
         opts["redescribe"] = get_yes_no(
@@ -406,6 +458,8 @@ def _build_command(
             parts.append("--geocode")
         if extra.get("limit"):
             parts += ["--limit", str(extra["limit"])]
+        if extra.get("show_descriptions"):
+            parts.append("--show-descriptions")
         if extra.get("redescribe"):
             parts.append("--redescribe")
         if extra.get("embed"):
@@ -575,8 +629,13 @@ def run_guide() -> None:
 def _offer_open_report(source_str: str) -> None:
     """After a describe run, find the HTML report and offer to open it."""
     import os
+    from cli.main import _mirror_source_path
+    from idt_core.config import UserConfig
+
     source = Path(source_str).resolve()
-    html_path = source.parent / (source.name + ".idtw") / "reports" / "descriptions.html"
+    root = UserConfig.load().workspace_root_path()
+    ws_path = _mirror_source_path(source, root).with_suffix(".idtw")
+    html_path = ws_path / "reports" / "descriptions.html"
     if not html_path.exists():
         return
     print()
@@ -647,11 +706,13 @@ def _run_command(parts: list[str], state: dict) -> None:
             geocode=state["geocode"],
             redescribe=extra.get("redescribe", False),
             limit=extra.get("limit"),
+            show_descriptions=extra.get("show_descriptions", False),
             embed=extra.get("embed", False),
             no_video=False,
             video_interval=5.0,
             no_export=False,
             quiet=False,
+            _command_parts=parts,  # full command for workspace manifest logging
         )
         cmd_describe(args)
         _offer_open_report(state["source"])

@@ -174,6 +174,11 @@ try:
 except ImportError:
     ViewerPanel = None
 
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
+
 # Import shared metadata extraction module
 try:
     if getattr(sys, 'frozen', False):
@@ -854,7 +859,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             print(f"Warning: Could not load config: {e}")
             self.config = {
                 'default_provider': 'ollama',
-                'default_model': 'moondream',
+                'default_model': DEFAULT_OLLAMA_MODEL,
                 'default_prompt_style': 'narrative'
             }
             self.config_file = None
@@ -3316,7 +3321,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Use defaults
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
                 'skip_existing': False
@@ -3454,7 +3459,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Use defaults
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
@@ -3709,7 +3714,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
@@ -6003,7 +6008,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Use defaults
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'llava'),
+                'model': self.config.get('default_model', DEFAULT_OLLAMA_MODEL),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
@@ -6040,7 +6045,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if options is None:
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
                 'skip_existing': True
@@ -6453,7 +6458,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Determine provider and model from the most recent description that has both
         provider = 'ollama'
-        model = 'llava:latest'
+        model = self.config.get('default_model', DEFAULT_OLLAMA_MODEL)
         for desc in reversed(chat_item.descriptions):
             if desc.provider and desc.model:
                 provider = desc.provider
@@ -6506,7 +6511,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Get original provider and model from the description
         # Default to config values if not stored in description
         original_provider = focused_description.provider or self.config.get('default_provider', 'ollama')
-        original_model = focused_description.model or self.config.get('default_model', 'moondream')
+        original_model = focused_description.model or self.config.get('default_model', 'llama3.2-vision')
 
         # Show dialog with model selection
         from dialogs_wx import FollowupQuestionDialog
@@ -6581,7 +6586,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Process with default settings
         options = {
             'provider': self.config.get('default_provider', 'ollama'),
-            'model': self.config.get('default_model', 'moondream'),
+            'model': self.config.get('default_model', 'llama3.2-vision'),
         }
 
         self.SetStatusText("Generating name with AI...", 0)
@@ -7258,9 +7263,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     msg = (
                         "✓ Ollama is already installed and running!\n\n"
                         "You can pull models using:\n"
-                        "  ollama pull moondream\n"
-                        "  ollama pull llava\n"
-                        "  ollama pull llama3.2-vision\n\n"
+                        "  ollama pull llama3.2-vision  (default, recommended)\n"
+                        "  ollama pull moondream        (lightweight, CPU-friendly)\n"
+                        "  ollama pull llava\n\n"
                         "Or use Process → Refresh AI Models to see what's available."
                     )
                     from shared.wx_common import show_info
@@ -7299,7 +7304,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     from shared.wx_common import show_info
                     show_info(self, "Opening Browser",
                              "Opening ollama.ai download page.\n\n"
-                             "After installing, run: ollama pull moondream")
+                             "After installing, run: ollama pull llama3.2-vision")
                 elif result == wx.ID_NO:
                     # Copy command to clipboard
                     install_cmd = "curl -fsSL https://ollama.ai/install.sh | sh"
@@ -7309,7 +7314,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                                  f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
                                  "1. Open Terminal\n"
                                  "2. Paste (Cmd+V) and press Enter\n"
-                                 "3. After install: ollama pull moondream")
+                                 "3. After install: ollama pull llama3.2-vision")
 
             elif sys.platform == 'win32':
                 # Windows
@@ -7342,7 +7347,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     from shared.wx_common import show_info
                     show_info(self, "Opening Browser",
                              "Opening ollama.ai download page.\n\n"
-                             "After installing, run: ollama pull moondream")
+                             "After installing, run: ollama pull llama3.2-vision")
                 elif result == wx.ID_NO:
                     # Copy command to clipboard
                     install_cmd = "winget install ollama"
@@ -7352,7 +7357,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                                  f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
                                  "1. Open Command Prompt or PowerShell\n"
                                  "2. Paste (Ctrl+V) and press Enter\n"
-                                 "3. After install: ollama pull moondream")
+                                 "3. After install: ollama pull llama3.2-vision")
 
             else:
                 # Linux or other

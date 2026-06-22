@@ -72,13 +72,14 @@ DEV_MODE_HARDCODED_MODELS = False
 
 # Hardcoded model lists based on system query results
 DEV_OLLAMA_MODELS = [
+    "minicpm-v4.6:latest",
+    "llama3.2-vision:latest",
+    "llava-llama3:latest",
+    "llava:latest",
     "bakllava:latest",
-    "mistral-small3.1:latest", 
+    "mistral-small3.1:latest",
     "gemma3:latest",
     "moondream:latest",
-    "llava-llama3:latest",
-    "llama3.2-vision:latest",
-    "llava:latest"
 ]
 
 DEV_OLLAMA_CLOUD_MODELS = [
@@ -1295,10 +1296,10 @@ class OllamaCloudProvider(AIProvider):
         # Cloud models don't support vision yet (as of Sep 2025)
         return f"⚠️ Ollama Cloud model '{model}' doesn't support vision capabilities yet.\n\n" \
                f"💡 Try these local vision models instead:\n" \
+               f"• llama3.2-vision:latest (11B, recommended default)\n" \
                f"• llava:latest (7B parameters)\n" \
                f"• llava-llama3:latest (8B parameters)\n" \
-               f"• bakllava:latest (7B parameters)\n" \
-               f"• moondream:latest (1.8B parameters)\n\n" \
+               f"• moondream:latest (1.8B, lightweight)\n\n" \
                f"Cloud models are excellent for text-only tasks but vision support is coming soon!"
 
 

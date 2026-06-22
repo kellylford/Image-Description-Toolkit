@@ -29,6 +29,10 @@ from pathlib import Path
 from typing import Optional
 
 from .scanner import scan_images, is_image, is_video
+try:
+    from .config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "llama3.2-vision"
 
 BUNDLE_EXT = ".idtw"
 FORMAT_VERSION = "1.0"
@@ -255,7 +259,7 @@ class WorkspaceItem:
 @dataclass
 class WorkspaceDefaults:
     provider: str = "ollama"
-    model: str = "moondream"
+    model: str = DEFAULT_OLLAMA_MODEL
     prompt_name: str = "detailed"
     prompt_text: str = ""
 
@@ -350,7 +354,7 @@ class Workspace:
         defs = data.get("defaults", {})
         ws.defaults = WorkspaceDefaults(
             provider=defs.get("provider", "ollama"),
-            model=defs.get("model", "moondream"),
+            model=defs.get("model", DEFAULT_OLLAMA_MODEL),
             prompt_name=defs.get("prompt_name", "detailed"),
             prompt_text=defs.get("prompt_text", ""),
         )

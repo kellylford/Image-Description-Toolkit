@@ -129,19 +129,21 @@ begin
         begin
           Log('Ollama installed successfully');
           
-          // Pull moondream model after successful Ollama installation
-          Log('Pulling moondream model...');
-          if Exec('cmd.exe', '/c ollama pull moondream', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+          // Pull default model after successful Ollama installation.
+          // DEFAULT MODEL: to change this, update scripts/image_describer_config.json "default_model"
+          // and change the two references to "minicpm-v4.6" below to match.
+          Log('Pulling minicpm-v4.6 model...');
+          if Exec('cmd.exe', '/c ollama pull minicpm-v4.6', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
           begin
             if ResultCode = 0 then
-              Log('Moondream model pulled successfully')
+              Log('minicpm-v4.6 model pulled successfully')
             else
-              Log('Moondream model pull returned code: ' + IntToStr(ResultCode));
+              Log('minicpm-v4.6 model pull returned code: ' + IntToStr(ResultCode));
           end
           else
           begin
             Log('Failed to execute ollama pull command');
-            MsgBox('Ollama installed but failed to pull moondream model. You can pull it manually by running: ollama pull moondream', mbInformation, MB_OK);
+            MsgBox('Ollama installed but failed to pull minicpm-v4.6 model. You can pull it manually by running: ollama pull minicpm-v4.6', mbInformation, MB_OK);
           end;
         end
         else
@@ -187,7 +189,7 @@ end;
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "addtopath"; Description: "Add to PATH (allows running 'idt' from any command prompt)"; GroupDescription: "System Integration:"; Flags: unchecked
-Name: "installollama"; Description: "Install Ollama and moondream model via winget"; GroupDescription: "Dependencies:"; Flags: unchecked; Check: ShouldShowOllamaInstallTask
+Name: "installollama"; Description: "Install Ollama and minicpm-v4.6 model via winget"; GroupDescription: "Dependencies:"; Flags: unchecked; Check: ShouldShowOllamaInstallTask
 
 [Files]
 ; Main I DT CLI executable

@@ -58,6 +58,11 @@ except ImportError:
     # Fallback for direct execution
     from data_models import ImageDescription, ImageItem, ImageWorkspace
 
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = DEFAULT_OLLAMA_MODEL
+
 
 def set_accessible_name(widget, name):
     """Safely set accessible name if supported"""
@@ -620,7 +625,7 @@ class FollowupQuestionDialog(wx.Dialog):
                         self.model_combo.Append(model)
                 else:
                     # Last-resort static fallback when Ollama is unreachable
-                    for model in sorted(["moondream", "llava", "llama3.2-vision"]):
+                    for model in [DEFAULT_OLLAMA_MODEL, "llava", "llama3.2-vision", "moondream"]:
                         self.model_combo.Append(model)
                         
             elif provider == "openai":
@@ -964,13 +969,13 @@ class ProcessingOptionsDialog(wx.Dialog):
                     for model in sorted(models):
                         self.model_combo.Append(model)
                     # Set default if in list
-                    default_model = self.config.get('default_model', 'moondream')
+                    default_model = self.config.get('default_model', 'minicpm-v4.6')
                     if default_model in models:
                         self.model_combo.SetStringSelection(default_model)
                     elif models:
                         self.model_combo.SetSelection(0)
                 else:
-                    self.model_combo.Append("moondream")
+                    self.model_combo.Append(DEFAULT_OLLAMA_MODEL)
                     self.model_combo.SetSelection(0)
             elif provider == "openai":
                 # Load from canonical list - supports both frozen and dev mode
@@ -1015,7 +1020,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                     self.model_combo.SetSelection(0)
         except Exception as e:
             print(f"Error populating models: {e}")
-            default = self.config.get('default_model', 'moondream')
+            default = self.config.get('default_model', 'minicpm-v4.6')
             if default not in [self.model_combo.GetString(i) for i in range(self.model_combo.GetCount())]:
                 self.model_combo.Append(default)
             if default:

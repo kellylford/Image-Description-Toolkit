@@ -1065,7 +1065,10 @@ def guided_workflow(custom_config_path=None):
                 sys.argv = original_argv
                 
         except Exception as e:
+            import traceback
             print(f"\nError running workflow: {e}")
+            print("\nTraceback (for diagnosis):")
+            traceback.print_exc()
             print("\nYou can manually run the command shown above.")
     
     elif action == "Just show the command (don't run)":
@@ -1099,7 +1102,9 @@ def main():
         print("\n\nCancelled by user. Exiting...")
         sys.exit(0)
     except Exception as e:
+        import traceback
         print(f"\nError: {e}")
+        traceback.print_exc()
         sys.exit(1)
 
 

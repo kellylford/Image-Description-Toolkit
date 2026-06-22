@@ -124,26 +124,73 @@ def check_scanner():
 
 
 def check_default_provider():
-    """Verify the out-of-box default is ollama/moondream, not a paid provider."""
+    """Verify the out-of-box default is a free local Ollama model, not a paid provider."""
     print("\n" + "=" * 80)
     print("CHECKING DEFAULT PROVIDER")
     print("=" * 80)
 
+    _PAID_PROVIDERS = {"openai", "anthropic", "claude", "huggingface"}
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        from idt_core.config import UserConfig
+        from idt_core.config import UserConfig, DEFAULT_OLLAMA_MODEL
         cfg = UserConfig()   # no file — pure code defaults
         if cfg.default_provider != "ollama":
             print(f"  FAIL  default_provider is '{cfg.default_provider}', expected 'ollama'")
             print("        This would charge users money on a fresh install.")
             return False
-        if cfg.default_model != "moondream":
-            print(f"  FAIL  default_model is '{cfg.default_model}', expected 'moondream'")
+        if cfg.default_provider in _PAID_PROVIDERS:
+            print(f"  FAIL  default_provider '{cfg.default_provider}' is a paid provider.")
             return False
-        print(f"  OK    defaults: {cfg.default_provider} / {cfg.default_model}")
+        print(f"  OK    defaults: {cfg.default_provider} / {cfg.default_model}  (DEFAULT_OLLAMA_MODEL={DEFAULT_OLLAMA_MODEL})")
         return True
     except Exception as e:
         print(f"  FAIL  Could not check defaults: {e}")
+        return False
+
+
+def check_default_model_sync():
+    """
+    Verify that the installer pull command matches the JSON default_model.
+
+    This is the one manual step when changing the default model: the JSON is
+    the Python source of truth (all code imports DEFAULT_OLLAMA_MODEL from
+    idt_core.config), but installer.iss is a non-Python file that must be
+    updated by hand. This check catches the mismatch at build time.
+
+    TO CHANGE THE DEFAULT MODEL:
+      1. Edit scripts/image_describer_config.json  →  "default_model": "new-model"
+      2. Edit BuildAndRelease/WinBuilds/installer.iss  →  ollama pull new-model
+      That is all. All Python code picks up the change automatically.
+    """
+    print("\n" + "=" * 80)
+    print("CHECKING DEFAULT MODEL SYNC (JSON vs installer)")
+    print("=" * 80)
+
+    root = Path(__file__).parent.parent
+    try:
+        import json as _json
+        cfg_path = root / "scripts" / "image_describer_config.json"
+        json_model = _json.loads(cfg_path.read_text(encoding="utf-8")).get("default_model", "")
+    except Exception as e:
+        print(f"  WARN  Could not read image_describer_config.json: {e}")
+        return None
+
+    try:
+        iss_path = root / "BuildAndRelease" / "WinBuilds" / "installer.iss"
+        iss_text = iss_path.read_text(encoding="utf-8")
+        import re
+        m = re.search(r"ollama pull\s+([\w.:-]+)", iss_text)
+        iss_model = m.group(1) if m else ""
+    except Exception as e:
+        print(f"  WARN  Could not read installer.iss: {e}")
+        return None
+
+    if json_model == iss_model:
+        print(f"  OK    Both set to '{json_model}'")
+        return True
+    else:
+        print(f"  FAIL  JSON default_model='{json_model}'  installer pulls='{iss_model}'")
+        print( "        Edit BuildAndRelease/WinBuilds/installer.iss to match the JSON.")
         return False
 
 
@@ -154,10 +201,11 @@ def main():
     print()
 
     results = [
-        ("Unit tests",        run_unit_tests()),
+        ("Unit tests",           run_unit_tests()),
         ("CLI/idt_core imports", check_new_cli_imports()),
-        ("File scanner",      check_scanner()),
-        ("Default provider",  check_default_provider()),
+        ("File scanner",         check_scanner()),
+        ("Default provider",     check_default_provider()),
+        ("Default model sync",   check_default_model_sync()),
     ]
 
     print("\n" + "=" * 80)
