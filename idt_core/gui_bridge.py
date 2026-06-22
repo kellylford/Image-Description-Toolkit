@@ -145,6 +145,24 @@ def gui_workspace_to_bundle(workspace_dict: dict, dest: Path,
 def _gui_image_item_to_bundle(ws: Workspace, file_path: str, item: dict,
                               copy_images: bool) -> None:
     src = Path(file_path)
+
+    # If the image is already inside this bundle's images/ directory, update the
+    # existing sidecar in-place so we preserve the original source_path and storage
+    # type that the CLI recorded (avoids overwriting provenance on re-save).
+    try:
+        src.relative_to(ws.images_dir)
+        existing = ws.get_item(src.name)
+        if existing is not None:
+            existing.is_missing = item.get("is_missing", False)
+            existing.descriptions = [_gui_desc_to_ws(d) for d in item.get("descriptions", [])]
+            if existing.descriptions:
+                existing.active_description_id = existing.descriptions[-1].id
+            existing.extra.update({k: v for k, v in item.items() if k not in _ITEM_CORE_GUI_KEYS})
+            ws.save_item(existing)
+            return
+    except ValueError:
+        pass  # src is not inside this bundle's images/ dir — proceed normally
+
     is_missing = item.get("is_missing", False) or not src.exists()
 
     if copy_images and src.exists():
