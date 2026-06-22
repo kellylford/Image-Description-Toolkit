@@ -86,6 +86,18 @@ figcaption {
   margin-top: 0.5rem;
 }
 .image-meta span + span::before { content: "  ·  "; }
+.desc-block {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  margin: 1rem 0;
+}
+.desc-block + .desc-block { margin-top: 1.5rem; }
+.desc-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--meta-fg);
+  margin: 0 0 0.35rem;
+}
 footer {
   max-width: var(--max-width);
   margin: 3rem auto 1rem;
@@ -305,7 +317,7 @@ def export_workspace_html(ws, filename: str = "descriptions.html") -> Path:
 
     generated = _format_datetime(datetime.now())
     n = len(items)
-    models_used = sorted({i.active_description.model for i in items if i.active_description})
+    models_used = sorted({d.model for i in items for d in i.descriptions})
 
     lines: list[str] = []
     a = lines.append
@@ -335,24 +347,27 @@ def export_workspace_html(ws, filename: str = "descriptions.html") -> Path:
     a('  <main id="main-content">')
     for i, item in enumerate(items, 1):
         slug = f"img-{i:04d}"
-        desc = item.active_description
-        text = desc.text if desc else "(no description)"
+        active = item.active_description
+        alt_text = active.text if active else "(no description)"
         img_src = f"../images/{item.image}"
+        multi = len(item.descriptions) > 1
         a(f'    <article id="{slug}">')
         a(f"      <h2>{_h(item.display_name)}</h2>")
         a("      <figure>")
-        a(f'        <img src="{_h(img_src)}" alt="{_h(text)}" loading="lazy">')
-        a(f"        <figcaption>{_h(text)}</figcaption>")
+        a(f'        <img src="{_h(img_src)}" alt="{_h(alt_text)}" loading="lazy">')
         a("      </figure>")
-        if desc:
-            tokens_str = f"{desc.output_tokens} tokens" if desc.output_tokens else ""
-            a('      <p class="image-meta">')
-            a(f'        <span>Model: {_h(desc.model)}</span>')
-            a(f'        <span>Prompt: {_h(desc.prompt_name)}</span>')
-            a(f'        <span>Date: {_ws_when(desc)[:10]}</span>')
-            if tokens_str:
-                a(f'        <span>{tokens_str}</span>')
-            a("      </p>")
+        # Show every description in its own labeled block
+        a(f"      <h3>{'Descriptions' if multi else 'Description'}</h3>")
+        for desc in item.descriptions:
+            label = f"{desc.model}  ·  {desc.provider}  ·  {_ws_when(desc)[:10]}"
+            if desc.output_tokens:
+                label += f"  ·  {desc.output_tokens} tokens"
+            a('      <div class="desc-block">')
+            if multi:
+                a(f'        <p class="desc-label">{_h(label)}</p>')
+            text_html = _h(desc.text).replace("\n", "<br>\n")
+            a(f"        <p>{text_html}</p>")
+            a("      </div>")
         a("    </article>")
     a("  </main>")
     a("  <footer>")
@@ -412,18 +427,19 @@ def export_workspace_txt(ws, filename: str = "descriptions.txt") -> Path:
     separator = "-" * 72
     blocks: list[str] = []
     for item in items:
-        desc = item.active_description
-        block_lines = [separator, f"File: {item.display_name}"]
-        if desc:
+        multi = len(item.descriptions) > 1
+        for idx, desc in enumerate(item.descriptions, 1):
+            block_lines = [separator]
+            if multi:
+                block_lines.append(f"(Description {idx} of {len(item.descriptions)})")
+            block_lines.append(f"File: {item.display_name}")
             block_lines += [
                 f"Model: {desc.model}  ({desc.provider})",
                 f"Date: {_ws_when(desc)[:10]}",
                 "",
                 desc.text,
             ]
-        else:
-            block_lines.append("(no description)")
-        blocks.append("\n".join(block_lines))
+            blocks.append("\n".join(block_lines))
     out_path.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
     return out_path
 
