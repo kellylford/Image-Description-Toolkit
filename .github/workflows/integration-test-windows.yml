@@ -358,7 +358,7 @@ jobs:
     # 12. Upload artifacts (always -- so you get outputs even on failure)  #
     # ------------------------------------------------------------------ #
     - name: Upload idt executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: idt-windows
@@ -366,7 +366,7 @@ jobs:
         retention-days: 14
 
     - name: Upload ImageDescriber executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: imagedescriber-windows
@@ -374,7 +374,7 @@ jobs:
         retention-days: 14
 
     - name: Upload workflow output (moondream descriptions)
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: workflow-output
@@ -383,7 +383,7 @@ jobs:
         if-no-files-found: warn
 
     - name: Upload extracted video frames
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: video-frames-output
