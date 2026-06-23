@@ -32,7 +32,7 @@ openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token trackin
 anthropic>=0.109.2      # Anthropic Claude official SDK (retry logic, token tracking, streaming)
 
 # Web Image Download Support (scripts/web_image_downloader.py)
-beautifulsoup4>=4.9.0   # HTML parsing for web image extraction
+beautifulsoup4>=4.15.0   # HTML parsing for web image extraction
 
 # ----------------------------------------------------------------------------
 # VIDEO PROCESSING (scripts/video_frame_extractor.py only)
