@@ -84,6 +84,11 @@ except ImportError as e:
     CLAUDE_MODEL_METADATA = {}
     print(f"Warning: AI providers not available: {e}")
 
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
+
 
 class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
     """Dialog for editing image description prompts"""
@@ -97,10 +102,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         # Windows) so it could create a shadow copy next to the exe that would
         # then shadow the user's real config.  config_loader.load_json_config()
         # uses the authoritative resolution order and is consistent with the CLI.
-        try:
-            from config_loader import load_json_config, get_user_config_dir
-        except ImportError:
-            from scripts.config_loader import load_json_config, get_user_config_dir
+        from idt_core.config_loader import load_json_config, get_user_config_dir
         _cfg, _cfg_path, _cfg_source = load_json_config('image_describer_config.json')
         # If config was loaded from the read-only bundled location (_MEIPASS),
         # redirect writes to the user config dir so edits persist correctly.
@@ -356,7 +358,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 "technical": "Provide a technical analysis of this image including photographic technique, lighting, and image quality."
             },
             "model_settings": {
-                "model": "moondream",
+                "model": DEFAULT_OLLAMA_MODEL,
                 "temperature": 0.1,
                 "num_predict": 600,
                 "top_k": 40,

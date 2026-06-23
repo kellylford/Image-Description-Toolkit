@@ -24,9 +24,6 @@ from pathlib import Path
 from datetime import datetime
 import pytest
 
-# Add scripts to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
-
 from PIL import Image
 import piexif
 
@@ -76,8 +73,8 @@ class TestWorkflowIntegration:
     @pytest.mark.slow
     def test_conversion_preserves_metadata_end_to_end(self, temp_workflow_dir):
         """Test that conversion preserves EXIF through the whole pipeline"""
-        from ConvertImage import convert_heic_to_jpg
-        from metadata_extractor import MetadataExtractor
+        from idt_core.converter import convert_heic_to_jpg
+        from idt_core.metadata import MetadataExtractor
         
         # Create source image with metadata
         source_path = temp_workflow_dir / "source.jpg"
@@ -116,7 +113,7 @@ class TestWorkflowIntegration:
     @pytest.mark.slow
     def test_description_file_includes_metadata(self, temp_workflow_dir):
         """Test that description file includes all metadata fields"""
-        from ConvertImage import convert_heic_to_jpg
+        from idt_core.converter import convert_heic_to_jpg
         from image_describer import ImageDescriber
         
         # Create and convert image
@@ -148,7 +145,7 @@ class TestWorkflowIntegration:
         output_file = temp_workflow_dir / "descriptions" / "test.txt"
         
         # Manually write a description with metadata
-        from metadata_extractor import MetadataExtractor
+        from idt_core.metadata import MetadataExtractor
         extractor = MetadataExtractor()
         metadata = extractor.extract_metadata(converted_path)
         
@@ -219,7 +216,7 @@ class TestVideoFrameSourceTracking:
     def test_video_frame_has_source_in_exif(self):
         """Test that extracted video frames have source path in EXIF"""
         # This would test the exif_embedder.py functionality
-        from exif_embedder import ExifEmbedder
+        from idt_core.video import ExifEmbedder
         
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)

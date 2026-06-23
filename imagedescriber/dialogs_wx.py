@@ -38,15 +38,10 @@ from shared.wx_common import (
     save_file_dialog,
 )
 
-# Import config loader for prompt loading
 try:
-    from scripts.config_loader import load_json_config
+    from idt_core.config_loader import load_json_config
 except ImportError:
-    try:
-        from config_loader import load_json_config
-    except ImportError:
-        load_json_config = None
-        logging.error("Failed to import load_json_config from both scripts.config_loader and config_loader")
+    load_json_config = None
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -57,6 +52,11 @@ try:
 except ImportError:
     # Fallback for direct execution
     from data_models import ImageDescription, ImageItem, ImageWorkspace
+
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = DEFAULT_OLLAMA_MODEL
 
 
 def set_accessible_name(widget, name):
@@ -298,6 +298,15 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
 
     if provider == "mlx":
         _mlx_descriptions = {
+            "mlx-community/Qwen3-VL-4B-Instruct-4bit":
+                "★ Recommended · Alibaba Qwen3-VL · 4 B params · ~3.1 GB download\n"
+                "Current best quality/speed balance for on-device captioning (2026). "
+                "Upgraded visual perception, OCR and spatial reasoning over Qwen2.5-VL. "
+                "Runs comfortably on 16 GB Apple Silicon. Best default for most users.",
+            "mlx-community/Qwen3-VL-8B-Instruct-4bit":
+                "Alibaba Qwen3-VL · 8 B params · ~5.8 GB download\n"
+                "Higher quality than the 4B with richer, more accurate descriptions. "
+                "16 GB+ Apple Silicon recommended. Choose when quality matters more than speed.",
             "mlx-community/Qwen2-VL-2B-Instruct-4bit":
                 "Alibaba Qwen2-VL · 2 B params · ~1.5 GB download\n"
                 "Fastest Qwen option (~35 tok/s on M-series). Solid all-round descriptions "
@@ -351,13 +360,7 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
         return f"{model_id} — Local AI model running via Ollama. No API key or cloud cost."
 
     if provider == "openai":
-        try:
-            from models.openai_models import OPENAI_MODEL_METADATA
-        except ImportError:
-            try:
-                from openai_models import OPENAI_MODEL_METADATA
-            except ImportError:
-                return ""
+        from idt_core.providers.openai_provider import OPENAI_MODEL_METADATA
         meta = OPENAI_MODEL_METADATA.get(model_id)
         if not meta:
             return f"{model_id} — OpenAI model. See openai.com/api/pricing for cost details."
@@ -377,13 +380,7 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
         return line
 
     if provider == "claude":
-        try:
-            from models.claude_models import CLAUDE_MODEL_METADATA
-        except ImportError:
-            try:
-                from claude_models import CLAUDE_MODEL_METADATA
-            except ImportError:
-                return ""
+        from idt_core.providers.claude import CLAUDE_MODEL_METADATA
         meta = CLAUDE_MODEL_METADATA.get(model_id, {})
         if not meta:
             return f"{model_id} — Anthropic Claude model. See anthropic.com/pricing for costs."
@@ -611,7 +608,7 @@ class FollowupQuestionDialog(wx.Dialog):
                         self.model_combo.Append(model)
                 else:
                     # Last-resort static fallback when Ollama is unreachable
-                    for model in sorted(["moondream", "llava", "llama3.2-vision"]):
+                    for model in [DEFAULT_OLLAMA_MODEL, "llava", "llama3.2-vision", "moondream"]:
                         self.model_combo.Append(model)
                         
             elif provider == "openai":
@@ -763,9 +760,33 @@ class ProcessingOptionsDialog(wx.Dialog):
         self.skip_existing_cb.SetValue(self.config.get('skip_existing', False))
         set_accessible_name(self.skip_existing_cb, "Skip images that already have descriptions")
         batch_sizer.Add(self.skip_existing_cb, 0, wx.ALL, 5)
-        
+
         sizer.Add(batch_sizer, 0, wx.ALL | wx.EXPAND, 10)
-        
+
+        # Context enrichment
+        context_box = wx.StaticBox(panel, label="Context Enrichment")
+        context_sizer = wx.StaticBoxSizer(context_box, wx.VERTICAL)
+
+        self.geocode_cb = wx.CheckBox(
+            panel,
+            label="&Geocode GPS coordinates to city/state (requires internet)",
+            name="Geocode GPS coordinates to city/state"
+        )
+        self.geocode_cb.SetValue(self.config.get('geocode_enabled', False))
+        self.geocode_cb.SetToolTip(
+            "When an image has GPS coordinates, look up the city and state via OpenStreetMap "
+            "and include them in the AI prompt context. Results are cached locally."
+        )
+        context_sizer.Add(self.geocode_cb, 0, wx.ALL, 5)
+
+        context_note = wx.StaticText(
+            panel,
+            label="Date and camera are always included when available — no internet needed."
+        )
+        context_sizer.Add(context_note, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        sizer.Add(context_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
         panel.SetSizer(sizer)
         return panel
     
@@ -931,13 +952,13 @@ class ProcessingOptionsDialog(wx.Dialog):
                     for model in sorted(models):
                         self.model_combo.Append(model)
                     # Set default if in list
-                    default_model = self.config.get('default_model', 'moondream')
+                    default_model = self.config.get('default_model', 'minicpm-v4.6')
                     if default_model in models:
                         self.model_combo.SetStringSelection(default_model)
                     elif models:
                         self.model_combo.SetSelection(0)
                 else:
-                    self.model_combo.Append("moondream")
+                    self.model_combo.Append(DEFAULT_OLLAMA_MODEL)
                     self.model_combo.SetSelection(0)
             elif provider == "openai":
                 # Load from canonical list - supports both frozen and dev mode
@@ -967,10 +988,11 @@ class ProcessingOptionsDialog(wx.Dialog):
                     except ImportError:
                         _MLXProvider = None
                 mlx_models = _MLXProvider.KNOWN_MODELS if _MLXProvider else [
+                    "mlx-community/Qwen3-VL-4B-Instruct-4bit",
+                    "mlx-community/Qwen3-VL-8B-Instruct-4bit",
                     "mlx-community/Qwen2-VL-2B-Instruct-4bit",
                     "mlx-community/Qwen2.5-VL-3B-Instruct-4bit",
                     "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
-                    "mlx-community/llava-1.5-7b-4bit",
                 ]
                 default_mlx = self.config.get('default_model', mlx_models[0])
                 for model in mlx_models:
@@ -981,7 +1003,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                     self.model_combo.SetSelection(0)
         except Exception as e:
             print(f"Error populating models: {e}")
-            default = self.config.get('default_model', 'moondream')
+            default = self.config.get('default_model', 'minicpm-v4.6')
             if default not in [self.model_combo.GetString(i) for i in range(self.model_combo.GetCount())]:
                 self.model_combo.Append(default)
             if default:
@@ -1060,6 +1082,7 @@ class ProcessingOptionsDialog(wx.Dialog):
             model = self.model_combo.GetStringSelection()
         return {
             'skip_existing': self.skip_existing_cb.GetValue(),
+            'geocode_enabled': self.geocode_cb.GetValue(),
             'provider': self.provider_choice.GetStringSelection().lower(),
             'model': model,
             'prompt_style': self.prompt_choice.GetStringSelection(),
@@ -1732,3 +1755,172 @@ class RescanFolderDialog(wx.Dialog):
     def _on_apply(self, event):
         self.handle_missing = "remove" if self._remove_rb.GetValue() else "keep"
         self.EndModal(wx.ID_OK)
+
+
+class EmbedDescriptionsDialog(wx.Dialog):
+    """Dialog for embedding AI descriptions into image file metadata.
+
+    Presents two modes:
+      - Copy mode (default): creates copies of images in an output folder with
+        descriptions embedded. Originals are never modified.
+      - In-place mode: embeds directly into the original image files.
+        Requires an explicit confirmation checkbox.
+    """
+
+    def __init__(self, parent, image_count: int,
+                 default_output_dir: Optional[Path] = None):
+        super().__init__(
+            parent,
+            title='Embed Descriptions into Images',
+            style=wx.DEFAULT_DIALOG_STYLE,
+        )
+        self._image_count = image_count
+        self._default_output_dir = default_output_dir
+        self._output_dir: Optional[Path] = None
+        self._init_ui()
+        self.SetSize((520, -1))
+        self.Fit()
+        self.Centre()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _init_ui(self):
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        intro = wx.StaticText(
+            self,
+            label=f"Embed AI descriptions as metadata in {self._image_count} image(s).\n"
+                  "The description text will be stored in the image file so it travels\n"
+                  "with the image when copied, shared, or posted.\n\n"
+                  "Supported formats: JPEG, TIFF, PNG, WebP",
+        )
+        main_sizer.Add(intro, 0, wx.ALL, 12)
+
+        # ---- Mode selection ----
+        mode_box = wx.StaticBox(self, label='Write Mode')
+        mode_sizer = wx.StaticBoxSizer(mode_box, wx.VERTICAL)
+
+        self._copy_rb = wx.RadioButton(
+            self, label='&Create copies with descriptions embedded (recommended)',
+            style=wx.RB_GROUP, name='Copy mode'
+        )
+        self._copy_rb.SetValue(True)
+        mode_sizer.Add(self._copy_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
+
+        copy_note = wx.StaticText(
+            self,
+            label="   Copies are saved to an output folder. Your original files\n"
+                  "   are not modified.",
+        )
+        mode_sizer.Add(copy_note, 0, wx.LEFT | wx.BOTTOM, 8)
+
+        self._inplace_rb = wx.RadioButton(
+            self, label='&Embed into original files', name='In-place mode'
+        )
+        mode_sizer.Add(self._inplace_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
+
+        self._confirm_check = wx.CheckBox(
+            self,
+            label='I understand this modifies my original image files',
+            name='Confirm in-place modification'
+        )
+        self._confirm_check.Enable(False)
+        mode_sizer.Add(self._confirm_check, 0, wx.LEFT | wx.BOTTOM, 24)
+
+        main_sizer.Add(mode_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
+        # ---- Output folder (copy mode only) ----
+        self._out_box = wx.StaticBox(self, label='Output Folder')
+        out_sizer = wx.StaticBoxSizer(self._out_box, wx.VERTICAL)
+
+        default_out = str(
+            self._default_output_dir
+            if self._default_output_dir
+            else Path.home() / 'Pictures' / 'IDT_Embedded'
+        )
+        path_row = wx.BoxSizer(wx.HORIZONTAL)
+        self._path_ctrl = wx.TextCtrl(self, value=default_out, name='Output folder path')
+        set_accessible_name(self._path_ctrl, 'Output folder path')
+        path_row.Add(self._path_ctrl, 1, wx.EXPAND | wx.RIGHT, 6)
+
+        self._browse_btn = wx.Button(self, label='&Browse...')
+        set_accessible_name(self._browse_btn, 'Browse for output folder')
+        self._browse_btn.Bind(wx.EVT_BUTTON, self._on_browse)
+        path_row.Add(self._browse_btn, 0)
+
+        out_sizer.Add(path_row, 0, wx.ALL | wx.EXPAND, 6)
+        main_sizer.Add(out_sizer, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
+
+        # ---- Buttons ----
+        btn_sizer = wx.StdDialogButtonSizer()
+        self._ok_btn = wx.Button(self, wx.ID_OK, label='&Embed')
+        self._ok_btn.SetDefault()
+        btn_sizer.AddButton(self._ok_btn)
+        cancel_btn = wx.Button(self, wx.ID_CANCEL)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+        main_sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 10)
+
+        self.SetSizer(main_sizer)
+
+        # Bindings
+        self._copy_rb.Bind(wx.EVT_RADIOBUTTON, self._on_mode_change)
+        self._inplace_rb.Bind(wx.EVT_RADIOBUTTON, self._on_mode_change)
+        self._confirm_check.Bind(wx.EVT_CHECKBOX, self._on_confirm_change)
+        self._ok_btn.Bind(wx.EVT_BUTTON, self._on_ok)
+
+    # ------------------------------------------------------------------
+    # Event handlers
+    # ------------------------------------------------------------------
+
+    def _on_mode_change(self, event):
+        in_place = self._inplace_rb.GetValue()
+        self._confirm_check.Enable(in_place)
+        self._path_ctrl.Enable(not in_place)
+        self._browse_btn.Enable(not in_place)
+        if in_place:
+            self._confirm_check.SetValue(False)
+            self._ok_btn.Enable(False)
+        else:
+            self._ok_btn.Enable(True)
+
+    def _on_confirm_change(self, event):
+        if self._inplace_rb.GetValue():
+            self._ok_btn.Enable(self._confirm_check.GetValue())
+
+    def _on_browse(self, event):
+        dlg = wx.DirDialog(
+            self, 'Choose output folder for embedded image copies',
+            defaultPath=self._path_ctrl.GetValue(),
+            style=wx.DD_DEFAULT_STYLE | wx.DD_NEW_DIR_BUTTON
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            self._path_ctrl.SetValue(dlg.GetPath())
+        dlg.Destroy()
+
+    def _on_ok(self, event):
+        if self._copy_rb.GetValue():
+            path_str = self._path_ctrl.GetValue().strip()
+            if not path_str:
+                wx.MessageBox(
+                    "Please enter an output folder path.",
+                    "Output folder required",
+                    wx.OK | wx.ICON_WARNING, self
+                )
+                return
+            self._output_dir = Path(path_str)
+        self.EndModal(wx.ID_OK)
+
+    # ------------------------------------------------------------------
+    # Result accessors
+    # ------------------------------------------------------------------
+
+    def get_mode(self) -> str:
+        """Return 'copy' or 'inplace'."""
+        return 'inplace' if self._inplace_rb.GetValue() else 'copy'
+
+    def get_output_dir(self) -> Optional[Path]:
+        """Return the chosen output directory (copy mode only, else None)."""
+        return self._output_dir

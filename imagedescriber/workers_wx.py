@@ -36,20 +36,20 @@ else:
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-# Import config_loader for frozen mode compatibility
 try:
-    from config_loader import load_json_config
+    from idt_core.config_loader import load_json_config
 except ImportError:
     load_json_config = None
 
-# Import web image downloader for URL downloads
 try:
-    from web_image_downloader import WebImageDownloader
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
 except ImportError:
-    try:
-        from scripts.web_image_downloader import WebImageDownloader
-    except ImportError:
-        WebImageDownloader = None
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
+
+try:
+    from idt_core.downloader import WebImageDownloader
+except ImportError:
+    WebImageDownloader = None
 
 # Import AI providers
 try:
@@ -61,29 +61,20 @@ except ImportError:
         get_available_providers = None
         get_all_providers = None
 
-# Import metadata extractor and geocoder
-MetadataExtractor = None
-NominatimGeocoder = None
 try:
-    from metadata_extractor import MetadataExtractor, NominatimGeocoder
+    from idt_core.metadata import MetadataExtractor, NominatimGeocoder
 except ImportError:
-    try:
-        from scripts.metadata_extractor import MetadataExtractor, NominatimGeocoder
-    except ImportError:
-        pass
+    MetadataExtractor = None
+    NominatimGeocoder = None
 
-# Import video metadata extractor and EXIF embedder (GPS embedding into extracted frames)
-VideoMetadataExtractor = None
-ExifEmbedder = None
+_IDTCoreMetadataExtractor = MetadataExtractor
+_IDTCoreNominatimGeocoder = NominatimGeocoder
+
 try:
-    from video_metadata_extractor import VideoMetadataExtractor
-    from exif_embedder import ExifEmbedder
+    from idt_core.video import VideoMetadataExtractor, ExifEmbedder
 except ImportError:
-    try:
-        from scripts.video_metadata_extractor import VideoMetadataExtractor
-        from scripts.exif_embedder import ExifEmbedder
-    except ImportError:
-        pass
+    VideoMetadataExtractor = None
+    ExifEmbedder = None
 
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
@@ -206,13 +197,14 @@ class ProcessingWorker(threading.Thread):
         ProcessingFailedEvent: Error during processing
     """
     
-    def __init__(self, parent_window, file_path: str, provider: str, model: str, 
-                 prompt_style: str, custom_prompt: str = "", 
-                 detection_settings: dict = None, 
+    def __init__(self, parent_window, file_path: str, provider: str, model: str,
+                 prompt_style: str, custom_prompt: str = "",
+                 detection_settings: dict = None,
                  prompt_config_path: Optional[str] = None,
-                 api_key: Optional[str] = None):
+                 api_key: Optional[str] = None,
+                 geocode: bool = False):
         """Initialize worker
-        
+
         Args:
             parent_window: wxWindow to receive events
             file_path: Path to image file
@@ -223,6 +215,7 @@ class ProcessingWorker(threading.Thread):
             detection_settings: Optional settings for object detection models
             prompt_config_path: Optional path to prompt config file
             api_key: Optional API key for cloud providers
+            geocode: Whether to reverse-geocode GPS coordinates (requires internet)
         """
         super().__init__(daemon=True)
         self.parent_window = parent_window
@@ -233,6 +226,7 @@ class ProcessingWorker(threading.Thread):
         self.custom_prompt = custom_prompt
         self.detection_settings = detection_settings or {}
         self.api_key = api_key
+        self.geocode = geocode
         
         try:
             self._prompt_config_path = Path(prompt_config_path) if prompt_config_path else None
@@ -261,14 +255,22 @@ class ProcessingWorker(threading.Thread):
             
             # Emit progress
             self._post_progress(f"Processing with {self.provider} {self.model}...")
-            
+
             # Extract metadata from image
             metadata = self._extract_metadata(self.file_path)
-            
+
+            # Inject EXIF context into the prompt before the AI call so the model
+            # knows when/where/with-what the photo was taken.  Uses idt_core's
+            # MetadataExtractor which returns a clean ImageMetadata with
+            # prompt_context() → "Munich, Germany  Sep 12, 2025  iPhone 14 Pro".
+            # Falls back gracefully when idt_core is unavailable (frozen builds
+            # that haven't been updated yet).
+            prompt_text, exif_context_str = self._inject_exif_context(prompt_text)
+
             # Track processing time
             import time
             start_time = time.time()
-            
+
             # Process the image with selected provider (passing API key)
             # Returns tuple: (description, provider_instance)
             description, provider_obj = self._process_with_ai(self.file_path, prompt_text, api_key=self.api_key)
@@ -276,6 +278,8 @@ class ProcessingWorker(threading.Thread):
             # Calculate processing duration
             processing_duration = time.time() - start_time
             metadata['processing_time_seconds'] = round(processing_duration, 2)
+            if exif_context_str:
+                metadata['prompt_context'] = exif_context_str
             
             # Extract diagnostic info from provider (for debugging empty responses - Issue #91)
             if hasattr(provider_obj, 'last_usage') and provider_obj.last_usage:
@@ -808,6 +812,52 @@ class ProcessingWorker(threading.Thread):
                 ProcessingWorker._geocoder_instance = None
         
         return ProcessingWorker._geocoder_instance
+
+    # Class-level idt_core metadata extractor and geocoder (shared across images for perf)
+    _idt_extractor = None
+    _idt_geocoder = None
+    _idt_geocoder_init = False  # True once we've tried to init (avoids retrying on every image)
+
+    def _inject_exif_context(self, prompt_text: str) -> tuple:
+        """
+        Prepend EXIF context to the prompt so the AI knows when/where/with-what
+        the photo was taken.
+
+        Returns (enriched_prompt, context_str) where context_str is the short
+        context line that was injected ("Munich, Germany  Sep 12, 2025  iPhone 14 Pro"),
+        or ("", "") if extraction failed or idt_core is unavailable.  Never raises.
+        """
+        if not _IDTCoreMetadataExtractor:
+            return prompt_text, ""
+
+        try:
+            # Lazy-init extractor (cheap — no I/O)
+            if ProcessingWorker._idt_extractor is None:
+                ProcessingWorker._idt_extractor = _IDTCoreMetadataExtractor()
+
+            meta = ProcessingWorker._idt_extractor.extract(Path(self.file_path))
+
+            # Lazy-init geocoder only when this batch has geocoding enabled
+            if self.geocode and _IDTCoreNominatimGeocoder and not ProcessingWorker._idt_geocoder_init:
+                ProcessingWorker._idt_geocoder_init = True
+                try:
+                    cache = Path.home() / ".idt" / "geocode_cache.json"
+                    ProcessingWorker._idt_geocoder = _IDTCoreNominatimGeocoder(cache_path=cache)
+                except Exception:
+                    ProcessingWorker._idt_geocoder = None
+
+            if self.geocode and ProcessingWorker._idt_geocoder and (meta.latitude is not None):
+                meta = ProcessingWorker._idt_geocoder.enrich(meta)
+
+            ctx = meta.prompt_context()
+            if ctx:
+                logging.info(f"EXIF context injected into prompt: {ctx}")
+                return f"Context: {ctx}\n\n{prompt_text}", ctx
+
+        except Exception as exc:
+            logging.warning(f"EXIF context injection failed for {self.file_path}: {exc}")
+
+        return prompt_text, ""
 
 
 class WorkflowProcessWorker(threading.Thread):
@@ -1599,9 +1649,11 @@ class BatchProcessingWorker(threading.Thread):
                  detection_settings: dict = None,
                  prompt_config_path: Optional[str] = None,
                  skip_existing: bool = False,
-                 progress_offset: int = 0):
+                 progress_offset: int = 0,
+                 geocode: bool = False,
+                 logs_dir: Optional[Path] = None):
         """Initialize batch worker
-        
+
         Args:
             parent_window: wxWindow to receive events
             file_paths: List of image file paths to process
@@ -1613,6 +1665,7 @@ class BatchProcessingWorker(threading.Thread):
             prompt_config_path: Optional path to prompt config file
             skip_existing: Skip images that already have descriptions
             progress_offset: Offset to add to progress counter (for continuing after video extraction)
+            geocode: Whether to reverse-geocode GPS coordinates (requires internet)
         """
         super().__init__(daemon=True)
         self.parent_window = parent_window
@@ -1625,7 +1678,9 @@ class BatchProcessingWorker(threading.Thread):
         self.prompt_config_path = prompt_config_path
         self.skip_existing = skip_existing
         self.progress_offset = progress_offset
-        
+        self.geocode = geocode
+        self.logs_dir = logs_dir
+
         # Phase 2: Pause/Resume/Stop controls using threading.Event
         self._stop_event = threading.Event()  # Set = stopped
         self._pause_event = threading.Event()  # Set = running, cleared = paused
@@ -1633,10 +1688,24 @@ class BatchProcessingWorker(threading.Thread):
     
     def run(self):
         """Process all images sequentially"""
+        run_log = None
+        if self.logs_dir:
+            try:
+                from idt_core.logger import open_run_log
+                run_log = open_run_log(self.logs_dir, label="run")
+            except Exception as _le:
+                logger.warning(f"Could not open workspace run log: {_le}")
+
         try:
             total = len(self.file_paths)
             completed = 0
             failed = 0
+
+            if run_log:
+                run_log.info(
+                    f"GUI batch run — provider={self.provider}  model={self.model}"
+                    f"  prompt={self.prompt_style}  images={total}"
+                )
 
             # For MLX: post a "loading" status event immediately so the progress
             # dialog doesn't look frozen during model load / first-time download.
@@ -1652,15 +1721,19 @@ class BatchProcessingWorker(threading.Thread):
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():
+                    if run_log:
+                        run_log.info(f"run stopped by user after {completed} images")
                     break
-                
+
                 # Phase 2: Wait if paused (blocks here until resume)
                 self._pause_event.wait()
-                
+
                 # Phase 2: Double-check stop after unpause
                 if self._stop_event.is_set():
+                    if run_log:
+                        run_log.info(f"run stopped by user after {completed} images")
                     break
-                
+
                 # Post progress with current/total counts (add offset for continuing from video extraction)
                 current_progress = i + self.progress_offset
                 total_progress = total + self.progress_offset
@@ -1671,7 +1744,10 @@ class BatchProcessingWorker(threading.Thread):
                     total=total_progress
                 )
                 wx.PostEvent(self.parent_window, evt)
-                
+
+                if run_log:
+                    run_log.info(f"{i}/{total}  {Path(file_path).name}: processing")
+
                 # Create worker for this image
                 worker = ProcessingWorker(
                     self.parent_window,
@@ -1681,23 +1757,27 @@ class BatchProcessingWorker(threading.Thread):
                     self.prompt_style,
                     self.custom_prompt,
                     self.detection_settings,
-                    self.prompt_config_path
+                    self.prompt_config_path,
+                    geocode=self.geocode,
                 )
-                
+
                 # Run synchronously and wait
                 worker.start()
                 worker.join()  # Wait for completion
-                
+
                 # Track completion (events are posted by ProcessingWorker)
                 completed += 1
-            
+
+            if run_log:
+                run_log.info(f"done  completed={completed}  total={total}")
+
             # Post final completion
             evt = WorkflowCompleteEventData(
                 input_dir=f"{completed}/{total} images",
                 output_dir=""
             )
             wx.PostEvent(self.parent_window, evt)
-            
+
         except Exception as e:
             # Comprehensive error logging for debugging frozen executables
             error_msg = f"FATAL ERROR in BatchProcessingWorker: {type(e).__name__}: {e}"
@@ -1725,10 +1805,20 @@ class BatchProcessingWorker(threading.Thread):
             except Exception as log_error:
                 logger.error(f"Failed to write crash log: {log_error}")
             
+            if run_log:
+                run_log.error(f"batch aborted: {error_msg}")
+
             # Post failure event
             evt = WorkflowFailedEventData(error=f"Batch processing failed: {str(e)}")
             wx.PostEvent(self.parent_window, evt)
-    
+        finally:
+            if run_log:
+                try:
+                    from idt_core.logger import close_run_log
+                    close_run_log(run_log)
+                except Exception:
+                    pass
+
     def pause(self):
         """Pause batch processing after current image completes"""
         self._pause_event.clear()
@@ -2036,11 +2126,6 @@ class VideoProcessingWorker(threading.Thread):
 
         # Try to use enhanced scene detector
         try:
-            # Add scripts path for import
-            scripts_path = _project_root / 'scripts'
-            if str(scripts_path) not in sys.path:
-                sys.path.insert(0, str(scripts_path))
-            
             from enhanced_scene_detector import EnhancedSceneDetector
             
             self._post_progress("Using enhanced scene detection...")
@@ -2216,9 +2301,7 @@ class HEICConversionWorker(threading.Thread):
     def run(self):
         """Convert HEIC files to JPEG"""
         try:
-            # Import conversion function from scripts
-            sys.path.insert(0, str(_project_root / 'scripts'))
-            from ConvertImage import convert_heic_to_jpg
+            from idt_core.converter import convert_heic_to_jpg
             
             converted = []
             failed = []
@@ -2633,17 +2716,12 @@ class VideoDescriptionWorker(threading.Thread):
     def run(self):
         """Process video in background thread"""
         try:
-            # Use module-level _project_root which handles both frozen and dev mode
-            scripts_path = _project_root / "scripts"
-            if str(scripts_path) not in sys.path:
-                sys.path.insert(0, str(scripts_path))
-
             from video_describer import VideoDescriber
 
             # Create describer with options
             config = {
                 "provider": self.options.get('provider', 'ollama'),
-                "model": self.options.get('model', 'llava'),
+                "model": self.options.get('model', DEFAULT_OLLAMA_MODEL),
                 "prompt_style": self.options.get('prompt_style', 'video_description'),
                 "custom_prompt": self.options.get('custom_prompt', ''),
                 "num_frames": 5,

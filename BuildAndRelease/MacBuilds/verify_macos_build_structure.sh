@@ -68,7 +68,7 @@ echo ""
 
 echo "Checking source files..."
 echo "------------------------"
-check_file "idt/idt_cli.py"
+check_file "cli/main.py"
 check_file "imagedescriber/imagedescriber_wx.py"
 echo ""
 

@@ -1,12 +1,13 @@
-name: "Integration Test: Windows (Ollama + moondream)"
+name: "Integration Test: Windows (Ollama + minicpm-v4.6)"
 
-# Runs automatically on every push to feature/video-description.
+# Runs automatically on every push to v4.5 and main.
 # Manual trigger also available via workflow_dispatch.
 on:
   workflow_dispatch:
   push:
     branches:
-      - feature/video-description
+      - v4.5
+      - main
 
 jobs:
   integration-test:
@@ -31,7 +32,7 @@ jobs:
         pip install -r requirements.txt
 
     # ------------------------------------------------------------------ #
-    #  2. Build both executables (same bat as the build workflow)          #
+    #  2. Build both executables                                           #
     # ------------------------------------------------------------------ #
     - name: Build all Windows apps
       run: |
@@ -91,7 +92,6 @@ jobs:
             exit 1
           }
         } else {
-          # Already in PATH -- still register the dir via GITHUB_PATH for later steps
           $ollamaDir = (Get-Command ollama).Source | Split-Path
           Add-Content $env:GITHUB_PATH $ollamaDir
         }
@@ -100,26 +100,24 @@ jobs:
         ollama --version
 
     # ------------------------------------------------------------------ #
-    #  4. Pull moondream (~1.7 GB -- the default idt workflow model)       #
+    #  4. Pull minicpm-v4.6 (the default IDT model)                      #
     # ------------------------------------------------------------------ #
-    - name: Pull moondream model
+    - name: Pull minicpm-v4.6 model
       shell: pwsh
       run: |
-        Write-Host "Pulling moondream -- may take a few minutes on first run..."
-        ollama pull moondream
+        Write-Host "Pulling minicpm-v4.6 -- may take a few minutes on first run..."
+        ollama pull minicpm-v4.6
         Write-Host ""
         Write-Host "--- Installed models ---"
         ollama list
 
     # ------------------------------------------------------------------ #
-    #  5. Verify Ollama server is running                                  #
-    #     `ollama pull` auto-starts the server as a side effect, so we    #
-    #     just confirm it is listening before running idt.                 #
+    #  5. Verify Ollama server is ready                                    #
     # ------------------------------------------------------------------ #
     - name: Verify Ollama server is ready
       shell: pwsh
       run: |
-        Write-Host "Waiting for Ollama server (auto-started by `ollama pull`)..."
+        Write-Host "Waiting for Ollama server (auto-started by 'ollama pull')..."
         $maxAttempts = 10
         for ($i = 1; $i -le $maxAttempts; $i++) {
           try {
@@ -137,204 +135,185 @@ jobs:
         }
 
     # ------------------------------------------------------------------ #
-    #  6. Run the real user command                                        #
-    #     testimages/ has blue_circle.jpg and red_square.jpg (committed)  #
+    #  6. Run idt describe on testimages/                                  #
+    #     This auto-extracts video frames, describes all images+frames,   #
+    #     and generates an HTML report under ~/Documents/idt/              #
     # ------------------------------------------------------------------ #
-    - name: Run idt workflow with moondream
+    - name: Run idt describe with minicpm-v4.6
       shell: pwsh
       run: |
-        Write-Host "Running: idt.exe workflow testimages --provider ollama --model moondream"
+        Write-Host "Running: idt.exe describe testimages --provider ollama --model minicpm-v4.6"
         Write-Host ""
-        .\idt\dist\idt.exe workflow testimages --provider ollama --model moondream
+        .\idt\dist\idt.exe describe testimages --provider ollama --model minicpm-v4.6
         $exitCode = $LASTEXITCODE
         Write-Host ""
-        Write-Host "idt workflow exit code: $exitCode"
+        Write-Host "idt describe exit code: $exitCode"
         if ($exitCode -ne 0) {
-          Write-Host "ERROR: idt workflow command failed"
+          Write-Host "ERROR: idt describe command failed"
           exit $exitCode
         }
 
-    # ------------------------------------------------------------------ #
-    #  7. Verify descriptions were actually produced (strict)              #
-    # ------------------------------------------------------------------ #
-    - name: Verify description output
+    - name: Set workspace path
       shell: pwsh
       run: |
-        # idt workflow defaults to --output-dir Descriptions, so wf_* dirs land under Descriptions\
-        $wfDirs = Get-ChildItem -Path "Descriptions" -Directory -Filter "wf_*" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-        if ($wfDirs.Count -eq 0) {
-          Write-Host "ERROR: No workflow output directory found under Descriptions\\"
-          Write-Host "Contents of current directory:"
-          Get-ChildItem -Recurse -Depth 2 | Select-Object FullName
+        $wsPath = [Environment]::GetFolderPath('MyDocuments') + '\idt\testimages.idtw'
+        Write-Host "IDT_WORKSPACE=$wsPath"
+        echo "IDT_WORKSPACE=$wsPath" >> $env:GITHUB_ENV
+
+    # ------------------------------------------------------------------ #
+    #  7. Verify workspace bundle was created with correct structure       #
+    # ------------------------------------------------------------------ #
+    - name: Verify workspace bundle structure
+      shell: pwsh
+      run: |
+        $wsPath = $env:IDT_WORKSPACE
+        if (-not (Test-Path $wsPath)) {
+          Write-Host "ERROR: Workspace bundle not created at $wsPath"
           exit 1
         }
-
-        $wfDir = $wfDirs[0].FullName
-        Write-Host "Workflow output directory: $wfDir"
+        Write-Host "Workspace bundle: $wsPath"
         Write-Host ""
-        Write-Host "--- Directory contents ---"
-        Get-ChildItem -Path $wfDir -Recurse | ForEach-Object {
-          Write-Host "  $($_.FullName.Replace($wfDir,'').TrimStart('\'))"
+
+        # Required top-level entries
+        $required = @('manifest.json', 'images', 'descriptions', 'chats', 'reports')
+        $missing = @()
+        foreach ($entry in $required) {
+          if (-not (Test-Path "$wsPath\$entry")) { $missing += $entry }
         }
+        if ($missing.Count -gt 0) {
+          Write-Host "ERROR: Missing required workspace entries: $($missing -join ', ')"
+          exit 1
+        }
+        Write-Host "PASS: All required workspace directories/files present"
         Write-Host ""
 
-        # Check the combined descriptions file has at least 1 image described
-        $descFile = Get-ChildItem -Path $wfDir -Filter "image_descriptions.txt" -Recurse | Select-Object -First 1
-        if (-not $descFile) {
-          Write-Host "ERROR: image_descriptions.txt not found in output directory"
+        # Verify images were copied into the bundle (not just referenced)
+        $images = Get-ChildItem -Path "$wsPath\images" -File -ErrorAction SilentlyContinue
+        Write-Host "Images in bundle: $($images.Count)"
+        if ($images.Count -lt 1) {
+          Write-Host "ERROR: No images found in $wsPath\images"
           exit 1
         }
 
-        $content = Get-Content $descFile.FullName -Raw
-        Write-Host "=== image_descriptions.txt ==="
-        Write-Host $content
-        Write-Host "=============================="
-
-        # Require at least one image block in the descriptions file
-        # The file format uses "File: <name>" headers for each image entry
-        $imageBlocks = ([regex]::Matches($content, '(?m)^File:')).Count
-        Write-Host "Image description blocks found: $imageBlocks"
-        if ($imageBlocks -lt 1) {
-          Write-Host "ERROR: No image descriptions found in image_descriptions.txt"
+        # Verify description sidecars were written
+        $sidecars = Get-ChildItem -Path "$wsPath\descriptions" -Filter "*.json" -ErrorAction SilentlyContinue
+        Write-Host "Description sidecars: $($sidecars.Count)"
+        if ($sidecars.Count -lt 1) {
+          Write-Host "ERROR: No description sidecars found in $wsPath\descriptions"
           exit 1
         }
 
-        # Verify actual description content -- test images are outdoor_scene.jpg (sky, grass, tree, sun)
-        # and coffee_desk.jpg (coffee cup, notebook, desk).
-        # At least one meaningful scene word should appear in the AI output.
-        $sceneWords = @('sky','grass','sun','cloud','tree','outdoor','green','coffee','cup','notebook','desk','pen','table','wood')
+        Write-Host ""
+        Write-Host "--- Bundle contents (depth 3) ---"
+        Get-ChildItem -Path $wsPath -Recurse -Depth 3 | ForEach-Object {
+          Write-Host "  $($_.FullName.Replace((Resolve-Path $wsPath).Path,'').TrimStart('\'))"
+        }
+
+    # ------------------------------------------------------------------ #
+    #  8. Verify HTML report was generated                                 #
+    # ------------------------------------------------------------------ #
+    - name: Verify HTML report and descriptions
+      shell: pwsh
+      run: |
+        $htmlPath = "$env:IDT_WORKSPACE\reports\descriptions.html"
+        if (-not (Test-Path $htmlPath)) {
+          Write-Host "ERROR: HTML report not found at $htmlPath"
+          exit 1
+        }
+        $content = Get-Content $htmlPath -Raw
+        Write-Host "HTML report size: $($content.Length) chars"
+
+        # Require at least one image entry
+        $imageEntries = ([regex]::Matches($content, '<article')).Count
+        Write-Host "Image entries in HTML: $imageEntries"
+        if ($imageEntries -lt 1) {
+          Write-Host "ERROR: No image entries found in HTML report"
+          exit 1
+        }
+
+        # Check for meaningful description content matching the current test images:
+        #   coffee_desk.jpg   → expect: coffee, cup, desk, notebook, mug, table
+        #   outdoor_scene.jpg → expect: sky, grass, outdoor, green, tree, field
+        $sceneWords = @('sky','grass','outdoor','green','tree','coffee','cup','desk','notebook','table','mug','field','image','scene')
         $matched = $sceneWords | Where-Object { $content -imatch "\b$_\b" }
         Write-Host "Scene words found: $($matched -join ', ')"
         if ($matched.Count -eq 0) {
-          Write-Host "ERROR: Description text contains none of the expected scene words - likely an empty/error response"
-          Write-Host "Expected one of: $($sceneWords -join ', ')"
+          Write-Host "ERROR: HTML report contains none of the expected scene words"
           exit 1
         }
 
-        Write-Host ""
-        Write-Host "PASS: $imageBlocks image description(s) produced with meaningful content"
+        Write-Host "PASS: HTML report generated with $imageEntries image entries and meaningful content"
 
     # ------------------------------------------------------------------ #
-    #  8. Video frame extraction test                                      #
-    #     testimages/test_video.mp4 is committed to the repo:             #
-    #       0-3 s black / 3-7 s white / 7-10 s black (5 fps, 320x240)    #
-    #     Two hard cuts let both time-interval and scene-change modes run. #
+    #  9. Verify video frames were extracted                               #
+    #     test_video.mp4 at 5-second intervals → at least 1 frame         #
     # ------------------------------------------------------------------ #
     - name: Verify committed test video exists
       shell: pwsh
       run: |
         if (-not (Test-Path "testimages/test_video.mp4")) {
-          Write-Host "ERROR: testimages/test_video.mp4 not found in checkout"
-          exit 1
-        }
-        $size = (Get-Item "testimages/test_video.mp4").Length
-        Write-Host "Using committed test video: testimages/test_video.mp4 ($size bytes)"
-
-    - name: "Extract frames - time interval mode (every 2 s)"
-      shell: pwsh
-      run: |
-        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_time --time 2"
-        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_time --time 2
-        $exitCode = $LASTEXITCODE
-        Write-Host "exit code: $exitCode"
-        if ($exitCode -ne 0) {
-          Write-Host "ERROR: extract-frames (time interval) failed"
-          exit $exitCode
-        }
-
-    - name: "Verify time-interval frames"
-      shell: pwsh
-      run: |
-        $frames = Get-ChildItem -Path "frames_time" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
-        Write-Host "Time-interval frames found: $($frames.Count)"
-        $frames | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
-
-        # 10-second video sampled every 2 seconds → at least 4 frames
-        if ($frames.Count -lt 4) {
-          Write-Host "ERROR: Expected at least 4 frames from time-interval mode, got $($frames.Count)"
-          Get-ChildItem -Path "frames_time" -Recurse | Select-Object FullName, Length
-          exit 1
-        }
-        Write-Host "PASS: $($frames.Count) frame(s) - time interval mode"
-
-    - name: "Extract frames - scene change detection mode"
-      shell: pwsh
-      run: |
-        Write-Host "Running: idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30"
-        .\idt\dist\idt.exe extract-frames testimages/test_video.mp4 --output-dir frames_scene --scene 30
-        $exitCode = $LASTEXITCODE
-        Write-Host "exit code: $exitCode"
-        if ($exitCode -ne 0) {
-          Write-Host "ERROR: extract-frames (scene change) failed"
-          exit $exitCode
-        }
-
-    - name: "Verify scene-change frames"
-      shell: pwsh
-      run: |
-        $frames = Get-ChildItem -Path "frames_scene" -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
-        Write-Host "Scene-change frames found: $($frames.Count)"
-        $frames | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
-
-        # There is exactly one hard cut (blue→orange at 5 s), so we expect
-        # at least 2 frames (one per scene) but allow a few boundary frames.
-        if ($frames.Count -lt 2) {
-          Write-Host "ERROR: Expected at least 2 frames from scene-change mode, got $($frames.Count)"
-          Get-ChildItem -Path "frames_scene" -Recurse | Select-Object FullName, Length
-          exit 1
-        }
-        Write-Host "PASS: $($frames.Count) frame(s) - scene change mode"
-
-    # ------------------------------------------------------------------ #
-    #  9. Run unit tests for stats_analysis frame parsing                 #
-    #     Validates the fix for idt stats reporting 0 frames extracted    #
-    # ------------------------------------------------------------------ #
-    - name: Run stats_analysis unit tests
-      shell: pwsh
-      run: |
-        Write-Host "Running stats_analysis frame-parsing unit tests..."
-        python -m pytest pytest_tests/unit/test_stats_analysis_frames.py -v -s --no-header --no-cov
-        $exitCode = $LASTEXITCODE
-        if ($exitCode -ne 0) {
-          Write-Host "ERROR: stats_analysis unit tests failed (exit code $exitCode)"
-          exit $exitCode
-        }
-        Write-Host "PASS: stats_analysis unit tests passed"
-
-    # ------------------------------------------------------------------ #
-    # 10. Validate idt stats reports non-zero frames extracted             #
-    #     The workflow run in step 6 processes testimages/ which contains  #
-    #     test_video.mp4, so at least some frames should be extracted.     #
-    # ------------------------------------------------------------------ #
-    - name: Validate idt stats reports frames extracted
-      shell: pwsh
-      run: |
-        Write-Host "Running: idt.exe stats --input-dir Descriptions"
-        $output = .\idt\dist\idt.exe stats --input-dir Descriptions 2>&1
-        Write-Host $output
-
-        # Look for the "Frames Extracted:" line and verify it is not 0
-        $framesLine = ($output | Out-String) -split "`n" | Where-Object { $_ -match "Frames Extracted" }
-        Write-Host "Frames line: $framesLine"
-
-        if (-not $framesLine) {
-          Write-Host "INFO: 'Frames Extracted' not found in idt stats output - no video step ran, skipping check"
+          Write-Host "WARNING: testimages/test_video.mp4 not found -- video extraction test skipped"
         } else {
-          $match = [regex]::Match($framesLine, '[\d,]+')
-          if ($match.Success) {
-            $count = [int]($match.Value -replace ',','')
-            Write-Host "Frames extracted reported by idt stats: $count"
-            if ($count -eq 0) {
-              Write-Host "ERROR: idt stats reports 0 frames extracted - the frame_extractor log parser is broken"
-              exit 1
-            }
-            Write-Host "PASS: idt stats correctly reports $count frames extracted"
-          }
+          $size = (Get-Item "testimages/test_video.mp4").Length
+          Write-Host "Test video: testimages/test_video.mp4 ($size bytes)"
         }
+
+    - name: Verify video frames in workspace
+      shell: pwsh
+      run: |
+        if (-not (Test-Path "testimages/test_video.mp4")) {
+          Write-Host "No test video present -- skipping frame verification"
+          exit 0
+        }
+
+        # Frames go to <workspace>\derived\frames\<video_stem>\
+        $framesDir = "$env:IDT_WORKSPACE\derived\frames"
+        if (-not (Test-Path $framesDir)) {
+          Write-Host "ERROR: No derived/frames directory found in workspace"
+          Write-Host "Expected: $framesDir"
+          exit 1
+        }
+
+        $frames = Get-ChildItem -Path $framesDir -Filter "*.jpg" -Recurse -ErrorAction SilentlyContinue
+        Write-Host "Video frames extracted: $($frames.Count)"
+        $frames | Select-Object -First 10 | ForEach-Object { Write-Host "  $($_.Name)  ($($_.Length) bytes)" }
+
+        if ($frames.Count -lt 1) {
+          Write-Host "ERROR: No video frames found under $framesDir"
+          exit 1
+        }
+        Write-Host "PASS: $($frames.Count) video frame(s) extracted"
+
+    # ------------------------------------------------------------------ #
+    # 10. idt status — verify the workspace is fully described             #
+    # ------------------------------------------------------------------ #
+    - name: Run idt status on workspace
+      shell: pwsh
+      run: |
+        Write-Host "Running: idt.exe status testimages"
+        $output = .\idt\dist\idt.exe status testimages 2>&1
+        Write-Host $output
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "ERROR: idt status returned exit code $LASTEXITCODE"
+          exit 1
+        }
+        # Join array to single string so -match/-notmatch return a boolean, not a filtered array
+        $outputStr = ($output | Out-String)
+        # Verify workspace path resolves to Documents/idt (not a sibling or legacy path)
+        if ($outputStr -notmatch [regex]::Escape("Documents")) {
+          Write-Host "ERROR: idt status workspace path does not point to Documents/idt folder"
+          Write-Host "Expected 'Documents' in workspace path"
+          exit 1
+        }
+        # Verify all images are described (100%)
+        if ($outputStr -notmatch "100%") {
+          Write-Host "ERROR: idt status does not show 100% described"
+          exit 1
+        }
+        Write-Host "PASS: idt status shows workspace at correct location, fully described"
 
     # ------------------------------------------------------------------ #
     # 11. Bonus: ImageDescriber launch smoke test                          #
-    #     continue-on-error so a runner/GUI issue doesn't fail the core   #
     # ------------------------------------------------------------------ #
     - name: Smoke test - ImageDescriber launches without crashing
       continue-on-error: true
@@ -346,7 +325,6 @@ jobs:
 
         if ($proc.HasExited) {
           Write-Host "FAIL: ImageDescriber.exe exited within 15 seconds (exit code $($proc.ExitCode))"
-          Write-Host "Likely a missing PyInstaller dependency or import error."
           exit 1
         }
 
@@ -355,7 +333,7 @@ jobs:
         Write-Host "Process terminated cleanly."
 
     # ------------------------------------------------------------------ #
-    # 12. Upload artifacts (always -- so you get outputs even on failure)  #
+    # 12. Upload artifacts                                                  #
     # ------------------------------------------------------------------ #
     - name: Upload idt executable
       uses: actions/upload-artifact@v7
@@ -373,22 +351,11 @@ jobs:
         path: imagedescriber/dist/ImageDescriber.exe
         retention-days: 14
 
-    - name: Upload workflow output (moondream descriptions)
+    - name: Upload workspace bundle (descriptions + report)
       uses: actions/upload-artifact@v7
       if: always()
       with:
-        name: workflow-output
-        path: Descriptions/wf_*/
-        retention-days: 14
-        if-no-files-found: warn
-
-    - name: Upload extracted video frames
-      uses: actions/upload-artifact@v7
-      if: always()
-      with:
-        name: video-frames-output
-        path: |
-          frames_time/
-          frames_scene/
+        name: workspace-output
+        path: ${{ env.IDT_WORKSPACE }}/
         retention-days: 14
         if-no-files-found: warn

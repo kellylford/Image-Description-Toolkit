@@ -1,32 +1,36 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-IDT CLI - PyInstaller Spec File
+IDT CLI v4.5 - PyInstaller Spec File
 
-This builds the unified CLI tool that routes commands to all IDT scripts.
+Builds the new unified CLI (cli/main.py) with all 13 commands powered by idt_core.
 
-Directory structure:
-- idt/ - This directory (contains idt_cli.py, idt_runner.py)
-- ../scripts/ - Workflow scripts
-- ../analysis/ - Analysis scripts
-- ../models/ - Model registry
+Directory structure (relative to idt/ where this spec lives):
+  ../cli/         - New CLI entry point and guide wizard
+  ../idt_core/    - Core engine (pipeline, providers, metadata, embed, etc.)
+  ../scripts/     - JSON config files only (image_describer_config.json, etc.)
 
-All paths use ../ prefix since we're building from idt/ subdirectory.
+PyInstaller is run from the idt/ directory by build_idt.bat.
 """
 
-# Web download dependencies - use PyInstaller's collect_all for BeautifulSoup4
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_submodules
+import sys as _sys
+
+# BeautifulSoup4 — used by idt_core.downloader
 bs4_datas, bs4_binaries, bs4_hiddenimports = collect_all('bs4')
 
-# Conditionally collect mlx-vlm and mlx (macOS Apple Silicon only)
-# mlx-vlm must be installed in the build venv: pip install mlx-vlm
-import sys as _sys
+# OpenCV — used by idt_core.video for frame extraction
+try:
+    cv2_datas, cv2_binaries, cv2_hiddenimports = collect_all('cv2')
+except Exception:
+    cv2_datas, cv2_binaries, cv2_hiddenimports = [], [], []
+
+# macOS Apple Silicon only — no-op on Windows
 if _sys.platform == 'darwin':
     try:
         mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = collect_all('mlx_vlm')
     except Exception:
         mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = [], [], []
     try:
-        # collect_all('mlx') includes libmlx.dylib (Metal framework) and all mlx submodules
         mlx_datas, mlx_binaries, mlx_hiddenimports = collect_all('mlx')
     except Exception:
         mlx_datas, mlx_binaries, mlx_hiddenimports = [], [], []
@@ -35,89 +39,61 @@ else:
     mlx_datas, mlx_binaries, mlx_hiddenimports = [], [], []
 
 a = Analysis(
-    ['idt_cli.py'],
-    pathex=['..'],  # Add parent directory to import path
-    binaries=bs4_binaries + mlx_vlm_binaries + mlx_binaries,
+    ['../cli/main.py'],
+    pathex=['..'],          # project root — makes idt_core, cli all importable
+    binaries=bs4_binaries + cv2_binaries + mlx_vlm_binaries + mlx_binaries,
     datas=[
-        # Include ALL scripts files
-        ('../scripts/workflow.py', 'scripts'),
-        ('../scripts/workflow_utils.py', 'scripts'),
-        ('../scripts/versioning.py', 'scripts'),
-        ('../scripts/image_describer.py', 'scripts'),
-        ('../scripts/metadata_extractor.py', 'scripts'),
-        ('../scripts/video_metadata_extractor.py', 'scripts'),
-        ('../scripts/exif_embedder.py', 'scripts'),
-        ('../scripts/ConvertImage.py', 'scripts'),
-        ('../scripts/descriptions_to_html.py', 'scripts'),
-        ('../scripts/video_frame_extractor.py', 'scripts'),
-        ('../scripts/video_describer.py', 'scripts'),
-        ('../scripts/enhanced_scene_detector.py', 'scripts'),
-        ('../scripts/web_image_downloader.py', 'scripts'),
-        ('../scripts/config_loader.py', 'scripts'),
-        ('../scripts/resource_manager.py', 'scripts'),
-        ('../scripts/guided_workflow.py', 'scripts'),
-        ('../scripts/list_prompts.py', 'scripts'),
-        ('../scripts/list_results.py', 'scripts'),
-        ('../scripts/workflow_config.json', 'scripts'),
+        # Config JSON files (resolution chain requires scripts/ subdir in frozen exe)
         ('../scripts/image_describer_config.json', 'scripts'),
-        ('../scripts/video_frame_extractor_config.json', 'scripts'),
-        # Include models and analysis directories
-        ('../models', 'models'),
-        ('../analysis', 'analysis'),
-        # Include imagedescriber package for ai_providers
-        ('../imagedescriber/__init__.py', 'imagedescriber'),
-        ('../imagedescriber/ai_providers.py', 'imagedescriber'),
-        ('../imagedescriber/data_models.py', 'imagedescriber'),
-        # Include VERSION file
+        ('../scripts/workflow_config.json', 'scripts'),
+        # Version
         ('../VERSION', '.'),
-    ] + bs4_datas + mlx_vlm_datas + mlx_datas,
+    ] + bs4_datas + cv2_datas + mlx_vlm_datas + mlx_datas,
     hiddenimports=[
-        # Scripts modules
-        'scripts',
-        'scripts.workflow',
-        'scripts.workflow_utils',
-        'scripts.versioning',
-        'scripts.image_describer',
-        'scripts.metadata_extractor',
-        'scripts.guided_workflow',
-        'scripts.resource_manager',
-        'scripts.video_metadata_extractor',
-        'scripts.exif_embedder',
-        'scripts.ConvertImage',
-        'scripts.descriptions_to_html',
-        'scripts.video_frame_extractor',
-        'scripts.video_describer',
-        'scripts.enhanced_scene_detector',
-        'scripts.web_image_downloader',
-        'scripts.config_loader',
-        'scripts.list_prompts',
-        'scripts.list_results',
-        # Models and analysis
-        'models.check_models',
-        'models.manage_models',
-        'models.claude_models',  # Central Claude model configuration
-        'models.openai_models',  # Central OpenAI model configuration
-        'analysis.stats_analysis',  # Fixed: was analyze_workflow_stats (wrong module name)
-        'analysis.content_analysis',  # Fixed: was analyze_description_content (wrong module name)
-        'analysis.combine_workflow_descriptions',
-        # imagedescriber package
-        'imagedescriber',
-        'imagedescriber.ai_providers',
-        # jaraco packages required by pkg_resources (setuptools >= 75)
-        'jaraco', 'jaraco.text', 'jaraco.functools', 'jaraco.context',
-        'jaraco.collections',
-        # Standard library
-        'json', 'pathlib', 'subprocess', 'logging', 'datetime', 'argparse',
-        # Image processing
-        'PIL', 'PIL.Image', 'PIL.ImageOps', 'pillow_heif',
-        # EXIF handling
+        # ---- New CLI ----
+        'cli',
+        'cli.main',
+        'cli.guide',
+
+        # ---- idt_core engine ----
+        'idt_core',
+        'idt_core.project',
+        'idt_core.pipeline',
+        'idt_core.image_item',
+        'idt_core.scanner',
+        'idt_core.metadata',
+        'idt_core.embedder',
+        'idt_core.exporter',
+        'idt_core.config',
+        'idt_core.converter',
+        'idt_core.progress',
+        'idt_core.watcher',
+        'idt_core.downloader',
+        'idt_core.video',
+        'idt_core.workspace',
+        'idt_core.logger',
+        'idt_core.providers',
+        'idt_core.providers.base',
+        'idt_core.providers.claude',
+        'idt_core.providers.ollama',
+        'idt_core.providers.openai_provider',
+        'idt_core.providers.florence',
+
+        # ---- idt_core new modules ----
+        'idt_core.config_loader',
+        'idt_core.gallery_exporter',
+
+        # ---- jaraco (required by pkg_resources / setuptools >= 75) ----
+        'jaraco', 'jaraco.text', 'jaraco.functools',
+        'jaraco.context', 'jaraco.collections',
+
+        # ---- image / EXIF ----
+        'PIL', 'PIL.Image', 'PIL.ImageOps', 'PIL.PngImagePlugin',
+        'pillow_heif',
         'piexif', 'piexif.helper',
-        # Web support
-        'html.parser', 'urllib3', 'urllib.parse', 'urllib.request',
-        'hashlib', 'requests.adapters', 'requests.packages',
-        # AI providers
-        'requests', 'anthropic', 'openai',
-        # Anthropic dependencies
+
+        # ---- AI providers ----
+        'anthropic',
         'anthropic._client',
         'anthropic._base_client',
         'anthropic._models',
@@ -127,7 +103,7 @@ a = Analysis(
         'anthropic._exceptions',
         'anthropic.types',
         'anthropic.resources',
-        # OpenAI dependencies
+        'openai',
         'openai._client',
         'openai._base_client',
         'openai._models',
@@ -137,36 +113,31 @@ a = Analysis(
         'openai._exceptions',
         'openai.types',
         'openai.resources',
-        # MLX / Apple Metal (macOS Apple Silicon only — no-op on Windows)
-        'mlx_vlm',
-        'mlx',
-        'mlx.core',
-        'mlx.nn',
-        'mlx.nn.layers',
-        'transformers',
-        'transformers.models.auto',
-        # Qwen2-VL modules (for mlx-community/Qwen2-VL-2B model)
-        'transformers.models.qwen2_vl',
-        'transformers.models.qwen2_vl.configuration_qwen2_vl',
-        'transformers.models.qwen2_vl.image_processing_qwen2_vl',
-        'transformers.models.qwen2_vl.image_processing_qwen2_vl_fast',
-        'transformers.models.qwen2_vl.modeling_qwen2_vl',
-        'transformers.models.qwen2_vl.processing_qwen2_vl',
-        'transformers.models.qwen2_vl.video_processing_qwen2_vl',
-        # Qwen2.5-VL modules (for mlx-community/Qwen2.5-VL-3B and 7B models)
-        'transformers.models.qwen2_5_vl',
-        'transformers.models.qwen2_5_vl.configuration_qwen2_5_vl',
-        'transformers.models.qwen2_5_vl.modeling_qwen2_5_vl',
-        'transformers.models.qwen2_5_vl.processing_qwen2_5_vl',
-        'huggingface_hub',
-        'safetensors',
-        'sentencepiece',
-        'tokenizers',
-    ] + bs4_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports,
+        'ollama',
+
+        # ---- HTTP / network ----
+        'requests', 'requests.adapters', 'requests.packages',
+        'urllib3', 'charset_normalizer', 'certifi', 'idna',
+
+        # ---- web scraping (downloader) ----
+        'bs4', 'bs4.builder', 'bs4.builder._htmlparser',
+        'bs4.builder._lxml', 'soupsieve',
+
+        # ---- video (OpenCV) ----
+        'cv2',
+
+        # ---- HuggingFace / Florence (local model) ----
+        'transformers', 'transformers.models.auto',
+        'huggingface_hub', 'safetensors', 'sentencepiece', 'tokenizers',
+        'torch',
+
+        # ---- macOS MLX (no-op on Windows) ----
+        'mlx_vlm', 'mlx', 'mlx.core', 'mlx.nn', 'mlx.nn.layers',
+    ] + bs4_hiddenimports + cv2_hiddenimports + mlx_vlm_hiddenimports + mlx_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=['hooks/rthooks/pyi_rth_pkgres.py'],
-    excludes=['workflow', 'setuptools', 'pip'],  # Exclude conflicting/problematic packages
+    excludes=['setuptools', 'pip'],
     noarchive=False,
     optimize=0,
 )
@@ -193,4 +164,3 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
-

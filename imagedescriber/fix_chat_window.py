@@ -28,7 +28,7 @@ if corruption_start in content:
         
         try:
             # Load config to get API keys
-            from config_loader import load_json_config
+            from idt_core.config_loader import load_json_config
             
             config, _, _ = load_json_config('image_describer_config.json')
             if not config:

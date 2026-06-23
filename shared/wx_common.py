@@ -19,9 +19,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Union
 from datetime import datetime
 
-# Import config_loader for frozen mode compatibility
 try:
-    from scripts.config_loader import load_json_config
+    from idt_core.config_loader import load_json_config
 except ImportError:
     load_json_config = None
 
@@ -854,16 +853,6 @@ def get_app_version() -> str:
     Returns:
         Version string
     """
-    # Try versioning module first
-    try:
-        scripts_dir = find_scripts_directory()
-        if scripts_dir:
-            sys.path.insert(0, str(scripts_dir))
-            from versioning import get_full_version
-            return get_full_version()
-    except (ImportError, Exception):
-        pass
-    
     # Try VERSION file
     try:
         version_file = find_file('VERSION')

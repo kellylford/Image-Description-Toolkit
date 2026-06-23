@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
-Post-Build Validation for IDT Executable
+Post-Build Validation for IDT Executable (v4.5 CLI)
 
-Runs quick smoke tests against the built executable to catch common issues:
-- Version command works and shows build info
-- Workflow command can import versioning module
-- Help commands work
-- Basic CLI structure is intact
+Smoke-tests the built executable to catch frozen-executable import failures
+before deployment. Tests the new cli/main.py command surface.
 
-Run this after builditall.bat/builditall_macos.sh to catch frozen-executable issues before deployment.
+Run from the project root after builditall:
+    python3 BuildAndRelease/validate_build.py
 """
 import subprocess
 import sys
@@ -17,15 +15,14 @@ from pathlib import Path
 
 
 def run_command(cmd, description):
-    """Run command and return success/failure"""
     try:
         result = subprocess.run(
-            cmd, 
-            capture_output=True, 
+            cmd,
+            capture_output=True,
             text=True,
             encoding='utf-8',
-            errors='replace',  # Replace invalid characters instead of crashing
-            timeout=60  # Increased for torch/transformers import (can take 30-40s first time)
+            errors='replace',
+            timeout=60,
         )
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
@@ -35,161 +32,113 @@ def run_command(cmd, description):
 
 
 def get_executable_path():
-    """Get the path to the IDT executable based on platform"""
-    base_dir = Path(__file__).parent.parent
-    
+    project_root = Path(__file__).parent.parent
     if platform.system() == 'Windows':
-        return base_dir / 'dist' / 'idt.exe'
-    else:  # macOS/Linux
-        return base_dir / 'dist' / 'idt'
+        return project_root / 'idt' / 'dist' / 'idt.exe'
+    else:
+        return project_root / 'idt' / 'dist' / 'idt'
 
 
 def test_executable_exists():
-    """Verify the executable was actually built"""
     exe_path = get_executable_path()
     if not exe_path.exists():
-        print(f"[FAIL] {exe_path.name} not found")
-        print(f"   Expected at: {exe_path}")
+        print(f"[FAIL] {exe_path.name} not found at: {exe_path}")
         return False
-    print(f"[PASS] Executable exists: {exe_path}")
-    return True
-
-
-def test_version_command():
-    """Verify version command works and shows build info"""
-    exe = str(get_executable_path())
-    success, stdout, stderr = run_command([exe, 'version'], "version command")
-    
-    if not success:
-        print(f"[FAIL] FAIL: {Path(exe).name} version command failed")
-        print(f"   stderr: {stderr}")
-        return False
-    
-    # Check for expected version components
-    # Output format: "Image Description Toolkit X.Y.Z\nCommit: ...\nMode: ..."
-    required = ['Image Description Toolkit', 'Commit:', 'Mode:']
-    missing = [r for r in required if r not in stdout]
-    
-    if missing:
-        print("[FAIL] FAIL: Version output missing required fields")
-        print(f"   Missing: {', '.join(missing)}")
-        print(f"   Output: {stdout[:200]}")
-        return False
-    
-    print("[PASS] Version command works with build info")
+    size_mb = exe_path.stat().st_size / 1_048_576
+    print(f"[PASS] Executable exists: {exe_path}  ({size_mb:.1f} MB)")
     return True
 
 
 def test_help_command():
-    """Verify help command works"""
     exe = str(get_executable_path())
-    success, stdout, stderr = run_command([exe, '--help'], "help command")
-    
+    success, stdout, stderr = run_command([exe, '--help'], "help")
     if not success:
-        print(f"[FAIL] FAIL: {Path(exe).name} --help failed")
+        print(f"[FAIL] --help failed\n   stderr: {stderr[:300]}")
         return False
-    
-    if 'workflow' not in stdout.lower():
-        print("[FAIL] FAIL: Help output doesn't mention workflow")
+    if 'describe' not in stdout.lower():
+        print("[FAIL] --help output doesn't mention 'describe' — wrong exe or broken import")
+        print(f"   Output: {stdout[:300]}")
         return False
-    
-    print("[PASS] Help command works")
+    print("[PASS] --help works and mentions 'describe'")
     return True
 
 
-def test_workflow_help():
-    """Verify workflow command exists and imports work"""
+def test_describe_help():
     exe = str(get_executable_path())
-    success, stdout, stderr = run_command([exe, 'workflow', '--help'], "workflow help")
-    
+    success, stdout, stderr = run_command([exe, 'describe', '--help'], "describe --help")
     if not success:
-        print(f"[FAIL] FAIL: {Path(exe).name} workflow --help failed")
-        print(f"   This often means versioning import failed in frozen build")
-        print(f"   stderr: {stderr[:500]}")
+        print(f"[FAIL] describe --help failed — likely a broken import in idt_core\n   stderr: {stderr[:500]}")
         return False
-    
-    print("[PASS] Workflow command works (versioning import OK)")
+    if '--provider' not in stdout:
+        print("[FAIL] describe --help missing expected flags")
+        return False
+    print("[PASS] describe command works (idt_core imports OK)")
     return True
 
 
-def test_list_commands():
-    """Verify other key commands are present"""
+def test_key_commands():
     exe = str(get_executable_path())
-    
-    commands_to_test = [
-        ('image_describer', 'Image describer'),
-        ('convert-images', 'Image converter'),
-        ('extract-frames', 'Frame extractor'),
+    commands = [
+        ('export',   '--help', 'export'),
+        ('status',   '--help', 'status'),
+        ('video',    '--help', 'video'),
+        ('embed',    '--help', 'embed'),
+        ('guideme',  '--help', 'guideme'),
     ]
-    
     all_passed = True
-    for cmd, name in commands_to_test:
-        success, stdout, stderr = run_command([exe, cmd, '--help'], f"{cmd} help")
+    for cmd, flag, name in commands:
+        success, stdout, stderr = run_command([exe, cmd, flag], f"{cmd} {flag}")
         if not success:
-            print(f"[WARN] WARNING: {name} command failed")
+            print(f"[WARN] {name} command failed")
             all_passed = False
         else:
             print(f"[PASS] {name} command works")
-    
     return all_passed
 
 
 def main():
-    """Run all validation tests"""
     print("=" * 70)
-    print("IDT BUILD VALIDATION")
+    print("IDT BUILD VALIDATION (v4.5)")
     print("=" * 70)
     print()
-    
+
     tests = [
         ("Executable exists", test_executable_exists),
-        ("Version command", test_version_command),
-        ("Help command", test_help_command),
-        ("Workflow command", test_workflow_help),
-        ("Other commands", test_list_commands),
+        ("Help command",      test_help_command),
+        ("Describe command",  test_describe_help),
+        ("Other commands",    test_key_commands),
     ]
-    
+
     results = []
-    for name, test_func in tests:
+    for name, fn in tests:
         print(f"\nTesting: {name}")
         print("-" * 70)
         try:
-            passed = test_func()
-            results.append((name, passed))
+            results.append((name, fn()))
         except Exception as e:
-            print(f"[FAIL] EXCEPTION in {name}: {e}")
+            print(f"[FAIL] EXCEPTION: {e}")
             results.append((name, False))
-    
-    # Summary
+
     print()
     print("=" * 70)
     print("VALIDATION SUMMARY")
     print("=" * 70)
-    
     passed = sum(1 for _, p in results if p)
-    total = len(results)
-    
     for name, result in results:
-        status = "[PASS] PASS" if result else "[FAIL] FAIL"
-        print(f"{status}: {name}")
-    
+        print(f"{'[PASS]' if result else '[FAIL]'} {name}")
     print()
-    print(f"Result: {passed}/{total} tests passed")
-    
-    if passed == total:
-        print()
+    print(f"Result: {passed}/{len(results)} tests passed")
+    print()
+
+    if passed == len(results):
         print("[SUCCESS] BUILD VALIDATION PASSED")
-        print()
         return 0
     else:
-        print()
         print("[FAIL] BUILD VALIDATION FAILED")
         print()
         print("Common fixes:")
-        print("  - If 'versioning import' failed: Check BuildAndRelease/final_working.spec")
-        print("  - If commands missing: Verify idt_cli.py includes all commands")
-        print("  - If version info missing: Rebuild after fixing scripts/versioning.py")
-        print()
+        print("  - Import error: check idt.spec hiddenimports for missing idt_core.* modules")
+        print("  - Wrong exe:    confirm idt/dist/idt.exe was rebuilt with --clean")
         return 1
 
 

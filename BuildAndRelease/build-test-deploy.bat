@@ -172,7 +172,7 @@ idt.exe workflow "%TEST_IMAGES_DIR%" ^
     --name %WORKFLOW_NAME% ^
     --steps describe,html ^
     --provider ollama ^
-    --model moondream:latest ^
+    --model minicpm-v4.6 ^
     --prompt-style narrative ^
     --batch ^
     --metadata ^

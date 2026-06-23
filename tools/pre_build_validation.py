@@ -1,199 +1,234 @@
 """
-Pre-build validation: Run before creating executable
+Pre-build validation: Run before creating the executable.
 
-Catches integration bugs that only appear in multi-step workflows.
-Run this before builditall.bat to ensure quality.
+Catches integration bugs before PyInstaller bundles them in.
 
 Usage:
     python tools/pre_build_validation.py
-    
+
 Exit codes:
-    0 = All checks passed
+    0 = All checks passed (or warnings only)
     1 = Critical failures (block build)
-    2 = Warnings only (build allowed but review needed)
 """
 import sys
 import subprocess
 from pathlib import Path
 
 
-def run_integration_tests():
-    """Run integration tests that verify multi-step workflow behavior"""
+def run_unit_tests():
+    """Run fast unit tests that don't need a built exe or live AI provider."""
     print("=" * 80)
-    print("RUNNING INTEGRATION TESTS")
+    print("RUNNING UNIT TESTS")
     print("=" * 80)
-    
-    # Check if pytest is available
+
     try:
-        import pytest
+        import pytest  # noqa: F401
     except ImportError:
-        print("⚠️  pytest not installed - skipping integration tests")
+        print("pytest not installed — skipping unit tests")
         print("Install with: pip install pytest")
-        print("Tests are recommended but not required for build.")
-        return None  # Return None to indicate warning, not failure
-    
+        return None  # warning, not failure
+
     result = subprocess.run(
-        ["python", "-m", "pytest", 
-         "pytest_tests/integration/",
-         "-v", 
-         "--tb=short",
-         "-x",  # Stop on first failure
-         "--durations=5"],  # Show slowest tests
-        capture_output=False
+        [
+            sys.executable, "-m", "pytest",
+            "pytest_tests/unit/",
+            "-v", "--tb=short", "-x",
+            "--durations=5",
+        ],
+        capture_output=False,
     )
-    
+
     if result.returncode != 0:
-        print("\n❌ INTEGRATION TESTS FAILED")
-        print("Fix these issues before building the executable.")
-        print("These bugs would only appear at runtime, not at build time.")
+        print("\nUNIT TESTS FAILED — fix these before building.")
         return False
-    
-    print("\n✅ Integration tests passed")
+
+    print("\nUnit tests passed")
     return True
 
 
-def check_workflow_logic():
-    """Verify critical workflow logic hasn't been broken"""
+def check_new_cli_imports():
+    """Verify cli/main.py and all idt_core modules import cleanly."""
     print("\n" + "=" * 80)
-    print("CHECKING WORKFLOW LOGIC PATTERNS")
+    print("CHECKING CLI AND IDT_CORE IMPORTS")
     print("=" * 80)
-    
-    workflow_file = Path("scripts/workflow.py")
-    content = workflow_file.read_text(encoding='utf-8')
-    
-    issues = []
-    warnings = []
-    
-    # NOTE: Removed is_workflow_dir check - too many false positives from safety assertions
-    # The integration tests will catch actual bugs in this logic
-    
-    # NOTE: Removed regular_input_images else block check - also prone to false positives
-    # The correct code SHOULD have this in an else block (normal mode vs workflow mode)
-    # Integration tests verify this works correctly
-    
-    # Check 3: Verify .rglob() used for extracted_frames (not .glob())
-    if 'extracted_frames' in content and '.glob(' in content:
-        for i, line in enumerate(content.split('\n'), 1):
-            if 'extracted_frames' in line and '.glob(' in line:
-                if '.rglob(' not in line:
-                    warnings.append(
-                        f"Line {i}: Using .glob() with extracted_frames - "
-                        f"should use .rglob() for nested video directories"
-                    )
-    
-    # Report results
-    if issues:
-        print("\n❌ CRITICAL ISSUES FOUND:")
-        for issue in issues:
-            print(f"\n  {issue}")
+
+    modules_to_check = [
+        "cli.main",
+        "cli.guide",
+        "idt_core",
+        "idt_core.workspace",
+        "idt_core.pipeline",
+        "idt_core.logger",
+        "idt_core.exporter",
+        "idt_core.config",
+        "idt_core.video",
+        "idt_core.scanner",
+        "idt_core.metadata",
+        "idt_core.embedder",
+        "idt_core.providers.claude",
+        "idt_core.providers.ollama",
+        "idt_core.providers.openai_provider",
+    ]
+
+    failed = []
+    for mod in modules_to_check:
+        result = subprocess.run(
+            [sys.executable, "-c", f"import {mod}"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            print(f"  FAIL  {mod}")
+            print(f"        {result.stderr.strip()[:200]}")
+            failed.append(mod)
+        else:
+            print(f"  OK    {mod}")
+
+    if failed:
+        print(f"\n{len(failed)} module(s) failed to import — fix before building")
         return False
-    
-    if warnings:
-        print("\n⚠️  WARNINGS:")
-        for warning in warnings:
-            print(f"\n  {warning}")
-        print("\nReview these warnings - they may indicate bugs.")
-        return None  # Warnings but not critical
-    
-    print("\n✅ Workflow logic checks passed")
+
+    print("\nAll modules import cleanly")
     return True
 
 
-def check_file_discovery():
-    """Verify file discovery works for all supported types"""
+def check_scanner():
+    """Smoke-test idt_core.scanner with temp files."""
     print("\n" + "=" * 80)
-    print("CHECKING FILE DISCOVERY")
+    print("CHECKING FILE SCANNER")
     print("=" * 80)
-    
-    # Quick smoke test of FileDiscovery
+
     try:
-        import sys
-        sys.path.insert(0, 'scripts')
-        from workflow_utils import FileDiscovery, WorkflowConfig
         import tempfile
-        
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from idt_core.scanner import scan_images, IMAGE_EXTENSIONS
+
         with tempfile.TemporaryDirectory() as tmpdir:
             test_dir = Path(tmpdir)
-            
-            # Create test files with different extensions (not same name with different case)
-            # Windows is case-insensitive so test.png and test.PNG are the same file
             (test_dir / "photo.jpg").write_bytes(b"jpg")
-            (test_dir / "screenshot.PNG").write_bytes(b"PNG")  # Uppercase extension
-            (test_dir / "image.png").write_bytes(b"png")  # Lowercase extension
-            (test_dir / "photo.HEIC").write_bytes(b"heic")
-            
-            config = WorkflowConfig()
-            discovery = FileDiscovery(config)
-            
-            images = discovery.find_files_by_type(test_dir, "images", recursive=False)
-            heic = discovery.find_files_by_type(test_dir, "heic", recursive=False)
-            
-            # Should find 3 images (jpg, PNG, png)
-            if len(images) != 3:
-                print(f"❌ Should find 3 images, found {len(images)}")
-                print(f"   Files found: {[f.name for f in images]}")
-                return False
-            
-            if len(heic) != 1:
-                print(f"❌ Should find 1 HEIC, found {len(heic)}")
-                return False
-            
-            print("✅ File discovery working correctly (case-insensitive)")
-            return True
-            
+            (test_dir / "screenshot.PNG").write_bytes(b"PNG")
+            (test_dir / "image.png").write_bytes(b"png")
+            (test_dir / "doc.pdf").write_bytes(b"pdf")    # should be excluded
+
+            images = list(scan_images(test_dir))
+
+        if len(images) != 3:
+            print(f"  FAIL  Expected 3 images, found {len(images)}: {[f.name for f in images]}")
+            return False
+
+        print(f"  OK    scan_images found {len(images)} images, excluded pdf correctly")
+        return True
+
     except Exception as e:
-        print(f"⚠️  File discovery test skipped: {e}")
-        print("This is not critical - the built executable will work correctly.")
-        return None  # Return None for warning, not failure
+        print(f"  WARN  Scanner check skipped: {e}")
+        return None  # warning, not failure
+
+
+def check_default_provider():
+    """Verify the out-of-box default is a free local Ollama model, not a paid provider."""
+    print("\n" + "=" * 80)
+    print("CHECKING DEFAULT PROVIDER")
+    print("=" * 80)
+
+    _PAID_PROVIDERS = {"openai", "anthropic", "claude", "huggingface"}
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from idt_core.config import UserConfig, DEFAULT_OLLAMA_MODEL
+        cfg = UserConfig()   # no file — pure code defaults
+        if cfg.default_provider != "ollama":
+            print(f"  FAIL  default_provider is '{cfg.default_provider}', expected 'ollama'")
+            print("        This would charge users money on a fresh install.")
+            return False
+        if cfg.default_provider in _PAID_PROVIDERS:
+            print(f"  FAIL  default_provider '{cfg.default_provider}' is a paid provider.")
+            return False
+        print(f"  OK    defaults: {cfg.default_provider} / {cfg.default_model}  (DEFAULT_OLLAMA_MODEL={DEFAULT_OLLAMA_MODEL})")
+        return True
+    except Exception as e:
+        print(f"  FAIL  Could not check defaults: {e}")
+        return False
+
+
+def check_default_model_sync():
+    """
+    Verify that the installer pull command matches the JSON default_model.
+
+    This is the one manual step when changing the default model: the JSON is
+    the Python source of truth (all code imports DEFAULT_OLLAMA_MODEL from
+    idt_core.config), but installer.iss is a non-Python file that must be
+    updated by hand. This check catches the mismatch at build time.
+
+    TO CHANGE THE DEFAULT MODEL:
+      1. Edit scripts/image_describer_config.json  →  "default_model": "new-model"
+      2. Edit BuildAndRelease/WinBuilds/installer.iss  →  ollama pull new-model
+      That is all. All Python code picks up the change automatically.
+    """
+    print("\n" + "=" * 80)
+    print("CHECKING DEFAULT MODEL SYNC (JSON vs installer)")
+    print("=" * 80)
+
+    root = Path(__file__).parent.parent
+    try:
+        import json as _json
+        cfg_path = root / "scripts" / "image_describer_config.json"
+        json_model = _json.loads(cfg_path.read_text(encoding="utf-8")).get("default_model", "")
+    except Exception as e:
+        print(f"  WARN  Could not read image_describer_config.json: {e}")
+        return None
+
+    try:
+        iss_path = root / "BuildAndRelease" / "WinBuilds" / "installer.iss"
+        iss_text = iss_path.read_text(encoding="utf-8")
+        import re
+        m = re.search(r"ollama pull\s+([\w.:-]+)", iss_text)
+        iss_model = m.group(1) if m else ""
+    except Exception as e:
+        print(f"  WARN  Could not read installer.iss: {e}")
+        return None
+
+    if json_model == iss_model:
+        print(f"  OK    Both set to '{json_model}'")
+        return True
+    else:
+        print(f"  FAIL  JSON default_model='{json_model}'  installer pulls='{iss_model}'")
+        print( "        Edit BuildAndRelease/WinBuilds/installer.iss to match the JSON.")
+        return False
 
 
 def main():
-    """Run all pre-build validations"""
     print("\n" + "=" * 80)
-    print("PRE-BUILD VALIDATION")
+    print("PRE-BUILD VALIDATION (v4.5)")
     print("=" * 80)
-    print("This catches integration bugs before building executables.")
     print()
-    
-    results = []
-    
-    # Run all checks
-    results.append(("Integration Tests", run_integration_tests()))
-    results.append(("Workflow Logic", check_workflow_logic()))
-    results.append(("File Discovery", check_file_discovery()))
-    
-    # Summary
+
+    results = [
+        ("Unit tests",           run_unit_tests()),
+        ("CLI/idt_core imports", check_new_cli_imports()),
+        ("File scanner",         check_scanner()),
+        ("Default provider",     check_default_provider()),
+        ("Default model sync",   check_default_model_sync()),
+    ]
+
     print("\n" + "=" * 80)
     print("VALIDATION SUMMARY")
     print("=" * 80)
-    
+
     has_failures = False
-    has_warnings = False
-    
     for name, result in results:
         if result is True:
-            print(f"✅ {name}: PASSED")
+            print(f"  PASS  {name}")
         elif result is False:
-            print(f"❌ {name}: FAILED")
+            print(f"  FAIL  {name}")
             has_failures = True
-        else:  # None = warnings
-            print(f"⚠️  {name}: WARNINGS")
-            has_warnings = True
-    
+        else:
+            print(f"  WARN  {name}")
+
     print()
-    
     if has_failures:
-        print("❌ BUILD BLOCKED - Fix critical issues before building")
-        print("These bugs would appear at runtime, wasting user time.")
+        print("BUILD BLOCKED — fix critical issues above before building")
         return 1
-    elif has_warnings:
-        print("✅ BUILD ALLOWED - Warnings are informational only")
-        if any(name == "Integration Tests" and result is None for name, result in results):
-            print("(pytest not installed - integration tests skipped)")
-        return 0  # Allow build to proceed
-    else:
-        print("✅ ALL CHECKS PASSED - Safe to build")
-        return 0
+
+    print("BUILD ALLOWED — safe to proceed")
+    return 0
 
 
 if __name__ == "__main__":

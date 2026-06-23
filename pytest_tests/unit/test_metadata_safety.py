@@ -11,7 +11,7 @@ from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
 # Import metadata extractor
-from scripts.metadata_extractor import MetadataExtractor
+from idt_core.metadata import MetadataExtractor
 
 
 class TestFormatStringSafety:

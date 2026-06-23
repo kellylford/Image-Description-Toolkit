@@ -19,16 +19,16 @@ wxPython>=4.2.5        # Cross-platform GUI framework
 Pillow>=12.2.0         # Image processing
 pillow-heif>=1.4.0    # HEIC/HEIF image support
 opencv-python>=4.13.0.92 # Video frame extraction
-numpy>=1.24.0          # Array operations (required by opencv)
+numpy>=2.4.6          # Array operations (required by opencv)
 piexif>=1.1.3          # EXIF metadata embedding for video frames
 
 # ----------------------------------------------------------------------------
 # REQUIRED - AI Providers
 # ----------------------------------------------------------------------------
-requests>=2.25.0       # HTTP requests
+requests>=2.34.2       # HTTP requests
 ollama>=0.6.2          # Ollama Python client
-openai>=1.0.0          # OpenAI API
-anthropic>=0.109.2     # Anthropic Claude API
+openai>=2.43.0          # OpenAI API
+anthropic>=0.111.0     # Anthropic Claude API
 beautifulsoup4>=4.15.0  # Web scraping for download functionality
 
 # ----------------------------------------------------------------------------
@@ -50,6 +50,9 @@ pyinstaller>=6.0.0     # For building the executable
 # It is intentionally excluded from the default requirements because it is
 # macOS-only and has many heavy dependencies (transformers, mlx, etc.).
 # If not installed, the MLX provider will be silently disabled at runtime.
+# 0.6.x is required to LOAD the Qwen3-VL models in the known-good list: 0.4.x
+# fails at runtime with "Unrecognized video processor" on transformers 5.x.
+# Verified working: mlx-vlm 0.6.3 + transformers 5.5.0 (older Qwen2.x/Gemma still load).
 mlx-vlm>=0.6.3 ; sys_platform == 'darwin' and platform_machine == 'arm64'
 
 # ----------------------------------------------------------------------------

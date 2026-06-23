@@ -28,6 +28,10 @@ from typing import Dict, Any, Optional, List, Tuple
 import wx
 import platform
 
+try:
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
 
 logger = logging.getLogger(__name__)
 
@@ -403,7 +407,7 @@ class ConfigureDialog(wx.Dialog):
             logger.warning(f"Could not detect Ollama models: {e}")
         
         # Fallback to common models if detection fails
-        return sorted(["moondream", "moondream:latest", "llama3.2-vision", "llava"])
+        return [DEFAULT_OLLAMA_MODEL, "llava", "llama3.2-vision", "moondream"]
     
     def find_scripts_directory(self) -> Path:
         """Find the scripts directory containing config files.
@@ -420,15 +424,9 @@ class ConfigureDialog(wx.Dialog):
             # --- Frozen mode: write to user-writable location ---
             import shutil
             try:
-                from config_loader import get_user_config_dir
-            except ImportError:
-                # Fallback if config_loader not on path yet
-                try:
-                    scripts_path = Path(sys._MEIPASS) / 'scripts'
-                    sys.path.insert(0, str(scripts_path))
-                    from config_loader import get_user_config_dir
-                except Exception:
-                    get_user_config_dir = None  # type: ignore
+                from idt_core.config_loader import get_user_config_dir
+            except Exception:
+                get_user_config_dir = None  # type: ignore
 
             if get_user_config_dir is not None:
                 user_dir = get_user_config_dir()

@@ -97,17 +97,11 @@ except ImportError:
     cv2 = None
 
 # Video metadata and EXIF embedding (GPS extraction from video files via ffprobe)
-VideoMetadataExtractor = None
-ExifEmbedder = None
 try:
-    from video_metadata_extractor import VideoMetadataExtractor
-    from exif_embedder import ExifEmbedder
+    from idt_core.video import VideoMetadataExtractor, ExifEmbedder
 except ImportError:
-    try:
-        from scripts.video_metadata_extractor import VideoMetadataExtractor
-        from scripts.exif_embedder import ExifEmbedder
-    except ImportError:
-        pass
+    VideoMetadataExtractor = None
+    ExifEmbedder = None
 
 try:
     import openai
@@ -144,12 +138,9 @@ except ImportError:
 
 # Gallery HTML exporter
 try:
-    import gallery_exporter
+    from idt_core import gallery_exporter
 except ImportError:
-    try:
-        import scripts.gallery_exporter as gallery_exporter
-    except ImportError:
-        gallery_exporter = None
+    gallery_exporter = None
 
 # Import chat feature components
 try:
@@ -174,15 +165,13 @@ try:
 except ImportError:
     ViewerPanel = None
 
-# Import shared metadata extraction module
 try:
-    if getattr(sys, 'frozen', False):
-        scripts_dir = Path(sys.executable).parent / "scripts"
-    else:
-        scripts_dir = Path(__file__).parent.parent / "scripts"
-    if str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
-    from metadata_extractor import MetadataExtractor, NominatimGeocoder
+    from idt_core.config import DEFAULT_OLLAMA_MODEL
+except ImportError:
+    DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
+
+try:
+    from idt_core.metadata import MetadataExtractor, NominatimGeocoder
 except ImportError:
     MetadataExtractor = None
     NominatimGeocoder = None
@@ -204,8 +193,8 @@ if getattr(sys, 'frozen', False):
     )
     from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
     from workspace_manager import (
-        get_default_workspaces_root, get_next_untitled_name, create_workspace_structure,
-        is_untitled_workspace, get_workspace_files_directory, propose_workspace_name_from_url
+        get_default_workspaces_root, get_next_untitled_name,
+        is_untitled_workspace, propose_workspace_name_from_url
     )
     from dialogs_wx import (
         DirectorySelectionDialog,
@@ -215,6 +204,7 @@ if getattr(sys, 'frozen', False):
         VideoExtractionDialog,
         ExportHtmlGalleryDialog,
         RescanFolderDialog,
+        EmbedDescriptionsDialog,
     )
     from workers_wx import (
         ProcessingWorker,
@@ -224,7 +214,6 @@ if getattr(sys, 'frozen', False):
         VideoDescriptionWorker,
         HEICConversionWorker,
         DirectoryScanWorker,
-        SaveWorkspaceWorker,
         FolderRescanWorker,
         EVT_PROGRESS_UPDATE,
         EVT_PROCESSING_COMPLETE,
@@ -237,8 +226,6 @@ if getattr(sys, 'frozen', False):
         EVT_SCAN_PROGRESS,
         EVT_SCAN_COMPLETE,
         EVT_SCAN_FAILED,
-        EVT_WORKSPACE_SAVE_COMPLETE,
-        EVT_WORKSPACE_SAVE_FAILED,
         EVT_VIDEO_DESCRIPTION_COMPLETE,
         EVT_VIDEO_DESCRIPTION_FAILED,
         EVT_RESCAN_COMPLETE,
@@ -253,8 +240,8 @@ else:
         )
         from .data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
         from .workspace_manager import (
-            get_default_workspaces_root, get_next_untitled_name, create_workspace_structure,
-            is_untitled_workspace, get_workspace_files_directory, propose_workspace_name_from_url
+            get_default_workspaces_root, get_next_untitled_name,
+            is_untitled_workspace, propose_workspace_name_from_url
         )
         from .dialogs_wx import (
             DirectorySelectionDialog,
@@ -264,6 +251,7 @@ else:
             VideoExtractionDialog,
             ExportHtmlGalleryDialog,
             RescanFolderDialog,
+            EmbedDescriptionsDialog,
         )
         from .workers_wx import (
             ProcessingWorker,
@@ -273,7 +261,6 @@ else:
             VideoDescriptionWorker,
             HEICConversionWorker,
             DirectoryScanWorker,
-            SaveWorkspaceWorker,
             FolderRescanWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
@@ -286,8 +273,6 @@ else:
             EVT_SCAN_PROGRESS,
             EVT_SCAN_COMPLETE,
             EVT_SCAN_FAILED,
-            EVT_WORKSPACE_SAVE_COMPLETE,
-            EVT_WORKSPACE_SAVE_FAILED,
             EVT_VIDEO_DESCRIPTION_COMPLETE,
             EVT_VIDEO_DESCRIPTION_FAILED,
             EVT_RESCAN_COMPLETE,
@@ -301,8 +286,8 @@ else:
         )
         from data_models import ImageDescription, ImageItem, ImageWorkspace, WORKSPACE_VERSION
         from workspace_manager import (
-            get_default_workspaces_root, get_next_untitled_name, create_workspace_structure,
-            is_untitled_workspace, get_workspace_files_directory, propose_workspace_name_from_url
+            get_default_workspaces_root, get_next_untitled_name,
+            is_untitled_workspace, propose_workspace_name_from_url
         )
         from dialogs_wx import (
             DirectorySelectionDialog,
@@ -312,6 +297,7 @@ else:
             VideoExtractionDialog,
             ExportHtmlGalleryDialog,
             RescanFolderDialog,
+            EmbedDescriptionsDialog,
         )
         from workers_wx import (
             ProcessingWorker,
@@ -321,7 +307,6 @@ else:
             VideoDescriptionWorker,
             HEICConversionWorker,
             DirectoryScanWorker,
-            SaveWorkspaceWorker,
             FolderRescanWorker,
             EVT_PROGRESS_UPDATE,
             EVT_PROCESSING_COMPLETE,
@@ -334,8 +319,6 @@ else:
             EVT_SCAN_PROGRESS,
             EVT_SCAN_COMPLETE,
             EVT_SCAN_FAILED,
-            EVT_WORKSPACE_SAVE_COMPLETE,
-            EVT_WORKSPACE_SAVE_FAILED,
             EVT_VIDEO_DESCRIPTION_COMPLETE,
             EVT_VIDEO_DESCRIPTION_FAILED,
             EVT_RESCAN_COMPLETE,
@@ -397,6 +380,10 @@ def format_image_metadata(metadata: dict) -> list:
         return []
 
     lines = []
+
+    # EXIF context injected into the AI prompt (idt_core path)
+    if metadata.get('prompt_context'):
+        lines.append(f"AI context: {metadata['prompt_context']}")
 
     # DateTime information
     if 'datetime_str' in metadata and metadata['datetime_str']:
@@ -788,10 +775,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.Bind(EVT_SCAN_COMPLETE, self.on_scan_complete)
         if EVT_SCAN_FAILED:
             self.Bind(EVT_SCAN_FAILED, self.on_scan_failed)
-        if EVT_WORKSPACE_SAVE_COMPLETE:
-            self.Bind(EVT_WORKSPACE_SAVE_COMPLETE, self.on_workspace_save_complete)
-        if EVT_WORKSPACE_SAVE_FAILED:
-            self.Bind(EVT_WORKSPACE_SAVE_FAILED, self.on_workspace_save_failed)
 
         # Folder rescan events
         if EVT_RESCAN_COMPLETE:
@@ -851,16 +834,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         saved via Configure Settings was previously being silently ignored.
         """
         try:
-            try:
-                from config_loader import load_json_config
-            except ImportError:
-                from scripts.config_loader import load_json_config
+            from idt_core.config_loader import load_json_config
             self.config, self.config_file, _ = load_json_config('image_describer_config.json')
         except Exception as e:
             print(f"Warning: Could not load config: {e}")
             self.config = {
                 'default_provider': 'ollama',
-                'default_model': 'moondream',
+                'default_model': DEFAULT_OLLAMA_MODEL,
                 'default_prompt_style': 'narrative'
             }
             self.config_file = None
@@ -910,22 +890,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Silently handle missing cv2, corrupted videos, network issues
             return None
 
-    def get_workspace_directory(self) -> Path:
-        """Get the workspace data directory for extracted frames, downloaded images, etc.
-
-        Returns the directory structure:
-        ~/Documents/ImageDescriptionToolkit/WorkspaceFiles/{workspace_name}/
-        """
+    def _derived_dir(self, sub: str = "") -> Path:
+        """Return a writable directory for derived files (frames, downloads) inside the bundle."""
         if self.workspace_file:
-            # Use new workspace structure in WorkspaceFiles
-            workspace_dir = get_workspace_files_directory(Path(self.workspace_file))
+            base = Path(self.workspace_file) / "derived"
         else:
-            # Fallback (shouldn't happen with new Untitled workspace pattern)
-            from workspace_manager import get_workspace_files_root
-            workspace_dir = get_workspace_files_root() / "untitled_workspace"
-
-        workspace_dir.mkdir(parents=True, exist_ok=True)
-        return workspace_dir
+            base = Path.home() / "Downloads" / "ImageDescriber" / "derived"
+        result = base / sub if sub else base
+        result.mkdir(parents=True, exist_ok=True)
+        return result
 
     def _extract_video_frames_sync(self, video_path: str, extraction_config: dict) -> tuple:
         """Extract frames from video synchronously (for auto-extraction in Process All).
@@ -965,8 +938,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Create output directory in workspace (NOT in source directory)
         video_path_obj = Path(video_path)
-        workspace_dir = self.get_workspace_directory()
-        extracted_frames_dir = workspace_dir / "extracted_frames"
+        extracted_frames_dir = self._derived_dir("frames")
         video_dir = extracted_frames_dir / f"{video_path_obj.stem}"
         video_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1449,7 +1421,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         new_item = file_menu.Append(wx.ID_NEW, "&New Workspace\tCtrl+N")
         self.Bind(wx.EVT_MENU, self.on_new_workspace, new_item)
 
-        open_item = file_menu.Append(wx.ID_OPEN, "&Open Workspace\tCtrl+O")
+        open_item = file_menu.Append(wx.ID_OPEN, "&Open Workspace (.idtw)...\tCtrl+O")
         self.Bind(wx.EVT_MENU, self.on_open_workspace, open_item)
 
         save_item = file_menu.Append(wx.ID_SAVE, "&Save Workspace\tCtrl+S")
@@ -1475,6 +1447,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         export_descriptions_item = file_menu.Append(wx.ID_ANY, "&Export Descriptions...")
         self.Bind(wx.EVT_MENU, self.on_export_descriptions, export_descriptions_item)
+
+        embed_item = file_menu.Append(wx.ID_ANY, "Em&bed Descriptions into Images...")
+        self.Bind(wx.EVT_MENU, self.on_embed_descriptions, embed_item)
 
         export_gallery_item = file_menu.Append(wx.ID_ANY, "Export &HTML Gallery...\tCtrl+Shift+G")
         self.Bind(wx.EVT_MENU, self.on_export_html_gallery, export_gallery_item)
@@ -2527,6 +2502,119 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 progress_dlg.Destroy()
             show_error(self, f"Error importing workflow:\n{str(e)}")
 
+    def on_import_from_idt_project(self, event):
+        """Import descriptions from an idt_core project (.idt/ mirror directory).
+
+        Lets the user open images that were described via 'idt describe' into the
+        GUI for viewing, browsing, and chat.
+        """
+        try:
+            from idt_core.project import Project
+            from idt_core.image_item import ImageItem as IdtImageItem
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.\n"
+                             "This feature requires idt_core to be installed.")
+            return
+
+        source_dir = select_directory_dialog(
+            self,
+            "Select the image folder (the idt project's source directory)"
+        )
+        if not source_dir:
+            return
+
+        source_path = Path(source_dir)
+        idt_dir = source_path.parent / (source_path.name + ".idt")
+        if not idt_dir.exists():
+            # Try as the .idt/ dir itself
+            if source_path.name.endswith(".idt") and source_path.exists():
+                idt_dir = source_path
+                source_path = source_path.parent / source_path.stem
+            else:
+                show_error(
+                    self,
+                    f"No idt project found for that folder.\n\n"
+                    f"Expected: {idt_dir}\n\n"
+                    "Run 'idt describe <folder>' first to create the project."
+                )
+                return
+
+        try:
+            project = Project.open(source_path)
+        except Exception as exc:
+            show_error(self, f"Could not open idt project:\n{exc}")
+            return
+
+        described = list(project.described())
+        if not described:
+            show_warning(self, f"No described images found in:\n{idt_dir}\n\nRun 'idt describe <folder>' to generate descriptions.")
+            return
+
+        if not self.workspace:
+            self.workspace = ImageWorkspace(new_workspace=True)
+
+        imported = 0
+        duplicates = 0
+
+        with wx.BusyCursor():
+            for idt_item in described:
+                file_path = str(idt_item.source_path)
+
+                # Create or retrieve GUI workspace item
+                if file_path not in self.workspace.items:
+                    gui_item = ImageItem(file_path=file_path)
+                    self.workspace.items[file_path] = gui_item
+                else:
+                    gui_item = self.workspace.items[file_path]
+
+                existing_ts = {d.created for d in gui_item.descriptions}
+
+                for idt_desc in idt_item.descriptions:
+                    if idt_desc.timestamp in existing_ts:
+                        duplicates += 1
+                        continue
+
+                    token_usage = {}
+                    if idt_desc.input_tokens:
+                        token_usage["prompt_tokens"] = idt_desc.input_tokens
+                    if idt_desc.output_tokens:
+                        token_usage["completion_tokens"] = idt_desc.output_tokens
+
+                    metadata = {}
+                    if idt_item.metadata:
+                        metadata = dict(idt_item.metadata)
+                    if idt_desc.metadata_context:
+                        metadata["prompt_context"] = idt_desc.metadata_context
+
+                    gui_desc = ImageDescription(
+                        text=idt_desc.text,
+                        provider=idt_desc.provider or "",
+                        model=idt_desc.model or "",
+                        created=idt_desc.timestamp or "",
+                        prompt_style=idt_desc.prompt_name or "",
+                        metadata=metadata,
+                        token_usage=token_usage if token_usage else {},
+                    )
+                    gui_item.descriptions.append(gui_desc)
+                    imported += 1
+
+        # Update directories list if not already tracked
+        if str(source_path) not in (self.workspace.directory_paths or []):
+            if not self.workspace.directory_paths:
+                self.workspace.directory_paths = []
+            self.workspace.directory_paths.append(str(source_path))
+            self.workspace.directory_path = str(source_path)
+
+        self.refresh_image_list()
+
+        show_info(self,
+            f"Import complete.\n\n"
+            f"Imported: {imported} description(s)\n"
+            f"Duplicates skipped: {duplicates}\n"
+            f"Total images with descriptions: {len([i for i in self.workspace.items.values() if i.descriptions])}\n\n"
+            f"Source: {source_path}"
+        )
+
     def on_open_workflow_result(self, event):
         """Open a workflow directory in Viewer Mode"""
         dlg = wx.DirDialog(self, "Select Workflow Directory to View",
@@ -2593,53 +2681,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         settings = dialog.get_settings()
         dialog.Destroy()
 
-        # Check if we need to create/save workspace first (None or Untitled)
-        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
-            # Propose a name based on the URL
+        # Ensure we have a saved bundle before downloading
+        if not self.workspace_file:
             proposed_name = propose_workspace_name_from_url(settings['url'])
+            if not self._prompt_and_create_bundle("Save Workspace for Downloads", proposed_name):
+                return  # user cancelled
 
-            # Show save dialog
-            save_dialog = wx.FileDialog(
-                self,
-                message=f"Save workspace before downloading from {settings['url']}",
-                defaultDir=str(get_default_workspaces_root()),
-                defaultFile=f"{proposed_name}.idw",
-                wildcard="IDT Workspace (*.idw)|*.idw",
-                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
-            )
-
-            if save_dialog.ShowModal() == wx.ID_OK:
-                new_path = Path(save_dialog.GetPath())
-                save_dialog.Destroy()
-
-                # Create/rename workspace depending on current state
-                new_name = new_path.stem
-
-                if self.workspace_file:
-                    # Rename existing Untitled workspace
-                    if not self.rename_workspace(new_name):
-                        show_error(self, "Failed to rename workspace. Download cancelled.")
-                        return
-                else:
-                    # Create new workspace structure (no previous workspace)
-                    workspace_file, workspace_data_dir = create_workspace_structure(new_name)
-                    self.workspace_file = workspace_file
-                    # Create workspace object if it doesn't exist
-                    if not self.workspace:
-                        self.workspace = ImageWorkspace(new_workspace=True)
-                    self.workspace.directory_path = str(workspace_data_dir)
-                    self.workspace.directory_paths = [str(workspace_data_dir)]
-                    self.current_directory = workspace_data_dir
-                    # Save workspace to new file
-                    self.save_workspace(self.workspace_file)
-                    self.update_window_title("ImageDescriber", new_name)
-            else:
-                save_dialog.Destroy()
-                # User cancelled - abort download
-                return
-
-        # Get workspace directory
-        workspace_dir = self.get_workspace_directory()
+        download_dir = self._derived_dir("downloads")
 
         # If the user wants to process images after download, let them pick
         # the provider, model and prompt now — before the download begins —
@@ -2674,7 +2722,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.download_worker = DownloadProcessingWorker(
             self,
             settings['url'],
-            workspace_dir,
+            download_dir,
             settings
         )
         self.download_worker.start()
@@ -3254,7 +3302,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Use defaults
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
                 'skip_existing': False
@@ -3271,7 +3319,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('custom_prompt', ''),
             None,  # detection_settings
             None,  # prompt_config_path
-            api_key  # API key for cloud providers
+            api_key,
+            geocode=options.get('geocode_enabled', False),
         )
 
         # Mark as processing with provider/model info
@@ -3326,17 +3375,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         logger.info(f"CHECKPOINT 3: Checking workspace file status - workspace_file={self.workspace_file}")
         if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
             logger.info("CHECKPOINT 3: Workspace is None or Untitled - showing save dialog")
-            # Inform user they need to save first
-            # CRITICAL: Must pass parent=self so the dialog is attached to the main window.
-            # Without a parent the dialog is parentless and appears hidden behind the main
-            # window on both macOS and Windows, silently blocking all further UI actions
-            # (including Quit) while the app waits indefinitely for a response.
+            # CRITICAL: Must Raise() before showing modal dialogs — without it the dialog
+            # can appear hidden behind the main window and block all further UI actions.
             self.Raise()
             result = wx.MessageBox(
-                "Batch processing requires a named workspace.\n\n"
-                "Please save your workspace with a descriptive name before processing.\n\n"
-                "Would you like to save the workspace now?",
-                "Save Workspace Required",
+                "Before processing, please choose where to save the workspace bundle.\n\n"
+                "A .idtw workspace bundle will be created next to your images so that "
+                "both ImageDescriber and the idt CLI can share the same results.\n\n"
+                "Continue?",
+                "Save Workspace Bundle",
                 wx.YES_NO | wx.ICON_QUESTION,
                 self
             )
@@ -3344,47 +3391,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if result != wx.YES:
                 return
 
-            # Propose a name based on workspace content
-            proposed_name = self._propose_workspace_name_from_content()
-
-            # Show save dialog
-            save_dialog = wx.FileDialog(
-                self,
-                message="Save workspace before batch processing",
-                defaultDir=str(get_default_workspaces_root()),
-                defaultFile=f"{proposed_name}.idw",
-                wildcard="IDT Workspace (*.idw)|*.idw",
-                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
-            )
-
-            if save_dialog.ShowModal() == wx.ID_OK:
-                new_path = Path(save_dialog.GetPath())
-                save_dialog.Destroy()
-
-                # Create/rename workspace depending on current state
-                new_name = new_path.stem
-
-                if self.workspace_file:
-                    # Rename existing Untitled workspace
-                    if not self.rename_workspace(new_name):
-                        show_error(self, "Failed to rename workspace. Processing cancelled.")
-                        return
-                else:
-                    # Create new workspace structure (no previous workspace)
-                    workspace_file, workspace_data_dir = create_workspace_structure(new_name)
-                    self.workspace_file = workspace_file
-                    # Create workspace object if it doesn't exist
-                    if not self.workspace:
-                        self.workspace = ImageWorkspace(new_workspace=True)
-                    self.workspace.directory_path = str(workspace_data_dir)
-                    self.workspace.directory_paths = [str(workspace_data_dir)]
-                    self.current_directory = workspace_data_dir
-                    # Save workspace to new file
-                    self.save_workspace(self.workspace_file)
-                    self.update_window_title("ImageDescriber", new_name)
-            else:
-                save_dialog.Destroy()
-                # User cancelled the file dialog
+            if not self._prompt_and_create_bundle("Save Workspace Bundle"):
+                # User cancelled the bundle creation dialog
                 return
         logger.info("CHECKPOINT 3 PASSED: Workspace file is valid (not None/Untitled)")
 
@@ -3392,7 +3400,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         logger.info(f"CHECKPOINT 4: Auto-save check - modified={self.modified}")
         if self.modified:
             logger.info("Workspace modified - auto-saving")
-            self.save_workspace(str(self.workspace_file))
+            self._save_bundle()
         logger.info("CHECKPOINT 4 PASSED: Auto-save complete")
 
         # Phase 5: Warn about redescribing all
@@ -3432,7 +3440,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Use defaults
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
@@ -3532,6 +3540,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
             "detection_settings": options.get('detection_settings'),
+            "geocode_enabled": options.get('geocode_enabled', False),
             "total_queued": len(to_process),
             "started": datetime.now().isoformat()
         }
@@ -3546,8 +3555,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options.get('custom_prompt', ''),
             None,  # detection_settings
             None,  # prompt_config_path
-            skip_existing,  # Phase 5: Use parameter instead of options
-            progress_offset=0  # No offset when processing without video extraction
+            skip_existing,
+            progress_offset=0,
+            geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
 
         # Phase 3: Initialize timing
@@ -3556,7 +3567,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Save workspace BEFORE showing dialog to avoid focus issues
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
 
         # Phase 3: Show progress dialog (AFTER save to maintain focus)
         if BatchProgressDialog:
@@ -3622,7 +3633,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "mlx-community/Qwen2.5-VL-3B-Instruct-4bit": "~2.0 GB",
             "mlx-community/gemma-3-4b-it-qat-4bit": "~2.5 GB",
             "mlx-community/phi-3.5-vision-instruct-4bit": "~2.5 GB",
+            "mlx-community/Qwen3-VL-4B-Instruct-4bit": "~3.1 GB",
             "mlx-community/Qwen2.5-VL-7B-Instruct-4bit": "~4.5 GB",
+            "mlx-community/Qwen3-VL-8B-Instruct-4bit": "~5.8 GB",
             "mlx-community/Llama-3.2-11B-Vision-Instruct-4bit": "~6.5 GB",
             "mlx-community/gemma-3-12b-it-4bit": "~8.0 GB",
             "mlx-community/gemma-3-27b-it-4bit": "~16.8 GB",
@@ -3682,7 +3695,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
@@ -3704,14 +3717,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,   # detection_settings
             None,   # prompt_config_path
             True,   # skip_existing
-            progress_offset=0
+            progress_offset=0,
+            geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
 
         self.batch_start_time = time.time()
         self.batch_processing_times = []
 
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
 
         if BatchProgressDialog:
             self._batch_active = True
@@ -3769,7 +3784,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Load extraction config
         try:
-            from config_loader import load_json_config
+            from idt_core.config_loader import load_json_config
             video_config, _, _ = load_json_config('video_frame_extractor_config.json')
             if video_config:
                 extraction_config = {
@@ -3901,6 +3916,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
             "detection_settings": options.get('detection_settings'),
+            "geocode_enabled": options.get('geocode_enabled', False),
             "total_queued": len(to_process),
             "started": datetime.now().isoformat()
         }
@@ -3919,7 +3935,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,  # detection_settings
             None,  # prompt_config_path
             skip_existing,
-            progress_offset=progress_offset
+            progress_offset=progress_offset,
+            geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
@@ -3948,7 +3966,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Save workspace
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
 
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
 
@@ -4012,263 +4030,175 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.clear_modified()
 
     def on_open_workspace(self, event):
-        """Open existing workspace"""
+        """Open a .idtw workspace bundle."""
         if not self.confirm_unsaved_changes():
             return
 
-        default_dir = ""
-        default_file = ""
-        if self.workspace_file:
-            default_dir = str(Path(self.workspace_file).parent)
-
-        file_path = open_file_dialog(
-            self,
-            "Open Workspace",
-            "ImageDescriber Workspace (*.idw)|*.idw|All files (*.*)|*.*",
-            default_dir,
-            default_file
+        default_dir = str(Path(self.workspace_file).parent) if self.workspace_file else ""
+        dlg = wx.DirDialog(
+            self, "Open Workspace Bundle (.idtw folder)",
+            defaultPath=default_dir,
+            style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
         )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            path = dlg.GetPath()
+        finally:
+            dlg.Destroy()
 
-        if file_path:
-            self.load_workspace(file_path)
+        try:
+            from idt_core.workspace import Workspace
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.")
+            return
+
+        if not Workspace.is_bundle(Path(path)):
+            show_error(
+                self,
+                "That folder is not a workspace bundle (no manifest.json found).\n\n"
+                "Choose a .idtw folder created by ImageDescriber or the idt CLI.",
+            )
+            return
+
+        self.load_workspace(path)
 
     def load_workspace(self, file_path):
-        """Load workspace from file"""
+        """Load a .idtw workspace bundle."""
         try:
-            logger.info(f"Loading workspace from: {file_path}")
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            logger.info(f"Loading workspace bundle: {file_path}")
+            from idt_core.workspace import Workspace
+            from idt_core.gui_bridge import bundle_to_gui_workspace_dict
 
-            # Create workspace from data
+            if not Workspace.is_bundle(Path(file_path)):
+                show_error(self, f"Not a valid .idtw workspace bundle:\n{file_path}")
+                return
+
+            bundle = Workspace.open(Path(file_path))
+            data = bundle_to_gui_workspace_dict(bundle)
+
             self.workspace = ImageWorkspace.from_dict(data)
-            self.workspace_file = Path(file_path)  # Convert to Path object
+            self.workspace_file = Path(file_path)
             self.workspace.saved = True
-
-            # Load cached Ollama models from workspace
             self.cached_ollama_models = self.workspace.cached_ollama_models
 
-            # Update UI
             self.refresh_image_list()
             self.update_window_title("ImageDescriber", Path(file_path).name)
 
-            # Update status
             count = len(self.workspace.items)
             self.SetStatusText(f"Workspace loaded: {Path(file_path).name}", 0)
             self.SetStatusText(f"{count} images", 1)
             self.clear_modified()
 
-            # Check for failed items during loading
             if hasattr(self.workspace, 'load_failures') and self.workspace.load_failures:
                 failed_count = len(self.workspace.load_failures)
-                total_attempted = count + failed_count
-                logger.warning(f"Workspace loaded with {failed_count} failures")
-
-                # Show warning dialog
-                failure_details = "\n".join([f"  • {Path(path).name}: {error}" for path, error in self.workspace.load_failures[:5]])
+                failure_details = "\n".join(
+                    [f"  • {Path(p).name}: {err}"
+                     for p, err in self.workspace.load_failures[:5]]
+                )
                 if failed_count > 5:
                     failure_details += f"\n  ... and {failed_count - 5} more"
-
                 show_warning(self,
-                    f"Workspace loaded with {failed_count} items that could not be restored (out of {total_attempted} total).\n\n"
-                    f"Loaded successfully: {count}\n"
-                    f"Failed to load: {failed_count}\n\n"
-                    f"Failed items (check log for details):\n{failure_details}\n\n"
-                    f"The workspace is functional but some items were skipped.",
+                    f"Loaded with {failed_count} unrestorable items "
+                    f"(out of {count + failed_count} total).\n\n"
+                    f"Failed items:\n{failure_details}",
                     "Partial Workspace Load")
             else:
-                logger.info(f"Workspace loaded successfully: {count} items")
+                logger.info(f"Workspace loaded: {count} items")
 
-            # Phase 4: Check for resumable batch
             if self.workspace.batch_state:
                 wx.CallAfter(self.prompt_resume_batch)
 
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error loading workspace: {e}", exc_info=True)
-            show_error(self, f"Error loading workspace - Invalid JSON format:\n\nLine {e.lineno}, Column {e.colno}\n{e.msg}\n\nThe workspace file may be corrupted. Try opening it in a text editor to fix the JSON syntax error.")
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.")
         except Exception as e:
             logger.error(f"Error loading workspace: {e}", exc_info=True)
             show_error(self, f"Error loading workspace:\n{e}")
 
     def on_save_workspace_as(self, event):
-        """Save workspace to new file"""
-        # Use default workspaces directory
-        default_dir = str(get_default_workspaces_root())
-
-        # Propose a sensible default name
-        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
-            default_file = f"{self._propose_workspace_name_from_content()}.idw"
-        else:
-            default_file = self.workspace_file.name
-
-        file_path = save_file_dialog(
-            self,
-            "Save Workspace As",
-            "ImageDescriber Workspace (*.idw)|*.idw|All files (*.*)|*.*",
-            default_dir,
-            default_file
-        )
-
-        if file_path:
-            new_path = Path(file_path)
-            new_name = new_path.stem
-
-            # If name changed (or creating new), use rename/create (moves data directory too)
-            if not self.workspace_file:
-                # Create new workspace structure in the canonical Workspaces directory.
-                # We use the name from the dialog but always persist the .idw file to
-                # the standard location so "Open Workspace" can find it reliably.
-                # (Previously the .idw was written to wherever the file dialog happened
-                # to be browsed to, e.g. OneDrive, leaving the Workspaces folder empty.)
-                workspace_file, workspace_data_dir = create_workspace_structure(new_name)
-                self.workspace_file = workspace_file
-                # Create workspace object if it doesn't exist
-                if not self.workspace:
-                    self.workspace = ImageWorkspace(new_workspace=True)
-                self.workspace.directory_path = str(workspace_data_dir)
-                self.workspace.directory_paths = [str(workspace_data_dir)]
-                self.current_directory = workspace_data_dir
-                # Always save to the canonical workspace_file path, not new_path.
-                # save_workspace() would overwrite self.workspace_file with its
-                # file_path argument, so we must pass the canonical path here.
-                self.save_workspace(str(workspace_file))
-            elif new_name != self.workspace_file.stem:
-                self.rename_workspace(new_name)
-            else:
-                # Same name, different location - just save
-                self.save_workspace(str(new_path))
+        """Save workspace to a new bundle location."""
+        self._prompt_and_create_bundle("Save Workspace As")
 
     def on_save_workspace(self, event):
-        """Save current workspace"""
+        """Save workspace to its current bundle, or prompt for location if unsaved."""
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
         else:
-            self.on_save_workspace_as(event)
+            self._prompt_and_create_bundle("Save Workspace")
 
-    def save_workspace(self, file_path):
-        """Save workspace to file (runs in background thread)"""
+    def _save_bundle(self) -> None:
+        """Persist the current workspace to its open .idtw bundle."""
+        if not self.workspace_file:
+            return
+        bundle_path = Path(self.workspace_file)
         try:
-            # Check if workspace location changed (for moving extracted frames)
-            old_workspace_file = self.workspace_file
-            workspace_changed = old_workspace_file != file_path
-
-            # Get old and new workspace directories
-            if workspace_changed and old_workspace_file:
-                old_ws_path = Path(old_workspace_file)
-                old_ws_dir = old_ws_path.parent / f"{old_ws_path.stem}_workspace"
-            else:
-                old_ws_dir = None
-
-            # Update workspace file path BEFORE getting new directory
-            self.workspace_file = Path(file_path)  # Convert to Path object
-            new_ws_dir = self.get_workspace_directory()
-
-            # Update workspace metadata (must happen on main thread before worker starts)
-            self.workspace.file_path = file_path
-            self.workspace.modified = datetime.now().isoformat()
-
-            # Sync cached models to workspace
+            from idt_core.workspace import Workspace, WorkspaceItem
+            from idt_core.gui_bridge import _gui_desc_to_ws
+        except ImportError:
+            return
+        try:
+            ws = Workspace.open(bundle_path)
             self.workspace.cached_ollama_models = self.cached_ollama_models
+            self.workspace.modified = datetime.now().isoformat()
+            ws.batch_state = self.workspace.batch_state
+            ws.cached_ollama_models = self.cached_ollama_models
+            ws.modified = self.workspace.modified
+            ws.save_manifest()
 
-            # Show saving status
-            self.SetStatusText(f"Saving workspace: {Path(file_path).name}...", 0)
+            for file_path, gui_item in (self.workspace.to_dict().get("items") or {}).items():
+                if str(file_path).startswith("chat:"):
+                    continue
+                p = Path(file_path)
+                existing = ws.get_item(p.name)
+                extra = {k: v for k, v in gui_item.items() if k not in {
+                    "file_path", "item_type", "descriptions", "subfolder",
+                    "parent_video", "video_metadata", "download_url",
+                    "download_timestamp", "alt_text", "exif_datetime",
+                    "file_mtime", "is_missing",
+                }}
+                descs = [_gui_desc_to_ws(d) for d in gui_item.get("descriptions", [])]
 
-            # Start background save worker
-            self.save_workspace_worker = SaveWorkspaceWorker(
-                self,
-                workspace_data=self.workspace.to_dict(),
-                file_path=file_path,
-                old_ws_dir=old_ws_dir,
-                new_ws_dir=new_ws_dir,
-                workspace_items=self.workspace.items
-            )
-            self.save_workspace_worker.start()
+                if existing is not None:
+                    existing.descriptions = descs
+                    if existing.descriptions:
+                        existing.active_description_id = existing.descriptions[-1].id
+                    existing.is_missing = gui_item.get("is_missing", False)
+                    existing.extra.update(extra)
+                else:
+                    wi = WorkspaceItem(
+                        image=p.name,
+                        source_path=str(p),
+                        storage="reference",
+                        subfolder=gui_item.get("subfolder"),
+                    )
+                    wi.item_type = gui_item.get("item_type", "image")
+                    wi.download_url = gui_item.get("download_url")
+                    wi.download_timestamp = gui_item.get("download_timestamp")
+                    wi.alt_text = gui_item.get("alt_text")
+                    wi.exif_datetime = gui_item.get("exif_datetime")
+                    wi.file_mtime = gui_item.get("file_mtime")
+                    wi.is_missing = gui_item.get("is_missing", False) or not p.exists()
+                    wi.descriptions = descs
+                    if wi.descriptions:
+                        wi.active_description_id = wi.descriptions[-1].id
+                    wi.extra = extra
+                    existing = wi
 
-        except Exception as e:
-            show_error(self, f"Error preparing workspace save:\n{e}")
-            self.SetStatusText("Error saving workspace", 0)
+                ws.save_item(existing)
 
-    def rename_workspace(self, new_name: str) -> bool:
-        """Rename workspace and its data directory
+            self.workspace.saved = True
+            self.clear_modified()
+            self.SetStatusText(f"Saved: {bundle_path.name}", 0)
+            logger.info(f"Saved bundle: {bundle_path}")
+        except Exception as exc:
+            logger.error(f"Bundle save failed: {exc}", exc_info=True)
+            show_error(self, f"Error saving workspace bundle:\n{exc}")
 
-        Args:
-            new_name: New workspace name (without .idw extension)
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            old_idw_path = self.workspace_file
-            old_name = old_idw_path.stem
-
-            # Create new paths
-            new_idw_path = old_idw_path.parent / f"{new_name}.idw"
-            old_data_dir = get_workspace_files_directory(old_idw_path)
-            new_data_dir = old_data_dir.parent / new_name
-
-            # Rename data directory first
-            if old_data_dir.exists():
-                old_data_dir.rename(new_data_dir)
-
-            # Update all internal file paths in workspace items
-            for item in self.workspace.items.values():
-                item_path = Path(item.file_path)
-
-                # Check if path is inside workspace data directory
-                try:
-                    relative = item_path.relative_to(old_data_dir)
-                    # Update to new data directory
-                    new_path = new_data_dir / relative
-                    item.file_path = str(new_path)
-                except ValueError:
-                    # Path is external, keep as-is
-                    pass
-
-                # Update extracted_frames paths if they exist
-                if hasattr(item, 'extracted_frames') and item.extracted_frames:
-                    updated_frames = []
-                    for frame_path in item.extracted_frames:
-                        frame_path_obj = Path(frame_path)
-                        try:
-                            relative = frame_path_obj.relative_to(old_data_dir)
-                            new_frame_path = new_data_dir / relative
-                            updated_frames.append(str(new_frame_path))
-                        except ValueError:
-                            # External path, keep as-is
-                            updated_frames.append(frame_path)
-                    item.extracted_frames = updated_frames
-
-            # Update workspace directory paths
-            updated_dir_paths = []
-            for dp in self.workspace.directory_paths:
-                try:
-                    dp_path = Path(dp)
-                    relative = dp_path.relative_to(old_data_dir)
-                    new_path = new_data_dir / relative
-                    updated_dir_paths.append(str(new_path))
-                except ValueError:
-                    # External path, keep as-is
-                    updated_dir_paths.append(dp)
-            self.workspace.directory_paths = updated_dir_paths
-
-            # Save workspace with current settings to new name
-            self.save_workspace(str(new_idw_path))
-
-            # Delete old IDW file
-            if old_idw_path.exists() and old_idw_path != new_idw_path:
-                old_idw_path.unlink()
-
-            # Update instance variables
-            self.workspace_file = new_idw_path
-            self.current_directory = new_data_dir
-
-            # Update window title
-            self.update_window_title("ImageDescriber", f"{new_name}.idw")
-
-            return True
-        except Exception as e:
-            logger.error(f"Error renaming workspace: {e}")
-            show_error(self, f"Error renaming workspace:\n{e}")
-            return False
+    def _workspace_logs_dir(self):
+        """Return the logs/ dir inside the .idtw bundle, or None."""
+        if self.workspace_file and Path(self.workspace_file).is_dir():
+            return Path(self.workspace_file) / "logs"
+        return None
 
     def _propose_workspace_name_from_content(self) -> str:
         """Propose a workspace name based on content
@@ -4333,6 +4263,293 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, f"Successfully exported descriptions to:\n{file_path}")
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
+
+    def _auto_save_bundle(self) -> None:
+        """Auto-create a reference-mode .idtw bundle after batch completes with no saved workspace.
+
+        Uses reference mode (no image copy) so the bundle is lightweight — just
+        manifest.json + description sidecars.  The original images stay where they are.
+        """
+        if not self.workspace or not self.workspace.directory_paths:
+            return
+        try:
+            from idt_core.gui_bridge import gui_workspace_to_bundle
+        except ImportError:
+            return
+
+        source = Path(self.workspace.directory_paths[0])
+        bundle_path = source.parent / (source.name + ".idtw")
+        try:
+            bundle = gui_workspace_to_bundle(
+                self.workspace.to_dict(), bundle_path, copy_images=False
+            )
+            self.workspace_file = bundle.path
+            self.update_window_title("ImageDescriber", bundle.path.name)
+            self.clear_modified()
+            self.SetStatusText(f"Saved to {bundle.path}", 0)
+            logger.info(f"Auto-saved workspace bundle: {bundle.path}")
+        except Exception as exc:
+            logger.error(f"Auto-bundle save failed: {exc}", exc_info=True)
+
+    def _prompt_and_create_bundle(self, title: str = "Save Workspace Bundle") -> bool:
+        """Prompt user for a .idtw bundle location and save the workspace there.
+
+        Defaults to placing the bundle next to the source folder.
+        Returns True if saved successfully, False if the user cancelled or it failed.
+        """
+        try:
+            from idt_core.gui_bridge import gui_workspace_to_bundle
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.")
+            return False
+
+        proposed_name = self._propose_workspace_name_from_content()
+        if self.workspace and self.workspace.directory_paths:
+            source = Path(self.workspace.directory_paths[0])
+            proposed_name = source.name
+            default_parent = str(source.parent)
+        else:
+            default_parent = str(get_default_workspaces_root())
+
+        dir_dlg = wx.DirDialog(
+            self, f"{title} — choose the folder to create the bundle inside",
+            defaultPath=default_parent,
+            style=wx.DD_DEFAULT_STYLE
+        )
+        try:
+            if dir_dlg.ShowModal() != wx.ID_OK:
+                return False
+            parent_dir = dir_dlg.GetPath()
+        finally:
+            dir_dlg.Destroy()
+
+        name_dlg = wx.TextEntryDialog(
+            self,
+            "Bundle name (a folder named <name>.idtw will be created):",
+            title, proposed_name
+        )
+        try:
+            if name_dlg.ShowModal() != wx.ID_OK:
+                return False
+            name = (name_dlg.GetValue() or "").strip() or proposed_name
+        finally:
+            name_dlg.Destroy()
+
+        bundle_path = Path(parent_dir) / name
+        try:
+            with wx.BusyCursor():
+                bundle = gui_workspace_to_bundle(
+                    self.workspace.to_dict(), bundle_path, copy_images=False
+                )
+            self.workspace_file = bundle.path
+            self.update_window_title("ImageDescriber", bundle.path.name)
+            self.clear_modified()
+            self.SetStatusText(f"Saved to bundle: {bundle.path}", 0)
+            logger.info(f"Saved workspace bundle: {bundle.path}")
+            return True
+        except Exception as exc:
+            logger.error(f"Error creating bundle: {exc}", exc_info=True)
+            show_error(self, f"Error creating workspace bundle:\n{exc}")
+            return False
+
+
+    def on_save_as_idt_project(self, event):
+        """Export GUI workspace descriptions as idt_core sidecar JSON files.
+
+        This writes <source_dir>.idt/<image.jpg>.json for every described image
+        so that the CLI commands (idt status, idt stats, idt combine, idt embed,
+        idt export) can work on images described through the GUI.
+        """
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace. Load a directory and process images first.")
+            return
+
+        described = [
+            item for item in self.workspace.items.values()
+            if item.descriptions and not item.file_path.startswith("chat:")
+        ]
+        if not described:
+            show_warning(self, "No described images found. Process your images first.")
+            return
+
+        try:
+            from idt_core.project import Project
+            from idt_core.image_item import ImageItem as IdtImageItem, Description as IdtDescription
+        except ImportError:
+            show_error(self, "idt_core is not available in this build.\n"
+                             "This feature requires idt_core to be installed.")
+            return
+
+        # Group images by parent directory so each directory gets its own .idt/ mirror
+        from collections import defaultdict
+        by_dir = defaultdict(list)
+        skipped_missing = []
+        for item in described:
+            p = Path(item.file_path)
+            if not p.exists():
+                skipped_missing.append(item.file_path)
+                continue
+            by_dir[p.parent].append(item)
+
+        if not by_dir:
+            show_warning(self,
+                "None of the described images could be found on disk.\n"
+                "The files may have been moved or deleted.")
+            return
+
+        total_written = 0
+        project_dirs = []
+
+        with wx.BusyCursor():
+            for source_dir, items in by_dir.items():
+                try:
+                    project = Project.open(source_dir)
+                except Exception as exc:
+                    logging.warning(f"Could not open idt project for {source_dir}: {exc}")
+                    continue
+
+                project_dirs.append(project.idt_dir)
+
+                for gui_item in items:
+                    src = Path(gui_item.file_path)
+                    sidecar = project.sidecar_path(src)
+                    sidecar.parent.mkdir(parents=True, exist_ok=True)
+
+                    # Load existing sidecar or create fresh ImageItem
+                    if sidecar.exists():
+                        try:
+                            idt_item = IdtImageItem.load(sidecar)
+                        except Exception:
+                            idt_item = IdtImageItem(source_path=src, sidecar_path=sidecar)
+                    else:
+                        idt_item = IdtImageItem(source_path=src, sidecar_path=sidecar)
+
+                    # Map GUI descriptions → idt_core Description objects
+                    for gui_desc in gui_item.descriptions:
+                        tu = gui_desc.token_usage or {}
+                        idt_desc = IdtDescription(
+                            text=gui_desc.text,
+                            provider=gui_desc.provider or "",
+                            model=gui_desc.model or "",
+                            timestamp=gui_desc.created or "",
+                            prompt_name=gui_desc.prompt_style or "",
+                            input_tokens=tu.get("prompt_tokens") or tu.get("input_tokens"),
+                            output_tokens=tu.get("completion_tokens") or tu.get("output_tokens"),
+                            metadata_context=gui_desc.metadata.get("prompt_context") if gui_desc.metadata else None,
+                        )
+                        # Avoid duplicating descriptions already in the sidecar
+                        existing_ts = {d.timestamp for d in idt_item.descriptions}
+                        if idt_desc.timestamp not in existing_ts:
+                            idt_item.descriptions.append(idt_desc)
+
+                    idt_item.save()
+                    total_written += 1
+
+        lines = [f"Exported {total_written} image(s) to idt project format."]
+        if project_dirs:
+            lines.append("\nProject mirror(s) created:")
+            for d in sorted(project_dirs):
+                lines.append(f"  {d}")
+        if skipped_missing:
+            lines.append(f"\nSkipped {len(skipped_missing)} image(s) not found on disk.")
+        lines.append("\nYou can now use the idt CLI on these images:")
+        lines.append("  idt status <folder>")
+        lines.append("  idt stats <folder>")
+        lines.append("  idt embed <folder>")
+
+        show_info(self, "\n".join(lines))
+
+    def on_embed_descriptions(self, event):
+        """Embed AI descriptions into image metadata (EXIF/PNG tEXt chunk)."""
+        if not self.workspace or not self.workspace.items:
+            show_warning(self, "No images in workspace. Load a directory and process images first.")
+            return
+
+        described_items = [
+            item for item in self.workspace.items.values()
+            if item.descriptions
+        ]
+        if not described_items:
+            show_warning(self, "No described images found. Process your images first.")
+            return
+
+        # Default output to bundle/embedded/ when a bundle is open.
+        default_embed_dir = (
+            Path(self.workspace_file) / "embedded" if self.workspace_file else None
+        )
+        # Source root for mirroring subfolder structure.
+        source_root = None
+        if self.workspace_file:
+            bundle_images = Path(self.workspace_file) / "images"
+            if bundle_images.exists():
+                source_root = bundle_images
+            elif self.workspace and self.workspace.directory_paths:
+                source_root = Path(self.workspace.directory_paths[0])
+
+        dlg = EmbedDescriptionsDialog(self, len(described_items),
+                                      default_output_dir=default_embed_dir)
+        if dlg.ShowModal() != wx.ID_OK:
+            dlg.Destroy()
+            return
+
+        mode = dlg.get_mode()          # 'copy' or 'inplace'
+        output_dir = dlg.get_output_dir()  # Path or None
+        dlg.Destroy()
+
+        try:
+            from embed_descriptions import EmbedDescriptions
+        except ImportError:
+            show_error(self, "embed_descriptions module is not available.")
+            return
+
+        in_place = (mode == 'inplace')
+
+        try:
+            with wx.BusyCursor():
+                workspace_data = self.workspace.to_dict()
+                embedder = EmbedDescriptions()
+                result = embedder.embed_from_workspace(
+                    workspace_data,
+                    output_dir=output_dir,
+                    in_place=in_place,
+                    source_root=source_root,
+                )
+        except Exception as e:
+            show_error(self, f"Error embedding descriptions:\n{e}")
+            return
+
+        summary_lines = [result.summary()]
+        if output_dir and not in_place:
+            summary_lines.append(f"\nOutput folder:\n{output_dir}")
+
+        if result.errors:
+            summary_lines.append("\nErrors:")
+            summary_lines.extend(f"  {err}" for err in result.errors[:5])
+            if len(result.errors) > 5:
+                summary_lines.append(f"  ...and {len(result.errors) - 5} more")
+
+        msg = '\n'.join(summary_lines)
+
+        if result.embedded > 0 and output_dir and not in_place:
+            answer = wx.MessageBox(
+                msg + "\n\nOpen output folder?",
+                "Embed Complete",
+                wx.YES_NO | wx.ICON_INFORMATION,
+                self
+            )
+            if answer == wx.YES:
+                try:
+                    import subprocess as _sp
+                    if sys.platform == 'win32':
+                        _sp.Popen(['explorer', str(output_dir)])
+                    elif sys.platform == 'darwin':
+                        _sp.Popen(['open', str(output_dir)])
+                    else:
+                        _sp.Popen(['xdg-open', str(output_dir)])
+                except Exception:
+                    pass
+        else:
+            show_info(self, msg)
 
     def on_export_html_gallery(self, event):
         """Export described images as a self-contained HTML gallery folder."""
@@ -4969,7 +5186,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # CRITICAL: Save workspace immediately to persist download_url metadata
             if self.workspace_file:
-                self.save_workspace(self.workspace_file)
+                self._save_bundle()
 
             # Check if auto-processing is enabled
             process_after = False
@@ -5098,9 +5315,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
         self.update_window_title("ImageDescriber", doc_name)
 
-        # Save workspace
+        # Save workspace (or auto-create a .idtw bundle next to the source folder)
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
+        else:
+            self._auto_save_bundle()
 
         # Return keyboard focus to image list
         self.image_list.SetFocus()
@@ -5213,20 +5432,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Clear scan worker reference
         self.scan_worker = None
 
-    def on_workspace_save_complete(self, event):
-        """Handle successful workspace save completion"""
-        # Update UI state (must run on main thread)
-        self.workspace.saved = True
-        self.clear_modified()
-        self.update_window_title("ImageDescriber", Path(event.file_path).name)
-        self.SetStatusText(f"Workspace saved: {Path(event.file_path).name}", 0)
-        logger.info(f"Workspace saved successfully: {event.file_path}")
-
-    def on_workspace_save_failed(self, event):
-        """Handle workspace save failure"""
-        self.SetStatusText(f"Error saving workspace", 0)
-        logger.error(f"Workspace save failed: {event.error}")
-        show_error(self, f"Error saving workspace:\n{event.error}")
 
     # ------------------------------------------------------------------
     # Refresh Folder from Disk
@@ -5436,7 +5641,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Save workspace (preserves paused state)
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
 
         self.SetStatusText("Batch processing paused", 0)
 
@@ -5497,7 +5702,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Save workspace
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
 
         # Clear worker reference
         self.batch_worker = None
@@ -5562,7 +5767,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     item.processing_state = None
                     item.batch_queue_position = None
             if self.workspace_file:
-                self.save_workspace(self.workspace_file)
+                self._save_bundle()
 
     def resume_batch_processing(self):
         """Resume batch processing from saved state"""
@@ -5614,7 +5819,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             custom_prompt=custom_prompt,
             detection_settings=detection_settings,
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
-            skip_existing=True  # Always skip completed
+            skip_existing=True,  # Always skip completed
+            geocode=batch_state.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
@@ -5689,7 +5896,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Load defaults from config file, then overlay dialog settings
         try:
-            from config_loader import load_json_config
+            from idt_core.config_loader import load_json_config
             video_config, _, _ = load_json_config('video_frame_extractor_config.json')
             if video_config:
                 extraction_config = {
@@ -5775,7 +5982,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Use defaults
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'llava'),
+                'model': self.config.get('default_model', DEFAULT_OLLAMA_MODEL),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
@@ -5812,7 +6019,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if options is None:
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
-                'model': self.config.get('default_model', 'moondream'),
+                'model': self.config.get('default_model', 'llama3.2-vision'),
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
                 'skip_existing': True
@@ -5877,7 +6084,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             None,  # detection_settings
             None,  # prompt_config_path
             options.get('skip_existing', True),
-            progress_offset=0
+            progress_offset=0,
+            geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
@@ -5887,7 +6096,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Save workspace
         if self.workspace_file:
-            self.save_workspace(self.workspace_file)
+            self._save_bundle()
 
         self.SetStatusText(f"Processing {len(to_process)} downloaded images...", 0)
 
@@ -5948,7 +6157,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             custom_prompt=options.get('custom_prompt'),
             detection_settings=options.get('detection_settings'),
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
-            skip_existing=True
+            skip_existing=True,
+            geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
         )
         self.batch_worker.start()
 
@@ -6186,7 +6397,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                 # Save workspace after chat closes and refresh tree
                 if self.workspace_file:
-                    self.save_workspace(self.workspace_file)
+                    self._save_bundle()
                 self.refresh_image_list()
             else:
                 chat_dialog.Destroy()
@@ -6221,7 +6432,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Determine provider and model from the most recent description that has both
         provider = 'ollama'
-        model = 'llava:latest'
+        model = self.config.get('default_model', DEFAULT_OLLAMA_MODEL)
         for desc in reversed(chat_item.descriptions):
             if desc.provider and desc.model:
                 provider = desc.provider
@@ -6242,7 +6453,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # Persist any new turns added in this session
             if self.workspace_file:
-                self.save_workspace(self.workspace_file)
+                self._save_bundle()
             self.refresh_image_list()
         except Exception as e:
             import traceback
@@ -6274,7 +6485,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Get original provider and model from the description
         # Default to config values if not stored in description
         original_provider = focused_description.provider or self.config.get('default_provider', 'ollama')
-        original_model = focused_description.model or self.config.get('default_model', 'moondream')
+        original_model = focused_description.model or self.config.get('default_model', 'llama3.2-vision')
 
         # Show dialog with model selection
         from dialogs_wx import FollowupQuestionDialog
@@ -6349,7 +6560,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Process with default settings
         options = {
             'provider': self.config.get('default_provider', 'ollama'),
-            'model': self.config.get('default_model', 'moondream'),
+            'model': self.config.get('default_model', 'llama3.2-vision'),
         }
 
         self.SetStatusText("Generating name with AI...", 0)
@@ -7026,9 +7237,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     msg = (
                         "✓ Ollama is already installed and running!\n\n"
                         "You can pull models using:\n"
-                        "  ollama pull moondream\n"
-                        "  ollama pull llava\n"
-                        "  ollama pull llama3.2-vision\n\n"
+                        "  ollama pull llama3.2-vision  (default, recommended)\n"
+                        "  ollama pull moondream        (lightweight, CPU-friendly)\n"
+                        "  ollama pull llava\n\n"
                         "Or use Process → Refresh AI Models to see what's available."
                     )
                     from shared.wx_common import show_info
@@ -7067,7 +7278,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     from shared.wx_common import show_info
                     show_info(self, "Opening Browser",
                              "Opening ollama.ai download page.\n\n"
-                             "After installing, run: ollama pull moondream")
+                             "After installing, run: ollama pull llama3.2-vision")
                 elif result == wx.ID_NO:
                     # Copy command to clipboard
                     install_cmd = "curl -fsSL https://ollama.ai/install.sh | sh"
@@ -7077,7 +7288,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                                  f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
                                  "1. Open Terminal\n"
                                  "2. Paste (Cmd+V) and press Enter\n"
-                                 "3. After install: ollama pull moondream")
+                                 "3. After install: ollama pull llama3.2-vision")
 
             elif sys.platform == 'win32':
                 # Windows
@@ -7110,7 +7321,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     from shared.wx_common import show_info
                     show_info(self, "Opening Browser",
                              "Opening ollama.ai download page.\n\n"
-                             "After installing, run: ollama pull moondream")
+                             "After installing, run: ollama pull llama3.2-vision")
                 elif result == wx.ID_NO:
                     # Copy command to clipboard
                     install_cmd = "winget install ollama"
@@ -7120,7 +7331,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                                  f"Installation command copied to clipboard:\n\n{install_cmd}\n\n"
                                  "1. Open Command Prompt or PowerShell\n"
                                  "2. Paste (Ctrl+V) and press Enter\n"
-                                 "3. After install: ollama pull moondream")
+                                 "3. After install: ollama pull llama3.2-vision")
 
             else:
                 # Linux or other
@@ -7437,22 +7648,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.confirm_unsaved_changes():
             logger.info("User confirmed close - cleaning up and destroying window")
 
-            # Clean up empty Untitled workspaces before closing (if any)
-            if self.workspace_file and is_untitled_workspace(self.workspace_file.stem):
-                # Check if workspace is empty (no items or only empty directories)
+            # Clean up empty Untitled bundles before closing
+            if self.workspace_file and is_untitled_workspace(Path(self.workspace_file).stem):
                 if not self.workspace.items or len(self.workspace.items) == 0:
                     try:
-                        # Delete workspace data directory
-                        data_dir = get_workspace_files_directory(self.workspace_file)
-                        if data_dir.exists():
+                        bundle = Path(self.workspace_file)
+                        if bundle.is_dir():
                             import shutil
-                            shutil.rmtree(data_dir)
-
-                        # Delete IDW file
-                        if self.workspace_file.exists():
-                            self.workspace_file.unlink()
-
-                        logger.info(f"Cleaned up empty Untitled workspace: {self.workspace_file.name}")
+                            shutil.rmtree(bundle)
+                        logger.info(f"Cleaned up empty Untitled workspace: {bundle.name}")
                     except Exception as e:
                         logger.warning(f"Failed to clean up Untitled workspace: {e}")
 
