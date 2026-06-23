@@ -36,9 +36,8 @@ else:
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-# Import config_loader for frozen mode compatibility
 try:
-    from config_loader import load_json_config
+    from idt_core.config_loader import load_json_config
 except ImportError:
     load_json_config = None
 
@@ -47,14 +46,10 @@ try:
 except ImportError:
     DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
 
-# Import web image downloader for URL downloads
 try:
-    from web_image_downloader import WebImageDownloader
+    from idt_core.downloader import WebImageDownloader
 except ImportError:
-    try:
-        from scripts.web_image_downloader import WebImageDownloader
-    except ImportError:
-        WebImageDownloader = None
+    WebImageDownloader = None
 
 # Import AI providers
 try:
@@ -66,40 +61,20 @@ except ImportError:
         get_available_providers = None
         get_all_providers = None
 
-# Import metadata extractor and geocoder
-MetadataExtractor = None
-NominatimGeocoder = None
 try:
-    from metadata_extractor import MetadataExtractor, NominatimGeocoder
+    from idt_core.metadata import MetadataExtractor, NominatimGeocoder
 except ImportError:
-    try:
-        from scripts.metadata_extractor import MetadataExtractor, NominatimGeocoder
-    except ImportError:
-        pass
+    MetadataExtractor = None
+    NominatimGeocoder = None
 
-# idt_core metadata — used for prompt context injection (date/location/camera → AI prompt)
-# Kept separate from the legacy MetadataExtractor above so the GUI's existing metadata
-# display/geocoding pipeline is not disturbed.
-_IDTCoreMetadataExtractor = None
-_IDTCoreNominatimGeocoder = None
-try:
-    from idt_core.metadata import MetadataExtractor as _IDTCoreMetadataExtractor
-    from idt_core.metadata import NominatimGeocoder as _IDTCoreNominatimGeocoder
-except ImportError:
-    pass
+_IDTCoreMetadataExtractor = MetadataExtractor
+_IDTCoreNominatimGeocoder = NominatimGeocoder
 
-# Import video metadata extractor and EXIF embedder (GPS embedding into extracted frames)
-VideoMetadataExtractor = None
-ExifEmbedder = None
 try:
-    from video_metadata_extractor import VideoMetadataExtractor
-    from exif_embedder import ExifEmbedder
+    from idt_core.video import VideoMetadataExtractor, ExifEmbedder
 except ImportError:
-    try:
-        from scripts.video_metadata_extractor import VideoMetadataExtractor
-        from scripts.exif_embedder import ExifEmbedder
-    except ImportError:
-        pass
+    VideoMetadataExtractor = None
+    ExifEmbedder = None
 
 # Create custom event types for thread communication
 ProgressUpdateEvent, EVT_PROGRESS_UPDATE = wx.lib.newevent.NewEvent()
@@ -2151,11 +2126,6 @@ class VideoProcessingWorker(threading.Thread):
 
         # Try to use enhanced scene detector
         try:
-            # Add scripts path for import
-            scripts_path = _project_root / 'scripts'
-            if str(scripts_path) not in sys.path:
-                sys.path.insert(0, str(scripts_path))
-            
             from enhanced_scene_detector import EnhancedSceneDetector
             
             self._post_progress("Using enhanced scene detection...")
@@ -2331,9 +2301,7 @@ class HEICConversionWorker(threading.Thread):
     def run(self):
         """Convert HEIC files to JPEG"""
         try:
-            # Import conversion function from scripts
-            sys.path.insert(0, str(_project_root / 'scripts'))
-            from ConvertImage import convert_heic_to_jpg
+            from idt_core.converter import convert_heic_to_jpg
             
             converted = []
             failed = []
@@ -2748,11 +2716,6 @@ class VideoDescriptionWorker(threading.Thread):
     def run(self):
         """Process video in background thread"""
         try:
-            # Use module-level _project_root which handles both frozen and dev mode
-            scripts_path = _project_root / "scripts"
-            if str(scripts_path) not in sys.path:
-                sys.path.insert(0, str(scripts_path))
-
             from video_describer import VideoDescriber
 
             # Create describer with options

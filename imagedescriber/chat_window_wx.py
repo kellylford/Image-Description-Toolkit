@@ -843,16 +843,10 @@ class ChatWindow(wx.Dialog):
 
             # Try imports
             try:
-                # Try direct import first
-                from config_loader import load_json_config
+                from idt_core.config_loader import load_json_config
                 load_json_config_func = load_json_config
             except ImportError:
-                try:
-                    # Try scripts package import
-                    from scripts.config_loader import load_json_config
-                    load_json_config_func = load_json_config
-                except ImportError:
-                    pass
+                pass
 
             config = None
             if load_json_config_func:
@@ -1162,10 +1156,7 @@ class ChatWindow(wx.Dialog):
                     # Convert HEIC/HEIF to JPEG before attaching (providers can't read HEIC directly)
                     if Path(path).suffix.lower() in ('.heic', '.heif'):
                         try:
-                            try:
-                                from ConvertImage import convert_heic_to_jpg
-                            except ImportError:
-                                from scripts.ConvertImage import convert_heic_to_jpg
+                            from idt_core.converter import convert_heic_to_jpg
                             import tempfile
                             tmp_dir = tempfile.mkdtemp(prefix="idt_chat_")
                             jpg_path = str(Path(tmp_dir) / (Path(path).stem + ".jpg"))
@@ -1292,22 +1283,10 @@ class ChatWindow(wx.Dialog):
         size = 0
         try:
             if self.provider == 'claude':
-                try:
-                    from models.claude_models import CLAUDE_MODEL_METADATA
-                except ImportError:
-                    try:
-                        from claude_models import CLAUDE_MODEL_METADATA
-                    except ImportError:
-                        CLAUDE_MODEL_METADATA = {}
+                from idt_core.providers.claude import CLAUDE_MODEL_METADATA
                 size = CLAUDE_MODEL_METADATA.get(self.model, {}).get('context_window', 200_000)
             elif self.provider == 'openai':
-                try:
-                    from models.openai_models import OPENAI_MODEL_METADATA
-                except ImportError:
-                    try:
-                        from openai_models import OPENAI_MODEL_METADATA
-                    except ImportError:
-                        OPENAI_MODEL_METADATA = {}
+                from idt_core.providers.openai_provider import OPENAI_MODEL_METADATA
                 size = OPENAI_MODEL_METADATA.get(self.model, {}).get('context_window', 128_000)
             elif self.provider == 'ollama':
                 try:

@@ -40,10 +40,10 @@ def _load_shared_config() -> tuple[dict[str, str], str, str]:
     → "default_model". All Python code reads from there at import time.
     """
     try:
-        from config_loader import load_json_config          # frozen mode
+        from idt_core.config_loader import load_json_config
     except ImportError:
         try:
-            from scripts.config_loader import load_json_config  # dev mode
+            from config_loader import load_json_config          # frozen mode
         except ImportError:
             return dict(_FALLBACK_PROMPTS), _FALLBACK_DEFAULT_PROMPT, "llama3.2-vision"
 

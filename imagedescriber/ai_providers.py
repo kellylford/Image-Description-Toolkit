@@ -89,61 +89,14 @@ DEV_OLLAMA_CLOUD_MODELS = [
     "qwen3-coder:480b-cloud"
 ]
 
-# Import OpenAI models from central configuration
-# IMPORTANT: DO NOT define models here - use models/openai_models.py as single source of truth
-try:
-    from models.openai_models import OPENAI_MODELS as DEV_OPENAI_MODELS
-except ImportError:
-    # Fallback if models package not available — verified working 2026-02-23
-    DEV_OPENAI_MODELS = [
-        "gpt-5.2",
-        "gpt-5.1",
-        "gpt-5",
-        "gpt-5-mini",
-        "gpt-5-nano",
-        "o4-mini",
-        "o3",
-        "o1",
-        "gpt-4o",
-        "gpt-4o-mini",
-        "gpt-4.1",
-        "gpt-4.1-mini",
-        "gpt-4.1-nano",
-        # Removed: gpt-5.2-pro, gpt-5-pro (404), o3-mini, gpt-4-turbo (no vision),
-        #          chatgpt-4o-latest (deprecated), o1-mini/o1-preview (deprecated)
-    ]
-
-# Import Claude models from central configuration
-# IMPORTANT: DO NOT define models here - use models/claude_models.py as single source of truth
-try:
-    from models.claude_models import (
-        CLAUDE_MODELS as DEV_CLAUDE_MODELS,
-        CLAUDE_MODEL_METADATA,
-        get_claude_model_info,
-        format_claude_model_for_display,
-        get_claude_api_id_from_display,
-    )
-except ImportError:
-    # Fallback if models package not available
-    DEV_CLAUDE_MODELS = [
-        "claude-opus-4-6",
-        "claude-sonnet-4-5-20250929",
-        "claude-haiku-4-5-20251001",
-    ]
-    CLAUDE_MODEL_METADATA = {
-        "claude-opus-4-6":           {"name": "Claude Opus 4.6"},
-        "claude-sonnet-4-5-20250929": {"name": "Claude Sonnet 4.5"},
-        "claude-haiku-4-5-20251001":  {"name": "Claude Haiku 4.5"},
-    }
-    def get_claude_model_info(model_id: str):
-        return CLAUDE_MODEL_METADATA.get(model_id, {"name": model_id})
-    def format_claude_model_for_display(model_id: str, include_description: bool = False) -> str:
-        return CLAUDE_MODEL_METADATA.get(model_id, {}).get("name", model_id)
-    def get_claude_api_id_from_display(display_name_or_id: str) -> str:
-        for api_id, meta in CLAUDE_MODEL_METADATA.items():
-            if meta.get("name") == display_name_or_id:
-                return api_id
-        return display_name_or_id
+from idt_core.providers.openai_provider import OPENAI_MODELS as DEV_OPENAI_MODELS
+from idt_core.providers.claude import (
+    CLAUDE_MODELS as DEV_CLAUDE_MODELS,
+    CLAUDE_MODEL_METADATA,
+    get_claude_model_info,
+    format_claude_model_for_display,
+    get_claude_api_id_from_display,
+)
 
 
 def sort_claude_models(models: List[str]) -> List[str]:
@@ -561,27 +514,19 @@ class OpenAIProvider(AIProvider):
         # 1. Try standard config_loader import
         load_json_config = None
         try:
-            # Import config_loader if available
-            try:
-                from config_loader import load_json_config
-            except ImportError:
-                try:
-                    from scripts.config_loader import load_json_config
-                except ImportError:
-                    load_json_config = None
-
-            if load_json_config:
-                config, _, _ = load_json_config('image_describer_config.json')
-                if config:
-                    api_keys = config.get('api_keys', {})
-                    for key in ['OpenAI', 'openai', 'OPENAI']:
-                        if key in api_keys and api_keys[key]:
-                            return api_keys[key].strip()
-        except Exception as e:
-            pass  # Silently continue to fallback
+            from idt_core.config_loader import load_json_config
+            config, _, _ = load_json_config('image_describer_config.json')
+            if config:
+                api_keys = config.get('api_keys', {})
+                for key in ['OpenAI', 'openai', 'OPENAI']:
+                    if key in api_keys and api_keys[key]:
+                        return api_keys[key].strip()
+        except Exception:
+            pass
 
         # 2. Manual Fallback
         try:
+            from idt_core.config_loader import get_user_config_dir
             candidates = []
             if getattr(sys, 'frozen', False):
                 base_dir = Path(sys.executable).parent
@@ -592,19 +537,7 @@ class OpenAIProvider(AIProvider):
             else:
                 base_dir = Path(__file__).parent.parent
                 candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
-            
-            # Also check the platform user config dir (AppData on Windows,
-            # ~/Library/Application Support/IDT on macOS) — this is where
-            # Configure Settings writes the key in the frozen exe.
-            try:
-                from config_loader import get_user_config_dir
-            except ImportError:
-                try:
-                    from scripts.config_loader import get_user_config_dir
-                except ImportError:
-                    get_user_config_dir = None
-            if get_user_config_dir:
-                candidates.append(get_user_config_dir() / 'image_describer_config.json')
+            candidates.append(get_user_config_dir() / 'image_describer_config.json')
 
             candidates.append(Path.cwd() / 'image_describer_config.json')
             
@@ -960,28 +893,19 @@ class ClaudeProvider(AIProvider):
         # 1. Try standard config_loader import
         load_json_config = None
         try:
-            # Import config_loader if available
-            try:
-                from config_loader import load_json_config
-            except ImportError:
-                try:
-                    from scripts.config_loader import load_json_config
-                except ImportError:
-                    load_json_config = None
+            from idt_core.config_loader import load_json_config
+            config, p, s = load_json_config('image_describer_config.json')
+            if config:
+                api_keys = config.get('api_keys', {})
+                for key in ['Claude', 'claude', 'CLAUDE']:
+                    if key in api_keys and api_keys[key]:
+                        return api_keys[key].strip()
+        except Exception:
+            pass
 
-            if load_json_config:
-                config, p, s = load_json_config('image_describer_config.json')
-                if config:
-                    api_keys = config.get('api_keys', {})
-                    for key in ['Claude', 'claude', 'CLAUDE']:
-                        if key in api_keys and api_keys[key]:
-                            return api_keys[key].strip()
-        except Exception as e:
-            pass  # Silently continue to fallback
-
-        # 2. Manual Fallback: Search for JSON file directly
-        # This bypasses import issues in frozen builds
+        # 2. Manual Fallback
         try:
+            from idt_core.config_loader import get_user_config_dir
             candidates = []
             if getattr(sys, 'frozen', False):
                 base_dir = Path(sys.executable).parent
@@ -992,18 +916,7 @@ class ClaudeProvider(AIProvider):
             else:
                 base_dir = Path(__file__).parent.parent
                 candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
-            
-            # Also check the platform user config dir (AppData on Windows) —
-            # this is where Configure Settings writes the key in the frozen exe.
-            try:
-                from config_loader import get_user_config_dir
-            except ImportError:
-                try:
-                    from scripts.config_loader import get_user_config_dir
-                except ImportError:
-                    get_user_config_dir = None
-            if get_user_config_dir:
-                candidates.append(get_user_config_dir() / 'image_describer_config.json')
+            candidates.append(get_user_config_dir() / 'image_describer_config.json')
 
             candidates.append(Path.cwd() / 'image_describer_config.json')
             
@@ -1700,16 +1613,7 @@ class MLXProvider(AIProvider):
         Returns an empty list if the key is absent or the config cannot be read.
         """
         try:
-            load_json_config = None
-            try:
-                from config_loader import load_json_config
-            except ImportError:
-                try:
-                    from scripts.config_loader import load_json_config
-                except ImportError:
-                    pass
-            if load_json_config is None:
-                return []
+            from idt_core.config_loader import load_json_config
             config, _, _ = load_json_config('image_describer_config.json')
             if not config:
                 return []

@@ -42,16 +42,11 @@ a = Analysis(
     pathex=[
         str(project_root),
         str(project_root / 'imagedescriber'),
-        str(project_root / 'scripts'),
         str(project_root / 'shared'),
-        str(project_root / 'models'),
     ],
     binaries=wx_binaries + cv2_binaries + mlx_vlm_binaries + mlx_binaries + torch_binaries,
     datas=[
         (str(project_root / 'scripts' / '*.json'), 'scripts'),
-        (str(project_root / 'scripts' / 'video_describer.py'), 'scripts'),
-        (str(project_root / 'scripts' / 'enhanced_scene_detector.py'), 'scripts'),
-        (str(project_root / 'scripts' / 'embed_descriptions.py'), 'scripts'),
         (str(project_root / 'VERSION'), '.'),
     ] + wx_datas + cv2_datas + mlx_vlm_datas + mlx_datas + torch_datas,
     hiddenimports=[
@@ -85,11 +80,6 @@ a = Analysis(
         'batch_progress_dialog',  # Phase 3: Batch progress dialog (frozen mode)
         'workspace_stats_dialog',  # Workspace Statistics dialog (frozen mode)
         'workspace_manager',  # .idtw bundle save/load (frozen bare name)
-        'scripts.metadata_extractor',
-        'scripts.versioning',
-        'scripts.config_loader',
-        'scripts.embed_descriptions',
-        'embed_descriptions',  # frozen mode bare name
         # idt_core package — EXIF context injection, Save/Import idt Project, XMP embed
         'idt_core',
         'idt_core.project',
@@ -103,10 +93,12 @@ a = Analysis(
         'idt_core.embedder',
         'idt_core.exporter',
         'idt_core.config',
+        'idt_core.config_loader',
         'idt_core.converter',
         'idt_core.progress',
         'idt_core.watcher',
         'idt_core.downloader',
+        'idt_core.gallery_exporter',
         'idt_core.video',
         'idt_core.providers',
         'idt_core.providers.base',
@@ -114,19 +106,6 @@ a = Analysis(
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
         'idt_core.providers.florence',
-        'scripts.descriptions_to_html',  # HTML export functionality
-        'scripts.gallery_exporter',       # HTML gallery export
-        'scripts.web_image_downloader',  # URL image downloader
-        'scripts.video_describer',       # Video description feature
-        'scripts.enhanced_scene_detector',  # Enhanced scene detection
-        'video_describer',               # Frozen mode: bare module name
-        'enhanced_scene_detector',       # Frozen mode: bare module name
-        'models.provider_configs',
-        'models.claude_models',  # Central Claude model configuration
-        'models.openai_models',  # Central OpenAI model configuration
-        'models.model_options',
-        'metadata_extractor',
-        'web_image_downloader',  # URL image downloader (frozen mode)
         'ollama',
         'openai',
         'anthropic',

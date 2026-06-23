@@ -78,3 +78,52 @@ def _pil_image_to_jpeg_bytes(img) -> tuple[bytes, str]:
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=92, optimize=True)
     return buf.getvalue(), "image/jpeg"
+
+
+def convert_heic_to_jpg(
+    input_path: Path,
+    output_path: Path | None = None,
+    quality: int = 95,
+    keep_metadata: bool = True,
+    max_file_size: int = 4_718_592,  # 4.5 MB — safe under Claude's 5 MB limit
+) -> bool:
+    """Convert a HEIC/HEIF file to JPEG with progressive quality reduction if needed.
+
+    Returns True on success, False on failure.
+    """
+    try:
+        import pillow_heif
+        from PIL import Image
+    except ImportError:
+        raise ImportError("pillow-heif is required: pip install pillow-heif")
+
+    pillow_heif.register_heif_opener()
+    input_path = Path(input_path)
+    output_path = Path(output_path) if output_path else input_path.with_suffix(".jpg")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with Image.open(input_path) as img:
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            exif_data = img.info.get("exif", b"") if keep_metadata else b""
+
+            current_quality = quality
+            for _ in range(10):
+                save_kwargs: dict = {"format": "JPEG", "quality": current_quality, "optimize": True}
+                if exif_data:
+                    save_kwargs["exif"] = exif_data
+                img.save(output_path, **save_kwargs)
+                if output_path.stat().st_size <= max_file_size:
+                    break
+                if current_quality > 75:
+                    current_quality -= 5
+                else:
+                    # Resize to 75 %
+                    img = img.resize(
+                        (int(img.width * 0.75), int(img.height * 0.75)),
+                        Image.LANCZOS,
+                    )
+        return True
+    except Exception:
+        return False

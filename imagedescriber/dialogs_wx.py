@@ -38,15 +38,10 @@ from shared.wx_common import (
     save_file_dialog,
 )
 
-# Import config loader for prompt loading
 try:
-    from scripts.config_loader import load_json_config
+    from idt_core.config_loader import load_json_config
 except ImportError:
-    try:
-        from config_loader import load_json_config
-    except ImportError:
-        load_json_config = None
-        logging.error("Failed to import load_json_config from both scripts.config_loader and config_loader")
+    load_json_config = None
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -365,13 +360,7 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
         return f"{model_id} — Local AI model running via Ollama. No API key or cloud cost."
 
     if provider == "openai":
-        try:
-            from models.openai_models import OPENAI_MODEL_METADATA
-        except ImportError:
-            try:
-                from openai_models import OPENAI_MODEL_METADATA
-            except ImportError:
-                return ""
+        from idt_core.providers.openai_provider import OPENAI_MODEL_METADATA
         meta = OPENAI_MODEL_METADATA.get(model_id)
         if not meta:
             return f"{model_id} — OpenAI model. See openai.com/api/pricing for cost details."
@@ -391,13 +380,7 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
         return line
 
     if provider == "claude":
-        try:
-            from models.claude_models import CLAUDE_MODEL_METADATA
-        except ImportError:
-            try:
-                from claude_models import CLAUDE_MODEL_METADATA
-            except ImportError:
-                return ""
+        from idt_core.providers.claude import CLAUDE_MODEL_METADATA
         meta = CLAUDE_MODEL_METADATA.get(model_id, {})
         if not meta:
             return f"{model_id} — Anthropic Claude model. See anthropic.com/pricing for costs."

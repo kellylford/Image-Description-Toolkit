@@ -102,10 +102,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         # Windows) so it could create a shadow copy next to the exe that would
         # then shadow the user's real config.  config_loader.load_json_config()
         # uses the authoritative resolution order and is consistent with the CLI.
-        try:
-            from config_loader import load_json_config, get_user_config_dir
-        except ImportError:
-            from scripts.config_loader import load_json_config, get_user_config_dir
+        from idt_core.config_loader import load_json_config, get_user_config_dir
         _cfg, _cfg_path, _cfg_source = load_json_config('image_describer_config.json')
         # If config was loaded from the read-only bundled location (_MEIPASS),
         # redirect writes to the user config dir so edits persist correctly.

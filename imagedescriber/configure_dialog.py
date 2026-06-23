@@ -424,15 +424,9 @@ class ConfigureDialog(wx.Dialog):
             # --- Frozen mode: write to user-writable location ---
             import shutil
             try:
-                from config_loader import get_user_config_dir
-            except ImportError:
-                # Fallback if config_loader not on path yet
-                try:
-                    scripts_path = Path(sys._MEIPASS) / 'scripts'
-                    sys.path.insert(0, str(scripts_path))
-                    from config_loader import get_user_config_dir
-                except Exception:
-                    get_user_config_dir = None  # type: ignore
+                from idt_core.config_loader import get_user_config_dir
+            except Exception:
+                get_user_config_dir = None  # type: ignore
 
             if get_user_config_dir is not None:
                 user_dir = get_user_config_dir()

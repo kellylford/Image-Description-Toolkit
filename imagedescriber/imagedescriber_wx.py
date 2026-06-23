@@ -97,17 +97,11 @@ except ImportError:
     cv2 = None
 
 # Video metadata and EXIF embedding (GPS extraction from video files via ffprobe)
-VideoMetadataExtractor = None
-ExifEmbedder = None
 try:
-    from video_metadata_extractor import VideoMetadataExtractor
-    from exif_embedder import ExifEmbedder
+    from idt_core.video import VideoMetadataExtractor, ExifEmbedder
 except ImportError:
-    try:
-        from scripts.video_metadata_extractor import VideoMetadataExtractor
-        from scripts.exif_embedder import ExifEmbedder
-    except ImportError:
-        pass
+    VideoMetadataExtractor = None
+    ExifEmbedder = None
 
 try:
     import openai
@@ -144,12 +138,9 @@ except ImportError:
 
 # Gallery HTML exporter
 try:
-    import gallery_exporter
+    from idt_core import gallery_exporter
 except ImportError:
-    try:
-        import scripts.gallery_exporter as gallery_exporter
-    except ImportError:
-        gallery_exporter = None
+    gallery_exporter = None
 
 # Import chat feature components
 try:
@@ -179,15 +170,8 @@ try:
 except ImportError:
     DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
 
-# Import shared metadata extraction module
 try:
-    if getattr(sys, 'frozen', False):
-        scripts_dir = Path(sys.executable).parent / "scripts"
-    else:
-        scripts_dir = Path(__file__).parent.parent / "scripts"
-    if str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
-    from metadata_extractor import MetadataExtractor, NominatimGeocoder
+    from idt_core.metadata import MetadataExtractor, NominatimGeocoder
 except ImportError:
     MetadataExtractor = None
     NominatimGeocoder = None
@@ -850,10 +834,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         saved via Configure Settings was previously being silently ignored.
         """
         try:
-            try:
-                from config_loader import load_json_config
-            except ImportError:
-                from scripts.config_loader import load_json_config
+            from idt_core.config_loader import load_json_config
             self.config, self.config_file, _ = load_json_config('image_describer_config.json')
         except Exception as e:
             print(f"Warning: Could not load config: {e}")
@@ -3803,7 +3784,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Load extraction config
         try:
-            from config_loader import load_json_config
+            from idt_core.config_loader import load_json_config
             video_config, _, _ = load_json_config('video_frame_extractor_config.json')
             if video_config:
                 extraction_config = {
@@ -4518,15 +4499,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         try:
             from embed_descriptions import EmbedDescriptions
         except ImportError:
-            try:
-                import sys as _sys
-                scripts_dir = Path(__file__).parent.parent / 'scripts'
-                if str(scripts_dir) not in _sys.path:
-                    _sys.path.insert(0, str(scripts_dir))
-                from embed_descriptions import EmbedDescriptions
-            except ImportError:
-                show_error(self, "embed_descriptions module is not available.")
-                return
+            show_error(self, "embed_descriptions module is not available.")
+            return
 
         in_place = (mode == 'inplace')
 
@@ -5922,7 +5896,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Load defaults from config file, then overlay dialog settings
         try:
-            from config_loader import load_json_config
+            from idt_core.config_loader import load_json_config
             video_config, _, _ = load_json_config('video_frame_extractor_config.json')
             if video_config:
                 extraction_config = {
