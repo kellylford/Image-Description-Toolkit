@@ -18,7 +18,7 @@
 Pillow>=10.0.0          # Image processing (all components)
 requests>=2.25.0        # HTTP requests for AI providers
 ollama>=0.6.2           # Ollama Python client
-psutil>=5.9.0           # System/hardware information for environment logging
+psutil>=7.2.2           # System/hardware information for environment logging
 
 # HEIC/HEIF Support (Strongly recommended for iPhone/iOS photos)
 # Without this, HEIC files lose GPS location and camera metadata
