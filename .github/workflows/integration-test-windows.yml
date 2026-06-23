@@ -137,7 +137,7 @@ jobs:
     # ------------------------------------------------------------------ #
     #  6. Run idt describe on testimages/                                  #
     #     This auto-extracts video frames, describes all images+frames,   #
-    #     and generates an HTML report in testimages.idtw/reports/.        #
+    #     and generates an HTML report under ~/Documents/idt/              #
     # ------------------------------------------------------------------ #
     - name: Run idt describe with minicpm-v4.6
       shell: pwsh
@@ -153,20 +153,58 @@ jobs:
           exit $exitCode
         }
 
+    - name: Set workspace path
+      shell: pwsh
+      run: |
+        $wsPath = [Environment]::GetFolderPath('MyDocuments') + '\idt\testimages.idtw'
+        Write-Host "IDT_WORKSPACE=$wsPath"
+        echo "IDT_WORKSPACE=$wsPath" >> $env:GITHUB_ENV
+
     # ------------------------------------------------------------------ #
-    #  7. Verify workspace bundle was created                              #
+    #  7. Verify workspace bundle was created with correct structure       #
     # ------------------------------------------------------------------ #
     - name: Verify workspace bundle structure
       shell: pwsh
       run: |
-        $wsPath = "testimages.idtw"
+        $wsPath = $env:IDT_WORKSPACE
         if (-not (Test-Path $wsPath)) {
           Write-Host "ERROR: Workspace bundle not created at $wsPath"
           exit 1
         }
         Write-Host "Workspace bundle: $wsPath"
         Write-Host ""
-        Write-Host "--- Bundle contents ---"
+
+        # Required top-level entries
+        $required = @('manifest.json', 'images', 'descriptions', 'chats', 'reports')
+        $missing = @()
+        foreach ($entry in $required) {
+          if (-not (Test-Path "$wsPath\$entry")) { $missing += $entry }
+        }
+        if ($missing.Count -gt 0) {
+          Write-Host "ERROR: Missing required workspace entries: $($missing -join ', ')"
+          exit 1
+        }
+        Write-Host "PASS: All required workspace directories/files present"
+        Write-Host ""
+
+        # Verify images were copied into the bundle (not just referenced)
+        $images = Get-ChildItem -Path "$wsPath\images" -File -ErrorAction SilentlyContinue
+        Write-Host "Images in bundle: $($images.Count)"
+        if ($images.Count -lt 1) {
+          Write-Host "ERROR: No images found in $wsPath\images"
+          exit 1
+        }
+
+        # Verify description sidecars were written
+        $sidecars = Get-ChildItem -Path "$wsPath\descriptions" -Filter "*.json" -ErrorAction SilentlyContinue
+        Write-Host "Description sidecars: $($sidecars.Count)"
+        if ($sidecars.Count -lt 1) {
+          Write-Host "ERROR: No description sidecars found in $wsPath\descriptions"
+          exit 1
+        }
+
+        Write-Host ""
+        Write-Host "--- Bundle contents (depth 3) ---"
         Get-ChildItem -Path $wsPath -Recurse -Depth 3 | ForEach-Object {
           Write-Host "  $($_.FullName.Replace((Resolve-Path $wsPath).Path,'').TrimStart('\'))"
         }
@@ -177,7 +215,7 @@ jobs:
     - name: Verify HTML report and descriptions
       shell: pwsh
       run: |
-        $htmlPath = "testimages.idtw\reports\descriptions.html"
+        $htmlPath = "$env:IDT_WORKSPACE\reports\descriptions.html"
         if (-not (Test-Path $htmlPath)) {
           Write-Host "ERROR: HTML report not found at $htmlPath"
           exit 1
@@ -193,8 +231,10 @@ jobs:
           exit 1
         }
 
-        # Check for meaningful description content
-        $sceneWords = @('sky','grass','sun','cloud','tree','outdoor','green','coffee','cup','notebook','desk','circle','square','blue','red','frame','image','scene')
+        # Check for meaningful description content matching the current test images:
+        #   coffee_desk.jpg   → expect: coffee, cup, desk, notebook, mug, table
+        #   outdoor_scene.jpg → expect: sky, grass, outdoor, green, tree, field
+        $sceneWords = @('sky','grass','outdoor','green','tree','coffee','cup','desk','notebook','table','mug','field','image','scene')
         $matched = $sceneWords | Where-Object { $content -imatch "\b$_\b" }
         Write-Host "Scene words found: $($matched -join ', ')"
         if ($matched.Count -eq 0) {
@@ -226,8 +266,8 @@ jobs:
           exit 0
         }
 
-        # Frames go to testimages.idtw\derived\frames\<video_stem>\
-        $framesDir = "testimages.idtw\derived\frames"
+        # Frames go to <workspace>\derived\frames\<video_stem>\
+        $framesDir = "$env:IDT_WORKSPACE\derived\frames"
         if (-not (Test-Path $framesDir)) {
           Write-Host "ERROR: No derived/frames directory found in workspace"
           Write-Host "Expected: $framesDir"
@@ -245,16 +285,30 @@ jobs:
         Write-Host "PASS: $($frames.Count) video frame(s) extracted"
 
     # ------------------------------------------------------------------ #
-    # 10. idt status — quick sanity check on the workspace                 #
+    # 10. idt status — verify the workspace is fully described             #
     # ------------------------------------------------------------------ #
     - name: Run idt status on workspace
       shell: pwsh
       run: |
         Write-Host "Running: idt.exe status testimages"
-        .\idt\dist\idt.exe status testimages
+        $output = .\idt\dist\idt.exe status testimages 2>&1
+        Write-Host $output
         if ($LASTEXITCODE -ne 0) {
-          Write-Host "WARNING: idt status returned $LASTEXITCODE"
+          Write-Host "ERROR: idt status returned exit code $LASTEXITCODE"
+          exit 1
         }
+        # Verify workspace path resolves to Documents/idt (not a sibling or legacy path)
+        if ($output -notmatch [regex]::Escape("Documents")) {
+          Write-Host "ERROR: idt status workspace path does not point to Documents/idt folder"
+          Write-Host "Expected 'Documents' in workspace path"
+          exit 1
+        }
+        # Verify all images are described (100%)
+        if ($output -notmatch "100%") {
+          Write-Host "ERROR: idt status does not show 100% described"
+          exit 1
+        }
+        Write-Host "PASS: idt status shows workspace at correct location, fully described"
 
     # ------------------------------------------------------------------ #
     # 11. Bonus: ImageDescriber launch smoke test                          #
@@ -300,6 +354,6 @@ jobs:
       if: always()
       with:
         name: workspace-output
-        path: testimages.idtw/
+        path: ${{ env.IDT_WORKSPACE }}/
         retention-days: 14
         if-no-files-found: warn

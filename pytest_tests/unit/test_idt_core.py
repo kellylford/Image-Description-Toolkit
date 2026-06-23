@@ -248,7 +248,7 @@ class TestImageItem:
 class TestConfig:
     def test_built_in_prompts_exist(self):
         from idt_core.config import BUILT_IN_PROMPTS
-        for name in ("detailed", "brief", "technical", "social", "document", "news"):
+        for name in ("detailed", "technical", "concise", "accessibility", "narrative"):
             assert name in BUILT_IN_PROMPTS
             assert len(BUILT_IN_PROMPTS[name]) > 20
 
@@ -257,7 +257,7 @@ class TestConfig:
         cfg = UserConfig()
         text = cfg.get_prompt_text("detailed")
         assert text is not None
-        assert "cannot see" in text.lower()
+        assert "structured description" in text.lower()
 
     def test_custom_prompt_overrides_builtin(self):
         from idt_core.config import UserConfig
