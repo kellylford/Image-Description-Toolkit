@@ -60,7 +60,7 @@ mlx-vlm>=0.6.3 ; sys_platform == 'darwin' and platform_machine == 'arm64'
 # still runs on Metal via MLX — torch is only used for the processor layer.
 # Qwen2-VL / Qwen2.5-VL models work without torch.
 # Note: llava-1.5-7b-4bit is NOT supported (breaks with transformers 5.x).
-torch>=2.0.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'        # CPU-only, needed by transformers processor
+torch>=2.12.1 ; sys_platform == 'darwin' and platform_machine == 'arm64'        # CPU-only, needed by transformers processor
 torchvision ; sys_platform == 'darwin' and platform_machine == 'arm64'         # required by torch
 # transformers>=4.30.0 # Already pulled in by mlx-vlm
 # Uncomment if you need GroundingDINO object detection:
