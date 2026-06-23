@@ -3,5 +3,5 @@
 # pip install -r tools/requirements.txt
 
 Pillow>=12.2.0
-pillow-heif>=0.16
+pillow-heif>=1.4.0
 requests>=2.34.2
