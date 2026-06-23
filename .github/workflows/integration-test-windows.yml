@@ -280,7 +280,7 @@ jobs:
     # 12. Upload artifacts                                                  #
     # ------------------------------------------------------------------ #
     - name: Upload idt executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: idt-windows
@@ -288,7 +288,7 @@ jobs:
         retention-days: 14
 
     - name: Upload ImageDescriber executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: imagedescriber-windows
@@ -296,7 +296,7 @@ jobs:
         retention-days: 14
 
     - name: Upload workspace bundle (descriptions + report)
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: workspace-output

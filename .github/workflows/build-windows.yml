@@ -48,21 +48,21 @@ jobs:
       shell: pwsh
     
     - name: Upload Windows Installer
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: idt-installer-windows
         path: BuildAndRelease/WinBuilds/dist_all/*.exe
         retention-days: 30
     
     - name: Upload IDT executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: idt-windows
         path: idt/dist/idt.exe
         retention-days: 30
     
     - name: Upload ImageDescriber executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: imagedescriber-windows
         path: imagedescriber/dist/ImageDescriber.exe
