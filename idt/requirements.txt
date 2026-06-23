@@ -60,7 +60,7 @@ tqdm>=4.68.3            # Progress bars (optional, nice-to-have)
 pytest>=6.0.0           # Unit testing framework
 pytest-mock>=3.15.1      # Test mocking utilities
 pytest-cov>=4.0.0       # Test coverage reporting
-pyinstaller>=6.0.0      # Executable bundling for distribution
+pyinstaller>=6.21.0      # Executable bundling for distribution
 
 # ============================================================================
 # INSTALLATION EXAMPLES
