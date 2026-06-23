@@ -79,18 +79,22 @@ def get_choice(prompt, options, default=None, allow_back=False, allow_exit=True)
     help_text = ", ".join(help_parts)
     
     while True:
-        if default:
-            if help_text:
-                user_input = input(f"Enter choice (1-{len(options)}, {help_text}, default={default}): ").strip().lower()
+        try:
+            if default:
+                if help_text:
+                    user_input = input(f"Enter choice (1-{len(options)}, {help_text}, default={default}): ").strip().lower()
+                else:
+                    user_input = input(f"Enter choice (1-{len(options)}, default={default}): ").strip().lower()
+                if not user_input:
+                    return options[default - 1]
             else:
-                user_input = input(f"Enter choice (1-{len(options)}, default={default}): ").strip().lower()
-            if not user_input:
-                return options[default - 1]
-        else:
-            if help_text:
-                user_input = input(f"Enter choice (1-{len(options)}, {help_text}): ").strip().lower()
-            else:
-                user_input = input(f"Enter choice (1-{len(options)}): ").strip().lower()
+                if help_text:
+                    user_input = input(f"Enter choice (1-{len(options)}, {help_text}): ").strip().lower()
+                else:
+                    user_input = input(f"Enter choice (1-{len(options)}): ").strip().lower()
+        except EOFError:
+            print("\nNot running in an interactive terminal. Run 'idt guideme' from a terminal prompt.")
+            sys.exit(1)
         
         # Check for special commands
         if user_input == 'b' and allow_back:
@@ -118,15 +122,19 @@ def get_choice(prompt, options, default=None, allow_back=False, allow_exit=True)
 
 def get_input(prompt, default=None, allow_empty=False):
     """Get user input with optional default"""
-    if default:
-        result = input(f"{prompt} (default: {default}): ").strip()
-        return result if result else default
-    else:
-        while True:
-            result = input(f"{prompt}: ").strip()
-            if result or allow_empty:
-                return result
-            print("This field is required. Please enter a value.")
+    try:
+        if default:
+            result = input(f"{prompt} (default: {default}): ").strip()
+            return result if result else default
+        else:
+            while True:
+                result = input(f"{prompt}: ").strip()
+                if result or allow_empty:
+                    return result
+                print("This field is required. Please enter a value.")
+    except EOFError:
+        print("\nNot running in an interactive terminal. Run 'idt guideme' from a terminal prompt.")
+        sys.exit(1)
 
 
 def get_yes_no(prompt, default=True):
@@ -142,7 +150,11 @@ def get_yes_no(prompt, default=True):
     """
     default_str = "Y/n" if default else "y/N"
     while True:
-        response = input(f"{prompt} [{default_str}]: ").strip().lower()
+        try:
+            response = input(f"{prompt} [{default_str}]: ").strip().lower()
+        except EOFError:
+            print("\nNot running in an interactive terminal. Run 'idt guideme' from a terminal prompt.")
+            sys.exit(1)
         if not response:
             return default
         if response in ['y', 'yes']:
@@ -991,7 +1003,11 @@ def guided_workflow(custom_config_path=None):
             return guided_workflow()
         
         if custom_output == "Specify custom directory":
-            output_dir = input("\nEnter output directory path: ").strip()
+            try:
+                output_dir = input("\nEnter output directory path: ").strip()
+            except EOFError:
+                print("\nNot running in an interactive terminal. Run 'idt guideme' from a terminal prompt.")
+                sys.exit(1)
             if not output_dir:
                 print("No directory specified, using default: Descriptions")
                 output_dir = "Descriptions"
