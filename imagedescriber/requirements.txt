@@ -16,7 +16,7 @@ wxPython>=4.2.0        # Cross-platform GUI framework
 # ----------------------------------------------------------------------------
 # REQUIRED - Image Processing
 # ----------------------------------------------------------------------------
-Pillow>=10.0.0         # Image processing
+Pillow>=12.2.0         # Image processing
 pillow-heif>=1.4.0    # HEIC/HEIF image support
 opencv-python>=4.13.0.92 # Video frame extraction
 numpy>=1.24.0          # Array operations (required by opencv)
