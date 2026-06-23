@@ -653,11 +653,11 @@ class ChatWindow(wx.Dialog):
         try:
             if self.chat_item is not None:
                 descs = self.chat_item.descriptions
-                if 0 <= idx < len(descs):
+                if idx < len(descs):
                     self.message_detail.SetValue(descs[idx].text)
             else:
                 msgs = self.session.get('messages', [])
-                if 0 <= idx < len(msgs):
+                if idx < len(msgs):
                     self.message_detail.SetValue(msgs[idx].get('content', ''))
         except Exception:
             pass  # Best-effort; guard against race conditions
@@ -802,7 +802,6 @@ class ChatWindow(wx.Dialog):
         if provider_key in env_map:
             env_val = os.getenv(env_map[provider_key])
             if env_val:
-                print(f"DEBUG: Found {provider} key in environment variables")
                 return env_val
 
         # 2. Local Text Files (Legacy support)
@@ -831,7 +830,6 @@ class ChatWindow(wx.Dialog):
                             with open(fp, 'r', encoding='utf-8') as f:
                                 val = f.read().strip()
                                 if val:
-                                    print(f"DEBUG: Found {provider} key in file {fp}")
                                     return val
                         except Exception:
                             pass
@@ -852,15 +850,12 @@ class ChatWindow(wx.Dialog):
             if load_json_config_func:
                 try:
                     config, config_path, source = load_json_config_func('image_describer_config.json')
-                    print(f"DEBUG: Loaded config from {config_path} (Source: {source})")
-                except Exception as e:
-                    print(f"DEBUG: Config loader func failed: {e}")
+                except Exception:
+                    pass
 
             # Manual Fallback if config loader failed
             if not config:
                 import json
-                print("DEBUG: Falling back to manual config file search")
-                
                 candidates = []
                 if getattr(sys, 'frozen', False):
                     base_dir = Path(sys.executable).parent
@@ -871,26 +866,23 @@ class ChatWindow(wx.Dialog):
                 else:
                     base_dir = Path(__file__).parent.parent
                     candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
-                
+
                 candidates.append(Path.cwd() / 'image_describer_config.json')
-                
+
                 for path in candidates:
                     if path.exists():
                         try:
                             with open(path, 'r', encoding='utf-8') as f:
                                 config = json.load(f)
-                                print(f"DEBUG: Found config manually at {path}")
                                 break
                         except Exception:
                             continue
-            
+
             if not config:
-                print("DEBUG: Config is empty or None")
                 return None
-            
+
             # Get API keys dict
             api_keys = config.get('api_keys', {})
-            print(f"DEBUG: Found API keys for: {list(api_keys.keys())}")
             
             # Match provider name (case-insensitive)
             # Check exact match first
