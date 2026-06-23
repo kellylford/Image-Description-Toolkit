@@ -297,14 +297,16 @@ jobs:
           Write-Host "ERROR: idt status returned exit code $LASTEXITCODE"
           exit 1
         }
+        # Join array to single string so -match/-notmatch return a boolean, not a filtered array
+        $outputStr = ($output | Out-String)
         # Verify workspace path resolves to Documents/idt (not a sibling or legacy path)
-        if ($output -notmatch [regex]::Escape("Documents")) {
+        if ($outputStr -notmatch [regex]::Escape("Documents")) {
           Write-Host "ERROR: idt status workspace path does not point to Documents/idt folder"
           Write-Host "Expected 'Documents' in workspace path"
           exit 1
         }
         # Verify all images are described (100%)
-        if ($output -notmatch "100%") {
+        if ($outputStr -notmatch "100%") {
           Write-Host "ERROR: idt status does not show 100% described"
           exit 1
         }
