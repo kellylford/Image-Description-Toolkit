@@ -4,4 +4,4 @@
 
 Pillow>=12.2.0
 pillow-heif>=0.16
-requests>=2.31
+requests>=2.34.2
