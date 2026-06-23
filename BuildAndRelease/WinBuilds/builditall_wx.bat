@@ -14,7 +14,7 @@ echo.
 echo ========================================================================
 echo BUILD ALL wxPython APPLICATIONS (Windows)
 echo ========================================================================
-echo This script builds IDT and ImageDescriber.
+echo This script builds ImageDescriber.
 echo Viewer is now integrated into ImageDescriber (Viewer Mode).
 echo.
 
@@ -86,7 +86,7 @@ if "%BUILD_ERRORS%"=="0" (
     
     echo Packaging applications...
     echo.
-    
+
     REM Copy IDT CLI
     if exist "idt\dist\idt.exe" (
         copy /Y "idt\dist\idt.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
@@ -94,7 +94,7 @@ if "%BUILD_ERRORS%"=="0" (
     ) else (
         echo   ✗ idt.exe NOT FOUND
     )
-    
+
     REM Copy ImageDescriber (includes Viewer Mode, PromptEditor and IDTConfigure)
     if exist "imagedescriber\dist\ImageDescriber.exe" (
         copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul

@@ -7,9 +7,7 @@ Builds the new unified CLI (cli/main.py) with all 13 commands powered by idt_cor
 Directory structure (relative to idt/ where this spec lives):
   ../cli/         - New CLI entry point and guide wizard
   ../idt_core/    - Core engine (pipeline, providers, metadata, embed, etc.)
-  ../scripts/     - Legacy scripts (still needed for some embed/convert paths)
-  ../models/      - Model registry
-  ../analysis/    - Analysis scripts
+  ../scripts/     - JSON config files only (image_describer_config.json, etc.)
 
 PyInstaller is run from the idt/ directory by build_idt.bat.
 """
@@ -42,21 +40,12 @@ else:
 
 a = Analysis(
     ['../cli/main.py'],
-    pathex=['..'],          # project root — makes idt_core, cli, models, scripts all importable
+    pathex=['..'],          # project root — makes idt_core, cli all importable
     binaries=bs4_binaries + cv2_binaries + mlx_vlm_binaries + mlx_binaries,
     datas=[
-        # idt_core configuration defaults
+        # Config JSON files (resolution chain requires scripts/ subdir in frozen exe)
         ('../scripts/image_describer_config.json', 'scripts'),
         ('../scripts/workflow_config.json', 'scripts'),
-        # Legacy scripts still called by embed/convert paths
-        ('../scripts/embed_descriptions.py', 'scripts'),
-        ('../scripts/exif_embedder.py', 'scripts'),
-        ('../scripts/ConvertImage.py', 'scripts'),
-        ('../scripts/descriptions_to_html.py', 'scripts'),
-        # Analysis
-        ('../analysis', 'analysis'),
-        # Models
-        ('../models', 'models'),
         # Version
         ('../VERSION', '.'),
     ] + bs4_datas + cv2_datas + mlx_vlm_datas + mlx_datas,
@@ -90,21 +79,9 @@ a = Analysis(
         'idt_core.providers.openai_provider',
         'idt_core.providers.florence',
 
-        # ---- scripts still used by idt_core helpers ----
-        'scripts.config_loader',   # idt_core.config loads the shared prompt library
-        'config_loader',           # frozen bare-name import
-        'scripts.embed_descriptions',
-        'scripts.exif_embedder',
-        'scripts.ConvertImage',
-        'scripts.descriptions_to_html',
-        'embed_descriptions',   # frozen bare-name import
-        'exif_embedder',        # frozen bare-name import
-
-        # ---- models / analysis ----
-        'models.claude_models',
-        'models.openai_models',
-        'models.provider_configs',
-        'analysis.combine_workflow_descriptions',
+        # ---- idt_core new modules ----
+        'idt_core.config_loader',
+        'idt_core.gallery_exporter',
 
         # ---- jaraco (required by pkg_resources / setuptools >= 75) ----
         'jaraco', 'jaraco.text', 'jaraco.functools',

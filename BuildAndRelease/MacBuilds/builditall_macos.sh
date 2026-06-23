@@ -68,19 +68,9 @@ else
     fi
 fi
 
-# Show composed build version and commit before starting
-echo "--- Build Version Banner (pre-build) ---"
-python3 idt/idt_cli.py version
-echo "----------------------------------------"
-echo ""
-
 echo ""
 echo "This script builds IDT and ImageDescriber."
 echo "Viewer is now integrated into ImageDescriber (Viewer Mode)."
-echo ""
-echo "Applications to build:"
-echo "  1. IDT (CLI)"
-echo "  2. ImageDescriber (with integrated Viewer Mode and Tools menu)"
 echo ""
 echo "Make sure all virtual environments are set up before continuing."
 echo ""
@@ -132,14 +122,6 @@ else
     echo "ERRORS: $BUILD_ERRORS build failures encountered"
 fi
 
-# Show version from built CLI if available
-if [ -f "idt/dist/idt" ]; then
-    echo ""
-    echo "--- Built Executable Version ---"
-    idt/dist/idt version
-    echo "--------------------------------"
-fi
-
 # ============================================================================
 # COLLECT ALL BUILDS TO CENTRAL LOCATION (PACKAGING)
 # ============================================================================
@@ -158,7 +140,7 @@ if [ $BUILD_ERRORS -eq 0 ]; then
     
     echo "Packaging applications to $DIST_ALL/..."
     echo ""
-    
+
     # Copy IDT CLI
     if [ -f "idt/dist/idt" ]; then
         cp "idt/dist/idt" "$DIST_ALL/"
@@ -167,7 +149,7 @@ if [ $BUILD_ERRORS -eq 0 ]; then
     else
         echo "✗ idt NOT FOUND"
     fi
-    
+
     # Copy ImageDescriber.app (includes integrated Viewer Mode, prompt editor and configuration)
     if [ -d "imagedescriber/dist/ImageDescriber.app" ]; then
         cp -R "imagedescriber/dist/ImageDescriber.app" "$DIST_ALL/Applications/"
