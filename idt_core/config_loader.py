@@ -114,6 +114,7 @@ def resolve_config(
     if meipass_dir:
         candidates.append(meipass_dir / 'scripts' / filename)
         candidates.append(meipass_dir / filename)
+    candidates.append(Path.cwd() / 'scripts' / filename)
     candidates.append(Path.cwd() / filename)
     candidates.append(script_dir / filename)
 
