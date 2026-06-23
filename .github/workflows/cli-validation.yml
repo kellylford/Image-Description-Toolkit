@@ -8,10 +8,6 @@ on:
     paths:
       - 'cli/**'
       - 'idt_core/**'
-      - 'idt/idt_cli.py'
-      - 'scripts/**'
-      - 'analysis/**'
-      - 'models/**'
       - 'pytest_tests/**'
       - '.github/workflows/cli-validation.yml'
   pull_request:
@@ -48,7 +44,7 @@ jobs:
       # ------------------------------------------------------------------ #
       #  2. Syntax validation                                                #
       # ------------------------------------------------------------------ #
-      - name: Syntax-check new CLI (cli/)
+      - name: Syntax-check CLI (cli/)
         run: |
           python -m py_compile cli/main.py
           python -m py_compile cli/guide.py
@@ -66,26 +62,10 @@ jobs:
           }
         shell: pwsh
 
-      - name: Syntax-check legacy idt_cli.py
-        run: python -m py_compile idt/idt_cli.py
-        shell: pwsh
-
-      - name: Syntax-check scripts
-        run: |
-          $files = Get-ChildItem scripts\*.py | Where-Object { $_.Name -notmatch 'llamado' }
-          foreach ($f in $files) {
-            python -m py_compile $f.FullName
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "SYNTAX ERROR in $($f.Name)"
-              exit 1
-            }
-          }
-        shell: pwsh
-
       # ------------------------------------------------------------------ #
-      #  3. New CLI smoke test — verify all commands are reachable           #
+      #  3. CLI smoke test — verify all commands are reachable               #
       # ------------------------------------------------------------------ #
-      - name: New CLI help contract
+      - name: CLI help contract
         run: |
           $cmds = @('describe','export','status','show','embed','video','download','combine','stats','models','prompts','config','guideme')
           foreach ($cmd in $cmds) {
@@ -111,17 +91,7 @@ jobs:
           IDT_QUIET_CONFIG_LOG: "1"
 
       # ------------------------------------------------------------------ #
-      #  5. Legacy CLI integration tests (old idt_cli.py still shipped)     #
-      # ------------------------------------------------------------------ #
-      - name: Run legacy IDT CLI integration tests
-        run: |
-          python -m pytest pytest_tests/integration/test_idt_cli.py -v --tb=short
-        shell: pwsh
-        env:
-          IDT_QUIET_CONFIG_LOG: "1"
-
-      # ------------------------------------------------------------------ #
-      #  6. Smoke tests (GUI-dependent; non-fatal)                          #
+      #  5. Smoke tests (GUI-dependent; non-fatal)                          #
       # ------------------------------------------------------------------ #
       - name: Run smoke tests
         run: |
@@ -130,12 +100,12 @@ jobs:
         continue-on-error: true
 
       # ------------------------------------------------------------------ #
-      #  7. Summary                                                          #
+      #  6. Summary                                                          #
       # ------------------------------------------------------------------ #
       - name: Test summary
         if: always()
         run: |
           Write-Host ""
           Write-Host "=== CLI Validation complete ==="
-          Write-Host "New CLI (cli/main.py), idt_core unit tests, and legacy CLI tests ran."
+          Write-Host "CLI (cli/main.py) and idt_core unit tests ran."
         shell: pwsh
