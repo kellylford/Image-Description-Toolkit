@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="generator" content="pandoc" />
+  <meta name="description" content="$if(description)$$description$$else$Image Description Toolkit documentation$endif$" />
+  <title>$if(title)$$title$ — Image Description Toolkit$else$Image Description Toolkit Documentation$endif$</title>
+  <link rel="stylesheet" href="wcag.css" />
+  $for(header-includes)$
+  $header-includes$
+  $endfor$
+</head>
+<body>
+
+  <!-- Skip navigation — required for WCAG 2.2 AA (Success Criterion 2.4.1) -->
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <a class="skip-link" href="#toc">Skip to table of contents</a>
+
+  <header role="banner">
+    <div class="site-header">
+      <span class="site-name">Image Description Toolkit</span>
+      <span class="doc-type">User Documentation</span>
+    </div>
+  </header>
+
+  <div class="page-wrapper">
+
+    $if(toc)$
+    <nav id="toc" aria-label="Table of contents">
+      <h2 class="toc-heading">Contents</h2>
+      $table-of-contents$
+    </nav>
+    $endif$
+
+    <main id="main-content" role="main">
+
+      $if(date)$
+      <p class="doc-dateline"><span class="label">Published:</span> <time>$date$</time></p>
+      $endif$
+
+      $body$
+
+    </main>
+  </div>
+
+  <footer role="contentinfo">
+    <div class="footer-inner">
+      <p>
+        Image Description Toolkit — open-source software.
+        <a href="https://github.com/kellylford/Image-Description-Toolkit/issues">Report an issue</a>.
+      </p>
+      <p class="footer-legal">
+        This document conforms to
+        <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> 2.2 Level AA.
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>

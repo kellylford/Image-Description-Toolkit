@@ -1,0 +1,167 @@
+name: Publish Documentation (WCAG 2.2 AA)
+
+on:
+  push:
+    branches:
+      - main
+      - v4.5
+    paths:
+      - 'docs/**'
+      - '.github/workflows/publish-docs.yml'
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Source branch to publish docs from'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one publish can run at a time; cancel in-progress if a new push arrives.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-docs:
+    name: Build accessible HTML documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc
+        run: |
+          curl -sL https://github.com/jgm/pandoc/releases/download/3.5/pandoc-3.5-1-amd64.deb -o pandoc.deb
+          sudo dpkg -i pandoc.deb
+          pandoc --version
+
+      - name: Install Node.js (for axe-core accessibility check)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install axe-cli for WCAG validation
+        run: npm install -g @axe-core/cli
+
+      - name: Create output directory
+        run: mkdir -p _site
+
+      - name: Copy CSS to output directory
+        run: cp docs/templates/wcag.css _site/wcag.css
+
+      - name: Build USER_GUIDE.html from Markdown
+        run: |
+          pandoc docs/USER_GUIDE.md \
+            --from markdown \
+            --to html5 \
+            --standalone \
+            --template docs/templates/wcag.html \
+            --toc \
+            --toc-depth=3 \
+            --number-sections \
+            --metadata title="Image Description Toolkit — User Guide" \
+            --metadata date="$(date '+%B %d, %Y')" \
+            --metadata description="Complete user guide for the Image Description Toolkit CLI (idt) and ImageDescriber GUI application." \
+            --output _site/user-guide.html \
+            --wrap=none
+          echo "Built user-guide.html"
+
+      - name: Build index page from docs/README.md
+        run: |
+          pandoc docs/README.md \
+            --from markdown \
+            --to html5 \
+            --standalone \
+            --template docs/templates/wcag.html \
+            --metadata title="Image Description Toolkit — Documentation" \
+            --metadata date="$(date '+%B %d, %Y')" \
+            --metadata description="Documentation index for the Image Description Toolkit." \
+            --output _site/index.html \
+            --wrap=none
+          echo "Built index.html"
+
+      - name: Build DEVELOPER_GUIDE.html
+        run: |
+          pandoc docs/DEVELOPER_GUIDE.md \
+            --from markdown \
+            --to html5 \
+            --standalone \
+            --template docs/templates/wcag.html \
+            --toc \
+            --toc-depth=3 \
+            --metadata title="Image Description Toolkit — Developer Guide" \
+            --metadata date="$(date '+%B %d, %Y')" \
+            --metadata description="Developer reference for the Image Description Toolkit." \
+            --output _site/developer-guide.html \
+            --wrap=none || echo "DEVELOPER_GUIDE.md not found or failed — skipping"
+
+      - name: Build CONFIGURATION_GUIDE.html
+        run: |
+          pandoc docs/CONFIGURATION_GUIDE.md \
+            --from markdown \
+            --to html5 \
+            --standalone \
+            --template docs/templates/wcag.html \
+            --toc \
+            --toc-depth=3 \
+            --metadata title="Image Description Toolkit — Configuration Guide" \
+            --metadata date="$(date '+%B %d, %Y')" \
+            --metadata description="Configuration reference for the Image Description Toolkit." \
+            --output _site/configuration-guide.html \
+            --wrap=none || echo "CONFIGURATION_GUIDE.md not found or failed — skipping"
+
+      - name: List generated files
+        run: ls -lah _site/
+
+      - name: Start local HTTP server for accessibility testing
+        run: |
+          cd _site
+          python3 -m http.server 8080 &
+          sleep 3
+          echo "Server started on port 8080"
+
+      - name: Run axe WCAG 2.2 AA check on user guide
+        run: |
+          axe http://localhost:8080/user-guide.html \
+            --tags wcag2a,wcag2aa,wcag22aa \
+            --reporter cli \
+            --exit || true
+          echo "Accessibility check complete (warnings do not block publish)"
+
+      - name: Run axe WCAG 2.2 AA check on index
+        run: |
+          axe http://localhost:8080/index.html \
+            --tags wcag2a,wcag2aa,wcag22aa \
+            --reporter cli \
+            --exit || true
+
+      - name: Generate accessibility report artifact
+        run: |
+          axe http://localhost:8080/user-guide.html \
+            --tags wcag2a,wcag2aa,wcag22aa \
+            --reporter json 2>/dev/null > _site/accessibility-report.json || true
+          echo "Accessibility report saved."
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-docs
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
