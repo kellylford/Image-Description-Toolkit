@@ -13,16 +13,13 @@ from datetime import datetime
 
 
 def get_default_workspaces_root() -> Path:
-    """Return platform-appropriate default directory for suggesting bundle locations."""
-    if sys.platform == 'win32':
-        return Path.home() / "Documents" / "ImageDescriptionToolkit"
-    elif sys.platform == 'darwin':
-        return Path.home() / "Documents" / "ImageDescriptionToolkit"
-    else:
-        docs = Path.home() / "Documents"
-        if docs.exists():
-            return docs / "ImageDescriptionToolkit"
-        return Path.home() / ".local" / "share" / "IDT"
+    """Return platform-appropriate default directory for suggesting bundle locations.
+
+    Matches the CLI default (~/Documents/idt) so bundles are always local,
+    never on network shares next to the source files.
+    """
+    docs = Path.home() / "Documents"
+    return docs / "idt"
 
 
 def get_next_untitled_name(workspace_root: Optional[Path] = None) -> str:

@@ -981,18 +981,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if _vme.ffprobe_available:
                     video_source_metadata = _vme.extract_metadata(video_path_obj)
                     if video_source_metadata:
-                        print(f"Video metadata extracted: GPS={('gps' in video_source_metadata)}, Date={('datetime' in video_source_metadata)}")
+                        logger.debug(f"Video metadata: GPS={('gps' in video_source_metadata)}, Date={('datetime' in video_source_metadata)}")
                     else:
-                        print("No metadata extracted from video (no GPS/date tags found)")
+                        logger.debug("No GPS/date metadata in video")
                 else:
-                    print("ffprobe not available; video frames will have no GPS EXIF")
+                    logger.debug("ffprobe unavailable; video frames will have no GPS EXIF")
             except Exception as _e:
-                print(f"Video metadata extraction failed (non-fatal): {_e}")
+                logger.debug(f"Video metadata extraction failed (non-fatal): {_e}")
 
-        # Extract based on mode (time_interval or scene_change)
         extraction_mode = extraction_config.get("extraction_mode", "time_interval")
-        print(f"Video extraction mode: {extraction_mode}")
-        print(f"Video: {frame_count} total frames, {duration:.1f}s, fps={fps:.2f}")
+        logger.debug(f"Extracting {Path(video_path).name}: mode={extraction_mode}, duration={duration:.1f}s, fps={fps:.2f}")
 
         if extraction_mode == "scene_change":
             extracted_paths = self._extract_by_scene_detection(cap, fps, video_dir, extraction_config, video_path_obj, video_source_metadata)
@@ -1020,60 +1018,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             end_frame = total_frames_in_video
 
-        # EMERGENCY: Safety limit - can't extract more frames than exist in video!
-        safety_limit = total_frames_in_video + 10  # Add small buffer for edge cases
-
-        print(f"\n{'='*60}")
-        print(f"EXTRACTION DEBUG: {video_path_obj.stem}")
-        print(f"Video has {total_frames_in_video} total frames, {fps:.2f} fps")
-        print(f"Time interval extraction: {interval_seconds}s = {frame_interval} frames")
-        print(f"Frame range: {start_frame} to {end_frame}")
-        print(f"Safety limit: {safety_limit} extractions max")
-        print(f"{'='*60}\n")
-
-        # Write to log file too
-        log_file = video_dir / "_extraction_debug.log"
-        with open(log_file, 'w') as f:
-            f.write(f"Video: {video_path_obj.name}\n")
-            f.write(f"Total frames in video: {total_frames_in_video}\n")
-            f.write(f"FPS: {fps:.2f}\n")
-            f.write(f"Interval: {interval_seconds}s = {frame_interval} frames\n")
-            f.write(f"Start frame: {start_frame}\n")
-            f.write(f"End frame: {end_frame}\n")
-            f.write(f"\nExtraction log:\n")
-
+        logger.debug(f"Extracting frames: interval={interval_seconds}s, frames {start_frame}-{end_frame}")
         extracted_paths = []
         frame_num = start_frame
         extract_count = 0
 
-        # Use CLI logic: check frame position in while condition
         while frame_num < end_frame:
-            # EMERGENCY STOP (shouldn't be needed now, but keep as safety)
-            if extract_count >= safety_limit:
-                error_msg = f"SAFETY STOP: Extracted {extract_count} frames from {total_frames_in_video}-frame video!"
-                print(f"\n*** {error_msg} ***\n")
-                with open(log_file, 'a') as f:
-                    f.write(f"\n*** {error_msg} ***\n")
-                break
-
-            # Log every extraction
-            with open(log_file, 'a') as f:
-                f.write(f"  [{extract_count}] Seeking to frame {frame_num}...")
-
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
             ret, frame = cap.read()
-
             if not ret:
-                with open(log_file, 'a') as f:
-                    f.write(f" FAILED (ret={ret})\n")
-                print(f"Frame {frame_num} read failed, stopping extraction")
                 break
 
-            # Save frame
             frame_filename = f"{video_path_obj.stem}_frame_{extract_count:05d}.jpg"
             frame_path = video_dir / frame_filename
             cv2.imwrite(str(frame_path), frame)
-            # Embed video GPS/date into frame EXIF if metadata is available
             if video_source_metadata and ExifEmbedder is not None:
                 try:
                     frame_time = frame_num / fps if fps > 0 else 0.0
@@ -1082,22 +1040,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         frame_time=frame_time,
                         source_video_path=video_path_obj
                     )
-                except Exception as _ee:
-                    print(f"EXIF embed failed for {frame_filename} (non-fatal): {_ee}")
+                except Exception:
+                    pass
             extracted_paths.append(str(frame_path))
-
-            with open(log_file, 'a') as f:
-                f.write(f" OK, saved as {frame_filename}\n")
-
             extract_count += 1
-            old_frame_num = frame_num
             frame_num += frame_interval
-
-            if extract_count % 10 == 0:
-                print(f"Extracted {extract_count} frames (frame {old_frame_num} -> {frame_num})")
-
-        print(f"\nExtraction complete: {extract_count} frames extracted")
-        print(f"Debug log written to: {log_file}\n")
 
         return extracted_paths
 
@@ -3501,115 +3448,65 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         logger.info(f"Queue: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process")
 
-        # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
-            logger.info(f"Starting batch video extraction: {len(videos_to_extract)} videos, {len(images_to_process)} images")
-            logger.debug(f"Videos to extract: {videos_to_extract}")
+            # Extract all video frames first, then hand the full queue to the
+            # image processing batch.  This mirrors what the CLI does (linear
+            # scan → extract → describe) and avoids the brittle async chain of
+            # VideoProcessingWorker → wx events → _complete_batch_video_extraction
+            # which was the root cause of frames being silently skipped.
+            extraction_config = self._load_video_extraction_config()
+            _images = list(images_to_process)
+            _options = options
+            _skip = skip_existing
 
-            # Show progress dialog immediately
-            total_items = len(videos_to_extract) + len(images_to_process)
-            logger.debug(f"Creating progress dialog with {total_items} total items")
-            if BatchProgressDialog:
-                self._batch_active = True
-                self.batch_progress_dialog = BatchProgressDialog(self, total_items)
-                self.batch_progress_dialog.Show()
-                logger.debug("Progress dialog shown")
-                if hasattr(self, 'show_batch_progress_item'):
-                    self.show_batch_progress_item.Enable(True)
-                if hasattr(self, 'workspace_stats_item'):
-                    self.workspace_stats_item.Enable(False)
-
-            self.SetStatusText(f"Extracting frames from {len(videos_to_extract)} video(s)...", 0)
-
-            # Store processing options and queue for after video extraction
-            self._pending_batch_options = options
-            self._pending_batch_queue = images_to_process.copy()  # FIX: Use images_to_process, not to_process
-            self._pending_batch_skip_existing = skip_existing
-            self._videos_to_extract = videos_to_extract
-            self._extracted_video_count = 0
-
-            # Start extracting first video
-            self._extract_next_video_in_batch()
-            return  # Will continue in video extraction event handler
-
-        # No videos to extract, proceed directly to image processing
-        to_process = images_to_process
-
-        if not to_process:
-            show_info(self, "All images already have descriptions")
-            return
-
-        # Phase 3: Mark items as pending BEFORE starting batch
-        queue_position = 0
-        for file_path in to_process:
-            if file_path in self.workspace.items:
-                item = self.workspace.items[file_path]
-                item.processing_state = "pending"
-                item.batch_queue_position = queue_position
-                queue_position += 1
-
-        # Phase 3: Store batch parameters for resume
-        self.workspace.batch_state = {
-            "provider": options['provider'],
-            "model": options['model'],
-            "prompt_style": options.get('prompt_style', 'default'),
-            "custom_prompt": options.get('custom_prompt'),
-            "detection_settings": options.get('detection_settings'),
-            "geocode_enabled": options.get('geocode_enabled', False),
-            "total_queued": len(to_process),
-            "started": datetime.now().isoformat()
-        }
-
-        # Start batch processing worker - STORE REFERENCE (Phase 3: KEY FIX)
-        self.batch_worker = BatchProcessingWorker(
-            self,
-            to_process,
-            options['provider'],
-            options['model'],
-            options['prompt_style'],
-            options.get('custom_prompt', ''),
-            None,  # detection_settings
-            None,  # prompt_config_path
-            skip_existing,
-            progress_offset=0,
-            geocode=options.get('geocode_enabled', False),
-            logs_dir=self._workspace_logs_dir(),
-        )
-
-        # Phase 3: Initialize timing
-        self.batch_start_time = time.time()
-        self.batch_processing_times = []
-
-        # Save workspace BEFORE showing dialog to avoid focus issues
-        if self.workspace_file:
-            self._save_bundle()
-
-        # Phase 3: Show progress dialog (AFTER save to maintain focus)
-        if BatchProgressDialog:
-            self._batch_active = True
-            # Capture batch settings before showing dialog so Job Settings section is populated
-            self._token_records = []
-            self._batch_provider = options['provider']
-            self._batch_model = options['model']
-            self._batch_prompt = options.get('prompt_style', '')
-            self.batch_progress_dialog = BatchProgressDialog(
-                self, len(to_process),
-                batch_provider=self._batch_provider,
-                batch_model=self._batch_model,
-                batch_prompt=self._batch_prompt
+            self.SetStatusText(
+                f"Extracting frames from {len(videos_to_extract)} video(s)…", 0
             )
-            self.batch_progress_dialog.Show()
-            self.batch_progress_dialog.Raise()  # Ensure it's on top after save
-            # Enable "Show Batch Progress" menu item
-            if hasattr(self, 'show_batch_progress_item'):
-                self.show_batch_progress_item.Enable(True)
-            if hasattr(self, 'workspace_stats_item'):
-                self.workspace_stats_item.Enable(False)
+            logger.info(f"Starting sync video extraction: {len(videos_to_extract)} videos")
 
-        # Start worker thread AFTER dialog is shown
-        self.batch_worker.start()
+            def _do_all_extractions():
+                results = []
+                for vp in videos_to_extract:
+                    try:
+                        frames, meta = self._extract_video_frames_sync(vp, extraction_config)
+                        logger.info(f"Extracted {len(frames)} frame(s) from {Path(vp).name}")
+                        results.append((vp, frames, meta or {}))
+                    except Exception as exc:
+                        logger.warning(f"Frame extraction failed for {Path(vp).name}: {exc}")
+                        results.append((vp, [], {}))
+                wx.CallAfter(_after_extraction, results)
 
-        self.SetStatusText(f"Processing {len(to_process)} images...", 0)
+            def _after_extraction(results):
+                to_process = list(_images)
+                vid_count = 0
+                frame_count = 0
+                for vp, frames, meta in results:
+                    if vp in self.workspace.items:
+                        vi = self.workspace.items[vp]
+                        vi.extracted_frames = frames
+                        if meta:
+                            vi.video_metadata = meta
+                    vid_count += 1
+                    frame_count += len(frames)
+                    for fp in frames:
+                        if fp not in self.workspace.items:
+                            fi = ImageItem(fp, "extracted_frame")
+                            fi.parent_video = vp
+                            self.workspace.add_item(fi)
+                        fi = self.workspace.items.get(fp)
+                        if fi and (not _skip or not fi.descriptions):
+                            to_process.append(fp)
+                preamble = (
+                    f"Video extraction: {vid_count} video(s) → {frame_count} frame(s)"
+                    if frame_count else None
+                )
+                self._launch_batch(to_process, _options, _skip, video_preamble=preamble)
+
+            import threading
+            threading.Thread(target=_do_all_extractions, daemon=True).start()
+            return  # resumes in _after_extraction → _launch_batch
+
+        self._launch_batch(images_to_process, options, skip_existing)
 
     def _check_mlx_model_ready(self, provider: str, model: str) -> bool:
         """Check if an MLX model is ready to use; warn the user if not yet downloaded.
@@ -4005,6 +3902,110 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self._save_bundle()
 
         self.SetStatusText(f"Processing {len(to_process)} images...", 0)
+
+    def _load_video_extraction_config(self) -> dict:
+        """Return video extraction config from file, or safe defaults."""
+        try:
+            from idt_core.config_loader import load_json_config
+            cfg, _, _ = load_json_config('video_frame_extractor_config.json')
+            if cfg:
+                return {
+                    "extraction_mode": cfg.get("extraction_mode", "time_interval"),
+                    "time_interval_seconds": cfg.get("time_interval_seconds", 5.0),
+                    "scene_change_threshold": cfg.get("scene_change_threshold", 30.0),
+                    "min_scene_duration_seconds": cfg.get("min_scene_duration_seconds", 1.0),
+                    "start_time_seconds": cfg.get("start_time_seconds", 0),
+                    "end_time_seconds": cfg.get("end_time_seconds"),
+                }
+        except Exception:
+            pass
+        return {
+            "extraction_mode": "time_interval",
+            "time_interval_seconds": 5.0,
+            "scene_change_threshold": 30.0,
+            "min_scene_duration_seconds": 1.0,
+            "start_time_seconds": 0,
+            "end_time_seconds": None,
+        }
+
+    def _launch_batch(self, to_process: list, options: dict, skip_existing: bool,
+                      video_preamble: str = None):
+        """Start a batch image-processing run.
+
+        Single entry point for all batch starts — called from on_process_all
+        for both the no-video path and after synchronous video extraction finishes.
+        """
+        if not to_process:
+            show_info(self, "All images already have descriptions.")
+            return
+
+        # Persist extracted frames / refresh the file list
+        self._persist_extracted_frames_to_bundle()
+        self.refresh_image_list()
+        self.mark_modified()
+
+        # Mark items as pending
+        for i, fp in enumerate(to_process):
+            if fp in self.workspace.items:
+                it = self.workspace.items[fp]
+                it.processing_state = "pending"
+                it.batch_queue_position = i
+
+        # Store batch_state so resume works
+        self.workspace.batch_state = {
+            "provider": options['provider'],
+            "model": options['model'],
+            "prompt_style": options.get('prompt_style', 'default'),
+            "custom_prompt": options.get('custom_prompt'),
+            "detection_settings": options.get('detection_settings'),
+            "geocode_enabled": options.get('geocode_enabled', False),
+            "total_queued": len(to_process),
+            "started": datetime.now().isoformat(),
+        }
+
+        self.batch_worker = BatchProcessingWorker(
+            self,
+            to_process,
+            options['provider'],
+            options['model'],
+            options['prompt_style'],
+            options.get('custom_prompt', ''),
+            None,
+            None,
+            skip_existing,
+            progress_offset=0,
+            geocode=options.get('geocode_enabled', False),
+            logs_dir=self._workspace_logs_dir(),
+            video_preamble=video_preamble,
+        )
+        self.batch_start_time = time.time()
+        self.batch_processing_times = []
+
+        # Save workspace BEFORE showing dialog (focus management)
+        if self.workspace_file:
+            self._save_bundle()
+
+        if BatchProgressDialog:
+            self._batch_active = True
+            self._token_records = []
+            self._batch_provider = options['provider']
+            self._batch_model = options['model']
+            self._batch_prompt = options.get('prompt_style', '')
+            self.batch_progress_dialog = BatchProgressDialog(
+                self, len(to_process),
+                batch_provider=self._batch_provider,
+                batch_model=self._batch_model,
+                batch_prompt=self._batch_prompt,
+            )
+            self.batch_progress_dialog.Show()
+            self.batch_progress_dialog.Raise()
+            if hasattr(self, 'show_batch_progress_item'):
+                self.show_batch_progress_item.Enable(True)
+            if hasattr(self, 'workspace_stats_item'):
+                self.workspace_stats_item.Enable(False)
+
+        self.batch_worker.start()
+        self.SetStatusText(f"Processing {len(to_process)} images…", 0)
 
     def on_process_undescribed(self, event):
         """Menu handler: Process only undescribed images"""
@@ -4424,9 +4425,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.workspace and self.workspace.directory_paths:
             source = Path(self.workspace.directory_paths[0])
             proposed_name = source.name
-            default_parent = str(source.parent)
-        else:
-            default_parent = str(get_default_workspaces_root())
+        # Always default to ~/Documents/idt, never the source folder's parent
+        # (source may be a read-only network share).
+        default_parent = str(get_default_workspaces_root())
 
         dir_dlg = wx.DirDialog(
             self, f"{title} — choose the folder to create the bundle inside",
