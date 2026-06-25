@@ -3217,21 +3217,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if selected_node.IsOk() and self.image_list.GetItemData(selected_node) is None:
             # Folder node selected — collect all file paths under it
             folder_paths = self._get_file_paths_under_node(selected_node)
-            # Filter to items that exist in workspace and aren't already described
-            to_process = [
-                fp for fp in folder_paths
-                if fp in self.workspace.items and not self.workspace.items[fp].descriptions
-                and self.workspace.items[fp].item_type != "video"
-            ]
-            if not to_process:
+            # Separate videos (need frame extraction) from images (ready to describe)
+            to_process = []
+            videos_to_extract = []
+            for fp in folder_paths:
+                if fp not in self.workspace.items:
+                    continue
+                item = self.workspace.items[fp]
+                if item.item_type == "video":
+                    if not hasattr(item, 'extracted_frames') or not item.extracted_frames:
+                        videos_to_extract.append(fp)
+                elif not item.descriptions:
+                    to_process.append(fp)
+            if not to_process and not videos_to_extract:
                 show_info(self, "All images in this folder already have descriptions")
                 return
             folder_label = self.image_list.GetItemText(selected_node)
             logger.info(
                 f"Folder batch triggered via P key: folder='{folder_label}', "
-                f"count={len(to_process)}, current_image_item={self.current_image_item!r}"
+                f"images={len(to_process)}, videos={len(videos_to_extract)}, "
+                f"current_image_item={self.current_image_item!r}"
             )
-            self._run_batch_for_paths(event, to_process, folder_label)
+            self._run_batch_for_paths(event, to_process, folder_label, videos_to_extract=videos_to_extract)
             return
 
         if not self.current_image_item:
@@ -3568,23 +3575,33 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         )
         return result == wx.YES
 
-    def _run_batch_for_paths(self, event, to_process: list, context_label: str = "folder"):
+    def _run_batch_for_paths(self, event, to_process: list, context_label: str = "folder",
+                             videos_to_extract: list = None):
         """Start batch processing for an explicit list of file paths.
 
-        Used when the user presses Process with a folder node selected.  Shows
+        Used when the user presses P with a folder node selected.  Shows
         the same ProcessingOptionsDialog and BatchProgressDialog as on_process_all,
         but operates only on the supplied paths rather than the whole workspace.
+        If videos_to_extract is provided, frames are extracted first (same pipeline
+        as on_process_all) before the image batch begins.
         """
         if not BatchProcessingWorker:
             show_error(self, "Batch processing worker not available")
             return
 
+        videos_to_extract = videos_to_extract or []
+
         # Confirm folder batch before showing options — prevents accidental mass-processing
-        n = len(to_process)
-        noun = 'image' if n == 1 else 'images'
+        n_images = len(to_process)
+        n_videos = len(videos_to_extract)
+        if n_videos:
+            summary = f"{n_images} image(s) + {n_videos} video(s) to extract"
+        else:
+            noun = 'image' if n_images == 1 else 'images'
+            summary = f"{n_images} unprocessed {noun}"
         confirm = wx.MessageDialog(
             self,
-            f"Process all {n} unprocessed {noun} in '{context_label}'?\n\n"
+            f"Process {summary} in '{context_label}'?\n\n"
             "To process a single image, select it in the list first.",
             f"Process Folder: {context_label}",
             wx.OK | wx.CANCEL | wx.ICON_QUESTION
@@ -3598,7 +3615,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Show processing options dialog
         if ProcessingOptionsDialog:
             dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
-            dialog.SetTitle(f"Processing Options — {context_label} ({n} {noun})")
+            dialog.SetTitle(f"Processing Options — {context_label} ({summary})")
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
@@ -3616,55 +3633,61 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Store embed-after-process flag for on_worker_complete to pick up per image
         self._batch_embed = options.get('embed_after_process', False)
 
-        # Mark items as pending
-        for idx, file_path in enumerate(to_process):
-            if file_path in self.workspace.items:
-                item = self.workspace.items[file_path]
-                item.processing_state = "pending"
-                item.batch_queue_position = idx
+        if videos_to_extract:
+            # Extract all video frames first, then hand combined queue to _launch_batch.
+            # Mirrors the on_process_all video extraction path exactly.
+            extraction_config = self._load_video_extraction_config()
+            _images = list(to_process)
+            _options = options
 
-        self.batch_worker = BatchProcessingWorker(
-            self,
-            to_process,
-            options['provider'],
-            options['model'],
-            options['prompt_style'],
-            options.get('custom_prompt', ''),
-            None,   # detection_settings
-            None,   # prompt_config_path
-            True,   # skip_existing
-            progress_offset=0,
-            geocode=options.get('geocode_enabled', False),
-            logs_dir=self._workspace_logs_dir(),
-        )
-
-        self.batch_start_time = time.time()
-        self.batch_processing_times = []
-
-        if self.workspace_file:
-            self._save_bundle()
-
-        if BatchProgressDialog:
-            self._batch_active = True
-            self._token_records = []
-            self._batch_provider = options['provider']
-            self._batch_model = options['model']
-            self._batch_prompt = options.get('prompt_style', '')
-            self.batch_progress_dialog = BatchProgressDialog(
-                self, len(to_process),
-                batch_provider=self._batch_provider,
-                batch_model=self._batch_model,
-                batch_prompt=self._batch_prompt
+            self.SetStatusText(
+                f"Extracting frames from {len(videos_to_extract)} video(s)…", 0
             )
-            self.batch_progress_dialog.Show()
-            self.batch_progress_dialog.Raise()
-            if hasattr(self, 'show_batch_progress_item'):
-                self.show_batch_progress_item.Enable(True)
-            if hasattr(self, 'workspace_stats_item'):
-                self.workspace_stats_item.Enable(False)
+            logger.info(f"Folder batch: starting sync video extraction: {len(videos_to_extract)} videos")
 
-        self.batch_worker.start()
-        self.SetStatusText(f"Processing {len(to_process)} images in '{context_label}'...", 0)
+            def _do_all_extractions():
+                results = []
+                for vp in videos_to_extract:
+                    try:
+                        frames, meta = self._extract_video_frames_sync(vp, extraction_config)
+                        logger.info(f"Extracted {len(frames)} frame(s) from {Path(vp).name}")
+                        results.append((vp, frames, meta or {}))
+                    except Exception as exc:
+                        logger.warning(f"Frame extraction failed for {Path(vp).name}: {exc}")
+                        results.append((vp, [], {}))
+                wx.CallAfter(_after_extraction, results)
+
+            def _after_extraction(results):
+                combined = list(_images)
+                vid_count = 0
+                frame_count = 0
+                for vp, frames, meta in results:
+                    if vp in self.workspace.items:
+                        vi = self.workspace.items[vp]
+                        vi.extracted_frames = frames
+                        if meta:
+                            vi.video_metadata = meta
+                    vid_count += 1
+                    frame_count += len(frames)
+                    for fp in frames:
+                        if fp not in self.workspace.items:
+                            fi = ImageItem(fp, "extracted_frame")
+                            fi.parent_video = vp
+                            self.workspace.add_item(fi)
+                        fi = self.workspace.items.get(fp)
+                        if fi and not fi.descriptions:
+                            combined.append(fp)
+                preamble = (
+                    f"Video extraction: {vid_count} video(s) → {frame_count} frame(s)"
+                    if frame_count else None
+                )
+                self._launch_batch(combined, _options, True, video_preamble=preamble)
+
+            import threading
+            threading.Thread(target=_do_all_extractions, daemon=True).start()
+            return  # resumes in _after_extraction → _launch_batch
+
+        self._launch_batch(to_process, options, True)
 
     def _extract_next_video_in_batch(self):
         """Extract next video in batch processing queue"""
@@ -6483,10 +6506,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.on_rename_item(event)
                 return
 
-        # Ctrl+V for paste
-        elif modifiers == wx.MOD_CONTROL and keycode == ord('V'):
-            self.on_paste_from_clipboard(event)
-            return
+        elif modifiers == wx.MOD_CONTROL:
+            if keycode == ord('V'):
+                self.on_paste_from_clipboard(event)
+                return
+            elif keycode == ord('S'):
+                self.on_save_workspace(None)
+                return
 
         # Let event propagate if not handled
         event.Skip()
