@@ -1,9 +1,11 @@
 """
 Smoke tests for CLI and GUI entry points.
 
-These tests verify that all main commands and apps can launch without crashing.
+These tests verify that all main commands can launch without crashing.
 They don't test full functionality, just that the entry points are valid and
-the processes/scripts start up correctly.
+respond correctly.
+
+CLI entry point: cli/main.py  (the active v4.5 CLI)
 """
 
 import os
@@ -12,222 +14,160 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
+_CLI = [sys.executable, str(Path(__file__).parent.parent.parent / "cli" / "main.py")]
+
 
 class TestCLIEntryPoints:
-    """Test that all CLI commands launch and respond correctly."""
-    
+    """Test that all active CLI commands (cli/main.py) launch and respond correctly."""
+
     def test_idt_help(self):
-        """Test that 'idt --help' or 'idt help' works."""
-        # Run the CLI with --help
+        """idt --help should print usage and exit 0."""
         result = subprocess.run(
-            [sys.executable, 'idt_cli.py', 'help'],
+            _CLI + ["--help"],
             capture_output=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=10
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         )
-        
-        # Should exit successfully (or with code 1 if it just prints help)
-        assert result.returncode in (0, 1), "idt help should exit cleanly"
-        
-        # Should output something to stdout or stderr
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
-        output = stdout + stderr
+        assert result.returncode == 0, f"--help should exit 0, got {result.returncode}"
+        output = (result.stdout or "") + (result.stderr or "")
         assert len(output) > 50, "Help should print usage information"
-    
+        assert "describe" in output.lower(), "--help should mention the describe command"
+
     def test_idt_version(self):
-        """Test that 'idt version' works."""
+        """idt version should print the version and exit 0."""
         result = subprocess.run(
-            [sys.executable, 'idt_cli.py', 'version'],
+            _CLI + ["version"],
             capture_output=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=10
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         )
-        
-        assert result.returncode == 0, "idt version should exit successfully"
-        
-        # Should mention "Image Description Toolkit"
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
-        output = stdout + stderr
-        assert 'Image Description Toolkit' in output or 'IDT' in output, \
-            "Version should identify the toolkit"
-    
-    def test_idt_workflow_help(self):
-        """Test that 'idt workflow --help' works."""
-        # Use utf-8 encoding and errors='replace' to handle any encoding issues
+        assert result.returncode == 0, f"version should exit 0, got {result.returncode}"
+        output = (result.stdout or "") + (result.stderr or "")
+        assert "idt" in output.lower() or "4." in output, \
+            f"version output should identify the toolkit, got: {output!r}"
+
+    def test_idt_describe_help(self):
+        """idt describe --help should print describe-specific options."""
         result = subprocess.run(
-            [sys.executable, 'idt_cli.py', 'workflow', '--help'],
+            _CLI + ["describe", "--help"],
             capture_output=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=10
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         )
-        
-        # Should exit successfully (help exits with 0)
-        assert result.returncode == 0, f"workflow --help should exit successfully (got {result.returncode})"
-        
-        # Should mention workflow-related options
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
-        output = stdout + stderr
-        
-        # Workflow help should be substantial (at least some text)
-        assert len(output) > 50, f"Workflow help should print usage info (got {len(output)} chars)"
-        
-        # Look for common workflow flags or usage text
-        output_lower = output.lower()
-        assert any(keyword in output_lower for keyword in 
-                  ['workflow', 'usage', 'input', 'output', 'model', 'provider', 'help', 'options']), \
-            f"Workflow help should mention key options, got: {output[:200]}"
-    
+        assert result.returncode == 0, f"describe --help should exit 0, got {result.returncode}"
+        output = (result.stdout or "") + (result.stderr or "")
+        assert len(output) > 50, "describe --help should print usage info"
+        assert any(kw in output.lower() for kw in ["provider", "model", "prompt", "source"]), \
+            "describe --help should mention key options"
+
     def test_idt_guideme_launches(self):
-        """Test that 'idt guideme' starts (we'll kill it immediately)."""
-        # Start guideme in a subprocess
+        """idt guideme should start (or exit cleanly when there is no terminal)."""
         proc = subprocess.Popen(
-            [sys.executable, 'idt_cli.py', 'guideme'],
+            _CLI + ["guideme"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-                encoding='utf-8',
-                errors='replace'
+            encoding="utf-8",
+            errors="replace",
         )
-        
-        # Wait a moment to see if it crashes immediately
         time.sleep(0.5)
-        
-        # Check if process is still running
         poll_result = proc.poll()
-        
-        # Terminate the process
+        stdout = proc.stdout.read() if poll_result is not None else ""
         proc.terminate()
         try:
             proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
-        
-        # If poll_result is None, process was still running (good!)
-        # If poll_result is not None, process exited (might be OK if it prompts and exits)
-        assert poll_result is None or poll_result == 0, \
-            f"guideme should launch without immediate crash (exit code: {poll_result})"
-    
-    def test_idt_check_models_launches(self):
-        """Test that 'idt check-models' runs."""
-        result = subprocess.run(
-            [sys.executable, 'idt_cli.py', 'check-models'],
-            capture_output=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=30  # Longer timeout as it may check network
-        )
-        
-        # Should exit (may fail if ollama not running, but shouldn't crash)
-        assert result.returncode in (0, 1), \
-            f"check-models should exit cleanly (got {result.returncode})"
-    
-    def test_idt_results_list_launches(self):
-        """Test that 'idt results-list' runs."""
-        result = subprocess.run(
-            [sys.executable, 'idt_cli.py', 'results-list'],
-            capture_output=True,
-                encoding='utf-8',
-                errors='replace',
-            timeout=10
-        )
-        
-        # Should exit successfully (may find 0 results, that's OK)
-        assert result.returncode in (0, 1), \
-            f"results-list should exit cleanly (got {result.returncode})"
+        # Either still running (interactive terminal) or exited cleanly without
+        # a Python traceback (expected when stdin is not a tty).
+        if poll_result not in (None, 0, 1):
+            pytest.fail(f"guideme crashed with unexpected exit code: {poll_result}")
+        if poll_result not in (None, 0):
+            assert "Traceback" not in stdout, "guideme should not crash with a traceback"
 
-    def test_idt_help_has_video_commands(self):
-        """Test that 'idt help' output includes video-related commands."""
+    def test_idt_models_launches(self):
+        """idt models should exit cleanly (may have no models if Ollama isn't running)."""
         result = subprocess.run(
-            [sys.executable, 'idt_cli.py', 'help'],
+            _CLI + ["models"],
             capture_output=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=10
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        )
+        assert result.returncode in (0, 1), \
+            f"models should exit cleanly (got {result.returncode})"
+
+    def test_idt_help_has_core_commands(self):
+        """idt --help should list the core commands present in v4.5."""
+        result = subprocess.run(
+            _CLI + ["--help"],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         )
         output = (result.stdout or "") + (result.stderr or "")
-        for cmd in ('extract-frames', 'describe-video', 'descriptions-to-html'):
-            assert cmd in output, f"'idt help' output should include '{cmd}'"
+        for cmd in ("describe", "status", "show", "embed", "export", "combine", "stats"):
+            assert cmd in output, f"--help output should include '{cmd}'"
 
-    def test_idt_help_no_deprecated_commands(self):
-        """Test that 'idt help' does not list removed commands (viewer, prompteditor, configure)."""
+    def test_idt_no_info_noise_on_simple_command(self):
+        """Running a simple command should not emit INFO: lines to stderr."""
         result = subprocess.run(
-            [sys.executable, 'idt_cli.py', 'help'],
+            _CLI + ["version"],
             capture_output=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=10
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         )
-        output = (result.stdout or "") + (result.stderr or "")
-        # These commands were removed; should not appear in the COMMANDS section
-        for cmd in ('prompteditor', 'configure (or config)'):
-            assert cmd not in output, (
-                f"'idt help' output should not mention deprecated command '{cmd}'"
-            )
+        stderr = result.stderr or ""
+        assert "INFO:" not in stderr, \
+            f"No INFO: lines should appear in stderr for 'version', got: {stderr!r}"
 
 
 class TestGUIEntryPoints:
     """Test that GUI apps launch without crashing."""
-    
+
     @staticmethod
     def _skip_gui_in_ci() -> bool:
-        """Return True if running in CI environment where GUI cannot launch."""
-        # GitHub sets GITHUB_ACTIONS=true; many CI environments set CI=true
-        return (os.environ.get("GITHUB_ACTIONS", "").lower() == "true" 
+        return (os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
                 or os.environ.get("CI", "").lower() == "true")
-    
 
-    
     def test_imagedescriber_launches(self):
-        """Test that ImageDescriber.exe or app launches."""
+        """ImageDescriber should launch and stay running."""
         if self._skip_gui_in_ci():
-            print("CI environment detected; skipping ImageDescriber GUI launch test")
-            return
-        app_paths = [
-            Path('imagedescriber/ImageDescriber.exe'),
-            Path('imagedescriber/imagedescriber.py')
-        ]
-        
+            pytest.skip("Skipping GUI launch test in CI environment")
+
         app_path = None
-        for path in app_paths:
-            if path.exists():
-                app_path = path
+        for candidate in [
+            Path("imagedescriber/ImageDescriber.exe"),
+            Path("imagedescriber/imagedescriber.py"),
+            Path("imagedescriber/imagedescriber_wx.py"),
+        ]:
+            if candidate.exists():
+                app_path = candidate
                 break
-        
+
         if app_path is None:
-            print("ImageDescriber not found, skipping launch test")
-            return
-        
-        if app_path.suffix == '.exe':
-            cmd = [str(app_path)]
-        else:
-            cmd = [sys.executable, str(app_path)]
-        
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
+            pytest.skip("ImageDescriber entry point not found")
+
+        cmd = ([str(app_path)] if app_path.suffix == ".exe"
+               else [sys.executable, str(app_path)])
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(1.0)
         poll_result = proc.poll()
-        
         proc.terminate()
         try:
             proc.wait(timeout=3)
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
-        
         assert poll_result is None, \
-            f"ImageDescriber should launch and stay running (exited with {poll_result})"
-    
-
+            f"ImageDescriber should stay running (exited with {poll_result})"
 
 
 if __name__ == "__main__":

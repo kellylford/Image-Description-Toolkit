@@ -193,7 +193,7 @@ class WorkspacePipeline:
                 cache = options.geocode_cache or (Path.home() / ".idt" / "geocode_cache.json")
                 self._geocoder = NominatimGeocoder(cache_path=cache)
 
-        all_items = self.workspace.items()
+        all_items = self.workspace.media_items()
         queue = all_items if options.redescribe else [i for i in all_items if not i.described]
         if options.limit is not None:
             queue = queue[: options.limit]

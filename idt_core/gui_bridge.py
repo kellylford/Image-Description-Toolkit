@@ -268,6 +268,10 @@ def bundle_to_gui_workspace_dict(ws: Workspace) -> dict:
         chat_item.update(chat.get("extra", {}))
         items[key] = chat_item
 
+    # Reconstruct video→frame links for bundles created before the CLI recorded
+    # parent_video / item_type="extracted_frame" in each sidecar.
+    _reconstruct_video_frame_links(ws, items)
+
     return {
         "version": "3.0",
         "directory_path": ws.sources[0]["path"] if ws.sources else "",
@@ -281,3 +285,64 @@ def bundle_to_gui_workspace_dict(ws: Workspace) -> dict:
         "created": ws.created,
         "modified": ws.modified,
     }
+
+
+def _reconstruct_video_frame_links(ws: Workspace, items: dict) -> None:
+    """
+    Detect extracted frames stored as item_type="image" with subfolder="frames/<Stem>"
+    and no parent_video — produced by older CLI runs — and synthesize the proper
+    video→frame relationship so the GUI tree can nest them correctly.
+
+    For each unique video stem found, if no video item already exists, a placeholder
+    video entry is inserted (is_missing=True, no image copy in the bundle).
+    The frame items are updated to item_type="extracted_frame" with parent_video set.
+    """
+    import re
+    _frame_sub = re.compile(r'^frames/(.+)$')
+
+    # Collect unlinked frames grouped by video stem.
+    unlinked: dict = {}  # stem -> [gui_path, ...]
+    for gui_path, item in items.items():
+        if (item.get("item_type", "image") == "image"
+                and item.get("parent_video") is None
+                and item.get("subfolder")):
+            m = _frame_sub.match(item["subfolder"])
+            if m:
+                stem = m.group(1)
+                unlinked.setdefault(stem, []).append(gui_path)
+
+    if not unlinked:
+        return
+
+    for stem, frame_paths in unlinked.items():
+        # Look for a video item already present (added by CLI after the fix).
+        video_key = next(
+            (k for k, v in items.items()
+             if v.get("item_type") == "video" and Path(k).stem == stem),
+            None,
+        )
+        if video_key is None:
+            # Synthesize a placeholder video node.  Use the would-be bundle path as
+            # a stable, unique key; is_missing=True since no file was copied.
+            video_key = str(ws.images_dir / stem)
+            items[video_key] = {
+                "file_path": video_key,
+                "item_type": "video",
+                "descriptions": [],
+                "subfolder": None,
+                "parent_video": None,
+                "video_metadata": None,
+                "download_url": None,
+                "download_timestamp": None,
+                "alt_text": None,
+                "exif_datetime": None,
+                "file_mtime": None,
+                "is_missing": True,
+                "extracted_frames": sorted(frame_paths),
+            }
+        elif not items[video_key].get("extracted_frames"):
+            items[video_key]["extracted_frames"] = sorted(frame_paths)
+
+        for fp in frame_paths:
+            items[fp]["item_type"] = "extracted_frame"
+            items[fp]["parent_video"] = video_key

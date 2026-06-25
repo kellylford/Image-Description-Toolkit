@@ -228,11 +228,18 @@ def cmd_describe(args):
         return
 
     source = Path(args.source).resolve()
-    if not source.is_dir():
-        print(f"Error: not a directory: {source}", file=sys.stderr)
-        sys.exit(1)
 
-    ws = _open_or_create_workspace(source, getattr(args, "workspace", None))
+    # Allow passing a workspace bundle directly to resume an interrupted run.
+    # The user may not remember the original source folder but always has the bundle.
+    from idt_core.workspace import Workspace
+    if Workspace.is_bundle(source):
+        ws = Workspace.open(source)
+        source = None  # no source folder to scan
+    elif not source.is_dir():
+        print(f"Error: not a directory or workspace bundle: {source}", file=sys.stderr)
+        sys.exit(1)
+    else:
+        ws = _open_or_create_workspace(source, getattr(args, "workspace", None))
     user_cfg = UserConfig.load()
 
     # Only inherit provider/model from the workspace manifest if this workspace
@@ -245,18 +252,21 @@ def cmd_describe(args):
     model         = args.model    or _ws_model    or user_cfg.default_model
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
 
-    # Copy this run's source images into the bundle (idempotent; originals untouched)
+    # Copy this run's source images into the bundle (idempotent; originals untouched).
+    # Skipped when the user passed a workspace bundle directly (source is None).
     if not args.quiet:
-        print(f"Source:     {source}")
+        if source:
+            print(f"Source:     {source}")
         print(f"Workspace:  {ws.path}")
-    added = ws.add_source_folder(source, recursive=True)
+    if source is not None:
+        added = ws.add_source_folder(source, recursive=True)
 
-    # Extract video frames and add them to the workspace (default on; opt out with --no-video)
-    if not getattr(args, "no_video", False):
-        _extract_videos_into_workspace(ws, source, args)
+        # Extract video frames and add them to the workspace (opt out with --no-video)
+        if not getattr(args, "no_video", False):
+            _extract_videos_into_workspace(ws, source, args)
 
     if not args.quiet:
-        total_items = len(ws.items())
+        total_items = len(ws.media_items())
         print(f"Images:     {total_items} in workspace")
         print(f"Provider:   {provider_name}  model: {model}")
         print(f"Prompt:     {prompt_name}")
@@ -289,7 +299,7 @@ def cmd_describe(args):
         geocode=args.geocode,
     )
 
-    all_items = ws.items()
+    all_items = ws.media_items()
     queue = all_items if args.redescribe else [i for i in all_items if not i.described]
     if args.limit:
         queue = queue[: args.limit]
@@ -352,6 +362,7 @@ def cmd_describe(args):
 def _extract_videos_into_workspace(ws, source: Path, args) -> None:
     """Scan source for videos, extract frames, and add them to the workspace."""
     from idt_core.video import scan_videos, extract_frames_to_dir, VideoExtractionOptions
+    from idt_core.workspace import WorkspaceItem
     videos = list(scan_videos(source))
     if not videos:
         return
@@ -365,8 +376,34 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
         frames_dir = ws.derived_dir("frames") / video.stem
         try:
             result = extract_frames_to_dir(video, frames_dir, opts)
+
+            # Register the video as a reference-mode item (no copy — videos are large).
+            video_wi = ws.get_item(video.name)
+            if video_wi is None:
+                video_wi = WorkspaceItem(
+                    image=video.name,
+                    source_path=str(video),
+                    storage="reference",
+                    item_type="video",
+                    is_missing=not video.exists(),
+                )
+                ws.save_item(video_wi)
+            # For reference-mode items image_path() returns the original source path,
+            # which is what the GUI uses as the dict key for this video item.
+            video_gui_path = str(ws.image_path(video_wi))
+
+            frame_paths = []
             for frame_path in result.frame_paths:
-                ws.add_image(frame_path, subfolder=f"frames/{video.stem}")
+                frame_wi = ws.add_image(frame_path, subfolder=f"frames/{video.stem}")
+                frame_wi.item_type = "extracted_frame"
+                frame_wi.parent_video = video_gui_path
+                ws.save_item(frame_wi)
+                frame_paths.append(str(ws.image_path(frame_wi)))
+
+            # Store the frame list on the video so the GUI can show the frame count.
+            video_wi.extra["extracted_frames"] = frame_paths
+            ws.save_item(video_wi)
+
             total_frames += len(result.frame_paths)
             if not args.quiet:
                 print(f"  {video.name}: {len(result.frame_paths)} frames")
@@ -872,11 +909,20 @@ def _show_file(target: Path, args):
     from idt_core.project import Project
     from idt_core.image_item import ImageItem
 
-    # Prefer a .idtw bundle: walk up looking for a sibling bundle whose items
-    # have this original as their source_path.
+    # Prefer a .idtw bundle.  Walk up the tree checking two things each level:
+    # 1. Whether candidate itself is a bundle (target is inside the bundle's images/)
+    # 2. Whether a sibling bundle exists whose items reference this file as source_path
     candidate = target.parent
     target_str = str(target)
     while True:
+        # Case 1: target lives inside a bundle (e.g. 09.idtw/images/photo.jpg)
+        if Workspace.is_bundle(candidate):
+            ws = Workspace.open(candidate)
+            for item in ws.items():
+                if item.image == target.name:
+                    _print_item(item, args)
+                    return
+        # Case 2: sibling bundle whose workspace was created from the same source folder
         sibling = candidate.parent / (candidate.name + ".idtw")
         if Workspace.is_bundle(sibling):
             ws = Workspace.open(sibling)
@@ -895,6 +941,15 @@ def _show_file(target: Path, args):
         if candidate == candidate.parent:
             break
         candidate = candidate.parent
+
+    # Last resort: the workspace may be at a mirrored location (e.g. ~/Documents/idt/).
+    # _find_workspace walks workspace directories that reference the same source.
+    ws = _find_workspace(str(target.parent))
+    if ws is not None:
+        for item in ws.items():
+            if item.source_path == target_str or item.image == target.name:
+                _print_item(item, args)
+                return
 
     if not args.quiet:
         print(f"No description found for: {target.name}", file=sys.stderr)
@@ -1345,25 +1400,44 @@ def cmd_prompts(args):
 
 def cmd_stats(args):
     """
-    Show token usage and cost estimates across a project.
+    Show progress and token/cost breakdown across one or more workspaces.
 
-    idt stats ~/Pictures/Vacation/
-    idt stats ~/Pictures/ --all
-    idt stats ~/Pictures/Vacation/ --json
+    idt stats Vacation.idtw
+    idt stats ~/Documents/idt/ --all
+    idt stats Vacation.idtw --json
     """
     from idt_core.project import Project
     from idt_core.workspace import Workspace
 
     root = Path(args.source).resolve()
 
-    # Gather described items from .idtw bundles (and legacy .idt/ projects)
+    # Rough cost table (USD per 1M tokens, input/output)
+    COST_TABLE = {
+        "claude-opus-4-8":             (15.0,  75.0),
+        "claude-opus-4-6":             (15.0,  75.0),
+        "claude-sonnet-4-6":           (3.0,   15.0),
+        "claude-haiku-4-5-20251001":   (0.8,   4.0),
+        "claude-haiku-3-5-20241022":   (0.8,   4.0),
+        "gpt-4o":                      (2.5,   10.0),
+        "gpt-4o-mini":                 (0.15,  0.6),
+    }
+
+    # workspace_rows: [(name, total, described, undescribed), ...]
+    workspace_rows = []
     described_items = []
 
     def _collect_ws(ws):
-        described_items.extend(i for i in ws.items() if i.described)
+        st = ws.status()
+        workspace_rows.append((ws.name, st["total"], st["described"], st["undescribed"]))
+        described_items.extend(i for i in ws.media_items() if i.described)
 
     def _collect_proj(pr):
-        described_items.extend(pr.described())
+        all_items = list(pr.items())
+        desc_items = list(pr.described())
+        total = len(all_items)
+        described = len(desc_items)
+        workspace_rows.append((str(pr.source_dir), total, described, total - described))
+        described_items.extend(desc_items)
 
     if args.all:
         for bundle in sorted(root.rglob("*.idtw")):
@@ -1379,7 +1453,7 @@ def cmd_stats(args):
                     _collect_proj(Project.open(source))
                 except Exception:
                     pass
-        if not described_items:
+        if not workspace_rows:
             print(f"No IDT workspaces found under: {root}")
             return
     else:
@@ -1392,8 +1466,8 @@ def cmd_stats(args):
                 sys.exit(1)
             _collect_proj(Project.open(root))
 
-    # Accumulate stats per provider+model
-    totals: dict = {}  # (provider, model) -> {images, input_tokens, output_tokens}
+    # Accumulate token stats per provider+model
+    totals: dict = {}
     grand_images = grand_in = grand_out = 0
     no_token_count = 0
 
@@ -1415,40 +1489,54 @@ def cmd_stats(args):
             totals[key]["output_tokens"] += desc.output_tokens
             grand_out += desc.output_tokens
 
-    if not totals:
-        print("No described images found.")
-        return
-
-    # Rough cost table (USD per 1M tokens, input/output)
-    COST_TABLE = {
-        "claude-opus-4-8":             (15.0,  75.0),
-        "claude-opus-4-6":             (15.0,  75.0),
-        "claude-sonnet-4-6":           (3.0,   15.0),
-        "claude-haiku-4-5-20251001":   (0.8,   4.0),
-        "claude-haiku-3-5-20241022":   (0.8,   4.0),
-        "gpt-4o":                      (2.5,   10.0),
-        "gpt-4o-mini":                 (0.15,  0.6),
-    }
-
     if args.json_out:
-        rows = []
+        grand_total = sum(r[1] for r in workspace_rows)
+        grand_described = sum(r[2] for r in workspace_rows)
+        token_rows = []
         for (prov, model), d in sorted(totals.items()):
             cost_in, cost_out = COST_TABLE.get(model, (0, 0))
             cost = (d["input_tokens"] / 1_000_000 * cost_in +
                     d["output_tokens"] / 1_000_000 * cost_out)
-            rows.append({
+            token_rows.append({
                 "provider": prov, "model": model,
                 "images": d["images"],
                 "input_tokens": d["input_tokens"],
                 "output_tokens": d["output_tokens"],
                 "estimated_cost_usd": round(cost, 4) if cost else None,
             })
-        print(json.dumps(rows, indent=2))
+        print(json.dumps({
+            "workspaces": [
+                {"name": r[0], "total": r[1], "described": r[2], "undescribed": r[3]}
+                for r in workspace_rows
+            ],
+            "grand_total": grand_total,
+            "grand_described": grand_described,
+            "token_breakdown": token_rows,
+        }, indent=2))
         return
 
-    print(f"Described images: {grand_images}")
+    # ── Progress section ────────────────────────────────────────────────
+    grand_total = sum(r[1] for r in workspace_rows)
+    grand_described = sum(r[2] for r in workspace_rows)
+    pct = int(100 * grand_described / grand_total) if grand_total else 0
+
+    print(f"Progress: {grand_described:,} of {grand_total:,} images described ({pct}%)")
+    if len(workspace_rows) > 1:
+        print()
+        print(f"  {'Workspace':<40} {'Total':>6} {'Done':>6} {'Left':>6} {'%':>4}")
+        print("  " + "-" * 60)
+        for name, total, described, undescribed in workspace_rows:
+            ws_pct = int(100 * described / total) if total else 0
+            print(f"  {name:<40} {total:>6,} {described:>6,} {undescribed:>6,} {ws_pct:>3}%")
+
+    if not totals:
+        return
+
+    # ── Token/cost section ──────────────────────────────────────────────
+    print()
+    print(f"Token usage: {grand_images:,} described images")
     if no_token_count:
-        print(f"  (Token data missing for {no_token_count} images — local models don't report tokens)")
+        print(f"  (No token data for {no_token_count} image(s) — token counts may not be recorded for all runs)")
     print()
     print(f"{'Provider':<12} {'Model':<35} {'Images':>7} {'Input tok':>10} {'Output tok':>11} {'Est. cost':>10}")
     print("-" * 90)
@@ -1463,11 +1551,10 @@ def cmd_stats(args):
         print(f"{prov:<12} {model:<35} {d['images']:>7} {in_str:>10} {out_str:>11} {cost_str:>10}")
 
     if len(totals) > 1:
-        total_cost_str = ""
         total_in_str = f"{grand_in:,}" if grand_in else "n/a"
         total_out_str = f"{grand_out:,}" if grand_out else "n/a"
         print("-" * 90)
-        print(f"{'TOTAL':<12} {'':<35} {grand_images:>7} {total_in_str:>10} {total_out_str:>11} {total_cost_str:>10}")
+        print(f"{'TOTAL':<12} {'':<35} {grand_images:>7} {total_in_str:>10} {total_out_str:>11} {''!s:>10}")
 
 
 def cmd_config(args):
@@ -1511,6 +1598,17 @@ def cmd_config(args):
 def cmd_guideme(args):
     from cli.guide import run_guide
     run_guide()
+
+
+def cmd_version(args):
+    try:
+        from idt_core import __version__ as _v
+        print(f"idt {_v}")
+    except Exception:
+        print("idt (version unknown)")
+    print(f"Python {sys.version.split()[0]}")
+    if getattr(sys, "frozen", False):
+        print(f"Binary: {sys.executable}")
 
 
 # ------------------------------------------------------------------ #
@@ -1839,6 +1937,9 @@ Supported providers:
     )
     p_guideme.set_defaults(func=cmd_guideme)
 
+    p_version = sub.add_parser("version", help="Print version information")
+    p_version.set_defaults(func=cmd_version)
+
     return parser
 
 
@@ -1847,6 +1948,13 @@ Supported providers:
 # ------------------------------------------------------------------ #
 
 def main():
+    # Ensure stdout/stderr can emit any Unicode character on Windows (cp1252 is the
+    # default and chokes on arrows, curly quotes, etc. found in AI descriptions).
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     _set_console_title("IDT - Image Description Toolkit")
     parser = build_parser()
     args = parser.parse_args()

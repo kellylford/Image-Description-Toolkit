@@ -57,6 +57,8 @@ class OllamaProvider(BaseProvider):
             text=response.message.content,
             model=self._model,
             provider="ollama",
+            input_tokens=getattr(response, "prompt_eval_count", None),
+            output_tokens=getattr(response, "eval_count", None),
         )
 
     def list_models(self) -> list[str]:

@@ -16,6 +16,14 @@ class FakeProvider:
     def __init__(self):
         self.calls = 0
 
+    @property
+    def provider_name(self) -> str:
+        return "fake"
+
+    @property
+    def model_name(self) -> str:
+        return "fake-1"
+
     def describe(self, image_bytes, mime_type, prompt):
         self.calls += 1
         return DescriptionResult(

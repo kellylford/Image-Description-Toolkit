@@ -772,7 +772,10 @@ class ProcessingOptionsDialog(wx.Dialog):
             label="&Geocode GPS coordinates to city/state (requires internet)",
             name="Geocode GPS coordinates to city/state"
         )
-        self.geocode_cb.SetValue(self.config.get('geocode_enabled', False))
+        # Read from flat key first; fall back to the nested Configure Settings path.
+        _geocode_default = self.config.get('geocode_enabled') or \
+            self.config.get('metadata', {}).get('geocoding', {}).get('enabled', False)
+        self.geocode_cb.SetValue(bool(_geocode_default))
         self.geocode_cb.SetToolTip(
             "When an image has GPS coordinates, look up the city and state via OpenStreetMap "
             "and include them in the AI prompt context. Results are cached locally."
@@ -787,9 +790,34 @@ class ProcessingOptionsDialog(wx.Dialog):
 
         sizer.Add(context_sizer, 0, wx.ALL | wx.EXPAND, 10)
 
+        # Embedding
+        embed_box = wx.StaticBox(panel, label="Embedding")
+        embed_sizer = wx.StaticBoxSizer(embed_box, wx.VERTICAL)
+
+        self.embed_after_process_cb = wx.CheckBox(
+            panel,
+            label="&Embed description into workspace after processing",
+            name="Embed description after processing"
+        )
+        self.embed_after_process_cb.SetValue(self.config.get('embed_after_process', False))
+        self.embed_after_process_cb.SetToolTip(
+            "After each image is processed, copy it to the workspace's embedded/ folder "
+            "with the AI description written into the image metadata. "
+            "Originals are never modified. Requires an open workspace bundle (.idtw)."
+        )
+        embed_sizer.Add(self.embed_after_process_cb, 0, wx.ALL, 5)
+
+        embed_note = wx.StaticText(
+            panel,
+            label="Copies go to workspace/embedded/. Originals are never modified."
+        )
+        embed_sizer.Add(embed_note, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        sizer.Add(embed_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
         panel.SetSizer(sizer)
         return panel
-    
+
     def create_ai_panel(self, parent):
         """Create AI model options panel"""
         panel = wx.Panel(parent)
@@ -1083,6 +1111,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         return {
             'skip_existing': self.skip_existing_cb.GetValue(),
             'geocode_enabled': self.geocode_cb.GetValue(),
+            'embed_after_process': self.embed_after_process_cb.GetValue(),
             'provider': self.provider_choice.GetStringSelection().lower(),
             'model': model,
             'prompt_style': self.prompt_choice.GetStringSelection(),
@@ -1798,6 +1827,37 @@ class EmbedDescriptionsDialog(wx.Dialog):
         )
         main_sizer.Add(intro, 0, wx.ALL, 12)
 
+        # ---- Description selection ----
+        desc_sel_box = wx.StaticBox(self, label='Which Description to Embed')
+        desc_sel_sizer = wx.StaticBoxSizer(desc_sel_box, wx.VERTICAL)
+
+        self._latest_rb = wx.RadioButton(
+            self, label='&Latest description (recommended)',
+            style=wx.RB_GROUP, name='Latest description'
+        )
+        self._latest_rb.SetValue(True)
+        desc_sel_sizer.Add(self._latest_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
+
+        latest_note = wx.StaticText(
+            self, label="   Uses the most recently added description for each image."
+        )
+        desc_sel_sizer.Add(latest_note, 0, wx.LEFT | wx.BOTTOM, 8)
+
+        self._all_rb = wx.RadioButton(
+            self, label='A&ll descriptions combined',
+            name='All descriptions combined'
+        )
+        desc_sel_sizer.Add(self._all_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
+
+        all_note = wx.StaticText(
+            self,
+            label="   Joins all descriptions for each image with a separator\n"
+                  "   (useful when you have both AI and manual descriptions)."
+        )
+        desc_sel_sizer.Add(all_note, 0, wx.LEFT | wx.BOTTOM, 8)
+
+        main_sizer.Add(desc_sel_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
         # ---- Mode selection ----
         mode_box = wx.StaticBox(self, label='Write Mode')
         mode_sizer = wx.StaticBoxSizer(mode_box, wx.VERTICAL)
@@ -1924,3 +1984,7 @@ class EmbedDescriptionsDialog(wx.Dialog):
     def get_output_dir(self) -> Optional[Path]:
         """Return the chosen output directory (copy mode only, else None)."""
         return self._output_dir
+
+    def get_description_selection(self) -> str:
+        """Return 'latest' or 'all'."""
+        return 'all' if self._all_rb.GetValue() else 'latest'

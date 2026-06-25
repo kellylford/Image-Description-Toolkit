@@ -530,9 +530,13 @@ class Workspace:
         if p.exists():
             p.unlink()
 
+    def media_items(self) -> list["WorkspaceItem"]:
+        """Items that can be AI-described: all items except video container entries."""
+        return [i for i in self.items() if i.item_type != "video"]
+
     # ----- status ----- #
     def status(self) -> dict:
-        all_items = self.items()
+        all_items = self.media_items()
         n_described = sum(1 for i in all_items if i.described)
         return {
             "name": self.name,
