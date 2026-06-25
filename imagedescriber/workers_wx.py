@@ -1865,37 +1865,23 @@ class VideoProcessingWorker(threading.Thread):
     
     def run(self):
         """Extract frames from video"""
-        print(f"VideoProcessingWorker.run() STARTED for {Path(self.video_path).name}", flush=True)
-        logger.info(f"VideoProcessingWorker.run() started for {self.video_path}")
-        logger.debug(f"Extraction config: {self.extraction_config}")
-        
+        logger.info(f"VideoProcessingWorker started for {Path(self.video_path).name}")
+
         try:
-            print(f"Posting progress message...", flush=True)
             self._post_progress(f"Extracting frames from: {Path(self.video_path).name}")
-            logger.debug("Starting _extract_frames()")
-            
-            print(f"Calling _extract_frames()...", flush=True)
-            # Extract frames and get video metadata
             extracted_frames, video_metadata = self._extract_frames()
-            print(f"_extract_frames() returned {len(extracted_frames)} frames", flush=True)
-            logger.info(f"_extract_frames() completed: {len(extracted_frames)} frames extracted")
-            
+            logger.info(f"Extracted {len(extracted_frames)} frames from {Path(self.video_path).name}")
+
             if extracted_frames:
                 self._post_progress(f"Extracted {len(extracted_frames)} frames")
                 evt = WorkflowCompleteEventData(
                     input_dir=self.video_path,
                     output_dir=str(Path(extracted_frames[0]).parent)
                 )
-                # Attach video metadata to event
                 evt.video_metadata = video_metadata
-                print(f"Posting WorkflowCompleteEventData...", flush=True)
-                logger.debug(f"Posting WorkflowCompleteEventData to parent window")
                 wx.PostEvent(self.parent_window, evt)
-                print(f"WorkflowCompleteEventData posted", flush=True)
-                logger.debug("WorkflowCompleteEventData posted successfully")
             else:
-                print(f"WARNING: No frames extracted!", flush=True)
-                logger.warning("No frames were extracted from video")
+                logger.warning(f"No frames extracted from {Path(self.video_path).name}")
                 evt = WorkflowFailedEventData(error="No frames were extracted from video")
                 wx.PostEvent(self.parent_window, evt)
                 
@@ -1973,13 +1959,13 @@ class VideoProcessingWorker(threading.Thread):
         # Create output directory in workspace (NOT in source directory)
         video_path_obj = Path(self.video_path)
         
-        # Get workspace directory from parent window
+        # Get workspace directory from parent window — must write inside the
+        # bundle, never in the source directory (which may be a read-only share).
         if hasattr(self.parent_window, 'get_workspace_directory'):
             workspace_dir = self.parent_window.get_workspace_directory()
-            extracted_frames_dir = workspace_dir / "extracted_frames"
-            video_dir = extracted_frames_dir / f"{video_path_obj.stem}"
+            video_dir = workspace_dir / "derived" / "frames" / video_path_obj.stem
         else:
-            # Fallback for older code or if method not available
+            # Fallback: write next to the source video (legacy behaviour)
             toolkit_dir = video_path_obj.parent / "imagedescriptiontoolkit"
             video_dir = toolkit_dir / f"{video_path_obj.stem}_frames"
         

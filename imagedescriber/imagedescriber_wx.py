@@ -909,6 +909,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         result.mkdir(parents=True, exist_ok=True)
         return result
 
+    def get_workspace_directory(self) -> Path:
+        """Return the root directory of the current workspace bundle.
+
+        VideoProcessingWorker calls this to determine where to write extracted
+        frames so they land inside the bundle, not in the source directory.
+        """
+        if self.workspace_file:
+            return Path(self.workspace_file)
+        return Path.home() / "Downloads" / "ImageDescriber"
+
     def _extract_video_frames_sync(self, video_path: str, extraction_config: dict) -> tuple:
         """Extract frames from video synchronously (for auto-extraction in Process All).
 
@@ -3356,29 +3366,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing: If True, only process images without descriptions (default, safe)
                           If False, reprocess all images (show warning first)
         """
-        logger.info("="*60)
-        logger.info(f"on_process_all CALLED - skip_existing={skip_existing}")
-        logger.info(f"Event type: {type(event)}, Event object: {event}")
-        logger.info(f"Workspace: {self.workspace}")
-        logger.info(f"Workspace items: {len(self.workspace.items) if self.workspace else 'None'}")
-        logger.info(f"Workspace file: {self.workspace_file}")
-        logger.info("="*60)
-        print("="*60, flush=True)
-        print(f"on_process_all CALLED - skip_existing={skip_existing}", flush=True)
-        print(f"Workspace items: {len(self.workspace.items) if self.workspace else 0}", flush=True)
-        print("="*60, flush=True)
+        logger.info(f"on_process_all called: skip_existing={skip_existing}, items={len(self.workspace.items) if self.workspace else 0}")
 
-        logger.info("CHECKPOINT 1: Checking workspace existence")
-        if not self.workspace or not self.workspace.items:
-            logger.warning("No workspace or no items in workspace - showing warning")
-            show_warning(self, "No images in workspace")
-            return
-        logger.info("CHECKPOINT 1 PASSED: Workspace exists with items")
-
-        # Guard: if the directory scan is still running, queue this request and
-        # let on_scan_complete fire it automatically once all files are known.
-        # On network shares the async scan can take 30–60 s; starting while it is
-        # in-flight means video files that haven't arrived yet are silently skipped.
+        # Guard: if the directory scan is still running, defer the request so that
+        # on_scan_complete fires it automatically once all files are known.
+        # MUST come before the empty-workspace check: on slow/large network shares
+        # all files arrive in one batch at the very end of the scan, so workspace.items
+        # is empty the entire time the scan is running — checking items first would
+        # show a spurious "No images" warning and never set the deferred flag.
         if self.scan_worker is not None:
             self._pending_process_all = True
             self._pending_process_all_skip_existing = skip_existing
@@ -3387,6 +3382,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             )
             logger.info("on_process_all deferred: scan still running, will auto-resume on scan_complete")
             return
+
+        logger.info("CHECKPOINT 1: Checking workspace existence")
+        if not self.workspace or not self.workspace.items:
+            logger.warning("No workspace or no items in workspace - showing warning")
+            show_warning(self, "No images in workspace")
+            return
+        logger.info("CHECKPOINT 1 PASSED: Workspace exists with items")
 
         logger.info("CHECKPOINT 2: Checking BatchProcessingWorker availability")
         if not BatchProcessingWorker:
@@ -3484,33 +3486,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         images_to_process = []
         videos_to_extract = []
 
-        print(f"Scanning {len(self.workspace.items)} workspace items...", flush=True)
         logger.info(f"Scanning {len(self.workspace.items)} workspace items...")
 
         for item in self.workspace.items.values():
-            print(f"  Item: {Path(item.file_path).name}, type={item.item_type}, has_desc={bool(item.descriptions)}", flush=True)
             if item.item_type == "video":
                 # Check if video needs extraction
                 if not hasattr(item, 'extracted_frames') or not item.extracted_frames:
-                    print(f"    -> Adding to videos_to_extract", flush=True)
                     videos_to_extract.append(item.file_path)
-                else:
-                    print(f"    -> Video already has {len(item.extracted_frames)} frames", flush=True)
             elif skip_existing:
                 if not item.descriptions:
-                    print(f"    -> Adding to images_to_process (no descriptions)", flush=True)
                     images_to_process.append(item.file_path)
-                else:
-                    print(f"    -> Skipping (has descriptions)", flush=True)
             else:
-                print(f"    -> Adding to images_to_process (redescribe all)", flush=True)
                 images_to_process.append(item.file_path)
 
-        print(f"Result: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process", flush=True)
+        logger.info(f"Queue: {len(videos_to_extract)} videos to extract, {len(images_to_process)} images to process")
 
         # Auto-extract video frames with default settings (1 frame every 5 seconds)
         if videos_to_extract:
-            print(f"BRANCH: Starting video extraction flow", flush=True)
             logger.info(f"Starting batch video extraction: {len(videos_to_extract)} videos, {len(images_to_process)} images")
             logger.debug(f"Videos to extract: {videos_to_extract}")
 
@@ -3537,15 +3529,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self._extracted_video_count = 0
 
             # Start extracting first video
-            print(f"About to call _extract_next_video_in_batch()...", flush=True)
-            logger.debug("Calling _extract_next_video_in_batch() to start extraction")
             self._extract_next_video_in_batch()
-            print(f"Returned from _extract_next_video_in_batch()", flush=True)
-            logger.debug("Returned from _extract_next_video_in_batch(), waiting for background thread")
             return  # Will continue in video extraction event handler
 
         # No videos to extract, proceed directly to image processing
-        print(f"BRANCH: No videos to extract, proceeding to image processing", flush=True)
         to_process = images_to_process
 
         if not to_process:
@@ -3784,12 +3771,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def _extract_next_video_in_batch(self):
         """Extract next video in batch processing queue"""
-        print(f"_extract_next_video_in_batch: count={self._extracted_video_count}, total={len(self._videos_to_extract)}", flush=True)
-        logger.debug(f"_extract_next_video_in_batch called: count={self._extracted_video_count}, total={len(self._videos_to_extract)}")
-
         if self._extracted_video_count >= len(self._videos_to_extract):
-            # All videos extracted, proceed to image processing
-            print(f"All videos extracted, moving to image processing", flush=True)
             logger.info("All videos extracted, proceeding to image processing")
             self._start_batch_image_processing()
             return
@@ -3797,7 +3779,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Get next video
         video_path = self._videos_to_extract[self._extracted_video_count]
         video_name = Path(video_path).name
-        print(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}", flush=True)
         logger.info(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}")
 
         # Update progress
@@ -5547,6 +5528,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_workflow_failed(self, event):
         """Handle workflow failures"""
+        # If we're in the middle of batch video extraction, log and skip this
+        # video rather than halting the entire batch — one bad video shouldn't
+        # prevent all the others (and the still images) from being processed.
+        if getattr(self, '_batch_video_extraction', False):
+            video_path = self._videos_to_extract[self._extracted_video_count] if hasattr(self, '_videos_to_extract') else "unknown"
+            logger.warning(f"Video extraction failed for {Path(video_path).name}: {event.error} — skipping")
+            self._extracted_video_count = getattr(self, '_extracted_video_count', 0) + 1
+            self._extract_next_video_in_batch()
+            return
+
         # Ensure main window has focus before showing error dialog
         self.Raise()
         self.SetFocus()
