@@ -4408,8 +4408,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def _auto_save_bundle(self) -> None:
         """Auto-create a reference-mode .idtw bundle after batch completes with no saved workspace.
 
-        Uses reference mode (no image copy) so the bundle is lightweight — just
-        manifest.json + description sidecars.  The original images stay where they are.
+        Always saves to ~/Documents/idt/<name> so the bundle is local, never on a
+        read-only network share next to the source images.  Reference mode only —
+        no image copy, just manifest.json + description sidecars.
         """
         if not self.workspace or not self.workspace.directory_paths:
             return
@@ -4419,7 +4420,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
 
         source = Path(self.workspace.directory_paths[0])
-        bundle_path = source.parent / (source.name + ".idtw")
+        workspace_root = get_default_workspaces_root()
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        bundle_path = workspace_root / source.name
         try:
             bundle = gui_workspace_to_bundle(
                 self.workspace.to_dict(), bundle_path, copy_images=False
