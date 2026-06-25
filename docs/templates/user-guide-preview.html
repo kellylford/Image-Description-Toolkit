@@ -1,0 +1,2538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="generator" content="pandoc" />
+  <meta name="description" content="Image Description Toolkit documentation" />
+  <title>Image Description Toolkit — User Guide — Image Description Toolkit</title>
+  <link rel="stylesheet" href="wcag.css" />
+  </head>
+<body>
+
+  <!-- Skip navigation — required for WCAG 2.2 AA (Success Criterion 2.4.1) -->
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <a class="skip-link" href="#toc">Skip to table of contents</a>
+
+  <header role="banner">
+    <div class="site-header">
+      <span class="site-name">Image Description Toolkit</span>
+      <span class="doc-type">User Documentation</span>
+    </div>
+  </header>
+
+  <div class="page-wrapper">
+
+        <nav id="toc" aria-label="Table of contents">
+      <h2 class="toc-heading">Contents</h2>
+      <ul>
+      <li><a href="#image-description-toolkit-user-guide" id="toc-image-description-toolkit-user-guide">Image Description Toolkit — User Guide</a>
+      <ul>
+      <li><a href="#overview" id="toc-overview">Overview</a>
+      <ul>
+      <li><a href="#supported-ai-providers" id="toc-supported-ai-providers">Supported AI Providers</a></li>
+      </ul></li>
+      <li><a href="#part-1-getting-started" id="toc-part-1-getting-started">Part 1: Getting Started</a>
+      <ul>
+      <li><a href="#system-requirements" id="toc-system-requirements">System Requirements</a></li>
+      <li><a href="#installation-on-windows" id="toc-installation-on-windows">Installation on Windows</a></li>
+      <li><a href="#installation-on-macos" id="toc-installation-on-macos">Installation on macOS</a></li>
+      <li><a href="#setting-up-api-keys" id="toc-setting-up-api-keys">Setting Up API Keys</a></li>
+      <li><a href="#quick-start-your-first-description" id="toc-quick-start-your-first-description">Quick Start: Your First Description</a></li>
+      </ul></li>
+      <li><a href="#part-2-the-idt-command-line-tool" id="toc-part-2-the-idt-command-line-tool">Part 2: The idt Command-Line Tool</a>
+      <ul>
+      <li><a href="#how-idt-works" id="toc-how-idt-works">How idt Works</a></li>
+      <li><a href="#command-reference" id="toc-command-reference">Command Reference</a></li>
+      <li><a href="#workspaces-.idtw" id="toc-workspaces-.idtw">Workspaces (.idtw)</a></li>
+      <li><a href="#metadata-and-geocoding" id="toc-metadata-and-geocoding">Metadata and Geocoding</a></li>
+      <li><a href="#environment-variables" id="toc-environment-variables">Environment Variables</a></li>
+      </ul></li>
+      <li><a href="#part-3-the-imagedescriber-gui" id="toc-part-3-the-imagedescriber-gui">Part 3: The ImageDescriber GUI</a>
+      <ul>
+      <li><a href="#application-overview" id="toc-application-overview">Application Overview</a></li>
+      <li><a href="#menu-reference" id="toc-menu-reference">Menu Reference</a></li>
+      <li><a href="#the-main-window-layout" id="toc-the-main-window-layout">The Main Window Layout</a></li>
+      <li><a href="#working-with-workspaces" id="toc-working-with-workspaces">Working with Workspaces</a></li>
+      <li><a href="#batch-processing" id="toc-batch-processing">Batch Processing</a></li>
+      <li><a href="#the-chat-window" id="toc-the-chat-window">The Chat Window</a></li>
+      <li><a href="#viewer-mode" id="toc-viewer-mode">Viewer Mode</a></li>
+      <li><a href="#export-options" id="toc-export-options">Export Options</a></li>
+      <li><a href="#keyboard-shortcuts" id="toc-keyboard-shortcuts">Keyboard Shortcuts</a></li>
+      </ul></li>
+      <li><a href="#part-4-ai-providers" id="toc-part-4-ai-providers">Part 4: AI Providers</a>
+      <ul>
+      <li><a href="#ollama-local-windows-and-macos" id="toc-ollama-local-windows-and-macos">Ollama — Local (Windows and macOS)</a></li>
+      <li><a href="#anthropic-claude-cloud-windows-and-macos" id="toc-anthropic-claude-cloud-windows-and-macos">Anthropic Claude — Cloud (Windows and macOS)</a></li>
+      <li><a href="#openai-gpt-cloud-windows-and-macos" id="toc-openai-gpt-cloud-windows-and-macos">OpenAI GPT — Cloud (Windows and macOS)</a></li>
+      <li><a href="#florence-2-local-windows-and-macos" id="toc-florence-2-local-windows-and-macos">Florence-2 — Local (Windows and macOS)</a></li>
+      <li><a href="#mlx-apple-silicon-local-gui-only-macos" id="toc-mlx-apple-silicon-local-gui-only-macos">MLX — Apple Silicon Local (GUI only, macOS)</a></li>
+      </ul></li>
+      <li><a href="#part-5-prompts-and-customization" id="toc-part-5-prompts-and-customization">Part 5: Prompts and Customization</a>
+      <ul>
+      <li><a href="#built-in-prompt-styles" id="toc-built-in-prompt-styles">Built-In Prompt Styles</a></li>
+      <li><a href="#creating-custom-prompts" id="toc-creating-custom-prompts">Creating Custom Prompts</a></li>
+      <li><a href="#the-prompt-editor-gui" id="toc-the-prompt-editor-gui">The Prompt Editor (GUI)</a></li>
+      </ul></li>
+      <li><a href="#part-6-advanced-features" id="toc-part-6-advanced-features">Part 6: Advanced Features</a>
+      <ul>
+      <li><a href="#video-frame-extraction" id="toc-video-frame-extraction">Video Frame Extraction</a></li>
+      <li><a href="#downloading-web-images" id="toc-downloading-web-images">Downloading Web Images</a></li>
+      <li><a href="#heicheif-conversion" id="toc-heicheif-conversion">HEIC/HEIF Conversion</a></li>
+      <li><a href="#geocoding-location-from-gps" id="toc-geocoding-location-from-gps">Geocoding — Location from GPS</a></li>
+      <li><a href="#embedding-descriptions-into-images" id="toc-embedding-descriptions-into-images">Embedding Descriptions into Images</a></li>
+      <li><a href="#combining-multiple-workspaces" id="toc-combining-multiple-workspaces">Combining Multiple Workspaces</a></li>
+      <li><a href="#piping-and-scripting-with-idt" id="toc-piping-and-scripting-with-idt">Piping and Scripting with idt</a></li>
+      </ul></li>
+      <li><a href="#part-7-accessibility" id="toc-part-7-accessibility">Part 7: Accessibility</a>
+      <ul>
+      <li><a href="#screen-reader-compatibility" id="toc-screen-reader-compatibility">Screen Reader Compatibility</a></li>
+      <li><a href="#keyboard-navigation" id="toc-keyboard-navigation">Keyboard Navigation</a></li>
+      <li><a href="#accessible-output" id="toc-accessible-output">Accessible Output</a></li>
+      </ul></li>
+      <li><a href="#part-8-troubleshooting" id="toc-part-8-troubleshooting">Part 8: Troubleshooting</a>
+      <ul>
+      <li><a href="#common-issues" id="toc-common-issues">Common Issues</a></li>
+      <li><a href="#diagnostic-steps" id="toc-diagnostic-steps">Diagnostic Steps</a></li>
+      </ul></li>
+      <li><a href="#appendix-a-supported-file-formats" id="toc-appendix-a-supported-file-formats">Appendix A: Supported File Formats</a>
+      <ul>
+      <li><a href="#image-formats" id="toc-image-formats">Image Formats</a></li>
+      <li><a href="#video-formats" id="toc-video-formats">Video Formats</a></li>
+      </ul></li>
+      <li><a href="#appendix-b-configuration-file-reference" id="toc-appendix-b-configuration-file-reference">Appendix B: Configuration File Reference</a></li>
+      <li><a href="#appendix-c-workspace-file-structure" id="toc-appendix-c-workspace-file-structure">Appendix C: Workspace File Structure</a></li>
+      <li><a href="#appendix-d-keyboard-shortcut-reference" id="toc-appendix-d-keyboard-shortcut-reference">Appendix D: Keyboard Shortcut Reference</a>
+      <ul>
+      <li><a href="#global-shortcuts" id="toc-global-shortcuts">Global Shortcuts</a></li>
+      <li><a href="#edit" id="toc-edit">Edit</a></li>
+      <li><a href="#view-and-navigation" id="toc-view-and-navigation">View and Navigation</a></li>
+      <li><a href="#image-list-navigation" id="toc-image-list-navigation">Image List Navigation</a></li>
+      </ul></li>
+      </ul></li>
+      </ul>
+    </nav>
+    
+    <main id="main-content" role="main">
+
+            <p class="doc-dateline"><span class="label">Published:</span> <time>June 2025</time></p>
+      
+      <h1 id="image-description-toolkit-user-guide">Image Description Toolkit — User Guide</h1>
+      <p><strong>Version 4.5</strong> · <a href="https://github.com/kellylford/Image-Description-Toolkit/issues">Report an issue</a></p>
+      <hr />
+      <h2 id="overview">Overview</h2>
+      <p><strong>Image Description Toolkit (IDT)</strong> is a batch AI-powered tool for generating human-quality text descriptions of images and video frames. It supports accessibility workflows, alt-text authoring, image cataloging, and archival documentation.</p>
+      <p>IDT includes two standalone applications that share the same workspace format and AI provider infrastructure:</p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Application</th>
+      <th>What it is</th>
+      <th>Best for</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><strong>idt</strong></td>
+      <td>Command-line tool</td>
+      <td>Automation, scripting, batch pipelines, server use</td>
+      </tr>
+      <tr>
+      <td><strong>ImageDescriber</strong></td>
+      <td>Desktop GUI application</td>
+      <td>Interactive editing, reviewing, visual workflow</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Both tools produce the same workspace bundles (<code>.idtw</code>), so you can start a job in the CLI and review results in the GUI—or vice versa.</p>
+      <h3 id="supported-ai-providers">Supported AI Providers</h3>
+      <table style="width:100%;">
+      <colgroup>
+      <col style="width: 16%" />
+      <col style="width: 16%" />
+      <col style="width: 16%" />
+      <col style="width: 16%" />
+      <col style="width: 16%" />
+      <col style="width: 16%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Provider</th>
+      <th>CLI name</th>
+      <th>GUI name</th>
+      <th>Type</th>
+      <th>API Key</th>
+      <th>Available on</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Ollama</td>
+      <td><code>ollama</code></td>
+      <td><code>ollama</code></td>
+      <td>Local</td>
+      <td>No</td>
+      <td>Windows, macOS</td>
+      </tr>
+      <tr>
+      <td>Ollama Cloud</td>
+      <td>—</td>
+      <td><code>ollama_cloud</code></td>
+      <td>Cloud (self-hosted)</td>
+      <td>No</td>
+      <td>GUI only</td>
+      </tr>
+      <tr>
+      <td>Anthropic Claude</td>
+      <td><code>anthropic</code></td>
+      <td><code>claude</code></td>
+      <td>Cloud</td>
+      <td>Yes</td>
+      <td>Windows, macOS</td>
+      </tr>
+      <tr>
+      <td>OpenAI GPT</td>
+      <td><code>openai</code></td>
+      <td><code>openai</code></td>
+      <td>Cloud</td>
+      <td>Yes</td>
+      <td>Windows, macOS</td>
+      </tr>
+      <tr>
+      <td>Florence-2 (Microsoft)</td>
+      <td><code>florence</code></td>
+      <td><code>huggingface</code></td>
+      <td>Local</td>
+      <td>No</td>
+      <td>Windows, macOS</td>
+      </tr>
+      <tr>
+      <td>MLX (Apple Silicon)</td>
+      <td>—</td>
+      <td><code>mlx</code></td>
+      <td>Local</td>
+      <td>No</td>
+      <td>GUI only, macOS Apple Silicon</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h2 id="part-1-getting-started">Part 1: Getting Started</h2>
+      <h3 id="system-requirements">System Requirements</h3>
+      <p><strong>Windows (both tools)</strong></p>
+      <ul>
+      <li>Windows 10 or 11 (64-bit)</li>
+      <li>4 GB RAM minimum; 8 GB recommended for local AI models</li>
+      <li>Internet connection for cloud AI providers (Claude, GPT)</li>
+      <li>Optional: NVIDIA GPU with CUDA for faster local models</li>
+      </ul>
+      <p><strong>macOS (both tools)</strong></p>
+      <ul>
+      <li>macOS 12 (Monterey) or later</li>
+      <li>Apple Silicon (M1/M2/M3) or Intel</li>
+      <li>8 GB RAM minimum; 16 GB recommended for local AI</li>
+      <li>Internet connection for cloud AI providers</li>
+      </ul>
+      <p><strong>For local Ollama models</strong></p>
+      <ul>
+      <li>Ollama installed: <a href="https://ollama.com">https://ollama.com</a></li>
+      <li>At least one vision model pulled (e.g., <code>ollama pull minicpm-v4.6</code>)</li>
+      </ul>
+      <p><strong>For video support</strong></p>
+      <ul>
+      <li>FFmpeg installed (used for frame extraction and GPS metadata)</li>
+      </ul>
+      <h3 id="installation-on-windows">Installation on Windows</h3>
+      <p><strong>Option 1: Pre-built executables (recommended)</strong></p>
+      <ol type="1">
+      <li>Download <code>idt.exe</code> and <code>ImageDescriber.exe</code> from the <a href="https://github.com/kellylford/Image-Description-Toolkit/releases">releases page</a>.</li>
+      <li>Place them in any folder on your system—no installation required.</li>
+      <li>To run <code>idt</code> from any terminal: add the folder to your <code>PATH</code> environment variable (Control Panel → System → Advanced → Environment Variables).</li>
+      <li>Launch <code>ImageDescriber.exe</code> by double-clicking.</li>
+      </ol>
+      <p><strong>Option 2: From source</strong></p>
+      <div class="sourceCode" id="cb1"><pre class="sourceCode bat"><code class="sourceCode dosbat"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>git clone https:/<span class="at">/github</span>.com<span class="at">/kellylford/Image-Description-Toolkit</span>.git</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> Image<span class="at">-Description-Toolkit</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">:: Create virtual environment</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>python <span class="at">-m</span> venv .winenv</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="bu">call</span> <span class="ot">.winenv\Scripts\activate.bat</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">:: Install dependencies</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>pip install <span class="at">-r</span> requirements.txt</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co">:: Run CLI</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>python idt<span class="at">/idt_cli</span>.py describe -<span class="at">-help</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">:: Run GUI</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>python imagedescriber<span class="at">/imagedescriber_wx</span>.py</span></code></pre></div>
+      <h3 id="installation-on-macos">Installation on macOS</h3>
+      <p><strong>Option 1: Pre-built app bundle (recommended)</strong></p>
+      <ol type="1">
+      <li><p>Download <code>ImageDescriber.app</code> and <code>idt</code> from the <a href="https://github.com/kellylford/Image-Description-Toolkit/releases">releases page</a>.</p></li>
+      <li><p>Drag <code>ImageDescriber.app</code> to your <code>/Applications</code> folder.</p></li>
+      <li><p>Copy <code>idt</code> to <code>/usr/local/bin/</code> and mark it executable:</p>
+      <div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cp idt /usr/local/bin/idt</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> chmod +x /usr/local/bin/idt</span></code></pre></div></li>
+      </ol>
+      <p><strong>Option 2: From source</strong></p>
+      <div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/kellylford/Image-Description-Toolkit.git</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> Image-Description-Toolkit</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-m</span> venv venv</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> venv/bin/activate</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-r</span> requirements.txt</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Run CLI</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> idt/idt_cli.py describe <span class="at">--help</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Run GUI</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> imagedescriber/imagedescriber_wx.py</span></code></pre></div>
+      <h3 id="setting-up-api-keys">Setting Up API Keys</h3>
+      <p>IDT uses environment variables for API keys so they are never stored in your workspace bundles.</p>
+      <p><strong>Anthropic Claude</strong></p>
+      <ol type="1">
+      <li>Sign up at <a href="https://console.anthropic.com">console.anthropic.com</a>.</li>
+      <li>Create an API key.</li>
+      <li>Set the environment variable:
+      <ul>
+      <li><strong>Windows (permanent):</strong> Control Panel → System → Environment Variables → New: <code>ANTHROPIC_API_KEY</code> = your key</li>
+      <li><strong>Windows (current session):</strong> <code>set ANTHROPIC_API_KEY=sk-ant-...</code></li>
+      <li><strong>macOS/Linux:</strong> Add <code>export ANTHROPIC_API_KEY="sk-ant-..."</code> to <code>~/.zshrc</code> or <code>~/.bashrc</code></li>
+      </ul></li>
+      </ol>
+      <p><strong>OpenAI GPT</strong></p>
+      <ol type="1">
+      <li>Sign up at <a href="https://platform.openai.com">platform.openai.com</a>.</li>
+      <li>Create an API key.</li>
+      <li>Set the environment variable: <code>OPENAI_API_KEY</code></li>
+      </ol>
+      <p><strong>Ollama (no key required)</strong></p>
+      <ol type="1">
+      <li><p>Install Ollama from <a href="https://ollama.com">ollama.com</a>.</p></li>
+      <li><p>Pull a vision-capable model:</p>
+      <div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> pull minicpm-v4.6     <span class="co"># 1.6 GB, excellent on all hardware</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> pull llava             <span class="co"># 7 GB, higher quality</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> pull moondream:latest  <span class="co"># 1.8 GB, fastest</span></span></code></pre></div></li>
+      <li><p>Ollama runs automatically as a background service once installed.</p></li>
+      </ol>
+      <h3 id="quick-start-your-first-description">Quick Start: Your First Description</h3>
+      <p><strong>Using the CLI</strong></p>
+      <div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Describe a single folder of images using Ollama (no API key needed)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Pictures/Vacation</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># With Claude for highest quality</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Pictures/Vacation <span class="at">--provider</span> anthropic <span class="at">--model</span> claude-opus-4-6</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># If you&#39;ve never run idt before, the interactive wizard walks you through everything</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> guideme</span></code></pre></div>
+      <p><strong>Using the GUI</strong></p>
+      <ol type="1">
+      <li>Launch <code>ImageDescriber</code> (double-click the app or run <code>ImageDescriber.exe</code>).</li>
+      <li>Choose <strong>File → New Workspace</strong> (or press <code>Ctrl+N</code>).</li>
+      <li>Choose <strong>File → Load Directory</strong> (<code>Ctrl+L</code>) and select your image folder.</li>
+      <li>Choose <strong>Process → Process Undescribed Images</strong>.</li>
+      <li>Select your AI provider and model in the dialog, then click <strong>OK</strong>.</li>
+      <li>Watch the Batch Progress dialog as descriptions are generated.</li>
+      <li>When done, choose <strong>File → Export Descriptions</strong> or <strong>File → Export HTML Gallery</strong>.</li>
+      </ol>
+      <hr />
+      <h2 id="part-2-the-idt-command-line-tool">Part 2: The idt Command-Line Tool</h2>
+      <h3 id="how-idt-works">How idt Works</h3>
+      <p><code>idt</code> processes images in four automatic steps:</p>
+      <ol type="1">
+      <li><strong>Video extraction</strong> — Any video files are converted to image frames (skippable with <code>--no-video</code>).</li>
+      <li><strong>HEIC conversion</strong> — Apple HEIC/HEIF images are converted to JPEG in memory.</li>
+      <li><strong>AI description</strong> — Each image is sent to the chosen AI provider.</li>
+      <li><strong>Output generation</strong> — An HTML report is produced automatically (skippable with <code>--no-export</code>).</li>
+      </ol>
+      <p>All results are stored in a workspace bundle (<code>.idtw</code> directory). Source images are <strong>never modified</strong>.</p>
+      <h3 id="command-reference">Command Reference</h3>
+      <h4 id="idt-describe-generate-descriptions">idt describe — Generate Descriptions</h4>
+      <p>The primary command. Processes every image in a folder (or workspace) and stores AI-generated descriptions.</p>
+      <pre><code>idt describe &lt;source&gt; [options]</code></pre>
+      <p><strong>Arguments</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Argument</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>&lt;source&gt;</code></td>
+      <td>Folder containing images, a <code>.idtw</code> workspace bundle, or <code>-</code> to read paths from stdin</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Provider and Model Options</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--provider {anthropic\|ollama\|openai\|florence}</code></td>
+      <td>From config</td>
+      <td>AI provider to use</td>
+      </tr>
+      <tr>
+      <td><code>--model NAME</code></td>
+      <td>Provider default</td>
+      <td>Model name (e.g., <code>claude-opus-4-6</code>, <code>gpt-4o</code>, <code>minicpm-v4.6</code>)</td>
+      </tr>
+      <tr>
+      <td><code>--ollama-host URL</code></td>
+      <td><code>http://localhost:11434</code></td>
+      <td>Ollama server address</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Prompt Options</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--prompt NAME</code></td>
+      <td><code>detailed</code></td>
+      <td>Named prompt style (see <code>idt prompts</code>)</td>
+      </tr>
+      <tr>
+      <td><code>--prompt-text TEXT</code></td>
+      <td>—</td>
+      <td>Custom prompt text; overrides <code>--prompt</code></td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Metadata and Location</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--no-metadata</code></td>
+      <td>Off</td>
+      <td>Disable EXIF extraction</td>
+      </tr>
+      <tr>
+      <td><code>--geocode</code></td>
+      <td>Off</td>
+      <td>Reverse-geocode GPS coordinates to city/state (requires internet; ~1 second per unique location)</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Processing Control</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--limit N</code></td>
+      <td>Unlimited</td>
+      <td>Stop after describing N images (useful for testing)</td>
+      </tr>
+      <tr>
+      <td><code>--redescribe</code></td>
+      <td>Off</td>
+      <td>Re-describe already-described images (adds new description, keeps old ones)</td>
+      </tr>
+      <tr>
+      <td><code>--workspace PATH</code></td>
+      <td>Auto-created</td>
+      <td>Path or name for the workspace bundle</td>
+      </tr>
+      <tr>
+      <td><code>--no-video</code></td>
+      <td>Off</td>
+      <td>Skip automatic video frame extraction</td>
+      </tr>
+      <tr>
+      <td><code>--video-interval SECONDS</code></td>
+      <td>5.0</td>
+      <td>Seconds between extracted video frames</td>
+      </tr>
+      <tr>
+      <td><code>--show-descriptions</code></td>
+      <td>Off</td>
+      <td>Print each description to the terminal as it’s generated</td>
+      </tr>
+      <tr>
+      <td><code>--quiet, -q</code></td>
+      <td>Off</td>
+      <td>Minimal output; in stdin mode, prints <code>filename TAB description</code></td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Output Control</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--embed</code></td>
+      <td>Off</td>
+      <td>Embed descriptions into image metadata copies after processing</td>
+      </tr>
+      <tr>
+      <td><code>--no-export</code></td>
+      <td>Off</td>
+      <td>Skip automatic HTML report generation</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Examples</strong></p>
+      <div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Describe all images in a folder using Claude</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos/Trip <span class="at">--provider</span> anthropic <span class="at">--model</span> claude-opus-4-6</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Resume an interrupted job (pass the workspace bundle)</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos/Trip.idtw</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Test with first 5 images only</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos/Trip <span class="at">--limit</span> 5</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Use a custom prompt</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos/Trip <span class="at">--prompt-text</span> <span class="st">&quot;Describe this image for someone who cannot see it.&quot;</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Include GPS location in every description</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos/Trip <span class="at">--geocode</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Process, then embed descriptions into image copies automatically</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos/Trip <span class="at">--embed</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Suppress HTML export (faster for scripting)</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos/Trip <span class="at">--no-export</span> <span class="at">--quiet</span></span></code></pre></div>
+      <hr />
+      <h4 id="idt-guideme-interactive-setup-wizard">idt guideme — Interactive Setup Wizard</h4>
+      <p>A screen-reader-friendly step-by-step wizard for first-time users. Guides you through selecting a provider, choosing images, and running your first description job.</p>
+      <pre><code>idt guideme</code></pre>
+      <p>The wizard uses numbered choices throughout, no ANSI codes, and supports pressing <code>b</code> to go back one step. When the job completes it offers to open the HTML report.</p>
+      <hr />
+      <h4 id="idt-download-download-web-images">idt download — Download Web Images</h4>
+      <p>Download images from a web page and optionally describe them in one step.</p>
+      <pre><code>idt download &lt;url&gt; [directory] [options]</code></pre>
+      <p><strong>Arguments</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Argument</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>&lt;url&gt;</code></td>
+      <td>Web page URL to scrape for images</td>
+      </tr>
+      <tr>
+      <td><code>[directory]</code></td>
+      <td>Local folder to save images (default: current directory)</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Options</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--max N</code></td>
+      <td>Unlimited</td>
+      <td>Maximum number of images to download</td>
+      </tr>
+      <tr>
+      <td><code>--min-size WxH</code></td>
+      <td>None</td>
+      <td>Skip images smaller than this (e.g., <code>200x200</code>)</td>
+      </tr>
+      <tr>
+      <td><code>--timeout SECONDS</code></td>
+      <td>30</td>
+      <td>HTTP request timeout</td>
+      </tr>
+      <tr>
+      <td><code>--describe</code></td>
+      <td>Off</td>
+      <td>Automatically describe downloaded images</td>
+      </tr>
+      <tr>
+      <td><code>--embed</code></td>
+      <td>Off</td>
+      <td>Embed descriptions after describing (requires <code>--describe</code>)</td>
+      </tr>
+      <tr>
+      <td><code>--provider</code>, <code>--model</code>, <code>--prompt</code>, <code>--prompt-text</code></td>
+      <td>—</td>
+      <td>AI options (same as <code>idt describe</code>)</td>
+      </tr>
+      <tr>
+      <td><code>--quiet, -q</code></td>
+      <td>Off</td>
+      <td>Minimal output</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>The command captures the original HTML <code>alt</code> attribute from each <code>&lt;img&gt;</code> tag alongside the downloaded image, storing it in the workspace for comparison with the AI-generated description.</p>
+      <p><strong>Examples</strong></p>
+      <div class="sourceCode" id="cb10"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Download all images from a page</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> download https://example.com/gallery ./my-images</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Download and immediately describe, limit to 20 images</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> download https://news-site.com <span class="at">--max</span> 20 <span class="at">--describe</span> <span class="at">--prompt</span> aialttext</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Download, describe, and embed in one pass</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> download https://news-site.com <span class="at">--describe</span> <span class="at">--embed</span> <span class="at">--provider</span> anthropic</span></code></pre></div>
+      <hr />
+      <h4 id="idt-video-extract-video-frames">idt video — Extract Video Frames</h4>
+      <p>Extract frames from video files, with optional AI description of the frames.</p>
+      <pre><code>idt video &lt;source&gt; [options]</code></pre>
+      <p><strong>Arguments</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Argument</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>&lt;source&gt;</code></td>
+      <td>A video file or directory containing video files</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Extraction Options</strong> (choose one)</p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--interval SECONDS</code></td>
+      <td>5.0</td>
+      <td>Extract one frame every N seconds (good for continuous footage)</td>
+      </tr>
+      <tr>
+      <td><code>--scene THRESHOLD</code></td>
+      <td>—</td>
+      <td>Scene-change detection (0–100; lower = more sensitive; good for events)</td>
+      </tr>
+      <tr>
+      <td><code>--max-frames N</code></td>
+      <td>Unlimited</td>
+      <td>Maximum frames to extract per video</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Description Options</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--describe</code></td>
+      <td>Off</td>
+      <td>Describe extracted frames</td>
+      </tr>
+      <tr>
+      <td><code>--provider</code>, <code>--model</code>, <code>--prompt</code>, <code>--prompt-text</code></td>
+      <td>—</td>
+      <td>AI options</td>
+      </tr>
+      <tr>
+      <td><code>--quiet, -q</code></td>
+      <td>Off</td>
+      <td>Minimal output</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Supported video formats:</strong> <code>.mp4</code>, <code>.mov</code>, <code>.avi</code>, <code>.mkv</code>, <code>.m4v</code>, <code>.wmv</code>, <code>.mts</code>, <code>.m2ts</code></p>
+      <p><strong>Examples</strong></p>
+      <div class="sourceCode" id="cb12"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract a frame every 2 seconds from a concert video</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> video concert.mp4 <span class="at">--interval</span> 2</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract scene changes only and describe them</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> video birthday.mp4 <span class="at">--scene</span> 30 <span class="at">--describe</span> <span class="at">--provider</span> anthropic</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract frames from every video in a folder</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> video ~/Videos <span class="at">--interval</span> 5 <span class="at">--describe</span></span></code></pre></div>
+      <hr />
+      <h4 id="idt-embed-embed-into-image-metadata">idt embed — Embed into Image Metadata</h4>
+      <p>Copy described images and write AI descriptions into the image metadata so descriptions travel with the file.</p>
+      <pre><code>idt embed &lt;source&gt; [options]</code></pre>
+      <table>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--force</code></td>
+      <td>Re-embed even images already embedded</td>
+      </tr>
+      <tr>
+      <td><code>--dry-run</code></td>
+      <td>Show what would be embedded without writing files</td>
+      </tr>
+      <tr>
+      <td><code>--quiet, -q</code></td>
+      <td>Minimal output</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Metadata written by file type</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Format</th>
+      <th>Metadata fields written</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>JPEG / TIFF</td>
+      <td>EXIF <code>UserComment</code> (shows in Windows Explorer “Comments”), XMP <code>dc:description</code></td>
+      </tr>
+      <tr>
+      <td>PNG</td>
+      <td><code>tEXt</code> chunk “Description”, <code>iTXt</code> XMP chunk</td>
+      </tr>
+      <tr>
+      <td>WebP</td>
+      <td>EXIF <code>UserComment</code>, XMP <code>dc:description</code></td>
+      </tr>
+      <tr>
+      <td>HEIC</td>
+      <td>Converted to JPEG first; then JPEG fields written</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Embedded copies are saved to <code>&lt;workspace&gt;/embedded/</code>. Original source files are <strong>never modified</strong>.</p>
+      <p><strong>Examples</strong></p>
+      <div class="sourceCode" id="cb14"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Preview what would be embedded</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> embed ~/Photos/Trip <span class="at">--dry-run</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Embed all described images</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> embed ~/Photos/Trip</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Force re-embed even if already done</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> embed ~/Photos/Trip <span class="at">--force</span></span></code></pre></div>
+      <hr />
+      <h4 id="idt-export-generate-reports">idt export — Generate Reports</h4>
+      <p>Generate an HTML, CSV, or plain-text report from a workspace.</p>
+      <pre><code>idt export &lt;source&gt; [--format {html|csv|txt}] [--quiet]</code></pre>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Format</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>html</code> (default)</td>
+      <td>Accessible HTML report with skip navigation, landmark regions, image thumbnails, and full descriptions. Works without JavaScript.</td>
+      </tr>
+      <tr>
+      <td><code>csv</code></td>
+      <td>Spreadsheet-compatible; one row per image with columns: file, source_path, workspace, description, model, provider, prompt_name, timestamp, metadata_context, input_tokens, output_tokens, alt_text</td>
+      </tr>
+      <tr>
+      <td><code>txt</code></td>
+      <td>Plain text, one entry per image</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Reports are saved to <code>&lt;workspace&gt;/reports/</code>.</p>
+      <hr />
+      <h4 id="idt-show-print-descriptions">idt show — Print Descriptions</h4>
+      <p>Print descriptions to the terminal. Useful for piping to other tools.</p>
+      <pre><code>idt show &lt;target&gt; [options]</code></pre>
+      <table>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--json</code></td>
+      <td>Output JSONL (one JSON object per line)</td>
+      </tr>
+      <tr>
+      <td><code>--quiet, -q</code></td>
+      <td>Suppress headers and separators</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>JSON output fields:</strong> <code>file</code>, <code>source</code>, <code>described</code>, <code>description</code>, <code>model</code>, <code>provider</code>, <code>timestamp</code>, <code>metadata_context</code>, <code>metadata</code>, <code>alt_text</code></p>
+      <p><strong>Examples</strong></p>
+      <div class="sourceCode" id="cb17"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Show all descriptions in a folder</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> show ~/Photos/Trip</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Output as JSON for piping to jq or Python</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> show ~/Photos/Trip <span class="at">--json</span> <span class="kw">|</span> <span class="ex">jq</span> <span class="st">&#39;.description&#39;</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract all descriptions to a text file</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> show ~/Photos/Trip <span class="at">--quiet</span> <span class="op">&gt;</span> descriptions.txt</span></code></pre></div>
+      <hr />
+      <h4 id="idt-status-check-progress">idt status — Check Progress</h4>
+      <p>Show how many images have been described in a workspace or folder tree.</p>
+      <pre><code>idt status &lt;directory&gt; [--all] [--json] [--quiet]</code></pre>
+      <table>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--all</code></td>
+      <td>Scan all IDT workspaces under the given directory</td>
+      </tr>
+      <tr>
+      <td><code>--json</code></td>
+      <td>JSON output</td>
+      </tr>
+      <tr>
+      <td><code>--quiet, -q</code></td>
+      <td>Minimal output</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h4 id="idt-stats-token-usage-and-costs">idt stats — Token Usage and Costs</h4>
+      <p>Summarize token counts and estimated API costs across one or more workspaces.</p>
+      <pre><code>idt stats &lt;source&gt; [--all] [--json]</code></pre>
+      <p>Output includes: total images, descriptions written, per-provider token counts, and estimated cost in USD. Local models (Ollama, Florence-2) do not report token usage.</p>
+      <hr />
+      <h4 id="idt-combine-merge-multiple-projects">idt combine — Merge Multiple Projects</h4>
+      <p>Walk a directory tree, find all IDT workspaces, and merge their descriptions into a single CSV or TSV file.</p>
+      <pre><code>idt combine &lt;directory&gt; [options]</code></pre>
+      <table>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--output FILE</code></td>
+      <td>stdout</td>
+      <td>Output file path</td>
+      </tr>
+      <tr>
+      <td><code>--format {csv\|tsv}</code></td>
+      <td><code>csv</code></td>
+      <td>Output format</td>
+      </tr>
+      <tr>
+      <td><code>--sort {date\|file\|timestamp}</code></td>
+      <td><code>timestamp</code></td>
+      <td>Sort order</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>The <code>date</code> sort uses EXIF <code>DateTimeOriginal</code> first, falling back to file modification time.</p>
+      <hr />
+      <h4 id="idt-watch-continuous-monitoring">idt watch — Continuous Monitoring</h4>
+      <p>Describe undescribed images in a folder, then keep polling for new files.</p>
+      <pre><code>idt watch &lt;directory&gt; [options]</code></pre>
+      <table>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>--interval SECONDS</code></td>
+      <td>30</td>
+      <td>Polling interval</td>
+      </tr>
+      <tr>
+      <td><code>--provider</code>, <code>--model</code>, <code>--prompt</code></td>
+      <td>—</td>
+      <td>AI options</td>
+      </tr>
+      <tr>
+      <td><code>--quiet, -q</code></td>
+      <td>Off</td>
+      <td>Tab-separated output for piping</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Press <code>Ctrl+C</code> to stop. Useful for monitoring a downloads folder or a folder receiving uploads.</p>
+      <hr />
+      <h4 id="idt-models-list-available-models">idt models — List Available Models</h4>
+      <p>Show which models are available from each provider.</p>
+      <pre><code>idt models [--provider NAME] [--ollama-host URL] [--json]</code></pre>
+      <p>For Ollama, queries the running Ollama service. For cloud providers, shows the known model list if the API key is set.</p>
+      <hr />
+      <h4 id="idt-prompts-list-prompt-styles">idt prompts — List Prompt Styles</h4>
+      <p>Print all available prompt names and descriptions.</p>
+      <pre><code>idt prompts [--json]</code></pre>
+      <hr />
+      <h4 id="idt-config-user-configuration">idt config — User Configuration</h4>
+      <p>View or update default settings.</p>
+      <pre><code>idt config [--set KEY=VALUE]</code></pre>
+      <p><strong>Valid keys</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Key</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>default_provider</code></td>
+      <td>AI provider: <code>anthropic</code>, <code>ollama</code>, <code>openai</code>, <code>florence</code></td>
+      </tr>
+      <tr>
+      <td><code>default_model</code></td>
+      <td>Model name for the provider</td>
+      </tr>
+      <tr>
+      <td><code>default_prompt_name</code></td>
+      <td>Default prompt style</td>
+      </tr>
+      <tr>
+      <td><code>workspace_root</code></td>
+      <td>Root folder for workspaces (default: <code>~/Documents/idt</code>)</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Examples</strong></p>
+      <div class="sourceCode" id="cb25"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Show current settings</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> config</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Set Claude as default</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> config <span class="at">--set</span> default_provider=anthropic</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> config <span class="at">--set</span> default_model=claude-opus-4-6</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Change workspace root</span></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> config <span class="at">--set</span> workspace_root=~/MyDescriptions</span></code></pre></div>
+      <p>Configuration is stored in <code>~/.idt/config.json</code>.</p>
+      <hr />
+      <h4 id="idt-version-display-version">idt version — Display Version</h4>
+      <pre><code>idt version</code></pre>
+      <p>Prints the application version, Python version, and executable path.</p>
+      <hr />
+      <h3 id="workspaces-.idtw">Workspaces (.idtw)</h3>
+      <p>A workspace is a folder ending in <code>.idtw</code> that holds all job state: image copies, description sidecars, logs, and reports. You never need to edit workspace files directly—both tools manage them automatically.</p>
+      <p><strong>Structure</strong></p>
+      <pre><code>MyTrip.idtw/
+  manifest.json          Job metadata, defaults, CLI command history
+  images/                Copies of source images (originals untouched)
+  descriptions/          JSON sidecars — one per image
+  derived/
+    converted/           HEIC → JPEG conversions
+    frames/              Extracted video frames
+  logs/                  Processing logs
+  embedded/              Images with embedded metadata (created by idt embed)
+  reports/               HTML, CSV, and TXT exports</code></pre>
+      <p><strong>Resuming an interrupted job</strong></p>
+      <p>Pass the <code>.idtw</code> bundle path to <code>idt describe</code> to continue where you left off:</p>
+      <div class="sourceCode" id="cb28"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe MyTrip.idtw</span></code></pre></div>
+      <p>Only undescribed images are processed. Existing descriptions are preserved.</p>
+      <p><strong>Sharing workspaces</strong></p>
+      <p>The <code>.idtw</code> bundle is portable. If you include image copies (<code>images/</code> subfolder), you can zip and share the entire bundle and the recipient can open it in ImageDescriber or run <code>idt show</code> on it without having the original source folder.</p>
+      <hr />
+      <h3 id="metadata-and-geocoding">Metadata and Geocoding</h3>
+      <p>By default, <code>idt describe</code> extracts EXIF metadata from each image and prepends context to the AI prompt:</p>
+      <pre><code>Context: Munich, Germany  Sep 12, 2024  iPhone 14 Pro
+
+[your prompt text]</code></pre>
+      <p>This significantly improves description quality for photos taken with smartphones or DSLR cameras.</p>
+      <p><strong>Extracted fields:</strong> capture date/time, GPS coordinates, camera make and model, lens model.</p>
+      <p><strong>Geocoding</strong> (opt-in with <code>--geocode</code>) reverses GPS coordinates to a human-readable place name using OpenStreetMap Nominatim. It requires an internet connection and adds approximately one second per unique location. Results are cached in <code>~/.idt/geocode_cache.json</code>.</p>
+      <p>To disable all metadata extraction: <code>--no-metadata</code>.</p>
+      <hr />
+      <h3 id="environment-variables">Environment Variables</h3>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Variable</th>
+      <th>Used by</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>ANTHROPIC_API_KEY</code></td>
+      <td>idt, GUI</td>
+      <td>Anthropic Claude API key</td>
+      </tr>
+      <tr>
+      <td><code>OPENAI_API_KEY</code></td>
+      <td>idt, GUI</td>
+      <td>OpenAI API key</td>
+      </tr>
+      <tr>
+      <td><code>IDT_CONFIG_DIR</code></td>
+      <td>idt, GUI</td>
+      <td>Override default config directory</td>
+      </tr>
+      <tr>
+      <td><code>IDT_IMAGE_DESCRIBER_CONFIG</code></td>
+      <td>idt, GUI</td>
+      <td>Explicit path to config file</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h2 id="part-3-the-imagedescriber-gui">Part 3: The ImageDescriber GUI</h2>
+      <h3 id="application-overview">Application Overview</h3>
+      <p>ImageDescriber is a wxPython desktop application for interactively managing image descriptions. It shares the same workspace format as the CLI, so you can freely mix both tools.</p>
+      <p>The application has two modes:</p>
+      <ul>
+      <li><strong>Editor Mode</strong> — Create workspaces, add images, process descriptions, and export results.</li>
+      <li><strong>Viewer Mode</strong> — Read-only review of descriptions from a completed workspace or CLI workflow.</li>
+      </ul>
+      <h3 id="menu-reference">Menu Reference</h3>
+      <h4 id="file-menu">File Menu</h4>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Item</th>
+      <th>Shortcut</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>New Workspace</td>
+      <td>Ctrl+N</td>
+      <td>Create a new empty workspace</td>
+      </tr>
+      <tr>
+      <td>Open Workspace (.idtw)…</td>
+      <td>Ctrl+O</td>
+      <td>Open a saved workspace bundle</td>
+      </tr>
+      <tr>
+      <td>Save Workspace</td>
+      <td>Ctrl+S</td>
+      <td>Save the current workspace</td>
+      </tr>
+      <tr>
+      <td>Save Workspace As…</td>
+      <td>—</td>
+      <td>Save with a new name</td>
+      </tr>
+      <tr>
+      <td>Load Directory</td>
+      <td>Ctrl+L</td>
+      <td>Add images from a folder</td>
+      </tr>
+      <tr>
+      <td>Refresh Folder from Disk…</td>
+      <td>Ctrl+Shift+R</td>
+      <td>Rescan a folder for new or missing files</td>
+      </tr>
+      <tr>
+      <td>Load Images From URL…</td>
+      <td>Ctrl+U</td>
+      <td>Download and import images from a web page</td>
+      </tr>
+      <tr>
+      <td>Import Workflow (to Workspace)…</td>
+      <td>—</td>
+      <td>Import descriptions from a CLI workflow output</td>
+      </tr>
+      <tr>
+      <td>Export Descriptions…</td>
+      <td>—</td>
+      <td>Save descriptions as text or HTML</td>
+      </tr>
+      <tr>
+      <td>Embed Descriptions into Images…</td>
+      <td>—</td>
+      <td>Write descriptions into image metadata</td>
+      </tr>
+      <tr>
+      <td>Export HTML Gallery…</td>
+      <td>Ctrl+Shift+G</td>
+      <td>Create an interactive HTML image gallery</td>
+      </tr>
+      <tr>
+      <td>Workspace Statistics…</td>
+      <td>Ctrl+I</td>
+      <td>Show statistics: counts, tokens, costs, providers</td>
+      </tr>
+      <tr>
+      <td>Open Workflow Result (Viewer Mode)…</td>
+      <td>—</td>
+      <td>Open a CLI workflow result in Viewer Mode</td>
+      </tr>
+      <tr>
+      <td>Exit</td>
+      <td>Ctrl+Q</td>
+      <td>Close the application</td>
+      </tr>
+      </tbody>
+      </table>
+      <h4 id="edit-menu">Edit Menu</h4>
+      <table>
+      <thead>
+      <tr>
+      <th>Item</th>
+      <th>Shortcut</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Cut</td>
+      <td>Ctrl+X</td>
+      <td>Cut text from focused field</td>
+      </tr>
+      <tr>
+      <td>Copy</td>
+      <td>Ctrl+C</td>
+      <td>Copy selected text</td>
+      </tr>
+      <tr>
+      <td>Paste</td>
+      <td>Ctrl+V</td>
+      <td>Paste text or an image from clipboard</td>
+      </tr>
+      <tr>
+      <td>Select All</td>
+      <td>Ctrl+A</td>
+      <td>Select all text in focused field</td>
+      </tr>
+      </tbody>
+      </table>
+      <h4 id="process-menu">Process Menu</h4>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Item</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Process Current Image</td>
+      <td>Generate a description for the selected image</td>
+      </tr>
+      <tr>
+      <td>Process Undescribed Images</td>
+      <td>Batch-process only images that have no description</td>
+      </tr>
+      <tr>
+      <td>Redescribe All Images</td>
+      <td>Re-process all images (adds new descriptions alongside existing ones)</td>
+      </tr>
+      <tr>
+      <td>Show Batch Progress</td>
+      <td>Show the batch progress dialog</td>
+      </tr>
+      <tr>
+      <td>Update Image List (F5)</td>
+      <td>Refresh the image list</td>
+      </tr>
+      <tr>
+      <td>Refresh AI Models</td>
+      <td>Reload available models from all providers</td>
+      </tr>
+      <tr>
+      <td>Chat with AI Model</td>
+      <td>Open the interactive chat window</td>
+      </tr>
+      <tr>
+      <td>Convert HEIC Files…</td>
+      <td>Convert HEIC/HEIF images to JPEG</td>
+      </tr>
+      <tr>
+      <td>Extract Video Frames…</td>
+      <td>Extract frames from video files</td>
+      </tr>
+      <tr>
+      <td>Describe Video with AI…</td>
+      <td>Generate an AI description for a video</td>
+      </tr>
+      <tr>
+      <td>Rename Item</td>
+      <td>Rename the selected image or folder</td>
+      </tr>
+      </tbody>
+      </table>
+      <h4 id="descriptions-menu">Descriptions Menu</h4>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Item</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Add Manual Description</td>
+      <td>Type a description by hand</td>
+      </tr>
+      <tr>
+      <td>Ask Followup Question</td>
+      <td>Ask the AI a follow-up question about the selected image</td>
+      </tr>
+      <tr>
+      <td>Edit Description…</td>
+      <td>Edit an existing description</td>
+      </tr>
+      <tr>
+      <td>Delete Description</td>
+      <td>Remove a description</td>
+      </tr>
+      <tr>
+      <td>Copy Description</td>
+      <td>Copy description text to clipboard</td>
+      </tr>
+      <tr>
+      <td>Copy Image Path</td>
+      <td>Copy the file path to clipboard</td>
+      </tr>
+      <tr>
+      <td>Copy Image</td>
+      <td>Copy the image file to clipboard</td>
+      </tr>
+      <tr>
+      <td>Copy Image + Description</td>
+      <td>Copy both image and description text</td>
+      </tr>
+      <tr>
+      <td>Show All Descriptions…</td>
+      <td>List all descriptions in a dialog</td>
+      </tr>
+      </tbody>
+      </table>
+      <h4 id="view-menu">View Menu</h4>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Item</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><strong>Application Mode</strong> → Editor Mode</td>
+      <td>Switch to the workspace editor</td>
+      </tr>
+      <tr>
+      <td><strong>Application Mode</strong> → Viewer Mode</td>
+      <td>Switch to the read-only viewer</td>
+      </tr>
+      <tr>
+      <td><strong>Filter</strong> → All Items</td>
+      <td>Show all images, videos, and chats</td>
+      </tr>
+      <tr>
+      <td><strong>Filter</strong> → Described Only</td>
+      <td>Show only images with at least one description</td>
+      </tr>
+      <tr>
+      <td><strong>Filter</strong> → Undescribed Only</td>
+      <td>Show only images lacking a description</td>
+      </tr>
+      <tr>
+      <td><strong>Filter</strong> → Videos Only</td>
+      <td>Show video files and their extracted frames</td>
+      </tr>
+      <tr>
+      <td><strong>Filter</strong> → Chats Only</td>
+      <td>Show saved chat sessions</td>
+      </tr>
+      <tr>
+      <td>Show Image Previews</td>
+      <td>Toggle the image thumbnail panel</td>
+      </tr>
+      <tr>
+      <td>Find Images… (Ctrl+F)</td>
+      <td>Show or hide the search bar</td>
+      </tr>
+      </tbody>
+      </table>
+      <h4 id="tools-menu">Tools Menu</h4>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Item</th>
+      <th>Shortcut</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Edit Prompts…</td>
+      <td>Ctrl+P</td>
+      <td>Create, edit, and manage AI prompt templates</td>
+      </tr>
+      <tr>
+      <td>Configure Settings…</td>
+      <td>Ctrl+Shift+C</td>
+      <td>Open the settings dialog</td>
+      </tr>
+      <tr>
+      <td>Install Ollama…</td>
+      <td>—</td>
+      <td>Instructions for installing the local Ollama server</td>
+      </tr>
+      <tr>
+      <td>Install FFmpeg (for video GPS)…</td>
+      <td>—</td>
+      <td>Instructions for installing FFmpeg</td>
+      </tr>
+      <tr>
+      <td>Export Configuration…</td>
+      <td>—</td>
+      <td>Save settings to a file</td>
+      </tr>
+      <tr>
+      <td>Import Configuration…</td>
+      <td>—</td>
+      <td>Load settings from a file</td>
+      </tr>
+      <tr>
+      <td><strong>AI Info</strong> → Ollama Models…</td>
+      <td>—</td>
+      <td>View installed Ollama models</td>
+      </tr>
+      <tr>
+      <td><strong>AI Info</strong> → OpenAI Usage Dashboard…</td>
+      <td>—</td>
+      <td>Open OpenAI usage tracking</td>
+      </tr>
+      <tr>
+      <td><strong>AI Info</strong> → Claude Usage Dashboard…</td>
+      <td>—</td>
+      <td>Open Anthropic usage tracking</td>
+      </tr>
+      <tr>
+      <td><strong>AI Info</strong> → MLX Community Models…</td>
+      <td>—</td>
+      <td>Browse HuggingFace MLX models</td>
+      </tr>
+      </tbody>
+      </table>
+      <h4 id="help-menu">Help Menu</h4>
+      <table>
+      <thead>
+      <tr>
+      <th>Item</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>User Guide…</td>
+      <td>Open this guide</td>
+      </tr>
+      <tr>
+      <td>Report an Issue…</td>
+      <td>Go to the GitHub issue tracker</td>
+      </tr>
+      <tr>
+      <td>About</td>
+      <td>Show version information</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h3 id="the-main-window-layout">The Main Window Layout</h3>
+      <p>The main window is divided into three areas.</p>
+      <p><strong>Left panel: Image list</strong></p>
+      <p>A hierarchical tree showing all items in the workspace:</p>
+      <ul>
+      <li>Folder nodes (expandable) — represent subfolder groups from your source directory</li>
+      <li>Video nodes (expandable) — videos with their extracted frames as child items</li>
+      <li>Image items — individual files with status icons:
+      <ul>
+      <li><code>[✓]</code> — has at least one description</li>
+      <li><code>[ ]</code> — no description yet</li>
+      <li><code>[!]</code> — file no longer exists on disk (descriptions preserved)</li>
+      </ul></li>
+      <li>Chat nodes — saved conversation sessions</li>
+      </ul>
+      <p>Use <strong>View → Find Images</strong> (<code>Ctrl+F</code>) to show a search bar that filters by filename, description text, or metadata content. Supports <code>and</code> / <code>or</code> operators: for example, <code>house and garage or backyard</code>.</p>
+      <p><strong>Right panel: Description area</strong></p>
+      <p>When an image is selected:</p>
+      <ul>
+      <li><strong>Description list</strong> — All descriptions for this image, showing provider/model and date. Click a description to view or edit its text.</li>
+      <li><strong>Generate Description button</strong> — Processes the selected image with the current AI settings.</li>
+      <li><strong>Save Description button</strong> — Saves edits made to the description text.</li>
+      </ul>
+      <p><strong>Bottom right: Metadata and text editor</strong></p>
+      <ul>
+      <li><strong>Image preview</strong> — Thumbnail of the selected image (toggle with <strong>View → Show Image Previews</strong>).</li>
+      <li><strong>Description text editor</strong> — Full text of the selected description. You can edit it directly and save with the <strong>Save Description</strong> button.</li>
+      <li>Below the text: metadata appended automatically: provider, model, prompt style, creation date, capture date, GPS location, camera info, and token counts.</li>
+      </ul>
+      <p><strong>Status bar</strong></p>
+      <p>The bar at the bottom of the window shows: - Left: Current action or status message. - Right: Workspace summary (e.g., “250 images, 180 described”).</p>
+      <hr />
+      <h3 id="working-with-workspaces">Working with Workspaces</h3>
+      <p><strong>Creating a workspace</strong></p>
+      <ol type="1">
+      <li><strong>File → New Workspace</strong> creates an empty workspace named “Untitled”.</li>
+      <li><strong>File → Load Directory</strong> adds a folder of images. Check <strong>Add to existing workspace</strong> to add a second folder without starting over.</li>
+      <li><strong>File → Save Workspace As…</strong> saves the bundle as <code>MyTrip.idtw</code> in the location you choose.</li>
+      </ol>
+      <p><strong>Opening an existing workspace</strong></p>
+      <ul>
+      <li><strong>File → Open Workspace (.idtw)…</strong> to browse for a bundle.</li>
+      <li>Drag-and-drop a <code>.idtw</code> folder onto the application window.</li>
+      </ul>
+      <p><strong>Refreshing after changes on disk</strong></p>
+      <p>If you add new images to the source folder after loading:</p>
+      <ul>
+      <li><strong>File → Refresh Folder from Disk…</strong> (<code>Ctrl+Shift+R</code>) — rescans the folder and adds new files. Images marked <code>[!]</code> (file deleted) are noted but their descriptions are kept.</li>
+      </ul>
+      <p><strong>Workspace statistics</strong></p>
+      <p><strong>File → Workspace Statistics…</strong> (<code>Ctrl+I</code>) shows:</p>
+      <ul>
+      <li>Image and description counts</li>
+      <li>Content metrics and description length distribution</li>
+      <li>AI provider and model breakdown</li>
+      <li>Token usage and estimated cost</li>
+      <li>Location information summary</li>
+      <li>Processing timeline</li>
+      </ul>
+      <hr />
+      <h3 id="batch-processing">Batch Processing</h3>
+      <p><strong>Starting a batch job</strong></p>
+      <ol type="1">
+      <li>Choose <strong>Process → Process Undescribed Images</strong> (or <strong>Redescribe All Images</strong> to re-process everything).</li>
+      <li>The <strong>Processing Options</strong> dialog appears:
+      <ul>
+      <li><strong>Provider</strong> — Ollama, OpenAI, Claude, or MLX.</li>
+      <li><strong>Model</strong> — Populated from the chosen provider.</li>
+      <li><strong>Prompt Style</strong> — Choose a built-in style or enter custom text.</li>
+      <li><strong>Enable Geocoding</strong> — Reverse-geocode GPS coordinates to place names.</li>
+      <li><strong>Embed After Processing</strong> — Automatically embed descriptions into image copies when the batch finishes.</li>
+      </ul></li>
+      <li>Click <strong>OK</strong> to start. The <strong>Batch Progress</strong> dialog opens.</li>
+      </ol>
+      <p>You can also right-click a folder node in the image list and choose <strong>Process Folder</strong> to batch only that folder.</p>
+      <p><strong>The Batch Progress dialog</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Element</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Statistics display</td>
+      <td>Shows current count, average time per image, estimated time remaining, and current filename</td>
+      </tr>
+      <tr>
+      <td>Progress bar</td>
+      <td>Visual percentage complete</td>
+      </tr>
+      <tr>
+      <td>Pause / Resume</td>
+      <td>Temporarily pause and resume the batch</td>
+      </tr>
+      <tr>
+      <td>Stop</td>
+      <td>Cancel the batch (descriptions generated so far are kept)</td>
+      </tr>
+      <tr>
+      <td>Close</td>
+      <td>Hide the dialog; processing continues in the background</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Video files in a batch</strong></p>
+      <p>Videos in the folder are automatically extracted to frames before the AI step. The default extraction interval is every 5 seconds; you can change this in <strong>Tools → Configure Settings</strong>.</p>
+      <hr />
+      <h3 id="the-chat-window">The Chat Window</h3>
+      <p>Open with <strong>Process → Chat with AI Model</strong>. Choose a provider and model in the prompt dialog.</p>
+      <p>The chat window lets you have a multi-turn conversation with the AI about the selected image. Use it to:</p>
+      <ul>
+      <li>Ask follow-up questions about details in a description</li>
+      <li>Request alternative phrasing</li>
+      <li>Ask the AI to identify specific elements in the image</li>
+      <li>Explore accessibility phrasing options</li>
+      </ul>
+      <p><strong>Layout</strong></p>
+      <ul>
+      <li><strong>Conversation history</strong> (ListBox) — All messages, navigable with arrow keys. Screen readers announce new messages automatically.</li>
+      <li><strong>Message detail pane</strong> — Full text of the selected message.</li>
+      <li><strong>Input field</strong> — Type your message and press Enter to send.</li>
+      <li><strong>Image context</strong> — The currently selected image is attached to the conversation.</li>
+      </ul>
+      <p>Chat sessions are saved with the workspace.</p>
+      <hr />
+      <h3 id="viewer-mode">Viewer Mode</h3>
+      <p><strong>View → Application Mode → Viewer Mode</strong> switches the application to a read-only display of all descriptions in the current workspace or workflow result.</p>
+      <p>This mode is also used when opening a CLI <code>idt describe</code> output via <strong>File → Open Workflow Result (Viewer Mode)…</strong>.</p>
+      <p>In Viewer Mode: - Descriptions cannot be edited. - <strong>Live monitoring</strong> is available: the view auto-refreshes when new descriptions arrive (useful when running <code>idt describe</code> in a terminal and watching progress in the GUI simultaneously).</p>
+      <hr />
+      <h3 id="export-options">Export Options</h3>
+      <p><strong>Export Descriptions (text or HTML)</strong></p>
+      <p><strong>File → Export Descriptions…</strong> saves descriptions to:</p>
+      <ul>
+      <li><strong>Text file (.txt)</strong> — Plain text with sections for each image: filename, capture date, and description.</li>
+      <li><strong>HTML file (.html)</strong> — Styled table with images and descriptions. Suitable for sharing in email or a web browser.</li>
+      </ul>
+      <p><strong>Export HTML Gallery</strong></p>
+      <p><strong>File → Export HTML Gallery…</strong> (<code>Ctrl+Shift+G</code>) produces an interactive gallery:</p>
+      <ul>
+      <li>Responsive design (works on desktop and mobile browsers)</li>
+      <li>Thumbnails with full descriptions visible on click</li>
+      <li>Search built in</li>
+      <li>No server required; open directly in any browser</li>
+      <li>Customizable title</li>
+      </ul>
+      <p><strong>Embed Descriptions into Images</strong></p>
+      <p><strong>File → Embed Descriptions into Images…</strong></p>
+      <p>Options in the dialog:</p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Option</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><strong>Which description</strong> → Latest</td>
+      <td>Embed the most recently generated description (recommended)</td>
+      </tr>
+      <tr>
+      <td><strong>Which description</strong> → All Combined</td>
+      <td>Join all descriptions with a separator and embed the combined text</td>
+      </tr>
+      <tr>
+      <td><strong>Write mode</strong> → Copy (recommended)</td>
+      <td>Create new image copies in the output folder; originals untouched</td>
+      </tr>
+      <tr>
+      <td><strong>Write mode</strong> → In-place</td>
+      <td>Modify the original files directly (requires confirmation)</td>
+      </tr>
+      <tr>
+      <td><strong>Output folder</strong></td>
+      <td>Browse to choose where copies are saved</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Embedded copies mirror the subfolder structure of the source.</p>
+      <hr />
+      <h3 id="keyboard-shortcuts">Keyboard Shortcuts</h3>
+      <p>See <a href="#appendix-d-keyboard-shortcut-reference">Appendix D: Keyboard Shortcut Reference</a> for the full table.</p>
+      <p><strong>Tab order in the main window:</strong></p>
+      <p>Image list → Description list → Description text editor (Shift+Tab to move backward)</p>
+      <p>All menu items, buttons, and interactive controls are reachable by keyboard. Arrow keys navigate the image list and description list. Space activates checkboxes and radio items.</p>
+      <hr />
+      <h2 id="part-4-ai-providers">Part 4: AI Providers</h2>
+      <blockquote>
+      <p><strong>Provider names differ between CLI and GUI.</strong> The CLI uses <code>anthropic</code> and <code>florence</code>; the GUI uses <code>claude</code> and <code>huggingface</code> for the same providers. MLX and Ollama Cloud are GUI-only and do not appear in the CLI.</p>
+      </blockquote>
+      <h3 id="ollama-local-windows-and-macos">Ollama — Local (Windows and macOS)</h3>
+      <p>Ollama runs AI models on your own machine. No internet connection is required after the model is downloaded. No data leaves your computer.</p>
+      <p><strong>CLI and GUI provider name:</strong> <code>ollama</code></p>
+      <p><strong>Setup</strong></p>
+      <ol type="1">
+      <li><p>Install Ollama from <a href="https://ollama.com">ollama.com</a>.</p></li>
+      <li><p>Pull a vision-capable model:</p>
+      <div class="sourceCode" id="cb30"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Recommended: best quality across all hardware (1.6 GB)</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> pull minicpm-v4.6</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Highest quality (requires CUDA GPU or Apple Silicon, 7+ GB)</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> pull llama3.2-vision</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Smallest / fastest (CPU-only, 1.8 GB)</span></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> pull moondream:latest</span></code></pre></div></li>
+      <li><p>Ollama starts automatically as a background service.</p></li>
+      </ol>
+      <p><strong>Using a remote Ollama server (CLI)</strong></p>
+      <div class="sourceCode" id="cb31"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos <span class="at">--provider</span> ollama <span class="at">--model</span> minicpm-v4.6 <span class="at">--ollama-host</span> http://192.168.1.100:11434</span></code></pre></div>
+      <p>In the GUI, a separate <strong>Ollama Cloud</strong> provider (<code>ollama_cloud</code>) handles remote Ollama connections — configure the host URL in <strong>Tools → Configure Settings</strong>.</p>
+      <p><strong>Recommended models</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Model</th>
+      <th>Size</th>
+      <th>Notes</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>minicpm-v4.6</code></td>
+      <td>1.6 GB</td>
+      <td>Excellent quality; works on all hardware including ARM Windows</td>
+      </tr>
+      <tr>
+      <td><code>llava</code></td>
+      <td>4–7 GB</td>
+      <td>Solid accuracy; CPU or GPU</td>
+      </tr>
+      <tr>
+      <td><code>llama3.2-vision</code></td>
+      <td>7+ GB</td>
+      <td>Higher quality; best on Apple Silicon or CUDA GPU</td>
+      </tr>
+      <tr>
+      <td><code>moondream:latest</code></td>
+      <td>1.8 GB</td>
+      <td>Fastest; CPU-only capable</td>
+      </tr>
+      <tr>
+      <td><code>qwen2-vl:7b</code></td>
+      <td>7 GB</td>
+      <td>Good balance of speed and quality</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h3 id="anthropic-claude-cloud-windows-and-macos">Anthropic Claude — Cloud (Windows and macOS)</h3>
+      <p>Claude models produce the highest quality, most detailed descriptions. Requires an internet connection and an Anthropic API key.</p>
+      <p><strong>CLI provider name:</strong> <code>anthropic</code> · <strong>GUI provider name:</strong> <code>claude</code></p>
+      <p><strong>Setup:</strong> Set <code>ANTHROPIC_API_KEY</code> in your environment (see <a href="#setting-up-api-keys">Setting Up API Keys</a>).</p>
+      <p><strong>Available models</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Model</th>
+      <th>Characteristics</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>claude-opus-4-6</code></td>
+      <td>Flagship; best intelligence and description depth</td>
+      </tr>
+      <tr>
+      <td><code>claude-sonnet-4-6</code></td>
+      <td>Excellent balance of speed and quality</td>
+      </tr>
+      <tr>
+      <td><code>claude-haiku-4-5-20251001</code></td>
+      <td>Fastest Claude model; very good quality</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>CLI example</strong></p>
+      <div class="sourceCode" id="cb32"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos <span class="at">--provider</span> anthropic <span class="at">--model</span> claude-opus-4-6 <span class="at">--prompt</span> detailed</span></code></pre></div>
+      <hr />
+      <h3 id="openai-gpt-cloud-windows-and-macos">OpenAI GPT — Cloud (Windows and macOS)</h3>
+      <p>Requires an OpenAI API key. Good for workflows already integrated with OpenAI.</p>
+      <p><strong>CLI and GUI provider name:</strong> <code>openai</code></p>
+      <p><strong>Setup:</strong> Set <code>OPENAI_API_KEY</code> in your environment.</p>
+      <p><strong>Available models</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Model</th>
+      <th>Characteristics</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>gpt-4o</code></td>
+      <td>Fast, flexible, high-quality vision</td>
+      </tr>
+      <tr>
+      <td><code>gpt-4o-mini</code></td>
+      <td>Faster and more affordable</td>
+      </tr>
+      <tr>
+      <td><code>o1</code>, <code>o3</code></td>
+      <td>Reasoning models (slower; better for complex scenes)</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>CLI example</strong></p>
+      <div class="sourceCode" id="cb33"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos <span class="at">--provider</span> openai <span class="at">--model</span> gpt-4o</span></code></pre></div>
+      <hr />
+      <h3 id="florence-2-local-windows-and-macos">Florence-2 — Local (Windows and macOS)</h3>
+      <p>Microsoft Florence-2 runs locally via the HuggingFace Transformers library. No API key is required. Quality is lower than Claude or GPT-4o but there is no per-image cost.</p>
+      <p><strong>CLI provider name:</strong> <code>florence</code> · <strong>GUI provider name:</strong> <code>huggingface</code></p>
+      <p><strong>Setup</strong></p>
+      <div class="sourceCode" id="cb34"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install torch transformers</span></code></pre></div>
+      <p>A GPU (CUDA on Windows/Linux, MPS on Apple Silicon) is recommended but a CPU works.</p>
+      <p><strong>Available models</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Model</th>
+      <th>Size</th>
+      <th>Notes</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>microsoft/Florence-2-large</code></td>
+      <td>700 MB</td>
+      <td>Best quality</td>
+      </tr>
+      <tr>
+      <td><code>microsoft/Florence-2-base</code></td>
+      <td>230 MB</td>
+      <td>Faster</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>CLI example</strong></p>
+      <div class="sourceCode" id="cb35"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos <span class="at">--provider</span> florence <span class="at">--model</span> microsoft/Florence-2-large</span></code></pre></div>
+      <p><strong>Note on prompts with Florence-2:</strong> IDT maps prompt names to Florence task tokens automatically. The <code>detailed</code> prompt uses <code>&lt;DETAILED_CAPTION&gt;</code>, <code>concise</code> uses <code>&lt;CAPTION&gt;</code>, etc. Custom prompt text is not supported by Florence-2 (it ignores the text and uses the task token).</p>
+      <hr />
+      <h3 id="mlx-apple-silicon-local-gui-only-macos">MLX — Apple Silicon Local (GUI only, macOS)</h3>
+      <p>MLX runs vision models directly on Apple Silicon (M1/M2/M3/M4) using Apple’s Metal GPU via the <code>mlx-vlm</code> library. It is the fastest local option on Mac and produces quality comparable to small Ollama models. <strong>MLX is only available in the GUI — it does not appear in the CLI.</strong></p>
+      <p><strong>GUI provider name:</strong> <code>mlx</code></p>
+      <p><strong>Setup</strong></p>
+      <div class="sourceCode" id="cb36"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install mlx-vlm</span></code></pre></div>
+      <p>Models are downloaded automatically on first use from HuggingFace Hub and cached in <code>~/.cache/huggingface/hub/</code>.</p>
+      <p><strong>Available models (select in GUI; you can also type any HuggingFace MLX repo ID)</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Model</th>
+      <th>Size</th>
+      <th>Notes</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>mlx-community/Qwen3-VL-4B-Instruct-4bit</code></td>
+      <td>~3.1 GB</td>
+      <td><strong>Recommended default</strong> — best quality/speed balance</td>
+      </tr>
+      <tr>
+      <td><code>mlx-community/Qwen3-VL-8B-Instruct-4bit</code></td>
+      <td>~5.8 GB</td>
+      <td>Higher quality; 16 GB+ Mac recommended</td>
+      </tr>
+      <tr>
+      <td><code>mlx-community/Qwen2-VL-2B-Instruct-4bit</code></td>
+      <td>~1.5 GB</td>
+      <td>Fastest Qwen option</td>
+      </tr>
+      <tr>
+      <td><code>mlx-community/gemma-3-4b-it-qat-4bit</code></td>
+      <td>~2.5 GB</td>
+      <td>Strong English descriptions</td>
+      </tr>
+      <tr>
+      <td><code>mlx-community/phi-3.5-vision-instruct-4bit</code></td>
+      <td>~2.5 GB</td>
+      <td>Good at text and fine detail</td>
+      </tr>
+      <tr>
+      <td><code>mlx-community/SmolVLM-Instruct-4bit</code></td>
+      <td>~0.5 GB</td>
+      <td>Smallest; very fast, shorter descriptions</td>
+      </tr>
+      <tr>
+      <td><code>mlx-community/Llama-3.2-11B-Vision-Instruct-4bit</code></td>
+      <td>~6.5 GB</td>
+      <td>High quality; 16 GB+ Mac recommended</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h2 id="part-5-prompts-and-customization">Part 5: Prompts and Customization</h2>
+      <h3 id="built-in-prompt-styles">Built-In Prompt Styles</h3>
+      <p>IDT ships with a library of prompt styles tuned for different use cases. List them with <code>idt prompts</code>.</p>
+      <table>
+      <colgroup>
+      <col style="width: 50%" />
+      <col style="width: 50%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Name</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>narrative</code></td>
+      <td>Flowing description with spatial organization (left-to-right, foreground/background)</td>
+      </tr>
+      <tr>
+      <td><code>detailed</code></td>
+      <td>Structured sections: SUBJECT, SETTING, COLORS, COMPOSITION, DETAILS</td>
+      </tr>
+      <tr>
+      <td><code>concise</code></td>
+      <td>Brief 2–3 sentence summary</td>
+      </tr>
+      <tr>
+      <td><code>artistic</code></td>
+      <td>Visual qualities with bullet points; accessible language</td>
+      </tr>
+      <tr>
+      <td><code>technical</code></td>
+      <td>Lighting, composition, and quality evaluation (no camera speculation)</td>
+      </tr>
+      <tr>
+      <td><code>colorful</code></td>
+      <td>Emphasizes specific color names (crimson, navy, ivory, etc.)</td>
+      </tr>
+      <tr>
+      <td><code>simple</code></td>
+      <td>One-sentence basic description</td>
+      </tr>
+      <tr>
+      <td><code>accessibility</code></td>
+      <td>Optimized for screen reader context; emphasizes spatial relationships</td>
+      </tr>
+      <tr>
+      <td><code>comparison</code></td>
+      <td>Uses analogies to familiar objects</td>
+      </tr>
+      <tr>
+      <td><code>mood</code></td>
+      <td>Emotional atmosphere and psychological tone</td>
+      </tr>
+      <tr>
+      <td><code>functional</code></td>
+      <td>Focuses on purpose, action, and utility</td>
+      </tr>
+      <tr>
+      <td><code>aialttext</code></td>
+      <td>Produces three website alt-text options at 25, 50, and 100 words</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h3 id="creating-custom-prompts">Creating Custom Prompts</h3>
+      <p><strong>Via the CLI config file</strong></p>
+      <p>Add prompts to <code>~/.idt/config.json</code>:</p>
+      <div class="sourceCode" id="cb37"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;custom_prompts&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;museum_label&quot;</span><span class="fu">:</span> <span class="st">&quot;Write a museum exhibit label for this artwork. Use 50–75 words. Begin with the most visually striking element.&quot;</span><span class="fu">,</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;ecommerce&quot;</span><span class="fu">:</span> <span class="st">&quot;Describe this product image for an e-commerce listing. Focus on visible features, materials, and condition. Avoid speculation about what is not visible.&quot;</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p>Then use them like any built-in style: <code>idt describe ~/Photos --prompt museum_label</code></p>
+      <p><strong>Via the GUI Prompt Editor</strong></p>
+      <p>See <a href="#the-prompt-editor-gui">The Prompt Editor (GUI)</a> below.</p>
+      <hr />
+      <h3 id="the-prompt-editor-gui">The Prompt Editor (GUI)</h3>
+      <p><strong>Tools → Edit Prompts…</strong> (<code>Ctrl+P</code>) opens the prompt editor.</p>
+      <p><strong>Left panel:</strong> List of all available prompts (built-in and custom).</p>
+      <p><strong>Right panel:</strong> Editor showing: - <strong>Prompt name</strong> — Editable; must be unique. - <strong>Prompt text</strong> — Full text editor with character count.</p>
+      <p><strong>Buttons:</strong> - <strong>Add New</strong> — Create a new prompt from a blank template. - <strong>Duplicate</strong> — Clone the selected prompt as a starting point. - <strong>Delete</strong> — Remove a custom prompt (built-in prompts cannot be deleted, only overridden).</p>
+      <p>The <strong>Default Settings</strong> section at the bottom of the dialog lets you set the default provider, model, and prompt for all new batch jobs.</p>
+      <hr />
+      <h2 id="part-6-advanced-features">Part 6: Advanced Features</h2>
+      <h3 id="video-frame-extraction">Video Frame Extraction</h3>
+      <p>IDT extracts still frames from video files before describing them. The AI then describes each frame as an image.</p>
+      <p><strong>In the CLI:</strong> Video extraction happens automatically when you run <code>idt describe</code> on a folder containing videos. Opt out with <code>--no-video</code>.</p>
+      <p><strong>In the GUI:</strong> Videos appear in the image list as expandable nodes. Use <strong>Process → Extract Video Frames…</strong> to control extraction settings, or <strong>Process → Describe Video with AI…</strong> to run the full pipeline.</p>
+      <p><strong>Extraction modes</strong></p>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Mode</th>
+      <th>CLI flag</th>
+      <th>Best for</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Time interval</td>
+      <td><code>--video-interval SECONDS</code></td>
+      <td>Continuous footage (surveillance, timelapse)</td>
+      </tr>
+      <tr>
+      <td>Scene detection</td>
+      <td><code>--scene THRESHOLD</code></td>
+      <td>Events, films, talks (extracts on natural cuts)</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Video GPS metadata:</strong> If FFmpeg is installed, GPS coordinates recorded in the video file are copied into each extracted frame’s EXIF data, enabling geocoding to work on video frames just as it does for photos. Install FFmpeg via <strong>Tools → Install FFmpeg (for video GPS)…</strong> in the GUI.</p>
+      <hr />
+      <h3 id="downloading-web-images">Downloading Web Images</h3>
+      <p>Use <code>idt download</code> or <strong>File → Load Images From URL…</strong> in the GUI to fetch images from a web page.</p>
+      <p>The tool: 1. Scrapes all <code>&lt;img&gt;</code> elements from the page. 2. Filters by minimum size if <code>--min-size</code> is specified. 3. Downloads images to the target folder. 4. Records the original HTML <code>alt</code> attribute alongside each image. 5. Optionally describes and embeds in the same pass.</p>
+      <p><strong>Common use case:</strong> Generate accessibility-compliant alt text for images on an existing web page, then compare the AI-generated description with the existing alt text stored in the workspace.</p>
+      <hr />
+      <h3 id="heicheif-conversion">HEIC/HEIF Conversion</h3>
+      <p>HEIC is the default format for photos taken on iPhones running iOS 11 and later. IDT handles HEIC transparently:</p>
+      <ul>
+      <li>In the CLI: HEIC files are converted to JPEG in memory before being sent to the AI. The conversion is cached in the workspace’s <code>derived/converted/</code> folder.</li>
+      <li>In the GUI: <strong>Process → Convert HEIC Files…</strong> converts a batch to JPEG. Originals are preserved.</li>
+      </ul>
+      <p>HEIC support requires <code>pillow-heif</code> to be installed (<code>pip install pillow-heif</code>).</p>
+      <hr />
+      <h3 id="geocoding-location-from-gps">Geocoding — Location from GPS</h3>
+      <p>When <code>--geocode</code> is used (CLI) or <strong>Enable Geocoding</strong> is checked (GUI), IDT reverse-geocodes GPS coordinates from image EXIF data to human-readable place names using the OpenStreetMap Nominatim API.</p>
+      <p>The location string is prepended to the AI prompt context:</p>
+      <pre><code>Context: Paris, France  Jun 10, 2024  Canon EOS R5</code></pre>
+      <p>Geocoding results are cached in <code>~/.idt/geocode_cache.json</code> so each unique location is only looked up once.</p>
+      <p><strong>Privacy note:</strong> GPS coordinates are sent to the Nominatim API (run by the OpenStreetMap Foundation) to resolve place names. If location privacy is a concern, use <code>--no-metadata</code> to disable all EXIF extraction.</p>
+      <hr />
+      <h3 id="embedding-descriptions-into-images">Embedding Descriptions into Images</h3>
+      <p>After generating descriptions, you can write them directly into the image file metadata so the description travels with the file everywhere it goes—File Explorer, Finder, Lightroom, macOS Spotlight, iOS Photos, and any other app that reads EXIF or XMP metadata.</p>
+      <p><strong>CLI:</strong> <code>idt embed &lt;workspace&gt;</code> or add <code>--embed</code> to the <code>describe</code> command to embed automatically after processing.</p>
+      <p><strong>GUI:</strong> <strong>File → Embed Descriptions into Images…</strong></p>
+      <p>Key points: - Original files are <strong>never modified</strong> in copy mode (the default). - Embedded copies are saved to <code>&lt;workspace&gt;/embedded/</code> and mirror the original subfolder structure. - HEIC sources are converted to JPEG before embedding (HEIC is a read-only format for this purpose). - In-place mode (modify originals) requires explicit confirmation and is not recommended unless you have backups.</p>
+      <hr />
+      <h3 id="combining-multiple-workspaces">Combining Multiple Workspaces</h3>
+      <p>If you have descriptions spread across many workspace bundles—for example, one per event or per year—use <code>idt combine</code> to merge them into a single CSV for analysis, reporting, or import into another tool.</p>
+      <div class="sourceCode" id="cb39"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Combine all workspaces under ~/Pictures into one CSV sorted by photo date</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> combine ~/Pictures <span class="at">--output</span> all-photos.csv <span class="at">--sort</span> date</span></code></pre></div>
+      <p>The CSV includes all description fields: filename, source path, description text, provider, model, timestamp, metadata context, and token counts.</p>
+      <hr />
+      <h3 id="piping-and-scripting-with-idt">Piping and Scripting with idt</h3>
+      <p><code>idt describe</code> accepts image file paths from stdin when you pass <code>-</code> as the source:</p>
+      <div class="sourceCode" id="cb40"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Describe images listed by another script</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="ex">get_images.sh</span> <span class="kw">|</span> <span class="ex">idt</span> describe <span class="at">-</span> <span class="at">--provider</span> anthropic <span class="at">--quiet</span></span></code></pre></div>
+      <p>In <code>--quiet</code> mode, stdin mode outputs <code>filename\tdescription</code> (tab-separated), making it easy to pipe into <code>awk</code>, <code>cut</code>, or a database import script.</p>
+      <div class="sourceCode" id="cb41"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract only descriptions into a text file</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> show ~/Photos <span class="at">--json</span> <span class="kw">|</span> <span class="ex">python</span> <span class="at">-c</span> <span class="st">&quot;</span></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a><span class="st">import sys, json</span></span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a><span class="st">for line in sys.stdin:</span></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a><span class="st">    obj = json.loads(line)</span></span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a><span class="st">    if obj.get(&#39;described&#39;):</span></span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a><span class="st">        print(obj[&#39;description&#39;])</span></span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;</span> <span class="op">&gt;</span> descriptions.txt</span></code></pre></div>
+      <hr />
+      <h2 id="part-7-accessibility">Part 7: Accessibility</h2>
+      <h3 id="screen-reader-compatibility">Screen Reader Compatibility</h3>
+      <p><strong>ImageDescriber GUI</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Screen reader</th>
+      <th>Platform</th>
+      <th>Support level</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>NVDA</td>
+      <td>Windows</td>
+      <td>Full (TreeCtrl with MSAA)</td>
+      </tr>
+      <tr>
+      <td>JAWS</td>
+      <td>Windows</td>
+      <td>Full (TreeCtrl with UIA)</td>
+      </tr>
+      <tr>
+      <td>VoiceOver</td>
+      <td>macOS</td>
+      <td>Full (custom NSOutlineView adapter)</td>
+      </tr>
+      <tr>
+      <td>Narrator</td>
+      <td>Windows</td>
+      <td>Tested and working</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>The chat window and description list use <code>wx.ListBox</code> instead of tree controls, providing a single tab stop and reliable screen reader announcement of new content.</p>
+      <p>All interactive controls have accessible names set via <code>SetAccessibleName()</code>. Separator rows in lists are automatically skipped during keyboard navigation.</p>
+      <p><strong>idt CLI</strong></p>
+      <p>The CLI uses no ANSI color codes in interactive mode (<code>idt guideme</code>) and all output is plain text. Progress messages are written to stdout as plain lines. The <code>--quiet</code> flag reduces output to the minimum needed for piping.</p>
+      <hr />
+      <h3 id="keyboard-navigation">Keyboard Navigation</h3>
+      <p><strong>All features in the GUI are reachable by keyboard.</strong> No action requires a mouse.</p>
+      <p><strong>Image list:</strong> Arrow keys to navigate, Enter to expand/collapse folders, Space to toggle checkboxes.</p>
+      <p><strong>Tab order:</strong> Image list → Description list → Description text editor. Shift+Tab moves backward.</p>
+      <p><strong>Menu bar:</strong> Alt (Windows) or Ctrl+F2 (macOS) activates the menu bar. All menu items have keyboard equivalents shown in the menu.</p>
+      <hr />
+      <h3 id="accessible-output">Accessible Output</h3>
+      <p><strong>HTML reports</strong> generated by <code>idt export --format html</code> and <strong>File → Export HTML Gallery</strong> include:</p>
+      <ul>
+      <li>Skip navigation link at the top of the page</li>
+      <li>Proper HTML5 landmark regions (<code>&lt;main&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;header&gt;</code>, <code>&lt;footer&gt;</code>)</li>
+      <li>Correct heading hierarchy (single H1 per page)</li>
+      <li>All images have <code>alt</code> attributes set to the AI-generated description</li>
+      <li>Tables use <code>&lt;caption&gt;</code> and <code>&lt;th scope&gt;</code> attributes</li>
+      <li>No color-only information</li>
+      <li>Works without JavaScript</li>
+      <li>Passes WCAG 2.2 Level AA</li>
+      </ul>
+      <hr />
+      <h2 id="part-8-troubleshooting">Part 8: Troubleshooting</h2>
+      <h3 id="common-issues">Common Issues</h3>
+      <p><strong>No models showing in the GUI</strong></p>
+      <ul>
+      <li>Ollama: Open a terminal and run <code>ollama list</code>. If nothing appears, open <code>http://localhost:11434</code> in a browser. If that fails, restart Ollama or reinstall it.</li>
+      <li>OpenAI / Claude: Check that the API key environment variable is set. Open <strong>Tools → AI Info → Ollama Models…</strong> to test connectivity.</li>
+      </ul>
+      <p><strong>Processing completes but descriptions are blank or very short</strong></p>
+      <ul>
+      <li>Some models (especially small Ollama models on CPU) time out if the image is very large. Try resizing images to under 2048 × 2048 pixels before describing.</li>
+      <li>Switch to a higher-quality model: <code>claude-opus-4-6</code> or <code>gpt-4o</code>.</li>
+      </ul>
+      <p><strong>Video extraction fails</strong></p>
+      <ul>
+      <li>Check that <code>opencv-python</code> is installed: <code>pip install opencv-python</code>.</li>
+      <li>For GPS from video: install FFmpeg via <strong>Tools → Install FFmpeg (for video GPS)…</strong> or from <a href="https://ffmpeg.org">ffmpeg.org</a>.</li>
+      </ul>
+      <p><strong>HEIC images not recognized</strong></p>
+      <ul>
+      <li>Install <code>pillow-heif</code>: <code>pip install pillow-heif</code>.</li>
+      <li>On Windows, you may also need to install the <a href="https://www.microsoft.com/store/productId/9PMMSR1CGPWG">HEIF Image Extensions</a> from the Microsoft Store.</li>
+      </ul>
+      <p><strong>The GUI silently does nothing when I click a button</strong></p>
+      <ul>
+      <li><p>Run the application from the terminal to see error output:</p>
+      <div class="sourceCode" id="cb42"><pre class="sourceCode bat"><code class="sourceCode dosbat"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> imagedescriber</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>.winenv\Scripts\python imagedescriber_wx.py</span></code></pre></div>
+      <p>Reproduce the action. Any exception will appear in the terminal immediately.</p></li>
+      </ul>
+      <p><strong>“Permission denied” errors on macOS</strong></p>
+      <ul>
+      <li>If you downloaded the app, macOS Gatekeeper may quarantine it. Open <strong>System Settings → Privacy &amp; Security</strong> and allow the app to run, or right-click and choose <strong>Open</strong> the first time.</li>
+      </ul>
+      <hr />
+      <h3 id="diagnostic-steps">Diagnostic Steps</h3>
+      <ol type="1">
+      <li><p>Check the version: <code>idt version</code> — confirm you are running the expected version.</p></li>
+      <li><p>Check the log: look in <code>&lt;workspace&gt;/logs/*.log</code> for the last processing run.</p></li>
+      <li><p>Test with a single image and <code>--show-descriptions</code> to see the raw AI output:</p>
+      <div class="sourceCode" id="cb43"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="ex">idt</span> describe ~/Photos <span class="at">--limit</span> 1 <span class="at">--show-descriptions</span></span></code></pre></div></li>
+      <li><p>Test connectivity: <code>idt models</code> to verify providers respond.</p></li>
+      <li><p>Test config: <code>idt config</code> to see current defaults.</p></li>
+      </ol>
+      <hr />
+      <h2 id="appendix-a-supported-file-formats">Appendix A: Supported File Formats</h2>
+      <h3 id="image-formats">Image Formats</h3>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Format</th>
+      <th>Extension(s)</th>
+      <th>Notes</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>JPEG</td>
+      <td><code>.jpg</code>, <code>.jpeg</code></td>
+      <td>Native; best supported</td>
+      </tr>
+      <tr>
+      <td>PNG</td>
+      <td><code>.png</code></td>
+      <td>Native</td>
+      </tr>
+      <tr>
+      <td>WebP</td>
+      <td><code>.webp</code></td>
+      <td>Native</td>
+      </tr>
+      <tr>
+      <td>GIF</td>
+      <td><code>.gif</code></td>
+      <td>Static frame only</td>
+      </tr>
+      <tr>
+      <td>TIFF</td>
+      <td><code>.tiff</code>, <code>.tif</code></td>
+      <td>Converted to JPEG before API</td>
+      </tr>
+      <tr>
+      <td>BMP</td>
+      <td><code>.bmp</code></td>
+      <td>Converted to JPEG before API</td>
+      </tr>
+      <tr>
+      <td>HEIC / HEIF</td>
+      <td><code>.heic</code>, <code>.heif</code></td>
+      <td>Requires <code>pillow-heif</code>; converted in memory</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="video-formats">Video Formats</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Format</th>
+      <th>Extension(s)</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>MPEG-4</td>
+      <td><code>.mp4</code>, <code>.m4v</code></td>
+      </tr>
+      <tr>
+      <td>QuickTime</td>
+      <td><code>.mov</code></td>
+      </tr>
+      <tr>
+      <td>AVI</td>
+      <td><code>.avi</code></td>
+      </tr>
+      <tr>
+      <td>Matroska</td>
+      <td><code>.mkv</code></td>
+      </tr>
+      <tr>
+      <td>Windows Media</td>
+      <td><code>.wmv</code></td>
+      </tr>
+      <tr>
+      <td>MPEG Transport Stream</td>
+      <td><code>.mts</code>, <code>.m2ts</code></td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h2 id="appendix-b-configuration-file-reference">Appendix B: Configuration File Reference</h2>
+      <p><strong>Location:</strong> <code>~/.idt/config.json</code></p>
+      <div class="sourceCode" id="cb44"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;default_provider&quot;</span><span class="fu">:</span> <span class="st">&quot;ollama&quot;</span><span class="fu">,</span></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;default_model&quot;</span><span class="fu">:</span> <span class="st">&quot;minicpm-v4.6&quot;</span><span class="fu">,</span></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;default_prompt_name&quot;</span><span class="fu">:</span> <span class="st">&quot;detailed&quot;</span><span class="fu">,</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;workspace_root&quot;</span><span class="fu">:</span> <span class="st">&quot;/home/yourname/Documents/idt&quot;</span><span class="fu">,</span></span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;custom_prompts&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;my_prompt&quot;</span><span class="fu">:</span> <span class="st">&quot;Describe this image for a museum label. 50–75 words.&quot;</span><span class="fu">,</span></span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;product_shot&quot;</span><span class="fu">:</span> <span class="st">&quot;E-commerce product description: visible features, materials, condition.&quot;</span></span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <table>
+      <colgroup>
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      <col style="width: 33%" />
+      </colgroup>
+      <thead>
+      <tr>
+      <th>Key</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>default_provider</code></td>
+      <td><code>ollama</code></td>
+      <td>AI provider used when none is specified</td>
+      </tr>
+      <tr>
+      <td><code>default_model</code></td>
+      <td>Provider default</td>
+      <td>Model used when none is specified</td>
+      </tr>
+      <tr>
+      <td><code>default_prompt_name</code></td>
+      <td><code>detailed</code></td>
+      <td>Prompt style used by default</td>
+      </tr>
+      <tr>
+      <td><code>workspace_root</code></td>
+      <td><code>~/Documents/idt</code></td>
+      <td>Root folder where new workspaces are created</td>
+      </tr>
+      <tr>
+      <td><code>custom_prompts</code></td>
+      <td><code>{}</code></td>
+      <td>Dictionary of name → prompt text for user-defined styles</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h2 id="appendix-c-workspace-file-structure">Appendix C: Workspace File Structure</h2>
+      <pre><code>MyTrip.idtw/                        Workspace bundle (a folder ending in .idtw)
+  manifest.json                     Job metadata
+  images/                           Copies of source images
+  descriptions/                     JSON description sidecars
+    vacation-photo-001.jpg.json
+    vacation-photo-002.jpg.json
+  derived/
+    converted/                      HEIC → JPEG conversions
+    frames/                         Extracted video frames
+  logs/                             Processing logs (one per run)
+  embedded/                         Images with embedded metadata
+  reports/
+    descriptions.html
+    descriptions.csv
+    descriptions.txt</code></pre>
+      <p><strong><code>manifest.json</code> key fields</strong></p>
+      <div class="sourceCode" id="cb46"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;format&quot;</span><span class="fu">:</span> <span class="st">&quot;idtw&quot;</span><span class="fu">,</span></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;1.0&quot;</span><span class="fu">,</span></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;MyTrip&quot;</span><span class="fu">,</span></span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;created&quot;</span><span class="fu">:</span> <span class="st">&quot;2024-09-12T10:00:00+00:00&quot;</span><span class="fu">,</span></span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;modified&quot;</span><span class="fu">:</span> <span class="st">&quot;2024-09-12T11:30:00+00:00&quot;</span><span class="fu">,</span></span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;sources&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span><span class="dt">&quot;path&quot;</span><span class="fu">:</span> <span class="st">&quot;/Users/you/Photos/Trip&quot;</span><span class="fu">,</span> <span class="dt">&quot;added&quot;</span><span class="fu">:</span> <span class="st">&quot;2024-09-12T10:00:00+00:00&quot;</span><span class="fu">}</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;defaults&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb46-9"><a href="#cb46-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;provider&quot;</span><span class="fu">:</span> <span class="st">&quot;anthropic&quot;</span><span class="fu">,</span></span>
+<span id="cb46-10"><a href="#cb46-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;model&quot;</span><span class="fu">:</span> <span class="st">&quot;claude-opus-4-6&quot;</span><span class="fu">,</span></span>
+<span id="cb46-11"><a href="#cb46-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;prompt_name&quot;</span><span class="fu">:</span> <span class="st">&quot;detailed&quot;</span></span>
+<span id="cb46-12"><a href="#cb46-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb46-13"><a href="#cb46-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;geocode_enabled&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span></span>
+<span id="cb46-14"><a href="#cb46-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;cli_commands&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb46-15"><a href="#cb46-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span><span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;idt describe /Users/you/Photos/Trip --provider anthropic&quot;</span><span class="fu">,</span> <span class="dt">&quot;timestamp&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">}</span></span>
+<span id="cb46-16"><a href="#cb46-16" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb46-17"><a href="#cb46-17" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p><strong>Description sidecar format</strong> (<code>descriptions/photo.jpg.json</code>)</p>
+      <div class="sourceCode" id="cb47"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;image&quot;</span><span class="fu">:</span> <span class="st">&quot;photo.jpg&quot;</span><span class="fu">,</span></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;source_path&quot;</span><span class="fu">:</span> <span class="st">&quot;/Users/you/Photos/Trip/photo.jpg&quot;</span><span class="fu">,</span></span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;descriptions&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;550e8400-e29b-41d4-a716-446655440000&quot;</span><span class="fu">,</span></span>
+<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;text&quot;</span><span class="fu">:</span> <span class="st">&quot;A group of hikers resting on a mountain ridge...&quot;</span><span class="fu">,</span></span>
+<span id="cb47-8"><a href="#cb47-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;provider&quot;</span><span class="fu">:</span> <span class="st">&quot;anthropic&quot;</span><span class="fu">,</span></span>
+<span id="cb47-9"><a href="#cb47-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;model&quot;</span><span class="fu">:</span> <span class="st">&quot;claude-opus-4-6&quot;</span><span class="fu">,</span></span>
+<span id="cb47-10"><a href="#cb47-10" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;prompt_name&quot;</span><span class="fu">:</span> <span class="st">&quot;detailed&quot;</span><span class="fu">,</span></span>
+<span id="cb47-11"><a href="#cb47-11" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;created&quot;</span><span class="fu">:</span> <span class="st">&quot;2024-09-12T10:15:32+00:00&quot;</span><span class="fu">,</span></span>
+<span id="cb47-12"><a href="#cb47-12" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;input_tokens&quot;</span><span class="fu">:</span> <span class="dv">512</span><span class="fu">,</span></span>
+<span id="cb47-13"><a href="#cb47-13" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;output_tokens&quot;</span><span class="fu">:</span> <span class="dv">183</span><span class="fu">,</span></span>
+<span id="cb47-14"><a href="#cb47-14" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;metadata_context&quot;</span><span class="fu">:</span> <span class="st">&quot;Zugspitze, Germany  Sep 12, 2024  iPhone 14 Pro&quot;</span></span>
+<span id="cb47-15"><a href="#cb47-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb47-16"><a href="#cb47-16" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb47-17"><a href="#cb47-17" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;active_description_id&quot;</span><span class="fu">:</span> <span class="st">&quot;550e8400-e29b-41d4-a716-446655440000&quot;</span></span>
+<span id="cb47-18"><a href="#cb47-18" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <hr />
+      <h2 id="appendix-d-keyboard-shortcut-reference">Appendix D: Keyboard Shortcut Reference</h2>
+      <h3 id="global-shortcuts">Global Shortcuts</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Action</th>
+      <th>Windows / Linux</th>
+      <th>macOS</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>New Workspace</td>
+      <td>Ctrl+N</td>
+      <td>Cmd+N</td>
+      </tr>
+      <tr>
+      <td>Open Workspace</td>
+      <td>Ctrl+O</td>
+      <td>Cmd+O</td>
+      </tr>
+      <tr>
+      <td>Save Workspace</td>
+      <td>Ctrl+S</td>
+      <td>Cmd+S</td>
+      </tr>
+      <tr>
+      <td>Load Directory</td>
+      <td>Ctrl+L</td>
+      <td>Cmd+L</td>
+      </tr>
+      <tr>
+      <td>Refresh Folder from Disk</td>
+      <td>Ctrl+Shift+R</td>
+      <td>Cmd+Shift+R</td>
+      </tr>
+      <tr>
+      <td>Load from URL</td>
+      <td>Ctrl+U</td>
+      <td>Cmd+U</td>
+      </tr>
+      <tr>
+      <td>Export HTML Gallery</td>
+      <td>Ctrl+Shift+G</td>
+      <td>Cmd+Shift+G</td>
+      </tr>
+      <tr>
+      <td>Workspace Statistics</td>
+      <td>Ctrl+I</td>
+      <td>Cmd+I</td>
+      </tr>
+      <tr>
+      <td>Exit / Quit</td>
+      <td>Ctrl+Q</td>
+      <td>Cmd+Q</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="edit">Edit</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Action</th>
+      <th>Windows / Linux</th>
+      <th>macOS</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Cut</td>
+      <td>Ctrl+X</td>
+      <td>Cmd+X</td>
+      </tr>
+      <tr>
+      <td>Copy</td>
+      <td>Ctrl+C</td>
+      <td>Cmd+C</td>
+      </tr>
+      <tr>
+      <td>Paste</td>
+      <td>Ctrl+V</td>
+      <td>Cmd+V</td>
+      </tr>
+      <tr>
+      <td>Select All</td>
+      <td>Ctrl+A</td>
+      <td>Cmd+A</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="view-and-navigation">View and Navigation</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Action</th>
+      <th>Shortcut</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Update Image List</td>
+      <td>F5</td>
+      </tr>
+      <tr>
+      <td>Filter: All Items</td>
+      <td>F5</td>
+      </tr>
+      <tr>
+      <td>Find Images (search bar)</td>
+      <td>Ctrl+F</td>
+      </tr>
+      <tr>
+      <td>Edit Prompts</td>
+      <td>Ctrl+P</td>
+      </tr>
+      <tr>
+      <td>Configure Settings</td>
+      <td>Ctrl+Shift+C</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="image-list-navigation">Image List Navigation</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Action</th>
+      <th>Key</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Move up/down</td>
+      <td>Arrow keys</td>
+      </tr>
+      <tr>
+      <td>Expand folder</td>
+      <td>Right arrow</td>
+      </tr>
+      <tr>
+      <td>Collapse folder</td>
+      <td>Left arrow</td>
+      </tr>
+      <tr>
+      <td>Select item</td>
+      <td>Enter</td>
+      </tr>
+      <tr>
+      <td>Toggle checkbox</td>
+      <td>Space</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <p><em>Image Description Toolkit is an open-source project. Contributions, bug reports, and feedback are welcome at the <a href="https://github.com/kellylford/Image-Description-Toolkit">project repository</a>.</em></p>
+
+    </main>
+  </div>
+
+  <footer role="contentinfo">
+    <div class="footer-inner">
+      <p>
+        Image Description Toolkit — open-source software.
+        <a href="https://github.com/kellylford/Image-Description-Toolkit/issues">Report an issue</a>.
+      </p>
+      <p class="footer-legal">
+        This document conforms to
+        <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> 2.2 Level AA.
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>
