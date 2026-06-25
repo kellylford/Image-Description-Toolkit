@@ -19,13 +19,14 @@ Both tools produce the same workspace bundles (`.idtw`), so you can start a job 
 
 ### Supported AI Providers
 
-| Provider | Type | API Key Required | Notes |
-|---|---|---|---|
-| Ollama | Local | No | Runs on your machine |
-| Anthropic Claude | Cloud | Yes | Highest quality descriptions |
-| OpenAI GPT-4o | Cloud | Yes | Fast and flexible |
-| Florence-2 (Microsoft) | Local | No | Via HuggingFace Transformers |
-| Anthropic via AWS Bedrock | Cloud | AWS credentials | Enterprise deployments |
+| Provider | CLI name | GUI name | Type | API Key | Available on |
+|---|---|---|---|---|---|
+| Ollama | `ollama` | `ollama` | Local | No | Windows, macOS |
+| Ollama Cloud | — | `ollama_cloud` | Cloud (self-hosted) | No | GUI only |
+| Anthropic Claude | `anthropic` | `claude` | Cloud | Yes | Windows, macOS |
+| OpenAI GPT | `openai` | `openai` | Cloud | Yes | Windows, macOS |
+| Florence-2 (Microsoft) | `florence` | `huggingface` | Local | No | Windows, macOS |
+| MLX (Apple Silicon) | — | `mlx` | Local | No | GUI only, macOS Apple Silicon |
 
 ---
 
@@ -954,9 +955,13 @@ All menu items, buttons, and interactive controls are reachable by keyboard. Arr
 
 ## Part 4: AI Providers
 
-### Ollama (Local — No API Key)
+> **Provider names differ between CLI and GUI.** The CLI uses `anthropic` and `florence`; the GUI uses `claude` and `huggingface` for the same providers. MLX and Ollama Cloud are GUI-only and do not appear in the CLI.
 
-Ollama runs AI models on your own machine. No internet connection is required after the model is downloaded. No data is sent to external servers.
+### Ollama — Local (Windows and macOS)
+
+Ollama runs AI models on your own machine. No internet connection is required after the model is downloaded. No data leaves your computer.
+
+**CLI and GUI provider name:** `ollama`
 
 **Setup**
 
@@ -976,11 +981,13 @@ Ollama runs AI models on your own machine. No internet connection is required af
 
 3. Ollama starts automatically as a background service.
 
-**Using a remote Ollama server**
+**Using a remote Ollama server (CLI)**
 
 ```bash
 idt describe ~/Photos --provider ollama --model minicpm-v4.6 --ollama-host http://192.168.1.100:11434
 ```
+
+In the GUI, a separate **Ollama Cloud** provider (`ollama_cloud`) handles remote Ollama connections — configure the host URL in **Tools → Configure Settings**.
 
 **Recommended models**
 
@@ -994,9 +1001,11 @@ idt describe ~/Photos --provider ollama --model minicpm-v4.6 --ollama-host http:
 
 ---
 
-### Anthropic Claude (Cloud)
+### Anthropic Claude — Cloud (Windows and macOS)
 
 Claude models produce the highest quality, most detailed descriptions. Requires an internet connection and an Anthropic API key.
+
+**CLI provider name:** `anthropic` · **GUI provider name:** `claude`
 
 **Setup:** Set `ANTHROPIC_API_KEY` in your environment (see [Setting Up API Keys](#setting-up-api-keys)).
 
@@ -1016,9 +1025,11 @@ idt describe ~/Photos --provider anthropic --model claude-opus-4-6 --prompt deta
 
 ---
 
-### OpenAI GPT (Cloud)
+### OpenAI GPT — Cloud (Windows and macOS)
 
 Requires an OpenAI API key. Good for workflows already integrated with OpenAI.
+
+**CLI and GUI provider name:** `openai`
 
 **Setup:** Set `OPENAI_API_KEY` in your environment.
 
@@ -1038,9 +1049,11 @@ idt describe ~/Photos --provider openai --model gpt-4o
 
 ---
 
-### HuggingFace Florence-2 (Local)
+### Florence-2 — Local (Windows and macOS)
 
 Microsoft Florence-2 runs locally via the HuggingFace Transformers library. No API key is required. Quality is lower than Claude or GPT-4o but there is no per-image cost.
+
+**CLI provider name:** `florence` · **GUI provider name:** `huggingface`
 
 **Setup**
 
@@ -1067,9 +1080,31 @@ idt describe ~/Photos --provider florence --model microsoft/Florence-2-large
 
 ---
 
-### Anthropic via AWS Bedrock
+### MLX — Apple Silicon Local (GUI only, macOS)
 
-For enterprise deployments where Claude is accessed through AWS Bedrock. Configure AWS credentials through the standard AWS credential chain (`~/.aws/credentials` or IAM role). Select this provider in the GUI settings dialog.
+MLX runs vision models directly on Apple Silicon (M1/M2/M3/M4) using Apple's Metal GPU via the `mlx-vlm` library. It is the fastest local option on Mac and produces quality comparable to small Ollama models. **MLX is only available in the GUI — it does not appear in the CLI.**
+
+**GUI provider name:** `mlx`
+
+**Setup**
+
+```bash
+pip install mlx-vlm
+```
+
+Models are downloaded automatically on first use from HuggingFace Hub and cached in `~/.cache/huggingface/hub/`.
+
+**Available models (select in GUI; you can also type any HuggingFace MLX repo ID)**
+
+| Model | Size | Notes |
+|---|---|---|
+| `mlx-community/Qwen3-VL-4B-Instruct-4bit` | ~3.1 GB | **Recommended default** — best quality/speed balance |
+| `mlx-community/Qwen3-VL-8B-Instruct-4bit` | ~5.8 GB | Higher quality; 16 GB+ Mac recommended |
+| `mlx-community/Qwen2-VL-2B-Instruct-4bit` | ~1.5 GB | Fastest Qwen option |
+| `mlx-community/gemma-3-4b-it-qat-4bit` | ~2.5 GB | Strong English descriptions |
+| `mlx-community/phi-3.5-vision-instruct-4bit` | ~2.5 GB | Good at text and fine detail |
+| `mlx-community/SmolVLM-Instruct-4bit` | ~0.5 GB | Smallest; very fast, shorter descriptions |
+| `mlx-community/Llama-3.2-11B-Vision-Instruct-4bit` | ~6.5 GB | High quality; 16 GB+ Mac recommended |
 
 ---
 
