@@ -232,7 +232,13 @@ class ProcessingWorker(threading.Thread):
             self._prompt_config_path = Path(prompt_config_path) if prompt_config_path else None
         except Exception:
             self._prompt_config_path = None
-    
+
+        # Result attributes read by BatchProcessingWorker after join()
+        self.result_ok = False
+        self.result_input_tokens = 0
+        self.result_output_tokens = 0
+        self.result_error = None
+
     def run(self):
         """Execute processing in background thread"""
         try:
@@ -313,11 +319,15 @@ class ProcessingWorker(threading.Thread):
                 metadata=metadata
             )
             wx.PostEvent(self.parent_window, evt)
-            
+            self.result_ok = True
+            self.result_input_tokens = metadata.get('input_tokens', 0)
+            self.result_output_tokens = metadata.get('output_tokens', 0)
+
         except Exception as e:
             # Emit failure
             evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e))
             wx.PostEvent(self.parent_window, evt)
+            self.result_error = str(e)
     
     def _post_progress(self, message: str):
         """Post progress update to parent window"""
@@ -618,65 +628,32 @@ class ProcessingWorker(threading.Thread):
             return image_data  # Return original if resize fails
     
     def _extract_metadata(self, image_path: str) -> dict:
-        """Extract EXIF metadata from image file
-        
-        Returns dictionary with metadata sections (datetime, location, camera, technical)
+        """Extract EXIF metadata from image file.
+
+        Returns a flat dict from ImageMetadata.to_dict() — keys like 'city', 'state',
+        'camera_model', 'date_taken', etc.  Geocoding is performed only when
+        self.geocode is True and GPS coordinates are present.
         """
         metadata = {}
         logging.info(f"Extracting metadata from: {image_path}")
-        
         try:
             if not MetadataExtractor:
-                logging.warning("MetadataExtractor not available")
                 return metadata
-            
-            extractor = MetadataExtractor()
-            metadata = extractor.extract_metadata(Path(image_path))
-            
-            # Add geocoding if GPS coordinates are present
-            if NominatimGeocoder and 'location' in metadata:
-                loc = metadata['location']
-                logging.info(f"Found location in metadata: {loc}")
-                # Try geocoding if we have GPS coords (geocoder handles caching internally)
-                if 'latitude' in loc and 'longitude' in loc:
-                    logging.info(f"GPS coords found: lat={loc['latitude']}, lon={loc['longitude']}")
-                    try:
-                        geocoder = self._get_geocoder()
-                        logging.info(f"Got geocoder instance: {geocoder}")
-                        if geocoder:
-                            # Let the geocoder enrich the metadata (it will merge results)
-                            logging.info(f"Calling geocoder.enrich_metadata()...")
-                            metadata = geocoder.enrich_metadata(metadata)
-                            logging.info(f"After geocoding, location = {metadata.get('location', {})}")
-                    except Exception as e:
-                        # Geocoding failed - continue without it
-                        logging.error(f"Geocoding failed for {image_path}: {e}")
-                        import traceback
-                        logging.error(traceback.format_exc())
-                else:
-                    logging.info(f"No lat/lon in location data")
-            elif not NominatimGeocoder:
-                logging.warning(f"NominatimGeocoder not available")
-            elif 'location' not in metadata:
-                logging.info(f"No location key in metadata")
-            
-            # Ensure all metadata is JSON-serializable
-            metadata = self._sanitize_for_json(metadata)
-            
-        except Exception as e:
-            # Metadata extraction failed - return empty
-            logging.error(f"Metadata extraction failed: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-        
-        # Add OSM attribution flag if geocoded data is present
-        if metadata and 'location' in metadata:
-            loc = metadata['location']
-            # Check if geocoded data (city/state/country) is present
-            if loc.get('city') or loc.get('state') or loc.get('country'):
+            meta = MetadataExtractor().extract(Path(image_path))
+            if meta is None:
+                return metadata
+            if self.geocode and NominatimGeocoder and (meta.latitude is not None):
+                try:
+                    geocoder = self._get_geocoder()
+                    if geocoder:
+                        meta = geocoder.enrich(meta)
+                except Exception as e:
+                    logging.error(f"Geocoding failed for {image_path}: {e}")
+            metadata = self._sanitize_for_json(meta.to_dict())
+            if metadata.get('city') or metadata.get('state') or metadata.get('country'):
                 metadata['osm_attribution_required'] = True
-                logging.info("OSM attribution required for geocoded location data")
-        
+        except Exception as e:
+            logging.error(f"Metadata extraction failed: {e}")
         return metadata
     
     def _add_location_byline(self, description: str, metadata: dict) -> str:
@@ -693,15 +670,15 @@ class ProcessingWorker(threading.Thread):
         """
         if not description or not metadata:
             return description
-        
+
+        # Support both the flat ImageMetadata.to_dict() format (new) and the old
+        # nested {'location': {'city': ...}} format that older descriptions may carry.
         location = metadata.get('location', {})
-        if not location:
+        city = metadata.get('city') or location.get('city') or location.get('town')
+        state = metadata.get('state') or location.get('state')
+        country = metadata.get('country') or location.get('country')
+        if not (city or state or country):
             return description
-        
-        # Build location string (matching format from format_image_metadata)
-        city = location.get('city') or location.get('town')
-        state = location.get('state')
-        country = location.get('country')
         
         byline = None
         if city and state:
@@ -792,14 +769,11 @@ class ProcessingWorker(threading.Thread):
                     except ImportError as req_err:
                         logging.error(f"requests module NOT available: {req_err}")
                     
-                    # Use a cache file in the user's temp directory or current directory
-                    cache_path = Path('geocode_cache.json')
-                    user_agent = 'IDT/4.0 (+https://github.com/kellylford/Image-Description-Toolkit)'
+                    cache_path = Path.home() / ".idt" / "geocode_cache.json"
                     logging.info(f"Initializing geocoder with cache: {cache_path}")
                     ProcessingWorker._geocoder_instance = NominatimGeocoder(
-                        user_agent=user_agent,
                         delay_seconds=1.0,
-                        cache_path=cache_path
+                        cache_path=cache_path,
                     )
                     logging.info("Geocoder initialized successfully")
                 except Exception as e:
@@ -1651,7 +1625,8 @@ class BatchProcessingWorker(threading.Thread):
                  skip_existing: bool = False,
                  progress_offset: int = 0,
                  geocode: bool = False,
-                 logs_dir: Optional[Path] = None):
+                 logs_dir: Optional[Path] = None,
+                 video_preamble: Optional[str] = None):
         """Initialize batch worker
 
         Args:
@@ -1680,6 +1655,7 @@ class BatchProcessingWorker(threading.Thread):
         self.progress_offset = progress_offset
         self.geocode = geocode
         self.logs_dir = logs_dir
+        self.video_preamble = video_preamble
 
         # Phase 2: Pause/Resume/Stop controls using threading.Event
         self._stop_event = threading.Event()  # Set = stopped
@@ -1700,12 +1676,15 @@ class BatchProcessingWorker(threading.Thread):
             total = len(self.file_paths)
             completed = 0
             failed = 0
+            start_time = time.time()
 
             if run_log:
                 run_log.info(
                     f"GUI batch run — provider={self.provider}  model={self.model}"
                     f"  prompt={self.prompt_style}  images={total}"
                 )
+                if getattr(self, 'video_preamble', None):
+                    run_log.info(self.video_preamble)
 
             # For MLX: post a "loading" status event immediately so the progress
             # dialog doesn't look frozen during model load / first-time download.
@@ -1745,9 +1724,6 @@ class BatchProcessingWorker(threading.Thread):
                 )
                 wx.PostEvent(self.parent_window, evt)
 
-                if run_log:
-                    run_log.info(f"{i}/{total}  {Path(file_path).name}: processing")
-
                 # Create worker for this image
                 worker = ProcessingWorker(
                     self.parent_window,
@@ -1765,11 +1741,25 @@ class BatchProcessingWorker(threading.Thread):
                 worker.start()
                 worker.join()  # Wait for completion
 
-                # Track completion (events are posted by ProcessingWorker)
+                if run_log:
+                    if worker.result_ok:
+                        in_t = worker.result_input_tokens
+                        out_t = worker.result_output_tokens
+                        token_str = f"  ({in_t} in, {out_t} out)" if (in_t or out_t) else ""
+                        run_log.info(f"{i}/{total}  {Path(file_path).name}: described{token_str}")
+                    else:
+                        err = worker.result_error or "unknown error"
+                        run_log.warning(f"{i}/{total}  {Path(file_path).name}: failed  {err}")
+                        failed += 1
+
                 completed += 1
 
+            elapsed = time.time() - start_time
             if run_log:
-                run_log.info(f"done  completed={completed}  total={total}")
+                run_log.info(
+                    f"done  described={completed - failed}  errors={failed}"
+                    f"  elapsed={elapsed:.1f}s"
+                )
 
             # Post final completion
             evt = WorkflowCompleteEventData(

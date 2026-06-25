@@ -723,6 +723,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Batch video extraction state
         self._batch_video_extraction = False  # Flag for batch video extraction mode
 
+        # Embed-after-process flag: set from ProcessingOptionsDialog each run; checked
+        # in on_worker_complete to embed each image's description as it completes.
+        self._batch_embed = False
+
         # AI Model caching (for faster dialog loading)
         self.cached_ollama_models = None  # Will be populated on first use or manual refresh
 
@@ -844,6 +848,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'default_prompt_style': 'narrative'
             }
             self.config_file = None
+
+    def _persist_processing_options(self, options: dict) -> None:
+        """Merge key processing options back into self.config so they stick for the session."""
+        if 'geocode_enabled' in options:
+            self.config['geocode_enabled'] = options['geocode_enabled']
 
     def get_api_key_for_provider(self, provider: str) -> str:
         """Get API key for a specific provider from config"""
@@ -3298,6 +3307,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logger.info("Dialog OK - getting config")
             options = dialog.get_config()
             dialog.Destroy()
+            self._persist_processing_options(options)
         else:
             # Use defaults
             options = {
@@ -3326,7 +3336,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Mark as processing with provider/model info
         self.processing_items[image_item.file_path] = {
             'provider': options['provider'],
-            'model': options['model']
+            'model': options['model'],
+            'embed_after_process': options.get('embed_after_process', False),
         }
         self.refresh_image_list()
 
@@ -3363,6 +3374,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, "No images in workspace")
             return
         logger.info("CHECKPOINT 1 PASSED: Workspace exists with items")
+
+        # Guard: refuse to start if the directory scan is still running.
+        # On network shares the async scan can take 30–60 s; starting while it is
+        # in-flight means video files that haven't arrived yet are silently skipped.
+        if self.scan_worker is not None:
+            show_warning(
+                self,
+                "Directory scan is still in progress.\n\n"
+                "Please wait for it to finish before processing, otherwise "
+                "video files may be missed."
+            )
+            return
 
         logger.info("CHECKPOINT 2: Checking BatchProcessingWorker availability")
         if not BatchProcessingWorker:
@@ -3434,6 +3457,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logger.info("Getting config from dialog")
             options = dialog.get_config()
             dialog.Destroy()
+            self._persist_processing_options(options)
             logger.info(f"CHECKPOINT 6 PASSED: Dialog completed successfully - options={options}")
         else:
             logger.warning("ProcessingOptionsDialog is None - using defaults")
@@ -3444,6 +3468,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
+
+        # Store embed-after-process flag for on_worker_complete to pick up per image
+        self._batch_embed = options.get('embed_after_process', False)
 
         logger.info("CHECKPOINT 7: Starting to scan workspace items for processing")
         # Pre-flight: warn if an MLX model isn't cached yet (a first-time download can
@@ -3692,6 +3719,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 return
             options = dialog.get_config()
             dialog.Destroy()
+            self._persist_processing_options(options)
         else:
             options = {
                 'provider': self.config.get('default_provider', 'ollama'),
@@ -3699,6 +3727,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 'prompt_style': self.config.get('default_prompt_style', 'narrative'),
                 'custom_prompt': '',
             }
+
+        # Store embed-after-process flag for on_worker_complete to pick up per image
+        self._batch_embed = options.get('embed_after_process', False)
 
         # Mark items as pending
         for idx, file_path in enumerate(to_process):
@@ -3842,6 +3873,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if video_metadata:
                 video_item.video_metadata = video_metadata
 
+        # Accumulate extraction totals for the run log preamble
+        self._extracted_video_total = getattr(self, '_extracted_video_total', 0) + 1
+        self._extracted_frame_total = getattr(self, '_extracted_frame_total', 0) + len(extracted_frames)
+
         # Add extracted frames as items to workspace
         # Sort by timestamp to maintain chronological order
         def get_frame_timestamp(frame_path):
@@ -3877,6 +3912,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._batch_video_extraction = False
         del self._videos_to_extract
         del self._extracted_video_count
+
+        # Persist extracted frames to the bundle immediately so that if the user
+        # pauses and exits before saving, the extraction isn't re-run on resume.
+        self._persist_extracted_frames_to_bundle()
 
         # Refresh UI
         self.refresh_image_list()
@@ -3924,6 +3963,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Calculate progress offset (number of videos already extracted)
         progress_offset = len(self._videos_to_extract) if hasattr(self, '_videos_to_extract') else 0
 
+        # Build run-log preamble summarising the preceding video extraction phase
+        video_preamble = None
+        _vid_count = getattr(self, '_extracted_video_total', 0)
+        _frame_count = getattr(self, '_extracted_frame_total', 0)
+        if _vid_count:
+            video_preamble = (
+                f"Video extraction: {_vid_count} video(s) → {_frame_count} frame(s) extracted"
+            )
+        try:
+            del self._extracted_video_total
+            del self._extracted_frame_total
+        except AttributeError:
+            pass
+
         # Start batch processing worker with offset
         self.batch_worker = BatchProcessingWorker(
             self,
@@ -3938,6 +3991,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             progress_offset=progress_offset,
             geocode=options.get('geocode_enabled', False),
             logs_dir=self._workspace_logs_dir(),
+            video_preamble=video_preamble,
         )
         self.batch_worker.start()
 
@@ -4082,6 +4136,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.workspace.saved = True
             self.cached_ollama_models = self.workspace.cached_ollama_models
 
+            # Seed geocode preference from the workspace so the ProcessingOptionsDialog
+            # defaults match what this workspace was described with.
+            if bundle.geocode_enabled:
+                self.config['geocode_enabled'] = True
+
             self.refresh_image_list()
             self.update_window_title("ImageDescriber", Path(file_path).name)
 
@@ -4115,6 +4174,58 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logger.error(f"Error loading workspace: {e}", exc_info=True)
             show_error(self, f"Error loading workspace:\n{e}")
 
+    def _persist_extracted_frames_to_bundle(self) -> None:
+        """Write extracted frame items and their parent video items to the open bundle.
+
+        Called after batch video extraction completes so that the extraction state
+        survives a pause-and-exit without requiring an explicit File > Save.
+        No-op when no bundle is open.
+        """
+        if not self.workspace_file or not self.workspace or not self.workspace.items:
+            return
+        try:
+            from idt_core.workspace import Workspace, WorkspaceItem
+            from idt_core.gui_bridge import _gui_desc_to_ws
+        except ImportError:
+            return
+        try:
+            ws = Workspace.open(Path(self.workspace_file))
+            for file_path, item in self.workspace.items.items():
+                if item.item_type not in ("video", "extracted_frame"):
+                    continue
+                p = Path(file_path)
+                existing = ws.get_item(p.name)
+                ef = getattr(item, 'extracted_frames', None) or []
+                descs = [_gui_desc_to_ws(d.to_dict()) for d in item.descriptions]
+                if existing is not None:
+                    existing.item_type = item.item_type
+                    existing.parent_video = getattr(item, 'parent_video', None)
+                    existing.descriptions = descs
+                    if descs:
+                        existing.active_description_id = descs[-1].id
+                    if ef:
+                        existing.extra['extracted_frames'] = ef
+                    ws.save_item(existing)
+                else:
+                    wi = WorkspaceItem(
+                        image=p.name,
+                        source_path=str(p),
+                        storage="reference" if item.item_type == "video" else "copy",
+                        item_type=item.item_type,
+                        subfolder=getattr(item, 'subfolder', None),
+                    )
+                    wi.parent_video = getattr(item, 'parent_video', None)
+                    wi.is_missing = getattr(item, 'is_missing', False) or not p.exists()
+                    wi.descriptions = descs
+                    if descs:
+                        wi.active_description_id = descs[-1].id
+                    if ef:
+                        wi.extra['extracted_frames'] = ef
+                    ws.save_item(wi)
+            logger.info("Persisted extracted frame items to bundle")
+        except Exception as exc:
+            logger.warning(f"Could not persist frames to bundle: {exc}")
+
     def on_save_workspace_as(self, event):
         """Save workspace to a new bundle location."""
         self._prompt_and_create_bundle("Save Workspace As")
@@ -4143,6 +4254,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             ws.batch_state = self.workspace.batch_state
             ws.cached_ollama_models = self.cached_ollama_models
             ws.modified = self.workspace.modified
+
+            # Reflect whether any item in the workspace has a description.
+            ws.has_any_descriptions = any(
+                item.descriptions
+                for item in self.workspace.items.values()
+                if not getattr(item, 'file_path', '').startswith("chat:")
+            )
+
+            # Keep manifest defaults in sync with what was actually used in the
+            # most recent batch run (stored in batch_state).
+            batch_state = self.workspace.batch_state
+            if batch_state and batch_state.get("provider"):
+                try:
+                    from idt_core.workspace import WorkspaceDefaults
+                    ws.defaults = WorkspaceDefaults(
+                        provider=batch_state.get("provider", ws.defaults.provider),
+                        model=batch_state.get("model", ws.defaults.model),
+                        prompt_name=batch_state.get("prompt_style", ws.defaults.prompt_name),
+                    )
+                except Exception:
+                    pass
+
             ws.save_manifest()
 
             for file_path, gui_item in (self.workspace.to_dict().get("items") or {}).items():
@@ -4159,6 +4292,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 descs = [_gui_desc_to_ws(d) for d in gui_item.get("descriptions", [])]
 
                 if existing is not None:
+                    existing.item_type = gui_item.get("item_type", existing.item_type)
+                    existing.parent_video = gui_item.get("parent_video", existing.parent_video)
                     existing.descriptions = descs
                     if existing.descriptions:
                         existing.active_description_id = existing.descriptions[-1].id
@@ -4425,14 +4560,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         idt_item = IdtImageItem(source_path=src, sidecar_path=sidecar)
 
                     # Map GUI descriptions → idt_core Description objects
+                    import uuid as _uuid
                     for gui_desc in gui_item.descriptions:
                         tu = gui_desc.token_usage or {}
                         idt_desc = IdtDescription(
+                            id=str(_uuid.uuid4()),
                             text=gui_desc.text,
                             provider=gui_desc.provider or "",
                             model=gui_desc.model or "",
-                            timestamp=gui_desc.created or "",
+                            timestamp=gui_desc.created or datetime.now().isoformat(),
                             prompt_name=gui_desc.prompt_style or "",
+                            prompt_text=gui_desc.custom_prompt or "",
                             input_tokens=tu.get("prompt_tokens") or tu.get("input_tokens"),
                             output_tokens=tu.get("completion_tokens") or tu.get("output_tokens"),
                             metadata_context=gui_desc.metadata.get("prompt_context") if gui_desc.metadata else None,
@@ -4467,7 +4605,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         described_items = [
             item for item in self.workspace.items.values()
-            if item.descriptions
+            if item.descriptions and item.item_type != ImageItem.ITEM_TYPE_CHAT
         ]
         if not described_items:
             show_warning(self, "No described images found. Process your images first.")
@@ -4492,45 +4630,77 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             dlg.Destroy()
             return
 
-        mode = dlg.get_mode()          # 'copy' or 'inplace'
-        output_dir = dlg.get_output_dir()  # Path or None
+        mode = dlg.get_mode()                        # 'copy' or 'inplace'
+        output_dir = dlg.get_output_dir()            # Path or None
+        desc_selection = dlg.get_description_selection()  # 'latest' or 'all'
         dlg.Destroy()
 
         try:
-            from embed_descriptions import EmbedDescriptions
+            from idt_core.embedder import embed_image_file
         except ImportError:
-            show_error(self, "embed_descriptions module is not available.")
+            show_error(self, "idt_core.embedder is not available.\nCannot embed descriptions.")
             return
 
         in_place = (mode == 'inplace')
+        embedded = 0
+        errors = []
 
         try:
             with wx.BusyCursor():
-                workspace_data = self.workspace.to_dict()
-                embedder = EmbedDescriptions()
-                result = embedder.embed_from_workspace(
-                    workspace_data,
-                    output_dir=output_dir,
-                    in_place=in_place,
-                    source_root=source_root,
-                )
+                for item in described_items:
+                    source = Path(item.file_path)
+                    if not source.exists():
+                        errors.append(f"File not found: {source.name}")
+                        continue
+
+                    # Pick which description text to embed
+                    if desc_selection == 'all':
+                        desc_text = '\n\n---\n\n'.join(
+                            d.text for d in item.descriptions if d.text
+                        )
+                    else:  # 'latest'
+                        desc_text = item.descriptions[-1].text
+
+                    if not desc_text:
+                        continue
+
+                    # Determine destination path
+                    if in_place:
+                        dest = source
+                    else:
+                        if source_root:
+                            try:
+                                rel = source.relative_to(source_root)
+                            except ValueError:
+                                rel = Path(source.name)
+                        else:
+                            rel = Path(source.name)
+                        dest = output_dir / rel
+
+                    try:
+                        embed_image_file(source, desc_text, dest)
+                        embedded += 1
+                    except Exception as exc:
+                        errors.append(f"{source.name}: {exc}")
         except Exception as e:
             show_error(self, f"Error embedding descriptions:\n{e}")
             return
 
-        summary_lines = [result.summary()]
+        parts = [f"Embedded: {embedded} image(s)"]
+        if errors:
+            parts.append(f"Errors: {len(errors)}")
+        summary_lines = [', '.join(parts)]
         if output_dir and not in_place:
             summary_lines.append(f"\nOutput folder:\n{output_dir}")
-
-        if result.errors:
+        if errors:
             summary_lines.append("\nErrors:")
-            summary_lines.extend(f"  {err}" for err in result.errors[:5])
-            if len(result.errors) > 5:
-                summary_lines.append(f"  ...and {len(result.errors) - 5} more")
+            summary_lines.extend(f"  {err}" for err in errors[:5])
+            if len(errors) > 5:
+                summary_lines.append(f"  ...and {len(errors) - 5} more")
 
         msg = '\n'.join(summary_lines)
 
-        if result.embedded > 0 and output_dir and not in_place:
+        if embedded > 0 and output_dir and not in_place:
             answer = wx.MessageBox(
                 msg + "\n\nOpen output folder?",
                 "Embed Complete",
@@ -4550,6 +4720,43 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     pass
         else:
             show_info(self, msg)
+
+    def _embed_single_description(self, image_item, desc) -> None:
+        """Copy image to workspace embedded/ folder and write description into metadata.
+
+        Called automatically after a single image or batch image is processed when the
+        user checked "Embed description after processing" in ProcessingOptionsDialog.
+        Originals are never touched. Silently skips if no workspace bundle is open or
+        if idt_core is unavailable.
+        """
+        if not self.workspace_file:
+            return  # No bundle open — nowhere to put the embedded copy
+
+        try:
+            from idt_core.embedder import embed_image_file
+        except ImportError:
+            return  # idt_core not available (frozen build without embedder)
+
+        source = Path(image_item.file_path)
+        if not source.exists():
+            return
+
+        embed_dir = Path(self.workspace_file) / "embedded"
+
+        # Mirror the relative path from bundle/images/ if possible; else use filename only
+        bundle_images = Path(self.workspace_file) / "images"
+        try:
+            rel = source.relative_to(bundle_images)
+        except ValueError:
+            rel = Path(source.name)
+
+        dest = embed_dir / rel
+
+        try:
+            embed_image_file(source, desc.text, dest)
+            logger.debug(f"Embedded description into {dest.name}")
+        except Exception as exc:
+            logger.warning(f"Embed after process failed for {source.name}: {exc}")
 
     def on_export_html_gallery(self, event):
         """Export described images as a self-contained HTML gallery folder."""
@@ -4929,8 +5136,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if event.current % 10 == 0:
                 logger.info(f"Progress: {event.current}/{event.total} ({progress_percent}%) - {Path(event.file_path).name}")
 
-            # Mark current image being processed with "P"
-            self.processing_items[event.file_path] = {'provider': '', 'model': ''}
+            # Mark current image being processed with "P"; preserve any existing
+            # metadata (e.g., embed_after_process from _on_process_single_impl).
+            existing = self.processing_items.get(event.file_path, {})
+            self.processing_items[event.file_path] = {**existing, 'provider': '', 'model': ''}
 
             # Throttle list redraws: rebuilding a large list on every event causes
             # visible lag at scale. We refresh immediately on the first image (gives
@@ -4988,8 +5197,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_worker_complete(self, event):
         """Handle successful processing completion"""
-        # Remove from processing items
-        self.processing_items.pop(event.file_path, None)
+        # Remove from processing items; keep options for embed decision below
+        proc_info = self.processing_items.pop(event.file_path, {})
 
         # Find the image item and add description
         if event.file_path in self.workspace.items:
@@ -5021,6 +5230,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 response_id=metadata.get('response_id', '')
             )
             image_item.add_description(desc)
+
+            # Embed description into workspace embedded/ folder if requested.
+            # Single-image path: embed_after_process stored in proc_info.
+            # Batch path: _batch_embed flag set when the batch worker started.
+            if proc_info.get('embed_after_process', False) or self._batch_embed:
+                self._embed_single_description(image_item, desc)
 
             # Track last completed for progress dialog (with safe error handling)
             try:
@@ -5326,6 +5541,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         self.SetStatusText("Batch complete", 0)
         self._batch_active = False
+        self._batch_embed = False
         self.refresh_image_list()
 
     def on_workflow_failed(self, event):
@@ -5978,6 +6194,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             options = dialog.get_config()
             dialog.Destroy()
+            self._persist_processing_options(options)
         else:
             # Use defaults
             options = {
@@ -6124,6 +6341,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         options = dialog.get_config()
         dialog.Destroy()
+        self._persist_processing_options(options)
 
         # Start batch processing for frames
         # Use already-resolved self.config_file so we read custom prompts from AppData.
