@@ -3591,6 +3591,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         videos_to_extract = videos_to_extract or []
 
+        # Require a saved workspace before processing — ensures results land in
+        # ~/Documents/idt rather than auto-saving next to the source images.
+        if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
+            self.Raise()
+            result = wx.MessageBox(
+                "Before processing, please choose where to save the workspace bundle.\n\n"
+                "A .idtw workspace bundle will be created in ~/Documents/idt so that "
+                "both ImageDescriber and the idt CLI can share the same results.\n\n"
+                "Continue?",
+                "Save Workspace Bundle",
+                wx.YES_NO | wx.ICON_QUESTION,
+                self
+            )
+            if result != wx.YES:
+                return
+            if not self._prompt_and_create_bundle("Save Workspace Bundle"):
+                return
+
         # Confirm folder batch before showing options — prevents accidental mass-processing
         n_images = len(to_process)
         n_videos = len(videos_to_extract)
@@ -4453,7 +4471,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             proposed_name = source.name
         # Always default to ~/Documents/idt, never the source folder's parent
         # (source may be a read-only network share).
-        default_parent = str(get_default_workspaces_root())
+        workspace_root = get_default_workspaces_root()
+        # Must exist before DirDialog opens — on Windows, wx.DirDialog ignores
+        # defaultPath if the directory doesn't exist yet, falling back to the
+        # last-visited location (often the network share the source images are on).
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        default_parent = str(workspace_root)
 
         dir_dlg = wx.DirDialog(
             self, f"{title} — choose the folder to create the bundle inside",
