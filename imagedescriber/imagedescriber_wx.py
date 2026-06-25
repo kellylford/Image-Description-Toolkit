@@ -3375,16 +3375,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
         logger.info("CHECKPOINT 1 PASSED: Workspace exists with items")
 
-        # Guard: refuse to start if the directory scan is still running.
+        # Guard: if the directory scan is still running, queue this request and
+        # let on_scan_complete fire it automatically once all files are known.
         # On network shares the async scan can take 30–60 s; starting while it is
         # in-flight means video files that haven't arrived yet are silently skipped.
         if self.scan_worker is not None:
-            show_warning(
-                self,
-                "Directory scan is still in progress.\n\n"
-                "Please wait for it to finish before processing, otherwise "
-                "video files may be missed."
+            self._pending_process_all = True
+            self._pending_process_all_skip_existing = skip_existing
+            self.SetStatusText(
+                "Scan in progress — processing will start automatically when complete", 0
             )
+            logger.info("on_process_all deferred: scan still running, will auto-resume on scan_complete")
             return
 
         logger.info("CHECKPOINT 2: Checking BatchProcessingWorker availability")
@@ -5640,13 +5641,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         logger.info(f"Directory scan complete: {total_files} files in {elapsed:.2f}s")
 
+        # If the user clicked Process All while the scan was still running,
+        # fire it now that we have the complete file list.
+        if getattr(self, '_pending_process_all', False):
+            self._pending_process_all = False
+            skip_existing = getattr(self, '_pending_process_all_skip_existing', True)
+            logger.info("Scan complete — resuming deferred on_process_all")
+            wx.CallAfter(self.on_process_all, None, skip_existing)
+
     def on_scan_failed(self, event):
         """Handle directory scan failure"""
         show_error(self, f"Error scanning directory:\n{event.error}")
         self.SetStatusText("Directory scan failed", 0)
 
-        # Clear scan worker reference
+        # Clear scan worker reference and any deferred process request
         self.scan_worker = None
+        self._pending_process_all = False
 
 
     # ------------------------------------------------------------------
