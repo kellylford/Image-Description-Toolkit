@@ -66,7 +66,7 @@ Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber\imagedescriber.e
 Name: "{group}\Viewer"; Filename: "{app}\Viewer\viewer.exe"; WorkingDir: "{app}\Viewer"
 Name: "{group}\Prompt Editor"; Filename: "{app}\PromptEditor\prompteditor.exe"; WorkingDir: "{app}\PromptEditor"
 Name: "{group}\Configure"; Filename: "{app}\IDTConfigure\idtconfigure.exe"; WorkingDir: "{app}\IDTConfigure"
-Name: "{group}\Documentation"; Filename: "{app}\docs"
+Name: "{group}\Documentation"; Filename: "https://kellylford.github.io/Image-Description-Toolkit/user-guide.html"; Flags: shellexec
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber\imagedescriber.exe"; WorkingDir: "{app}\ImageDescriber"; Tasks: desktopicon
@@ -180,4 +180,4 @@ end;
 Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent
 Filename: "{app}\ImageDescriber\imagedescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent unchecked
 Filename: "https://ollama.com"; Description: "Open Ollama website to download (if not installed)"; Flags: shellexec postinstall skipifsilent unchecked
-Filename: "{app}\docs"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked
+Filename: "https://kellylford.github.io/Image-Description-Toolkit/user-guide.html"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked

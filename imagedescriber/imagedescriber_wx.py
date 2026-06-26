@@ -7798,7 +7798,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_user_guide(self, event):
         """Open user guide in web browser"""
-        user_guide_url = "https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE_V4.md"
+        user_guide_url = "https://kellylford.github.io/Image-Description-Toolkit/user-guide.html"
         try:
             webbrowser.open(user_guide_url)
         except Exception as e:
