@@ -270,6 +270,63 @@ class TestConfig:
         cfg = UserConfig()
         assert cfg.get_prompt_text("does_not_exist") is None
 
+    def test_workspace_root_path_default_is_documents_idt(self):
+        from idt_core.config import UserConfig
+        from pathlib import Path
+        cfg = UserConfig()
+        expected = Path.home() / "Documents" / "idt"
+        assert cfg.workspace_root_path() == expected
+
+    def test_workspace_root_path_respects_custom_value(self, tmp_path):
+        from idt_core.config import UserConfig
+        cfg = UserConfig()
+        cfg.workspace_root = str(tmp_path / "my_workspaces")
+        assert cfg.workspace_root_path() == (tmp_path / "my_workspaces").resolve()
+
+    def test_workspace_root_path_expands_tilde(self):
+        from idt_core.config import UserConfig
+        from pathlib import Path
+        cfg = UserConfig()
+        cfg.workspace_root = "~/my_idt"
+        assert cfg.workspace_root_path() == (Path.home() / "my_idt").resolve()
+
+    def test_workspace_root_path_none_resets_to_default(self):
+        from idt_core.config import UserConfig
+        from pathlib import Path
+        cfg = UserConfig()
+        cfg.workspace_root = "/some/custom/path"
+        cfg.workspace_root = None
+        assert cfg.workspace_root_path() == Path.home() / "Documents" / "idt"
+
+    def test_save_and_load_workspace_root(self, tmp_path):
+        from idt_core.config import UserConfig
+        import idt_core.config as cfg_module
+        original = cfg_module._CONFIG_FILE
+        cfg_module._CONFIG_FILE = tmp_path / "config.json"
+        try:
+            cfg = UserConfig()
+            cfg.workspace_root = str(tmp_path / "custom_ws")
+            cfg.save()
+            loaded = UserConfig.load()
+            assert loaded.workspace_root == str(tmp_path / "custom_ws")
+        finally:
+            cfg_module._CONFIG_FILE = original
+
+    def test_save_omits_workspace_root_when_none(self, tmp_path):
+        from idt_core.config import UserConfig
+        import idt_core.config as cfg_module
+        original = cfg_module._CONFIG_FILE
+        cfg_module._CONFIG_FILE = tmp_path / "config.json"
+        try:
+            cfg = UserConfig()
+            cfg.workspace_root = None
+            cfg.save()
+            import json
+            data = json.loads((tmp_path / "config.json").read_text())
+            assert "workspace_root" not in data
+        finally:
+            cfg_module._CONFIG_FILE = original
+
 
 # ------------------------------------------------------------------ #
 # Pipeline tests (mock provider)                                       #

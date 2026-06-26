@@ -13,6 +13,9 @@ from idt_core.providers.base import DescriptionResult
 
 class FakeProvider:
     """Returns a deterministic description; records how many times it was called."""
+    provider_name = "fake"
+    model_name = "fake-1"
+
     def __init__(self):
         self.calls = 0
 

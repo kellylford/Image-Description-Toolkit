@@ -14,15 +14,17 @@ from datetime import datetime
 
 def get_default_workspaces_root() -> Path:
     """Return platform-appropriate default directory for suggesting bundle locations."""
-    if sys.platform == 'win32':
-        return Path.home() / "Documents" / "ImageDescriptionToolkit"
-    elif sys.platform == 'darwin':
-        return Path.home() / "Documents" / "ImageDescriptionToolkit"
-    else:
-        docs = Path.home() / "Documents"
-        if docs.exists():
-            return docs / "ImageDescriptionToolkit"
-        return Path.home() / ".local" / "share" / "IDT"
+    try:
+        from idt_core.config import UserConfig
+        return UserConfig.load().workspace_root_path()
+    except Exception:
+        pass
+    if sys.platform in ('win32', 'darwin'):
+        return Path.home() / "Documents" / "idt"
+    docs = Path.home() / "Documents"
+    if docs.exists():
+        return docs / "idt"
+    return Path.home() / ".local" / "share" / "idt"
 
 
 def get_next_untitled_name(workspace_root: Optional[Path] = None) -> str:

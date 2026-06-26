@@ -765,6 +765,10 @@ class ConfigureDialog(wx.Dialog):
             tab_panel = self.create_category_tab(self.notebook, category)
             self.notebook.AddPage(tab_panel, category)
         
+        # Add Workspace tab
+        workspace_tab = self.create_workspace_tab(self.notebook)
+        self.notebook.AddPage(workspace_tab, "Workspace")
+
         # Add special API Keys tab
         api_keys_tab = self.create_api_keys_tab(self.notebook)
         self.notebook.AddPage(api_keys_tab, "API Keys")
@@ -1128,10 +1132,13 @@ class ConfigureDialog(wx.Dialog):
                 path = self.config_files[name]
                 with open(path, 'w', encoding='utf-8') as f:
                     json.dump(config, f, indent=2)
-            
+
             # Reload API keys in providers after saving
             self._reload_provider_api_keys()
-            
+
+            # Save workspace root to ~/.idt/config.json
+            self._save_workspace_config()
+
             return True
         except Exception as e:
             show_error(self, f"Error saving configurations:\n{str(e)}")
@@ -1202,6 +1209,114 @@ class ConfigureDialog(wx.Dialog):
         else:
             self.Destroy()
     
+    def create_workspace_tab(self, parent) -> wx.Panel:
+        """Create the Workspace settings tab for configuring the default bundle save location."""
+        panel = wx.Panel(parent)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        try:
+            from idt_core.config import UserConfig
+            cfg = UserConfig.load()
+            self._workspace_initial_custom = cfg.workspace_root or ""
+            default_display = str(cfg.workspace_root_path())
+        except Exception:
+            self._workspace_initial_custom = ""
+            default_display = str(Path.home() / "Documents" / "idt")
+
+        desc = wx.StaticText(
+            panel,
+            label="Default location where workspace bundles (.idtw files) are saved "
+                  "when you run a batch without opening an existing workspace.\n\n"
+                  "Leave blank to use the built-in default: ~/Documents/idt"
+        )
+        desc.Wrap(580)
+        sizer.Add(desc, 0, wx.ALL, 10)
+
+        # Read-only display of the resolved path
+        sizer.Add(wx.StaticText(panel, label="Resolved default location:"), 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        self.workspace_current_text = wx.TextCtrl(
+            panel, value=default_display,
+            style=wx.TE_READONLY,
+            name="Resolved workspace location"
+        )
+        sizer.Add(self.workspace_current_text, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        # Editable custom path
+        sizer.Add(wx.StaticText(panel, label="Custom location (leave blank to use default):"), 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        path_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.workspace_path_text = wx.TextCtrl(
+            panel, value=self._workspace_initial_custom,
+            name="Custom workspace location"
+        )
+        self.workspace_path_text.Bind(wx.EVT_TEXT, lambda e: self._update_workspace_display())
+        path_sizer.Add(self.workspace_path_text, 1, wx.EXPAND | wx.RIGHT, 5)
+        browse_btn = wx.Button(panel, label="Browse...")
+        browse_btn.Bind(wx.EVT_BUTTON, self._on_workspace_browse)
+        path_sizer.Add(browse_btn, 0)
+        sizer.Add(path_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        reset_btn = wx.Button(panel, label="Reset to Default")
+        reset_btn.Bind(wx.EVT_BUTTON, self._on_workspace_reset)
+        sizer.Add(reset_btn, 0, wx.LEFT | wx.BOTTOM, 10)
+
+        help_text = wx.StaticText(
+            panel,
+            label="This setting is shared with the idt command-line tool and stored in "
+                  "~/.idt/config.json. You can also change it from the terminal with:\n"
+                  "    idt config --set workspace_root=<path>\n"
+                  "    idt config --set workspace_root=   (to reset to default)"
+        )
+        help_text.SetForegroundColour(wx.Colour(100, 100, 100))
+        help_text.Wrap(580)
+        sizer.Add(help_text, 0, wx.ALL, 10)
+
+        panel.SetSizer(sizer)
+        return panel
+
+    def _on_workspace_browse(self, event):
+        """Open a directory picker for the workspace root."""
+        current = self.workspace_path_text.GetValue().strip()
+        default_path = current if current else str(Path.home() / "Documents")
+        dlg = wx.DirDialog(
+            self, "Choose default workspace location",
+            defaultPath=default_path,
+            style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            self.workspace_path_text.SetValue(dlg.GetPath())
+        dlg.Destroy()
+
+    def _on_workspace_reset(self, event):
+        """Clear the custom workspace root, reverting to ~/Documents/idt."""
+        self.workspace_path_text.SetValue("")
+
+    def _update_workspace_display(self):
+        """Keep the resolved-path display in sync as the user types."""
+        if not hasattr(self, 'workspace_current_text'):
+            return
+        try:
+            from idt_core.config import UserConfig
+            custom = self.workspace_path_text.GetValue().strip()
+            cfg = UserConfig()
+            cfg.workspace_root = custom or None
+            self.workspace_current_text.SetValue(str(cfg.workspace_root_path()))
+        except Exception:
+            pass
+
+    def _save_workspace_config(self):
+        """Persist the workspace root to ~/.idt/config.json via UserConfig."""
+        if not hasattr(self, 'workspace_path_text'):
+            return
+        try:
+            from idt_core.config import UserConfig
+            cfg = UserConfig.load()
+            custom = self.workspace_path_text.GetValue().strip()
+            cfg.workspace_root = custom or None
+            cfg.save()
+            logger.info("Workspace root saved: %s", cfg.workspace_root_path())
+        except Exception as e:
+            logger.warning("Failed to save workspace config: %s", e)
+
     def create_api_keys_tab(self, parent) -> wx.Panel:
         """Create the API Keys management tab"""
         panel = wx.Panel(parent)

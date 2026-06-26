@@ -4278,7 +4278,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
 
         source = Path(self.workspace.directory_paths[0])
-        bundle_path = source.parent / (source.name + ".idtw")
+        workspace_root = get_default_workspaces_root()
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        bundle_path = workspace_root / (source.name + ".idtw")
         try:
             bundle = gui_workspace_to_bundle(
                 self.workspace.to_dict(), bundle_path, copy_images=False
@@ -4307,9 +4309,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.workspace and self.workspace.directory_paths:
             source = Path(self.workspace.directory_paths[0])
             proposed_name = source.name
-            default_parent = str(source.parent)
-        else:
-            default_parent = str(get_default_workspaces_root())
+        default_parent = str(get_default_workspaces_root())
 
         dir_dlg = wx.DirDialog(
             self, f"{title} — choose the folder to create the bundle inside",

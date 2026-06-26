@@ -1577,8 +1577,10 @@ Supported providers:
             "Describe images in a directory. Creates a self-contained .idtw "
             "workspace bundle that holds copies of the images and their "
             "descriptions. Your original files are never modified. By default "
-            "the bundle is named '<folder>.idtw' next to the source folder; use "
-            "--workspace to choose a different name or location."
+            "the bundle is saved under ~/Documents/idt/ using the source "
+            "folder name (e.g. ~/Documents/idt/Vacation.idtw). Use --workspace "
+            "to choose a different name or location, or set a persistent default "
+            "with: idt config --set workspace_root=<path>"
         ),
     )
     p_desc.add_argument(

@@ -3,6 +3,13 @@
 **Version:** 3.5.0  
 **Last Updated:** November 1, 2025
 
+> **Note:** This guide describes the **legacy workflow configuration files** (`workflow_config.json`, `image_describer_config.json`, `video_frame_extractor_config.json`) that control the `idt workflow` command and the ImageDescriber GUI processing settings. It does **not** cover the workspace root default save location, which is configured separately:
+>
+> - **Default save location:** `~/Documents/idt/` on all platforms
+> - **CLI:** `idt config --set workspace_root=<path>` (persists to `~/.idt/config.json`)
+> - **GUI:** Configure dialog → **Workspace** tab → Custom location field
+> - **Per-run CLI override:** `idt describe <folder> --workspace <name|path>`
+
 This guide explains how to configure and customize the Image Description Toolkit (IDT) using configuration files with the frozen/built version (`idt.exe`). It covers all three configuration file types, their settings, and how to use custom configurations across all IDT tools.
 
 ---

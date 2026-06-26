@@ -20,23 +20,19 @@ class TestFormatStringSafety:
     @pytest.mark.regression
     def test_camera_make_with_format_chars_safe(self):
         """Test that camera make/model with {} characters doesn't break formatting."""
-        # This was the actual bug reported by the user
-        mock_exif = {
-            'Make': 'Camera{0}Brand',  # Malicious or accidental format string
-            'Model': 'Model{1}Name'
+        from idt_core.metadata import ImageMetadata
+        exif = {
+            'Make': 'Camera{0}Brand',
+            'Model': 'Model{1}Name',
         }
-        
-        extractor = MetadataExtractor()
-        # Use public extraction API and ensure values are preserved literally
-        camera = extractor._extract_camera_info(mock_exif)
-        assert camera is not None, "Camera info should be extracted"
-        assert camera.get('make') == 'Camera{0}Brand'
-        assert camera.get('model') == 'Model{1}Name'
-        
-        # Ensure downstream formatting (meta suffix) does not crash
-        meta = {'datetime_str': '1/1/2025 1:00P', 'camera': camera}
-        suffix = extractor.build_meta_suffix(Path('x.jpg'), meta)
-        assert isinstance(suffix, str)
+        meta = ImageMetadata()
+        MetadataExtractor()._fill_camera(meta, exif)
+        assert meta.camera_make == 'Camera{0}Brand'
+        assert meta.camera_model == 'Model{1}Name'
+        # prompt_context must not raise when values contain format-string characters
+        context = meta.prompt_context()
+        assert isinstance(context, str)
+        assert 'Camera{0}Brand' in context or 'Model{1}Name' in context
     
     @pytest.mark.regression  
     def test_location_prefix_with_format_chars_safe(self):
@@ -59,38 +55,20 @@ class TestFormatStringSafety:
                 pytest.fail(f"Location text '{city}, {state}' caused error: {e}")
     
     def test_metadata_formatting_uses_concatenation(self):
-        """Verify that metadata formatting uses safe concatenation."""
-        # Check that image_describer.py uses concatenation, not format()
-        image_describer_path = Path(__file__).parent.parent.parent / "scripts" / "image_describer.py"
-        
-        with open(image_describer_path, 'r', encoding='utf-8') as f:
-            source = f.read()
-        
-        # Look for the metadata formatting section
-        # Should find safe concatenation patterns, not .format() with user data
-        lines = source.split('\n')
-        
-        # Find where metadata is formatted
-        metadata_section = []
-        in_metadata_format = False
-        
-        for line in lines:
-            if 'def _format_metadata_line' in line or '_format_location_prefix' in line:
-                in_metadata_format = True
-            
-            if in_metadata_format:
-                metadata_section.append(line)
-                
-                if line.strip() and not line.strip().startswith('#') and \
-                   line.strip() != '' and 'return' in line:
-                    in_metadata_format = False
-        
-        metadata_code = '\n'.join(metadata_section)
-        
-        # Should use + concatenation, not .format() or f-strings with external data
-        # This is a heuristic check - not perfect but catches obvious issues
-        if 'camera_info.format(' in metadata_code or 'location.format(' in metadata_code:
-            pytest.fail("Metadata formatting should not use .format() with user data")
+        """Verify that prompt_context() is safe when metadata values contain format-string chars."""
+        from idt_core.metadata import ImageMetadata
+        # Values with format-string markers that would crash str.format() or % formatting
+        meta = ImageMetadata(
+            city="City{0}",
+            state="State{1}",
+            date_short="Jan{2} 2025",
+            camera_model="Model{name}",
+        )
+        # Must not raise KeyError / IndexError even with format-string characters
+        context = meta.prompt_context()
+        assert isinstance(context, str)
+        assert "City{0}" in context
+        assert "State{1}" in context
 
 
 class TestMetadataExtraction:
@@ -98,29 +76,22 @@ class TestMetadataExtraction:
     
     def test_gps_coordinates_extracted(self):
         """Test that GPS coordinates are properly extracted."""
-        mock_exif = {
-            'GPSLatitude': ((28, 1), (6, 1), (2, 100)),
-            'GPSLatitudeRef': 'N',
-            'GPSLongitude': ((80, 1), (34, 1), (5, 100)),
-            'GPSLongitudeRef': 'W'
-        }
-        
-        extractor = MetadataExtractor()
-        exif_dict = {
+        from idt_core.metadata import ImageMetadata
+        exif = {
             'GPSInfo': {
-                'GPSLatitude': mock_exif['GPSLatitude'],
-                'GPSLatitudeRef': mock_exif['GPSLatitudeRef'],
-                'GPSLongitude': mock_exif['GPSLongitude'],
-                'GPSLongitudeRef': mock_exif['GPSLongitudeRef'],
+                'GPSLatitude': ((28, 1), (6, 1), (2, 100)),
+                'GPSLatitudeRef': 'N',
+                'GPSLongitude': ((80, 1), (34, 1), (5, 100)),
+                'GPSLongitudeRef': 'W',
             }
         }
-        loc = extractor._extract_location(exif_dict)
-        assert loc is not None and 'latitude' in loc and 'longitude' in loc
-        lat = loc['latitude']
-        lon = loc['longitude']
+        meta = ImageMetadata()
+        MetadataExtractor()._fill_location(meta, exif)
+        assert meta.latitude is not None
+        assert meta.longitude is not None
         # Should be approximately 28.1006, -80.5681
-        assert 28.0 < lat < 28.2, f"Latitude {lat} should be ~28.1"
-        assert -80.6 < lon < -80.5, f"Longitude {lon} should be ~-80.57"
+        assert 28.0 < meta.latitude < 28.2, f"Latitude {meta.latitude} should be ~28.1"
+        assert -80.6 < meta.longitude < -80.5, f"Longitude {meta.longitude} should be ~-80.57"
     
     def test_date_formatting_windows_safe(self):
         """Test that date formatting works on Windows (no %-formatting)."""
