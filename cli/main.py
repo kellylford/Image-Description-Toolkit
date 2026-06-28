@@ -1059,14 +1059,16 @@ def _do_embed_workspace(ws, force: bool, dry_run: bool, quiet: bool) -> None:
             continue
         try:
             src = ws.image_path(item)
-            dst = out_dir / item.image
-            # HEIC can't carry JPEG-style metadata — use the converted JPEG copy
-            # instead (already in derived/converted/ from the describe run).
+            orig_name = Path(item.source_path).name if item.source_path else item.image
+            sub = item.subfolder
             if is_heic(src):
                 converted = ws.derived_dir("converted") / Path(item.image).with_suffix(".jpg").name
                 if converted.exists():
                     src = converted
-                dst = dst.with_suffix(".jpg")
+                out_name = Path(orig_name).stem + ".jpg"
+            else:
+                out_name = orig_name
+            dst = out_dir / sub / out_name if (sub and sub not in (".", "")) else out_dir / out_name
             embed_image_file(src, desc.text, dst)
             item.embedded_at = datetime.now(timezone.utc).isoformat()
             ws.save_item(item)

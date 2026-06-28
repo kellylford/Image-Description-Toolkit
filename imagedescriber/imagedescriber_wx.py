@@ -4647,15 +4647,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         default_embed_dir = (
             Path(self.workspace_file) / "embedded" if self.workspace_file else None
         )
-        # Source root for mirroring subfolder structure.
-        source_root = None
-        if self.workspace_file:
-            bundle_images = Path(self.workspace_file) / "images"
-            if bundle_images.exists():
-                source_root = bundle_images
-            elif self.workspace and self.workspace.directory_paths:
-                source_root = Path(self.workspace.directory_paths[0])
-
         dlg = EmbedDescriptionsDialog(self, len(described_items),
                                       default_output_dir=default_embed_dir)
         if dlg.ShowModal() != wx.ID_OK:
@@ -4700,13 +4691,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if in_place:
                         dest = source
                     else:
-                        if source_root:
-                            try:
-                                rel = source.relative_to(source_root)
-                            except ValueError:
-                                rel = Path(source.name)
-                        else:
-                            rel = Path(source.name)
+                        sub = item.subfolder
+                        rel = Path(sub) / source.name if (sub and sub not in (".", "")) else Path(source.name)
                         dest = output_dir / rel
 
                     try:
@@ -4775,13 +4761,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         embed_dir = Path(self.workspace_file) / "embedded"
 
-        # Mirror the relative path from bundle/images/ if possible; else use filename only
-        bundle_images = Path(self.workspace_file) / "images"
-        try:
-            rel = source.relative_to(bundle_images)
-        except ValueError:
-            rel = Path(source.name)
-
+        sub = image_item.subfolder
+        rel = Path(sub) / source.name if (sub and sub not in (".", "")) else Path(source.name)
         dest = embed_dir / rel
 
         try:
