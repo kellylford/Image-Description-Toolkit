@@ -394,7 +394,7 @@ class Workspace:
         idx: dict = {}
         for item in self.items():
             if item.source_path:
-                idx[item.source_path] = item.image
+                idx[item.source_path] = (item.image, item.subfolder)
         return idx
 
     def _bundle_name_for(self, source_path: Path, subfolder: Optional[str]) -> str:
@@ -427,7 +427,8 @@ class Workspace:
 
         existing = self._source_index.get(str(source_path))
         if existing:
-            return self.get_item(existing)
+            image_name, sub = existing
+            return self.get_item(image_name, sub)
 
         self.images_dir.mkdir(parents=True, exist_ok=True)
         bundle_name = self._bundle_name_for(source_path, subfolder)
@@ -441,7 +442,7 @@ class Workspace:
             subfolder=subfolder,
         )
         self.save_item(item)
-        self._source_index[str(source_path)] = bundle_name
+        self._source_index[str(source_path)] = (bundle_name, subfolder)
         return item
 
     def add_source_folder(self, folder: Path, recursive: bool = True,
@@ -472,26 +473,35 @@ class Workspace:
         return added
 
     # ----- item persistence ----- #
-    def _sidecar_path(self, image_name: str) -> Path:
+    def _sidecar_path(self, image_name: str, subfolder: Optional[str] = None) -> Path:
+        if subfolder and subfolder != ".":
+            return self.descriptions_dir / subfolder / (image_name + ".json")
         return self.descriptions_dir / (image_name + ".json")
 
     def save_item(self, item: WorkspaceItem) -> None:
         _atomic_write_text(
-            self._sidecar_path(item.image),
+            self._sidecar_path(item.image, item.subfolder),
             json.dumps(item.to_dict(), indent=2, ensure_ascii=False),
         )
 
-    def get_item(self, image_name: str) -> Optional[WorkspaceItem]:
-        p = self._sidecar_path(image_name)
-        if not p.exists():
-            return None
-        return WorkspaceItem.from_dict(json.loads(p.read_text(encoding="utf-8")))
+    def get_item(self, image_name: str, subfolder: Optional[str] = None) -> Optional[WorkspaceItem]:
+        p = self._sidecar_path(image_name, subfolder)
+        if p.exists():
+            return WorkspaceItem.from_dict(json.loads(p.read_text(encoding="utf-8")))
+        if subfolder is None:
+            # Caller doesn't know the subfolder — scan recursively (e.g. GUI bridge lookup)
+            for p in self.descriptions_dir.glob(f"**/{image_name}.json"):
+                try:
+                    return WorkspaceItem.from_dict(json.loads(p.read_text(encoding="utf-8")))
+                except Exception:
+                    continue
+        return None
 
     def items(self) -> list[WorkspaceItem]:
         if not self.descriptions_dir.is_dir():
             return []
         out: list[WorkspaceItem] = []
-        for p in sorted(self.descriptions_dir.glob("*.json")):
+        for p in sorted(self.descriptions_dir.glob("**/*.json")):
             try:
                 out.append(WorkspaceItem.from_dict(json.loads(p.read_text(encoding="utf-8"))))
             except Exception:
