@@ -28,7 +28,7 @@ pillow-heif>=1.4.0     # HEIC/HEIF image format support (iPhone photos)
 piexif>=1.1.3           # Write EXIF metadata to extracted video frames
 
 # Cloud AI Provider SDKs (used by both scripts and GUI)
-openai>=1.0.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
+openai>=2.44.0           # OpenAI GPT-4o official SDK (retry logic, token tracking, streaming)
 anthropic>=0.111.0      # Anthropic Claude official SDK (retry logic, token tracking, streaming)
 
 # Web Image Download Support (scripts/web_image_downloader.py)
