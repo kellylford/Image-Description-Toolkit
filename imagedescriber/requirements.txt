@@ -19,7 +19,7 @@ wxPython>=4.2.5        # Cross-platform GUI framework
 Pillow>=12.2.0         # Image processing
 pillow-heif>=1.4.0    # HEIC/HEIF image support
 opencv-python>=4.13.0.92 # Video frame extraction
-numpy>=2.4.6          # Array operations (required by opencv)
+numpy>=2.5.0          # Array operations (required by opencv)
 piexif>=1.1.3          # EXIF metadata embedding for video frames
 
 # ----------------------------------------------------------------------------
@@ -27,8 +27,8 @@ piexif>=1.1.3          # EXIF metadata embedding for video frames
 # ----------------------------------------------------------------------------
 requests>=2.34.2       # HTTP requests
 ollama>=0.6.2          # Ollama Python client
-openai>=2.43.0          # OpenAI API
-anthropic>=0.111.0     # Anthropic Claude API
+openai>=2.44.0          # OpenAI API
+anthropic>=0.113.0     # Anthropic Claude API
 beautifulsoup4>=4.15.0  # Web scraping for download functionality
 
 # ----------------------------------------------------------------------------
@@ -39,7 +39,7 @@ tqdm>=4.68.3           # Progress bars
 # ----------------------------------------------------------------------------
 # REQUIRED - Build Tool
 # ----------------------------------------------------------------------------
-pyinstaller>=6.0.0     # For building the executable
+pyinstaller>=6.21.0     # For building the executable
 
 # ----------------------------------------------------------------------------
 # OPTIONAL - Apple Metal GPU Inference (macOS Apple Silicon only)
