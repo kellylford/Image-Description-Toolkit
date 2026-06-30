@@ -39,7 +39,7 @@ tqdm>=4.68.3           # Progress bars
 # ----------------------------------------------------------------------------
 # REQUIRED - Build Tool
 # ----------------------------------------------------------------------------
-pyinstaller>=6.0.0     # For building the executable
+pyinstaller>=6.21.0     # For building the executable
 
 # ----------------------------------------------------------------------------
 # OPTIONAL - Apple Metal GPU Inference (macOS Apple Silicon only)
