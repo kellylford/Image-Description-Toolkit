@@ -43,7 +43,7 @@ beautifulsoup4>=4.15.0  # HTML parsing for web image extraction
 transformers>=5.12.1    # HuggingFace transformers (Florence-2 support, Python 3.13 compatible)
 torch>=2.0.0            # PyTorch backend for Florence-2
 torchvision>=0.15.0     # Vision utilities for PyTorch
-einops>=0.8.0           # Tensor operations (required by Florence-2)
+einops>=0.8.2           # Tensor operations (required by Florence-2)
 timm>=1.0.27            # PyTorch Image Models (required by Florence-2)
 
 # ----------------------------------------------------------------------------
