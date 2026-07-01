@@ -96,6 +96,7 @@ class ImageItem:
 
     # Set when the active description has been embedded into a copy
     embedded_at: Optional[str] = None
+    embedded_path: Optional[Path] = None
 
     tags: list[str] = field(default_factory=list)
     notes: str = ""
@@ -142,6 +143,7 @@ class ImageItem:
         self.active_description_id = description.id
         # A new description means any prior embed is stale
         self.embedded_at = None
+        self.embedded_path = None
 
     # ------------------------------------------------------------------ #
     # Persistence                                                          #
@@ -155,6 +157,7 @@ class ImageItem:
             "descriptions": [d.to_dict() for d in self.descriptions],
             "active_description_id": self.active_description_id,
             "embedded_at": self.embedded_at,
+            "embedded_path": str(self.embedded_path) if self.embedded_path else None,
             "tags": self.tags,
             "notes": self.notes,
         }
@@ -176,6 +179,7 @@ class ImageItem:
             descriptions=[Description.from_dict(d) for d in data.get("descriptions", [])],
             active_description_id=data.get("active_description_id"),
             embedded_at=data.get("embedded_at"),
+            embedded_path=Path(data["embedded_path"]) if data.get("embedded_path") else None,
             tags=data.get("tags", []),
             notes=data.get("notes", ""),
             metadata=data.get("metadata", {}),

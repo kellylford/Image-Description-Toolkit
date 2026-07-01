@@ -138,6 +138,7 @@ class Embedder:
                 result.embedded.append(dest)
                 if not dry_run:
                     item.embedded_at = datetime.now(timezone.utc).isoformat()
+                    item.embedded_path = dest
                     item.save()
             except Exception as exc:
                 result.errors.append((item.source_path, str(exc)))
