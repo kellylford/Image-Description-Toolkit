@@ -182,10 +182,21 @@ The option appears in three places, with the same meaning everywhere:
 | **GUI processing dialog** | A checkbox: "Copy original images into the workspace" | follows config default |
 | **GUI config / settings dialog** | A persistent default for the above | no copy |
 | **Config file** (`~/.idt/config.json`) | `"copy_originals": false` | no copy |
+| **Workspace** (`manifest.json`) | `"copy_originals": true\|false` — the workspace remembers its own character | inherited from config at creation |
 
-Precedence: explicit CLI flag or GUI dialog checkbox for *this run* > workspace
-manifest setting (if we record one) > user config default > built-in default
+**The copy setting is stored per-workspace** (decided). A workspace records
+whether it is a copy or reference workspace in its manifest, so a copied
+(self-contained) workspace stays copied and a referenced one stays referenced —
+the setting is a property of *that workspace*, seeded from the user's config
+default when the workspace is created.
+
+Precedence for a given run: explicit CLI flag or GUI dialog checkbox for *this
+run* > workspace manifest setting > user config default > built-in default
 (no copy).
+
+GUI copy UX: when copying is on for a large folder, reuse the **same batch
+progress experience** the tool already shows for a describe run (decided) — no
+separate copy dialog or bespoke mechanism.
 
 Whatever the choice, **the no-modify-originals rule (§1) still holds.** "Copy"
 vs "reference" only decides whether a duplicate lives in the bundle; it never
@@ -211,8 +222,11 @@ working path, resolved in this order:
 2. **Bundle copy** in `images/` if `storage == "copy"`.
 3. **Original `source_path`** if `storage == "reference"`.
 
-If a reference-mode original is gone, the item is `is_missing` and is skipped
-(or shown greyed-out in the GUI), never an error that halts a batch.
+If a reference-mode original is gone, the item is marked `is_missing=True`,
+skipped during a batch (never an error that halts it), and **the count of
+skipped-missing items is reported in the run summary** (decided). In the GUI the
+missing items are shown greyed-out. We do not prompt or emit a per-file warning
+for each one — a summary count plus the greyed-out state is enough.
 
 ---
 
@@ -272,13 +286,19 @@ These are **out of scope** for this document but will land as follow-ups:
 
 ---
 
-## 9. Review checklist before we implement
+## 9. Decisions (resolved 2026-06-30)
 
-- [ ] Confirm default-no-copy is what we want for **both** CLI and GUI.
-- [ ] Confirm `images/` should mirror structure (retire flat collision naming).
-- [ ] Decide whether the copy setting is also stored per-workspace in the
-      manifest, or only config + per-run.
-- [ ] Decide GUI copy timing/UX (background copy + progress for large folders).
-- [ ] Decide how reference-mode missing originals surface in CLI output and GUI.
-- [ ] Sketch (not build) the cleanup model so we don't paint ourselves into a
-      corner with the copy layout.
+- [x] **Default no-copy for both CLI and GUI.** Confirmed.
+- [x] **`images/` mirrors source structure**, retiring the flat collision-safe
+      naming (`_bundle_name_for`). Confirmed.
+- [x] **Copy setting stored per-workspace** in `manifest.json`, seeded from the
+      user config default at creation; overridable per run. (§4)
+- [x] **GUI copy UX reuses the existing batch-progress experience** shown for a
+      describe run — no separate copy dialog. (§4)
+- [x] **Missing referenced originals: skip + report count** in the run summary;
+      greyed-out in the GUI; no prompt, no per-file warning. (§5)
+
+Still deferred (Open Items, §8):
+
+- [ ] Cleanup / duplication model — sketch before the copy layout locks in, but
+      not part of this change.

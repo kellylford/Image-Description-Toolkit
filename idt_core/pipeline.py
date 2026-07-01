@@ -194,7 +194,18 @@ class WorkspacePipeline:
                 self._geocoder = NominatimGeocoder(cache_path=cache)
 
         all_items = self.workspace.media_items()
-        queue = all_items if options.redescribe else [i for i in all_items if not i.described]
+        # Skip items whose image is missing on disk (e.g. a moved/deleted reference
+        # original). Mark them so the state is durable, and never queue them — this
+        # is the single place that decides what gets processed.
+        live_items = []
+        for i in all_items:
+            if not self.workspace.image_path(i).exists():
+                if not i.is_missing:
+                    i.is_missing = True
+                    self.workspace.save_item(i)
+                continue
+            live_items.append(i)
+        queue = live_items if options.redescribe else [i for i in live_items if not i.described]
         if options.limit is not None:
             queue = queue[: options.limit]
 

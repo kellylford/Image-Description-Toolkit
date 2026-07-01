@@ -143,7 +143,7 @@ class WorkspaceDescription:
 class WorkspaceItem:
     image: str                 # bundle-internal filename in images/ (the KEY)
     source_path: str = ""      # original absolute path, provenance only
-    storage: str = "copy"      # "copy" (v4.5) | "reference" (future)
+    storage: str = "copy"      # "copy" = bundle holds a copy | "reference" = original in place
     item_type: str = "image"   # image | video | extracted_frame | downloaded_image
     subfolder: Optional[str] = None
 
@@ -277,6 +277,10 @@ class Workspace:
         self.batch_state: Optional[dict] = None
         self.cached_ollama_models: Optional[list] = None
         self.geocode_enabled: bool = False
+        # Whether this workspace copies originals into images/ (self-contained) or
+        # references them in place. Seeded from UserConfig at creation; a per-run
+        # flag can override for a given run. See docs/design/image-handling-lifecycle.md.
+        self.copy_originals: bool = False
         # True once at least one image has been successfully described.
         # Guards provider/model resolution so a failed run can't poison the defaults
         # for the next run (workspace provider is only honored when there ARE descriptions).
@@ -320,7 +324,8 @@ class Workspace:
         return path.is_dir() and (path / "manifest.json").is_file()
 
     @classmethod
-    def create(cls, path: Path, name: Optional[str] = None) -> "Workspace":
+    def create(cls, path: Path, name: Optional[str] = None,
+               copy_originals: bool = False) -> "Workspace":
         """Create a new bundle at path. Appends .idtw if missing."""
         path = Path(path)
         if path.suffix.lower() != BUNDLE_EXT:
@@ -329,6 +334,7 @@ class Workspace:
         ws = cls(path)
         if name:
             ws.name = name
+        ws.copy_originals = copy_originals
         path.mkdir(parents=True, exist_ok=True)
         for d in (ws.images_dir, ws.descriptions_dir, ws.chats_dir):
             d.mkdir(parents=True, exist_ok=True)
@@ -359,6 +365,7 @@ class Workspace:
             prompt_text=defs.get("prompt_text", ""),
         )
         ws.has_any_descriptions = data.get("has_any_descriptions", False)
+        ws.copy_originals = bool(data.get("copy_originals", False))
         ws.batch_state = data.get("batch_state")
         ws.cached_ollama_models = data.get("cached_ollama_models")
         ws.geocode_enabled = data.get("geocode_enabled", False)
@@ -382,6 +389,7 @@ class Workspace:
                 "prompt_text": self.defaults.prompt_text,
             },
             "has_any_descriptions": self.has_any_descriptions,
+            "copy_originals": self.copy_originals,
             "batch_state": self.batch_state,
             "cached_ollama_models": self.cached_ollama_models,
             "geocode_enabled": self.geocode_enabled,
@@ -397,29 +405,40 @@ class Workspace:
                 idx[item.source_path] = (item.image, item.subfolder)
         return idx
 
-    def _bundle_name_for(self, source_path: Path, subfolder: Optional[str]) -> str:
-        """Pick a collision-safe filename inside images/ for a new source file."""
+    def _image_copy_path(self, image_name: str, subfolder: Optional[str] = None) -> Path:
+        """Path of an image's bundle copy in images/, mirroring source structure."""
+        if subfolder and subfolder != ".":
+            return self.images_dir / subfolder / image_name
+        return self.images_dir / image_name
+
+    def _unique_image_name(self, source_path: Path, subfolder: Optional[str]) -> str:
+        """
+        Pick the bundle key (filename) for a new source file.
+
+        Because images/ and descriptions/ mirror the source subfolder structure,
+        the (subfolder, name) pair is normally unique on its own — no flattening
+        needed. The only way to collide is two *different* source roots contributing
+        the same relative path; in that rare case we disambiguate with a counter so
+        neither sidecar nor copy is silently overwritten.
+        """
         base = source_path.name
-        if not (self.images_dir / base).exists():
+        if not self._sidecar_path(base, subfolder).exists():
             return base
-        # collision: prefix with flattened subfolder
-        if subfolder:
-            flat = subfolder.replace("/", "__").replace("\\", "__")
-            candidate = f"{flat}__{base}"
-            if not (self.images_dir / candidate).exists():
-                return candidate
-        # still colliding: append a counter before the extension
         stem, suffix = source_path.stem, source_path.suffix
         n = 1
-        while (self.images_dir / f"{stem}_{n}{suffix}").exists():
+        while self._sidecar_path(f"{stem}_{n}{suffix}", subfolder).exists():
             n += 1
         return f"{stem}_{n}{suffix}"
 
-    def add_image(self, source_path: Path, subfolder: Optional[str] = None) -> WorkspaceItem:
+    def add_image(self, source_path: Path, subfolder: Optional[str] = None,
+                  copy: Optional[bool] = None) -> WorkspaceItem:
         """
-        Copy a source image into the bundle (if not already present) and return its item.
-        Idempotent: adding the same source path twice returns the existing item.
-        The original file is never modified.
+        Add a source image to the bundle and return its item. Idempotent: adding the
+        same source path twice returns the existing item. The original is never modified.
+
+        copy: True  -> copy the file into images/<subfolder>/ (storage="copy").
+              False -> reference the original in place (storage="reference"), no copy.
+              None  -> use this workspace's copy_originals setting.
         """
         source_path = Path(os.path.abspath(source_path))
         if self._source_index is None:
@@ -430,14 +449,23 @@ class Workspace:
             image_name, sub = existing
             return self.get_item(image_name, sub)
 
-        self.images_dir.mkdir(parents=True, exist_ok=True)
-        bundle_name = self._bundle_name_for(source_path, subfolder)
-        dest = self.images_dir / bundle_name
-        shutil.copy2(source_path, dest)  # copy2 preserves mtime; original untouched
+        if copy is None:
+            copy = self.copy_originals
+
+        bundle_name = self._unique_image_name(source_path, subfolder)
+
+        if copy:
+            dest = self._image_copy_path(bundle_name, subfolder)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, dest)  # copy2 preserves mtime; original untouched
+            storage = "copy"
+        else:
+            storage = "reference"
 
         item = WorkspaceItem(
             image=bundle_name,
             source_path=str(source_path),
+            storage=storage,
             item_type="video" if is_video(source_path) else "image",
             subfolder=subfolder,
         )
@@ -446,8 +474,12 @@ class Workspace:
         return item
 
     def add_source_folder(self, folder: Path, recursive: bool = True,
-                          include_videos: bool = False) -> list[WorkspaceItem]:
-        """Scan a folder and add every image. Records the folder in manifest.sources."""
+                          include_videos: bool = False,
+                          copy: Optional[bool] = None) -> list[WorkspaceItem]:
+        """Scan a folder and add every image. Records the folder in manifest.sources.
+
+        copy is passed through to add_image (None -> workspace copy_originals setting).
+        """
         folder = Path(os.path.abspath(folder))
         added: list[WorkspaceItem] = []
         if recursive:
@@ -464,7 +496,7 @@ class Workspace:
                 sub = None
             if sub == ".":
                 sub = None
-            added.append(self.add_image(p, subfolder=sub))
+            added.append(self.add_image(p, subfolder=sub, copy=copy))
 
         entry = {"path": str(folder), "recursive": recursive, "added": _now()}
         if not any(s.get("path") == str(folder) for s in self.sources):
@@ -512,7 +544,7 @@ class Workspace:
         """Absolute path to the item's image (bundle copy or original reference)."""
         if item.storage == "reference" and item.source_path:
             return Path(item.source_path)
-        return self.images_dir / item.image
+        return self._image_copy_path(item.image, item.subfolder)
 
     # ----- chats ----- #
     def save_chat(self, chat: dict) -> None:

@@ -150,10 +150,10 @@ Always show stats: `"XX%, X of Y images described"`. Live mode adds `"(Live)"` s
 - `wx.ListBox` items: concatenate data into single strings (no multi-column)
 
 ### Session Summaries
-Create `docs/worktracking/YYYY-MM-DD-session-summary.md` for non-trivial sessions. Include: files changed, decisions, test results, what was NOT tested.
+Create `docs/WorkTracking/YYYY-MM-DD-session-summary.md` for non-trivial sessions. Include: files changed, decisions, test results, what was NOT tested.
 
 ## Additional Reference
 - `docs/DEVELOPER_GUIDE.md` — comprehensive developer guide (architecture, `idt_core` inventory, CLI commands, build system, testing, conventions)
 - `.github/copilot-instructions.md` — full agent guidelines and protocols
-- `docs/worktracking/PRE_COMMIT_VERIFICATION_CHECKLIST.md` — pre-commit checklist
+- `docs/WorkTracking/PRE_COMMIT_VERIFICATION_CHECKLIST.md` — pre-commit checklist
 - `BuildAndRelease/BUILD_SYSTEM_REFERENCE.md` — build troubleshooting

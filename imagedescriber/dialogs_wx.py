@@ -815,6 +815,40 @@ class ProcessingOptionsDialog(wx.Dialog):
 
         sizer.Add(embed_sizer, 0, wx.ALL | wx.EXPAND, 10)
 
+        # Workspace storage
+        storage_box = wx.StaticBox(panel, label="Workspace Storage")
+        storage_sizer = wx.StaticBoxSizer(storage_box, wx.VERTICAL)
+
+        self.copy_originals_cb = wx.CheckBox(
+            panel,
+            label="&Copy original images into the workspace",
+            name="Copy original images into the workspace"
+        )
+        # Default from the shared idt config (~/.idt/config.json), falling back to
+        # this dialog's config dict. Off means reference originals in place.
+        _copy_default = self.config.get('copy_originals', None)
+        if _copy_default is None:
+            try:
+                from idt_core.config import UserConfig
+                _copy_default = UserConfig.load().copy_originals
+            except Exception:
+                _copy_default = False
+        self.copy_originals_cb.SetValue(bool(_copy_default))
+        self.copy_originals_cb.SetToolTip(
+            "When on, the workspace bundle keeps its own copy of every image, so it is "
+            "self-contained and can be moved to another computer. When off, the workspace "
+            "references your originals in place. Either way, originals are never modified."
+        )
+        storage_sizer.Add(self.copy_originals_cb, 0, wx.ALL, 5)
+
+        storage_note = wx.StaticText(
+            panel,
+            label="Off = reference originals in place. On = self-contained, portable workspace (uses more disk)."
+        )
+        storage_sizer.Add(storage_note, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        sizer.Add(storage_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
         panel.SetSizer(sizer)
         return panel
 
@@ -1112,6 +1146,7 @@ class ProcessingOptionsDialog(wx.Dialog):
             'skip_existing': self.skip_existing_cb.GetValue(),
             'geocode_enabled': self.geocode_cb.GetValue(),
             'embed_after_process': self.embed_after_process_cb.GetValue(),
+            'copy_originals': self.copy_originals_cb.GetValue(),
             'provider': self.provider_choice.GetStringSelection().lower(),
             'model': model,
             'prompt_style': self.prompt_choice.GetStringSelection(),

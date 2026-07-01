@@ -75,6 +75,10 @@ class UserConfig:
     default_prompt_name: str = DEFAULT_PROMPT_NAME
     custom_prompts: dict[str, str] = field(default_factory=dict)
     workspace_root: Optional[str] = None  # None → ~/Documents/idt
+    # Whether new workspaces copy the user's originals into images/ (self-contained,
+    # portable) or reference them in place. Default off. See
+    # docs/design/image-handling-lifecycle.md.
+    copy_originals: bool = False
 
     def workspace_root_path(self) -> Path:
         """Resolved workspace root. Defaults to ~/Documents/idt."""
@@ -95,6 +99,7 @@ class UserConfig:
             if key in data:
                 setattr(obj, key, data[key])
         obj.custom_prompts = data.get("custom_prompts", {})
+        obj.copy_originals = bool(data.get("copy_originals", False))
         return obj
 
     def save(self) -> None:
@@ -104,6 +109,7 @@ class UserConfig:
             "default_model": self.default_model,
             "default_prompt_name": self.default_prompt_name,
             "custom_prompts": self.custom_prompts,
+            "copy_originals": self.copy_originals,
         }
         if self.workspace_root:
             data["workspace_root"] = self.workspace_root

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import html as _html
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -316,11 +317,25 @@ def export_txt(project: Project, filename: str = "descriptions.txt") -> Path:
 # ------------------------------------------------------------------ #
 #
 # These mirror the Project exporters above but read from a Workspace bundle.
-# Images live in <bundle>/images/ and reports in <bundle>/reports/, so image
-# src paths are simply ../images/<name>.
+# Reports live in <bundle>/reports/. The image an item points at may be a copy
+# inside the bundle (images/<subfolder>/<name>, when copy mode is on) or the
+# user's original in place (reference mode). _ws_img_src resolves either to a
+# src the report can load.
 
 def _ws_when(desc) -> str:
     return getattr(desc, "created", None) or getattr(desc, "timestamp", "") or ""
+
+
+def _ws_img_src(ws, item, reports_dir: Path) -> str:
+    """Build an <img src> for a report in reports_dir, for copy or reference mode."""
+    img = ws.image_path(item)
+    try:
+        # Relative to the report — works for bundle copies and for reference
+        # originals that live on the same drive as the bundle.
+        return os.path.relpath(img, reports_dir).replace("\\", "/")
+    except ValueError:
+        # Different drive (Windows): a relative path is impossible — use a file URI.
+        return img.as_uri()
 
 
 def export_workspace_html(ws, filename: str = "descriptions.html") -> Path:
@@ -366,7 +381,7 @@ def export_workspace_html(ws, filename: str = "descriptions.html") -> Path:
         slug = f"img-{i:04d}"
         active = item.active_description
         alt_text = active.text if active else "(no description)"
-        img_src = f"../images/{item.image}"
+        img_src = _ws_img_src(ws, item, reports_dir)
         multi = len(item.descriptions) > 1
         a(f'    <article id="{slug}">')
         a(f"      <h2>{_h(item.display_name)}</h2>")

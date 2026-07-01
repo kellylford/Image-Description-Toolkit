@@ -1,11 +1,13 @@
 """
 Tests for the unified .idtw workspace bundle (idt_core.workspace).
 
-Covers the invariants from docs/design/unified-workspace.md:
-  - originals are copied in, never moved or modified
-  - collision-safe image naming
+Covers the invariants from docs/design/unified-workspace.md and
+docs/design/image-handling-lifecycle.md:
+  - originals are never moved or modified
+  - copy mode duplicates into images/ mirroring source structure; reference mode
+    (the default) leaves originals in place
   - description / chat round-trips
-  - manifest + batch_state persistence across reopen
+  - manifest + batch_state + copy_originals persistence across reopen
   - everything lands inside the bundle directory
 """
 import hashlib
@@ -56,13 +58,13 @@ def test_create_appends_extension_only_once(tmp_path):
     assert not ws.path.name.endswith(".idtw.idtw")
 
 
-def test_add_image_copies_in_and_leaves_original_untouched(tmp_path, src):
+def test_add_image_copy_mode_duplicates_and_leaves_original_untouched(tmp_path, src):
     original = src / "beach.jpg"
     before = _digest(original)
     before_mtime = original.stat().st_mtime
 
     ws = Workspace.create(tmp_path / "WS")
-    item = ws.add_image(original)
+    item = ws.add_image(original, copy=True)
 
     # original is byte-for-byte unchanged and not moved
     assert original.exists()
@@ -74,28 +76,46 @@ def test_add_image_copies_in_and_leaves_original_untouched(tmp_path, src):
     assert copy.exists()
     assert _digest(copy) == before
     assert copy.parent == ws.images_dir
+    assert item.storage == "copy"
     # source path retained as provenance
     assert item.source_path == str(original.resolve())
 
 
+def test_add_image_reference_mode_is_the_default(tmp_path, src):
+    ws = Workspace.create(tmp_path / "WS")
+    item = ws.add_image(src / "beach.jpg")  # no copy arg → workspace default (off)
+
+    assert item.storage == "reference"
+    # nothing copied into the bundle; the working path IS the original
+    assert list(ws.images_dir.rglob("*.jpg")) == []
+    assert ws.image_path(item) == (src / "beach.jpg").resolve()
+    # but the sidecar (workspace state) still lives inside the bundle
+    assert ws._sidecar_path(item.image, item.subfolder).exists()
+
+
 def test_add_image_is_idempotent(tmp_path, src):
     ws = Workspace.create(tmp_path / "WS")
-    a = ws.add_image(src / "beach.jpg")
-    b = ws.add_image(src / "beach.jpg")
+    a = ws.add_image(src / "beach.jpg", copy=True)
+    b = ws.add_image(src / "beach.jpg", copy=True)
     assert a.image == b.image
-    assert len(list(ws.images_dir.glob("*.jpg"))) == 1
+    assert len(list(ws.images_dir.rglob("*.jpg"))) == 1
 
 
-def test_collision_safe_naming(tmp_path, src):
+def test_mirrored_naming_no_flattening(tmp_path, src):
+    """Same filename in different subfolders keeps its name; the subfolder mirrors."""
     ws = Workspace.create(tmp_path / "WS")
-    a = ws.add_image(src / "beach.jpg", subfolder=None)
-    b = ws.add_image(src / "Day2" / "beach.jpg", subfolder="Day2")
-    assert a.image != b.image
+    a = ws.add_image(src / "beach.jpg", subfolder=None, copy=True)
+    b = ws.add_image(src / "Day2" / "beach.jpg", subfolder="Day2", copy=True)
+    # names are NOT flattened — both stay "beach.jpg", disambiguated by subfolder
     assert a.image == "beach.jpg"
-    assert b.image == "Day2__beach.jpg"
-    # both copies exist independently
-    assert (ws.images_dir / a.image).exists()
-    assert (ws.images_dir / b.image).exists()
+    assert b.image == "beach.jpg"
+    # copies live at mirrored paths, not a flat "Day2__beach.jpg"
+    assert ws.image_path(a) == ws.images_dir / "beach.jpg"
+    assert ws.image_path(b) == ws.images_dir / "Day2" / "beach.jpg"
+    assert ws.image_path(a).exists() and ws.image_path(b).exists()
+    # distinct copy paths and distinct sidecars — neither silently overwrote the other
+    assert ws.image_path(a) != ws.image_path(b)
+    assert ws._sidecar_path(a.image, a.subfolder) != ws._sidecar_path(b.image, b.subfolder)
 
 
 def test_add_source_folder_records_provenance(tmp_path, src):
@@ -167,7 +187,7 @@ def test_chat_round_trip(tmp_path):
 
 
 def test_manifest_and_batch_state_persist_across_reopen(tmp_path, src):
-    ws = Workspace.create(tmp_path / "WS", name="My Trip")
+    ws = Workspace.create(tmp_path / "WS", name="My Trip", copy_originals=True)
     ws.add_image(src / "beach.jpg")
     ws.defaults.provider = "ollama"
     ws.defaults.model = "llava"
@@ -181,6 +201,7 @@ def test_manifest_and_batch_state_persist_across_reopen(tmp_path, src):
     assert reopened.defaults.provider == "ollama"
     assert reopened.defaults.model == "llava"
     assert reopened.geocode_enabled is True
+    assert reopened.copy_originals is True
     assert reopened.batch_state["paused_at_index"] == 3
     # item survives reopen too
     assert reopened.status()["total"] == 1

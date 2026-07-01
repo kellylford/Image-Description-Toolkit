@@ -170,16 +170,24 @@ def _open_or_create_workspace(source: Path, workspace_arg: Optional[str]):
     from idt_core.workspace import Workspace, BUNDLE_EXT
     from idt_core.config import UserConfig
 
+    cfg = UserConfig.load()
     if workspace_arg:
         wp = Path(workspace_arg).expanduser()
         is_bare_name = (wp.parent == Path(".")) and (BUNDLE_EXT not in workspace_arg)
         if is_bare_name:
-            root = UserConfig.load().workspace_root_path()
-            wp = root / workspace_arg
+            wp = cfg.workspace_root_path() / workspace_arg
     else:
-        root = UserConfig.load().workspace_root_path()
-        wp = _mirror_source_path(source, root)
-    return Workspace.open(wp)
+        wp = _mirror_source_path(source, cfg.workspace_root_path())
+
+    # Seed a brand-new workspace's copy preference from the user config default.
+    # An existing workspace keeps whatever preference it already recorded.
+    resolved = wp if Workspace.is_bundle(wp) else wp.with_name(wp.name + BUNDLE_EXT)
+    was_new = not Workspace.is_bundle(resolved)
+    ws = Workspace.open(wp)
+    if was_new:
+        ws.copy_originals = cfg.copy_originals
+        ws.save_manifest()
+    return ws
 
 
 def _find_workspace(arg: str):
@@ -217,6 +225,63 @@ def _find_workspace(arg: str):
 # describe                                                             #
 # ------------------------------------------------------------------ #
 
+def _resolve_gui_launch() -> Optional[list]:
+    """Return the command prefix that launches the ImageDescriber GUI, or None.
+
+    Frozen: a sibling ImageDescriber executable next to idt(.exe), or the macOS
+    app bundle. Development: the GUI script run with the current interpreter.
+    """
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        for name in ("ImageDescriber.exe", "ImageDescriber"):
+            cand = exe_dir / name
+            if cand.exists():
+                return [str(cand)]
+        app_bin = exe_dir / "ImageDescriber.app" / "Contents" / "MacOS" / "ImageDescriber"
+        if app_bin.exists():
+            return [str(app_bin)]
+        return None
+    gui = Path(__file__).resolve().parent.parent / "imagedescriber" / "imagedescriber_wx.py"
+    if gui.exists():
+        return [sys.executable, str(gui)]
+    return None
+
+
+def _launch_gui_describe(source: Path, args) -> None:
+    """Launch the GUI on *source*, auto-starting the batch with this run's options.
+
+    Blocks until the GUI exits and exits with its return code, so the invocation is
+    one process lifetime — closing the GUI ends the command.
+    """
+    import subprocess
+
+    launch = _resolve_gui_launch()
+    if launch is None:
+        print("Error: --showgui requested but the ImageDescriber GUI could not be located.",
+              file=sys.stderr)
+        sys.exit(1)
+
+    cmd = launch + [str(source), "--autostart"]
+    if getattr(args, "provider", None):
+        cmd += ["--provider", args.provider]
+    if getattr(args, "model", None):
+        cmd += ["--model", args.model]
+    if getattr(args, "prompt", None):
+        cmd += ["--prompt", args.prompt]
+    if getattr(args, "geocode", False):
+        cmd += ["--geocode"]
+    _copy = getattr(args, "copy_originals", None)
+    if _copy is True:
+        cmd += ["--copy-originals"]
+    elif _copy is False:
+        cmd += ["--no-copy-originals"]
+
+    if not getattr(args, "quiet", False):
+        print(f"Launching ImageDescriber on {source} …")
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
+
+
 def cmd_describe(args):
     from idt_core.pipeline import WorkspacePipeline, RunOptions
     from idt_core.progress import Progress
@@ -228,6 +293,16 @@ def cmd_describe(args):
         return
 
     source = Path(args.source).resolve()
+
+    # --showgui: hand the whole run to the GUI. The GUI IS the invocation from here —
+    # it opens on the directory, auto-starts the batch, and shows live progress; when
+    # it closes, this command returns. We do NOT also run a headless pipeline.
+    if getattr(args, "showgui", False):
+        if not source.is_dir():
+            print("Error: --showgui requires a source directory.", file=sys.stderr)
+            sys.exit(1)
+        _launch_gui_describe(source, args)
+        return
 
     # Allow passing a workspace bundle directly to resume an interrupted run.
     # The user may not remember the original source folder but always has the bundle.
@@ -252,14 +327,22 @@ def cmd_describe(args):
     model         = args.model    or _ws_model    or user_cfg.default_model
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
 
-    # Copy this run's source images into the bundle (idempotent; originals untouched).
+    # Resolve the effective copy setting: explicit --copy-originals/--no-copy-originals
+    # flag for this run overrides the workspace's stored preference.
+    _copy_flag = getattr(args, "copy_originals", None)
+    if _copy_flag is not None:
+        ws.copy_originals = _copy_flag
+
+    # Add this run's source images to the bundle (idempotent; originals never modified).
+    # copy_originals decides whether they are copied in or referenced in place.
     # Skipped when the user passed a workspace bundle directly (source is None).
     if not args.quiet:
         if source:
             print(f"Source:     {source}")
         print(f"Workspace:  {ws.path}")
+        print(f"Copy mode:  {'copy originals into workspace' if ws.copy_originals else 'reference in place'}")
     if source is not None:
-        added = ws.add_source_folder(source, recursive=True)
+        added = ws.add_source_folder(source, recursive=True, copy=ws.copy_originals)
 
         # Extract video frames and add them to the workspace (opt out with --no-video)
         if not getattr(args, "no_video", False):
@@ -300,7 +383,20 @@ def cmd_describe(args):
     )
 
     all_items = ws.media_items()
-    queue = all_items if args.redescribe else [i for i in all_items if not i.described]
+
+    # Reference-mode originals may have moved or been deleted since they were added.
+    # Mark those missing, skip them, and report the count in the summary rather than
+    # letting each one fail as a read error mid-batch.
+    missing = [i for i in all_items if not ws.image_path(i).exists()]
+    for m in missing:
+        if not m.is_missing:
+            m.is_missing = True
+            ws.save_item(m)
+    available = [i for i in all_items if not i.is_missing]
+    if missing and not args.quiet:
+        print(f"Missing:    {len(missing)} referenced original(s) not found on disk — skipping")
+
+    queue = available if args.redescribe else [i for i in available if not i.described]
     if args.limit:
         queue = queue[: args.limit]
 
@@ -342,6 +438,8 @@ def cmd_describe(args):
         _set_console_title(f"IDT - Describing Images ({_pct}%, {_done} of {_total})")
 
     progress.summary(described=described, errors=errors)
+    if missing and not args.quiet:
+        print(f"Skipped {len(missing)} missing original(s) not found on disk.")
     _set_console_title(f"IDT - Image Description Complete ({described} of {_total})")
 
     if described > 0:
@@ -394,7 +492,9 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
 
             frame_paths = []
             for frame_path in result.frame_paths:
-                frame_wi = ws.add_image(frame_path, subfolder=f"frames/{video.stem}")
+                # Frames already live in derived/frames/ — reference them there rather
+                # than copying into images/ (that would duplicate every frame).
+                frame_wi = ws.add_image(frame_path, subfolder=f"frames/{video.stem}", copy=False)
                 frame_wi.item_type = "extracted_frame"
                 frame_wi.parent_video = video_gui_path
                 ws.save_item(frame_wi)
@@ -1700,12 +1800,21 @@ Supported providers:
                         help="Stop after describing N images")
     p_desc.add_argument("--embed", action="store_true",
                         help="Automatically embed descriptions into image copies after describing")
+    p_desc.add_argument("--copy-originals", dest="copy_originals", action="store_true", default=None,
+                        help="Copy source images into the workspace (self-contained, portable). "
+                             "Overrides the workspace/config default for this run.")
+    p_desc.add_argument("--no-copy-originals", dest="copy_originals", action="store_false",
+                        help="Reference originals in place instead of copying them into the workspace.")
     p_desc.add_argument("--no-video", action="store_true",
                         help="Skip automatic video frame extraction (videos are included by default)")
     p_desc.add_argument("--video-interval", type=float, default=5.0, metavar="SECONDS",
                         help="Seconds between extracted video frames (default: 5.0)")
     p_desc.add_argument("--no-export", action="store_true",
                         help="Skip automatic HTML report generation after describing")
+    p_desc.add_argument("--showgui", action="store_true",
+                        help="Run this describe in the ImageDescriber GUI instead of the console: "
+                             "the GUI opens on the directory, starts the batch, and shows live "
+                             "progress. Closing the GUI ends the command.")
     p_desc.add_argument("--show-descriptions", action="store_true", dest="show_descriptions",
                         help="Print each description to the screen as it is generated")
     p_desc.add_argument("--quiet", "-q", action="store_true",

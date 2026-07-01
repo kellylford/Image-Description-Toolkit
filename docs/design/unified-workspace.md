@@ -3,6 +3,15 @@
 **Status:** v4.5 — in development
 **Audience:** developers working on `idt` (CLI) and ImageDescriber (GUI), plus advanced users who want to understand where their files live.
 
+> **⚠️ Superseded on image copying.** This document's original decision — "self-contained,
+> duplicating bundle; copies images by default" (§1, §2) — has been **revised**. As of
+> 2026-06-30, copying is **off by default** and is an explicit per-workspace / per-run
+> option, and bundle folders (`images/`, `derived/`, `embedded/`) **mirror the source
+> subfolder structure** instead of using flat collision-safe names. For the current
+> behavior and the full image lifecycle, see
+> [`image-handling-lifecycle.md`](image-handling-lifecycle.md). The rest of this document
+> (manifest schema, sidecar schema, chat schema, migration) remains accurate.
+
 ---
 
 ## 1. Why this exists

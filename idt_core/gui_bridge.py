@@ -120,6 +120,9 @@ def gui_workspace_to_bundle(workspace_dict: dict, dest: Path,
     """
     ws = Workspace.open(dest)
 
+    # Record this bundle's copy character so it round-trips and matches the CLI.
+    ws.copy_originals = bool(copy_images)
+
     # Top-level manifest mapping
     dir_paths = workspace_dict.get("directory_paths") or []
     scan_recursive = workspace_dict.get("directory_scan_recursive") or {}
@@ -166,7 +169,7 @@ def _gui_image_item_to_bundle(ws: Workspace, file_path: str, item: dict,
     is_missing = item.get("is_missing", False) or not src.exists()
 
     if copy_images and src.exists():
-        wi = ws.add_image(src, subfolder=item.get("subfolder"))
+        wi = ws.add_image(src, subfolder=item.get("subfolder"), copy=True)
     elif src.exists():
         # Reference mode: record source path in a sidecar, don't copy the file.
         wi = WorkspaceItem(

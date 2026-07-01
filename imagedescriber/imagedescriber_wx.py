@@ -853,6 +853,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Merge key processing options back into self.config so they stick for the session."""
         if 'geocode_enabled' in options:
             self.config['geocode_enabled'] = options['geocode_enabled']
+        if 'copy_originals' in options:
+            self.config['copy_originals'] = options['copy_originals']
 
     def get_api_key_for_provider(self, provider: str) -> str:
         """Get API key for a specific provider from config"""
@@ -3312,13 +3314,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         self.SetStatusText(f"Processing: {Path(image_item.file_path).name}...", 0)
 
-    def on_process_all(self, event, skip_existing: bool = True):
+    def autostart_batch(self, provider=None, model=None, prompt=None,
+                        geocode=False, copy_originals=None):
+        """Kick off a batch with preset options (no dialogs) — the CLI --showgui hand-off.
+
+        Builds an options dict equivalent to what ProcessingOptionsDialog returns,
+        filling anything the CLI didn't specify from the GUI's own config defaults,
+        then runs the normal batch path via on_process_all(preset_options=...).
+        """
+        if copy_originals is not None:
+            self.config['copy_originals'] = bool(copy_originals)
+        self.config['geocode_enabled'] = bool(geocode)
+        options = {
+            'skip_existing': True,
+            'geocode_enabled': bool(geocode),
+            'embed_after_process': False,
+            'copy_originals': self.config.get('copy_originals', False),
+            'provider': (provider or self.config.get('default_provider', 'ollama')).lower(),
+            'model': model or self.config.get('default_model', DEFAULT_OLLAMA_MODEL),
+            'prompt_style': prompt or self.config.get('default_prompt_style', 'detailed'),
+            'custom_prompt': '',
+        }
+        logger.info(f"autostart_batch: options={options}")
+        self.on_process_all(None, skip_existing=True, preset_options=options)
+
+    def on_process_all(self, event, skip_existing: bool = True, preset_options: Optional[dict] = None):
         """Process images in batch
 
         Args:
             event: Menu event
             skip_existing: If True, only process images without descriptions (default, safe)
                           If False, reprocess all images (show warning first)
+            preset_options: When provided (CLI --showgui autostart), skip the modal
+                          options/save prompts and use these options directly.
         """
         logger.info(f"on_process_all called: skip_existing={skip_existing}, items={len(self.workspace.items) if self.workspace else 0}")
 
@@ -3331,6 +3359,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.scan_worker is not None:
             self._pending_process_all = True
             self._pending_process_all_skip_existing = skip_existing
+            self._pending_preset_options = preset_options
             self.SetStatusText(
                 "Scan in progress — processing will start automatically when complete", 0
             )
@@ -3354,26 +3383,35 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Check if we need to create a workspace first (None) or if it's Untitled - prompt to save/name
         logger.info(f"CHECKPOINT 3: Checking workspace file status - workspace_file={self.workspace_file}")
         if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
-            logger.info("CHECKPOINT 3: Workspace is None or Untitled - showing save dialog")
-            # CRITICAL: Must Raise() before showing modal dialogs — without it the dialog
-            # can appear hidden behind the main window and block all further UI actions.
-            self.Raise()
-            result = wx.MessageBox(
-                "Before processing, please choose where to save the workspace bundle.\n\n"
-                "A .idtw workspace bundle will be created next to your images so that "
-                "both ImageDescriber and the idt CLI can share the same results.\n\n"
-                "Continue?",
-                "Save Workspace Bundle",
-                wx.YES_NO | wx.ICON_QUESTION,
-                self
-            )
+            if preset_options is not None:
+                # Autostart (CLI --showgui): don't prompt — create the bundle silently
+                # in the default workspace root, honoring the copy-originals setting.
+                logger.info("CHECKPOINT 3: autostart — auto-saving bundle without prompting")
+                self._auto_save_bundle()
+                if not self.workspace_file or is_untitled_workspace(self.workspace_file.stem):
+                    show_error(self, "Could not create a workspace bundle for the autostart run.")
+                    return
+            else:
+                logger.info("CHECKPOINT 3: Workspace is None or Untitled - showing save dialog")
+                # CRITICAL: Must Raise() before showing modal dialogs — without it the dialog
+                # can appear hidden behind the main window and block all further UI actions.
+                self.Raise()
+                result = wx.MessageBox(
+                    "Before processing, please choose where to save the workspace bundle.\n\n"
+                    "A .idtw workspace bundle will be created next to your images so that "
+                    "both ImageDescriber and the idt CLI can share the same results.\n\n"
+                    "Continue?",
+                    "Save Workspace Bundle",
+                    wx.YES_NO | wx.ICON_QUESTION,
+                    self
+                )
 
-            if result != wx.YES:
-                return
+                if result != wx.YES:
+                    return
 
-            if not self._prompt_and_create_bundle("Save Workspace Bundle"):
-                # User cancelled the bundle creation dialog
-                return
+                if not self._prompt_and_create_bundle("Save Workspace Bundle"):
+                    # User cancelled the bundle creation dialog
+                    return
         logger.info("CHECKPOINT 3 PASSED: Workspace file is valid (not None/Untitled)")
 
         # Auto-save before batch processing
@@ -3398,9 +3436,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 return
         logger.info("CHECKPOINT 5 PASSED: Skip existing check complete")
 
-        # Show processing options dialog with cached models
+        # Show processing options dialog with cached models — unless the caller
+        # supplied options (CLI --showgui autostart), in which case use those directly.
         logger.info(f"CHECKPOINT 6: About to show ProcessingOptionsDialog - ProcessingOptionsDialog={ProcessingOptionsDialog}")
-        if ProcessingOptionsDialog:
+        if preset_options is not None:
+            logger.info("Using preset options (autostart) — skipping ProcessingOptionsDialog")
+            options = preset_options
+            self._persist_processing_options(options)
+        elif ProcessingOptionsDialog:
             logger.info("Creating ProcessingOptionsDialog instance")
             dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
             logger.info("Calling ProcessingOptionsDialog.ShowModal() - THIS MAY BLOCK")
@@ -4423,12 +4466,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             show_error(self, f"Error exporting descriptions:\n{e}")
 
+    def _resolve_copy_originals(self) -> bool:
+        """Whether to copy originals into the bundle when saving.
+
+        Uses the last processing-dialog choice for this session if present, else the
+        shared idt config default (~/.idt/config.json copy_originals). Keeps the GUI
+        and CLI reading the same default. See docs/design/image-handling-lifecycle.md.
+        """
+        try:
+            from idt_core.config import UserConfig
+            default = UserConfig.load().copy_originals
+        except Exception:
+            default = False
+        return bool(self.config.get('copy_originals', default))
+
     def _auto_save_bundle(self) -> None:
-        """Auto-create a reference-mode .idtw bundle after batch completes with no saved workspace.
+        """Auto-create a .idtw bundle after batch completes with no saved workspace.
 
         Always saves to ~/Documents/idt/<name> so the bundle is local, never on a
-        read-only network share next to the source images.  Reference mode only —
-        no image copy, just manifest.json + description sidecars.
+        read-only network share next to the source images. Whether images are copied
+        in or referenced in place follows the copy-originals setting.
         """
         if not self.workspace or not self.workspace.directory_paths:
             return
@@ -4443,7 +4500,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         bundle_path = workspace_root / source.name
         try:
             bundle = gui_workspace_to_bundle(
-                self.workspace.to_dict(), bundle_path, copy_images=False
+                self.workspace.to_dict(), bundle_path,
+                copy_images=self._resolve_copy_originals()
             )
             self.workspace_file = bundle.path
             self.update_window_title("ImageDescriber", bundle.path.name)
@@ -4506,7 +4564,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         try:
             with wx.BusyCursor():
                 bundle = gui_workspace_to_bundle(
-                    self.workspace.to_dict(), bundle_path, copy_images=False
+                    self.workspace.to_dict(), bundle_path,
+                    copy_images=self._resolve_copy_originals()
                 )
             self.workspace_file = bundle.path
             self.update_window_title("ImageDescriber", bundle.path.name)
@@ -5668,8 +5727,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if getattr(self, '_pending_process_all', False):
             self._pending_process_all = False
             skip_existing = getattr(self, '_pending_process_all_skip_existing', True)
+            preset = getattr(self, '_pending_preset_options', None)
+            self._pending_preset_options = None
             logger.info("Scan complete — resuming deferred on_process_all")
-            wx.CallAfter(self.on_process_all, None, skip_existing)
+            wx.CallAfter(self.on_process_all, None, skip_existing, preset)
 
     def on_scan_failed(self, event):
         """Handle directory scan failure"""
@@ -7938,6 +7999,18 @@ def main():
     parser = argparse.ArgumentParser(description="Image Describer Tool")
     parser.add_argument('path', nargs='?', help="Directory or workspace to load")
     parser.add_argument('--viewer', action='store_true', help="Start in viewer mode")
+    # --showgui hand-off from the CLI: open on the directory and begin the batch
+    # immediately with these options, as if the user had clicked "Describe All".
+    parser.add_argument('--autostart', action='store_true',
+                        help="Immediately start describing the loaded directory (used by 'idt describe --showgui')")
+    parser.add_argument('--provider', help="AI provider for --autostart")
+    parser.add_argument('--model', help="Model name for --autostart")
+    parser.add_argument('--prompt', help="Prompt name for --autostart")
+    parser.add_argument('--geocode', action='store_true', help="Enable GPS geocoding for --autostart")
+    parser.add_argument('--copy-originals', dest='copy_originals', action='store_true', default=None,
+                        help="Copy originals into the workspace for --autostart")
+    parser.add_argument('--no-copy-originals', dest='copy_originals', action='store_false',
+                        help="Reference originals in place for --autostart")
     parser.add_argument('--debug', action='store_true',
                        help='Enable verbose debug logging to file')
     parser.add_argument('--debug-file',
@@ -8027,6 +8100,17 @@ def main():
             wx.CallAfter(lambda: frame.load_workspace(path))
         elif path.is_dir():
             wx.CallAfter(lambda: frame.load_directory(path))
+
+        # --autostart: begin the batch right after the directory loads. on_process_all
+        # defers itself until the scan finishes, so this is safe to queue immediately.
+        if args.autostart and path.is_dir():
+            wx.CallAfter(lambda: frame.autostart_batch(
+                provider=args.provider,
+                model=args.model,
+                prompt=args.prompt,
+                geocode=args.geocode,
+                copy_originals=args.copy_originals,
+            ))
 
     frame.Show()
     app.MainLoop()
