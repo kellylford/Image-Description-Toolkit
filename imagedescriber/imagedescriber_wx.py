@@ -1573,13 +1573,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         view_menu.AppendSubMenu(mode_menu, "Application &Mode")
         view_menu.AppendSeparator()
 
-        filter_all_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &All Items\tF5")
+        filter_all_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &All Items\tCtrl+Shift+A")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("all"), filter_all_item)
 
-        filter_desc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Described Only")
+        filter_desc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Described Only\tCtrl+Shift+D")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("described"), filter_desc_item)
 
-        filter_undesc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Undescribed Only")
+        filter_undesc_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Undescribed Only\tCtrl+Shift+U")
         self.Bind(wx.EVT_MENU, lambda e: self.on_set_filter("undescribed"), filter_undesc_item)
 
         filter_videos_item = view_menu.AppendRadioItem(wx.ID_ANY, "Filter: &Videos Only")

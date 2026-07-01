@@ -15,7 +15,7 @@ IDT includes two standalone applications that share the same workspace format an
 | **idt** | Command-line tool | Automation, scripting, batch pipelines, server use |
 | **ImageDescriber** | Desktop GUI application | Interactive editing, reviewing, visual workflow |
 
-Both tools produce the same workspace bundles (`.idtw`), so you can start a job in the CLI and review results in the GUI—or vice versa.
+Both tools produce the same workspace bundles (`.idtw`) — a `.idtw` bundle is a **folder** (directory), not a compressed archive. It contains image copies, description sidecars, logs, and reports. You can start a job in the CLI and review results in the GUI—or vice versa.
 
 ### Supported AI Providers
 
@@ -52,6 +52,11 @@ Both tools produce the same workspace bundles (`.idtw`), so you can start a job 
 
 - Ollama installed: [https://ollama.com](https://ollama.com)
 - At least one vision model pulled (e.g., `ollama pull minicpm-v4.6`)
+
+**For HEIC/HEIF image support (iPhone photos)**
+
+- `pillow-heif` Python package installed (`pip install pillow-heif`)
+- On Windows, you may also need the [HEIF Image Extensions](https://www.microsoft.com/store/productId/9PMMSR1CGPWG) from the Microsoft Store
 
 **For video support**
 
@@ -144,6 +149,39 @@ IDT uses environment variables for API keys so they are never stored in your wor
    ollama pull moondream:latest  # 1.8 GB, fastest
    ```
 3. Ollama runs automatically as a background service once installed.
+
+### Updating IDT
+
+**Pre-built executables**
+
+1. Download the latest `idt.exe` and `ImageDescriber.exe` (or `ImageDescriber.app` on macOS) from the [releases page](https://github.com/kellylford/Image-Description-Toolkit/releases).
+2. Replace the old executables in your folder (or `/Applications` on macOS).
+3. Your existing `.idtw` workspace bundles and `~/.idt/config.json` settings are preserved — no migration needed.
+
+**From source**
+
+```bash
+git pull origin main
+pip install -r requirements.txt   # pick up any new dependencies
+```
+
+If you installed via a virtual environment, activate it first (`.winenv\Scripts\activate.bat` on Windows, `source venv/bin/activate` on macOS).
+
+### Uninstalling IDT
+
+**Pre-built executables**
+
+1. Delete `idt.exe` and `ImageDescriber.exe` (or `ImageDescriber.app` on macOS) from your system.
+2. To remove configuration and cache data, delete the `~/.idt/` directory:
+   - **Windows:** `rmdir /s %USERPROFILE%\.idt`
+   - **macOS/Linux:** `rm -rf ~/.idt`
+3. Your `.idtw` workspace bundles are not removed — delete them manually if desired.
+
+**From source**
+
+1. Delete the cloned repository folder.
+2. Remove the virtual environment folder (`.winenv` on Windows, `venv` on macOS).
+3. Delete `~/.idt/` as above.
 
 ### Quick Start: Your First Description
 
@@ -734,9 +772,9 @@ The application has two modes:
 |---|---|
 | **Application Mode** → Editor Mode | Switch to the workspace editor |
 | **Application Mode** → Viewer Mode | Switch to the read-only viewer |
-| **Filter** → All Items | Show all images, videos, and chats |
-| **Filter** → Described Only | Show only images with at least one description |
-| **Filter** → Undescribed Only | Show only images lacking a description |
+| **Filter** → All Items | Show all images, videos, and chats (Ctrl+Shift+A) |
+| **Filter** → Described Only | Show only images with at least one description (Ctrl+Shift+D) |
+| **Filter** → Undescribed Only | Show only images lacking a description (Ctrl+Shift+U) |
 | **Filter** → Videos Only | Show video files and their extracted frames |
 | **Filter** → Chats Only | Show saved chat sessions |
 | Show Image Previews | Toggle the image thumbnail panel |
@@ -778,9 +816,9 @@ A hierarchical tree showing all items in the workspace:
 - Folder nodes (expandable) — represent subfolder groups from your source directory
 - Video nodes (expandable) — videos with their extracted frames as child items
 - Image items — individual files with status icons:
-  - `[✓]` — has at least one description
-  - `[ ]` — no description yet
-  - `[!]` — file no longer exists on disk (descriptions preserved)
+  - `[✓]` — has at least one description (screen readers announce "described")
+  - `[ ]` — no description yet (screen readers announce "undescribed")
+  - `[!]` — file no longer exists on disk (screen readers announce "missing"; descriptions preserved)
 - Chat nodes — saved conversation sessions
 
 Use **View → Find Images** (`Ctrl+F`) to show a search bar that filters by filename, description text, or metadata content. Supports `and` / `or` operators: for example, `house and garage or backyard`.
@@ -955,7 +993,16 @@ All menu items, buttons, and interactive controls are reachable by keyboard. Arr
 
 ## Part 4: AI Providers
 
-> **Provider names differ between CLI and GUI.** The CLI uses `anthropic` and `florence`; the GUI uses `claude` and `huggingface` for the same providers. MLX and Ollama Cloud are GUI-only and do not appear in the CLI.
+> **Provider names differ between CLI and GUI.** Use this mapping table as a quick reference:
+>
+> | CLI name | GUI name | Notes |
+> |---|---|---|
+> | `anthropic` | `claude` | Same provider; Anthropic Claude models |
+> | `florence` | `huggingface` | Same provider; Microsoft Florence-2 via HuggingFace |
+> | `ollama` | `ollama` | Same name in both |
+> | `openai` | `openai` | Same name in both |
+> | — | `ollama_cloud` | GUI only; remote Ollama server |
+> | — | `mlx` | GUI only; Apple Silicon local models |
 
 ### Ollama — Local (Windows and macOS)
 
@@ -1088,7 +1135,10 @@ MLX runs vision models directly on Apple Silicon (M1/M2/M3/M4) using Apple's Met
 
 **Setup**
 
+MLX is a GUI-only feature. To enable it, install the `mlx-vlm` package into the same Python environment that runs the ImageDescriber GUI:
+
 ```bash
+# Activate the GUI's virtual environment first, then:
 pip install mlx-vlm
 ```
 
@@ -1128,6 +1178,16 @@ IDT ships with a library of prompt styles tuned for different use cases. List th
 | `mood` | Emotional atmosphere and psychological tone |
 | `functional` | Focuses on purpose, action, and utility |
 | `aialttext` | Produces three website alt-text options at 25, 50, and 100 words |
+
+**Sample outputs for the same image** (a photo of a golden retriever on a beach at sunset):
+
+| Style | Sample output |
+|---|---|
+| `simple` | A golden retriever sits on a sandy beach at sunset. |
+| `concise` | A golden retriever rests on a sandy beach, silhouetted against a warm orange sunset over calm ocean waters. |
+| `detailed` | **SUBJECT:** A golden retriever sitting on sand. **SETTING:** Beach at sunset, ocean in background. **COLORS:** Golden fur, orange sky, blue-gray water, tan sand. **COMPOSITION:** Dog centered in foreground, horizon line in upper third. **DETAILS:** Dog faces the camera, tongue out, waves gently lapping at shoreline. |
+| `narrative` | On the left, gentle waves roll onto a tan sandy beach. Centered in the foreground, a golden retriever sits facing the camera with its tongue out. Behind the dog, the ocean stretches to the horizon where a warm orange sunset fills the sky. |
+| `aialttext` | **25 words:** Golden retriever sitting on sandy beach at sunset facing camera. **50 words:** A golden retriever with tongue out sits on a sandy beach in the foreground, silhouetted against a vibrant orange sunset over calm ocean waters. **100 words:** A golden retriever sits centered on a tan sandy beach, facing the camera with its tongue hanging out. Behind the dog, gentle waves lap at the shoreline. The ocean extends to the horizon where a warm orange and yellow sunset fills the sky. The lighting creates a silhouette effect on the dog's fur. |
 
 ---
 
@@ -1542,7 +1602,9 @@ MyTrip.idtw/                        Workspace bundle (a folder ending in .idtw)
 | Action | Shortcut |
 |---|---|
 | Update Image List | F5 |
-| Filter: All Items | F5 |
+| Filter: All Items | Ctrl+Shift+A |
+| Filter: Described Only | Ctrl+Shift+D |
+| Filter: Undescribed Only | Ctrl+Shift+U |
 | Find Images (search bar) | Ctrl+F |
 | Edit Prompts | Ctrl+P |
 | Configure Settings | Ctrl+Shift+C |
