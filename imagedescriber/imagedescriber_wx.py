@@ -906,7 +906,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.workspace_file:
             base = Path(self.workspace_file) / "derived"
         else:
-            base = Path.home() / "Downloads" / "ImageDescriber" / "derived"
+            # No bundle saved yet: fall back to a scratch area under the workspace
+            # root (~/Documents/idt), NEVER ~/Downloads. Callers that write derived
+            # files should call _ensure_saved_bundle() first so this rarely triggers.
+            base = get_default_workspaces_root() / "_scratch" / "derived"
         result = base / sub if sub else base
         result.mkdir(parents=True, exist_ok=True)
         return result
@@ -919,7 +922,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """
         if self.workspace_file:
             return Path(self.workspace_file)
-        return Path.home() / "Downloads" / "ImageDescriber"
+        # No bundle saved: scratch under the workspace root (~/Documents/idt),
+        # never ~/Downloads. Extraction callers ensure a bundle first.
+        return get_default_workspaces_root() / "_scratch"
 
     def _extract_video_frames_sync(self, video_path: str, extraction_config: dict) -> tuple:
         """Extract frames from video synchronously (for auto-extraction in Process All).
@@ -1031,12 +1036,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if not ret:
                 break
 
-            frame_filename = f"{video_path_obj.stem}_frame_{extract_count:05d}.jpg"
+            # Name frames by their timestamp in the video (e.g. Caddyshack_490.00s.jpg)
+            # so the filename tells you how many seconds in the frame was taken —
+            # matches the "Extract Video Frames" worker path.
+            frame_time = frame_num / fps if fps > 0 else 0.0
+            frame_filename = f"{video_path_obj.stem}_{frame_time:.2f}s.jpg"
             frame_path = video_dir / frame_filename
             cv2.imwrite(str(frame_path), frame)
             if video_source_metadata and ExifEmbedder is not None:
                 try:
-                    frame_time = frame_num / fps if fps > 0 else 0.0
                     ExifEmbedder().embed_metadata(
                         frame_path, video_source_metadata,
                         frame_time=frame_time,
@@ -1089,14 +1097,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if (change_score > threshold and
                     frame_num - last_extract_frame >= min_frame_gap):
 
-                    # Save frame
-                    frame_filename = f"{video_path_obj.stem}_scene_{extract_count:04d}.jpg"
+                    # Save frame, tagging the filename with its timestamp so you
+                    # know how far into the video each scene change occurred.
+                    frame_time = frame_num / fps if fps > 0 else 0.0
+                    frame_filename = f"{video_path_obj.stem}_scene_{extract_count:04d}_{frame_time:.2f}s.jpg"
                     frame_path = video_dir / frame_filename
                     cv2.imwrite(str(frame_path), frame)
                     # Embed video GPS/date into frame EXIF if metadata is available
                     if video_source_metadata and ExifEmbedder is not None:
                         try:
-                            frame_time = frame_num / fps if fps > 0 else 0.0
                             ExifEmbedder().embed_metadata(
                                 frame_path, video_source_metadata,
                                 frame_time=frame_time,
@@ -4480,6 +4489,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             default = False
         return bool(self.config.get('copy_originals', default))
 
+    def _ensure_saved_bundle(self, context: str = "this operation") -> bool:
+        """Guarantee a real .idtw bundle exists before writing derived files.
+
+        Video frame extraction and URL downloads write into ``<bundle>/derived/``.
+        When no bundle has been saved yet, those files would otherwise land in a
+        scratch folder disconnected from any workspace and get lost — the cause of
+        "extracted frames not found" after Process All. This creates a bundle under
+        the workspace root (~/Documents/idt) first: silently when the source folder
+        is known (named after it), otherwise by prompting for a location.
+
+        Returns True if a saved, named bundle is available afterward; False if the
+        user cancelled or creation failed.
+        """
+        if self.workspace_file and not is_untitled_workspace(Path(self.workspace_file).stem):
+            return True
+        # Silent auto-save under ~/Documents/idt when we know the source folder.
+        if self.workspace and self.workspace.directory_paths:
+            self._auto_save_bundle()
+            if self.workspace_file and not is_untitled_workspace(Path(self.workspace_file).stem):
+                return True
+        # No source folder to name the bundle after (e.g. a video picked via file
+        # dialog into an empty workspace): ask the user where to create it.
+        return self._prompt_and_create_bundle(f"Save Workspace Bundle before {context}")
+
     def _auto_save_bundle(self) -> None:
         """Auto-create a .idtw bundle after batch completes with no saved workspace.
 
@@ -5439,6 +5472,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 except Exception as e:
                     logger.warning(f"Could not load alt text mapping: {e}")
 
+            # "Preserve alt text as a description" checkbox in the download dialog
+            # (default from idt_core.config.UserConfig.preserve_alt_text).
+            preserve_alt_text = True
+            if hasattr(self, 'current_download_settings'):
+                preserve_alt_text = self.current_download_settings.get('preserve_alt_text', True)
+
             # Add all downloaded images to workspace (always add)
             for img_path in downloaded_images:
                 item = ImageItem(str(img_path), "downloaded_image")
@@ -5447,14 +5486,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 item.download_url = url_mapping.get(filename, event.input_dir)
                 item.download_timestamp = datetime.now().isoformat()
 
-                # If the source page provided alt text, store it and create a
-                # "Website Alt Text" description so the user has both the
-                # site-authored text and any AI-generated description.
-                # Require >= 3 chars AND at least one space to reject bare
-                # filenames (e.g. 'IMG_0160.DNG') while accepting short labels.
+                # If the source page provided alt text, store it and — when the user
+                # opted to preserve it — create a "Website Alt Text" description so
+                # they have both the site-authored text and any AI-generated one.
+                # Require >= 3 chars AND at least one space to reject bare filenames
+                # (e.g. 'IMG_0160.DNG') while accepting short labels.
                 alt_text = alt_text_mapping.get(filename, '').strip()
                 item.alt_text = alt_text if alt_text else None
-                if len(alt_text) >= 3 and ' ' in alt_text:
+                if preserve_alt_text and len(alt_text) >= 3 and ' ' in alt_text:
                     alt_desc = ImageDescription(
                         text=alt_text,
                         model="Website Alt Text",
@@ -6229,6 +6268,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 "min_scene_duration_seconds": 1.0,
                 **settings
             }
+
+        # Frames are written into the bundle's derived/frames/. Ensure a real bundle
+        # exists first (under ~/Documents/idt) so extraction never drops frames into a
+        # disconnected scratch folder that Process All then can't find.
+        if not self._ensure_saved_bundle("extracting video frames"):
+            return
 
         # Store settings for potential auto-processing
         self.last_extraction_settings = {

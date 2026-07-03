@@ -79,6 +79,10 @@ class UserConfig:
     # portable) or reference them in place. Default off. See
     # docs/design/image-handling-lifecycle.md.
     copy_originals: bool = False
+    # Whether `idt download` (CLI) and the ImageDescriber download dialog (GUI) save
+    # a downloaded image's HTML alt text as its own description (model "Website Alt
+    # Text"), in addition to any AI-generated one. Default on.
+    preserve_alt_text: bool = True
 
     def workspace_root_path(self) -> Path:
         """Resolved workspace root. Defaults to ~/Documents/idt."""
@@ -100,6 +104,7 @@ class UserConfig:
                 setattr(obj, key, data[key])
         obj.custom_prompts = data.get("custom_prompts", {})
         obj.copy_originals = bool(data.get("copy_originals", False))
+        obj.preserve_alt_text = bool(data.get("preserve_alt_text", True))
         return obj
 
     def save(self) -> None:
@@ -110,6 +115,7 @@ class UserConfig:
             "default_prompt_name": self.default_prompt_name,
             "custom_prompts": self.custom_prompts,
             "copy_originals": self.copy_originals,
+            "preserve_alt_text": self.preserve_alt_text,
         }
         if self.workspace_root:
             data["workspace_root"] = self.workspace_root

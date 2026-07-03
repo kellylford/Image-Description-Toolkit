@@ -186,13 +186,18 @@ def extract_frames_to_dir(
         if should_save:
             if opts.max_frames and saved_count >= opts.max_frames:
                 break
-            filename = f"frame_{saved_count + 1:04d}.jpg"
+            # Name frames by their timestamp in the video (seconds in) so the
+            # filename tells you where each frame came from — matches the GUI.
+            ts = frame_number / fps if fps else 0.0
+            if opts.mode == "scene":
+                filename = f"{video_path.stem}_scene_{saved_count + 1:04d}_{ts:.2f}s.jpg"
+            else:
+                filename = f"{video_path.stem}_{ts:.2f}s.jpg"
             dest = output_dir / filename
             cv2.imwrite(str(dest), frame)
             frame_paths.append(dest)
             saved_count += 1
             if opts.on_progress:
-                ts = frame_number / fps
                 opts.on_progress(saved_count, f"{ts:.1f}s")
 
         frame_number += 1

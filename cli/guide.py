@@ -275,9 +275,10 @@ def _step_model(provider: str) -> str:
     return get_input("Enter model name")
 
 
-def _step_source() -> tuple[str, str]:
+def _step_source() -> tuple[str, str, dict]:
     """
-    Returns (source_type, source_value) where source_type is 'dir' or 'url'.
+    Returns (source_type, source_value, extra) where source_type is 'dir' or 'url'.
+    For 'url', extra may contain 'preserve_alt_text'.
     """
     _header("Step 4: Image Source")
     print("You can describe images in a local folder, or download and describe")
@@ -290,11 +291,19 @@ def _step_source() -> tuple[str, str]:
         allow_back=True,
     )
     if source_type in ("BACK", "EXIT"):
-        return source_type, ""
+        return source_type, "", {}
 
     if "URL" in source_type:
         url = get_input("Enter the URL")
-        return "url", url
+        print()
+        print("Web pages often include alt text describing each image.")
+        from idt_core.config import UserConfig
+        preserve_alt_text = get_yes_no(
+            "If the page has alt text, save it as an additional description "
+            "alongside the AI-generated one?",
+            default=UserConfig.load().preserve_alt_text,
+        )
+        return "url", url, {"preserve_alt_text": preserve_alt_text}
 
     # Local folder
     while True:
@@ -303,12 +312,12 @@ def _step_source() -> tuple[str, str]:
         if not p.exists():
             print(f"Not found: {p}")
             if not get_yes_no("Try again?"):
-                return "EXIT", ""
+                return "EXIT", "", {}
             continue
         if not p.is_dir():
             print(f"That is not a directory: {p}")
             if not get_yes_no("Try again?"):
-                return "EXIT", ""
+                return "EXIT", "", {}
             continue
         # Check for images and videos
         from idt_core.scanner import scan_images
@@ -329,7 +338,7 @@ def _step_source() -> tuple[str, str]:
             print("No image or video files found in that folder.")
             if not get_yes_no("Use it anyway?", default=False):
                 continue
-        return "dir", str(p)
+        return "dir", str(p), {}
 
 
 def _step_prompt() -> tuple[str, str]:
@@ -417,6 +426,11 @@ def _step_extra_options(source_type: str) -> dict:
             "Embed descriptions into image copies after describing?", default=False
         )
     elif source_type == "url":
+        opts["redescribe"] = get_yes_no(
+            "Generate an AI description even for images whose alt text was "
+            "saved as a description?",
+            default=True,
+        )
         opts["embed"] = get_yes_no(
             "Embed descriptions into downloaded image copies after describing?",
             default=False,
@@ -445,6 +459,12 @@ def _build_command(
         parts += ["download", source, "--describe"]
         if extra.get("embed"):
             parts.append("--embed")
+        # Always emit an explicit flag (not just when it differs from the config
+        # default) so the printed/run command is self-contained and unambiguous
+        # regardless of what's currently configured.
+        parts.append("--preserve-alt-text" if extra.get("preserve_alt_text", True) else "--no-preserve-alt-text")
+        if not extra.get("redescribe", True):
+            parts.append("--no-redescribe")
         parts += ["--provider", provider, "--model", model, "--prompt", prompt_name]
         if extra.get("limit"):
             parts += ["--max", str(extra["limit"])]
@@ -526,7 +546,7 @@ def run_guide() -> None:
                 step = 4
 
             elif step == 4:
-                src_type, src_val = _step_source()
+                src_type, src_val, src_extra = _step_source()
                 if src_type == "EXIT":
                     print("Exiting.")
                     return
@@ -535,6 +555,7 @@ def run_guide() -> None:
                     continue
                 state["source_type"] = src_type
                 state["source"] = src_val
+                state["source_extra"] = src_extra
                 step = 5
 
             elif step == 5:
@@ -555,6 +576,7 @@ def run_guide() -> None:
 
             elif step == 7:
                 state["extra"] = _step_extra_options(state["source_type"])
+                state["extra"].update(state.get("source_extra", {}))
 
                 # Build and show the command
                 cmd_parts = _build_command(
@@ -580,6 +602,9 @@ def run_guide() -> None:
                 print("Metadata:   ", meta_str)
                 if state["extra"].get("limit"):
                     print("Limit:      ", state["extra"]["limit"], "images")
+                if state["source_type"] == "url":
+                    alt_str = "saved as a description" if state["extra"].get("preserve_alt_text", True) else "context only"
+                    print("Alt text:   ", alt_str)
                 print()
                 print("Command to run:")
                 print()
@@ -683,6 +708,8 @@ def _run_command(parts: list[str], state: dict) -> None:
             timeout=30,
             describe=True,
             embed=extra.get("embed", False),
+            preserve_alt_text=extra.get("preserve_alt_text", True),
+            redescribe=extra.get("redescribe", True),
             provider=state["provider"],
             model=state["model"],
             ollama_host="http://localhost:11434",

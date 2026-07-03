@@ -332,7 +332,7 @@ idt download <url> [directory] [options]
 | Argument | Description |
 |---|---|
 | `<url>` | Web page URL to scrape for images |
-| `[directory]` | Local folder to save images (default: current directory) |
+| `[directory]` | Workspace name or path (default: derived from the URL's domain, under the workspace root — see `idt config`) |
 
 **Options**
 
@@ -343,10 +343,14 @@ idt download <url> [directory] [options]
 | `--timeout SECONDS` | 30 | HTTP request timeout |
 | `--describe` | Off | Automatically describe downloaded images |
 | `--embed` | Off | Embed descriptions after describing (requires `--describe`) |
+| `--preserve-alt-text` / `--no-preserve-alt-text` | From config (`preserve_alt_text`, on by default) | Save existing HTML alt text as its own description (model `Website Alt Text`), in addition to any AI-generated one |
+| `--redescribe` / `--no-redescribe` | On | With `--describe`, generate an AI description even for images whose alt text was preserved as a description. Turn off to keep alt-text-only images and skip the AI call for them. |
 | `--provider`, `--model`, `--prompt`, `--prompt-text` | — | AI options (same as `idt describe`) |
 | `--quiet, -q` | Off | Minimal output |
 
-The command captures the original HTML `alt` attribute from each `<img>` tag alongside the downloaded image, storing it in the workspace for comparison with the AI-generated description.
+**Where images land:** `idt download` uses the same `.idtw` workspace model as `idt describe` (see [Workspaces (.idtw)](#workspaces-idtw) below) — it never writes into an old-style `.idt` sibling folder. Downloaded images are copied into `<workspace>.idtw/derived/downloads/<page title>-<timestamp>/` and registered as workspace items, so `idt describe`, `idt status`, `idt show`, and the ImageDescriber GUI can all see them. With `[directory]` omitted, the workspace is named after the URL's domain (e.g. `nytimes.com.idtw`) and created under the workspace root (`~/Documents/idt` by default). Running `idt download` against the same site again reuses that same workspace — each run just adds a new timestamped batch — so history accumulates per site instead of scattering across one-off folders. Pass `[directory]` (a bare name or a full path) to target a different or explicitly named workspace, exactly like `idt describe --workspace`.
+
+The command captures the original HTML `alt` attribute from each `<img>` tag alongside the downloaded image. By default (`preserve_alt_text` config, on) that alt text is stored two ways: as prompt context, and (when non-trivial — at least 3 characters and containing a space, to filter out bare filenames) as its own description entry, so it shows up in the workspace history alongside the AI-generated description for comparison.
 
 **Examples**
 
@@ -1261,9 +1265,11 @@ Use `idt download` or **File → Load Images From URL...** in the GUI to fetch i
 The tool:
 1. Scrapes all `<img>` elements from the page.
 2. Filters by minimum size if `--min-size` is specified.
-3. Downloads images to the target folder.
+3. Downloads images into a `.idtw` workspace (see [Workspaces (.idtw)](#workspaces-idtw)).
 4. Records the original HTML `alt` attribute alongside each image.
 5. Optionally describes and embeds in the same pass.
+
+**Where images land:** Both the CLI and the GUI put downloads inside the workspace bundle, at `<workspace>.idtw/derived/downloads/<page title>-<timestamp>/`, never in a separate folder next to the workspace. In the CLI, `idt download <url> [directory]` resolves the workspace exactly like `idt describe --workspace` does: omit `[directory]` and it's named after the URL's domain under the workspace root (`~/Documents/idt` by default, see `idt config`); pass a name or path to target a specific workspace. Run `idt download <url> --describe` and check the printed `Location:` and `Workspace:` lines for the exact path. In the GUI, **File → Load Images From URL...** downloads into the current bundle's `derived/downloads/` folder (prompting you to save a workspace first if none is open yet).
 
 **Common use case:** Generate accessibility-compliant alt text for images on an existing web page, then compare the AI-generated description with the existing alt text stored in the workspace.
 

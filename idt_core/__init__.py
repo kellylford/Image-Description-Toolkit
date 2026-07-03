@@ -9,7 +9,7 @@ from .image_item import ImageItem, Description
 from .scanner import scan_images, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from .config import UserConfig, BUILT_IN_PROMPTS, DEFAULT_PROMPT_NAME
 from .metadata import MetadataExtractor, NominatimGeocoder, ImageMetadata
-from .downloader import Downloader, DownloadResult
+from .downloader import Downloader, DownloadResult, download_into_workspace, WorkspaceDownloadResult, domain_name
 from .video import VideoExtractor, VideoExtractionOptions, VideoExtractionResult, scan_videos
 from .embedder import Embedder, embed_image_file
 from .exporter import (
@@ -30,7 +30,7 @@ __all__ = [
     "scan_images", "scan_videos", "IMAGE_EXTENSIONS", "VIDEO_EXTENSIONS",
     "UserConfig", "BUILT_IN_PROMPTS", "DEFAULT_PROMPT_NAME",
     "MetadataExtractor", "NominatimGeocoder", "ImageMetadata",
-    "Downloader", "DownloadResult",
+    "Downloader", "DownloadResult", "download_into_workspace", "WorkspaceDownloadResult", "domain_name",
     "VideoExtractor", "VideoExtractionOptions", "VideoExtractionResult",
     "Embedder", "embed_image_file",
     "export_html", "export_csv", "export_txt",

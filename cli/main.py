@@ -190,6 +190,37 @@ def _open_or_create_workspace(source: Path, workspace_arg: Optional[str]):
     return ws
 
 
+def _resolve_download_workspace(url: str, workspace_arg: Optional[str]):
+    """
+    Resolve the .idtw bundle for `idt download`, mirroring _open_or_create_workspace:
+      <arg> PATH  (contains separator or ends in .idtw) → that exact path
+      <arg> NAME  (bare name)                           → NAME.idtw in default workspace root
+      (omitted)                                          → <domain>.idtw under ~/Documents/idt
+    Downloads accumulate in the same per-domain (or explicitly named) workspace across
+    runs, same as local-folder workspaces do for `idt describe`.
+    """
+    from idt_core.workspace import Workspace, BUNDLE_EXT
+    from idt_core.downloader import domain_name
+    from idt_core.config import UserConfig
+
+    cfg = UserConfig.load()
+    if workspace_arg:
+        wp = Path(workspace_arg).expanduser()
+        is_bare_name = (wp.parent == Path(".")) and (BUNDLE_EXT not in workspace_arg)
+        if is_bare_name:
+            wp = cfg.workspace_root_path() / workspace_arg
+    else:
+        wp = cfg.workspace_root_path() / domain_name(url)
+
+    resolved = wp if Workspace.is_bundle(wp) else wp.with_name(wp.name + BUNDLE_EXT)
+    was_new = not Workspace.is_bundle(resolved)
+    ws = Workspace.open(wp)
+    if was_new:
+        ws.copy_originals = cfg.copy_originals
+        ws.save_manifest()
+    return ws
+
+
 def _find_workspace(arg: str):
     """
     For read commands: locate an existing bundle from a user-supplied path.
@@ -457,10 +488,54 @@ def cmd_describe(args):
         _auto_export_workspace(ws, args.quiet)
 
 
+def _extract_one_video_into_workspace(ws, video: Path, opts) -> list:
+    """
+    Extract one video's frames into ws.derived_dir("frames")/<stem>/ and register
+    the video (reference item) plus each frame (extracted_frame item) in the
+    workspace. Returns the list of frame WorkspaceItems (for describing).
+
+    Raises ImportError if opencv-python is not installed.
+    """
+    from idt_core.video import extract_frames_to_dir
+    from idt_core.workspace import WorkspaceItem
+
+    frames_dir = ws.derived_dir("frames") / video.stem
+    result = extract_frames_to_dir(video, frames_dir, opts)
+
+    # Register the video as a reference-mode item (no copy — videos are large).
+    video_wi = ws.get_item(video.name)
+    if video_wi is None:
+        video_wi = WorkspaceItem(
+            image=video.name,
+            source_path=str(video),
+            storage="reference",
+            item_type="video",
+            is_missing=not video.exists(),
+        )
+        ws.save_item(video_wi)
+    video_gui_path = str(ws.image_path(video_wi))
+
+    frame_items = []
+    frame_paths = []
+    for frame_path in result.frame_paths:
+        # Frames already live in derived/frames/ — reference them there rather
+        # than copying into images/ (that would duplicate every frame).
+        frame_wi = ws.add_image(frame_path, subfolder=f"frames/{video.stem}", copy=False)
+        frame_wi.item_type = "extracted_frame"
+        frame_wi.parent_video = video_gui_path
+        ws.save_item(frame_wi)
+        frame_items.append(frame_wi)
+        frame_paths.append(str(ws.image_path(frame_wi)))
+
+    # Store the frame list on the video so the GUI can show the frame count.
+    video_wi.extra["extracted_frames"] = frame_paths
+    ws.save_item(video_wi)
+    return frame_items
+
+
 def _extract_videos_into_workspace(ws, source: Path, args) -> None:
     """Scan source for videos, extract frames, and add them to the workspace."""
-    from idt_core.video import scan_videos, extract_frames_to_dir, VideoExtractionOptions
-    from idt_core.workspace import WorkspaceItem
+    from idt_core.video import scan_videos, VideoExtractionOptions
     videos = list(scan_videos(source))
     if not videos:
         return
@@ -471,42 +546,11 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
     total_frames = 0
     cv_missing = False
     for video in videos:
-        frames_dir = ws.derived_dir("frames") / video.stem
         try:
-            result = extract_frames_to_dir(video, frames_dir, opts)
-
-            # Register the video as a reference-mode item (no copy — videos are large).
-            video_wi = ws.get_item(video.name)
-            if video_wi is None:
-                video_wi = WorkspaceItem(
-                    image=video.name,
-                    source_path=str(video),
-                    storage="reference",
-                    item_type="video",
-                    is_missing=not video.exists(),
-                )
-                ws.save_item(video_wi)
-            # For reference-mode items image_path() returns the original source path,
-            # which is what the GUI uses as the dict key for this video item.
-            video_gui_path = str(ws.image_path(video_wi))
-
-            frame_paths = []
-            for frame_path in result.frame_paths:
-                # Frames already live in derived/frames/ — reference them there rather
-                # than copying into images/ (that would duplicate every frame).
-                frame_wi = ws.add_image(frame_path, subfolder=f"frames/{video.stem}", copy=False)
-                frame_wi.item_type = "extracted_frame"
-                frame_wi.parent_video = video_gui_path
-                ws.save_item(frame_wi)
-                frame_paths.append(str(ws.image_path(frame_wi)))
-
-            # Store the frame list on the video so the GUI can show the frame count.
-            video_wi.extra["extracted_frames"] = frame_paths
-            ws.save_item(video_wi)
-
-            total_frames += len(result.frame_paths)
+            frame_items = _extract_one_video_into_workspace(ws, video, opts)
+            total_frames += len(frame_items)
             if not args.quiet:
-                print(f"  {video.name}: {len(result.frame_paths)} frames")
+                print(f"  {video.name}: {len(frame_items)} frames")
         except ImportError:
             cv_missing = True
             break
@@ -538,15 +582,12 @@ def _auto_export_workspace(ws, quiet: bool) -> None:
 
 def _cmd_describe_stdin(args):
     """
-    Describe image paths read from stdin, one per line.
+    Describe image paths read from stdin, one per line, into a .idtw workspace.
     Pipeline use: get_nyt_images.bat | idt describe - --prompt aialttext
     """
-    from idt_core.project import Project
-    from idt_core.image_item import ImageItem, Description
+    from idt_core.pipeline import WorkspacePipeline, RunOptions
     from idt_core.progress import Progress
     from idt_core.config import UserConfig
-    from idt_core.converter import load_for_api
-    from idt_core.metadata import MetadataExtractor, NominatimGeocoder
 
     import io
     stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8-sig")
@@ -567,85 +608,68 @@ def _cmd_describe_stdin(args):
         sys.exit(1)
 
     source = Path(getattr(args, "project", None) or "").resolve() if getattr(args, "project", None) else _common_ancestor(paths)
-    project = Project.open(source)
+    ws = _open_or_create_workspace(source, getattr(args, "workspace", None))
     user_cfg = UserConfig.load()
 
-    provider_name = args.provider or project.config.default_provider or user_cfg.default_provider
-    model = args.model or project.config.default_model or user_cfg.default_model
-    prompt_name, prompt_text = _resolve_prompt(args, project.config)
+    _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
+    _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
+    provider_name = args.provider or _ws_provider or user_cfg.default_provider
+    model         = args.model    or _ws_model    or user_cfg.default_model
+    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
-    extractor = MetadataExtractor() if args.extract_metadata else None
-    geocoder = None
-    if extractor and args.geocode:
-        geocoder = NominatimGeocoder(
-            cache_path=Path.home() / ".idt" / "geocode_cache.json"
-        )
-
-    if not args.quiet:
-        print(f"Project:   {project.idt_dir}")
-        print(f"Provider:  {provider_name}  model: {model}")
-        print(f"Images:    {len(paths)} from stdin")
-        print()
-
-    progress = Progress(total=len(paths), quiet=args.quiet)
-    described = errors = 0
-
+    # Add each stdin image to the workspace (idempotent), mirroring its position
+    # under the common source root as a subfolder. copy_originals decides copy vs
+    # reference; originals are never modified either way.
+    items = []
     for img_path in paths:
         try:
-            rel = img_path.relative_to(source)
+            sub = str(img_path.parent.relative_to(source))
         except ValueError:
-            print(f"Warning: {img_path} is outside project root {source} — skipping", file=sys.stderr)
-            continue
+            sub = None
+        if sub in (".", ""):
+            sub = None
+        items.append(ws.add_image(img_path, subfolder=sub, copy=ws.copy_originals))
 
-        sidecar = project.sidecar_path(img_path)
-        item = ImageItem.load(sidecar) if sidecar.exists() else ImageItem(source_path=img_path, sidecar_path=sidecar)
+    if not args.quiet:
+        print(f"Workspace: {ws.path}")
+        print(f"Provider:  {provider_name}  model: {model}")
+        print(f"Images:    {len(items)} from stdin")
+        print()
 
-        if item.described and not args.redescribe:
-            progress.skip(img_path.name, "already described")
-            continue
+    ws.defaults.prompt_name = prompt_name
+    ws.geocode_enabled = bool(args.geocode)
+    ws.save_manifest()
 
-        try:
-            # Metadata extraction
-            meta_context = ""
-            if extractor:
-                meta = extractor.extract(img_path)
-                if geocoder:
-                    meta = geocoder.enrich(meta)
-                meta_context = meta.prompt_context()
-                item.metadata = meta.to_dict()
+    options = RunOptions(
+        prompt_name=prompt_name,
+        prompt_text=prompt_text,
+        redescribe=args.redescribe,
+        extract_metadata=args.extract_metadata,
+        geocode=args.geocode,
+    )
+    progress = Progress(total=len(items), quiet=args.quiet)
+    described = errors = 0
+    pipeline = WorkspacePipeline(ws, provider)
 
-            effective_prompt = prompt_text
-            if meta_context and effective_prompt:
-                effective_prompt = f"Context: {meta_context}\n\n{effective_prompt}"
-            elif meta_context:
-                effective_prompt = f"Context: {meta_context}\n\n"
-
-            image_bytes, mime_type = load_for_api(img_path)
-            result = provider.describe(image_bytes, mime_type, effective_prompt)
-            desc = Description.create(
-                text=result.text,
-                model=result.model,
-                provider=result.provider,
-                prompt_name=prompt_name,
-                prompt_text=prompt_text,
-                input_tokens=result.input_tokens,
-                output_tokens=result.output_tokens,
-                metadata_context=meta_context or None,
-            )
-            item.add_description(desc)
-            item.save()
+    for event in pipeline.run_items(items, options):
+        if event.success:
             described += 1
-            progress.update(img_path.name, success=True)
-
-            if args.quiet:
-                print(f"{img_path}\t{result.text}")
-
-        except Exception as exc:
+            progress.update(event.item.display_name, success=True)
+            if args.quiet and event.item.descriptions:
+                # Pipeline-friendly output: original source path TAB description
+                print(f"{event.item.source_path}\t{event.item.descriptions[-1].text}")
+        else:
             errors += 1
-            progress.update(img_path.name, success=False, error=str(exc))
+            progress.update(event.item.display_name, success=False, error=event.error)
 
     progress.summary(described=described, errors=errors)
+
+    if described > 0:
+        ws.defaults.provider = provider_name
+        ws.defaults.model = model
+        ws.has_any_descriptions = True
+        ws.save_manifest()
 
 
 def _common_ancestor(paths: list[Path]) -> Path:
@@ -666,21 +690,19 @@ def _common_ancestor(paths: list[Path]) -> Path:
 
 def cmd_download(args):
     """
-    Download images from a URL and optionally describe them.
+    Download images from a URL into a workspace, and optionally describe them.
 
     idt download https://www.nytimes.com/ --max 20 --describe --prompt aialttext
     """
-    from idt_core.project import Project
-    from idt_core.downloader import Downloader
+    from idt_core.downloader import download_into_workspace
+    from idt_core.config import UserConfig
 
-    # Determine target directory
-    target = Path(args.directory).resolve() if args.directory else Path.cwd()
-    target.mkdir(parents=True, exist_ok=True)
-    project = Project.open(target)
+    cfg = UserConfig.load()
+    ws = _resolve_download_workspace(args.url, args.directory)
 
     if not args.quiet:
         print(f"URL:       {args.url}")
-        print(f"Project:   {project.idt_dir}")
+        print(f"Workspace: {ws.path}")
         print()
 
     min_w = min_h = 0
@@ -693,23 +715,18 @@ def cmd_download(args):
                 print(f"Invalid --min-size format (use WIDTHxHEIGHT, e.g. 200x200)", file=sys.stderr)
                 sys.exit(1)
 
-    total_started = [0]
     def _on_progress(i: int, total: int, url: str) -> None:
         if not args.quiet:
             pct = int(i / total * 100) if total else 0
             print(f"  {i} of {total}  {pct}%  {url[:60]}", end="\r", flush=True)
-        total_started[0] = total
-
-    downloader = Downloader(
-        project=project,
-        min_width=min_w,
-        min_height=min_h,
-        timeout=args.timeout,
-        on_progress=_on_progress,
-    )
 
     try:
-        result = downloader.download(args.url, max_images=args.max_images)
+        result = download_into_workspace(
+            ws, args.url,
+            min_width=min_w, min_height=min_h,
+            timeout=args.timeout, max_images=args.max_images,
+            on_progress=_on_progress,
+        )
     except ImportError as e:
         print(f"Error: {e}", file=sys.stderr)
         print("Install with: pip install requests beautifulsoup4", file=sys.stderr)
@@ -719,36 +736,44 @@ def cmd_download(args):
         print()  # clear progress line
 
     print(f"Downloaded: {result.downloaded} images  skipped: {result.skipped}  failed: {result.failed}")
-    print(f"Location:  {result.download_dir}")
+    print(f"Location:  {ws.derived_dir(result.subfolder)}")
 
-    if result.alt_texts and not args.quiet:
-        print(f"Alt texts: {len(result.alt_texts)} images had existing alt text from the site")
+    # Explicit --preserve-alt-text/--no-preserve-alt-text overrides the user's
+    # configured default (`idt config --set preserve_alt_text=...`, on by default).
+    preserve_alt_text = (
+        args.preserve_alt_text if args.preserve_alt_text is not None else cfg.preserve_alt_text
+    )
+    n_alt = sum(1 for i in result.items if i.alt_text)
+    if n_alt and not args.quiet:
+        suffix = " (saved as a description)" if preserve_alt_text else ""
+        print(f"Alt texts: {n_alt} images had existing alt text from the site{suffix}")
+
+    # Record alt text as its own description before describing, so it shows up in
+    # history alongside the AI-generated one — filtered to reject bare filenames
+    # used as alt text (matches the old GUI's "Website Alt Text" heuristic).
+    if preserve_alt_text:
+        from idt_core.workspace import WorkspaceDescription
+        for item in result.items:
+            alt = item.alt_text
+            if alt and len(alt) >= 3 and " " in alt:
+                item.add_description(WorkspaceDescription.create(
+                    text=alt, model="Website Alt Text", provider="website", prompt_name="alt_text",
+                ))
+                ws.save_item(item)
 
     # Auto-describe the downloaded images if requested
     if args.describe and result.downloaded > 0:
         print()
-        # Treat the download dir as a new project source
-        dl_project = Project.open(result.download_dir)
-
-        # Seed alt text into sidecars before describing
-        if result.alt_texts:
-            from idt_core.image_item import ImageItem
-            for fname, alt in result.alt_texts.items():
-                img_path = result.download_dir / fname
-                if img_path.exists():
-                    sp = dl_project.sidecar_path(img_path)
-                    item = ImageItem.load(sp) if sp.exists() else ImageItem(source_path=img_path, sidecar_path=sp)
-                    item.alt_text = alt
-                    item.save()
-
-        from idt_core.pipeline import Pipeline, RunOptions
+        from idt_core.pipeline import WorkspacePipeline, RunOptions
         from idt_core.progress import Progress
-        from idt_core.config import UserConfig
 
-        user_cfg = UserConfig.load()
-        provider_name = args.provider or user_cfg.default_provider
-        model = args.model or user_cfg.default_model
-        prompt_name, prompt_text = _resolve_prompt(args, dl_project.config)
+        # Only inherit provider/model from the workspace once it has a real
+        # description history (same guard cmd_describe uses).
+        _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
+        _ws_model = ws.defaults.model if ws.has_any_descriptions else ""
+        provider_name = args.provider or _ws_provider or cfg.default_provider
+        model = args.model or _ws_model or cfg.default_model
+        prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
         if not args.quiet:
@@ -759,12 +784,19 @@ def cmd_download(args):
             prompt_name=prompt_name,
             prompt_text=prompt_text,
             extract_metadata=False,  # downloaded images don't have EXIF
+            # Freshly downloaded images should always get an AI description,
+            # even when a "Website Alt Text" description was just seeded above
+            # (otherwise the undescribed-only queue would skip every image whose
+            # alt text we preserved). Scoped to just this batch via run_items(),
+            # so it never touches other, already-described images sharing this
+            # workspace.
+            redescribe=args.redescribe,
         )
         progress = Progress(total=result.downloaded, quiet=args.quiet)
         described = errors = 0
-        pipeline = Pipeline(dl_project, provider)
+        pipeline = WorkspacePipeline(ws, provider)
 
-        for event in pipeline.run(options):
+        for event in pipeline.run_items(result.items, options):
             if event.success:
                 described += 1
                 progress.update(event.item.display_name, success=True)
@@ -773,6 +805,16 @@ def cmd_download(args):
                 progress.update(event.item.display_name, success=False, error=event.error)
 
         progress.summary(described=described, errors=errors)
+
+        if described > 0:
+            ws.defaults.provider = provider_name
+            ws.defaults.model = model
+            ws.has_any_descriptions = True
+            ws.save_manifest()
+
+        if described > 0 and args.embed:
+            print()
+            _do_embed_workspace(ws, force=False, dry_run=False, quiet=args.quiet)
 
         if described > 0 and args.embed:
             print()
@@ -790,8 +832,7 @@ def cmd_video(args):
     idt video ~/Movies/concert.mp4 --interval 5 --describe
     idt video ~/Movies/events/ --scene 30 --describe --prompt detailed
     """
-    from idt_core.project import Project
-    from idt_core.video import VideoExtractor, VideoExtractionOptions, scan_videos
+    from idt_core.video import VideoExtractionOptions, scan_videos
     from idt_core.scanner import is_video
 
     source = Path(args.source).resolve()
@@ -799,7 +840,11 @@ def cmd_video(args):
         print(f"Error: not found: {source}", file=sys.stderr)
         sys.exit(1)
 
-    project = Project.open(source if source.is_dir() else source.parent)
+    # Frames and descriptions land in a .idtw workspace under the workspace root
+    # (~/Documents/idt), the same model idt describe uses — never a sibling .idt/.
+    ws = _open_or_create_workspace(
+        source if source.is_dir() else source.parent, getattr(args, "workspace", None)
+    )
 
     # Find videos to process
     if source.is_file():
@@ -823,23 +868,20 @@ def cmd_video(args):
 
     if not args.quiet:
         print(f"Source:    {source}")
+        print(f"Workspace: {ws.path}")
         print(f"Videos:    {len(videos)}")
         print(f"Mode:      {mode}  ({'every ' + str(args.interval) + 's' if mode == 'interval' else 'threshold ' + str(args.scene)})")
         print()
 
-    extractor = VideoExtractor(project)
-    all_frame_paths = []
-    all_frame_dirs = []
-
+    all_frame_items = []
     for video in videos:
         if not args.quiet:
             print(f"  Extracting frames: {video.name}")
         try:
-            result = extractor.extract(video, opts)
-            all_frame_paths.extend(result.frame_paths)
-            all_frame_dirs.append(result.frames_dir)
+            frame_items = _extract_one_video_into_workspace(ws, video, opts)
+            all_frame_items.extend(frame_items)
             if not args.quiet:
-                print(f"    {len(result.frame_paths)} frames → {result.frames_dir}")
+                print(f"    {len(frame_items)} frames -> {ws.derived_dir('frames') / video.stem}")
         except ImportError as e:
             print(f"Error: {e}", file=sys.stderr)
             print("Install with: pip install opencv-python", file=sys.stderr)
@@ -847,45 +889,54 @@ def cmd_video(args):
         except Exception as e:
             print(f"  Error processing {video.name}: {e}", file=sys.stderr)
 
-    total_frames = len(all_frame_paths)
+    total_frames = len(all_frame_items)
     if not args.quiet:
         print(f"\nExtracted {total_frames} frames total.")
 
     if args.describe and total_frames > 0:
         print()
-        from idt_core.pipeline import Pipeline, RunOptions
+        from idt_core.pipeline import WorkspacePipeline, RunOptions
         from idt_core.progress import Progress
         from idt_core.config import UserConfig
 
         user_cfg = UserConfig.load()
-        provider_name = args.provider or user_cfg.default_provider
-        model = args.model or user_cfg.default_model
-        prompt_name, prompt_text = _resolve_prompt(args, project.config)
+        _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
+        _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
+        provider_name = args.provider or _ws_provider or user_cfg.default_provider
+        model         = args.model    or _ws_model    or user_cfg.default_model
+        prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
         if not args.quiet:
             print(f"Describing {total_frames} frames with {provider_name} / {model}...")
             print()
 
-        described = errors = 0
+        ws.defaults.prompt_name = prompt_name
+        ws.save_manifest()
 
-        for frames_dir in all_frame_dirs:
-            frame_project = Project.open(frames_dir)
-            options = RunOptions(
-                prompt_name=prompt_name,
-                prompt_text=prompt_text,
-                extract_metadata=False,
-            )
-            progress = Progress(total=len(list(frame_project.undescribed())), quiet=args.quiet)
-            pipeline = Pipeline(frame_project, provider)
-            for event in pipeline.run(options):
-                if event.success:
-                    described += 1
-                    progress.update(event.item.display_name, success=True)
-                else:
-                    errors += 1
-                    progress.update(event.item.display_name, success=False, error=event.error)
-            progress.summary(described=described, errors=errors)
+        options = RunOptions(
+            prompt_name=prompt_name,
+            prompt_text=prompt_text,
+            extract_metadata=False,  # extracted frames carry no EXIF
+            redescribe=args.redescribe,
+        )
+        progress = Progress(total=total_frames, quiet=args.quiet)
+        described = errors = 0
+        pipeline = WorkspacePipeline(ws, provider)
+        for event in pipeline.run_items(all_frame_items, options):
+            if event.success:
+                described += 1
+                progress.update(event.item.display_name, success=True)
+            else:
+                errors += 1
+                progress.update(event.item.display_name, success=False, error=event.error)
+        progress.summary(described=described, errors=errors)
+
+        if described > 0:
+            ws.defaults.provider = provider_name
+            ws.defaults.model = model
+            ws.has_any_descriptions = True
+            ws.save_manifest()
 
 
 # ------------------------------------------------------------------ #
@@ -1420,8 +1471,9 @@ def cmd_models(args):
 # ------------------------------------------------------------------ #
 
 def cmd_watch(args):
-    from idt_core.project import Project
-    from idt_core.watcher import Watcher, WatchOptions
+    import time
+    from idt_core.pipeline import WorkspacePipeline, RunOptions
+    from idt_core.scanner import scan_images
     from idt_core.config import UserConfig
 
     source = Path(args.source).resolve()
@@ -1429,34 +1481,37 @@ def cmd_watch(args):
         print(f"Error: not a directory: {source}", file=sys.stderr)
         sys.exit(1)
 
-    project = Project.open(source)
+    # New images described here land in a .idtw workspace under the workspace root
+    # (~/Documents/idt), the same model idt describe uses — never a sibling .idt/.
+    ws = _open_or_create_workspace(source, getattr(args, "workspace", None))
     user_cfg = UserConfig.load()
 
-    provider_name = args.provider or project.config.default_provider or user_cfg.default_provider
-    model = args.model or project.config.default_model or user_cfg.default_model
-    prompt_name, prompt_text = _resolve_prompt(args, project.config)
+    _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
+    _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
+    provider_name = args.provider or _ws_provider or user_cfg.default_provider
+    model         = args.model    or _ws_model    or user_cfg.default_model
+    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
     if not args.quiet:
         print(f"Watching:  {source}")
+        print(f"Workspace: {ws.path}")
         print(f"Provider:  {provider_name}  model: {model}")
         print(f"Interval:  {args.interval}s  prompt: {prompt_name}")
         print("Press Ctrl+C to stop.\n")
 
-    def _on_poll(remaining: int) -> None:
-        if not args.quiet and remaining % 30 == 0:
-            print(f"  ... next scan in {remaining}s", flush=True)
-
-    options = WatchOptions(
-        interval_seconds=args.interval,
+    ws.defaults.prompt_name = prompt_name
+    ws.save_manifest()
+    options = RunOptions(
         prompt_name=prompt_name,
         prompt_text=prompt_text,
-        on_poll=_on_poll,
+        extract_metadata=getattr(args, "extract_metadata", True),
+        geocode=getattr(args, "geocode", False),
     )
 
-    watcher = Watcher(project, provider, options)
-    try:
-        for event in watcher.run():
+    def _describe(new_items) -> None:
+        pipeline = WorkspacePipeline(ws, provider)
+        for event in pipeline.run_items(new_items, options):
             if event.success:
                 desc = event.item.active_description
                 if not args.quiet:
@@ -1464,11 +1519,51 @@ def cmd_watch(args):
                     if desc:
                         preview = desc.text[:120] + ("..." if len(desc.text) > 120 else "")
                         print(f"  {preview}\n")
-                else:
-                    if desc:
-                        print(f"{event.item.display_name}\t{desc.text}")
+                elif desc:
+                    print(f"{event.item.source_path}\t{desc.text}")
             else:
                 print(f"Error: {event.item.display_name}: {event.error}", file=sys.stderr)
+        if any(i.described for i in new_items):
+            ws.defaults.provider = provider_name
+            ws.defaults.model = model
+            ws.has_any_descriptions = True
+            ws.save_manifest()
+
+    def _add_source_images(paths) -> list:
+        added = []
+        for p in sorted(paths):
+            try:
+                sub = str(p.parent.relative_to(source))
+            except ValueError:
+                sub = None
+            if sub in (".", ""):
+                sub = None
+            added.append(ws.add_image(p, subfolder=sub, copy=ws.copy_originals))
+        return added
+
+    try:
+        # Initial pass: add everything currently in the folder and describe what's new.
+        known = set(scan_images(source))
+        initial = [i for i in _add_source_images(known) if not i.described]
+        if initial:
+            _describe(initial)
+
+        # Poll loop
+        while True:
+            remaining = args.interval
+            while remaining > 0:
+                if not args.quiet and remaining % 30 == 0:
+                    print(f"  ... next scan in {remaining}s", flush=True)
+                time.sleep(min(5, remaining))
+                remaining -= 5
+
+            current = set(scan_images(source))
+            new_paths = current - known
+            known |= current
+            if new_paths:
+                new_items = [i for i in _add_source_images(new_paths) if not i.described]
+                if new_items:
+                    _describe(new_items)
     except KeyboardInterrupt:
         if not args.quiet:
             print("\nWatcher stopped.")
@@ -1676,9 +1771,12 @@ def cmd_config(args):
             cfg.default_prompt_name = value
         elif key == "workspace_root":
             cfg.workspace_root = value or None
+        elif key == "preserve_alt_text":
+            cfg.preserve_alt_text = value.strip().lower() not in ("false", "0", "no", "off")
         else:
             print(f"Unknown config key: {key!r}", file=sys.stderr)
-            print("Valid keys: default_provider, default_model, default_prompt_name, workspace_root", file=sys.stderr)
+            print("Valid keys: default_provider, default_model, default_prompt_name, "
+                  "workspace_root, preserve_alt_text", file=sys.stderr)
             sys.exit(1)
         cfg.save()
         print(f"Set {key} = {value}")
@@ -1689,6 +1787,7 @@ def cmd_config(args):
     print(f"default_model:    {cfg.default_model}")
     print(f"default_prompt:   {cfg.default_prompt_name}")
     print(f"workspace_root:   {cfg.workspace_root_path()}")
+    print(f"preserve_alt_text: {cfg.preserve_alt_text}")
     if cfg.custom_prompts:
         print(f"custom_prompts:   {', '.join(cfg.custom_prompts.keys())}")
 
@@ -1774,11 +1873,12 @@ Supported providers:
         "describe",
         help="Generate AI descriptions for images in a directory",
         description=(
-            "Describe images in a directory. Creates a self-contained .idtw "
-            "workspace bundle that holds copies of the images and their "
-            "descriptions. Your original files are never modified. By default "
-            "the bundle is named '<folder>.idtw' next to the source folder; use "
-            "--workspace to choose a different name or location."
+            "Describe images in a directory. Creates a .idtw workspace bundle "
+            "that holds the descriptions (and, with --copy-originals, copies of "
+            "the images). Your original files are never modified. By default the "
+            "bundle is named '<folder>.idtw' and created under the workspace root "
+            "(~/Documents/idt — see 'idt config'); use --workspace to choose a "
+            "different name or location."
         ),
     )
     p_desc.add_argument(
@@ -1786,7 +1886,9 @@ Supported providers:
         help="Directory containing images, or '-' to read image paths from stdin",
     )
     p_desc.add_argument("--workspace", "-w", metavar="NAME|PATH",
-                        help="Workspace bundle to create/use (default: <source>.idtw next to the folder)")
+                        help="Workspace bundle to create/use. Bare name -> under the "
+                             "workspace root; path or .idtw -> that exact location. "
+                             "Default: '<source-folder>.idtw' under the workspace root.")
     p_desc.add_argument("--stdin", action="store_true",
                         help="Read image paths from stdin (same as passing '-' as source)")
     p_desc.add_argument("--project", metavar="DIR",
@@ -1828,14 +1930,15 @@ Supported providers:
         "download",
         help="Download images from a URL",
         description=(
-            "Download images from a web page into the .idt/downloads/ directory. "
-            "Captures HTML alt text alongside each image. Use --describe to "
-            "describe downloaded images immediately."
+            "Download images from a web page into a .idtw workspace (see 'idt describe "
+            "--help' for the workspace model). Captures HTML alt text alongside each "
+            "image. Use --describe to describe downloaded images immediately."
         ),
     )
     p_dl.add_argument("url", help="URL to download images from")
     p_dl.add_argument("directory", nargs="?",
-                      help="Target directory (default: current directory)")
+                      help="Workspace name or path (default: derived from the URL's "
+                           "domain, under the workspace root — see 'idt config')")
     p_dl.add_argument("--max", dest="max_images", type=int, metavar="N",
                       help="Maximum number of images to download")
     p_dl.add_argument("--min-size", metavar="WxH",
@@ -1846,6 +1949,17 @@ Supported providers:
                       help="Describe downloaded images immediately")
     p_dl.add_argument("--embed", action="store_true",
                       help="Embed descriptions after describing (requires --describe)")
+    p_dl.add_argument("--preserve-alt-text", dest="preserve_alt_text", action="store_true", default=None,
+                      help="Save existing HTML alt text as an additional description. "
+                           "Overrides the configured default for this run (see 'idt config').")
+    p_dl.add_argument("--no-preserve-alt-text", dest="preserve_alt_text", action="store_false",
+                      help="Do not save alt text as a description; keep it only as prompt context")
+    p_dl.add_argument("--redescribe", dest="redescribe", action="store_true", default=True,
+                      help="Generate an AI description even for images whose alt text was "
+                           "preserved as a description (default: on)")
+    p_dl.add_argument("--no-redescribe", dest="redescribe", action="store_false",
+                      help="Skip AI description for images that already have a description "
+                           "(e.g. preserved alt text)")
     _provider_args(p_dl)
     _prompt_args(p_dl)
     p_dl.add_argument("--quiet", "-q", action="store_true", help="Minimal output")
@@ -1858,12 +1972,16 @@ Supported providers:
         "video",
         help="Extract frames from video files and optionally describe them",
         description=(
-            "Extract frames from video files into .idt/frames/. "
+            "Extract frames from video files into a .idtw workspace's "
+            "derived/frames/ folder (under the workspace root — see 'idt config'). "
             "Supports interval mode (one frame every N seconds) and scene-change "
             "detection. Use --describe to describe the extracted frames."
         ),
     )
     p_vid.add_argument("source", help="Video file or directory containing video files")
+    p_vid.add_argument("--workspace", "-w", metavar="NAME|PATH",
+                       help="Workspace to extract into (bare name → under the workspace "
+                            "root; path/.idtw → that location). Default: mirrored from the source.")
     p_vid.add_argument(
         "--interval", type=float, default=5.0, metavar="SECONDS",
         help="Extract one frame every N seconds (default: 5.0)",
@@ -1877,6 +1995,8 @@ Supported providers:
                        help="Maximum frames to extract per video")
     p_vid.add_argument("--describe", action="store_true",
                        help="Describe extracted frames after extraction")
+    p_vid.add_argument("--redescribe", action="store_true",
+                       help="Re-describe frames that already have a description")
     _provider_args(p_vid)
     _prompt_args(p_vid)
     p_vid.add_argument("--quiet", "-q", action="store_true", help="Minimal output")
@@ -1991,10 +2111,14 @@ Supported providers:
         ),
     )
     p_watch.add_argument("source", help="Directory to watch")
+    p_watch.add_argument("--workspace", "-w", metavar="NAME|PATH",
+                         help="Workspace to describe into (bare name → under the workspace "
+                              "root; path/.idtw → that location). Default: mirrored from the source.")
     p_watch.add_argument("--interval", type=int, default=30, metavar="SECONDS",
                          help="Polling interval in seconds (default: 30)")
     _provider_args(p_watch)
     _prompt_args(p_watch)
+    _metadata_args(p_watch)
     p_watch.add_argument("--quiet", "-q", action="store_true",
                          help="Output tab-separated filename/description for piping")
     p_watch.set_defaults(func=cmd_watch)

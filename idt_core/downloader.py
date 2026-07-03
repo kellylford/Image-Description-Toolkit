@@ -156,6 +156,97 @@ class Downloader:
         return result
 
 
+@dataclass
+class WorkspaceDownloadResult:
+    workspace: object                # the Workspace images were added to
+    subfolder: str                   # bundle-relative subfolder, e.g. "downloads/<site> - <title> - <ts>"
+    downloaded: int = 0
+    skipped: int = 0
+    failed: int = 0
+    items: list = field(default_factory=list)   # list[WorkspaceItem], in download order
+
+
+def download_into_workspace(
+    workspace,
+    url: str,
+    min_width: int = 0,
+    min_height: int = 0,
+    timeout: int = 30,
+    max_images: Optional[int] = None,
+    on_progress: Optional[Callable[[int, int, str], None]] = None,
+) -> WorkspaceDownloadResult:
+    """
+    Download images from url straight into workspace's derived/downloads/ folder
+    and register each as a WorkspaceItem (item_type="downloaded_image"), so the
+    workspace's own describe pipeline can pick them up like any other image.
+    """
+    try:
+        import requests
+    except ImportError:
+        raise ImportError("requests is required: pip install requests")
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        raise ImportError("beautifulsoup4 is required: pip install beautifulsoup4")
+    try:
+        from PIL import Image as _PILImage
+    except ImportError:
+        raise ImportError("Pillow is required: pip install Pillow")
+
+    from datetime import datetime, timezone
+
+    url = normalize_url(url)
+
+    session = requests.Session()
+    session.headers["User-Agent"] = _UA
+
+    resp = session.get(url, timeout=timeout)
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    subfolder_name = _subfolder_name(url, soup)
+    bundle_subfolder = f"downloads/{subfolder_name}"
+    dl_dir = workspace.derived_dir("downloads") / subfolder_name
+    dl_dir.mkdir(parents=True, exist_ok=True)
+
+    entries = _extract_image_entries(resp.text, url)
+    total = len(entries)
+
+    result = WorkspaceDownloadResult(workspace=workspace, subfolder=bundle_subfolder)
+    seen_hashes: set = set()
+    now = datetime.now(timezone.utc).isoformat()
+
+    for i, (img_url, alt) in enumerate(entries, 1):
+        if max_images and result.downloaded >= max_images:
+            break
+        if on_progress:
+            on_progress(i, total, img_url[:60])
+
+        path = _download_one(
+            session, img_url, i, dl_dir, seen_hashes,
+            min_width, min_height, timeout, _PILImage
+        )
+        if path is None:
+            result.skipped += 1
+            continue
+        result.downloaded += 1
+
+        # copy=False: the file already lives in the bundle's derived/downloads/
+        # folder, so reference it there rather than duplicating it into images/.
+        item = workspace.add_image(path, subfolder=bundle_subfolder, copy=False)
+        item.item_type = "downloaded_image"
+        item.download_url = img_url
+        item.download_timestamp = now
+        item.alt_text = alt.strip() if alt else None
+        workspace.save_item(item)
+        result.items.append(item)
+
+        if i < total:
+            time.sleep(0.3)
+
+    return result
+
+
 # ------------------------------------------------------------------ #
 # Helpers                                                              #
 # ------------------------------------------------------------------ #
@@ -198,10 +289,15 @@ def _is_image_url(url: str) -> bool:
     return Path(urlparse(url.lower()).path).suffix in _IMAGE_EXTENSIONS
 
 
-def _subfolder_name(url: str, soup) -> str:
+def domain_name(url: str) -> str:
+    """Filesystem-safe bare domain for a URL, e.g. 'www.nytimes.com' -> 'nytimes.com'."""
     parsed = urlparse(url)
     domain = re.sub(r"^www\.", "", parsed.netloc).split(":")[0]
-    domain = re.sub(r"[^\w.\-]", "_", domain).strip("_")
+    return re.sub(r"[^\w.\-]", "_", domain).strip("_")
+
+
+def _subfolder_name(url: str, soup) -> str:
+    domain = domain_name(url)
     title_tag = soup.find("title")
     title = ""
     if title_tag:

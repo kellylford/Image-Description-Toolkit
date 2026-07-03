@@ -185,14 +185,6 @@ class WorkspacePipeline:
         self._geocoder: Optional[NominatimGeocoder] = None
 
     def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
-        from .logger import open_run_log, close_run_log
-
-        if options.extract_metadata:
-            self._extractor = MetadataExtractor()
-            if options.geocode:
-                cache = options.geocode_cache or (Path.home() / ".idt" / "geocode_cache.json")
-                self._geocoder = NominatimGeocoder(cache_path=cache)
-
         all_items = self.workspace.media_items()
         # Skip items whose image is missing on disk (e.g. a moved/deleted reference
         # original). Mark them so the state is durable, and never queue them — this
@@ -208,6 +200,33 @@ class WorkspacePipeline:
         queue = live_items if options.redescribe else [i for i in live_items if not i.described]
         if options.limit is not None:
             queue = queue[: options.limit]
+
+        yield from self._run_queue(queue, options)
+
+    def run_items(self, items: list[WorkspaceItem], options: RunOptions) -> Iterator[WorkspaceEvent]:
+        """
+        Process an explicit list of items (e.g. a batch just downloaded via
+        `idt download`) instead of deriving the queue from the whole workspace.
+        `options.redescribe` still controls whether already-described items among
+        *items* are skipped, but the rest of the workspace is never touched — this
+        is what lets a freshly downloaded, alt-text-seeded batch get an AI
+        description without reprocessing every previously-described image in a
+        shared workspace.
+        """
+        queue = list(items) if options.redescribe else [i for i in items if not i.described]
+        if options.limit is not None:
+            queue = queue[: options.limit]
+
+        yield from self._run_queue(queue, options)
+
+    def _run_queue(self, queue: list[WorkspaceItem], options: RunOptions) -> Iterator[WorkspaceEvent]:
+        from .logger import open_run_log, close_run_log
+
+        if options.extract_metadata:
+            self._extractor = MetadataExtractor()
+            if options.geocode:
+                cache = options.geocode_cache or (Path.home() / ".idt" / "geocode_cache.json")
+                self._geocoder = NominatimGeocoder(cache_path=cache)
 
         total = len(queue)
         log = open_run_log(self.workspace.logs_dir)

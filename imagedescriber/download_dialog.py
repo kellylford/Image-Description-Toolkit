@@ -32,7 +32,7 @@ class DownloadSettingsDialog(wx.Dialog):
         super().__init__(parent, title="Download Images From URL",
                         style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         
-        self.SetSize((550, 400))
+        self.SetSize((550, 440))
         
         # Create main panel
         panel = wx.Panel(self)
@@ -94,7 +94,21 @@ class DownloadSettingsDialog(wx.Dialog):
                                         name="Process after download checkbox")
         self.process_after.SetValue(True)
         settings_box.Add(self.process_after, 0, wx.ALL, 10)
-        
+
+        # Preserve alt text checkbox — default comes from the user's configured
+        # preference (idt config preserve_alt_text, on by default).
+        try:
+            from idt_core.config import UserConfig
+            preserve_alt_default = UserConfig.load().preserve_alt_text
+        except Exception:
+            preserve_alt_default = True
+        self.preserve_alt_text = wx.CheckBox(
+            panel,
+            label="Preserve existing alt text as an additional &description",
+            name="Preserve alt text as a description checkbox")
+        self.preserve_alt_text.SetValue(preserve_alt_default)
+        settings_box.Add(self.preserve_alt_text, 0, wx.ALL, 10)
+
         main_sizer.Add(settings_box, 0, wx.ALL | wx.EXPAND, 10)
         
         # Help text
@@ -165,18 +179,20 @@ class DownloadSettingsDialog(wx.Dialog):
     def get_settings(self) -> dict:
         """
         Get download settings from dialog.
-        
+
         Returns:
-            dict with keys: url, min_width, min_height, max_images, process_after
+            dict with keys: url, min_width, min_height, max_images, process_after,
+            preserve_alt_text
         """
         max_imgs = self.max_images.GetValue()
         if max_imgs == -1:
             max_imgs = None  # Unlimited
-        
+
         return {
             'url': self.url_input.GetValue().strip(),
             'min_width': self.min_width.GetValue(),
             'min_height': self.min_height.GetValue(),
             'max_images': max_imgs,
-            'process_after': self.process_after.GetValue()
+            'process_after': self.process_after.GetValue(),
+            'preserve_alt_text': self.preserve_alt_text.GetValue(),
         }
