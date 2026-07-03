@@ -227,7 +227,7 @@ Notes:
 ### CLI (`cli/main.py` + `idt_core`)
 
 - `idt describe <folder> [--workspace <name|path>]` opens or creates a bundle, copies the folder's images into `images/`, runs the pipeline, writes `descriptions/*.json`.
-- Default bundle location when `--workspace` is omitted: `<folder>.idtw` next to the source folder (so the simple case still has an obvious home), **or** a configured default workspaces root. (Implementation picks one; document the choice in the CLI help.)
+- Default bundle location when `--workspace` is omitted: `<folder>.idtw` under the configured **workspace root** (`~/Documents/idt` by default; override with `idt config --set workspace_root=...`). The bundle is named after the source folder's leaf name. `--workspace NAME` places `NAME.idtw` under the root; `--workspace PATH`/`.idtw` targets an exact location.
 - `status` / `show` / `stats` / `export` / `embed` / `combine` operate on a bundle path.
 - The old sibling `Name.idt/` is read for one release for migration, then dropped.
 

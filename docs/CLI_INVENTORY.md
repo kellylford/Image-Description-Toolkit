@@ -42,17 +42,16 @@ BuildAndRelease/WinBuilds/dist_all/bin/
 
 The codebase has two data models. Bugs often come from mixing them up.
 
-**Workspace (`.idtw`) — new model, used by `describe`, `status`, `show`, `embed`, `export`, `stats`, `combine`:**
-- A self-contained directory bundle: `MyTrip.idtw/images/`, `descriptions/`, `logs/`, `manifest.json`
-- Created by `idt describe <source_dir>`; auto-placed under `~/Documents/idt/` by default
+**Workspace (`.idtw`) — the model used by ALL write commands** (`describe`, `download`, `video`, `watch`, stdin `describe`) **and read commands** (`status`, `show`, `embed`, `export`, `stats`, `combine`):
+- A self-contained directory bundle: `MyTrip.idtw/images/`, `descriptions/`, `derived/`, `logs/`, `manifest.json`
+- Created under `~/Documents/idt/` by default (the workspace root); `--workspace NAME|PATH` overrides
 - `Workspace` class in `idt_core/workspace.py`
-- Per-image state lives in `descriptions/<imagename>.json` sidecars (one per image)
+- Per-image state lives in `descriptions/<imagename>.json` sidecars (one per image), mirroring source subfolders
 - Resume = run `describe` again; already-described images skipped automatically
 
-**Project (`.idt/`) — legacy model, used by `download`, `video`, `watch`, and stdin mode:**
-- Mirror directory created NEXT TO the source folder: `Photos/2025/09.idt/`
-- `Project` class in `idt_core/project.py`
-- Per-image state in `idt_dir/<relpath>.json` sidecars
+**Project (`.idt/`) — legacy model, READ-ONLY fallback only** (migrated away from 2026-07-03):
+- Older sibling mirror directories (`Photos/2025/09.idt/`) are still *readable* by `status`, `show`, `export`, `combine`, `stats` for backward compatibility
+- No command WRITES to this model anymore; `Project` in `idt_core/project.py` is dead code pending removal
 
 Most of the P0/P1 bugs are in `cli/main.py`. Changes there are self-contained; no other file needs editing for the encoding and show-lookup fixes.
 
@@ -195,8 +194,8 @@ This fires on every command including `idt models`, `idt prompts`, `idt config`.
 | `check-models` | `models` | ⚠️ REPLACED | Same info; no `--verbose`; Anthropic/OpenAI report key-present vs key-absent |
 | `manage-models list` | `models` | ⚠️ REPLACED | `models` lists; no `--installed` filter; no `--provider` filter for huggingface |
 | `prompt-list` | `prompts` | ⚠️ REPLACED | Same info; no `--config-image-describer` override |
-| `extract-frames <video>` | `video <source>` | ⚠️ REPLACED | Different path: creates `.idt/frames/` in a legacy project, not workspace |
-| `describe-video <video>` | `video <source> --describe` | ⚠️ REPLACED | Same caveat as above |
+| `extract-frames <video>` | `video <source>` | ⚠️ REPLACED | Frames now land in a `.idtw` workspace's `derived/frames/<stem>/` under the workspace root (timestamped filenames, e.g. `clip_490.00s.jpg`) |
+| `describe-video <video>` | `video <source> --describe` | ⚠️ REPLACED | Extracts into the workspace, then describes the frames via `WorkspacePipeline` |
 | `descriptions-to-html <file>` | `export --format html` | ⚠️ REPLACED | Now operates on workspace, not a raw `.txt` descriptions file |
 | `combinedescriptions` | `combine <dir>` | ⚠️ REPLACED | Works; different column names; `atsv` format gone; no `analysis/results/` default output |
 | `stats` (workflow timing/performance) | `stats` (token cost) | ❌ INCOMPATIBLE REPLACEMENT | **Completely different purpose.** Old: per-step timing, images/hour, duration. New: token counts and API cost estimates per model. No overlap. |
@@ -383,10 +382,11 @@ The relevant code flow:
 **Workaround:** Check `idt status 09.idtw` to see the source path, then run `idt describe <that-path>`.  
 **Fix:** Add `idt describe --workspace 09.idtw` (or `idt resume 09.idtw`) that reads sources from manifest and describes remaining items without requiring the user to specify a source directory.
 
-### `download` and `video` and `watch` Use Legacy `.idt/` Model
-The `download`, `video`, and `watch` commands create `.idt/` sidecar directories next to the source folder — the old project model, not the new `.idtw` workspace bundle. This means:
-- Files described via `download` or `video --describe` are NOT in a workspace and cannot be managed by `status`, `show`, `embed`, or `export` unless the user also points these commands at the `.idt/` project (which works via the legacy fallback path).
-- Results from `video` and `download` workflows are not consolidated in `status --all` unless a `.idt/` sibling dir is present.
+### `download`, `video`, `watch`, and stdin `describe` Migrated to the Workspace Model — RESOLVED 2026-07-03
+Previously these commands created legacy `.idt/` sidecar directories next to the source folder. They now all use the `.idtw` workspace model (under `~/Documents/idt`, the same as `describe`):
+- `video` extracts frames into `<workspace>.idtw/derived/frames/<stem>/`; `download` into `derived/downloads/<...>/`; `watch` and `describe -` (stdin) write per-image sidecars into the workspace.
+- All accept `--workspace NAME|PATH` and are visible to `status`, `show`, `embed`, and `export`.
+- The read commands (`status`, `show`, `export`, `combine`, `stats`) still keep a **read-only** legacy `.idt/` fallback so older sibling projects remain viewable.
 
 ### `manage-models` Install/Remove Capability Gone
 The old CLI included `manage-models install <model>` (via `ollama pull`), `manage-models remove`, and `manage-models recommend` to help users get set up with Ollama. These are completely gone. New users must know to use `ollama pull <model>` directly, with no IDT guidance.
