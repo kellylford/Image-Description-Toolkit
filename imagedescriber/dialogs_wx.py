@@ -10,7 +10,7 @@ import sys
 import json
 import logging
 from pathlib import Path
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable
 
 import wx
 import platform
@@ -693,15 +693,20 @@ class FollowupQuestionDialog(wx.Dialog):
 class ProcessingOptionsDialog(wx.Dialog):
     """Dialog for configuring processing options"""
     
-    def __init__(self, current_config: Dict[str, Any], cached_ollama_models=None, parent=None):
+    def __init__(self, current_config: Dict[str, Any], cached_ollama_models=None, parent=None,
+                 on_apply: Optional[Callable[[dict], None]] = None):
         super().__init__(
             parent,
             title="Processing Options",
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
         )
-        
+
         self.config = current_config.copy()
         self.cached_ollama_models = cached_ollama_models  # Use cached models if available
+        # Optional parent callback invoked with get_config() when the user clicks
+        # Apply. It applies the current options live while the dialog stays open.
+        # When None, no Apply button is shown.
+        self._on_apply = on_apply
         self.init_ui()
         self.SetSize((600, 400))
         self.Centre()
@@ -723,11 +728,21 @@ class ProcessingOptionsDialog(wx.Dialog):
         self.notebook.AddPage(ai_panel, "&AI Model")
         
         main_sizer.Add(self.notebook, 1, wx.ALL | wx.EXPAND, 10)
-        
-        # Dialog buttons
-        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+
+        # Dialog buttons. Apply commits the current options without closing
+        # (via the parent callback); only shown when a callback was supplied.
+        button_flags = wx.OK | wx.CANCEL
+        if self._on_apply is not None:
+            button_flags |= wx.APPLY
+        btn_sizer = self.CreateButtonSizer(button_flags)
         main_sizer.Add(btn_sizer, 0, wx.ALL | wx.EXPAND, 10)
-        
+
+        # FindWindow (not FindWindowById) is scoped to this dialog's children,
+        # so we never bind to an Apply button belonging to another open window.
+        apply_btn = self.FindWindow(wx.ID_APPLY)
+        if apply_btn is not None:
+            apply_btn.Bind(wx.EVT_BUTTON, self.on_apply)
+
         self.SetSizer(main_sizer)
         
         # Set focus to AI provider control (the key area for user interaction)
@@ -1152,6 +1167,26 @@ class ProcessingOptionsDialog(wx.Dialog):
             'prompt_style': self.prompt_choice.GetStringSelection(),
             'custom_prompt': self.custom_prompt_input.GetValue(),
         }
+
+    def on_apply(self, event):
+        """Apply the current options without closing the dialog.
+
+        Hands the current selections to the parent-supplied callback so they take
+        effect immediately while the dialog stays open for further tweaking.
+        """
+        if self._on_apply is None:
+            return
+        try:
+            self._on_apply(self.get_config())
+        except Exception as e:
+            logger.error("Processing options Apply callback failed: %s", e, exc_info=True)
+            wx.MessageBox(
+                f"Could not apply the processing options:\n{e}",
+                "Apply Failed", wx.OK | wx.ICON_ERROR, self)
+            return
+        # Confirm the action so screen-reader users know Apply did something.
+        wx.MessageBox("Processing options applied.", "Applied",
+                      wx.OK | wx.ICON_INFORMATION, self)
 
 
 class ImageDetailDialog(wx.Dialog):

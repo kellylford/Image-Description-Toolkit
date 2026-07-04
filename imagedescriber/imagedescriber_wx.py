@@ -2673,7 +2673,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             proc_dialog = ProcessingOptionsDialog(
                 self.config,
                 cached_ollama_models=self.cached_ollama_models,
-                parent=self
+                parent=self,
+                on_apply=self._persist_processing_options
             )
             if proc_dialog.ShowModal() == wx.ID_OK:
                 settings['processing_options'] = proc_dialog.get_config()
@@ -3273,7 +3274,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Show processing options dialog with cached models
         if ProcessingOptionsDialog:
             logger.info("Creating ProcessingOptionsDialog")
-            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self, on_apply=self._persist_processing_options)
             logger.info("Calling ShowModal")
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
@@ -3454,7 +3455,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self._persist_processing_options(options)
         elif ProcessingOptionsDialog:
             logger.info("Creating ProcessingOptionsDialog instance")
-            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self, on_apply=self._persist_processing_options)
             logger.info("Calling ProcessingOptionsDialog.ShowModal() - THIS MAY BLOCK")
             result = dialog.ShowModal()
             logger.info(f"ProcessingOptionsDialog returned result={result}")
@@ -3684,7 +3685,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Show processing options dialog
         if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self, on_apply=self._persist_processing_options)
             dialog.SetTitle(f"Processing Options — {context_label} ({summary})")
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
@@ -6325,7 +6326,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Show processing options dialog
         if ProcessingOptionsDialog:
-            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+            dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self, on_apply=self._persist_processing_options)
             if dialog.ShowModal() != wx.ID_OK:
                 dialog.Destroy()
                 return
@@ -6466,7 +6467,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
 
         # Show processing options dialog
-        dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self)
+        dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self, on_apply=self._persist_processing_options)
         if dialog.ShowModal() != wx.ID_OK:
             dialog.Destroy()
             # Ensure main window has focus before showing dialog
