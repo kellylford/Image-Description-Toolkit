@@ -2,7 +2,7 @@
 AI Provider classes for Image Describer
 
 This module contains all AI provider implementations including
-Ollama, OpenAI, and HuggingFace providers.
+Ollama, OpenAI, Claude, and MLX providers.
 """
 
 import os
@@ -1216,295 +1216,6 @@ class OllamaCloudProvider(AIProvider):
                f"Cloud models are excellent for text-only tasks but vision support is coming soon!"
 
 
-# Try to import ONNX Runtime (optional dependency)
-try:
-    import onnxruntime as ort
-    import numpy as np
-    HAS_ONNX = True
-except ImportError:
-    ort = None
-    np = None
-    HAS_ONNX = False
-
-# Try to import transformers for Florence-2 (optional dependency)
-# When running as frozen executable, delay import to allow system-installed packages
-HAS_TRANSFORMERS = False
-AutoProcessor = None
-AutoModelForCausalLM = None
-PILImage = None
-torch = None
-
-def _check_transformers_available():
-    """Check if transformers is available at runtime
-    
-    For frozen executables, this will try to import from system Python
-    by temporarily adding site-packages to sys.path.
-    """
-    # If running as frozen executable, add system site-packages to path
-    if getattr(sys, 'frozen', False):
-        try:
-            import site
-            import sysconfig
-            
-            # Get system site-packages directories
-            user_site = site.getusersitepackages()
-            global_site = sysconfig.get_path('purelib')
-            
-            # Temporarily add to path if not already there
-            paths_to_add = []
-            if user_site and user_site not in sys.path:
-                paths_to_add.append(user_site)
-            if global_site and global_site not in sys.path:
-                paths_to_add.append(global_site)
-            
-            # Add paths temporarily
-            for p in paths_to_add:
-                sys.path.insert(0, p)
-            
-            # Try to import
-            try:
-                from transformers import AutoProcessor, AutoModelForCausalLM
-                from PIL import Image as PILImage
-                import torch
-                return True
-            except ImportError:
-                return False
-            finally:
-                # Remove added paths
-                for p in paths_to_add:
-                    if p in sys.path:
-                        sys.path.remove(p)
-        except Exception:
-            return False
-    else:
-        # Not frozen, use normal import
-        try:
-            from transformers import AutoProcessor, AutoModelForCausalLM
-            from PIL import Image as PILImage
-            import torch
-            return True
-        except ImportError:
-            return False
-
-# Try import if not running as frozen executable
-HAS_TRANSFORMERS = False  # Default; set True below if imports succeed
-if not getattr(sys, 'frozen', False):
-    try:
-        from transformers import AutoProcessor, AutoModelForCausalLM
-        from PIL import Image as PILImage
-        import torch
-        HAS_TRANSFORMERS = True
-    except ImportError:
-        pass
-
-from pathlib import Path
-import platform
-import subprocess
-
-
-class HuggingFaceProvider(AIProvider):
-    """HuggingFace provider for local Florence-2 vision models with NPU acceleration"""
-    
-    # Florence-2 task types for different levels of detail
-    TASK_CAPTION = "<CAPTION>"
-    TASK_DETAILED = "<DETAILED_CAPTION>"
-    TASK_MORE_DETAILED = "<MORE_DETAILED_CAPTION>"
-    
-    # Prompt style to task mapping
-    PROMPT_TO_TASK = {
-        "simple": TASK_CAPTION,
-        "narrative": TASK_MORE_DETAILED,
-        "detailed": TASK_MORE_DETAILED,
-        "technical": TASK_DETAILED,
-    }
-    
-    def __init__(self):
-        self.model = None
-        self.processor = None
-        self.device = None
-        self.model_name = None
-        self._available_models = [
-            "microsoft/Florence-2-base",
-            "microsoft/Florence-2-large"
-        ]
-    
-    def get_provider_name(self) -> str:
-        return "HuggingFace"
-    
-    def is_available(self) -> bool:
-        """Check if Florence-2 dependencies are available"""
-        # For frozen executables, check at runtime instead of import time
-        if getattr(sys, 'frozen', False):
-            return _check_transformers_available()
-        return HAS_TRANSFORMERS
-    
-    def get_available_models(self) -> List[str]:
-        """Get list of available Florence-2 models"""
-        # Check availability at runtime for frozen executables
-        if getattr(sys, 'frozen', False):
-            if not _check_transformers_available():
-                return []
-        elif not HAS_TRANSFORMERS:
-            return []
-        return self._available_models.copy()
-    
-    def _load_model(self, model: str):
-        """Load Florence-2 model if not already loaded"""
-        if self.model is not None and self.model_name == model:
-            return  # Already loaded
-        
-        # Import transformers at runtime (needed for frozen executables)
-        global AutoProcessor, AutoModelForCausalLM, torch, PILImage
-        if AutoProcessor is None:
-            # Add system site-packages for frozen executables
-            paths_added = []
-            if getattr(sys, 'frozen', False):
-                try:
-                    import site
-                    import sysconfig
-                    user_site = site.getusersitepackages()
-                    global_site = sysconfig.get_path('purelib')
-                    
-                    if user_site and user_site not in sys.path:
-                        sys.path.insert(0, user_site)
-                        paths_added.append(user_site)
-                    if global_site and global_site not in sys.path:
-                        sys.path.insert(0, global_site)
-                        paths_added.append(global_site)
-                except Exception:
-                    pass
-            
-            try:
-                from transformers import AutoProcessor as AP, AutoModelForCausalLM as AM
-                from PIL import Image as PI
-                import torch as t
-                AutoProcessor = AP
-                AutoModelForCausalLM = AM
-                PILImage = PI
-                torch = t
-            except ImportError as e:
-                # Clean up added paths
-                for p in paths_added:
-                    if p in sys.path:
-                        sys.path.remove(p)
-                raise ImportError(
-                    f"Florence-2 requires transformers>=4.45.0, torch, and Pillow.\n"
-                    f"Install with: pip install 'transformers>=4.45.0' torch torchvision pillow\n"
-                    f"Error: {str(e)}"
-                )
-        
-        try:
-            # Determine device (NPU/GPU/CPU)
-            if torch.cuda.is_available():
-                self.device = "cuda"
-            else:
-                self.device = "cpu"
-            
-            # Load model and processor
-            print(f"Loading {model} on {self.device}...")
-            self.processor = AutoProcessor.from_pretrained(model, trust_remote_code=True)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model, 
-                trust_remote_code=True,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                attn_implementation="eager"  # Use eager attention to avoid SDPA compatibility issues
-            ).to(self.device)
-            self.model_name = model
-            print(f"Model loaded successfully on {self.device}")
-            
-        except Exception as e:
-            raise RuntimeError(f"Failed to load Florence-2 model: {str(e)}")
-    
-    def _get_task_for_prompt(self, prompt: str) -> str:
-        """Convert prompt style to Florence-2 task type
-        
-        Florence-2 only supports 3 task types regardless of custom prompts:
-        - simple/brief → <CAPTION>
-        - technical → <DETAILED_CAPTION>  
-        - narrative/detailed → <MORE_DETAILED_CAPTION>
-        """
-        # Extract prompt style from the prompt text by keyword matching
-        prompt_lower = prompt.lower()
-        
-        # Check for explicit task keywords in the prompt
-        # Order matters: check specific keywords before general ones
-        if "technical" in prompt_lower:
-            return self.TASK_DETAILED
-        elif "simple" in prompt_lower or "brief" in prompt_lower or "concise" in prompt_lower:
-            return self.TASK_CAPTION
-        elif "detailed" in prompt_lower or "comprehensive" in prompt_lower or "narrative" in prompt_lower:
-            return self.TASK_MORE_DETAILED
-        
-        # Default to most detailed description
-        return self.TASK_MORE_DETAILED
-    
-    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
-        """Generate description for an image using Florence-2"""
-        try:
-            # Load model if needed
-            self._load_model(model)
-            
-            # Load image
-            image = PILImage.open(image_path).convert('RGB')
-            
-            # Determine task type based on prompt
-            task = self._get_task_for_prompt(prompt)
-            
-            # Prepare inputs - Florence-2 uses task as the text prompt
-            inputs = self.processor(
-                text=task,
-                images=image,
-                return_tensors="pt"
-            )
-            
-            # Move inputs to device (handle tensors only, skip None values)
-            device_inputs = {}
-            for k, v in inputs.items():
-                if v is not None and hasattr(v, 'to'):
-                    device_inputs[k] = v.to(self.device)
-                else:
-                    device_inputs[k] = v
-            
-            # Generate description - Florence-2 expects all inputs passed as kwargs
-            # Note: use_cache=False is required due to Florence-2 incompatibility with
-            # transformers 4.57+ EncoderDecoderCache format. This makes generation slower
-            # but ensures compatibility. See: https://github.com/huggingface/transformers/issues/xxxxx
-            generated_ids = self.model.generate(
-                **device_inputs,
-                max_new_tokens=1024,
-                use_cache=False,  # Required for transformers 4.57+ compatibility
-                do_sample=False
-            )
-            
-            # Decode output
-            generated_text = self.processor.batch_decode(
-                generated_ids, 
-                skip_special_tokens=False
-            )[0]
-            
-            # Extract the actual description (remove task prefix)
-            parsed_answer = self.processor.post_process_generation(
-                generated_text,
-                task=task,
-                image_size=(image.width, image.height)
-            )
-            
-            # Get the description text
-            description = parsed_answer.get(task, "")
-            
-            if not description:
-                return "⚠️ Florence-2 generated no description for this image."
-            
-            return description
-            
-        except ImportError as e:
-            return f"⚠️ Florence-2 dependencies not installed: {str(e)}"
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return f"⚠️ Error generating description with Florence-2: {str(e)}"
-
-
 # ---------------------------------------------------------------------------
 # MLX Provider — Apple Metal inference via mlx-vlm
 # macOS + Apple Silicon only; gracefully unavailable on other platforms.
@@ -1807,7 +1518,6 @@ _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
-_huggingface_provider = HuggingFaceProvider()
 _mlx_provider = MLXProvider()
 
 
@@ -1827,9 +1537,6 @@ def get_available_providers() -> Dict[str, AIProvider]:
     if _claude_provider.is_available():
         providers['claude'] = _claude_provider
 
-    if _huggingface_provider.is_available():
-        providers['huggingface'] = _huggingface_provider
-
     if _mlx_provider.is_available():
         providers['mlx'] = _mlx_provider
 
@@ -1843,6 +1550,5 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'ollama_cloud': _ollama_cloud_provider,
         'openai': _openai_provider,
         'claude': _claude_provider,
-        'huggingface': _huggingface_provider,
         'mlx': _mlx_provider,
     }

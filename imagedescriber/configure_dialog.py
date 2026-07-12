@@ -63,10 +63,10 @@ class ApiKeyEditDialog(wx.Dialog):
         
         # Provider selection
         form_sizer.Add(wx.StaticText(panel, label="Provider:"), 0, wx.ALIGN_CENTER_VERTICAL)
-        self.provider_choice = wx.Choice(panel, choices=["OpenAI", "Claude", "HuggingFace"])
+        self.provider_choice = wx.Choice(panel, choices=["OpenAI", "Claude"])
         if self.provider:
             # Find index of current provider (case-insensitive)
-            for i, choice in enumerate(["OpenAI", "Claude", "HuggingFace"]):
+            for i, choice in enumerate(["OpenAI", "Claude"]):
                 if choice.lower() == self.provider.lower():
                     self.provider_choice.SetSelection(i)
                     break
@@ -1240,7 +1240,7 @@ class ConfigureDialog(wx.Dialog):
         
         # Help text
         help_text = wx.StaticText(panel, 
-            label="API keys are required for OpenAI (GPT-4), Claude (Anthropic), and HuggingFace providers. "
+            label="API keys are required for OpenAI (GPT-4) and Claude (Anthropic) providers. "
                   "Ollama does not require an API key as it runs locally.")
         help_text.SetForegroundColour(wx.Colour(100, 100, 100))
         help_text.Wrap(600)

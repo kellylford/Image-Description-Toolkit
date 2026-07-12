@@ -129,7 +129,7 @@ def check_default_provider():
     print("CHECKING DEFAULT PROVIDER")
     print("=" * 80)
 
-    _PAID_PROVIDERS = {"openai", "anthropic", "claude", "huggingface"}
+    _PAID_PROVIDERS = {"openai", "anthropic", "claude"}
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent))
         from idt_core.config import UserConfig, DEFAULT_OLLAMA_MODEL

@@ -105,7 +105,6 @@ a = Analysis(
         'idt_core.providers.claude',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
-        'idt_core.providers.florence',
         'ollama',
         'openai',
         'anthropic',

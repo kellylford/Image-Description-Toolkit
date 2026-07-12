@@ -53,23 +53,17 @@ Welcome! You have everything you need to get started.
 ✅ Full-featured image viewer  
 
 ### With Ollama (10 min setup)
-✅ Everything above, PLUS:  
-✅ AI-generated image descriptions  
-✅ Multiple AI models to choose from  
-✅ Completely local and private  
-✅ Works offline after setup  
+✅ Everything above, PLUS:
+✅ AI-generated image descriptions
+✅ Multiple AI models to choose from
+✅ Completely local and private
+✅ Works offline after setup
 
-### With YOLO (5 min additional)
-✅ Everything above, PLUS:  
-✅ Object detection and counting  
-✅ Identify people, cars, animals, etc.  
-✅ 80 object types recognized  
-
-### With Enhanced ONNX (10 min additional)
-✅ Everything above, PLUS:  
-✅ Hybrid AI (YOLO + descriptions)  
-✅ Most accurate analysis  
-✅ Fastest performance  
+### With OpenAI or Claude (2 min additional)
+✅ Everything above, PLUS:
+✅ Highest-quality cloud descriptions
+✅ Just add an API key in Settings
+✅ Requires internet (pay-as-you-go)
 
 ---
 
@@ -83,9 +77,9 @@ Welcome! You have everything you need to get started.
 - Launch app → Select Ollama provider → Let AI describe images → Export HTML
 - **Perfect for**: Large collections, consistent descriptions, accessibility
 
-### 3. Pro Mode (25 min setup)
-- Launch app → Select Enhanced ONNX → AI + object detection → Export HTML
-- **Perfect for**: Professional work, detailed analysis, object counting
+### 3. Cloud Mode (2 min setup)
+- Launch app → Select OpenAI or Claude → AI describes images → Export HTML
+- **Perfect for**: Highest-quality descriptions, professional work
 
 ---
 
@@ -114,7 +108,6 @@ Welcome! You have everything you need to get started.
 - **USER_SETUP_GUIDE.md** - Detailed setup instructions  
 - **WHATS_INCLUDED.txt** - Quick reference guide
 - **setup_imagedescriber.bat** - Automated setup assistant
-- **download_onnx_models.bat** - Optional performance models
 - **This file** - Quick start instructions
 
 ---

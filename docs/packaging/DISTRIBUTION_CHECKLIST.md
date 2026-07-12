@@ -36,7 +36,6 @@ build_imagedescriber_amd.bat
   - [ ] USER_SETUP_GUIDE.md
   - [ ] WHATS_INCLUDED.txt
   - [ ] setup_imagedescriber.bat
-  - [ ] download_onnx_models.bat
 
 ### ARM64 Build (Optional)
 ```batch
@@ -70,9 +69,6 @@ build_imagedescriber_arm.bat
 - [ ] Restart ImageDescriber
 - [ ] Ollama provider appears in dropdown
 - [ ] Generate AI description successfully
-- [ ] Install YOLO via setup script
-- [ ] Object Detection provider appears
-- [ ] Generate object detection description
 
 ---
 
@@ -95,13 +91,12 @@ ImageDescriber_v2.0_AMD64.zip
     ├── README.txt                     (~10 KB)
     ├── USER_SETUP_GUIDE.md            (~30 KB)
     ├── WHATS_INCLUDED.txt             (~15 KB)
-    ├── setup_imagedescriber.bat       (~15 KB)
-    └── download_onnx_models.bat       (~5 KB)
+    └── setup_imagedescriber.bat       (~15 KB)
 ```
 
 **Verify:**
 - [ ] Total ZIP size: ~30-50 MB (minimal package)
-- [ ] All 6 files present
+- [ ] All 5 files present
 - [ ] No extra build artifacts (.spec, __pycache__, etc.)
 - [ ] No absolute paths in batch files
 - [ ] README.txt is named correctly (not DISTRIBUTION_README.txt)
@@ -148,9 +143,8 @@ ImageDescriber_v2.0_AMD64.zip
 - **What's Included**: See WHATS_INCLUDED.txt for feature reference
 
 ### 🔧 Optional Components
-- Ollama (for AI descriptions) - FREE, automated setup via setup_imagedescriber.bat
-- YOLO (for object detection) - FREE, automated setup via setup_imagedescriber.bat
-- ONNX Models (for performance) - FREE, automated download via script
+- Ollama (for local AI descriptions) - FREE, automated setup via setup_imagedescriber.bat
+- OpenAI or Claude API key (for cloud AI descriptions) - paid, entered in Settings
 
 ### 📞 Support
 - [Report Issues](https://github.com/kellylford/Image-Description-Toolkit/issues)

@@ -132,9 +132,8 @@ def _step_provider() -> str:
     print("  ollama    - Local models on your machine (no API key)")
     print("  anthropic - Claude (requires ANTHROPIC_API_KEY)")
     print("  openai    - GPT-4o (requires OPENAI_API_KEY)")
-    print("  florence  - Microsoft Florence-2 local model (no API key, GPU recommended)")
     print()
-    providers = ["ollama", "anthropic", "openai", "florence"]
+    providers = ["ollama", "anthropic", "openai"]
     choice = get_choice("Which provider?", providers, default=1)
     return choice
 
@@ -261,16 +260,6 @@ def _step_model(provider: str) -> str:
         if choice in ("BACK", "EXIT"):
             return choice
         return choice
-
-    if provider == "florence":
-        models = [
-            "microsoft/Florence-2-base (230 MB, faster)",
-            "microsoft/Florence-2-large (700 MB, better quality)",
-        ]
-        choice = get_choice("Select a Florence-2 model", models, default=1, allow_back=True)
-        if choice in ("BACK", "EXIT"):
-            return choice
-        return choice.split()[0]  # strip description
 
     return get_input("Enter model name")
 

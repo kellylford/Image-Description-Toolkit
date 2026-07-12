@@ -55,10 +55,6 @@ if exist "dist_templates\USER_SETUP_GUIDE.md" copy "dist_templates\USER_SETUP_GU
 if exist "dist_templates\WHATS_INCLUDED.txt" copy "dist_templates\WHATS_INCLUDED.txt" "%STAGE_DIR%\" >nul
 if exist "dist_templates\DISTRIBUTION_README.txt" copy "dist_templates\DISTRIBUTION_README.txt" "%STAGE_DIR%\README.txt" >nul
 if exist "setup_imagedescriber.bat" copy "setup_imagedescriber.bat" "%STAGE_DIR%\" >nul
-if exist "..\models\download_onnx_models.bat" copy "..\models\download_onnx_models.bat" "%STAGE_DIR%\" >nul
-if exist "..\models\install_groundingdino.bat" copy "..\models\install_groundingdino.bat" "%STAGE_DIR%\" >nul
-if exist "test_groundingdino.bat" copy "test_groundingdino.bat" "%STAGE_DIR%\" >nul
-if exist "GROUNDINGDINO_QUICK_REFERENCE.md" copy "GROUNDINGDINO_QUICK_REFERENCE.md" "%STAGE_DIR%\" >nul
 
 echo [3/4] Creating main README...
 if not exist "%STAGE_DIR%\README.txt" (
@@ -95,8 +91,6 @@ if not exist "%STAGE_DIR%\README.txt" (
     echo - Screen reader accessible
     echo.
     echo OPTIONAL FEATURES:
-    echo - GroundingDINO object detection
-    echo - ONNX model support
     echo - Video frame extraction
     echo - HEIC/HEIF image support
     echo.

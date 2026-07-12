@@ -77,7 +77,6 @@ a = Analysis(
         'idt_core.providers.claude',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
-        'idt_core.providers.florence',
 
         # ---- idt_core new modules ----
         'idt_core.config_loader',
@@ -125,11 +124,6 @@ a = Analysis(
 
         # ---- video (OpenCV) ----
         'cv2',
-
-        # ---- HuggingFace / Florence (local model) ----
-        'transformers', 'transformers.models.auto',
-        'huggingface_hub', 'safetensors', 'sentencepiece', 'tokenizers',
-        'torch',
 
         # ---- macOS MLX (no-op on Windows) ----
         'mlx_vlm', 'mlx', 'mlx.core', 'mlx.nn', 'mlx.nn.layers',

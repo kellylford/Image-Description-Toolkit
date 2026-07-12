@@ -24,6 +24,13 @@
 **`idt manage-models` — install, remove, and list AI models from the CLI**
 - New command supports `list`, `install`, `remove`, `info`, and `recommend` subcommands for managing Ollama models without leaving the terminal.
 
+### 🗑️ Removed
+
+**Florence-2 / HuggingFace provider removed**
+- Dropped the local Florence-2 vision provider from both the CLI (`--provider florence`) and the GUI (the `huggingface` provider). Ollama already covers the local, no-API-key use case, and Florence required a ~2 GB `torch` + `transformers` dependency that was never correctly bundled into the Windows executables (the `.spec` files declared `torch`/`transformers` as bare hidden imports without `collect_all`, so a built `idt.exe` failed at runtime with an import error the moment Florence was selected).
+- Removed: `idt_core/providers/florence.py`, the GUI `HuggingFaceProvider`, provider wiring in the CLI/guide/config dialogs, the Florence hidden imports from `idt.spec` / `imagedescriber_wx.spec`, the Florence-only dependencies (`transformers`, `torch`, `torchvision`, `einops`, `timm`) from the top-level `requirements.txt`, and `docs/HUGGINGFACE_PROVIDER_GUIDE.md`.
+- The macOS-only MLX provider and its `torch`/`transformers` dependencies are unaffected.
+
 ### 🔧 Bug Fixes
 
 **`idt guideme` no longer shows MLX as a provider option on Windows (issue #111)**

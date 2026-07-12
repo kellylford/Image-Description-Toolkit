@@ -81,7 +81,6 @@ try:
         model="moondream",
         prompt_style="detailed",
         custom_prompt="",
-        detection_settings=None,
         prompt_config_path=None
     )
     print(f"✓ Worker created: {worker}")

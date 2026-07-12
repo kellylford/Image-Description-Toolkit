@@ -22,7 +22,7 @@ idt_core/
   workspace.py      ← Workspace class — the .idtw bundle model
   project.py        ← Project class — the legacy .idt/ sidecar model
   pipeline.py       ← WorkspacePipeline (for .idtw), Pipeline (for .idt/)
-  providers/        ← claude.py, ollama.py, openai_provider.py, florence.py
+  providers/        ← claude.py, ollama.py, openai_provider.py
   embedder.py       ← embed_image_file()
   exporter.py       ← export_workspace_html/csv/txt(), export_html/csv/txt()
   config.py         ← UserConfig, BUILT_IN_PROMPTS
@@ -192,7 +192,7 @@ This fires on every command including `idt models`, `idt prompts`, `idt config`.
 | `redescribe <wf_dir>` | `describe <source_dir> --redescribe` | ⚠️ CHANGED | Must pass source dir, not workspace path |
 | `results-list` | `status --all <dir>` | ⚠️ REPLACED | Different format; no CSV output; no sort-by option |
 | `check-models` | `models` | ⚠️ REPLACED | Same info; no `--verbose`; Anthropic/OpenAI report key-present vs key-absent |
-| `manage-models list` | `models` | ⚠️ REPLACED | `models` lists; no `--installed` filter; no `--provider` filter for huggingface |
+| `manage-models list` | `models` | ⚠️ REPLACED | `models` lists; no `--installed` filter |
 | `prompt-list` | `prompts` | ⚠️ REPLACED | Same info; no `--config-image-describer` override |
 | `extract-frames <video>` | `video <source>` | ⚠️ REPLACED | Frames now land in a `.idtw` workspace's `derived/frames/<stem>/` under the workspace root (timestamped filenames, e.g. `clip_490.00s.jpg`) |
 | `describe-video <video>` | `video <source> --describe` | ⚠️ REPLACED | Extracts into the workspace, then describes the frames via `WorkspacePipeline` |
@@ -209,7 +209,7 @@ This fires on every command including `idt models`, `idt prompts`, `idt config`.
 | Option | v4.5 form | Notes |
 |--------|-----------|-------|
 | Input directory | positional `source` | Same |
-| Provider selection | `--provider {anthropic,ollama,openai,florence}` | `huggingface` renamed to `florence`; `mlx` removed from choices |
+| Provider selection | `--provider {anthropic,ollama,openai}` | `huggingface`/`florence` removed (Florence-2 provider dropped); `mlx` is GUI-only |
 | Model selection | `--model NAME` | Same |
 | Prompt | `--prompt NAME` / `--prompt-text TEXT` | Same concept; old: `--prompt-style`; new: `--prompt` |
 | Re-describe | `--redescribe` | Same flag, same meaning |
@@ -357,7 +357,7 @@ This applies to `show`, `combine` stdout output, and any other command that prin
 ### Bug 6: `stats` Has No Replacement for Old Workflow Performance Metrics
 **Not a crash** — both old and new `stats` commands run successfully — but they measure completely different things:
 - **Old `idt stats`** (`analysis/stats_analysis.py`): Workflow run timing, images-per-hour throughput, per-step duration (video extraction, conversion, AI description, HTML generation). Wrote CSV/JSON/text to `analysis/results/`.  
-- **New `idt stats`** (`cli/main.py:1346`, `cmd_stats`): Token counts and estimated API cost per provider/model. Shows "n/a" for all local models (Ollama, Florence) since they don't report tokens.  
+- **New `idt stats`** (`cli/main.py:1346`, `cmd_stats`): Token counts and estimated API cost per provider/model. Shows "n/a" for all local models (Ollama) since they don't report tokens.  
 **Impact:** Operations/performance monitoring is gone. API cost tracking is new. No overlap in purpose. `analysis/stats_analysis.py` still exists in source but is not reachable from the CLI.
 
 ### Architecture Gap: Resume Requires Source Directory, Not Workspace Path

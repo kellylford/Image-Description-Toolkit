@@ -199,7 +199,6 @@ class ProcessingWorker(threading.Thread):
     
     def __init__(self, parent_window, file_path: str, provider: str, model: str,
                  prompt_style: str, custom_prompt: str = "",
-                 detection_settings: dict = None,
                  prompt_config_path: Optional[str] = None,
                  api_key: Optional[str] = None,
                  geocode: bool = False):
@@ -212,7 +211,6 @@ class ProcessingWorker(threading.Thread):
             model: Model name (gpt-4o, claude-sonnet-4, etc.)
             prompt_style: Prompt style name (narrative, detailed, etc.)
             custom_prompt: Custom prompt text (overrides prompt_style)
-            detection_settings: Optional settings for object detection models
             prompt_config_path: Optional path to prompt config file
             api_key: Optional API key for cloud providers
             geocode: Whether to reverse-geocode GPS coordinates (requires internet)
@@ -224,7 +222,6 @@ class ProcessingWorker(threading.Thread):
         self.model = model
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
-        self.detection_settings = detection_settings or {}
         self.api_key = api_key
         self.geocode = geocode
         
@@ -513,14 +510,7 @@ class ProcessingWorker(threading.Thread):
                 MAX_EMPTY_RETRIES = 2
                 description = ""
                 for attempt in range(MAX_EMPTY_RETRIES + 1):
-                    if self.provider == "object_detection" and self.detection_settings:
-                        description = provider.describe_image(processing_path, prompt, self.model,
-                                                             yolo_settings=self.detection_settings)
-                    elif self.provider in ["grounding_dino", "grounding_dino_hybrid"] and self.detection_settings:
-                        description = provider.describe_image(processing_path, prompt, self.model,
-                                                             **self.detection_settings)
-                    else:
-                        description = provider.describe_image(processing_path, prompt, self.model)
+                    description = provider.describe_image(processing_path, prompt, self.model)
 
                     # Accept non-empty results immediately
                     if description and description.strip():
@@ -1620,7 +1610,6 @@ class BatchProcessingWorker(threading.Thread):
     
     def __init__(self, parent_window, file_paths: list, provider: str, model: str,
                  prompt_style: str, custom_prompt: str = "",
-                 detection_settings: dict = None,
                  prompt_config_path: Optional[str] = None,
                  skip_existing: bool = False,
                  progress_offset: int = 0,
@@ -1636,7 +1625,6 @@ class BatchProcessingWorker(threading.Thread):
             model: Model name
             prompt_style: Prompt style name
             custom_prompt: Custom prompt text (overrides prompt_style)
-            detection_settings: Optional settings for object detection
             prompt_config_path: Optional path to prompt config file
             skip_existing: Skip images that already have descriptions
             progress_offset: Offset to add to progress counter (for continuing after video extraction)
@@ -1649,7 +1637,6 @@ class BatchProcessingWorker(threading.Thread):
         self.model = model
         self.prompt_style = prompt_style
         self.custom_prompt = custom_prompt
-        self.detection_settings = detection_settings
         self.prompt_config_path = prompt_config_path
         self.skip_existing = skip_existing
         self.progress_offset = progress_offset
@@ -1732,7 +1719,6 @@ class BatchProcessingWorker(threading.Thread):
                     self.model,
                     self.prompt_style,
                     self.custom_prompt,
-                    self.detection_settings,
                     self.prompt_config_path,
                     geocode=self.geocode,
                 )

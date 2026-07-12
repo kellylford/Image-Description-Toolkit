@@ -782,7 +782,7 @@ class ChatWindow(wx.Dialog):
         3. Configuration file (via config_loader)
         
         Args:
-            provider: Provider name (ollama, openai, claude, huggingface)
+            provider: Provider name (ollama, openai, claude)
             
         Returns:
             API key string or None if not found/not needed
@@ -796,8 +796,7 @@ class ChatWindow(wx.Dialog):
         # 1. Environment Variables
         env_map = {
             'openai': 'OPENAI_API_KEY',
-            'claude': 'ANTHROPIC_API_KEY',
-            'huggingface': 'HUGGINGFACE_API_KEY'
+            'claude': 'ANTHROPIC_API_KEY'
         }
         if provider_key in env_map:
             env_val = os.getenv(env_map[provider_key])
@@ -808,8 +807,7 @@ class ChatWindow(wx.Dialog):
         # Common filenames used in this project
         file_map = {
             'openai': ['openai_api_key.txt', 'openai.txt'],
-            'claude': ['claude.txt', 'anthropic.txt'],
-            'huggingface': ['huggingface_api_key.txt', 'hf_key.txt']
+            'claude': ['claude.txt', 'anthropic.txt']
         }
         
         if provider_key in file_map:
@@ -897,8 +895,7 @@ class ChatWindow(wx.Dialog):
             # Check standard capitalization mappings
             provider_map = {
                 'openai': ['OpenAI', 'open_ai'],
-                'claude': ['Claude', 'Anthropic', 'anthropic'],
-                'huggingface': ['HuggingFace', 'Hugging Face', 'HF']
+                'claude': ['Claude', 'Anthropic', 'anthropic']
             }
             
             if provider_key in provider_map:

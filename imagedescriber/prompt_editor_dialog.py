@@ -519,7 +519,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         """Handle AI provider change"""
         provider = self.provider_combo.GetStringSelection()
         # Show/hide API key field based on provider
-        needs_api_key = provider in ["openai", "huggingface"]
+        needs_api_key = provider in ["openai"]
         self.api_key_panel.Show(needs_api_key)
         self.Layout()
         

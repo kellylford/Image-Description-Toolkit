@@ -28,20 +28,15 @@ When you build ImageDescriber using the build scripts, the following files are n
   - Quick reference: what's bundled in the .exe
   - What optional components can be added
   - Disk space requirements
-  - Quick start guide (0 to 25 minutes depending on setup level)
+  - Quick start guide (0 to 12 minutes depending on setup level)
   - FAQ section
 
 - **setup_imagedescriber.bat**
   - Interactive setup assistant for end users
   - Menu-driven interface for checking status and installing components
   - Automatically detects what's installed and what's missing
-  - Guides users through Ollama, YOLO, and ONNX setup
+  - Guides users through Ollama setup
   - Test providers option to verify everything works
-
-- **download_onnx_models.bat**
-  - Automated ONNX model downloader
-  - Downloads optimized AI models (~230MB)
-  - For users who want Enhanced ONNX provider
 
 ---
 
@@ -53,7 +48,6 @@ When you build ImageDescriber using the build scripts, the following files are n
    - `USER_SETUP_GUIDE.md`
    - `WHATS_INCLUDED.txt`
    - `setup_imagedescriber.bat`
-   - `download_onnx_models.bat`
 
 ### Level 1: Immediate Use (0 minutes)
 - **Double-click** `ImageDescriber_amd64.exe`
@@ -78,16 +72,14 @@ When you build ImageDescriber using the build scripts, the following files are n
 - See what's installed and what's available
 - Get specific recommendations
 
-### Level 4: Enable AI Features (10-25 minutes)
-- Use `setup_imagedescriber.bat` menu to:
-  - Set up Ollama (10 min) - FREE local AI
-  - Set up YOLO (5 min) - FREE object detection
-  - Download ONNX models (10 min) - FREE performance boost
+### Level 4: Enable AI Features (2-10 minutes)
+- Use `setup_imagedescriber.bat` menu to set up Ollama (10 min) - FREE local AI
+- Or add an OpenAI/Claude API key in Settings (2 min) - cloud AI
 - Or follow detailed steps in `USER_SETUP_GUIDE.md`
 
 ### Level 5: Start Using AI (immediately after setup)
 - Launch ImageDescriber
-- Select AI provider (Ollama, Object Detection, Enhanced ONNX, etc.)
+- Select AI provider (Ollama, OpenAI, Claude)
 - Process images with AI-generated descriptions
 - Export beautiful HTML reports
 
@@ -120,23 +112,9 @@ These require separate installation but are fully documented:
    - Why not bundled: Separate service that runs independently
    - Setup: Automated in `setup_imagedescriber.bat`
 
-2. **YOLO / Ultralytics** (for object detection)
-   - Python package
-   - Install: `pip install ultralytics`
-   - Size: ~50MB + auto-downloads models
-   - Why not bundled: Optional feature, requires Python pip
-   - Setup: Automated in `setup_imagedescriber.bat`
-
-3. **ONNX Runtime** (for enhanced performance)
-   - Python packages + model files
-   - Install: `pip install onnxruntime`
-   - Size: ~230MB for optimized models
-   - Why not bundled: Optional enhancement, large files
-   - Setup: Automated in `setup_imagedescriber.bat`
-
-4. **API Keys** (for cloud providers)
+2. **API Keys** (for cloud providers)
    - OpenAI: Requires paid API key
-   - HuggingFace: Free account + token
+   - Claude (Anthropic): Requires paid API key
    - Why not bundled: User-specific credentials
    - Setup: Documented in `USER_SETUP_GUIDE.md`
 
@@ -152,7 +130,6 @@ Both `build_imagedescriber_amd.bat` and `build_imagedescriber_arm.bat` now:
    - `USER_SETUP_GUIDE.md`
    - `WHATS_INCLUDED.txt`
    - `setup_imagedescriber.bat`
-   - `download_onnx_models.bat`
 3. **Display distribution summary** (NEW):
    - Shows what files are included
    - Instructions for zipping and distributing
@@ -167,7 +144,6 @@ Distribution Package Contents:
   USER_SETUP_GUIDE.md            - Detailed setup instructions
   WHATS_INCLUDED.txt             - What's bundled vs optional
   setup_imagedescriber.bat       - Interactive setup assistant
-  download_onnx_models.bat       - ONNX model downloader
 ================================================================
 
 To distribute to end users:
@@ -187,7 +163,6 @@ To distribute to end users:
   - [ ] USER_SETUP_GUIDE.md
   - [ ] WHATS_INCLUDED.txt
   - [ ] setup_imagedescriber.bat
-  - [ ] download_onnx_models.bat
 - [x] Zip the entire `dist/imagedescriber/` folder
 - [x] Name it: `ImageDescriber_v2.0_AMD64.zip` (or ARM64)
 - [x] Upload to release page or distribution site
@@ -196,7 +171,7 @@ To distribute to end users:
 - [ ] Extract ZIP to any folder
 - [ ] Read `WHATS_INCLUDED.txt` (2 min)
 - [ ] Run `ImageDescriber_amd64.exe` to test core features (0 min setup)
-- [ ] Run `setup_imagedescriber.bat` to enable AI (10-25 min)
+- [ ] Run `setup_imagedescriber.bat` to enable AI (2-10 min)
 - [ ] Start processing images!
 
 ---
@@ -204,7 +179,7 @@ To distribute to end users:
 ## 💡 Key Design Decisions
 
 ### Why Not Bundle Everything?
-1. **Size**: Ollama models are 2-8GB each, ONNX models are 230MB
+1. **Size**: Ollama models are 2-8GB each
 2. **Flexibility**: Users may already have Ollama installed
 3. **Choice**: Not everyone needs all providers
 4. **Updates**: External components update independently
@@ -215,7 +190,7 @@ To distribute to end users:
 2. **Clear documentation** - Users know exactly what to do
 3. **Automated setup** - `setup_imagedescriber.bat` handles complexity
 4. **Graduated complexity** - Start simple, add features as needed
-5. **Turn-key when needed** - Full AI setup in 10-25 minutes
+5. **Turn-key when needed** - Full AI setup in 2-10 minutes
 
 ---
 
@@ -234,7 +209,7 @@ To distribute to end users:
 **Best for**: Users who want AI but prefer single download
 
 ### Approach 3: Full Package (Everything Pre-downloaded)
-**Contents**: ImageDescriber.exe + Ollama + YOLO + ONNX + docs  
+**Contents**: ImageDescriber.exe + Ollama + models + docs  
 **Size**: ~5 GB  
 **User setup time**: 2 minutes (run setup script)  
 **Best for**: Corporate/institutional deployment, limited internet
@@ -259,8 +234,6 @@ To distribute to end users:
 ```
 ✓ Ollama status: RUNNING
 ✓ Vision models: llava:7b found
-✓ YOLO: READY
-✓ Enhanced ONNX: READY
 ✓ All AI features available!
 ```
 
@@ -304,8 +277,8 @@ All common issues are addressed in the user documentation:
 
 ### Achievement: ✨ Truly Turn-Key ✨
 - **0 minutes**: Use core features (manual descriptions, HTML export)
-- **10 minutes**: Enable AI descriptions (Ollama)
-- **25 minutes**: Enable ALL features (Ollama + YOLO + ONNX)
+- **10 minutes**: Enable local AI descriptions (Ollama)
+- **12 minutes**: Add cloud AI (OpenAI or Claude API key)
 - **All documented**, **all automated**, **all user-friendly**
 
 ---

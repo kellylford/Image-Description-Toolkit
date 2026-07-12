@@ -25,7 +25,6 @@ Both tools produce the same workspace bundles (`.idtw`) — a `.idtw` bundle is 
 | Ollama Cloud | — | `ollama_cloud` | Cloud (self-hosted) | No | GUI only |
 | Anthropic Claude | `anthropic` | `claude` | Cloud | Yes | Windows, macOS |
 | OpenAI GPT | `openai` | `openai` | Cloud | Yes | Windows, macOS |
-| Florence-2 (Microsoft) | `florence` | `huggingface` | Local | No | Windows, macOS |
 | MLX (Apple Silicon) | — | `mlx` | Local | No | GUI only, macOS Apple Silicon |
 
 ---
@@ -243,7 +242,7 @@ idt describe <source> [options]
 
 | Option | Default | Description |
 |---|---|---|
-| `--provider {anthropic\|ollama\|openai\|florence}` | From config | AI provider to use |
+| `--provider {anthropic\|ollama\|openai}` | From config | AI provider to use |
 | `--model NAME` | Provider default | Model name (e.g., `claude-opus-4-6`, `gpt-4o`, `minicpm-v4.6`) |
 | `--ollama-host URL` | `http://localhost:11434` | Ollama server address |
 
@@ -526,7 +525,7 @@ Summarize token counts and estimated API costs across one or more workspaces.
 idt stats <source> [--all] [--json]
 ```
 
-Output includes: total images, descriptions written, per-provider token counts, and estimated cost in USD. Local models (Ollama, Florence-2) do not report token usage.
+Output includes: total images, descriptions written, per-provider token counts, and estimated cost in USD. Local models (Ollama) do not report token usage.
 
 ---
 
@@ -600,7 +599,7 @@ idt config [--set KEY=VALUE]
 
 | Key | Description |
 |---|---|
-| `default_provider` | AI provider: `anthropic`, `ollama`, `openai`, `florence` |
+| `default_provider` | AI provider: `anthropic`, `ollama`, `openai` |
 | `default_model` | Model name for the provider |
 | `default_prompt_name` | Default prompt style |
 | `workspace_root` | Root folder for workspaces (default: `~/Documents/idt`) |
@@ -1002,7 +1001,6 @@ All menu items, buttons, and interactive controls are reachable by keyboard. Arr
 > | CLI name | GUI name | Notes |
 > |---|---|---|
 > | `anthropic` | `claude` | Same provider; Anthropic Claude models |
-> | `florence` | `huggingface` | Same provider; Microsoft Florence-2 via HuggingFace |
 > | `ollama` | `ollama` | Same name in both |
 > | `openai` | `openai` | Same name in both |
 > | — | `ollama_cloud` | GUI only; remote Ollama server |
@@ -1097,37 +1095,6 @@ Requires an OpenAI API key. Good for workflows already integrated with OpenAI.
 ```bash
 idt describe ~/Photos --provider openai --model gpt-4o
 ```
-
----
-
-### Florence-2 — Local (Windows and macOS)
-
-Microsoft Florence-2 runs locally via the HuggingFace Transformers library. No API key is required. Quality is lower than Claude or GPT-4o but there is no per-image cost.
-
-**CLI provider name:** `florence` · **GUI provider name:** `huggingface`
-
-**Setup**
-
-```bash
-pip install torch transformers
-```
-
-A GPU (CUDA on Windows/Linux, MPS on Apple Silicon) is recommended but a CPU works.
-
-**Available models**
-
-| Model | Size | Notes |
-|---|---|---|
-| `microsoft/Florence-2-large` | 700 MB | Best quality |
-| `microsoft/Florence-2-base` | 230 MB | Faster |
-
-**CLI example**
-
-```bash
-idt describe ~/Photos --provider florence --model microsoft/Florence-2-large
-```
-
-**Note on prompts with Florence-2:** IDT maps prompt names to Florence task tokens automatically. The `detailed` prompt uses `<DETAILED_CAPTION>`, `concise` uses `<CAPTION>`, etc. Custom prompt text is not supported by Florence-2 (it ignores the text and uses the task token).
 
 ---
 

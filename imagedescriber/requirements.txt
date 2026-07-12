@@ -66,8 +66,6 @@ mlx-vlm>=0.6.3 ; sys_platform == 'darwin' and platform_machine == 'arm64'
 torch>=2.12.1 ; sys_platform == 'darwin' and platform_machine == 'arm64'        # CPU-only, needed by transformers processor
 torchvision ; sys_platform == 'darwin' and platform_machine == 'arm64'         # required by torch
 # transformers>=4.30.0 # Already pulled in by mlx-vlm
-# Uncomment if you need GroundingDINO object detection:
-# groundingdino        # GroundingDINO package
 
 # Note: The imagedescriber bundles scripts directory for configurations
 # and includes all necessary AI provider dependencies.

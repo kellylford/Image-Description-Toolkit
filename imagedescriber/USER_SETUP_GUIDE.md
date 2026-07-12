@@ -63,143 +63,6 @@ To unlock **AI-powered image descriptions**, you need to set up at least ONE AI 
 
 ---
 
-### ⚡ Optional: Object Detection (YOLO)
-
-**Best for**: Counting objects, detecting specific items, precise analysis
-
-**What it does**: Detects and counts objects (people, cars, animals, etc.) with bounding boxes
-
-**Setup time**: 2-3 minutes
-
-**Steps**:
-
-1. **Run the setup batch file** (included with ImageDescriber)
-   - Double-click: **setup_imagedescriber.bat**
-   - OR manually: `pip install ultralytics`
-
-2. **Verify Setup**
-   - Restart ImageDescriber
-   - Look for **"Object Detection"** in the provider dropdown
-   - If it appears, you're all set!
-
-**Usage**:
-- Provider: **Object Detection**
-- Adjust settings: Confidence threshold, max objects, YOLO model size
-- Best for: Counting people, vehicles, animals; detecting specific objects
-
-**Note**: YOLO detects 80 common objects (COCO dataset). It won't recognize artistic objects like sculptures, paintings, or specialized items.
-
----
-
-### 🎯 Optional: GroundingDINO (Text-Prompted Object Detection)
-
-**Best for**: Detecting ANY object you describe, unlimited flexibility, works in chat
-
-**What it does**: Detects objects based on text descriptions - no preset limits!
-
-**Requirements**: Python packages (torch, torchvision, groundingdino-py)
-
-**Setup time**: 5 minutes + ~700MB model download on first use
-
-**Steps**:
-
-1. **Install GroundingDINO**
-   ```bash
-   pip install groundingdino-py torch torchvision
-   ```
-
-2. **First Use Model Download**
-   - First time you use GroundingDINO, it downloads ~700MB model
-   - This happens automatically
-   - Subsequent uses are instant (model is cached)
-
-3. **Verify Installation**
-   - In ImageDescriber provider dropdown, look for:
-     - **GroundingDINO** (standalone detection)
-     - **GroundingDINO + Ollama** (detection + descriptions)
-
-**Usage**:
-
-**Option 1: Preset Detection Modes**
-- Provider: **GroundingDINO** or **GroundingDINO + Ollama**
-- Detection Mode: **Automatic**
-- Choose preset: Comprehensive, Indoor, Outdoor, Workplace, Safety, Retail, Document
-- Adjust confidence threshold (default 25%)
-
-**Option 2: Custom Queries** (The Power Feature!)
-- Provider: **GroundingDINO** or **GroundingDINO + Ollama**
-- Detection Mode: **Custom Query**
-- Type what to find: "red cars . blue trucks . motorcycles"
-- Separate items with " . " (period with spaces)
-
-**Example Queries**:
-- `red cars . blue trucks . motorcycles`
-- `people wearing helmets . safety equipment`
-- `fire exits . emergency signs . first aid kits`
-- `logos . text . diagrams`
-- `damaged items . missing parts`
-
-**Chat Integration** (Chat-based Detection):
-- Select an image in the workspace
-- Open or continue a chat session
-- Type natural queries:
-  - "find red cars"
-  - "detect people wearing hats"
-  - "show me safety equipment"
-  - "locate fire exits"
-- GroundingDINO automatically detects and responds!
-
-**Advantages over YOLO**:
-- ✅ Unlimited object types (YOLO limited to 80)
-- ✅ Describe attributes: colors, states, conditions
-- ✅ Natural language: "person wearing hat" not just "person"
-- ✅ Works in chat with conversational queries
-- ✅ Hybrid mode: Combines detection with Ollama descriptions
-
-**Note**: First use downloads ~700MB model automatically. Requires internet connection for initial download only.
-
----
-
-### 🔥 Optional: HuggingFace Provider (CLI Only - Florence-2 Models)
-
-**Note**: HuggingFace is **available via command-line only** to keep the ImageDescriber GUI installer size reasonable (~100MB instead of ~2GB).
-
-**Best for**: Free, privacy-focused local AI vision without internet connection
-
-**What it does**: Runs Microsoft Florence-2 vision models entirely on your computer
-
-**Requirements**: Python environment with transformers library
-
-**Setup time**: 5-10 minutes (first download)
-
-**Steps**:
-
-1. **Install Florence-2 Dependencies**
-   ```bash
-   pip install transformers torch torchvision einops timm
-   ```
-
-2. **Use via Command Line**
-   ```bash
-   # Single image
-   idt describe image.jpg --provider huggingface --model microsoft/Florence-2-base
-   
-   # Full workflow
-   idt workflow --provider huggingface --model microsoft/Florence-2-base
-   ```
-
-3. **Available Models**
-   - **microsoft/Florence-2-base** (230MB, faster)
-   - **microsoft/Florence-2-large** (700MB, better quality)
-   - First use will download the model automatically
-
-**Why CLI-only?**
-- Bundling transformers + PyTorch would increase installer from ~100MB to ~2.5GB
-- CLI provides full functionality without GUI overhead
-- GUI focuses on providers optimized for interactive use
-
----
-
 ### 💰 Optional: OpenAI (Cloud, Paid, GPT-4 Vision)
 
 **Best for**: Highest quality descriptions, cloud-based, requires API key
@@ -233,33 +96,6 @@ To unlock **AI-powered image descriptions**, you need to set up at least ONE AI 
 - Requires internet connection
 - Costs add up with heavy use
 - Excellent quality, but not private (images sent to OpenAI)
-
----
-
-### 🤗 Optional: HuggingFace (Local/Cloud, Mixed)
-
-**Best for**: Experimenting with different AI models, research
-
-**What it does**: Access to thousands of AI models from HuggingFace
-
-**Setup time**: 5 minutes
-
-**Steps**:
-
-1. **Get HuggingFace Token**
-   - Sign up at [huggingface.co](https://huggingface.co/join)
-   - Go to [Settings → Access Tokens](https://huggingface.co/settings/tokens)
-   - Click "New token" → Select "Read"
-   - Copy the token
-
-2. **Add Token to ImageDescriber**
-   - Settings → Provider Settings → **HuggingFace Token**
-   - Paste token and save
-
-3. **Download Models** (optional, for offline use)
-   - Most models download on first use
-   - Some require manual download
-   - See HuggingFace documentation for specific models
 
 ---
 
@@ -335,11 +171,8 @@ Use this checklist to track what you've set up:
 - [ ] Test description generated in ImageDescriber
 
 ### Optional Enhancements
-- [ ] YOLO installed (`pip install ultralytics`)
-- [ ] "Object Detection" provider appears in ImageDescriber
-- [ ] Florence-2 dependencies installed (for HuggingFace provider)
 - [ ] OpenAI API key configured (if using OpenAI)
-- [ ] HuggingFace token configured (if using HuggingFace)
+- [ ] Claude API key configured (if using Claude)
 
 ---
 
@@ -352,14 +185,6 @@ Use this checklist to track what you've set up:
 2. Restart Ollama: Exit from system tray, then start again
 3. Test connection: Open browser to [http://localhost:11434](http://localhost:11434)
 4. Reinstall Ollama if needed
-
-### "Object Detection provider not showing"
-
-**Solutions**:
-1. Run: **setup_imagedescriber.bat** (included with ImageDescriber)
-2. OR manually: `pip install ultralytics`
-3. Restart ImageDescriber
-4. Check: Provider dropdown should now show "Object Detection"
 
 ### "Unable to load image" errors
 
@@ -387,7 +212,7 @@ Use this checklist to track what you've set up:
 4. For Copilot+ PC: Use Copilot+ provider for NPU acceleration
 5. For cloud: Consider OpenAI provider (faster but costs money)
 
-### "API key invalid" (OpenAI/HuggingFace)
+### "API key invalid" (OpenAI/Claude)
 
 **Solutions**:
 1. Double-check key/token copied correctly
@@ -412,22 +237,18 @@ Use this checklist to track what you've set up:
 
 ### **Power User** (Best quality, all features)
 - ✅ Install Ollama
-- ✅ Install YOLO
-- ✅ Install Florence-2 dependencies
-- ✅ Use HuggingFace provider
+- ✅ Add OpenAI or Claude for highest-quality descriptions
 - Time: 20 minutes
 
 ### **Professional** (High volume, quality matters)
 - ✅ OpenAI API key
 - ✅ Install Ollama as backup
-- ✅ Install YOLO for object counting
 - Cost: ~$0.02/image
 - Time: 15 minutes setup
 
 ### **Copilot+ PC Owner** (Hardware acceleration)
 - ✅ Use Copilot+ provider (built-in)
 - ✅ Install Ollama as alternative
-- ✅ Install YOLO for object detection
 - Time: 15 minutes
 
 ---
@@ -446,17 +267,15 @@ Use this checklist to track what you've set up:
 
 ### Quick Reference
 - **Ollama**: [ollama.ai/download](https://ollama.ai/download)
-- **YOLO Setup**: Run `setup_imagedescriber.bat`
 - **OpenAI**: [platform.openai.com](https://platform.openai.com)
-- **HuggingFace**: [huggingface.co](https://huggingface.co)
+- **Claude**: [console.anthropic.com](https://console.anthropic.com)
 
 ---
 
 ## 🎉 You're All Set!
 
 **Minimum to start**: Just run ImageDescriber.exe (0 minutes)  
-**Recommended setup**: + Ollama (10 minutes)  
-**Maximum features**: + HuggingFace Florence-2 (25 minutes total)
+**Recommended setup**: + Ollama (10 minutes)
 
 **Remember**: Start simple, add features as needed. The core app works great without any AI setup!
 

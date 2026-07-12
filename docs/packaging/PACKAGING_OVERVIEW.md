@@ -26,15 +26,11 @@ After running `build_imagedescriber_amd.bat` or `build_imagedescriber_arm.bat`, 
 │   └── FAQ section
 │   └── Quick comparison of features
 │
-├── ⚙️ setup_imagedescriber.bat                   [Interactive]
-│   └── Menu-driven setup assistant
-│   └── Checks status of all components
-│   └── Automates Ollama/YOLO/ONNX installation
-│   └── Tests all providers
-│
-└── 📥 download_onnx_models.bat                   [Optional]
-    └── Downloads optimized ONNX models (~230MB)
-    └── For users who want Enhanced ONNX provider
+└── ⚙️ setup_imagedescriber.bat                   [Interactive]
+    └── Menu-driven setup assistant
+    └── Checks status of all components
+    └── Automates Ollama installation
+    └── Tests all providers
 ```
 
 ---
@@ -44,7 +40,7 @@ After running `build_imagedescriber_amd.bat` or `build_imagedescriber_arm.bat`, 
 ### Minute 0: Extract and Run
 ```
 User extracts ZIP
-├── Sees 6 files
+├── Sees 5 files
 ├── Opens README.txt (clearly marked "START HERE")
 └── Learns: App works NOW, AI optional
 ```
@@ -61,9 +57,7 @@ Double-click ImageDescriber_amd64.exe
 ```
 Run setup_imagedescriber.bat
 ├── Check status (what's installed)
-├── Install Ollama (if desired)
-├── Install YOLO (if desired)
-└── Download ONNX models (if desired)
+└── Install Ollama (if desired)
 ```
 
 ### Minute 11+: Full AI Experience
@@ -100,9 +94,8 @@ Launch ImageDescriber
 
 ### 4. Flexible Installation Paths
 - ✅ Level 0: No setup (manual descriptions)
-- ✅ Level 1: Ollama only (AI descriptions)
-- ✅ Level 2: + YOLO (object detection)
-- ✅ Level 3: + ONNX (maximum performance)
+- ✅ Level 1: Ollama (local AI descriptions)
+- ✅ Level 2: + OpenAI or Claude API key (cloud AI descriptions)
 - ✅ Users choose what they need
 
 ### 5. Complete Build Automation
@@ -119,33 +112,31 @@ Launch ImageDescriber
 | Component | Size | Required? | Setup Time |
 |-----------|------|-----------|------------|
 | **ImageDescriber.exe** | 30-50 MB | ✅ Required | 0 min (works immediately) |
-| **Documentation (6 files)** | < 1 MB | ✅ Included | 2 min (read README.txt) |
+| **Documentation (5 files)** | < 1 MB | ✅ Included | 2 min (read README.txt) |
 | **Ollama** | 250 MB + 2-8 GB models | ❌ Optional | 10 min (automated) |
-| **YOLO** | 50 MB | ❌ Optional | 5 min (automated) |
-| **ONNX Models** | 230 MB | ❌ Optional | 10 min (automated) |
 
 **Minimal Package (recommended)**: ~50 MB total  
-**With AI (Ollama + YOLO)**: ~4.5 GB total  
-**Maximum (all features)**: ~9 GB total
+**With AI (Ollama + llava:7b)**: ~4.5 GB total  
+**Maximum (all models)**: ~9 GB total
 
 ---
 
 ## 🎨 Distribution Options
 
 ### Option 1: Minimal Package (Recommended)
-**Contents**: Just the 6 files above  
+**Contents**: Just the 5 files above  
 **Size**: ~50 MB  
 **Best for**: Public downloads, GitHub releases  
 **User experience**: Works immediately, add AI in 10 min if desired
 
 ### Option 2: Ollama Bundle
-**Contents**: 6 files + Ollama installer  
+**Contents**: 5 files + Ollama installer  
 **Size**: ~300 MB  
 **Best for**: Users who definitely want AI  
 **User experience**: Install two things, done in 5 min
 
 ### Option 3: Full Package
-**Contents**: 6 files + Ollama + pre-downloaded models  
+**Contents**: 5 files + Ollama + pre-downloaded models  
 **Size**: ~5 GB  
 **Best for**: Corporate deployment, limited internet  
 **User experience**: Everything ready, 2 min setup
@@ -160,19 +151,18 @@ Launch ImageDescriber
 cd imagedescriber
 build_imagedescriber_amd.bat
 
-# Result: dist/imagedescriber/ folder with 6 files
+# Result: dist/imagedescriber/ folder with 5 files
 # - ImageDescriber_amd64.exe
 # - README.txt
 # - USER_SETUP_GUIDE.md
 # - WHATS_INCLUDED.txt
 # - setup_imagedescriber.bat
-# - download_onnx_models.bat
 ```
 
 ### Distribution Steps
 1. ✅ Build completes successfully
 2. ✅ Navigate to `dist/imagedescriber/`
-3. ✅ Verify all 6 files present
+3. ✅ Verify all 5 files present
 4. ✅ Zip the entire folder
 5. ✅ Name: `ImageDescriber_v2.0_AMD64.zip`
 6. ✅ Upload to GitHub Releases or distribution site
@@ -192,7 +182,7 @@ build_imagedescriber_amd.bat
 - ✅ **Works on first launch** (core features functional)
 - ✅ **Clear documentation** (README.txt as entry point)
 - ✅ **Automated setup** (setup_imagedescriber.bat)
-- ✅ **Layered complexity** (0 min → 10 min → 25 min paths)
+- ✅ **Layered complexity** (0 min → 10 min → cloud API key paths)
 - ✅ **Professional packaging** (all files in one place)
 - ✅ **Error handling** (helpful messages if setup fails)
 - ✅ **Offline capable** (after initial setup)

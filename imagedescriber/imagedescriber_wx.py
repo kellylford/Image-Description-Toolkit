@@ -3303,7 +3303,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options['model'],
             options['prompt_style'],
             options.get('custom_prompt', ''),
-            None,  # detection_settings
             None,  # prompt_config_path
             api_key,
             geocode=options.get('geocode_enabled', False),
@@ -3927,7 +3926,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "model": options['model'],
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
-            "detection_settings": options.get('detection_settings'),
             "geocode_enabled": options.get('geocode_enabled', False),
             "total_queued": len(to_process),
             "started": datetime.now().isoformat()
@@ -3958,7 +3956,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options['model'],
             options['prompt_style'],
             options.get('custom_prompt', ''),
-            None,  # detection_settings
             None,  # prompt_config_path
             skip_existing,
             progress_offset=progress_offset,
@@ -4051,7 +4048,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "model": options['model'],
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
-            "detection_settings": options.get('detection_settings'),
             "geocode_enabled": options.get('geocode_enabled', False),
             "total_queued": len(to_process),
             "started": datetime.now().isoformat(),
@@ -4064,8 +4060,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options['model'],
             options['prompt_style'],
             options.get('custom_prompt', ''),
-            None,
-            None,
+            None,  # prompt_config_path
             skip_existing,
             progress_offset=0,
             geocode=options.get('geocode_enabled', False),
@@ -5398,7 +5393,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if "not available" in error_msg.lower():
             # Extract provider name if present
             provider_name = None
-            for prov in ["openai", "claude", "ollama", "huggingface"]:
+            for prov in ["openai", "claude", "ollama"]:
                 if prov in error_msg.lower():
                     provider_name = prov
                     break
@@ -6147,7 +6142,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         model = batch_state['model']
         prompt_style = batch_state.get('prompt_style', 'default')
         custom_prompt = batch_state.get('custom_prompt')
-        detection_settings = batch_state.get('detection_settings')
 
         # Get prompt config path - use the already-resolved config_file path so we
         # read custom prompts from AppData (where Configure Settings writes them) not
@@ -6166,7 +6160,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             model=model,
             prompt_style=prompt_style,
             custom_prompt=custom_prompt,
-            detection_settings=detection_settings,
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
             skip_existing=True,  # Always skip completed
             geocode=batch_state.get('geocode_enabled', False),
@@ -6400,7 +6393,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "model": options['model'],
             "prompt_style": options['prompt_style'],
             "custom_prompt": options.get('custom_prompt'),
-            "detection_settings": None,
             "total_queued": len(image_paths),
             "started": datetime.now().isoformat()
         }
@@ -6437,7 +6429,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             options['model'],
             options['prompt_style'],
             options.get('custom_prompt', ''),
-            None,  # detection_settings
             None,  # prompt_config_path
             options.get('skip_existing', True),
             progress_offset=0,
@@ -6499,7 +6490,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "model": options['model'],
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
-            "detection_settings": options.get('detection_settings'),
             "total_queued": len(frame_paths),
             "started": datetime.now().isoformat()
         }
@@ -6512,7 +6502,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             model=options['model'],
             prompt_style=options.get('prompt_style', 'default'),
             custom_prompt=options.get('custom_prompt'),
-            detection_settings=options.get('detection_settings'),
             prompt_config_path=str(prompt_config_path) if prompt_config_path else None,
             skip_existing=True,
             geocode=options.get('geocode_enabled', False),
@@ -6892,8 +6881,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     values['model'],
                     'followup',
                     custom_prompt,  # Just the question, not full description
-                    None,
-                    None,
+                    None,  # prompt_config_path
                     api_key  # API key for cloud providers
                 )
                 self.followup_worker.start()
@@ -6939,8 +6927,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 options['model'],
                 'brief',  # Use brief prompt style
                 rename_prompt,
-                None,
-                None,
+                None,  # prompt_config_path
                 api_key  # API key for cloud providers
             )
             worker.start()

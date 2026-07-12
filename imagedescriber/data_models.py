@@ -215,7 +215,6 @@ class ImageWorkspace:
         #     "model": "claude-opus-4-6",
         #     "prompt_style": "detailed",
         #     "custom_prompt": "...",
-        #     "detection_settings": {...},
         #     "paused_at_index": 5,
         #     "total_queued": 20,
         #     "started": "2026-02-09T14:30:00"

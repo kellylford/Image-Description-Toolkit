@@ -1,6 +1,6 @@
 # Image Description Toolkit
 
-AI-powered batch image description tool supporting multiple vision models (Ollama, OpenAI GPT-4o, Claude, HuggingFace Florence-2).
+AI-powered batch image description tool supporting multiple vision models (Ollama, OpenAI GPT-4o, Claude).
 
 ## Quick Start
 
@@ -51,7 +51,7 @@ idt workflow path/to/images
 ## Features
 
 - **Two Powerful Applications**: GUI for visual workflow, CLI for automation
-- **Multiple AI Providers**: Ollama (local), OpenAI, Claude, HuggingFace Florence-2
+- **Multiple AI Providers**: Ollama (local), OpenAI, Claude
 - **Batch Processing**: Process directories of images automatically
 - **Video Frame Extraction**: Extract and describe frames from videos
 - **Integrated Viewer**: Browse and monitor workflows in real-time (built into GUI)
@@ -70,7 +70,6 @@ idt workflow path/to/images
 
 ### Configuration & Setup
 - **[Configuration Guide](docs/CONFIGURATION_GUIDE.md)** - Setup and customization
-- **[HuggingFace Provider Guide](docs/HUGGINGFACE_PROVIDER_GUIDE.md)** - Florence-2 local models
 
 ### Developer Documentation
 - **[Build Guide (Windows)](BuildAndRelease/README.md)** - Windows build instructions
@@ -83,17 +82,13 @@ Pre-built Executable**: No Python required - download installer from releases
   - [Ollama](https://ollama.com) (free, runs locally) - **Recommended for most users**
   - [OpenAI API](https://platform.openai.com/api-keys) (GPT-4o, paid)
   - [Claude API](https://console.anthropic.com) (paid)
-  - HuggingFace Florence-2 (free, local, requires more setup
-  - [OpenAI API](https://platform.openai.com/api-keys) (GPT-4o, paid)
-  - [Claude API](https://console.anthropic.com) (paid)
-  - HuggingFace Florence-2 (free, local, no API needed)
 
 ### macOS
 - **macOS 10.13+** (High Sierra or later)
 - **Python 3.8+** (system Python or Homebrew)
 - **Installation**: Download .pkg installer or .dmg disk image from releases
 - **Build from Source**: See [macOS Build Guide](docs/BUILD_MACOS.md)
-- **AI Providers**: Same as Windows (Ollama, OpenAI, Claude, HuggingFace)
+- **AI Providers**: Same as Windows (Ollama, OpenAI, Claude)
 
 **macOS Quick Start:**
 ```bash
@@ -110,7 +105,6 @@ brew install python@3
   - Ollama (local, free)
   - OpenAI API key
   - Anthropic Claude API key
-  - HuggingFace transformers (local, free)
 
 ## Support
 
@@ -121,8 +115,3 @@ brew install python@3
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-### Third-Party Models
-
-- **Florence-2 Models**: Created by Microsoft Corporation, MIT License
-- **Citation**: Xiao, Bin, et al. "Florence-2: Advancing a unified representation for a variety of vision tasks." arXiv:2311.06242 (2023)

@@ -64,12 +64,8 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
         from idt_core.providers.openai_provider import OpenAIProvider, DEFAULT_MODEL
         return OpenAIProvider(model=model or DEFAULT_MODEL)
 
-    if provider == "florence":
-        from idt_core.providers.florence import FlorenceProvider, DEFAULT_MODEL
-        return FlorenceProvider(model=model or DEFAULT_MODEL)
-
     print(f"Unknown provider: {provider!r}", file=sys.stderr)
-    print("Valid providers: anthropic, ollama, openai, florence", file=sys.stderr)
+    print("Valid providers: anthropic, ollama, openai", file=sys.stderr)
     sys.exit(1)
 
 
@@ -108,7 +104,7 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
 def _provider_args(p: argparse.ArgumentParser) -> None:
     """Add the standard provider/model/ollama-host arguments."""
     p.add_argument(
-        "--provider", choices=["anthropic", "ollama", "openai", "florence"],
+        "--provider", choices=["anthropic", "ollama", "openai"],
         help="AI provider (default: from config, else ollama)",
     )
     p.add_argument("--model", metavar="NAME", help="Model name")
@@ -1846,7 +1842,6 @@ Examples:
   idt video ~/Movies/ --scene 30 --describe --prompt detailed
   idt watch ~/Downloads/ --interval 60 --prompt aialttext
   get_nyt_images.bat | idt describe - --prompt aialttext --provider anthropic
-  idt describe - --provider florence < image_list.txt
   idt models
   idt models --provider ollama
   idt prompts
@@ -1859,7 +1854,6 @@ Supported providers:
   anthropic  Claude (requires ANTHROPIC_API_KEY)
   openai     GPT-4o (requires OPENAI_API_KEY)
   ollama     Local models via Ollama (no API key)
-  florence   Microsoft Florence-2 local model (no API key, GPU recommended)
         """,
     )
 
@@ -2138,8 +2132,8 @@ Supported providers:
         help="Show token usage and cost estimates for a project",
         description=(
             "Summarise token counts and estimated API costs across all described "
-            "images, broken down by provider and model. Local models (Ollama, "
-            "Florence) do not report tokens so no cost is shown for them."
+            "images, broken down by provider and model. Local models (Ollama) "
+            "do not report tokens so no cost is shown for them."
         ),
     )
     p_stats.add_argument("source", help="Source directory (or parent directory with --all)")

@@ -15,7 +15,7 @@ Both apps open and write the same `.idtw` bundle format. Users' source images ar
 - Ollama (local/cloud models: llama3.2-vision, qwen2-vl, llava, etc.)
 - OpenAI (GPT-4o, GPT-4o-mini)
 - Anthropic Claude (claude-opus-4-6, claude-haiku-4-5-20251001)
-- HuggingFace Florence-2
+- MLX (macOS Apple Silicon, GUI only — Qwen3-VL and compatible models via mlx-vlm)
 
 ### Dual Execution Model
 
@@ -43,7 +43,7 @@ except ImportError:
 Central configuration system shared across CLI, GUI, and workspace.
 
 **`UserConfig` class:**
-- `default_provider` — "ollama", "anthropic", "openai", "florence"
+- `default_provider` — "ollama", "anthropic", "openai"
 - `default_model` — model name for the provider
 - `default_prompt_name` — built-in prompt key ("narrative", "detailed", etc.)
 - `custom_prompts` — user-defined prompt overrides
@@ -124,7 +124,6 @@ class BaseProvider:
 - `ollama.py` — connects to `http://localhost:11434`
 - `openai_provider.py` — reads `OPENAI_API_KEY` from environment
 - `claude.py` — reads `ANTHROPIC_API_KEY`
-- `florence.py` — local HuggingFace model
 
 ### `embedder.py`
 

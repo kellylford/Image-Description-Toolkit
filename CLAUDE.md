@@ -8,7 +8,7 @@ Image Description Toolkit (IDT) is an AI-powered batch image/video description t
 - **`idt`** — CLI dispatcher (`idt/idt_cli.py`) routing to all sub-commands
 - **`ImageDescriber`** — wxPython batch processing GUI (`imagedescriber/imagedescriber_wx.py`) with integrated viewer (`viewer_components.py`), chat (`chat_window_wx.py`), workspace manager (`workspace_manager.py`), prompt editor, and configuration manager
 
-Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic), HuggingFace Florence-2.
+Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic), and MLX (macOS Apple Silicon, GUI only).
 
 ## Commands
 
