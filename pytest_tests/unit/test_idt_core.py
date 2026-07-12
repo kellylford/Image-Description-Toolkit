@@ -100,6 +100,35 @@ class TestScanner:
         found = list(scan_images(src))
         assert all(".Trash" not in str(p) for p in found)
 
+    def test_scan_root_under_hidden_ancestor(self, tmp_path):
+        """A scan root that itself lives under a hidden directory (e.g. a git
+        worktree under .claude/, or images under ~/.local/share) must still be
+        scanned. Regression: exclusions were applied to the absolute path, so a
+        hidden *ancestor* of the root wrongly excluded every file."""
+        from idt_core.scanner import scan_images
+        hidden_root = tmp_path / ".claude" / "worktrees" / "wt"
+        src = hidden_root / "Photos"
+        (src / "Day1").mkdir(parents=True)
+        img = src / "Day1" / "morning.jpg"
+        img.write_bytes(_make_tiny_jpeg())
+
+        found = list(scan_images(src))
+        assert found == [img]
+
+    def test_skips_hidden_dir_inside_tree_under_hidden_ancestor(self, tmp_path):
+        """Even under a hidden ancestor, hidden dirs *within* the tree are still
+        skipped — exclusion is relative to the scan root, not disabled."""
+        from idt_core.scanner import scan_images
+        src = tmp_path / ".hidden_ancestor" / "Photos"
+        src.mkdir(parents=True)
+        keep = src / "keep.jpg"
+        keep.write_bytes(_make_tiny_jpeg())
+        (src / ".Trash").mkdir()
+        (src / ".Trash" / "decoy.jpg").write_bytes(_make_tiny_jpeg())
+
+        found = list(scan_images(src))
+        assert found == [keep]
+
     def test_sorted_output(self, tmp_path):
         from idt_core.scanner import scan_images
         src, images = _make_source_tree(tmp_path)

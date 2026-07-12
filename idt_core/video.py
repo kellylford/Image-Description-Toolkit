@@ -214,15 +214,25 @@ def extract_frames_to_dir(
 
 
 def scan_videos(directory: Path) -> Iterator[Path]:
-    """Yield all video files under directory, excluding .idt/ and hidden dirs."""
+    """Yield all video files under directory, excluding .idt/ and hidden dirs.
+
+    Exclusions are evaluated relative to `directory` (see scanner.scan_images):
+    a scan root under a hidden ancestor must not exclude its own contents.
+    """
     from .scanner import VIDEO_EXTENSIONS, _is_excluded
-    paths = sorted(
-        p for p in directory.rglob("*")
-        if p.is_file()
-        and p.suffix.lower() in VIDEO_EXTENSIONS
-        and not _is_excluded(p)
-    )
-    yield from paths
+    directory = Path(directory)
+    matches: list[Path] = []
+    for p in directory.rglob("*"):
+        if not (p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS):
+            continue
+        try:
+            rel = p.relative_to(directory)
+        except ValueError:
+            rel = p
+        if _is_excluded(rel):
+            continue
+        matches.append(p)
+    yield from sorted(matches)
 
 
 # ---------------------------------------------------------------------------

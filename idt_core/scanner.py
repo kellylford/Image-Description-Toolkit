@@ -25,20 +25,35 @@ ALL_MEDIA_EXTENSIONS: frozenset[str] = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 def scan_images(directory: Path, include_videos: bool = False) -> Iterator[Path]:
     """
     Yield all supported image paths under directory, sorted by relative path.
-    Skips .idt/ mirror directories and hidden directories.
+    Skips .idt/ mirror directories and hidden directories *within* the tree.
+
+    Exclusions are evaluated relative to `directory`, not on the absolute path:
+    a scan root that itself lives under a hidden directory (e.g. a git worktree
+    under ``.claude/`` or images under ``~/.local/share``) must not exclude
+    everything just because an *ancestor* of the root is hidden.
     """
+    directory = Path(directory)
     extensions = IMAGE_EXTENSIONS | (VIDEO_EXTENSIONS if include_videos else set())
-    paths = sorted(
-        p for p in directory.rglob("*")
-        if p.is_file()
-        and p.suffix.lower() in extensions
-        and not _is_excluded(p)
-    )
-    yield from paths
+    matches: list[Path] = []
+    for p in directory.rglob("*"):
+        if not (p.is_file() and p.suffix.lower() in extensions):
+            continue
+        try:
+            rel = p.relative_to(directory)
+        except ValueError:
+            rel = p
+        if _is_excluded(rel):
+            continue
+        matches.append(p)
+    yield from sorted(matches)
 
 
 def _is_excluded(path: Path) -> bool:
-    """True if the path is inside an .idt/ directory or a hidden directory."""
+    """True if the path descends through an .idt/ directory or a hidden directory.
+
+    Expects a path *relative* to the scan root so that hidden ancestors above
+    the root are not considered.
+    """
     return any(
         part.endswith(".idt") or (part.startswith(".") and part != ".")
         for part in path.parts
