@@ -137,14 +137,19 @@ jobs:
     # ------------------------------------------------------------------ #
     #  6. Run idt describe on testimages/                                  #
     #     This auto-extracts video frames, describes all images+frames,   #
-    #     and generates an HTML report under ~/Documents/idt/              #
+    #     and generates an HTML report under ~/Documents/idt/.             #
+    #                                                                      #
+    #     --copy-originals: the CLI defaults to *reference* mode (images   #
+    #     stay in place, images/ is left empty) per the v4.5 design. This  #
+    #     test verifies the self-contained bundle, so it opts into copy    #
+    #     mode; the "images in bundle" check below depends on it.          #
     # ------------------------------------------------------------------ #
     - name: Run idt describe with minicpm-v4.6
       shell: pwsh
       run: |
-        Write-Host "Running: idt.exe describe testimages --provider ollama --model minicpm-v4.6"
+        Write-Host "Running: idt.exe describe testimages --copy-originals --provider ollama --model minicpm-v4.6"
         Write-Host ""
-        .\idt\dist\idt.exe describe testimages --provider ollama --model minicpm-v4.6
+        .\idt\dist\idt.exe describe testimages --copy-originals --provider ollama --model minicpm-v4.6
         $exitCode = $LASTEXITCODE
         Write-Host ""
         Write-Host "idt describe exit code: $exitCode"
