@@ -1,0 +1,185 @@
+name: Build macOS Applications
+
+# Phase 1: build + test on Apple Silicon with ad-hoc signatures (identical to a
+# local `builditall_macos.sh` run). Developer ID signing and notarization are
+# NOT done here yet -- see docs/WorkTracking/ for the follow-up plan.
+#
+# Runner note: macos-latest is arm64, so mlx-vlm installs and the idt.spec
+# conditional MLX bundling is exercised. This is why the timeout is generous.
+
+on:
+  push:
+    branches: [ v4.5, main ]
+  pull_request:
+    branches: [ v4.5, main ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  IDT_QUIET_CONFIG_LOG: "1"
+
+jobs:
+  build-macos:
+    name: "Build + Test (Apple Silicon)"
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+        cache-dependency-path: |
+          requirements.txt
+          imagedescriber/requirements.txt
+
+    - name: Confirm runner architecture
+      run: |
+        echo "arch:  $(uname -m)"
+        echo "macOS: $(sw_vers -productVersion)"
+        echo "xcode: $(xcodebuild -version 2>/dev/null | head -1 || echo 'n/a')"
+        if [ "$(uname -m)" != "arm64" ]; then
+          echo "ERROR: expected an Apple Silicon runner (arm64), got $(uname -m)"
+          exit 1
+        fi
+
+    # ------------------------------------------------------------------ #
+    #  Virtual environments                                               #
+    #  The build scripts hard-require these exact paths:                  #
+    #    idt/build_idt.sh                 -> ../.venv/bin/activate        #
+    #    imagedescriber/build_*_wx.sh     -> .venv/bin/activate           #
+    # ------------------------------------------------------------------ #
+    - name: Create root virtual environment (.venv)
+      run: |
+        python -m venv .venv
+        ./.venv/bin/python -m pip install --upgrade pip
+        ./.venv/bin/python -m pip install -r requirements.txt
+
+    - name: Create ImageDescriber virtual environment
+      run: |
+        python -m venv imagedescriber/.venv
+        ./imagedescriber/.venv/bin/python -m pip install --upgrade pip
+        ./imagedescriber/.venv/bin/python -m pip install -r imagedescriber/requirements.txt
+
+    - name: Record installed versions
+      run: |
+        echo "--- root .venv ---"
+        ./.venv/bin/python -m pip list
+        echo "--- imagedescriber/.venv ---"
+        ./imagedescriber/.venv/bin/python -m pip list
+
+    # ------------------------------------------------------------------ #
+    #  Pre-build checks                                                   #
+    # ------------------------------------------------------------------ #
+    - name: Verify macOS build system structure
+      # Non-fatal: this script currently checks for docs/BUILD_MACOS.md,
+      # which does not exist in the repo, so it always exits 1.
+      continue-on-error: true
+      run: bash BuildAndRelease/MacBuilds/verify_macos_build_structure.sh
+
+    - name: Syntax-check core modules
+      run: |
+        ./.venv/bin/python -m py_compile \
+          scripts/workflow.py \
+          scripts/image_describer.py \
+          scripts/config_loader.py \
+          cli/main.py \
+          imagedescriber/imagedescriber_wx.py
+
+    - name: Run unit tests
+      run: ./.venv/bin/python -m pytest pytest_tests/unit -v --tb=short
+
+    - name: Run smoke tests (GUI-dependent; non-fatal)
+      continue-on-error: true
+      run: ./.venv/bin/python -m pytest pytest_tests/smoke -v --tb=short
+
+    # ------------------------------------------------------------------ #
+    #  Build                                                              #
+    #  Activating the root venv first makes builditall's `python3` calls  #
+    #  (pre_build_validation.py, validate_build.py) resolve to the venv   #
+    #  interpreter that actually has pytest installed.                    #
+    # ------------------------------------------------------------------ #
+    - name: Build both macOS applications
+      run: |
+        source .venv/bin/activate
+        bash BuildAndRelease/MacBuilds/builditall_macos.sh
+
+    # ------------------------------------------------------------------ #
+    #  Post-build verification                                            #
+    # ------------------------------------------------------------------ #
+    - name: Smoke-test the built CLI
+      run: |
+        set -e
+        test -x idt/dist/idt
+        ./idt/dist/idt version
+        ./idt/dist/idt --help
+        for cmd in describe export status show embed video download combine stats models prompts config; do
+          echo "--- idt $cmd --help ---"
+          ./idt/dist/idt "$cmd" --help > /dev/null
+        done
+        echo "All CLI subcommands reachable in the frozen binary."
+
+    - name: Verify ImageDescriber.app bundle
+      run: |
+        set -e
+        APP=imagedescriber/dist/ImageDescriber.app
+        test -d "$APP"
+        test -x "$APP/Contents/MacOS/ImageDescriber"
+        echo "CFBundleIdentifier: $(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Contents/Info.plist")"
+        echo "CFBundleShortVersionString: $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+        echo "--- signature ---"
+        codesign -dvv "$APP" 2>&1 || true
+        # Ad-hoc signatures do not always pass strict verification; informational only.
+        codesign --verify --verbose=2 "$APP" 2>&1 || \
+          echo "NOTE: ad-hoc signature did not pass strict verify (expected until Developer ID signing lands)"
+
+    - name: Confirm packaged output
+      run: |
+        set -e
+        ls -la BuildAndRelease/MacBuilds/dist_all
+        test -f BuildAndRelease/MacBuilds/dist_all/idt
+        test -d BuildAndRelease/MacBuilds/dist_all/Applications/ImageDescriber.app
+
+    # ------------------------------------------------------------------ #
+    #  Artifacts                                                          #
+    #  Tar first: upload-artifact does not reliably preserve the exec bit  #
+    #  or symlinks, both of which a .app bundle needs to launch.           #
+    # ------------------------------------------------------------------ #
+    - name: Package artifacts
+      run: |
+        set -e
+        VERSION=$(tr -d ' \n' < VERSION 2>/dev/null || echo "dev")
+        mkdir -p artifacts
+        tar -czf "artifacts/idt-macos-arm64-${VERSION}.tar.gz" -C idt/dist idt
+        tar -czf "artifacts/ImageDescriber-macos-arm64-${VERSION}.tar.gz" -C imagedescriber/dist ImageDescriber.app
+        ls -lh artifacts
+
+    - name: Upload IDT CLI
+      uses: actions/upload-artifact@v7
+      with:
+        name: idt-macos-arm64
+        path: artifacts/idt-macos-arm64-*.tar.gz
+        retention-days: 30
+
+    - name: Upload ImageDescriber.app
+      uses: actions/upload-artifact@v7
+      with:
+        name: imagedescriber-macos-arm64
+        path: artifacts/ImageDescriber-macos-arm64-*.tar.gz
+        retention-days: 30
+
+    - name: Upload build logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: macos-build-logs
+        path: |
+          idt/build/**/warn-*.txt
+          imagedescriber/build/**/warn-*.txt
+          wf_*/logs/*.log
+        retention-days: 7
+        if-no-files-found: ignore
