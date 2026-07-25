@@ -82,13 +82,10 @@ jobs:
       run: bash BuildAndRelease/MacBuilds/verify_macos_build_structure.sh
 
     - name: Syntax-check core modules
-      run: |
-        ./.venv/bin/python -m py_compile \
-          scripts/workflow.py \
-          scripts/image_describer.py \
-          scripts/config_loader.py \
-          cli/main.py \
-          imagedescriber/imagedescriber_wx.py
+      # compileall over whole packages rather than a hand-listed set of files,
+      # so this cannot rot when modules move (it was originally written against
+      # scripts/workflow.py, which no longer exists).
+      run: ./.venv/bin/python -m compileall -q idt_core cli shared imagedescriber
 
     - name: Run unit tests
       run: ./.venv/bin/python -m pytest pytest_tests/unit -v --tb=short

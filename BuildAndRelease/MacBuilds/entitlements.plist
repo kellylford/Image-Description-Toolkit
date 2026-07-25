@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Hardened runtime entitlements for PyInstaller-built IDT applications.
+
+    Apple requires the hardened runtime (the codesign flag "options runtime")
+    for notarization. The hardened runtime breaks CPython unless the following
+    exceptions are granted. Each one below is load-bearing; do not trim this
+    list without testing a notarized build on a machine that has never run
+    the app before.
+
+    allow-unsigned-executable-memory
+        CPython and several C extensions allocate writable-executable pages.
+        Without this the interpreter dies at startup.
+
+    disable-library-validation
+        MANDATORY for onefile PyInstaller builds. At runtime the bootloader
+        unpacks the embedded .so/.dylib files to a temp directory and dlopens
+        them. Those extracted files carry no signature from our team, so
+        library validation would refuse to load them and the app would fail
+        to launch with no visible error.
+
+    allow-dyld-environment-variables
+        The PyInstaller bootloader sets DYLD_LIBRARY_PATH so the extracted
+        libraries can be found.
+
+    allow-jit
+        Needed by some bundled dependencies that map JIT pages. Harmless if
+        unused, and cheaper to include than to debug its absence.
+
+    Deliberately NOT included: com.apple.security.cs.disable-executable-page-protection.
+    It is a much broader exemption, Apple discourages it, and nothing here
+    has been shown to need it.
+
+    This app is not sandboxed, so file and network access need no entitlement.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>
