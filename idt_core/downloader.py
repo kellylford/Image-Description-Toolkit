@@ -270,7 +270,10 @@ def _extract_image_entries(html: str, base_url: str) -> list[tuple[str, str]]:
         for source in picture.find_all("source"):
             srcset = source.get("srcset", "")
             for part in srcset.split(","):
-                u = part.strip().split()[0]
+                tokens = part.strip().split()
+                if not tokens:
+                    continue
+                u = tokens[0]
                 abs_url = urljoin(base_url, u)
                 if _is_image_url(abs_url) and abs_url not in seen:
                     seen.add(abs_url)
