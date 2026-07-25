@@ -142,31 +142,56 @@ jobs:
         test -d BuildAndRelease/MacBuilds/dist_all/Applications/ImageDescriber.app
 
     # ------------------------------------------------------------------ #
-    #  Artifacts                                                          #
-    #  Tar first: upload-artifact does not reliably preserve the exec bit  #
-    #  or symlinks, both of which a .app bundle needs to launch.           #
+    #  DMG                                                                #
+    #  Actions sets CI=true, so create_macos_dmg.sh skips its AppleScript  #
+    #  Finder layout automatically. The DMG is functionally identical to   #
+    #  a local one; only the window styling is absent.                     #
+    #  Signing stays off here until the certificate secrets are added.     #
     # ------------------------------------------------------------------ #
-    - name: Package artifacts
+    - name: Create DMG
+      run: bash BuildAndRelease/MacBuilds/create_macos_dmg.sh
+
+    - name: Verify DMG mounts and contains both apps
+      run: |
+        set -e
+        DMG=$(ls BuildAndRelease/MacBuilds/dist/*.dmg | head -1)
+        echo "Verifying $DMG"
+        hdiutil verify "$DMG"
+        MNT=$(mktemp -d)
+        hdiutil attach "$DMG" -mountpoint "$MNT" -nobrowse -readonly
+        ls -la "$MNT" "$MNT/IDT"
+        test -d "$MNT/IDT/ImageDescriber.app"
+        test -x "$MNT/IDT/idt"
+        test -L "$MNT/Applications"
+        hdiutil detach "$MNT"
+        echo "DMG contents verified."
+
+    # ------------------------------------------------------------------ #
+    #  Artifacts                                                          #
+    #  The CLI is tarred rather than uploaded raw: upload-artifact does    #
+    #  not reliably preserve the executable bit. The DMG is immune, since  #
+    #  it is a filesystem image.                                          #
+    # ------------------------------------------------------------------ #
+    - name: Package CLI tarball
       run: |
         set -e
         VERSION=$(tr -d ' \n' < VERSION 2>/dev/null || echo "dev")
         mkdir -p artifacts
         tar -czf "artifacts/idt-macos-arm64-${VERSION}.tar.gz" -C idt/dist idt
-        tar -czf "artifacts/ImageDescriber-macos-arm64-${VERSION}.tar.gz" -C imagedescriber/dist ImageDescriber.app
-        ls -lh artifacts
+        ls -lh artifacts BuildAndRelease/MacBuilds/dist
+
+    - name: Upload DMG
+      uses: actions/upload-artifact@v7
+      with:
+        name: idt-macos-arm64-dmg
+        path: BuildAndRelease/MacBuilds/dist/*.dmg
+        retention-days: 30
 
     - name: Upload IDT CLI
       uses: actions/upload-artifact@v7
       with:
-        name: idt-macos-arm64
+        name: idt-macos-arm64-cli
         path: artifacts/idt-macos-arm64-*.tar.gz
-        retention-days: 30
-
-    - name: Upload ImageDescriber.app
-      uses: actions/upload-artifact@v7
-      with:
-        name: imagedescriber-macos-arm64
-        path: artifacts/ImageDescriber-macos-arm64-*.tar.gz
         retention-days: 30
 
     - name: Upload build logs on failure

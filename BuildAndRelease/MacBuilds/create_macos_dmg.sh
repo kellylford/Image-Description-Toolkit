@@ -32,32 +32,54 @@ echo ""
 # CODE SIGNING SETUP
 # ============================================================================
 
-# DISABLED: Developer ID signing conflicts with PyInstaller's bundled Python framework
-# The bundled Python.framework has python.org's signature, creating a Team ID mismatch
-# Ad-hoc signatures work fine for distribution (users right-click → Open first time)
+# Signing is OPT-IN. With no environment set, this script behaves exactly as it
+# always has: ad-hoc signatures, unsigned DMG, users right-click -> Open.
+#
+#   IDT_SIGN_CODE=1   Sign the apps and the DMG with a Developer ID certificate
+#   IDT_NOTARIZE=1    Submit the finished DMG to Apple (implies IDT_SIGN_CODE=1)
+#
+# See sign_macos.sh and notarize_macos.sh for the credentials each one needs.
+#
+# Historical note: this block previously hardcoded SIGN_CODE=0 with a comment
+# saying Developer ID signing conflicted with the bundled Python.framework's
+# python.org signature. That does not apply to the current specs -- both apps
+# are onefile builds (EXE with no COLLECT), so there is no Python.framework
+# inside the bundle to conflict with.
 
-SIGN_CODE=0
-NOTARIZE=0
+SIGN_CODE="${IDT_SIGN_CODE:-0}"
+NOTARIZE="${IDT_NOTARIZE:-0}"
 
-echo "⚠️  Developer ID signing disabled for PyInstaller apps"
-echo "   (Bundled Python framework has conflicting signature)"
-echo "   Apps are ad-hoc signed - users must right-click → Open first time"
-echo ""
+# Notarization is meaningless without a Developer ID signature.
+if [ "$NOTARIZE" = "1" ]; then
+    SIGN_CODE=1
+fi
 
-# Uncomment below to re-enable Developer ID signing if Python framework issue is resolved
-# # Detect Developer ID certificate
-# SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
-# 
-# if [ -z "$SIGNING_IDENTITY" ]; then
-#     echo "⚠️  No Developer ID certificate found - building unsigned DMG"
-#     echo ""
-#     SIGN_CODE=0
-#     NOTARIZE=0
-# else
-#     echo "Found Developer ID certificate: $SIGNING_IDENTITY"
-#     SIGN_CODE=1
-#     # ... rest of signing logic
-# fi
+SIGNING_IDENTITY="${IDT_SIGNING_IDENTITY:-}"
+
+if [ "$SIGN_CODE" = "1" ]; then
+    if [ -z "$SIGNING_IDENTITY" ]; then
+        SIGNING_IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" \
+            | head -1 \
+            | sed 's/.*"\(.*\)"/\1/') || true
+    fi
+
+    if [ -z "$SIGNING_IDENTITY" ]; then
+        echo "ERROR: IDT_SIGN_CODE=1 but no Developer ID Application certificate found."
+        echo "       Set IDT_SIGNING_IDENTITY explicitly, or import the certificate."
+        exit 1
+    fi
+
+    echo "Code signing ENABLED"
+    echo "  Identity:  $SIGNING_IDENTITY"
+    echo "  Notarize:  $NOTARIZE"
+    echo ""
+else
+    echo "Code signing disabled (set IDT_SIGN_CODE=1 to enable)"
+    echo "  Apps keep their ad-hoc signatures."
+    echo "  Users must right-click -> Open the first time."
+    echo ""
+fi
 
 # Create dist directory in MacBuilds if it doesn't exist
 mkdir -p BuildAndRelease/MacBuilds/dist
@@ -114,50 +136,27 @@ fi
 # Sign applications if code signing is enabled
 if [ "$SIGN_CODE" = "1" ]; then
     echo ""
-    echo "Signing applications..."
+    echo "Signing applications with Developer ID..."
+
+    # Delegated to sign_macos.sh, which signs inside-out and applies the
+    # hardened runtime plus entitlements. The previous inline version used
+    # `codesign --deep`, which Apple deprecated: it applies the same
+    # entitlements to every nested binary and silently skips code it does
+    # not recognise.
+    SIGN_TARGETS=()
     for APP in "$DMG_STAGING/IDT"/*.app; do
-        if [ -d "$APP" ]; then
-            APP_NAME=$(basename "$APP")
-            echo "  Preparing $APP_NAME for signing..."
-            
-            # Critical: Remove Python.framework signature (has python.org Team ID)
-            find "$APP/Contents/Frameworks" -type f -name "Python" 2>/dev/null | while read pylib; do
-                echo "    Removing Python.framework signature"
-                codesign --remove-signature "$pylib" 2>/dev/null || true
-            done
-            
-            # Remove all other signatures
-            find "$APP/Contents/Frameworks" -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | while read lib; do
-                codesign --remove-signature "$lib" 2>/dev/null || true
-            done
-            codesign --remove-signature "$APP/Contents/MacOS"/* 2>/dev/null || true
-            codesign --remove-signature "$APP" 2>/dev/null || true
-            
-            # Now sign with our Developer ID
-            echo "  Signing $APP_NAME with Developer ID..."
-            codesign --force --deep \
-                --options runtime \
-                --timestamp \
-                --sign "$SIGNING_IDENTITY" \
-                "$APP"
-            codesign --verify --verbose "$APP"
-        fi
+        [ -d "$APP" ] && SIGN_TARGETS+=("$APP")
     done
-    
-    # Sign CLI tool
-    echo "  Signing idt CLI..."
-    codesign --remove-signature "$DMG_STAGING/IDT/idt" 2>/dev/null || true
-    if codesign --force \
-        --options runtime \
-        --timestamp \
-        --sign "$SIGNING_IDENTITY" \
-        "$DMG_STAGING/IDT/idt" 2>/dev/null; then
-        codesign --verify --verbose "$DMG_STAGING/IDT/idt"
-        echo "  ✓ CLI tool signed"
-    else
-        echo "  ⚠️  CLI tool signing failed"
+    [ -f "$DMG_STAGING/IDT/idt" ] && SIGN_TARGETS+=("$DMG_STAGING/IDT/idt")
+
+    if [ ${#SIGN_TARGETS[@]} -eq 0 ]; then
+        echo "ERROR: signing enabled but nothing to sign in $DMG_STAGING/IDT"
+        exit 1
     fi
-    
+
+    IDT_SIGNING_IDENTITY="$SIGNING_IDENTITY" \
+        bash "$(dirname "$0")/sign_macos.sh" "${SIGN_TARGETS[@]}"
+
     echo "✓ All applications signed"
     echo ""
 else
@@ -327,8 +326,32 @@ rm -f "$BG_IMAGE"
 #   • IDT folder:    left  (165, 185)
 #   • Applications:  right (415, 185)
 #   • README.txt:    bottom centre (290, 315)
-echo "Applying Finder layout via AppleScript..."
-osascript << APPLESCRIPT
+# The Finder layout is cosmetic. It needs a live Aqua session and Automation
+# permission, neither of which exists on a headless CI runner, where the
+# osascript call fails or hangs indefinitely. Skip it there; the DMG is fully
+# functional without it, just plainly laid out.
+#
+#   IDT_DMG_SKIP_LAYOUT=1   force skip
+#   IDT_DMG_SKIP_LAYOUT=0   force attempt
+#   unset                   skip when $CI is set or there is no Aqua session
+SKIP_LAYOUT="${IDT_DMG_SKIP_LAYOUT:-}"
+if [ -z "$SKIP_LAYOUT" ]; then
+    if [ -n "${CI:-}" ]; then
+        SKIP_LAYOUT=1
+    elif ! /bin/launchctl managername 2>/dev/null | grep -q "Aqua"; then
+        SKIP_LAYOUT=1
+    else
+        SKIP_LAYOUT=0
+    fi
+fi
+
+if [ "$SKIP_LAYOUT" = "1" ]; then
+    echo "Skipping Finder layout (no GUI session)."
+    echo "  DMG will use the default Finder view. Contents are unaffected."
+else
+    echo "Applying Finder layout via AppleScript..."
+    # Non-fatal: a cosmetic step must not fail an otherwise good build.
+    if ! osascript << 'APPLESCRIPT'
 tell application "Finder"
     tell disk "Image Description Toolkit"
         open
@@ -351,6 +374,10 @@ tell application "Finder"
     end tell
 end tell
 APPLESCRIPT
+    then
+        echo "WARNING: Finder layout failed. Continuing with the default view."
+    fi
+fi
 
 # Sync filesystem and detach
 echo "Syncing and unmounting..."
@@ -382,34 +409,14 @@ if [ "$SIGN_CODE" = "1" ]; then
     echo "✓ DMG signed"
 fi
 
-# Notarize if enabled
+# Notarize if enabled.
+#
+# The previous inline implementation passed --keychain-profile "$PROFILE_NAME",
+# but PROFILE_NAME was never assigned anywhere in this script. Under `set -u`
+# that would have aborted here. It was unreachable in practice because
+# SIGN_CODE was hardcoded to 0.
 if [ "$SIGN_CODE" = "1" ] && [ "$NOTARIZE" = "1" ]; then
-    echo ""
-    echo "========================================================================"
-    echo "NOTARIZING WITH APPLE"
-    echo "========================================================================"
-    echo "Submitting to Apple (this takes 2-5 minutes)..."
-    echo ""
-    
-    SUBMIT_OUTPUT=$(xcrun notarytool submit "$FINAL_DMG" \
-        --keychain-profile "$PROFILE_NAME" \
-        --wait 2>&1)
-    
-    echo "$SUBMIT_OUTPUT"
-    
-    if echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
-        echo ""
-        echo "✓ Notarization successful!"
-        echo ""
-        echo "Stapling notarization ticket..."
-        xcrun stapler staple "$FINAL_DMG"
-        xcrun stapler validate "$FINAL_DMG"
-        echo "✓ Notarization ticket stapled"
-    else
-        echo ""
-        echo "❌ Notarization failed - see output above"
-        exit 1
-    fi
+    bash "$(dirname "$0")/notarize_macos.sh" "$FINAL_DMG"
 fi
 
 # Success summary
