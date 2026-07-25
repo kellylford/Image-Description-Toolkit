@@ -71,11 +71,10 @@ Output directories: `wf_YYYY-MM-DD_HHMMSS_{model}_{prompt}`
 5. Current working directory → bundled script dir (fallback)
 
 ### AI Model Registry (Single Source of Truth)
-All model lists live in `models/`:
-- `models/claude_models.py` — Claude versions (latest: claude-opus-4-6, claude-haiku-4-5-20251001)
-- `models/openai_models.py` — OpenAI models (latest: gpt-4o, gpt-4o-mini, o1)
-- `models/model_registry.py` — central metadata
-- `models/provider_configs.py` — dynamic UI capabilities (`supports_prompts()`, `supports_custom_prompts()`)
+All model lists live in the provider modules under `idt_core/providers/`:
+- `idt_core/providers/claude.py` — Claude model list and metadata (sourced from Anthropic SDK)
+- `idt_core/providers/openai_provider.py` — OpenAI model list and metadata (sourced from OpenAI SDK)
+- `idt_core/providers/ollama.py` — Ollama models are dynamic (queries the running Ollama service at runtime)
 
 Imported by CLI, GUI, and chat features. Never duplicate model lists elsewhere.
 

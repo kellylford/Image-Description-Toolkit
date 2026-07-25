@@ -185,11 +185,10 @@ which noticeably improves descriptions.
 
 ---
 
-## Providers (unchanged)
+## Providers (updated July 2026)
 
 | Provider | Key required | Notes |
 |----------|-------------|-------|
 | Ollama | No | Local; Ollama must be installed/running. |
-| Claude (Anthropic) | `ANTHROPIC_API_KEY` | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 |
-| OpenAI | `OPENAI_API_KEY` | gpt-4o, gpt-4o-mini, o1 |
-| Florence-2 | No | Local via HuggingFace; GPU recommended. |
+| Claude (Anthropic) | `ANTHROPIC_API_KEY` | claude-opus-5, claude-sonnet-5, claude-opus-4-8, claude-haiku-4-5 |
+| OpenAI | `OPENAI_API_KEY` | gpt-5.2, gpt-5.1, gpt-5-mini, gpt-5-nano, o4-mini, o3 |

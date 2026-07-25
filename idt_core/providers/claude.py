@@ -9,38 +9,85 @@ from typing import Optional
 
 from .base import BaseProvider, DescriptionResult
 
+# Model list sourced from the Anthropic SDK (anthropic.types.model).
+# All Claude models support vision natively. Updated July 2026.
 CLAUDE_MODELS = [
+    # Current generation — 5.x
+    "claude-opus-5",
+    "claude-sonnet-5",
+    "claude-fable-5",
+    "claude-mythos-5",
+    "claude-mythos-preview",
+    # Current generation — 4.x (still supported)
+    "claude-opus-4-8",
+    "claude-opus-4-7",
     "claude-opus-4-6",
     "claude-sonnet-4-6",
-    "claude-sonnet-4-5-20250929",
     "claude-haiku-4-5-20251001",
+    # Legacy (still in SDK, users may have old descriptions referencing them)
     "claude-opus-4-5-20251101",
+    "claude-sonnet-4-5-20250929",
     "claude-opus-4-1-20250805",
-    "claude-opus-4-20250514",
-    "claude-sonnet-4-20250514",
-    "claude-3-haiku-20240307",
 ]
 
-DEFAULT_MODEL = "claude-opus-4-6"
+DEFAULT_MODEL = "claude-opus-4-8"
 
 CLAUDE_MODEL_METADATA: dict = {
+    # --- Generation 5 ---
+    "claude-opus-5": {
+        "name": "Claude Opus 5",
+        "description": "Flagship — highest intelligence and description depth",
+        "generation": "5.0", "context_window": 200000, "max_output": 128000,
+        "supports_vision": True, "cost": "$$$$", "recommended": True,
+    },
+    "claude-sonnet-5": {
+        "name": "Claude Sonnet 5",
+        "description": "Best balance of speed and intelligence",
+        "generation": "5.0", "context_window": 200000, "max_output": 64000,
+        "supports_vision": True, "cost": "$$$", "recommended": True,
+    },
+    "claude-fable-5": {
+        "name": "Claude Fable 5",
+        "description": "Creative model with strong visual storytelling",
+        "generation": "5.0", "context_window": 200000, "max_output": 64000,
+        "supports_vision": True, "cost": "$$", "recommended": False,
+    },
+    "claude-mythos-5": {
+        "name": "Claude Mythos 5",
+        "description": "Specialized model for complex visual analysis",
+        "generation": "5.0", "context_window": 200000, "max_output": 128000,
+        "supports_vision": True, "cost": "$$$", "recommended": False,
+    },
+    "claude-mythos-preview": {
+        "name": "Claude Mythos (Preview)",
+        "description": "Preview model — experimental, may change",
+        "generation": "5.0", "context_window": 200000, "max_output": 128000,
+        "supports_vision": True, "cost": "$$$", "recommended": False,
+    },
+    # --- Generation 4.x (current, still supported) ---
+    "claude-opus-4-8": {
+        "name": "Claude Opus 4.8",
+        "description": "Most intelligent 4.x model for complex coding and analysis",
+        "generation": "4.8", "context_window": 200000, "max_output": 128000,
+        "supports_vision": True, "cost": "$$$", "recommended": True,
+    },
+    "claude-opus-4-7": {
+        "name": "Claude Opus 4.7",
+        "description": "High intelligence, strong value",
+        "generation": "4.7", "context_window": 200000, "max_output": 128000,
+        "supports_vision": True, "cost": "$$$", "recommended": False,
+    },
     "claude-opus-4-6": {
         "name": "Claude Opus 4.6",
-        "description": "Most intelligent model for agents and complex coding",
+        "description": "Intelligent model for agents and complex coding",
         "generation": "4.6", "context_window": 200000, "max_output": 128000,
-        "supports_vision": True, "cost": "$$$", "recommended": True,
+        "supports_vision": True, "cost": "$$$", "recommended": False,
     },
     "claude-sonnet-4-6": {
         "name": "Claude Sonnet 4.6",
-        "description": "Best combination of speed and intelligence",
+        "description": "Best combination of speed and intelligence (4.x)",
         "generation": "4.6", "context_window": 200000, "max_output": 64000,
-        "supports_vision": True, "cost": "$$", "recommended": True,
-    },
-    "claude-sonnet-4-5-20250929": {
-        "name": "Claude Sonnet 4.5",
-        "description": "Best combination of speed and intelligence",
-        "generation": "4.5", "context_window": 200000, "max_output": 64000,
-        "supports_vision": True, "cost": "$$", "recommended": True,
+        "supports_vision": True, "cost": "$$", "recommended": False,
     },
     "claude-haiku-4-5-20251001": {
         "name": "Claude Haiku 4.5",
@@ -48,35 +95,24 @@ CLAUDE_MODEL_METADATA: dict = {
         "generation": "4.5", "context_window": 200000, "max_output": 64000,
         "supports_vision": True, "cost": "$", "recommended": True,
     },
+    # --- Legacy (still in SDK, not recommended for new work) ---
     "claude-opus-4-5-20251101": {
         "name": "Claude Opus 4.5",
-        "description": "Powerful model for complex challenges (Nov 2025)",
+        "description": "Legacy — prefer claude-opus-4-8 or claude-opus-5",
         "generation": "4.5", "context_window": 200000, "max_output": 32000,
         "supports_vision": True, "cost": "$$$", "recommended": False,
     },
-    "claude-opus-4-1-20250805": {
-        "name": "Claude Opus 4.1",
-        "description": "High intelligence (legacy, prefer claude-opus-4-6)",
-        "generation": "4.1", "context_window": 200000, "max_output": 32000,
-        "supports_vision": True, "cost": "$$$", "recommended": False,
-    },
-    "claude-opus-4-20250514": {
-        "name": "Claude Opus 4.0",
-        "description": "Original 4th generation high intelligence (legacy)",
-        "generation": "4.0", "context_window": 200000, "max_output": 32000,
-        "supports_vision": True, "cost": "$$$", "recommended": False,
-    },
-    "claude-sonnet-4-20250514": {
-        "name": "Claude Sonnet 4.0",
-        "description": "Original 4th generation balanced performance (legacy)",
-        "generation": "4.0", "context_window": 200000, "max_output": 64000,
+    "claude-sonnet-4-5-20250929": {
+        "name": "Claude Sonnet 4.5",
+        "description": "Legacy — prefer claude-sonnet-5 or claude-sonnet-4-6",
+        "generation": "4.5", "context_window": 200000, "max_output": 64000,
         "supports_vision": True, "cost": "$$", "recommended": False,
     },
-    "claude-3-haiku-20240307": {
-        "name": "Claude Haiku 3",
-        "description": "Claude 3 Haiku (shutting down April 19, 2026)",
-        "generation": "3.0", "context_window": 200000, "max_output": 4096,
-        "supports_vision": True, "cost": "$", "recommended": False,
+    "claude-opus-4-1-20250805": {
+        "name": "Claude Opus 4.1",
+        "description": "Legacy — prefer claude-opus-4-8 or claude-opus-5",
+        "generation": "4.1", "context_window": 200000, "max_output": 32000,
+        "supports_vision": True, "cost": "$$$", "recommended": False,
     },
 }
 

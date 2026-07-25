@@ -9,29 +9,39 @@ from typing import Optional
 
 from .base import BaseProvider, DescriptionResult
 
-DEFAULT_MODEL = "gpt-4o"
+# Model list sourced from the OpenAI Python SDK model definitions.
+# Only vision-capable models are included (IDT describes images).
+# Updated July 2026.
+DEFAULT_MODEL = "gpt-5.2"
 
 OPENAI_MODELS = [
+    # Current generation — GPT-5.x
     "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano",
-    "o4-mini", "o3", "o1",
+    # Reasoning models
+    "o4-mini", "o3",
+    # Legacy (still functional, users may have old descriptions referencing them)
     "gpt-4o", "gpt-4o-mini",
     "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+    "o1",
 ]
 
 OPENAI_MODEL_METADATA: dict = {
-    "gpt-5.2": {"name": "GPT-5.2", "description": "Best available model.", "cost": "$$$$", "supports_vision": True, "recommended": False},
+    # --- GPT-5.x ---
+    "gpt-5.2": {"name": "GPT-5.2", "description": "Best available model — highest quality vision and reasoning.", "cost": "$$$$", "supports_vision": True, "recommended": True},
     "gpt-5.1": {"name": "GPT-5.1", "description": "High-quality GPT-5 with strong reasoning.", "cost": "$$$", "supports_vision": True, "recommended": False},
     "gpt-5": {"name": "GPT-5", "description": "Flagship GPT-5 reasoning model.", "cost": "$$$", "supports_vision": True, "recommended": False},
     "gpt-5-mini": {"name": "GPT-5 Mini", "description": "Faster, efficient GPT-5.", "cost": "$$", "supports_vision": True, "recommended": False},
-    "gpt-5-nano": {"name": "GPT-5 Nano", "description": "Fastest GPT-5.", "cost": "$", "supports_vision": True, "recommended": False},
+    "gpt-5-nano": {"name": "GPT-5 Nano", "description": "Fastest and most affordable GPT-5.", "cost": "$", "supports_vision": True, "recommended": False},
+    # --- Reasoning models ---
     "o4-mini": {"name": "O4 Mini", "description": "Fast cost-efficient reasoning.", "cost": "$$", "supports_vision": True, "recommended": False},
     "o3": {"name": "O3", "description": "Powerful reasoning for complex tasks.", "cost": "$$$", "supports_vision": True, "recommended": False},
-    "o1": {"name": "O1", "description": "Original full reasoning model.", "cost": "$$$", "supports_vision": True, "recommended": False},
-    "gpt-4o": {"name": "GPT-4o", "description": "Fast, intelligent, flexible — best for most tasks.", "cost": "$$", "supports_vision": True, "recommended": True},
-    "gpt-4o-mini": {"name": "GPT-4o Mini", "description": "Affordable and fast.", "cost": "$", "supports_vision": True, "recommended": False},
-    "gpt-4.1": {"name": "GPT-4.1", "description": "Latest non-reasoning GPT-4.1.", "cost": "$$", "supports_vision": True, "recommended": False},
-    "gpt-4.1-mini": {"name": "GPT-4.1 Mini", "description": "Compact GPT-4.1.", "cost": "$", "supports_vision": True, "recommended": False},
-    "gpt-4.1-nano": {"name": "GPT-4.1 Nano", "description": "Ultra-budget GPT-4.1.", "cost": "$", "supports_vision": True, "recommended": False},
+    # --- Legacy (still functional) ---
+    "gpt-4o": {"name": "GPT-4o", "description": "Legacy — still works well for vision tasks.", "cost": "$$", "supports_vision": True, "recommended": False},
+    "gpt-4o-mini": {"name": "GPT-4o Mini", "description": "Legacy — affordable and fast.", "cost": "$", "supports_vision": True, "recommended": False},
+    "gpt-4.1": {"name": "GPT-4.1", "description": "Legacy — last non-reasoning GPT-4 generation.", "cost": "$$", "supports_vision": True, "recommended": False},
+    "gpt-4.1-mini": {"name": "GPT-4.1 Mini", "description": "Legacy — compact GPT-4.1.", "cost": "$", "supports_vision": True, "recommended": False},
+    "gpt-4.1-nano": {"name": "GPT-4.1 Nano", "description": "Legacy — ultra-budget GPT-4.1.", "cost": "$", "supports_vision": True, "recommended": False},
+    "o1": {"name": "O1", "description": "Legacy — original full reasoning model.", "cost": "$$$", "supports_vision": True, "recommended": False},
 }
 
 

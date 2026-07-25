@@ -1062,14 +1062,15 @@ Claude models produce the highest quality, most detailed descriptions. Requires 
 
 | Model | Characteristics |
 |---|---|
-| `claude-opus-4-6` | Flagship; best intelligence and description depth |
-| `claude-sonnet-4-6` | Excellent balance of speed and quality |
+| `claude-opus-5` | Flagship; highest intelligence and description depth |
+| `claude-sonnet-5` | Best balance of speed and intelligence |
+| `claude-opus-4-8` | Most intelligent 4.x model; strong value |
 | `claude-haiku-4-5-20251001` | Fastest Claude model; very good quality |
 
 **CLI example**
 
 ```bash
-idt describe ~/Photos --provider anthropic --model claude-opus-4-6 --prompt detailed
+idt describe ~/Photos --provider anthropic --model claude-opus-5 --prompt detailed
 ```
 
 ---
@@ -1086,14 +1087,16 @@ Requires an OpenAI API key. Good for workflows already integrated with OpenAI.
 
 | Model | Characteristics |
 |---|---|
-| `gpt-4o` | Fast, flexible, high-quality vision |
-| `gpt-4o-mini` | Faster and more affordable |
-| `o1`, `o3` | Reasoning models (slower; better for complex scenes) |
+| `gpt-5.2` | Best available; highest quality vision and reasoning |
+| `gpt-5-mini` | Faster, efficient GPT-5 |
+| `gpt-5-nano` | Fastest and most affordable GPT-5 |
+| `o4-mini` | Fast cost-efficient reasoning |
+| `o3` | Powerful reasoning for complex tasks |
 
 **CLI example**
 
 ```bash
-idt describe ~/Photos --provider openai --model gpt-4o
+idt describe ~/Photos --provider openai --model gpt-5.2
 ```
 
 ---
