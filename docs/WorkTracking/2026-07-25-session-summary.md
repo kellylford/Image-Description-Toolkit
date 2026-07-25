@@ -128,6 +128,48 @@ Run 30175190609 — all steps passed:
 4. Decide whether release DMGs need the styled Finder window. If so, either
    build releases locally or commit a pre-made `.DS_Store` for CI to apply.
 
+## Windows code signing (added later in the session)
+
+`build-windows.yml` now signs with Azure Trusted Signing over GitHub OIDC,
+mirroring the configuration already working in QuickMail: `azure/login@v3`
+followed by `azure/artifact-signing-action@v2.0.0` against signing account
+`kellylford`, certificate profile `kellyford-public`, endpoint
+`https://eus.codesigning.azure.net/`.
+
+Signing runs against `idt/dist` and `imagedescriber/dist` **before**
+`package_all_windows.bat` copies them into `dist_all/bin`. Signing after
+packaging would have left the standalone `idt-windows` and
+`imagedescriber-windows` artifacts unsigned while the installer was signed.
+The Inno Setup installer is signed separately afterwards, non-recursively,
+since signatures on files inside an installer do not cover the installer.
+
+A verify step using `Get-AuthenticodeSignature` fails the build if any binary
+is not `Valid`, so a silently-unsigned release cannot ship.
+
+**Currently inert.** Every signing step is gated on `SIGNING_ENABLED`, derived
+from whether `AZURE_CLIENT_ID` exists in this repository. It does not, so the
+steps skip and the build behaves as before. Verified: run 30180128021, green
+in 4m18s, all five signing steps skipped, all three artifacts produced.
+
+To activate:
+
+1. Add `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` as
+   repository secrets. QuickMail has the same three; GitHub cannot reveal
+   existing values, so read them from the Azure portal.
+2. Add a federated credential in Azure with subject
+   `repo:kellylford/Image-Description-Toolkit:environment:azure-signing`.
+   The QuickMail credential names its own repository and will not authorize
+   this one — the subject is an exact string match.
+
+The `azure-signing` GitHub environment was created in this repository as part
+of this work; it did not previously exist. No new Azure RBAC is required, as
+the app registration already holds the Trusted Signing Certificate Profile
+Signer role from the QuickMail setup.
+
+Azure Trusted Signing is Windows Authenticode only. It cannot sign macOS
+applications, which still require the Apple Developer ID certificate. The two
+platforms remain on separate signing tracks.
+
 ## Certificate note
 
 Developer ID Application certificate exists, Team ID `P887QF74N8`.
