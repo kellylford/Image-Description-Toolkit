@@ -10,10 +10,25 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+permissions:
+  contents: read    # checkout
+  id-token: write   # OIDC token azure/login exchanges for Azure creds (signing)
+
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+    # The OIDC subject includes the environment name, so it must match the
+    # federated credential configured in Azure for THIS repository:
+    #   repo:kellylford/Image-Description-Toolkit:environment:azure-signing
+    # Unprotected; not a gate.
+    environment: azure-signing
+
+    env:
+      # Signing turns itself on only once the Azure secrets exist in this repo.
+      # Until then every signing step skips and the build behaves as it did
+      # before, rather than failing on a credential that is not configured yet.
+      SIGNING_ENABLED: ${{ secrets.AZURE_CLIENT_ID != '' }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v7
@@ -34,19 +49,109 @@ jobs:
         ./builditall_wx.bat
       shell: cmd
     
+    # ------------------------------------------------------------------ #
+    #  Code signing (Azure Trusted Signing via GitHub OIDC)                #
+    #                                                                      #
+    #  Signing happens at the source dist/ folders, BEFORE packaging, so    #
+    #  every downstream copy inherits the signature: the exes bundled into  #
+    #  the installer AND the standalone exes uploaded as artifacts. Signing #
+    #  only dist_all/bin would leave the standalone artifacts unsigned.     #
+    #                                                                      #
+    #  Skipped on pull_request: fork PRs have no access to secrets, and     #
+    #  signing every PR build would burn signing operations for nothing.    #
+    # ------------------------------------------------------------------ #
+    - name: Azure login (code signing)
+      if: env.SIGNING_ENABLED == 'true' && github.event_name != 'pull_request'
+      uses: azure/login@v3
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Sign idt.exe
+      if: env.SIGNING_ENABLED == 'true' && github.event_name != 'pull_request'
+      uses: azure/artifact-signing-action@v2.0.0
+      with:
+        endpoint: https://eus.codesigning.azure.net/
+        signing-account-name: kellylford
+        certificate-profile-name: kellyford-public
+        files-folder: ${{ github.workspace }}\idt\dist
+        files-folder-filter: exe
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+
+    - name: Sign ImageDescriber.exe
+      if: env.SIGNING_ENABLED == 'true' && github.event_name != 'pull_request'
+      uses: azure/artifact-signing-action@v2.0.0
+      with:
+        endpoint: https://eus.codesigning.azure.net/
+        signing-account-name: kellylford
+        certificate-profile-name: kellyford-public
+        files-folder: ${{ github.workspace }}\imagedescriber\dist
+        files-folder-filter: exe
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+
     - name: Package for installer
       run: |
         cd BuildAndRelease/WinBuilds
         ./package_all_windows.bat
       shell: cmd
-    
+
     - name: Build installer with Inno Setup
       run: |
         choco install innosetup -y
         cd BuildAndRelease/WinBuilds
         & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
       shell: pwsh
-    
+
+    # The installer is built last, so it has to be signed separately -- the
+    # signatures on the files inside it do not cover the installer itself.
+    # Non-recursive on purpose: dist_all\bin already holds signed copies and
+    # re-signing them would waste signing operations without changing anything.
+    - name: Sign installer
+      if: env.SIGNING_ENABLED == 'true' && github.event_name != 'pull_request'
+      uses: azure/artifact-signing-action@v2.0.0
+      with:
+        endpoint: https://eus.codesigning.azure.net/
+        signing-account-name: kellylford
+        certificate-profile-name: kellyford-public
+        files-folder: ${{ github.workspace }}\BuildAndRelease\WinBuilds\dist_all
+        files-folder-filter: exe
+        files-folder-recurse: false
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+
+    - name: Verify signatures
+      if: env.SIGNING_ENABLED == 'true' && github.event_name != 'pull_request'
+      shell: pwsh
+      run: |
+        $targets = @(
+          "idt\dist\idt.exe",
+          "imagedescriber\dist\ImageDescriber.exe"
+        ) + (Get-ChildItem "BuildAndRelease\WinBuilds\dist_all\*.exe" | ForEach-Object { $_.FullName })
+
+        $failed = $false
+        foreach ($t in $targets) {
+          $sig = Get-AuthenticodeSignature $t
+          Write-Host "$($sig.Status.ToString().PadRight(12)) $t"
+          if ($sig.Status -ne 'Valid') {
+            Write-Host "  Signer: $($sig.SignerCertificate.Subject)"
+            $failed = $true
+          } else {
+            Write-Host "  Signer: $($sig.SignerCertificate.Subject)"
+            Write-Host "  Timestamp: $($sig.TimeStamperCertificate.Subject)"
+          }
+        }
+        if ($failed) {
+          Write-Host "ERROR: one or more binaries are not validly signed."
+          exit 1
+        }
+        Write-Host "All binaries validly signed."
+
     - name: Upload Windows Installer
       uses: actions/upload-artifact@v7
       with:
