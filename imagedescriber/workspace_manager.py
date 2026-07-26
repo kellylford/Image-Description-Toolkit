@@ -13,13 +13,33 @@ from datetime import datetime
 
 
 def get_default_workspaces_root() -> Path:
-    """Return platform-appropriate default directory for suggesting bundle locations.
+    """Return the directory where bundles are saved by default.
 
-    Matches the CLI default (~/Documents/idt) so bundles are always local,
-    never on network shares next to the source files.
+    Delegates to UserConfig so the GUI honours the same workspace_root the CLI
+    uses (`idt config --set workspace_root=...`). Without this the two silently
+    disagree: the CLI would write to the configured root while the GUI kept
+    using ~/Documents/idt.
+
+    The default remains ~/Documents/idt. Bundles are always local, never on a
+    read-only network share next to the source images.
     """
+    # idt_core.config is listed in imagedescriber_wx.spec hiddenimports, so this
+    # same import path works in both dev and frozen mode.
+    try:
+        from idt_core.config import UserConfig
+        return UserConfig.load().workspace_root_path()
+    except Exception:
+        # A missing idt_core or a malformed ~/.idt/config.json must not stop the
+        # GUI from saving; fall through to the built-in default.
+        pass
+
+    # Fallback only if idt_core is unavailable or unreadable.
+    if sys.platform in ('win32', 'darwin'):
+        return Path.home() / "Documents" / "idt"
     docs = Path.home() / "Documents"
-    return docs / "idt"
+    if docs.exists():
+        return docs / "idt"
+    return Path.home() / ".local" / "share" / "idt"
 
 
 def get_next_untitled_name(workspace_root: Optional[Path] = None) -> str:
