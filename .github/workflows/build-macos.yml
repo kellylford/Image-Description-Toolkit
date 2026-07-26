@@ -1,8 +1,8 @@
 name: Build macOS Applications
 
-# Phase 1: build + test on Apple Silicon with ad-hoc signatures (identical to a
-# local `builditall_macos.sh` run). Developer ID signing and notarization are
-# NOT done here yet -- see docs/WorkTracking/ for the follow-up plan.
+# Builds and tests on Apple Silicon. Developer ID signing and notarization
+# activate automatically once their secrets exist; until then the build uses
+# ad-hoc signatures, identical to a local `builditall_macos.sh` run.
 #
 # Runner note: macos-latest is arm64, so mlx-vlm installs and the idt.spec
 # conditional MLX bundling is exercised. This is why the timeout is generous.
@@ -24,6 +24,13 @@ jobs:
     name: "Build + Test (Apple Silicon)"
     runs-on: macos-latest
     timeout-minutes: 90
+
+    env:
+      # Signing and notarization each switch on only when their full set of
+      # secrets exists. Missing secrets mean ad-hoc signatures and a green
+      # build, never a failure on credentials that were never configured.
+      MACOS_SIGNING_ENABLED: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      MACOS_NOTARIZE_ENABLED: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' && secrets.NOTARY_KEY_P8 != '' && secrets.NOTARY_KEY_ID != '' && secrets.NOTARY_ISSUER_ID != '' }}
 
     steps:
     - name: Checkout code
@@ -143,14 +150,96 @@ jobs:
         test -d BuildAndRelease/MacBuilds/dist_all/Applications/ImageDescriber.app
 
     # ------------------------------------------------------------------ #
+    #  Developer ID signing                                                #
+    #                                                                      #
+    #  The certificate goes into a throwaway keychain in RUNNER_TEMP, never #
+    #  the login keychain, and the keychain is deleted at the end of the    #
+    #  job regardless of outcome.                                          #
+    # ------------------------------------------------------------------ #
+    - name: Import Developer ID certificate
+      if: env.MACOS_SIGNING_ENABLED == 'true'
+      env:
+        CERT_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+        CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      run: |
+        set -euo pipefail
+        KEYCHAIN="$RUNNER_TEMP/idt-signing.keychain-db"
+        KEYCHAIN_PASSWORD="$(uuidgen)"
+        CERT_PATH="$RUNNER_TEMP/certificate.p12"
+
+        echo "$CERT_P12" | base64 --decode > "$CERT_PATH"
+
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+        # Default keychains auto-lock after 5 minutes, which would break a
+        # build partway through. 6 hours comfortably outlives the job.
+        security set-keychain-settings -lut 21600 "$KEYCHAIN"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+        security import "$CERT_PATH" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+          -T /usr/bin/codesign -T /usr/bin/security
+
+        # Without this, codesign triggers a GUI authorization prompt that
+        # nothing can answer on a headless runner, and the job hangs.
+        security set-key-partition-list -S apple-tool:,apple:,codesign: \
+          -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+
+        security list-keychain -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+        rm -f "$CERT_PATH"
+
+        echo "Identities available for signing:"
+        security find-identity -v -p codesigning "$KEYCHAIN"
+
+    - name: Write notarization API key
+      if: env.MACOS_NOTARIZE_ENABLED == 'true'
+      env:
+        NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+      run: |
+        set -euo pipefail
+        echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+        chmod 600 "$RUNNER_TEMP/notary.p8"
+        echo "Notarization key written."
+
+    # Sign the standalone artifacts too, not just the copies that go into the
+    # DMG. Same reasoning as the Windows build: the uploaded CLI tarball comes
+    # from idt/dist, so signing only the staged copies would ship an ad-hoc
+    # signed tarball alongside a properly signed DMG.
+    - name: Sign standalone artifacts
+      if: env.MACOS_SIGNING_ENABLED == 'true'
+      env:
+        IDT_SIGNING_IDENTITY: "${{ secrets.MACOS_SIGNING_IDENTITY || 'Developer ID Application: Kelly Ford (P887QF74N8)' }}"
+        IDT_KEYCHAIN: ${{ runner.temp }}/idt-signing.keychain-db
+      run: |
+        bash BuildAndRelease/MacBuilds/sign_macos.sh \
+          idt/dist/idt \
+          imagedescriber/dist/ImageDescriber.app
+
+    # ------------------------------------------------------------------ #
     #  DMG                                                                #
     #  Actions sets CI=true, so create_macos_dmg.sh skips its AppleScript  #
     #  Finder layout automatically. The DMG is functionally identical to   #
     #  a local one; only the window styling is absent.                     #
-    #  Signing stays off here until the certificate secrets are added.     #
     # ------------------------------------------------------------------ #
     - name: Create DMG
+      env:
+        IDT_SIGN_CODE: ${{ env.MACOS_SIGNING_ENABLED == 'true' && '1' || '0' }}
+        IDT_NOTARIZE: ${{ env.MACOS_NOTARIZE_ENABLED == 'true' && '1' || '0' }}
+        IDT_SIGNING_IDENTITY: "${{ secrets.MACOS_SIGNING_IDENTITY || 'Developer ID Application: Kelly Ford (P887QF74N8)' }}"
+        IDT_KEYCHAIN: ${{ runner.temp }}/idt-signing.keychain-db
+        NOTARY_KEY_PATH: ${{ runner.temp }}/notary.p8
+        NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+        NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
       run: bash BuildAndRelease/MacBuilds/create_macos_dmg.sh
+
+    # Gatekeeper's verdict on a machine that has never seen this app. This is
+    # the check that actually predicts what a user downloading the DMG sees.
+    - name: Assess DMG with Gatekeeper
+      if: env.MACOS_NOTARIZE_ENABLED == 'true'
+      run: |
+        set -euo pipefail
+        DMG=$(ls BuildAndRelease/MacBuilds/dist/*.dmg | head -1)
+        spctl --assess --type open --context context:primary-signature -v "$DMG"
+        xcrun stapler validate "$DMG"
+        echo "Gatekeeper accepts the DMG."
 
     - name: Verify DMG mounts and contains both apps
       run: |
@@ -194,6 +283,14 @@ jobs:
         name: idt-macos-arm64-cli
         path: artifacts/idt-macos-arm64-*.tar.gz
         retention-days: 30
+
+    # Runs even when the build fails, so a signing key never outlives the job.
+    - name: Clean up signing keychain
+      if: always()
+      run: |
+        rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/certificate.p12" || true
+        security delete-keychain "$RUNNER_TEMP/idt-signing.keychain-db" 2>/dev/null || true
+        echo "Signing material removed."
 
     - name: Upload build logs on failure
       if: failure()
