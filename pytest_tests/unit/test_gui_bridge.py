@@ -185,3 +185,30 @@ def test_missing_file_does_not_crash(tmp_path):
     items = bundle.items()
     assert len(items) == 1
     assert items[0].is_missing is True
+
+
+def test_progress_callback_reports_every_item(gui_workspace, tmp_path):
+    """progress() fires once per item, counting up to the true total.
+
+    The GUI drives its "Saving workspace" stage off this callback; a miscount
+    would leave the progress bar stuck short of 100%.
+    """
+    ws, _src_dir = gui_workspace
+    calls = []
+    gui_workspace_to_bundle(
+        ws.to_dict(), tmp_path / "WS",
+        progress=lambda done, total, name: calls.append((done, total, name)),
+    )
+
+    total_items = len(ws.to_dict()["items"])
+    assert [c[0] for c in calls] == list(range(1, total_items + 1))
+    assert {c[1] for c in calls} == {total_items}
+    assert calls[-1][0] == calls[-1][1]        # ends on an exact count
+    assert all(c[2] for c in calls)            # every call carries a name
+
+
+def test_progress_callback_is_optional(gui_workspace, tmp_path):
+    """Omitting progress leaves behaviour unchanged (CLI and tests call it bare)."""
+    ws, _src_dir = gui_workspace
+    bundle = gui_workspace_to_bundle(ws.to_dict(), tmp_path / "WS")
+    assert len(bundle.items()) >= 2

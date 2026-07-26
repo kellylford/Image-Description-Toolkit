@@ -3423,12 +3423,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     return
         logger.info("CHECKPOINT 3 PASSED: Workspace file is valid (not None/Untitled)")
 
-        # Auto-save before batch processing
-        logger.info(f"CHECKPOINT 4: Auto-save check - modified={self.modified}")
-        if self.modified:
-            logger.info("Workspace modified - auto-saving")
-            self._save_bundle()
-        logger.info("CHECKPOINT 4 PASSED: Auto-save complete")
+        # Auto-save before batch processing — deferred to the "Saving workspace"
+        # stage in _launch_batch so it runs off the main thread with visible
+        # progress, and so cancelling the options dialog below costs nothing.
+        logger.info(f"CHECKPOINT 4: Auto-save deferred to save stage - modified={self.modified}")
 
         # Phase 5: Warn about redescribing all
         logger.info(f"CHECKPOINT 5: Checking skip_existing={skip_existing}")
@@ -3518,14 +3516,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             _options = options
             _skip = skip_existing
 
-            self.SetStatusText(
-                f"Extracting frames from {len(videos_to_extract)} video(s)…", 0
-            )
+            # Three stages when there are videos: extract → save → describe.
+            self._ensure_progress_dialog(options, 3)
+            self._begin_stage("Extracting frames", len(videos_to_extract))
             logger.info(f"Starting sync video extraction: {len(videos_to_extract)} videos")
 
             def _do_all_extractions():
                 results = []
-                for vp in videos_to_extract:
+                total_vids = len(videos_to_extract)
+                for idx, vp in enumerate(videos_to_extract, start=1):
                     try:
                         frames, meta = self._extract_video_frames_sync(vp, extraction_config)
                         logger.info(f"Extracted {len(frames)} frame(s) from {Path(vp).name}")
@@ -3533,6 +3532,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     except Exception as exc:
                         logger.warning(f"Frame extraction failed for {Path(vp).name}: {exc}")
                         results.append((vp, [], {}))
+                    # Report after each video — extraction of a single long video
+                    # can take minutes, so this is the only feedback available.
+                    self._stage_progress(idx, total_vids, Path(vp).name)
                 wx.CallAfter(_after_extraction, results)
 
             def _after_extraction(results):
@@ -3561,10 +3563,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 )
                 self._launch_batch(to_process, _options, _skip, video_preamble=preamble)
 
-            import threading
             threading.Thread(target=_do_all_extractions, daemon=True).start()
             return  # resumes in _after_extraction → _launch_batch
 
+        # No videos: two stages — save → describe.
+        self._ensure_progress_dialog(options, 2)
         self._launch_batch(images_to_process, options, skip_existing)
 
     def _check_mlx_model_ready(self, provider: str, model: str) -> bool:
@@ -3710,14 +3713,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             _images = list(to_process)
             _options = options
 
-            self.SetStatusText(
-                f"Extracting frames from {len(videos_to_extract)} video(s)…", 0
-            )
+            # Three stages when there are videos: extract → save → describe.
+            self._ensure_progress_dialog(options, 3)
+            self._begin_stage("Extracting frames", len(videos_to_extract))
             logger.info(f"Folder batch: starting sync video extraction: {len(videos_to_extract)} videos")
 
             def _do_all_extractions():
                 results = []
-                for vp in videos_to_extract:
+                total_vids = len(videos_to_extract)
+                for idx, vp in enumerate(videos_to_extract, start=1):
                     try:
                         frames, meta = self._extract_video_frames_sync(vp, extraction_config)
                         logger.info(f"Extracted {len(frames)} frame(s) from {Path(vp).name}")
@@ -3725,6 +3729,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     except Exception as exc:
                         logger.warning(f"Frame extraction failed for {Path(vp).name}: {exc}")
                         results.append((vp, [], {}))
+                    self._stage_progress(idx, total_vids, Path(vp).name)
                 wx.CallAfter(_after_extraction, results)
 
             def _after_extraction(results):
@@ -3753,10 +3758,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 )
                 self._launch_batch(combined, _options, True, video_preamble=preamble)
 
-            import threading
             threading.Thread(target=_do_all_extractions, daemon=True).start()
             return  # resumes in _after_extraction → _launch_batch
 
+        # No videos: two stages — save → describe.
+        self._ensure_progress_dialog(options, 2)
         self._launch_batch(to_process, options, True)
 
     def _extract_next_video_in_batch(self):
@@ -4019,6 +4025,87 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "end_time_seconds": None,
         }
 
+    def _ensure_progress_dialog(self, options: dict, stage_count: int):
+        """Create (or reuse) the batch progress dialog before the first stage.
+
+        The dialog used to appear only when describing started, so the frame
+        extraction and workspace save stages ran with no visible progress at all.
+        Opening it up front lets every stage report into the same window.
+        """
+        if not BatchProgressDialog:
+            return None
+
+        # Reuse an open dialog without disturbing the stage counter — _launch_batch
+        # calls this again after extraction, and resetting here would relabel the
+        # save stage as "step 1 of 3".
+        if self.batch_progress_dialog:
+            return self.batch_progress_dialog
+
+        self._stage_count = stage_count
+        self._stage_no = 0
+        self._batch_active = True
+        self._token_records = []
+        self._batch_provider = options.get('provider', '')
+        self._batch_model = options.get('model', '')
+        self._batch_prompt = options.get('prompt_style', '')
+
+        self.batch_progress_dialog = BatchProgressDialog(
+            self, 0,
+            batch_provider=self._batch_provider,
+            batch_model=self._batch_model,
+            batch_prompt=self._batch_prompt,
+        )
+        self.batch_progress_dialog.Show()
+        self.batch_progress_dialog.Raise()
+        if hasattr(self, 'show_batch_progress_item'):
+            self.show_batch_progress_item.Enable(True)
+        if hasattr(self, 'workspace_stats_item'):
+            self.workspace_stats_item.Enable(False)
+        return self.batch_progress_dialog
+
+    def _close_progress_dialog(self):
+        """Close the batch progress dialog and restore the menus it disabled."""
+        if self.batch_progress_dialog:
+            self.batch_progress_dialog.Close()
+            self.batch_progress_dialog = None
+        self._batch_active = False
+        if hasattr(self, 'show_batch_progress_item'):
+            self.show_batch_progress_item.Enable(False)
+        if hasattr(self, 'workspace_stats_item'):
+            self.workspace_stats_item.Enable(True)
+
+    def _begin_stage(self, name: str, total: int, can_interrupt: bool = False):
+        """Advance the progress dialog to the next stage. Main thread only."""
+        dlg = self.batch_progress_dialog
+        if not dlg:
+            self.SetStatusText(f"{name}…", 0)
+            return
+        self._stage_no = getattr(self, '_stage_no', 0) + 1
+        self._stage_last_paint = 0.0
+        dlg.begin_stage(
+            name, total,
+            stage_index=self._stage_no,
+            stage_count=getattr(self, '_stage_count', 0),
+            can_interrupt=can_interrupt,
+        )
+
+    def _stage_progress(self, done: int, total: int, name: str = ""):
+        """Progress callback for the extract/save stages. Safe from any thread.
+
+        update_progress() rebuilds the whole stats ListBox, so repainting on every
+        item would swamp the event loop on a large workspace. Repaint at most ~8×/sec,
+        always including the final item so the stage ends on an exact count.
+        """
+        now = time.time()
+        if done < total and (now - getattr(self, '_stage_last_paint', 0.0)) < 0.125:
+            return
+        self._stage_last_paint = now
+        dlg = self.batch_progress_dialog
+        if dlg:
+            wx.CallAfter(dlg.update_progress, done, total, image_name=name)
+        else:
+            wx.CallAfter(self.SetStatusText, f"{done} of {total}  {name}", 0)
+
     def _launch_batch(self, to_process: list, options: dict, skip_existing: bool,
                       video_preamble: str = None):
         """Start a batch image-processing run.
@@ -4027,6 +4114,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         for both the no-video path and after synchronous video extraction finishes.
         """
         if not to_process:
+            # The progress dialog may already be open from an earlier stage
+            # (e.g. video extraction produced no new frames) — close it before
+            # the message box so it isn't left behind at 0%.
+            self._close_progress_dialog()
             show_info(self, "All images already have descriptions.")
             return
 
@@ -4070,31 +4161,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.batch_start_time = time.time()
         self.batch_processing_times = []
 
-        # Save workspace BEFORE showing dialog (focus management)
+        # Make sure the dialog exists even on paths that reach _launch_batch
+        # without going through on_process_all's staged setup.
+        self._ensure_progress_dialog(options, getattr(self, '_stage_count', 2))
+
+        def _start_describing():
+            self._begin_stage("Describing", len(to_process), can_interrupt=True)
+            self.batch_worker.start()
+            self.SetStatusText(f"Processing {len(to_process)} images…", 0)
+
+        # Save the workspace before describing starts. This writes a sidecar per
+        # item, so it is done on a worker thread reporting into the progress
+        # dialog — inline it froze the UI with no repaint for the whole save.
         if self.workspace_file:
-            self._save_bundle()
+            self._begin_stage("Saving workspace", len(self.workspace.items))
 
-        if BatchProgressDialog:
-            self._batch_active = True
-            self._token_records = []
-            self._batch_provider = options['provider']
-            self._batch_model = options['model']
-            self._batch_prompt = options.get('prompt_style', '')
-            self.batch_progress_dialog = BatchProgressDialog(
-                self, len(to_process),
-                batch_provider=self._batch_provider,
-                batch_model=self._batch_model,
-                batch_prompt=self._batch_prompt,
-            )
-            self.batch_progress_dialog.Show()
-            self.batch_progress_dialog.Raise()
-            if hasattr(self, 'show_batch_progress_item'):
-                self.show_batch_progress_item.Enable(True)
-            if hasattr(self, 'workspace_stats_item'):
-                self.workspace_stats_item.Enable(False)
+            def _do_save():
+                try:
+                    self._save_bundle(progress=self._stage_progress)
+                except Exception as exc:
+                    logger.error(f"Pre-describe save failed: {exc}", exc_info=True)
+                wx.CallAfter(_start_describing)
 
-        self.batch_worker.start()
-        self.SetStatusText(f"Processing {len(to_process)} images…", 0)
+            threading.Thread(target=_do_save, daemon=True).start()
+        else:
+            _start_describing()
 
     def on_process_undescribed(self, event):
         """Menu handler: Process only undescribed images"""
@@ -4309,10 +4400,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             self._prompt_and_create_bundle("Save Workspace")
 
-    def _save_bundle(self) -> None:
-        """Persist the current workspace to its open .idtw bundle."""
+    def _save_bundle(self, progress=None) -> None:
+        """Persist the current workspace to its open .idtw bundle.
+
+        Args:
+            progress: Optional callback progress(done, total, name) invoked after
+                each item is written.  Supplying it also marks the save as running
+                on a worker thread, so every wx call is marshalled back to the main
+                thread — writing a large workspace inline used to block the UI with
+                no repaint, which left the status bar frozen and screen readers silent.
+        """
         if not self.workspace_file:
             return
+
+        off_thread = progress is not None
+
+        def _ui(fn, *a):
+            """Run a wx call on the main thread when saving off-thread."""
+            if off_thread:
+                wx.CallAfter(fn, *a)
+            else:
+                fn(*a)
+
         bundle_path = Path(self.workspace_file)
         try:
             from idt_core.workspace import Workspace, WorkspaceItem
@@ -4350,8 +4459,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             ws.save_manifest()
 
-            for file_path, gui_item in (self.workspace.to_dict().get("items") or {}).items():
+            gui_items = (self.workspace.to_dict().get("items") or {})
+            total_items = len(gui_items)
+            for done, (file_path, gui_item) in enumerate(gui_items.items(), start=1):
                 if str(file_path).startswith("chat:"):
+                    if progress:
+                        progress(done, total_items, str(file_path))
                     continue
                 p = Path(file_path)
                 existing = ws.get_item(p.name)
@@ -4393,13 +4506,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                 ws.save_item(existing)
 
+                if progress:
+                    progress(done, total_items, p.name)
+
             self.workspace.saved = True
-            self.clear_modified()
-            self.SetStatusText(f"Saved: {bundle_path.name}", 0)
+            _ui(self.clear_modified)
+            _ui(self.SetStatusText, f"Saved: {bundle_path.name}", 0)
             logger.info(f"Saved bundle: {bundle_path}")
         except Exception as exc:
             logger.error(f"Bundle save failed: {exc}", exc_info=True)
-            show_error(self, f"Error saving workspace bundle:\n{exc}")
+            _ui(show_error, self, f"Error saving workspace bundle:\n{exc}")
 
     def _workspace_logs_dir(self):
         """Return the logs/ dir inside the .idtw bundle, or None."""
@@ -4530,7 +4646,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         try:
             bundle = gui_workspace_to_bundle(
                 self.workspace.to_dict(), bundle_path,
-                copy_images=self._resolve_copy_originals()
+                copy_images=self._resolve_copy_originals(),
+                progress=self._stage_progress,
             )
             self.workspace_file = bundle.path
             self.update_window_title("ImageDescriber", bundle.path.name)
@@ -4594,7 +4711,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             with wx.BusyCursor():
                 bundle = gui_workspace_to_bundle(
                     self.workspace.to_dict(), bundle_path,
-                    copy_images=self._resolve_copy_originals()
+                    copy_images=self._resolve_copy_originals(),
+                    progress=self._stage_progress,
                 )
             self.workspace_file = bundle.path
             self.update_window_title("ImageDescriber", bundle.path.name)

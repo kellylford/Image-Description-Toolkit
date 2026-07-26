@@ -18,7 +18,7 @@ These are pure functions — no wx — so they are unit-testable headlessly.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from .workspace import Workspace, WorkspaceItem, WorkspaceDescription
 
@@ -112,11 +112,17 @@ def _ws_desc_to_gui(w: WorkspaceDescription) -> dict:
 # --------------------------------------------------------------------------- #
 
 def gui_workspace_to_bundle(workspace_dict: dict, dest: Path,
-                            copy_images: bool = True) -> Workspace:
+                            copy_images: bool = True,
+                            progress: Optional[Callable[[int, int, str], None]] = None) -> Workspace:
     """
     Build (or update) a .idtw bundle from a GUI ImageWorkspace.to_dict() document.
     Images referenced by each item are copied into the bundle; originals untouched.
     Chat items are written to the bundle's chats/ store.
+
+    Args:
+        progress: Optional callback invoked as progress(done, total, name) after
+            each item is written.  Lets the GUI drive a progress dialog through
+            what is otherwise a long silent loop.  Never called with total == 0.
     """
     ws = Workspace.open(dest)
 
@@ -135,12 +141,15 @@ def gui_workspace_to_bundle(workspace_dict: dict, dest: Path,
     ws.save_manifest()
 
     items = workspace_dict.get("items") or {}
-    for key, item in items.items():
+    total = len(items)
+    for done, (key, item) in enumerate(items.items(), start=1):
         item_type = item.get("item_type", "image")
         if item_type == _CHAT_TYPE or str(key).startswith("chat:"):
             _gui_chat_item_to_bundle(ws, key, item)
-            continue
-        _gui_image_item_to_bundle(ws, key, item, copy_images)
+        else:
+            _gui_image_item_to_bundle(ws, key, item, copy_images)
+        if progress:
+            progress(done, total, Path(str(key)).name)
 
     return ws
 

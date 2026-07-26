@@ -50,6 +50,14 @@ class BatchProgressDialog(wx.Dialog):
         self.batch_prompt = batch_prompt
         self._is_complete = False  # Set by mark_complete(); changes Stop→Close
 
+        # Stage tracking — a run moves through Extracting → Saving → Describing,
+        # each with its own item count.  begin_stage() resets the counter and bar
+        # so progress reads per stage rather than as one merged total.
+        self.stage_name = ''
+        self.stage_index = 0
+        self.stage_count = 0
+        self.separator_indices = set()
+
         # Create UI
         self._create_ui()
         
@@ -134,6 +142,43 @@ class BatchProgressDialog(wx.Dialog):
         dialog_sizer.Add(panel, 1, wx.EXPAND)
         self.SetSizer(dialog_sizer)
     
+    def begin_stage(self, name: str, total: int,
+                    stage_index: int = 0, stage_count: int = 0,
+                    can_interrupt: bool = True):
+        """Start a new stage, resetting the item counter and progress bar.
+
+        A run moves through up to three stages (Extracting frames, Saving
+        workspace, Describing).  Each gets its own 0..total count rather than
+        being merged into one bar, so "40 of 200" always means "within this
+        stage".
+
+        Args:
+            name: Stage label, e.g. "Extracting frames"
+            total: Number of items in this stage
+            stage_index: 1-based position of this stage (0 = don't show)
+            stage_count: Total number of stages in the run (0 = don't show)
+            can_interrupt: Whether Pause/Stop apply.  Only the describe stage
+                runs under BatchProcessingWorker, so the copy/extract stages
+                pass False and the buttons are disabled.
+        """
+        self.stage_name = name
+        self.total_images = total
+        self.stage_index = stage_index
+        self.stage_count = stage_count
+
+        self.progress_bar.SetValue(0)
+        self.pause_button.Enable(can_interrupt)
+        self.stop_button.Enable(can_interrupt)
+
+        # Title carries the stage so screen readers announce the transition
+        # when the dialog is the active window.
+        if stage_index and stage_count:
+            self.SetTitle(f"{name} (step {stage_index} of {stage_count}) — Batch Processing")
+        else:
+            self.SetTitle(f"{name} — Batch Processing")
+
+        self.update_progress(0, total)
+
     def update_progress(self, current: int, total: int,
                        file_path: str = None, avg_time: float = 0.0,
                        image_name: str = None, provider: str = None, model: str = None,
@@ -186,6 +231,12 @@ class BatchProgressDialog(wx.Dialog):
             self.separator_indices.add(self.stats_list.GetCount() - 1)
 
         # ── Processing Progress section ──────────────────────────────────────
+        if self.stage_name:
+            if self.stage_index and self.stage_count:
+                stage_label = f"{self.stage_name} (step {self.stage_index} of {self.stage_count})"
+            else:
+                stage_label = self.stage_name
+            self.stats_list.Append(f"Stage:                      {stage_label}")
         self.stats_list.Append(f"Items Processed:            {current} / {total}")
 
         if avg_time > 0:
