@@ -14,11 +14,11 @@ configuration that is already committed to the workflow files.
 
 | Workflow | File | Runs on | Trigger | Duration |
 |---|---|---|---|---|
-| Build Windows Executables | `build-windows.yml` | `windows-latest` | push/PR to `main`, manual, called by Release | ~4 min |
-| Build macOS Applications | `build-macos.yml` | `macos-latest` (arm64) | push/PR to `main`, manual, called by Release | ~13 min, ~20 with notarization |
+| Build Windows Executables | `build-windows.yml` | `windows-latest` | push/PR to `main` (skips docs), manual, called by Release | ~4 min |
+| Build macOS Applications | `build-macos.yml` | `macos-latest` (arm64) | push/PR to `main` (skips docs), manual, called by Release | ~13 min, ~20 with notarization |
 | Release | `release.yml` | mixed | push of a `v*` tag | ~20 min |
 | CLI Validation | `cli-validation.yml` | `windows-latest` | push to `main` (path-filtered), all PRs, manual | ~2 min |
-| Integration Test: Windows | `integration-test-windows.yml` | `windows-latest` | push to `main`, manual | varies |
+| Integration Test: Windows | `integration-test-windows.yml` | `windows-latest` | push to `main` (skips docs), manual | varies |
 | CodeQL Security Scan | `codeql.yml` | `ubuntu-latest` | push/PR to `main`, Mondays 08:00 UTC | ~5 min |
 | Publish Documentation | `publish-docs.yml` | `ubuntu-latest` | push to `main` (path-filtered), manual | ~2 min |
 
@@ -148,7 +148,10 @@ when the tag looks like one.
 ## CLI Validation
 
 Path-filtered on push — only runs when `cli/**`, `idt_core/**`,
-`pytest_tests/**`, or its own file changes. Runs on **all** PRs regardless.
+`pytest_tests/**`, or its own file changes. Runs on **all** PRs regardless,
+which is required: `main`'s branch protection lists
+`cli-validation / IDT CLI Validation` as a required status check, so it must
+report on every PR or merges block.
 
 Syntax-checks `cli/` and `idt_core/`, runs `idt <cmd> --help` for all 12
 subcommands to confirm every command is reachable, runs `test_idt_core.py`,
@@ -156,8 +159,8 @@ then smoke tests non-fatally.
 
 ## Integration Test: Windows
 
-Real Ollama with minicpm-v4.6. Every push to `main`, or manual. Not
-path-filtered.
+Real Ollama with minicpm-v4.6. Push to `main` (documentation changes excluded)
+or manual. The heaviest workflow here — it pulls and runs an actual model.
 
 ## CodeQL Security Scan
 
@@ -169,15 +172,40 @@ Path-filtered to `docs/**`. Two jobs: `build-docs` then `deploy`.
 
 ---
 
-## Trigger overlap
+## Trigger overlap and path filtering
 
-Only CLI Validation and Publish Documentation use path filters. Everything else
-runs on every push to `main`.
+A push touching `cli/` or `idt_core/` deliberately fires five workflows: both
+builds, CLI Validation, Integration Test, and CodeQL. That is the intended
+coverage for a code change.
 
-A push touching `cli/` or `idt_core/` fires **five** workflows at once: both
-builds, CLI Validation, Integration Test, and CodeQL. A docs-only commit still
-triggers both platform builds and the Ollama integration test. Worth adding
-path filters to the build workflows if CI minutes become a concern.
+Documentation changes should not pay for that. Both platform builds and the
+Integration Test carry:
+
+```yaml
+paths-ignore:
+  - 'docs/**'
+  - '**.md'
+  - 'LICENSE'
+  - '.github/ISSUE_TEMPLATE/**'
+```
+
+So a docs-only commit runs only Publish Documentation and CodeQL, instead of
+two ~15-minute builds and a live Ollama model run.
+
+Two deliberate exceptions:
+
+- **CodeQL is not path-filtered.** It is a security scan and cheap
+  (`ubuntu-latest`, ~5 min). Skipping security tooling to save minutes ages
+  badly.
+- **CLI Validation's `pull_request` trigger is not path-filtered**, and must
+  not be. `main` has branch protection requiring the status check
+  `cli-validation / IDT CLI Validation`. If a path filter skipped that check on
+  a docs-only PR, the PR would wait forever on a check that never runs and
+  could not be merged.
+
+`paths-ignore` applies only to the event it is attached to. It has no effect on
+`workflow_call`, so **Release always builds both platforms** regardless of what
+the tagged commit touched.
 
 ---
 
