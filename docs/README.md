@@ -8,7 +8,7 @@ Welcome to the IDT documentation. The published accessible version of this docum
 - **[USER_GUIDE.md](USER_GUIDE.md)** — Complete user guide for both the `idt` CLI and ImageDescriber GUI (v4.5)
 - **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** — Developer reference: architecture, build system, conventions
 - **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** — Configuration files, API keys, and customization
-- **[WHATS_NEW — v4.5](release-notes-v4.5.md)** — Latest features and changes in v4.5
+- **[WHATS_NEW — v4.5](release-notes-v4.5.0.md)** — Latest features and changes in v4.5
 
 ### Configuration & Customization
 - **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Complete guide to config files and customization

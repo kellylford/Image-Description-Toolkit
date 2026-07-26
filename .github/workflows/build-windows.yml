@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [ v4.5, main ]
   workflow_dispatch:  # Also allow manual trigger
+  workflow_call:      # invoked by release.yml on tag pushes
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

@@ -1,0 +1,178 @@
+name: Release
+
+# Push a v* tag and this builds, tests, signs, and publishes a GitHub Release
+# with the Windows installer and the macOS DMG attached.
+#
+#   git tag v4.5.0
+#   git push origin v4.5.0
+#
+# Two things must be true before tagging, both enforced by the validate job so
+# they fail in seconds rather than after a 13-minute macOS build:
+#
+#   1. The tag matches the VERSION file exactly (v4.5.0 <-> 4.5.0)
+#   2. docs/release-notes-<tag>.md exists and is not empty
+#
+# The release is published only if BOTH platform builds succeed. A release with
+# a Windows installer and no DMG would be worse than no release at all.
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+# Reusable workflows cannot hold more permission than their caller grants, so
+# id-token must be here for the Windows job's Azure signing to work.
+permissions:
+  contents: write   # create the release
+  id-token: write   # OIDC token for Azure Trusted Signing
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ---------------------------------------------------------------------- #
+  #  Fail fast on a malformed release before spending any build time        #
+  # ---------------------------------------------------------------------- #
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag must match VERSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          TAG_VERSION="${TAG#v}"
+          FILE_VERSION="$(tr -d ' \r\n' < VERSION)"
+
+          echo "tag         : $TAG"
+          echo "tag version : $TAG_VERSION"
+          echo "VERSION file: $FILE_VERSION"
+
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo ""
+            echo "ERROR: tag '$TAG' does not match the VERSION file ('$FILE_VERSION')."
+            echo "A mismatch ships binaries that misreport their own version."
+            echo "Either update VERSION and re-tag, or delete and recreate the tag."
+            exit 1
+          fi
+          echo "OK"
+
+      - name: Release notes must exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES="docs/release-notes-${GITHUB_REF_NAME}.md"
+
+          if [ ! -f "$NOTES" ]; then
+            echo "ERROR: $NOTES not found."
+            echo ""
+            echo "Release notes are required. Write them and commit before tagging."
+            echo "Existing notes files:"
+            ls -1 docs/release-notes-*.md 2>/dev/null || echo "  (none)"
+            exit 1
+          fi
+
+          if [ ! -s "$NOTES" ]; then
+            echo "ERROR: $NOTES exists but is empty."
+            exit 1
+          fi
+
+          echo "Using $NOTES"
+          echo "--- first 20 lines ---"
+          head -20 "$NOTES"
+
+  # ---------------------------------------------------------------------- #
+  #  Platform builds — the same workflows that run on every push            #
+  #  secrets: inherit passes the AZURE_* secrets through for signing.       #
+  # ---------------------------------------------------------------------- #
+  windows:
+    name: Windows
+    needs: validate
+    uses: ./.github/workflows/build-windows.yml
+    secrets: inherit
+
+  macos:
+    name: macOS
+    needs: validate
+    uses: ./.github/workflows/build-macos.yml
+    secrets: inherit
+
+  # ---------------------------------------------------------------------- #
+  #  Publish                                                                #
+  # ---------------------------------------------------------------------- #
+  publish:
+    name: Publish release
+    needs: [ windows, macos ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reusable workflows share the caller's run, so their artifacts are
+      # downloadable here. No name filter: fetch everything both jobs uploaded.
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Inspect what arrived
+        run: find artifacts -type f | sort
+
+      # Rename into platform-explicit asset names. Straight from the artifact
+      # folders you would get bare "idt.exe" next to a macOS "idt" tarball,
+      # which is ambiguous on the release page.
+      - name: Stage release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          mkdir -p release
+
+          # $1 = glob to find, $2 = destination filename
+          take() {
+            local found
+            found=$(find artifacts -type f -path "$1" | head -1)
+            if [ -z "$found" ]; then
+              echo "ERROR: no file matched $1"
+              echo "Available files:"
+              find artifacts -type f | sort
+              exit 1
+            fi
+            cp "$found" "release/$2"
+            echo "  $2  <-  ${found#artifacts/}"
+          }
+
+          echo "Staging assets for $TAG:"
+          take "*/idt-installer-windows/*.exe"      "ImageDescriptionToolkitSetup-${VERSION}-windows.exe"
+          take "*/idt-windows/idt.exe"              "idt-${VERSION}-windows-x64.exe"
+          take "*/imagedescriber-windows/*.exe"     "ImageDescriber-${VERSION}-windows-x64.exe"
+          take "*/idt-macos-arm64-dmg/*.dmg"        "IDT-${VERSION}-macos-arm64.dmg"
+          take "*/idt-macos-arm64-cli/*.tar.gz"     "idt-${VERSION}-macos-arm64.tar.gz"
+
+          echo ""
+          ls -lh release
+
+      # Checksums let anyone confirm a download matches what CI produced.
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: Image Description Toolkit ${{ github.ref_name }}
+          body_path: docs/release-notes-${{ github.ref_name }}.md
+          # Anything unmatched fails the release rather than quietly publishing
+          # an incomplete set of downloads.
+          fail_on_unmatched_files: true
+          files: |
+            release/ImageDescriptionToolkitSetup-*-windows.exe
+            release/idt-*-windows-x64.exe
+            release/ImageDescriber-*-windows-x64.exe
+            release/IDT-*-macos-arm64.dmg
+            release/idt-*-macos-arm64.tar.gz
+            release/SHA256SUMS.txt
