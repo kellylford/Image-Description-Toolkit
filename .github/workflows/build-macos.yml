@@ -9,9 +9,9 @@ name: Build macOS Applications
 
 on:
   push:
-    branches: [ v4.5, main ]
+    branches: [ main ]
   pull_request:
-    branches: [ v4.5, main ]
+    branches: [ main ]
   workflow_dispatch:
   workflow_call:   # invoked by release.yml on tag pushes
 

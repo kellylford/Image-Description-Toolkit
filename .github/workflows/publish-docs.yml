@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - v4.5
     paths:
       - 'docs/**'
       - '.github/workflows/publish-docs.yml'

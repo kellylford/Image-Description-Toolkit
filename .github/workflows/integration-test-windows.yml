@@ -1,12 +1,11 @@
 name: "Integration Test: Windows (Ollama + minicpm-v4.6)"
 
-# Runs automatically on every push to v4.5 and main.
+# Runs automatically on every push to main.
 # Manual trigger also available via workflow_dispatch.
 on:
   workflow_dispatch:
   push:
     branches:
-      - v4.5
       - main
 
 jobs:
