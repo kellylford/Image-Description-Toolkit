@@ -24,10 +24,12 @@ jobs:
     environment: azure-signing
 
     env:
-      # Signing turns itself on only once the Azure secrets exist in this repo.
-      # Until then every signing step skips and the build behaves as it did
-      # before, rather than failing on a credential that is not configured yet.
-      SIGNING_ENABLED: ${{ secrets.AZURE_CLIENT_ID != '' }}
+      # Signing turns itself on only once ALL THREE Azure secrets exist in this
+      # repo. Until then every signing step skips and the build behaves as it
+      # did before, rather than failing on credentials that are not fully
+      # configured yet. All three are required: gating on one would let a
+      # partially-configured repo reach azure/login and fail the build.
+      SIGNING_ENABLED: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
 
     steps:
     - name: Checkout code
