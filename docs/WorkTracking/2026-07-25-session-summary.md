@@ -101,16 +101,16 @@ Run 30175190609 — all steps passed:
 
 ## What was NOT tested
 
-- **Developer ID signing.** `sign_macos.sh` has never run against a real
-  certificate. Syntax-checked only.
-- **Notarization.** `notarize_macos.sh` has never been submitted to Apple.
-  Syntax-checked only.
-- **Whether Apple's notary service accepts a onefile build.** `codesign` can
-  only sign the outer executable; the embedded `.so`/`.dylib` files are opaque
-  payload inside the archive. Reports of the notary rejecting unsigned nested
-  binaries are mixed. If it rejects, the fix is switching both specs to onedir
-  (`COLLECT`), which is what PyInstaller recommends for macOS distribution.
-  `sign_macos.sh` already handles both layouts.
+- ~~Developer ID signing.~~ **Verified** — run 30184243480. Both artifacts
+  signed and passing `codesign --verify --strict`.
+- ~~Notarization.~~ **Verified** — run 30188868550. Accepted by Apple,
+  stapled, and accepted by Gatekeeper.
+- ~~Whether Apple's notary service accepts a onefile build.~~ **RESOLVED —
+  it does.** Run 30188868550 returned `status: Accepted`, stapled the ticket,
+  and Gatekeeper reported `accepted / source=Notarized Developer ID`. No
+  migration to onedir is needed. Should a future PyInstaller or notary change
+  break it, `COLLECT` remains the fallback and `sign_macos.sh` already handles
+  that layout.
 - **Whether the built apps actually launch.** CI verifies bundle structure and
   runs the CLI, but the GUI is never launched. No headless test covers wx.
 - **The DMG's appearance.** CI skips the Finder layout, so the CI DMG has no
