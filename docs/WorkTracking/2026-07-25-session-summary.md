@@ -146,25 +146,39 @@ since signatures on files inside an installer do not cover the installer.
 A verify step using `Get-AuthenticodeSignature` fails the build if any binary
 is not `Valid`, so a silently-unsigned release cannot ship.
 
-**Currently inert.** Every signing step is gated on `SIGNING_ENABLED`, derived
-from whether `AZURE_CLIENT_ID` exists in this repository. It does not, so the
-steps skip and the build behaves as before. Verified: run 30180128021, green
-in 4m18s, all five signing steps skipped, all three artifacts produced.
+**ACTIVE and verified.** Run 30182752058: all steps green, all three binaries
+reporting `Valid` from `Get-AuthenticodeSignature`, signed
+`CN=kelly ford, O=kelly ford, L=Madison, S=wi, C=US` and timestamped by
+Microsoft Public RSA Time Stamping Authority.
 
-To activate:
+- `idt\dist\idt.exe`
+- `imagedescriber\dist\ImageDescriber.exe`
+- `dist_all\ImageDescriptionToolkitSetup_4.5.0.exe`
 
-1. Add `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` as
-   repository secrets. QuickMail has the same three; GitHub cannot reveal
-   existing values, so read them from the Azure portal.
-2. Add a federated credential in Azure with subject
-   `repo:kellylford/Image-Description-Toolkit:environment:azure-signing`.
-   The QuickMail credential names its own repository and will not authorize
-   this one — the subject is an exact string match.
+Configuration applied to make it live:
 
-The `azure-signing` GitHub environment was created in this repository as part
-of this work; it did not previously exist. No new Azure RBAC is required, as
-the app registration already holds the Trusted Signing Certificate Profile
-Signer role from the QuickMail setup.
+1. Repository secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+   `AZURE_SUBSCRIPTION_ID`.
+2. Two federated credentials on app registration `github-artifact-signing`
+   (AppId `da30172c-ceb4-412c-b1fa-3c3a3808c631`, object id
+   `7cf1d9c3-8dec-4199-b2bf-e17df0e2f892`):
+   - `gh-idt-signing` — `repo:kellylford/Image-Description-Toolkit:environment:azure-signing`
+   - `gh-idt-immutable` — `repo:kellylford@44002405/Image-Description-Toolkit@915671217:environment:azure-signing`
+
+   Both forms are registered because GitHub may issue either the plain or the
+   immutable subject claim. The other signing repos (QuickMail, WeatherFast,
+   LiveCaptions) carry the same pair.
+3. The `azure-signing` GitHub environment was created in this repository; it
+   did not previously exist. The environment name is part of the OIDC subject,
+   so the credential would not have matched without it.
+
+No new Azure RBAC was required — `github-artifact-signing` already held the
+Trusted Signing Certificate Profile Signer role from the earlier setup, and
+IDT uses the same signing account and certificate profile.
+
+Note: the signing gate requires all three secrets, not just one. An earlier
+version checked only `AZURE_CLIENT_ID`, which would have enabled the signing
+steps on a partially-configured repo and failed at `azure/login`.
 
 Azure Trusted Signing is Windows Authenticode only. It cannot sign macOS
 applications, which still require the Apple Developer ID certificate. The two
