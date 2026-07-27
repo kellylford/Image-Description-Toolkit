@@ -4156,20 +4156,47 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """
         state = {}
 
+        # A batch owns the shared dialog: its stage counter, its labels, its
+        # describe progress. A save started mid-batch must not touch any of that
+        # — doing so relabelled the running batch and pushed the counter past its
+        # own total ("Saving workspace (step 4 of 3)"). Give this work its own
+        # throwaway dialog instead.
+        standalone = self._batch_worker_running()
+
+        if standalone:
+            dlg = BatchProgressDialog(self, total) if BatchProgressDialog else None
+            if dlg:
+                dlg.begin_stage(stage_name, total, can_interrupt=False)
+                dlg.Show()
+                dlg.Raise()
+            owns_dialog = False
+        else:
+            # stage_count 0 suppresses "step N of M" — a standalone save is not
+            # part of a multi-stage run.
+            owns_dialog = self.batch_progress_dialog is None
+            dlg = self._ensure_progress_dialog({}, 0)
+            self._begin_stage(stage_name, total)
+
+        # Progress is bound to *this* dialog rather than going through
+        # _stage_progress, which always targets the shared batch dialog.
+        last_paint = [0.0]
+
+        def progress_cb(done, tot, name=""):
+            now = time.time()
+            is_final = tot > 0 and done >= tot
+            if not is_final and (now - last_paint[0]) < 0.125:
+                return
+            last_paint[0] = now
+            if dlg:
+                wx.CallAfter(dlg.update_progress, done, tot, image_name=name)
+
         def runner():
             try:
-                state['value'] = work(self._stage_progress)
+                state['value'] = work(progress_cb)
             except BaseException as exc:      # re-raised on the main thread below
                 state['error'] = exc
             finally:
                 state['done'] = True
-
-        # stage_count 0 suppresses "step N of M" — a standalone save is not part
-        # of a multi-stage run. When a batch already owns the dialog this is a
-        # no-op and the existing stage numbering is preserved.
-        owns_dialog = self.batch_progress_dialog is None
-        dlg = self._ensure_progress_dialog({}, 0)
-        self._begin_stage(stage_name, total)
 
         threading.Thread(target=runner, daemon=True).start()
         try:
@@ -4178,7 +4205,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 time.sleep(0.02)
             wx.SafeYield(dlg, True)           # drain queued progress CallAfters
         finally:
-            if owns_dialog:
+            if standalone:
+                if dlg:
+                    dlg.Destroy()
+            elif owns_dialog:
                 self._close_progress_dialog()
 
         if 'error' in state:
@@ -4254,10 +4284,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # dialog — inline it froze the UI with no repaint for the whole save.
         if self.workspace_file:
             self._begin_stage("Saving workspace", len(self.workspace.items))
+            # Snapshot on the main thread — see _save_bundle's ws_dict docstring.
+            pre_save_dict = self.workspace.to_dict()
 
             def _do_save():
                 try:
-                    self._save_bundle(progress=self._stage_progress)
+                    self._save_bundle(progress=self._stage_progress,
+                                      ws_dict=pre_save_dict)
                 except Exception as exc:
                     logger.error(f"Pre-describe save failed: {exc}", exc_info=True)
                 wx.CallAfter(_start_describing)
@@ -4477,15 +4510,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.workspace_file:
             # Writes one sidecar per item — slow enough on a large workspace to
             # look hung, so run it with the progress dialog like the other paths.
-            total = len(self.workspace.items) if self.workspace else 0
+            # Snapshot on the main thread: this save can be started while a batch
+            # is still adding items, and building the dict on the worker thread
+            # could iterate the items mapping mid-mutation.
+            ws_dict = self.workspace.to_dict() if self.workspace else {}
+            total = len((ws_dict.get("items") or {}))
             self._run_with_progress(
                 "Saving workspace", total,
-                lambda cb: self._save_bundle(progress=cb),
+                lambda cb: self._save_bundle(progress=cb, ws_dict=ws_dict),
             )
         else:
             self._prompt_and_create_bundle("Save Workspace")
 
-    def _save_bundle(self, progress=None) -> None:
+    def _save_bundle(self, progress=None, ws_dict=None) -> None:
         """Persist the current workspace to its open .idtw bundle.
 
         Args:
@@ -4494,6 +4531,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 on a worker thread, so every wx call is marshalled back to the main
                 thread — writing a large workspace inline used to block the UI with
                 no repaint, which left the status bar frozen and screen readers silent.
+            ws_dict: Pre-built workspace.to_dict() snapshot. Callers that save from
+                a worker thread MUST pass one taken on the main thread: a batch
+                adds items and descriptions as it runs, so building the dict here
+                could iterate the items mapping while another thread mutates it.
         """
         if not self.workspace_file:
             return
@@ -4544,7 +4585,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             ws.save_manifest()
 
-            gui_items = (self.workspace.to_dict().get("items") or {})
+            gui_items = ((ws_dict if ws_dict is not None
+                          else self.workspace.to_dict()).get("items") or {})
             total_items = len(gui_items)
             for done, (file_path, gui_item) in enumerate(gui_items.items(), start=1):
                 if str(file_path).startswith("chat:"):
