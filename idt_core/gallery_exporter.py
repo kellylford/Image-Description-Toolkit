@@ -24,7 +24,7 @@ import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,13 @@ logger = logging.getLogger(__name__)
 # Public API
 # ---------------------------------------------------------------------------
 
-def export_gallery(items: dict, options: dict) -> dict:
+def export_gallery(items: dict, options: dict,
+                   progress: Optional[Callable[[int, int, str], None]] = None) -> dict:
     """Export workspace images + descriptions as an HTML gallery folder.
 
     Args:
+        progress: Optional callback progress(done, total, name) fired per image
+                 as it is copied — the copy loop dominates export time.
         items:   workspace.items — Dict[str, ImageItem]
         options: {
             'output_dir':       str   — destination folder (created if needed)
@@ -82,7 +85,7 @@ def export_gallery(items: dict, options: dict) -> dict:
 
     # Copy images, build path mapping
     image_paths, images_copied, images_skipped, warnings = _copy_images(
-        described_sorted, images_dir
+        described_sorted, images_dir, progress
     )
 
     # Keep only items whose image was successfully copied
@@ -124,6 +127,7 @@ def export_gallery(items: dict, options: dict) -> dict:
 def _copy_images(
     sorted_items: List[Tuple[str, object]],
     images_dir: Path,
+    progress: Optional[Callable[[int, int, str], None]] = None,
 ) -> Tuple[Dict[str, str], int, int, List[str]]:
     """Copy source images into <output>/images/.
 
@@ -137,8 +141,11 @@ def _copy_images(
     skipped = 0
     warnings: List[str] = []
 
-    for file_path, _item in sorted_items:
+    total = len(sorted_items)
+    for done, (file_path, _item) in enumerate(sorted_items, start=1):
         src = Path(file_path)
+        if progress:
+            progress(done, total, src.name)
         if not src.exists():
             warnings.append(f"Source file not found, skipped: {file_path}")
             skipped += 1

@@ -2522,7 +2522,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, f"Could not open idt project:\n{exc}")
             return
 
-        described = list(project.described())
+        # Reads a sidecar per image off disk — the expensive part of an import,
+        # and it was outside the busy cursor entirely. Length is unknown until
+        # the generator is drained, so this stage reports a running count.
+        def _load_described(progress_cb):
+            out = []
+            for idt_item in project.described():
+                out.append(idt_item)
+                progress_cb(len(out), 0, Path(str(idt_item.source_path)).name)
+            return out
+
+        described = self._run_with_progress("Reading idt project", 0, _load_described)
         if not described:
             show_warning(self, f"No described images found in:\n{idt_dir}\n\nRun 'idt describe <folder>' to generate descriptions.")
             return
@@ -4097,7 +4107,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         always including the final item so the stage ends on an exact count.
         """
         now = time.time()
-        if done < total and (now - getattr(self, '_stage_last_paint', 0.0)) < 0.125:
+        # Always paint the final item so a stage ends on an exact count. With an
+        # unknown total (0) there is no final item, so everything is throttled.
+        is_final = total > 0 and done >= total
+        if not is_final and (now - getattr(self, '_stage_last_paint', 0.0)) < 0.125:
             return
         self._stage_last_paint = now
         dlg = self.batch_progress_dialog
@@ -4840,12 +4853,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         total_written = 0
         project_dirs = []
 
-        with wx.BusyCursor():
+        # One sidecar write per image — runs with the progress dialog rather
+        # than a busy cursor, which conveys nothing to a screen reader and left
+        # the UI frozen on a large workspace.
+        total_to_write = sum(len(v) for v in by_dir.values())
+
+        def _do_export(progress_cb):
+            nonlocal total_written
+            done = 0
             for source_dir, items in by_dir.items():
                 try:
                     project = Project.open(source_dir)
                 except Exception as exc:
                     logging.warning(f"Could not open idt project for {source_dir}: {exc}")
+                    done += len(items)
+                    progress_cb(done, total_to_write, Path(source_dir).name)
                     continue
 
                 project_dirs.append(project.idt_dir)
@@ -4887,6 +4909,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
                     idt_item.save()
                     total_written += 1
+                    done += 1
+                    progress_cb(done, total_to_write, src.name)
+
+        self._run_with_progress("Exporting to idt project", total_to_write, _do_export)
 
         lines = [f"Exported {total_written} image(s) to idt project format."]
         if project_dirs:
@@ -4942,9 +4968,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         errors = []
 
         try:
-            with wx.BusyCursor():
-                for item in described_items:
+            # embed_image_file() copies the image and rewrites its metadata, so
+            # this is the heaviest per-item loop in the app — run it with the
+            # progress dialog instead of a busy cursor.
+            def _do_embed(progress_cb):
+                nonlocal embedded
+                total = len(described_items)
+                for done, item in enumerate(described_items, start=1):
                     source = Path(item.file_path)
+                    progress_cb(done, total, source.name)
                     if not source.exists():
                         errors.append(f"File not found: {source.name}")
                         continue
@@ -4973,6 +5005,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         embedded += 1
                     except Exception as exc:
                         errors.append(f"{source.name}: {exc}")
+
+            self._run_with_progress(
+                "Embedding descriptions", len(described_items), _do_embed
+            )
         except Exception as e:
             show_error(self, f"Error embedding descriptions:\n{e}")
             return
@@ -5072,8 +5108,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         dlg.Destroy()
 
         try:
-            with wx.BusyCursor():
-                result = gallery_exporter.export_gallery(self.workspace.items, options)
+            # The per-image copy loop dominates export time.
+            total_imgs = sum(1 for i in self.workspace.items.values() if i.descriptions)
+            result = self._run_with_progress(
+                "Exporting gallery", total_imgs,
+                lambda cb: gallery_exporter.export_gallery(
+                    self.workspace.items, options, progress=cb
+                ),
+            )
         except Exception as e:
             show_error(self, f"Error exporting gallery:\n{e}")
             return

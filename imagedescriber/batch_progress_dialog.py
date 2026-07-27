@@ -237,7 +237,12 @@ class BatchProgressDialog(wx.Dialog):
             else:
                 stage_label = self.stage_name
             self.stats_list.Append(f"Stage:                      {stage_label}")
-        self.stats_list.Append(f"Items Processed:            {current} / {total}")
+        if total > 0:
+            self.stats_list.Append(f"Items Processed:            {current} / {total}")
+        else:
+            # total == 0 means "unknown length" (e.g. consuming a generator);
+            # show a running count rather than a meaningless "N / 0".
+            self.stats_list.Append(f"Items Processed:            {current}")
 
         if avg_time > 0:
             self.stats_list.Append(f"Average Processing Time:    {avg_time:.1f} seconds")
@@ -295,9 +300,11 @@ class BatchProgressDialog(wx.Dialog):
         elif file_path:
             self.stats_list.Append(f"Current Image:              {Path(file_path).name}")
 
-        # Update progress bar
-        percentage = int((current / total) * 100) if total > 0 else 0
-        self.progress_bar.SetValue(percentage)
+        # Update progress bar — pulse when the total is unknown
+        if total > 0:
+            self.progress_bar.SetValue(int((current / total) * 100))
+        else:
+            self.progress_bar.Pulse()
 
         # Restore the previously selected row (skip separators if needed)
         count = self.stats_list.GetCount()
