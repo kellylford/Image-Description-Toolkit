@@ -2752,6 +2752,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.SetStatusText(f"Scanning {dir_path.name}...", 0)
             self.SetStatusText("0 files found", 1)
 
+            # The scan already runs on a worker thread, but its only feedback was
+            # the status bar — which fires no accessibility notification, so with
+            # a screen reader a multi-minute network scan is completely silent and
+            # reads as a hang. Show the progress dialog instead. The file count is
+            # unknown until the scan finishes, so this stage runs in unknown-total
+            # mode (running count, pulsing gauge).
+            if not self._batch_worker_running():
+                self._ensure_progress_dialog({}, 0)
+                self._begin_stage(f"Scanning {dir_path.name}", 0)
+
             # Start async directory scan
             self.scan_worker = DirectoryScanWorker(
                 parent_window=self,
@@ -4072,6 +4082,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if hasattr(self, 'workspace_stats_item'):
             self.workspace_stats_item.Enable(False)
         return self.batch_progress_dialog
+
+    def _batch_worker_running(self) -> bool:
+        """True while a describe batch owns the progress dialog.
+
+        A directory scan can be started while a batch is still running, and the
+        scan must never close or relabel a dialog the batch is using.
+        """
+        worker = getattr(self, 'batch_worker', None)
+        return bool(worker is not None and worker.is_alive())
 
     def _close_progress_dialog(self):
         """Close the batch progress dialog and restore the menus it disabled."""
@@ -5963,11 +5982,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Update status bar with scan progress
         self.SetStatusText(event.message, 0)
         self.SetStatusText(f"{event.files_found} files found", 1)
+        # Mirror into the progress dialog — the status bar alone is silent to a
+        # screen reader. Unknown total, so this shows a running count. Skipped
+        # while a batch is describing, so a scan cannot overwrite its progress.
+        if not self._batch_worker_running():
+            self._stage_progress(event.files_found, 0, event.message)
 
     def on_scan_complete(self, event):
         """Handle directory scan completion"""
         total_files = event.total_files
         elapsed = event.elapsed_time
+
+        # Land the scan stage on its final count before the dialog goes away, so
+        # the last thing announced is the real total rather than a stale figure.
+        if self.batch_progress_dialog and not self._batch_worker_running():
+            self._stage_last_paint = 0.0
+            self.batch_progress_dialog.update_progress(
+                total_files, total_files,
+                image_name=f"{total_files} files in {elapsed:.1f}s",
+            )
 
         # NOW refresh UI once with all files (this will trigger EXIF extraction as needed)
         self.refresh_image_list()
@@ -5992,10 +6025,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             preset = getattr(self, '_pending_preset_options', None)
             self._pending_preset_options = None
             logger.info("Scan complete — resuming deferred on_process_all")
+            # Leave the dialog open: on_process_all reuses it for its own stages.
             wx.CallAfter(self.on_process_all, None, skip_existing, preset)
+        elif not self._batch_worker_running():
+            # Nothing follows the scan, so retire the dialog.
+            self._close_progress_dialog()
 
     def on_scan_failed(self, event):
         """Handle directory scan failure"""
+        # Retire the scan dialog before the modal error, so it isn't left
+        # stranded behind the message box at a partial count.
+        if not self._batch_worker_running():
+            self._close_progress_dialog()
         show_error(self, f"Error scanning directory:\n{event.error}")
         self.SetStatusText("Directory scan failed", 0)
 
