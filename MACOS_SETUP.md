@@ -111,7 +111,7 @@ After successful setup:
 
 1. **Build executables**: Run `./BuildAndRelease/MacBuilds/builditall_macos.command`
 2. **Test apps**: Open the `.app` bundles in `dist/` directories
-3. **Read user guide**: See [docs/MACOS_USER_GUIDE.md](docs/MACOS_USER_GUIDE.md) for detailed usage
+3. **Read user guide**: See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for detailed usage
 
 ## System Requirements
 

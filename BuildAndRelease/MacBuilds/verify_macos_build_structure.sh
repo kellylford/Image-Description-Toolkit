@@ -80,7 +80,7 @@ echo ""
 
 echo "Checking documentation..."
 echo "-------------------------"
-check_file "docs/BUILD_MACOS.md"
+check_file "BuildAndRelease/MacBuilds/README_MACOS.md"
 check_file "VERSION"
 echo ""
 

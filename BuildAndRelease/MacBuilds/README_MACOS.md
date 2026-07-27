@@ -242,9 +242,9 @@ source ~/.zshrc
 
 ## Documentation
 
-- **[BUILD_MACOS.md](../docs/BUILD_MACOS.md)** - Comprehensive build guide
-- **[MACOS_USER_GUIDE.md](../docs/MACOS_USER_GUIDE.md)** - End-user installation guide
-- **[MACOS_BUILD_IMPLEMENTATION.md](../docs/worktracking/MACOS_BUILD_IMPLEMENTATION.md)** - Technical implementation details
+- **[DEVELOPER_GUIDE.md](../../docs/DEVELOPER_GUIDE.md)** - Architecture, build system, and testing
+- **[USER_GUIDE.md](../../docs/USER_GUIDE.md)** - End-user installation and usage guide
+- **[BUILD_SYSTEM_REFERENCE.md](../BUILD_SYSTEM_REFERENCE.md)** - Build troubleshooting reference
 
 ## Differences from Windows
 

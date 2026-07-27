@@ -94,9 +94,6 @@ jobs:
     #  Pre-build checks                                                   #
     # ------------------------------------------------------------------ #
     - name: Verify macOS build system structure
-      # Non-fatal: this script currently checks for docs/BUILD_MACOS.md,
-      # which does not exist in the repo, so it always exits 1.
-      continue-on-error: true
       run: bash BuildAndRelease/MacBuilds/verify_macos_build_structure.sh
 
     - name: Syntax-check core modules

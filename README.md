@@ -65,7 +65,7 @@ idt workflow path/to/images
 ### User Guides
 - **[What's New in v4.1.0](docs/WHATS_NEW_v4.1.0.md)** - wxPython migration, accessibility, code consolidation
 - **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions (Windows)
-- **[macOS User Guide](docs/MACOS_USER_GUIDE.md)** - macOS installation and usage
+- **[macOS Setup](MACOS_SETUP.md)** - macOS installation and usage
 - **[CLI Reference](docs/CLI_REFERENCE.md)** - All commands and options
 
 ### Configuration & Setup
@@ -73,7 +73,7 @@ idt workflow path/to/images
 
 ### Developer Documentation
 - **[Build Guide (Windows)](BuildAndRelease/README.md)** - Windows build instructions
-- **[Build Guide (macOS)](docs/BUILD_MACOS.md)** - macOS build instructions
+- **[Build Guide (macOS)](BuildAndRelease/MacBuilds/README_MACOS.md)** - macOS build instructions
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ## Requirements
@@ -87,7 +87,7 @@ Pre-built Executable**: No Python required - download installer from releases
 - **macOS 10.13+** (High Sierra or later)
 - **Python 3.8+** (system Python or Homebrew)
 - **Installation**: Download .pkg installer or .dmg disk image from releases
-- **Build from Source**: See [macOS Build Guide](docs/BUILD_MACOS.md)
+- **Build from Source**: See [macOS Build Guide](BuildAndRelease/MacBuilds/README_MACOS.md)
 - **AI Providers**: Same as Windows (Ollama, OpenAI, Claude)
 
 **macOS Quick Start:**
