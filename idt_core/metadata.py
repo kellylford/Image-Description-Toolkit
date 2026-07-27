@@ -62,12 +62,8 @@ class ImageMetadata:
     # Whether date came from EXIF or file mtime
     date_from_exif: bool = False
 
-    def prompt_context(self) -> str:
-        """
-        One-line context string to prepend to AI prompts.
-        Example: "Munich, Germany  Sep 12, 2025  iPhone 14 Pro"
-        Returns empty string when nothing useful is available.
-        """
+    def _where_when(self) -> list[str]:
+        """Location and date parts, shared by prompt_context() and display_context()."""
         parts: list[str] = []
 
         # Location
@@ -83,6 +79,34 @@ class ImageMetadata:
         # Date
         if self.date_short:
             parts.append(self.date_short)
+
+        return parts
+
+    def prompt_context(self) -> str:
+        """
+        One-line context string to prepend to AI prompts.
+        Example: "Munich, Germany  Sep 12, 2025"
+        Returns empty string when nothing useful is available.
+
+        Deliberately EXCLUDES the camera. The capture device is not in the photo,
+        and describer models treat everything in the context line as scene
+        content: a Ray-Ban Meta Smart Glasses capture was described as "a pair of
+        black Ray-Ban Meta Smart Glasses sits centered on a smooth grey surface"
+        — the model described the camera instead of the picture. Location and
+        date genuinely help ground a description; the hardware never does.
+
+        Use display_context() when showing metadata to a person.
+        """
+        return "  ".join(self._where_when())
+
+    def display_context(self) -> str:
+        """
+        One-line context string for showing to a person (CLI progress, UI labels).
+        Includes the camera: "Munich, Germany  Sep 12, 2025  iPhone 14 Pro"
+
+        Never send this to a model — see prompt_context().
+        """
+        parts = self._where_when()
 
         # Camera — collapse "Apple iPhone 14 Pro" → "iPhone 14 Pro"
         camera = self._camera_display()

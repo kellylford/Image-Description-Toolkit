@@ -26,6 +26,17 @@ from .providers.base import BaseProvider
 from .scanner import is_heic
 from .workspace import Workspace, WorkspaceItem, WorkspaceDescription
 
+# Label for the EXIF context line prepended to describe prompts.
+#
+# A bare "Context:" gave the model no way to tell capture metadata from scene
+# content — with the camera in that line, a Ray-Ban Meta capture was described
+# as a photo *of* Ray-Ban glasses. The camera is gone from prompt_context() now,
+# but the label still states plainly that this is not visible in the image, so
+# a place name is used to ground the description rather than described as if
+# printed on it. Shared by the CLI pipeline and the GUI worker so the two
+# cannot drift.
+META_PREFIX = "Capture metadata (not visible in the image): "
+
 
 @dataclass
 class RunOptions:
@@ -109,10 +120,8 @@ class Pipeline:
 
             # Build enriched prompt: context line first, then the actual prompt
             prompt = options.prompt_text
-            if meta_context and prompt:
-                prompt = f"Context: {meta_context}\n\n{prompt}"
-            elif meta_context:
-                prompt = f"Context: {meta_context}\n\n{prompt}"
+            if meta_context:
+                prompt = f"{META_PREFIX}{meta_context}\n\n{prompt}"
 
             image_bytes, mime_type = load_for_api(item.processable_path)
             result = self.provider.describe(image_bytes, mime_type, prompt)
@@ -154,7 +163,7 @@ def _extract_and_build_prompt(extractor, geocoder, exif_path, prompt_text):
             meta_context = meta.prompt_context()
     prompt = prompt_text
     if meta_context:
-        prompt = f"Context: {meta_context}\n\n{prompt_text}"
+        prompt = f"{META_PREFIX}{meta_context}\n\n{prompt_text}"
     return meta, meta_context, prompt
 
 

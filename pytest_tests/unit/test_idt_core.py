@@ -720,7 +720,42 @@ class TestMetadata:
         ctx = meta.prompt_context()
         assert "Munich, Bavaria" in ctx
         assert "Sep 12, 2025" in ctx
-        assert "iPhone 14 Pro" in ctx
+
+    def test_prompt_context_excludes_camera(self):
+        """The capture device must never reach an AI prompt.
+
+        Models treat the context line as scene content — a Ray-Ban Meta capture
+        was described as a photo *of* Ray-Ban glasses.
+        """
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(
+            date_short="Jul 3, 2026",
+            city="Monona",
+            state="Wisconsin",
+            camera_make="Meta AI",
+            camera_model="Ray-Ban Meta Smart Glasses",
+        )
+        ctx = meta.prompt_context()
+        assert "Monona, Wisconsin" in ctx
+        assert "Jul 3, 2026" in ctx
+        assert "Ray-Ban" not in ctx
+        assert "Meta" not in ctx
+        assert "Glasses" not in ctx
+
+    def test_display_context_includes_camera(self):
+        """Human-facing output still shows the camera."""
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(
+            date_short="Sep 12, 2025",
+            city="Munich",
+            state="Bavaria",
+            camera_make="Apple",
+            camera_model="iPhone 14 Pro",
+        )
+        disp = meta.display_context()
+        assert "Munich, Bavaria" in disp
+        assert "Sep 12, 2025" in disp
+        assert "iPhone 14 Pro" in disp
 
     def test_camera_display_strips_redundant_make(self):
         from idt_core.metadata import ImageMetadata
@@ -887,3 +922,34 @@ class TestImageItemNewFields:
 
         loaded = ImageItem.load(sidecar)
         assert loaded.active_description.metadata_context == "Munich, Germany  Sep 12, 2025"
+
+
+class TestPromptMetadataLabel:
+    """The EXIF context line must be labelled as non-visible capture metadata.
+
+    A bare "Context:" prefix let models treat the line as scene content.
+    """
+
+    def test_prefix_states_it_is_not_visible(self):
+        from idt_core.pipeline import META_PREFIX
+        low = META_PREFIX.lower()
+        assert "not visible" in low
+        assert "metadata" in low
+
+    def test_gui_and_cli_share_one_prefix(self):
+        """Both describe paths build the prompt from the same constant.
+
+        They drifted before; a divergence here means the GUI and CLI would
+        send materially different prompts for the same image.
+        """
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[2]
+        gui = (root / "imagedescriber" / "workers_wx.py").read_text()
+        pipe = (root / "idt_core" / "pipeline.py").read_text()
+
+        # Neither may hand-roll the old bare label
+        assert 'f"Context: {' not in gui
+        assert 'f"Context: {' not in pipe
+        # Both build the prompt from META_PREFIX
+        assert "META_PREFIX" in gui
+        assert pipe.count("META_PREFIX") >= 3   # definition + both call sites

@@ -450,7 +450,8 @@ def cmd_describe(args):
             described += 1
             extra = ""
             if not args.quiet and event.metadata:
-                ctx = event.metadata.prompt_context()
+                # Display only — includes the camera, which prompt_context() omits.
+                ctx = event.metadata.display_context()
                 if ctx:
                     extra = f"  [{ctx}]"
             progress.update(event.item.display_name, success=True, note=extra)

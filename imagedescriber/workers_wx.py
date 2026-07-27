@@ -816,7 +816,11 @@ class ProcessingWorker(threading.Thread):
             ctx = meta.prompt_context()
             if ctx:
                 logging.info(f"EXIF context injected into prompt: {ctx}")
-                return f"Context: {ctx}\n\n{prompt_text}", ctx
+                try:
+                    from idt_core.pipeline import META_PREFIX
+                except ImportError:
+                    from pipeline import META_PREFIX  # frozen mode
+                return f"{META_PREFIX}{ctx}\n\n{prompt_text}", ctx
 
         except Exception as exc:
             logging.warning(f"EXIF context injection failed for {self.file_path}: {exc}")
