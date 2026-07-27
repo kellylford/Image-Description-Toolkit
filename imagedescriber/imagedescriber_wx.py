@@ -4106,6 +4106,53 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         else:
             wx.CallAfter(self.SetStatusText, f"{done} of {total}  {name}", 0)
 
+    def _run_with_progress(self, stage_name: str, total: int, work):
+        """Run `work(progress_cb)` off the main thread while the dialog repaints.
+
+        Saving a large workspace writes one sidecar per item — 7,674 items over a
+        network share measured at ~2 minutes — and doing that inline froze the UI
+        completely: no repaint, so the status bar could not update and screen
+        readers announced nothing.
+
+        Several callers depend on a synchronous return value (Save/Save As return
+        a bool the caller branches on), so rather than restructure them, the work
+        moves to a thread and the main thread pumps the event loop until it
+        finishes. SafeYield keeps every window except the progress dialog disabled,
+        so the pumped loop cannot re-enter another handler.
+
+        Returns whatever `work` returned; re-raises whatever it raised.
+        """
+        state = {}
+
+        def runner():
+            try:
+                state['value'] = work(self._stage_progress)
+            except BaseException as exc:      # re-raised on the main thread below
+                state['error'] = exc
+            finally:
+                state['done'] = True
+
+        # stage_count 0 suppresses "step N of M" — a standalone save is not part
+        # of a multi-stage run. When a batch already owns the dialog this is a
+        # no-op and the existing stage numbering is preserved.
+        owns_dialog = self.batch_progress_dialog is None
+        dlg = self._ensure_progress_dialog({}, 0)
+        self._begin_stage(stage_name, total)
+
+        threading.Thread(target=runner, daemon=True).start()
+        try:
+            while not state.get('done'):
+                wx.SafeYield(dlg, True)
+                time.sleep(0.02)
+            wx.SafeYield(dlg, True)           # drain queued progress CallAfters
+        finally:
+            if owns_dialog:
+                self._close_progress_dialog()
+
+        if 'error' in state:
+            raise state['error']
+        return state.get('value')
+
     def _launch_batch(self, to_process: list, options: dict, skip_existing: bool,
                       video_preamble: str = None):
         """Start a batch image-processing run.
@@ -4396,7 +4443,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_save_workspace(self, event):
         """Save workspace to its current bundle, or prompt for location if unsaved."""
         if self.workspace_file:
-            self._save_bundle()
+            # Writes one sidecar per item — slow enough on a large workspace to
+            # look hung, so run it with the progress dialog like the other paths.
+            total = len(self.workspace.items) if self.workspace else 0
+            self._run_with_progress(
+                "Saving workspace", total,
+                lambda cb: self._save_bundle(progress=cb),
+            )
         else:
             self._prompt_and_create_bundle("Save Workspace")
 
@@ -4644,10 +4697,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         workspace_root.mkdir(parents=True, exist_ok=True)
         bundle_path = workspace_root / source.name
         try:
-            bundle = gui_workspace_to_bundle(
-                self.workspace.to_dict(), bundle_path,
-                copy_images=self._resolve_copy_originals(),
-                progress=self._stage_progress,
+            ws_dict = self.workspace.to_dict()
+            copy_images = self._resolve_copy_originals()
+            bundle = self._run_with_progress(
+                "Saving workspace", len(ws_dict.get("items") or {}),
+                lambda cb: gui_workspace_to_bundle(
+                    ws_dict, bundle_path, copy_images=copy_images, progress=cb,
+                ),
             )
             self.workspace_file = bundle.path
             self.update_window_title("ImageDescriber", bundle.path.name)
@@ -4657,11 +4713,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as exc:
             logger.error(f"Auto-bundle save failed: {exc}", exc_info=True)
 
-    def _prompt_and_create_bundle(self, title: str = "Save Workspace Bundle") -> bool:
+    def _prompt_and_create_bundle(self, title: str = "Save Workspace Bundle",
+                                  proposed_name: str = None) -> bool:
         """Prompt user for a .idtw bundle location and save the workspace there.
 
         Defaults to placing the bundle next to the source folder.
         Returns True if saved successfully, False if the user cancelled or it failed.
+
+        Args:
+            proposed_name: Pre-fills the name field. The web-download path derives
+                a name from the URL and passes it here.
         """
         try:
             from idt_core.gui_bridge import gui_workspace_to_bundle
@@ -4669,10 +4730,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "idt_core is not available in this build.")
             return False
 
-        proposed_name = self._propose_workspace_name_from_content()
-        if self.workspace and self.workspace.directory_paths:
-            source = Path(self.workspace.directory_paths[0])
-            proposed_name = source.name
+        # An explicit name from the caller wins; otherwise prefer the source
+        # folder's name, falling back to one derived from the content.
+        if not proposed_name:
+            proposed_name = self._propose_workspace_name_from_content()
+            if self.workspace and self.workspace.directory_paths:
+                source = Path(self.workspace.directory_paths[0])
+                proposed_name = source.name
         # Always default to ~/Documents/idt, never the source folder's parent
         # (source may be a read-only network share).
         workspace_root = get_default_workspaces_root()
@@ -4708,12 +4772,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         bundle_path = Path(parent_dir) / name
         try:
-            with wx.BusyCursor():
-                bundle = gui_workspace_to_bundle(
-                    self.workspace.to_dict(), bundle_path,
-                    copy_images=self._resolve_copy_originals(),
-                    progress=self._stage_progress,
-                )
+            # Snapshot the GUI model on the main thread before handing off.
+            ws_dict = self.workspace.to_dict()
+            copy_images = self._resolve_copy_originals()
+            bundle = self._run_with_progress(
+                "Saving workspace", len(ws_dict.get("items") or {}),
+                lambda cb: gui_workspace_to_bundle(
+                    ws_dict, bundle_path, copy_images=copy_images, progress=cb,
+                ),
+            )
             self.workspace_file = bundle.path
             self.update_window_title("ImageDescriber", bundle.path.name)
             self.clear_modified()

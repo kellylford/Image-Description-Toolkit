@@ -92,5 +92,60 @@ Pause/Stop are disabled outside the describe stage — only that stage runs unde
 - Not rebuilt as a frozen executable; PyInstaller behaviour unverified.
 - The `_auto_save_bundle` / `_prompt_and_create_bundle` copy paths now pass a progress
   callback, but they still run on the main thread. When they're reached before the dialog
-  exists (CHECKPOINT 3), progress still can't paint. Left as-is — those are explicit
-  user-initiated saves, not the batch path.
+  exists (CHECKPOINT 3), progress still can't paint. **Addressed in Part 3 below.**
+
+## Part 3: Save Workspace hang on a large network workspace
+
+### Evidence
+
+From `~/Library/Logs/ImageDescriber/ImageDescriber.log`, using the build from Part 2
+against an iPhone photo library on a network share:
+
+```
+21:08:02  Directory scan complete: 7674 files in 17.41s
+21:10:04  Saved workspace bundle: /Users/kellyford/Documents/idt/iPhone.idtw
+```
+
+**122 seconds with no output of any kind** — 7,674 items at ~16ms each over the share.
+The "Saved workspace bundle" wording identifies this as `_prompt_and_create_bundle`,
+which had only a `wx.BusyCursor()`: a cursor change conveys nothing to a screen reader,
+and the blocked main thread meant nothing could repaint anyway.
+
+### Changes (`imagedescriber/imagedescriber_wx.py`)
+
+- New `_run_with_progress(stage_name, total, work)` — runs `work(progress_cb)` on a
+  worker thread while the main thread pumps the event loop via `wx.SafeYield(dlg, True)`
+  until it completes. This keeps the callers **synchronous** (seven callers branch on
+  `_prompt_and_create_bundle`'s bool return) while letting the dialog repaint. SafeYield
+  disables every window except the progress dialog, so the pumped loop cannot re-enter
+  another handler. Return values pass through; exceptions re-raise on the main thread.
+- `_prompt_and_create_bundle`, `_auto_save_bundle`, and the plain Save path in
+  `on_save_workspace` all route through it. The GUI model is snapshotted with
+  `to_dict()` on the main thread before the hand-off.
+- A standalone save passes `stage_count=0` so the title omits "step N of M"; when a batch
+  already owns the dialog it is reused and its stage numbering continues.
+
+### Separate bug fixed along the way
+
+`imagedescriber_wx.py:2664` called `_prompt_and_create_bundle("Save Workspace for
+Downloads", proposed_name)` with two positional arguments, but the signature accepted
+only `title` — a `TypeError` on every web download started without a saved workspace,
+silently swallowed by wx. Added the `proposed_name` parameter it was already being
+passed. An explicit name now wins over the source-folder-derived default.
+
+### Testing
+
+- Full unit suite: 260 passed.
+- Headless harness against the real methods, covering: return-value pass-through, work
+  actually running off the main thread, exception propagation with cleanup, and dialog
+  ownership (an existing batch dialog is reused and its stage numbering continues rather
+  than being closed out from under the batch).
+- Repaint harness sampling the dialog *during* a simulated 400-item save: gauge observed
+  at 19% → 45% → 69% mid-run, confirming updates reach the dialog while work proceeds.
+
+### NOT tested (Part 3)
+
+- Still no real GUI run — not reproduced against the actual 7,674-file network share.
+- `_save_bundle` calls `workspace.to_dict()` inside the worker thread. It is a pure data
+  read with no wx calls, and during the pump every window but the dialog is disabled, so
+  a concurrent mutation is unlikely — but it is not formally guarded.
