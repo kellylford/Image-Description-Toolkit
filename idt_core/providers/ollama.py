@@ -18,6 +18,38 @@ except ImportError:
         DEFAULT_MODEL = "llama3.2-vision"                               # fallback
 DEFAULT_HOST = "http://localhost:11434"
 
+# model name -> True/False, or absent when we could not determine it.
+# /api/show is one request per model and pickers list ~20, so cache per process.
+_VISION_CACHE: dict[str, bool] = {}
+
+
+def model_has_vision(name: str, host: str = DEFAULT_HOST, client=None) -> bool:
+    """True when Ollama reports `vision` among the model's capabilities.
+
+    Fails OPEN: if the capability query itself errors we return True and keep the
+    model. Only a *successful* query that omits `vision` excludes it — a transient
+    API problem must never silently hide a working model from the picker.
+    """
+    if name in _VISION_CACHE:
+        return _VISION_CACHE[name]
+
+    try:
+        if client is None:
+            import ollama
+            client = ollama.Client(host=host.rstrip("/"))
+        info = client.show(name)
+        caps = getattr(info, "capabilities", None)
+        if caps is None and isinstance(info, dict):
+            caps = info.get("capabilities")
+        if caps is None:
+            return True                      # nothing reported — do not exclude
+        result = "vision" in [str(c).lower() for c in caps]
+    except Exception:
+        return True                          # unreachable — do not exclude
+
+    _VISION_CACHE[name] = result
+    return result
+
 
 class OllamaProvider(BaseProvider):
     def __init__(self, model: str = DEFAULT_MODEL, host: str = DEFAULT_HOST):
@@ -62,11 +94,23 @@ class OllamaProvider(BaseProvider):
         )
 
     def list_models(self) -> list[str]:
-        """Return names of vision-capable models available in this Ollama instance."""
+        """Return names of vision-capable models available in this Ollama instance.
+
+        Models without vision must not be offered for description. Ollama accepts
+        an attached image for them and silently discards it, so the model writes a
+        confident description from the prompt alone — a photo of boats at a dock
+        came back as "a woman standing next to a white Porsche 911" (issue #227).
+        Fluent, wrong, and nothing signals it.
+        """
         import ollama
         client = ollama.Client(host=self._host)
         try:
             models = client.list()
-            return [m.model for m in models.models]
         except Exception:
             return []
+
+        out: list[str] = []
+        for m in models.models:
+            if model_has_vision(m.model, host=self._host, client=client):
+                out.append(m.model)
+        return out

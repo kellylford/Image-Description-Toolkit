@@ -331,8 +331,11 @@ class OllamaProvider(AIProvider):
         self._models_cache = None
         self._models_cache_time = 0
         self._cache_duration = 30  # Cache for 30 seconds
+        # model name -> has vision. Outlives _models_cache: capabilities do not
+        # change between runs of a model, and /api/show is one request each.
+        self._vision_cache: Dict[str, bool] = {}
         self.last_usage = None  # Token usage tracking (similar to OpenAI/Claude)
-    
+
     def get_provider_name(self) -> str:
         return "Ollama"
     
@@ -362,8 +365,13 @@ class OllamaProvider(AIProvider):
             if response.status_code == 200:
                 data = response.json()
                 all_models = [model['name'] for model in data.get('models', [])]
-                local_models = sorted(all_models)
-                
+                # Only models that can actually see images — Ollama accepts an
+                # attached image for a text-only model and silently drops it, so
+                # the model describes from the prompt alone (issue #227).
+                local_models = sorted(
+                    m for m in all_models if self._model_has_vision(m)
+                )
+
                 # Update cache
                 self._models_cache = local_models
                 self._models_cache_time = current_time
@@ -371,6 +379,32 @@ class OllamaProvider(AIProvider):
         except Exception:
             pass
         return []
+
+    def _model_has_vision(self, name: str) -> bool:
+        """True when Ollama reports `vision` for this model.
+
+        Fails OPEN: only a successful query that omits `vision` excludes a model.
+        A transient API error must never hide a working model from the picker.
+        """
+        cached = self._vision_cache.get(name)
+        if cached is not None:
+            return cached
+        try:
+            resp = requests.post(f"{self.base_url}/api/show",
+                                 json={"model": name}, timeout=10)
+            if resp.status_code != 200:
+                return True
+            caps = resp.json().get("capabilities")
+            if caps is None:
+                return True
+            result = "vision" in [str(c).lower() for c in caps]
+        except Exception:
+            return True
+        self._vision_cache[name] = result
+        if not result:
+            logging.info(f"Ollama model {name!r} has no vision capability — "
+                         f"not offered for description")
+        return result
     
     @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
@@ -1205,15 +1239,17 @@ class OllamaCloudProvider(AIProvider):
         return []
     
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
-        """Generate description using Ollama Cloud - NOTE: Vision not supported yet"""
-        # Cloud models don't support vision yet (as of Sep 2025)
-        return f"⚠️ Ollama Cloud model '{model}' doesn't support vision capabilities yet.\n\n" \
-               f"💡 Try these local vision models instead:\n" \
-               f"• llama3.2-vision:latest (11B, recommended default)\n" \
-               f"• llava:latest (7B parameters)\n" \
-               f"• llava-llama3:latest (8B parameters)\n" \
-               f"• moondream:latest (1.8B, lightweight)\n\n" \
-               f"Cloud models are excellent for text-only tasks but vision support is coming soon!"
+        """Generate description using an Ollama Cloud model.
+
+        This used to hard-refuse on the assumption that no cloud model supported
+        vision ("as of Sep 2025"). That is stale — gemma4:cloud and
+        gemma4:31b-cloud both report `vision` today. Cloud models are served
+        through the same local Ollama endpoint, so delegate to OllamaProvider,
+        which asks the API what each model can actually do (issue #227).
+        """
+        return OllamaProvider(base_url=self.base_url).describe_image(
+            image_path, prompt, model
+        )
 
 
 # ---------------------------------------------------------------------------
