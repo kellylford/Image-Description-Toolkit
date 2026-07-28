@@ -1,0 +1,76 @@
+name: "Coverage Floors"
+
+# Issue #228. Two defects shipped and survived for months under a fully green
+# suite, because nothing ran with coverage against real source: pyproject
+# pointed --cov at scripts/, which was emptied of Python in 2a32e6d.
+#
+# This job is the enforcement half of the fix. It runs the whole suite with
+# coverage measured against idt_core/imagedescriber/cli, applies the global
+# fail_under from pyproject, and then applies the per-file floors -- which are
+# the ones that matter, because a global percentage is satisfied by covering
+# anything at all.
+#
+# GUI modules need wxPython installed or the headless import smoke test skips,
+# which would quietly drop ~10,000 statements back out of the measurement.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  coverage:
+    name: "Test coverage floors"
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+
+      - name: Install wxPython
+        # Without this the GUI import smoke and Bind-handler tests skip, and
+        # the GUI silently returns to 0% measured.
+        run: pip install wxPython
+        shell: pwsh
+
+      - name: Verify wxPython is importable
+        # An importorskip that always skips is indistinguishable from a pass.
+        run: python -c "import wx; print(wx.version())"
+        shell: pwsh
+
+      - name: Run the suite with coverage
+        run: |
+          python -m pytest pytest_tests/ `
+            --cov --cov-report=term --cov-report=json:coverage.json
+        shell: pwsh
+        env:
+          IDT_QUIET_CONFIG_LOG: "1"
+
+      - name: Enforce per-file coverage floors
+        run: python tools/check_coverage_floors.py coverage.json
+        shell: pwsh
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-json
+          path: coverage.json
+          if-no-files-found: warn

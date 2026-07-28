@@ -183,3 +183,4 @@ stdout.txt
 .coverage
 .coverage.*
 htmlcov/
+coverage.json
