@@ -168,17 +168,67 @@ note in `copilot-instructions.md`, and `CHANGELOG.md` are accurate records.
 * ImageDescriber.exe rebuilt after the `ai_providers.py` / `workers_wx.py`
   changes (both are in the spec's `hiddenimports`).
 
+## What CI proved (PR #229, all six checks green)
+
+Two caveats from the original draft of this document are now retired:
+
+* **macOS is verified.** `Build + Test (Apple Silicon)` ran all ten
+  `test_macos_*` orchestrator tests on real macOS with real bash and real
+  `python3` — not the Git Bash and stubbed `python3` they were written under.
+  The full macOS build completed and its post-build validation passed 4/4.
+* **`coverage.yml` works.** wxPython 4.2.5 installed and imported on
+  `windows-latest`, 852 tests ran, `fail_under=19` was applied against 20.28%,
+  and all nine per-file floors were enforced with real numbers printed.
+
+CI also caught a defect local runs structurally could not — see bug 5 below.
+
 ## What was NOT tested
 
-* **macOS**: `builditall_macos.sh` harness runs under Git Bash on Windows with
-  a stubbed `python3`. Real macOS behaviour unverified. No macOS build run.
+* **The GUI smoke test does not run on macOS.** `build-macos.yml` runs
+  `pytest_tests/unit` with the ROOT `.venv`, which has no wxPython — it is
+  installed only in the ImageDescriber venv. So `pytest.importorskip("wx")`
+  drops all 213 tests at collection time, reported as nothing louder than
+  "collected 605 items / 1 skipped". That is the same silent-skip failure mode
+  `coverage.yml` guards against with its explicit "Verify wxPython is
+  importable" step; `build-macos.yml` has no such guard. The tests do run in
+  full on Windows. Worth either installing wxPython into the macOS root venv or
+  pointing that step at the ImageDescriber venv — deliberately left alone here
+  as a workflow change beyond this issue.
+* **macOS runs only `pytest_tests/unit`**, so the stub-HTTP-server integration
+  test is Windows-only in CI.
 * **MLX provider**: driven only through a fully mocked `mlx_vlm`. Never
   executed on Apple Silicon.
 * **Real API calls**: no test hits OpenAI, Anthropic or a live Ollama. All
   provider tests use injected transports or a local stub server.
 * **GUI behaviour**: import and binding integrity only. No dialog is opened, no
   handler is invoked, nothing is clicked.
-* **`coverage.yml`**: written but not yet executed by GitHub Actions. The
-  wxPython install step on `windows-latest` is unproven.
 * **The exception refactor** (issue item 5) is deliberately not done — see
   above.
+
+## 5. A macOS-only blind spot in this work's own tests
+
+Worth recording because it is the same shape as the bugs this issue is about.
+
+The first CI run failed with `assert 895 <= 0`: the new encoding scanner walked
+into `imagedescriber/.venv/lib/python3.13/site-packages` and reported offenders
+from transformers, typer and wx.
+
+The virtualenv name differs per platform — `.winenv` on Windows, `.venv` on
+macOS — and both live *inside* `imagedescriber/`, a directory the scan treats
+as one of its packages. Excluding only the locally visible name passes locally
+and can fail only on the other platform.
+
+Fixed by excluding both names plus `site-packages`, and by asserting the scan
+never reached installed packages. Verified by planting a `.py` with two
+unqualified reads and a `.bat` with a doubly-nested `exit /b 1` inside a
+macOS-style `.venv`, confirming each would trip its scanner if seen and that
+both are skipped. `test_batch_script_syntax.py` had the identical latent bug;
+`test_coverage_floors.py` counted venv modules toward "this directory contains
+Python". `test_shell_script_safety.py` already excluded both.
+
+CodeQL additionally raised six alerts, all in new code, all fixed rather than
+dismissed: two `py/overly-permissive-file` (high) from `chmod 0o755` on stub
+build scripts only the current user executes, now `0o700`; a genuinely
+redundant `400 <= status < 500` after `status >= 500` had returned; an unused
+import; and two `import-and-import-from`, resolved by using monkeypatch's
+dotted-string form as `test_retry_contract.py` already does.

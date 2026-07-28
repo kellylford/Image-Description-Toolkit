@@ -409,6 +409,11 @@ def cmd_describe(args):
         geocode=args.geocode,
     )
 
+    # Checking every referenced original for existence walks the whole library,
+    # which is slow on a network share. Say so rather than leaving the previous
+    # stage's title up while it runs.
+    _set_console_title("IDT - Preparing (checking images)")
+
     all_items = ws.media_items()
 
     # Reference-mode originals may have moved or been deleted since they were added.
@@ -542,10 +547,20 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
     opts = VideoExtractionOptions(mode="interval", interval_seconds=interval)
     total_frames = 0
     cv_missing = False
-    for video in videos:
+    # Extraction can run for many minutes on a large library, and until it
+    # finishes cmd_describe has not reached its own title updates. Without this
+    # the window still reads whatever the dispatcher set on startup -- "IDT -
+    # Setup Wizard" for a guideme run -- for the entire extraction, which reads
+    # as a hung wizard rather than work in progress.
+    _set_console_title(f"IDT - Extracting Video Frames (0 of {len(videos)})")
+    for _n, video in enumerate(videos, start=1):
         try:
             frame_items = _extract_one_video_into_workspace(ws, video, opts)
             total_frames += len(frame_items)
+            _set_console_title(
+                f"IDT - Extracting Video Frames ({_n} of {len(videos)}, "
+                f"{total_frames} frames)"
+            )
             if not args.quiet:
                 print(f"  {video.name}: {len(frame_items)} frames")
         except ImportError:
