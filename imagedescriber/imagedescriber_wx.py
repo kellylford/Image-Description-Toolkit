@@ -1471,18 +1471,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         process_menu.AppendSeparator()
 
-        # Phase 5: Split Process All into two options
+        # Folder-scoped commands. These honour the selected folder in the tree,
+        # matching what the P key already does. Listed first because scoped work
+        # is the common case and the safer default on a large workspace.
+        process_undesc_folder_item = process_menu.Append(
+            wx.ID_ANY,
+            "Process Undescribed in Selected &Folder",
+            "Process images without descriptions in the selected folder only"
+        )
+        self.Bind(wx.EVT_MENU, self.on_process_undescribed_folder, process_undesc_folder_item)
+
+        redescribe_folder_item = process_menu.Append(
+            wx.ID_ANY,
+            "Redescribe All in Selected Fo&lder",
+            "Process every image in the selected folder again (adds new descriptions)"
+        )
+        self.Bind(wx.EVT_MENU, self.on_redescribe_folder, redescribe_folder_item)
+
+        process_menu.AppendSeparator()
+
+        # Workspace-wide commands. Named explicitly: these used to be called
+        # "Process Undescribed Images" / "Redescribe All Images", which gave no
+        # hint that they ignore the selected folder and process everything.
         process_undesc_item = process_menu.Append(
             wx.ID_ANY,
-            "Process &Undescribed Images",
-            "Process only images without descriptions (safe default)"
+            "Process &Undescribed Images (Entire Workspace)",
+            "Process every image without a description in the whole workspace"
         )
         self.Bind(wx.EVT_MENU, self.on_process_undescribed, process_undesc_item)
 
         redescribe_all_item = process_menu.Append(
             wx.ID_ANY,
-            "&Redescribe All Images",
-            "Process ALL images again (adds new descriptions)"
+            "&Redescribe All Images (Entire Workspace)",
+            "Process ALL images in the whole workspace again (adds new descriptions)"
         )
         self.Bind(wx.EVT_MENU, self.on_redescribe_all, redescribe_all_item)
 
@@ -3230,6 +3251,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             child, cookie = self.image_list.GetNextChild(node, cookie)
         return paths
 
+    def _selected_folder_scope(self):
+        """Return (paths, label) for the selected folder node, or None.
+
+        The P key already scopes to the selected folder via
+        _get_file_paths_under_node(); the Process menu historically did not,
+        so "Process Undescribed Images" with focus on iphone/2026/07 quietly
+        processed all of iphone. Both paths now resolve scope through here so
+        they cannot drift apart again.
+
+        Returns None when the selection is not a folder node, which callers
+        treat as "no folder scope" rather than "empty scope".
+        """
+        if not self.image_list:
+            return None
+        node = self.image_list.GetSelection()
+        if not node or not node.IsOk():
+            return None
+        # Folder nodes carry no item data; leaf nodes carry a file path.
+        if self.image_list.GetItemData(node) is not None:
+            return None
+        paths = self._get_file_paths_under_node(node)
+        return paths, self.image_list.GetItemText(node)
+
     def on_process_single(self, event):
         """Process single selected image or extract video frames"""
         logger.info("on_process_single CALLED")
@@ -3367,7 +3411,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         logger.info(f"autostart_batch: options={options}")
         self.on_process_all(None, skip_existing=True, preset_options=options)
 
-    def on_process_all(self, event, skip_existing: bool = True, preset_options: Optional[dict] = None):
+    def on_process_all(self, event, skip_existing: bool = True, preset_options: Optional[dict] = None,
+                       scope_paths: Optional[list] = None, scope_label: Optional[str] = None):
         """Process images in batch
 
         Args:
@@ -3376,6 +3421,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                           If False, reprocess all images (show warning first)
             preset_options: When provided (CLI --showgui autostart), skip the modal
                           options/save prompts and use these options directly.
+            scope_paths: When provided, restrict processing to these file paths
+                          (the folder-scoped menu commands). None means the whole
+                          workspace, which is what the "Entire Workspace" commands
+                          and the CLI autostart path want.
+            scope_label: Folder name for prompts/logging when scope_paths is set.
         """
         logger.info(f"on_process_all called: skip_existing={skip_existing}, items={len(self.workspace.items) if self.workspace else 0}")
 
@@ -3452,10 +3502,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         logger.info(f"CHECKPOINT 5: Checking skip_existing={skip_existing}")
         if not skip_existing:
             logger.info("skip_existing=False - showing redescribe warning dialog")
+            # State the scope in the prompt. Saying "ALL images" for a run
+            # restricted to one folder is exactly the ambiguity these scoped
+            # commands exist to remove.
+            if scope_paths is None:
+                target = "ALL images in the entire workspace"
+            else:
+                target = f"all {len(scope_paths)} image(s) in \"{scope_label}\""
             result = ask_yes_no(
                 self,
-                "Redescribe ALL images?\n\n"
-                "This will ADD new descriptions to all images (including those already described).\n"
+                f"Redescribe {target}?\n\n"
+                "This will ADD new descriptions (including to images that already have one).\n"
                 "Existing descriptions will be kept - you'll have multiple descriptions per image.\n\n"
                 "Continue?"
             )
@@ -3510,9 +3567,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         images_to_process = []
         videos_to_extract = []
 
-        logger.info(f"Scanning {len(self.workspace.items)} workspace items...")
+        # Folder-scoped commands pass scope_paths; the workspace-wide ones pass
+        # None. Resolve to the actual items once, here, so every downstream stage
+        # (video extraction, save, describe) sees the same restricted queue.
+        if scope_paths is None:
+            items_to_scan = list(self.workspace.items.values())
+            logger.info(f"Scanning {len(items_to_scan)} workspace items (entire workspace)...")
+        else:
+            wanted = set(scope_paths)
+            items_to_scan = [i for p, i in self.workspace.items.items() if p in wanted]
+            logger.info(
+                f"Scanning {len(items_to_scan)} of {len(self.workspace.items)} workspace "
+                f"items (scoped to folder {scope_label!r})..."
+            )
 
-        for item in self.workspace.items.values():
+        for item in items_to_scan:
             if item.item_type == "video":
                 # Check if video needs extraction
                 if not hasattr(item, 'extracted_frames') or not item.extracted_frames:
@@ -4300,12 +4369,48 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             _start_describing()
 
     def on_process_undescribed(self, event):
-        """Menu handler: Process only undescribed images"""
+        """Menu handler: Process undescribed images across the ENTIRE workspace."""
         self.on_process_all(event, skip_existing=True)
 
     def on_redescribe_all(self, event):
-        """Menu handler: Redescribe all images"""
+        """Menu handler: Redescribe every image in the ENTIRE workspace."""
         self.on_process_all(event, skip_existing=False)
+
+    def on_process_undescribed_folder(self, event):
+        """Menu handler: Process undescribed images in the selected folder only."""
+        self._process_selected_folder(event, skip_existing=True)
+
+    def on_redescribe_folder(self, event):
+        """Menu handler: Redescribe every image in the selected folder."""
+        self._process_selected_folder(event, skip_existing=False)
+
+    def _process_selected_folder(self, event, skip_existing: bool):
+        """Shared entry point for the two folder-scoped menu commands."""
+        scope = self._selected_folder_scope()
+        if scope is None:
+            show_warning(
+                self,
+                "Select a folder in the image tree first.\n\n"
+                "To process the whole workspace, use the \"Entire Workspace\" "
+                "commands in the Process menu."
+            )
+            return
+
+        paths, label = scope
+        if not paths:
+            show_info(self, f"No images found in \"{label}\".")
+            return
+
+        logger.info(
+            f"Folder-scoped batch: folder={label!r}, paths={len(paths)}, "
+            f"skip_existing={skip_existing}"
+        )
+        self.on_process_all(
+            event,
+            skip_existing=skip_existing,
+            scope_paths=paths,
+            scope_label=label,
+        )
 
     def on_save_description(self, event):
         """Save edited description"""

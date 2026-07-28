@@ -719,7 +719,7 @@ class TestMetadata:
         )
         ctx = meta.prompt_context()
         assert "Munich, Bavaria" in ctx
-        assert "Sep 12, 2025" in ctx
+        assert "Sep 12, 2025" not in ctx, "the capture date must not reach a prompt"
 
     def test_prompt_context_excludes_camera(self):
         """The capture device must never reach an AI prompt.
@@ -737,10 +737,34 @@ class TestMetadata:
         )
         ctx = meta.prompt_context()
         assert "Monona, Wisconsin" in ctx
-        assert "Jul 3, 2026" in ctx
         assert "Ray-Ban" not in ctx
         assert "Meta" not in ctx
         assert "Glasses" not in ctx
+
+    def test_prompt_context_excludes_capture_date(self):
+        """The capture date must never reach an AI prompt.
+
+        kimi-k recited it in every description: "This photograph, dated
+        July 2, 2026, in Monona, Wisconsin, shows a sunny daytime scene..."
+        The date is not visible in the image, so the model can only parrot it
+        back as preamble.
+        """
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(
+            date_short="Jul 2, 2026",
+            city="Monona",
+            state="Wisconsin",
+        )
+        ctx = meta.prompt_context()
+        assert "Monona, Wisconsin" in ctx, "location should still be sent"
+        for token in ("Jul", "2026", "July"):
+            assert token not in ctx, f"date fragment {token!r} leaked into the prompt"
+
+    def test_prompt_context_is_location_only_with_no_location(self):
+        """No location and no camera means nothing worth sending."""
+        from idt_core.metadata import ImageMetadata
+        meta = ImageMetadata(date_short="Jul 2, 2026")
+        assert meta.prompt_context() == ""
 
     def test_display_context_includes_camera(self):
         """Human-facing output still shows the camera."""

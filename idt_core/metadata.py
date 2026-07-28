@@ -62,21 +62,26 @@ class ImageMetadata:
     # Whether date came from EXIF or file mtime
     date_from_exif: bool = False
 
+    def _location_display(self) -> Optional[str]:
+        """Location part alone. Used by prompt_context(), which omits the date."""
+        if self.city and self.state:
+            return f"{self.city}, {self.state}"
+        if self.city and self.country:
+            return f"{self.city}, {self.country}"
+        if self.state:
+            return self.state
+        if self.country:
+            return self.country
+        return None
+
     def _where_when(self) -> list[str]:
-        """Location and date parts, shared by prompt_context() and display_context()."""
+        """Location and date parts. Human-facing only — see display_context()."""
         parts: list[str] = []
 
-        # Location
-        if self.city and self.state:
-            parts.append(f"{self.city}, {self.state}")
-        elif self.city and self.country:
-            parts.append(f"{self.city}, {self.country}")
-        elif self.state:
-            parts.append(self.state)
-        elif self.country:
-            parts.append(self.country)
+        location = self._location_display()
+        if location:
+            parts.append(location)
 
-        # Date
         if self.date_short:
             parts.append(self.date_short)
 
@@ -85,19 +90,29 @@ class ImageMetadata:
     def prompt_context(self) -> str:
         """
         One-line context string to prepend to AI prompts.
-        Example: "Munich, Germany  Sep 12, 2025"
+        Example: "Munich, Germany"
         Returns empty string when nothing useful is available.
 
-        Deliberately EXCLUDES the camera. The capture device is not in the photo,
-        and describer models treat everything in the context line as scene
-        content: a Ray-Ban Meta Smart Glasses capture was described as "a pair of
-        black Ray-Ban Meta Smart Glasses sits centered on a smooth grey surface"
-        — the model described the camera instead of the picture. Location and
-        date genuinely help ground a description; the hardware never does.
+        Deliberately EXCLUDES the camera AND the capture date. Describer models
+        treat everything in the context line as material to report, not as
+        background:
 
-        Use display_context() when showing metadata to a person.
+        * Camera: a Ray-Ban Meta Smart Glasses capture came back as "a pair of
+          black Ray-Ban Meta Smart Glasses sits centered on a smooth grey
+          surface" — the model described the device instead of the picture.
+        * Date: kimi-k opened every description by reciting it — "This
+          photograph, dated July 2, 2026, in Monona, Wisconsin, shows..." The
+          date is not visible in the image and adds nothing a viewer needs, so
+          it is pure preamble in every single description.
+
+        Location is still sent: where a photo was taken is often genuinely
+        inferable from the scene and helps ground it (a beach in Wisconsin vs
+        one in Thailand).
+
+        Use display_context() when showing metadata to a person — it keeps the
+        date and camera, which are useful to a human reading a listing.
         """
-        return "  ".join(self._where_when())
+        return self._location_display() or ""
 
     def display_context(self) -> str:
         """

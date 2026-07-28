@@ -178,3 +178,8 @@ stdout.txt
 /BuildAndRelease/MacBuilds/dist_all
 /analysis/results
 /BuildAndRelease/WinBuilds/dist_all
+
+# Coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
