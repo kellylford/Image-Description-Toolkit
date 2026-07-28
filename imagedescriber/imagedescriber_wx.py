@@ -103,6 +103,14 @@ except ImportError:
     VideoMetadataExtractor = None
     ExifEmbedder = None
 
+# The one definition of how a scanned file maps to a tree folder — shared with
+# the CLI so both tools group images identically. Imported at module scope: the
+# scan handler calls it once per discovered file.
+try:
+    from idt_core.workspace import source_relative_subfolder
+except ImportError:
+    source_relative_subfolder = None
+
 try:
     import openai
 except ImportError:
@@ -6108,24 +6116,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # Create item with MINIMAL metadata (no network I/O!)
                 item = ImageItem(file_path_str, item_type)
 
-                # Compute subfolder relative to scan root's PARENT so that the
-                # scan root directory itself appears as a top-level folder node.
-                # Example: scanning \\server\photos\iphone recursively
-                #   file: \\server\photos\iphone\2004\img.jpg
-                #   scan_root: \\server\photos\iphone
-                #   scan_root.parent: \\server\photos
-                #   relative to parent: iphone\2004\img.jpg
-                #   parent of relative: iphone\2004  → subfolder = "iphone/2004"
-                # Files directly in the scan root (no subdirectory):
-                #   relative parent: iphone  → subfolder = "iphone"
-                if scan_root is not None:
-                    try:
-                        relative = file_path.relative_to(scan_root.parent)
-                        parent = relative.parent
-                        if str(parent) not in ('', '.'):
-                            item.subfolder = str(parent)
-                    except ValueError:
-                        pass  # file_path not under scan_root — leave subfolder as None
+                # Subfolder anchors the scan root itself as a top-level folder
+                # node. Shared with the CLI — see source_relative_subfolder.
+                if scan_root is not None and source_relative_subfolder is not None:
+                    item.subfolder = source_relative_subfolder(file_path, scan_root)
 
                 # ONLY cache file mtime (already available from directory scan, no extra I/O)
                 try:
@@ -6322,15 +6316,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             item_type = "video" if fpath.suffix.lower() in video_exts else "image"
             item = ImageItem(fpath_str, item_type)
 
-            # Compute subfolder relative to folder_path's parent (same logic as on_files_discovered)
-            try:
-                folder_parent = Path(folder_path).parent
-                relative = fpath.relative_to(folder_parent)
-                parent_rel = relative.parent
-                if str(parent_rel) not in ('', '.'):
-                    item.subfolder = str(parent_rel)
-            except ValueError:
-                pass
+            # Same subfolder rule as the initial scan and the CLI, so a rescan
+            # cannot split one source folder across two tree groups.
+            if source_relative_subfolder is not None:
+                item.subfolder = source_relative_subfolder(fpath, folder_path)
 
             # Cache mtime (fast, no network round-trip for sort)
             try:

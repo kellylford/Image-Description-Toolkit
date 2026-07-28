@@ -597,6 +597,7 @@ def _cmd_describe_stdin(args):
     Describe image paths read from stdin, one per line, into a .idtw workspace.
     Pipeline use: get_nyt_images.bat | idt describe - --prompt aialttext
     """
+    from idt_core.workspace import source_relative_subfolder
     from idt_core.pipeline import WorkspacePipeline, RunOptions
     from idt_core.progress import Progress
     from idt_core.config import UserConfig
@@ -635,13 +636,11 @@ def _cmd_describe_stdin(args):
     # reference; originals are never modified either way.
     items = []
     for img_path in paths:
-        try:
-            sub = str(img_path.parent.relative_to(source))
-        except ValueError:
-            sub = None
-        if sub in (".", ""):
-            sub = None
-        items.append(ws.add_image(img_path, subfolder=sub, copy=ws.copy_originals))
+        items.append(ws.add_image(
+            img_path,
+            subfolder=source_relative_subfolder(img_path, source),
+            copy=ws.copy_originals,
+        ))
 
     if not args.quiet:
         print(f"Workspace: {ws.path}")
@@ -1484,6 +1483,7 @@ def cmd_models(args):
 
 def cmd_watch(args):
     import time
+    from idt_core.workspace import source_relative_subfolder
     from idt_core.pipeline import WorkspacePipeline, RunOptions
     from idt_core.scanner import scan_images
     from idt_core.config import UserConfig
@@ -1544,13 +1544,11 @@ def cmd_watch(args):
     def _add_source_images(paths) -> list:
         added = []
         for p in sorted(paths):
-            try:
-                sub = str(p.parent.relative_to(source))
-            except ValueError:
-                sub = None
-            if sub in (".", ""):
-                sub = None
-            added.append(ws.add_image(p, subfolder=sub, copy=ws.copy_originals))
+            added.append(ws.add_image(
+                p,
+                subfolder=source_relative_subfolder(p, source),
+                copy=ws.copy_originals,
+            ))
         return added
 
     try:

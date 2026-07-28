@@ -50,6 +50,40 @@ def _atomic_write_text(path: Path, text: str) -> None:
     tmp.replace(path)
 
 
+def source_relative_subfolder(file_path, source_root) -> Optional[str]:
+    """The `subfolder` key for a file discovered under `source_root`.
+
+    THE single definition of that rule. The CLI (add_source_folder), the GUI's
+    directory scan, and the GUI's folder rescan all call this — they used to
+    each compute it inline and disagreed, which left CLI-made bundles with no
+    top-level folder node in the GUI tree and so no working folder-scoped
+    commands.
+
+    The result is `file_path`'s parent relative to source_root's PARENT, so the
+    source folder itself becomes the first path component:
+
+        source_root  \\\\server\\photos\\2026\\05
+        file         \\\\server\\photos\\2026\\05\\IMG_1.HEIC    -> "05"
+        file         \\\\server\\photos\\2026\\05\\Day2\\IMG.jpg -> "05\\Day2"
+
+    That leading component is what the GUI renders as the top-level folder node,
+    and it is what `descriptions/` and `images/` mirror inside the bundle.
+
+    Returns None — meaning "no folder node, sit at the tree root" — when
+    file_path is not under source_root, or when file_path sits directly in a
+    source_root that is itself a filesystem root (a drive or UNC share) and so
+    has no name of its own.
+    """
+    file_path = Path(file_path)
+    source_root = Path(source_root)
+    try:
+        relative = file_path.relative_to(source_root.parent)
+    except ValueError:
+        return None
+    parent = str(relative.parent)
+    return None if parent in ("", ".") else parent
+
+
 # --------------------------------------------------------------------------- #
 # Description — unified shape (superset of idt_core.Description and GUI's       #
 # ImageDescription). See design doc §4.1.                                       #
@@ -490,13 +524,9 @@ class Workspace:
                 if p.is_file() and (is_image(p) or (include_videos and is_video(p)))
             )
         for p in paths:
-            try:
-                sub = str(p.parent.relative_to(folder)) if p.parent != folder else None
-            except ValueError:
-                sub = None
-            if sub == ".":
-                sub = None
-            added.append(self.add_image(p, subfolder=sub, copy=copy))
+            added.append(
+                self.add_image(p, subfolder=source_relative_subfolder(p, folder), copy=copy)
+            )
 
         entry = {"path": str(folder), "recursive": recursive, "added": _now()}
         if not any(s.get("path") == str(folder) for s in self.sources):

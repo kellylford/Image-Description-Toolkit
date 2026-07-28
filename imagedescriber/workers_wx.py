@@ -61,6 +61,14 @@ except ImportError:
         get_available_providers = None
         get_all_providers = None
 
+# is_provider_error must NOT silently fall back to None: if it did, a failed
+# import would restore the old behaviour of storing API errors as descriptions,
+# which is precisely the bug this guards (issue #230). Fail loudly instead.
+try:
+    from ai_providers import is_provider_error            # frozen mode
+except ImportError:
+    from imagedescriber.ai_providers import is_provider_error   # dev mode
+
 try:
     from idt_core.metadata import MetadataExtractor, NominatimGeocoder
 except ImportError:
@@ -103,6 +111,33 @@ WorkspaceSaveFailedEvent, EVT_WORKSPACE_SAVE_FAILED = wx.lib.newevent.NewEvent()
 # Folder rescan event types (for Refresh Folder from Disk feature)
 RescanCompleteEvent, EVT_RESCAN_COMPLETE = wx.lib.newevent.NewEvent()
 RescanFailedEvent, EVT_RESCAN_FAILED = wx.lib.newevent.NewEvent()
+
+
+class ProviderCallFailed(Exception):
+    """A provider reported a failure instead of describing the image."""
+
+
+def raise_if_provider_error(description, provider: str, model: str) -> str:
+    """Return the description, or raise when the provider actually failed.
+
+    Providers signal failure by RETURNING a string. The batch worker used to
+    test only `if description and description.strip()`, and an error string is
+    perfectly non-empty -- so "Rate limit exceeded (status code: 429) - (...)"
+    was accepted as the description, appended with a location byline and token
+    counts, and posted as ProcessingCompleteEventData with result_ok = True.
+
+    The user's workspace then contained an API error where a description should
+    be, counted among the "X of Y images described" and exported to HTML, with
+    no failure event and nothing in the log to notice (issue #230).
+
+    Kept as a module-level function, not a method, so it is testable without
+    constructing a worker or a wx.App -- wx swallows exceptions raised inside
+    event handlers, which is exactly how this class of bug stays invisible.
+    """
+    if is_provider_error(description):
+        raise ProviderCallFailed(
+            f"{provider}/{model} did not return a description: {description}")
+    return description
 
 
 # Custom event classes that properly store attributes
@@ -511,6 +546,13 @@ class ProcessingWorker(threading.Thread):
                 description = ""
                 for attempt in range(MAX_EMPTY_RETRIES + 1):
                     description = provider.describe_image(processing_path, prompt, self.model)
+
+                    # A provider reports failure by RETURNING a string, and an
+                    # error string is non-empty -- so without this, the emptiness
+                    # check below accepts "Rate limit exceeded (status code: 429)"
+                    # as the description and stores it in the workspace.
+                    description = raise_if_provider_error(
+                        description, self.provider, self.model)
 
                     # Accept non-empty results immediately
                     if description and description.strip():

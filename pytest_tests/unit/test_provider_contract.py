@@ -39,6 +39,7 @@ from ai_providers import (  # noqa: E402
     OpenAIProvider,
     ProviderError,
     RETRYABLE_KINDS,
+    retry_on_api_error,
     _is_retryable_error,
     format_provider_error,
     kind_for_status,
@@ -520,6 +521,57 @@ def test_kind_for_status_covers_the_boundaries():
     assert kind_for_status(599) == ErrorKind.SERVER_ERROR
     assert kind_for_status(None) == ErrorKind.UNKNOWN
     assert kind_for_status("nonsense") == ErrorKind.UNKNOWN
+
+
+def test_decorator_retries_a_raised_provider_error_by_its_kind(monkeypatch):
+    """A raised ProviderError needs no string parsing: the kind decides."""
+    monkeypatch.setattr("ai_providers.time.sleep", lambda _s: None)
+    calls = []
+
+    @retry_on_api_error(max_retries=3, base_delay=0)
+    def flaky():
+        calls.append(1)
+        if len(calls) < 3:
+            raise ProviderError("upstream down", status_code=503,
+                                provider="Ollama")
+        return OK
+
+    assert flaky() == OK
+    assert len(calls) == 3
+
+
+def test_decorator_does_not_retry_a_permanent_provider_error(monkeypatch):
+    monkeypatch.setattr("ai_providers.time.sleep", lambda _s: None)
+    calls = []
+
+    @retry_on_api_error(max_retries=3, base_delay=0)
+    def denied():
+        calls.append(1)
+        raise ProviderError("bad key", status_code=401, provider="OpenAI API")
+
+    with pytest.raises(ProviderError):
+        denied()
+    assert len(calls) == 1, "a 401 must not be retried"
+
+
+def test_decorator_survives_an_exception_whose_status_code_is_none(monkeypatch):
+    """`hasattr(e,'status_code') and e.status_code >= 500` raised TypeError.
+
+    It happened inside the except block, so the real failure was replaced by
+    "'>=' not supported between instances of 'NoneType' and 'int'". Any
+    on-device or unclassified ProviderError carries status_code=None.
+    """
+    monkeypatch.setattr("ai_providers.time.sleep", lambda _s: None)
+
+    class Weird(Exception):
+        status_code = None
+
+    @retry_on_api_error(max_retries=1, base_delay=0)
+    def boom():
+        raise Weird("no status here")
+
+    with pytest.raises(Weird):
+        boom()
 
 
 def test_provider_error_carries_the_status_as_a_field():

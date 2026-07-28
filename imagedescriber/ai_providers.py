@@ -344,6 +344,29 @@ def format_provider_error(provider: str, kind: str, status_code=None,
     return f"Error generating description: {message} {suffix}"
 
 
+def is_provider_error(result) -> bool:
+    """True when a describe_image() return value is a failure, not a description.
+
+    Callers previously had no way to ask this. workers_wx.py tested only that
+    the result was non-empty, so "Rate limit exceeded (status code: 429) - (...)"
+    was accepted as the image's description: written into the workspace, counted
+    in the "X of Y described" stats and exported to HTML, with no failure event
+    raised and nothing in the log (issue #230).
+
+    Every failure string is built by format_provider_error, which always emits
+    "(status code: ...)", so that marker is a reliable signal rather than a
+    guess. The remaining cases are the availability messages providers return
+    before they ever reach the network ("Error: OpenAI API key not configured").
+
+    This is a stopgap. The real fix is for describe_image to RAISE, so that a
+    failure cannot be mistaken for a description by construction -- a caller
+    that forgets to ask this question still gets it wrong.
+    """
+    if not isinstance(result, str):
+        return False
+    return "(status code: " in result or result.startswith("Error:")
+
+
 def provider_error_from_exception(exc: BaseException, provider: str,
                                   timestamp: Optional[str] = None) -> str:
     """Convenience: classify an exception and format it in one step."""
@@ -403,17 +426,30 @@ def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_mu
                     
                 except Exception as e:
                     last_exception = e
-                    
-                    # Determine if error is retryable
+
                     error_type = type(e).__name__
-                    error_msg = str(e).lower()
-                    is_retryable = (
-                        'timeout' in error_msg or
-                        'connectionerror' in error_type.lower() or
-                        'httperror' in error_type.lower() or
-                        'ratelimiterror' in error_type.lower() or
-                        hasattr(e, 'status_code') and (e.status_code >= 500 or e.status_code == 429)
-                    )
+
+                    if isinstance(e, ProviderError):
+                        # The kind already encodes the retry policy; no parsing.
+                        is_retryable = e.is_retryable
+                    else:
+                        error_msg = str(e).lower()
+                        # getattr, not hasattr: an exception may carry
+                        # status_code = None (ProviderError does for on-device
+                        # and unclassified failures). The old
+                        # `hasattr(e, 'status_code') and e.status_code >= 500`
+                        # raised TypeError comparing None to int -- inside the
+                        # except block, so it replaced the real error with a
+                        # confusing one.
+                        status = getattr(e, 'status_code', None)
+                        is_retryable = (
+                            'timeout' in error_msg or
+                            'connectionerror' in error_type.lower() or
+                            'httperror' in error_type.lower() or
+                            'ratelimiterror' in error_type.lower() or
+                            (isinstance(status, int)
+                             and (status >= 500 or status == 429))
+                        )
                     
                     if is_retryable and attempt < max_retries:
                         delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
