@@ -201,7 +201,7 @@ def _scaffold_macos(tmp_path, idt=OK, describer=OK, stale=False):
     binder.mkdir()
     (binder / "python3").write_text("#!/bin/sh\nexit 0\n",
                                     encoding="utf-8", newline="\n")
-    os.chmod(binder / "python3", 0o755)
+    os.chmod(binder / "python3", 0o700)
 
     emitters = {
         "idt": 'echo "{content}" > dist/idt',
@@ -217,7 +217,7 @@ def _scaffold_macos(tmp_path, idt=OK, describer=OK, stale=False):
         body = _SH_STUB[behaviour].format(
             emit=emitters[app].format(content=FRESH))
         (root / app / script).write_text(body, encoding="utf-8", newline="\n")
-        os.chmod(root / app / script, 0o755)
+        os.chmod(root / app / script, 0o700)
 
     if stale:
         (root / "idt" / "dist").mkdir(parents=True, exist_ok=True)

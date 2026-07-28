@@ -29,7 +29,6 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "imagedescriber"))
 
-import ai_providers  # noqa: E402
 from ai_providers import (  # noqa: E402
     AIProvider,
     ClaudeProvider,
@@ -38,6 +37,7 @@ from ai_providers import (  # noqa: E402
     OllamaCloudProvider,
     OllamaProvider,
     OpenAIProvider,
+    ProviderError,
     RETRYABLE_KINDS,
     _is_retryable_error,
     format_provider_error,
@@ -165,7 +165,7 @@ class _OllamaDriver(ProviderDriver):
                 return _FakeResponse(200, "<html>not json</html>", parseable=False)
             raise _ScriptExhausted(kind)
 
-        monkeypatch.setattr(ai_providers.requests, "post", fake_post)
+        monkeypatch.setattr("ai_providers.requests.post", fake_post)
         return script
 
     def build(self, monkeypatch, tmp_path, outcomes):
@@ -284,8 +284,8 @@ class _MLXDriver(ProviderDriver):
             ("_mlx_load_config", lambda _m: {}),
             ("_mlx_apply_chat_template", lambda *a, **k: "prompt"),
         ):
-            monkeypatch.setattr(ai_providers, name, value, raising=False)
-        monkeypatch.setattr(ai_providers.platform, "system", lambda: "Darwin")
+            monkeypatch.setattr(f"ai_providers.{name}", value, raising=False)
+        monkeypatch.setattr("ai_providers.platform.system", lambda: "Darwin")
 
         provider = MLXProvider()
         monkeypatch.setattr(
@@ -320,7 +320,7 @@ def _all_subclasses(cls):
 @pytest.fixture
 def image(tmp_path, monkeypatch):
     """A file on disk, with retries instant and api_errors.log out of the repo."""
-    monkeypatch.setattr(ai_providers.time, "sleep", lambda _s: None)
+    monkeypatch.setattr("ai_providers.time.sleep", lambda _s: None)
     monkeypatch.chdir(tmp_path)
     path = tmp_path / "img.jpg"
     path.write_bytes(b"\xff\xd8\xff\xe0not-a-real-jpeg")
@@ -524,13 +524,13 @@ def test_kind_for_status_covers_the_boundaries():
 
 def test_provider_error_carries_the_status_as_a_field():
     """The decorator's exception branch reads e.status_code -- no parsing."""
-    err = ai_providers.ProviderError("boom", status_code=503, provider="Ollama")
+    err = ProviderError("boom", status_code=503, provider="Ollama")
     assert err.status_code == 503
     assert err.kind == ErrorKind.SERVER_ERROR
     assert err.is_retryable is True
     assert _is_retryable_error(err.as_description()) is True
 
-    denied = ai_providers.ProviderError("nope", status_code=401, provider="X")
+    denied = ProviderError("nope", status_code=401, provider="X")
     assert denied.is_retryable is False
 
 

@@ -33,11 +33,17 @@ _RELEASE_SCRIPTS = [
 ]
 
 
+#: The virtualenv name differs per platform -- `.winenv` on Windows, `.venv` on
+#: macOS -- and pip ships .bat shims inside both. Excluding only one platform's
+#: name means the scan reaches into installed packages on the other.
+_NOT_OUR_SOURCE = {".claude", ".git", ".venv", ".winenv", "venv", "winenv",
+                   "env", "site-packages", "node_modules"}
+
+
 def _batch_files():
     for p in sorted(_ROOT.rglob("*.bat")):
         rel = p.relative_to(_ROOT)
-        parts = set(rel.parts)
-        if ".claude" in parts or ".winenv" in parts or "winenv" in parts:
+        if _NOT_OUR_SOURCE & set(rel.parts):
             continue
         yield rel
 

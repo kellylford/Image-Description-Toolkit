@@ -19,7 +19,6 @@ fail later, on someone else's machine, for a reason that looks unrelated.
 """
 
 import ast
-import re
 from pathlib import Path
 
 import pytest
@@ -36,10 +35,29 @@ _PATH_TEXT_METHODS = {"read_text", "write_text"}
 #: constructors with nothing to do with file encodings.
 _BUILTIN_READERS = {"open"}
 
+#: Directories that are not this project's source.
+#:
+#: The virtualenv name differs per platform -- `.winenv` on Windows (see
+#: CLAUDE.md), `.venv` on macOS -- and both live INSIDE imagedescriber/, which
+#: is a package this scan walks. Excluding only the local one passes locally
+#: and fails on the other platform: an earlier version of this file did exactly
+#: that and reported 895 offenders from transformers, typer and wx on the macOS
+#: runner. site-packages is listed too, so an unexpected venv layout cannot
+#: reintroduce it.
+_NOT_OUR_SOURCE = {
+    "__pycache__", ".git", ".claude",
+    ".venv", ".winenv", "venv", "winenv", "env",
+    "site-packages", "node_modules", "build", "dist",
+}
+
+
+def _is_project_source(path: Path) -> bool:
+    return not (_NOT_OUR_SOURCE & set(path.parts))
+
 
 def _test_sources():
     for path in sorted(_TEST_DIR.rglob("*.py")):
-        if "__pycache__" in path.parts:
+        if not _is_project_source(path):
             continue
         yield path.relative_to(_ROOT)
 
@@ -143,9 +161,10 @@ def test_shipped_code_names_an_encoding_too():
     BUDGET = 0
 
     counts = {}
+    scanned = []
     for package in _SHIPPED:
         for path in sorted((_ROOT / package).rglob("*.py")):
-            if "__pycache__" in path.parts or ".winenv" in path.parts:
+            if not _is_project_source(path):
                 continue
             try:
                 source = path.read_text(encoding="utf-8")
@@ -155,8 +174,15 @@ def test_shipped_code_names_an_encoding_too():
                 found = list(_unqualified_reads(source, str(path)))
             except SyntaxError:
                 continue
+            scanned.append(path)
             if found:
                 counts[str(path.relative_to(_ROOT))] = len(found)
+
+    strays = [p for p in scanned if "site-packages" in p.parts]
+    assert not strays, (
+        "the scan walked into installed packages, not this project's source: "
+        f"{strays[:3]}. Add the directory to _NOT_OUR_SOURCE."
+    )
 
     total = sum(counts.values())
     assert total <= BUDGET, (

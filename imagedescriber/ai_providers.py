@@ -231,7 +231,7 @@ def kind_for_status(status_code) -> str:
         return ErrorKind.AUTH
     if status >= 500:
         return ErrorKind.SERVER_ERROR
-    if 400 <= status < 500:
+    if status >= 400:          # 5xx already returned above
         return ErrorKind.INVALID_REQUEST
     return ErrorKind.UNKNOWN
 

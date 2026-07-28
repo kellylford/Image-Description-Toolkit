@@ -42,8 +42,12 @@ def test_coverage_source_points_at_directories_containing_python():
     for entry in source:
         directory = _ROOT / entry
         assert directory.is_dir(), f"coverage source {entry!r} is not a directory"
+        # A venv lives inside imagedescriber/ and is named .winenv on Windows
+        # but .venv on macOS. Counting either would let this pass on a source
+        # directory whose own Python had been removed.
+        not_ours = {"__pycache__", ".venv", ".winenv", "site-packages"}
         modules = [p for p in directory.rglob("*.py")
-                   if "__pycache__" not in p.parts and ".winenv" not in p.parts]
+                   if not (not_ours & set(p.parts))]
         assert modules, (
             f"coverage source {entry!r} contains no Python files, so measuring "
             "it produces a meaningless 0 -- exactly the state this repo was in."

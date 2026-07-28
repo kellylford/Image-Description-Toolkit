@@ -23,7 +23,6 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "imagedescriber"))
 
-import ai_providers  # noqa: E402
 from ai_providers import OllamaProvider, _is_retryable_error  # noqa: E402
 
 pytestmark = pytest.mark.integration
@@ -84,7 +83,7 @@ def failing_server():
 
 @pytest.fixture
 def image(tmp_path, monkeypatch):
-    monkeypatch.setattr(ai_providers.time, "sleep", lambda _s: None)
+    monkeypatch.setattr("ai_providers.time.sleep", lambda _s: None)
     monkeypatch.chdir(tmp_path)   # keep api_errors.log out of the repo
     path = tmp_path / "dock.jpg"
     path.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 64)
