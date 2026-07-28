@@ -22,29 +22,42 @@ echo Cleaning PyInstaller cache...
 python -c "import shutil; from pathlib import Path; cache_dir = Path.home() / 'AppData' / 'Local' / 'pyinstaller'; shutil.rmtree(cache_dir, ignore_errors=True); print(f'Cleaned: {cache_dir}')"
 echo.
 
+REM ----------------------------------------------------------------------------
+REM The dependency checks below are deliberately flat. cmd discards the exit code
+REM of an "exit /b N" issued from a block nested inside another block, so
+REM
+REM     if errorlevel 1 ( pip install X
+REM                       if errorlevel 1 ( exit /b 1 ) )
+REM
+REM would print "ERROR: Failed to install" and still report success to
+REM builditall_wx.bat, which would then try to build against a missing
+REM dependency and blame something else. Verified 2026-07-28; see
+REM pytest_tests/unit/test_batch_script_syntax.py.
+REM ----------------------------------------------------------------------------
+
 REM Check if PyInstaller is installed
 python -c "import PyInstaller" 2>nul
+if not errorlevel 1 goto :have_pyinstaller
+echo PyInstaller not found. Installing...
+pip install pyinstaller
 if errorlevel 1 (
-    echo PyInstaller not found. Installing...
-    pip install pyinstaller
-    if errorlevel 1 (
-        echo ERROR: Failed to install PyInstaller.
-        exit /b 1
-    )
-    echo.
+    echo ERROR: Failed to install PyInstaller.
+    exit /b 1
 )
+echo.
+:have_pyinstaller
 
 REM Check if wxPython is installed
 python -c "import wx" 2>nul
+if not errorlevel 1 goto :have_wxpython
+echo wxPython not found. Installing dependencies...
+pip install -r requirements.txt
 if errorlevel 1 (
-    echo wxPython not found. Installing dependencies...
-    pip install -r requirements.txt
-    if errorlevel 1 (
-        echo ERROR: Failed to install dependencies.
-        exit /b 1
-    )
-    echo.
+    echo ERROR: Failed to install dependencies.
+    exit /b 1
 )
+echo.
+:have_wxpython
 
 REM Create output directory
 if not exist "dist" mkdir dist

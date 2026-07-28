@@ -78,6 +78,83 @@ def test_no_unescaped_parens_in_echo_inside_blocks(rel):
     )
 
 
+def _nested_nonzero_exits(lines: list[str]) -> list[tuple[int, str]]:
+    """`exit /b N` (N != 0) issued from a block nested inside another block.
+
+    cmd discards the exit code in that position. The script terminates and
+    prints whatever it was about to print, but the caller is told it succeeded.
+    One level of nesting is fine; two is not. Reduced case, verified 2026-07-28:
+
+        if "%E%"=="0" ( if not exist x ( exit /b 1 ) )   -> caller sees 0
+        if "%E%"=="0" ( exit /b 1 )                      -> caller sees 1
+    """
+    depth = 0
+    hits = []
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if re.match(r"(?i)^(rem\b|::)", stripped):
+            continue
+        if depth >= 2 and re.match(r"(?i)^exit\s+/b\s+[1-9]", stripped):
+            hits.append((i, stripped))
+        if re.match(r"^\)\s*else\s*\(", stripped):
+            pass                       # closes one and opens one: net zero
+        elif stripped.startswith(")"):
+            depth = max(depth - 1, 0)
+        elif re.search(r"\(\s*$", stripped):
+            depth += 1
+    return hits
+
+
+@pytest.mark.parametrize("rel", list(_batch_files()), ids=str)
+def test_no_nonzero_exit_from_a_doubly_nested_block(rel):
+    """A guard whose exit code cmd throws away is not a guard.
+
+    This is how the missing-artifact checks added in 1488bb5 came to print
+    "NOT FOUND" and still exit 0: each one sat inside `if not exist ... (`
+    inside `if "%BUILD_ERRORS%"=="0" (`. Use flat control flow with goto and
+    put every failing `exit /b` at top level.
+    """
+    hits = _nested_nonzero_exits(_read(rel))
+    assert not hits, (
+        f"{rel}: `exit /b N` inside a block nested in another block. cmd "
+        "discards the exit code, so the caller sees success. Restructure with "
+        "goto so the exit is at top level.\n"
+        + "\n".join(f"  line {n}: {t}" for n, t in hits)
+    )
+
+
+def test_the_nested_exit_scanner_actually_detects_the_shape():
+    """Guard the guard -- a scanner nobody has seen fire proves nothing."""
+    broken = [
+        'if "%E%"=="0" (',
+        '    if not exist "x" (',
+        '        exit /b 1',
+        '    )',
+        ')',
+    ]
+    assert [n for n, _ in _nested_nonzero_exits(broken)] == [3]
+
+    ok_one_level = [
+        'if "%E%"=="0" (',
+        '    exit /b 1',
+        ')',
+    ]
+    assert _nested_nonzero_exits(ok_one_level) == []
+
+    ok_flat = [
+        'if not exist "x" goto :missing',
+        'exit /b 0',
+        ':missing',
+        'exit /b 1',
+    ]
+    assert _nested_nonzero_exits(ok_flat) == []
+
+    # exit /b 0 in the same position is harmless -- success is the default.
+    assert _nested_nonzero_exits([
+        'if "%E%"=="0" (', '    if x (', '        exit /b 0', '    )', ')',
+    ]) == []
+
+
 @pytest.mark.parametrize("rel", _RELEASE_SCRIPTS, ids=str)
 def test_release_scripts_exist(rel):
     assert (_ROOT / rel).is_file(), f"missing release script: {rel}"
