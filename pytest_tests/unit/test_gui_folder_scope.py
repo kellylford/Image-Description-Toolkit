@@ -144,35 +144,39 @@ def frame(_frame, no_dialogs):
 # Tree walking helpers -- read the real control, do not reimplement grouping
 # ---------------------------------------------------------------------------
 
-def _top_level_nodes(tree):
-    root = tree.GetRootItem()
+def _children(tree, parent):
+    """Every direct child of `parent`, in tree order.
+
+    Uses the cookie-based GetFirstChild/GetNextChild pair rather than
+    GetNextSibling(item). wx.TreeCtrl inherits from wx.Window, which has its
+    own zero-argument GetNextSibling(), and which overload wins is platform
+    dependent: Windows resolved to wx.TreeCtrl's, macOS to wx.Window's and
+    raised "TypeError: Window.GetNextSibling(): too many arguments". The cookie
+    API has no such collision.
+    """
     out = []
-    node, cookie = tree.GetFirstChild(root)
+    node, cookie = tree.GetFirstChild(parent)
     while node.IsOk():
         out.append(node)
-        node, cookie = tree.GetNextSibling(node), cookie
+        node, cookie = tree.GetNextChild(parent, cookie)
     return out
+
+
+def _top_level_nodes(tree):
+    return _children(tree, tree.GetRootItem())
 
 
 def _folder_nodes(tree, parent):
     """Folder nodes carry no item data; leaf nodes carry a file path."""
-    out = []
-    node, cookie = tree.GetFirstChild(parent)
-    while node.IsOk():
-        if tree.GetItemData(node) is None:
-            out.append(node)
-        node = tree.GetNextSibling(node)
-    return out
+    return [n for n in _children(tree, parent) if tree.GetItemData(n) is None]
+
+
+def _leaf_nodes(tree, parent):
+    return [n for n in _children(tree, parent) if tree.GetItemData(n) is not None]
 
 
 def _leaf_count(tree, parent):
-    n = 0
-    node, cookie = tree.GetFirstChild(parent)
-    while node.IsOk():
-        if tree.GetItemData(node) is not None:
-            n += 1
-        node = tree.GetNextSibling(node)
-    return n
+    return len(_leaf_nodes(tree, parent))
 
 
 # ---------------------------------------------------------------------------
@@ -295,10 +299,8 @@ def test_selecting_an_image_gives_no_folder_scope(frame, cli_style_bundle):
 
     tree = frame.image_list
     top = {tree.GetItemText(n): n for n in _top_level_nodes(tree)}
-    node, _cookie = tree.GetFirstChild(top[source.name])
-    while node.IsOk() and tree.GetItemData(node) is None:
-        node = tree.GetNextSibling(node)
-    assert node.IsOk(), "expected at least one image leaf under the folder"
+    leaves = _leaf_nodes(tree, top[source.name])
+    assert leaves, "expected at least one image leaf under the folder"
 
-    tree.SelectItem(node)
+    tree.SelectItem(leaves[0])
     assert frame._selected_folder_scope() is None
