@@ -1518,6 +1518,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.show_batch_progress_item.Enable(False)  # Disabled by default
         self.Bind(wx.EVT_MENU, self.on_show_batch_progress, self.show_batch_progress_item)
 
+        # Stop All Processing. The Qt6 build had this in the Process menu; it was
+        # lost in the wxPython migration (7054a61 added it as a QAction), leaving
+        # the progress dialog's Stop button as the only way to halt a run. If that
+        # dialog is closed or was never shown, there is no way out.
+        self.stop_processing_item = process_menu.Append(
+            wx.ID_ANY,
+            "S&top All Processing\tCtrl+.",
+            "Stop batch processing, scanning, and any other background work"
+        )
+        self.stop_processing_item.Enable(False)
+        self.Bind(wx.EVT_MENU, self.on_stop_all_processing, self.stop_processing_item)
+        # EVT_UPDATE_UI keeps the enabled state correct on its own. Hooking the
+        # individual worker start/finish sites instead would mean finding every
+        # transition for six different workers and never missing one later.
+        self.Bind(wx.EVT_UPDATE_UI, self.on_update_stop_processing_ui,
+                  self.stop_processing_item)
+
         process_menu.AppendSeparator()
 
         refresh_list_item = process_menu.Append(wx.ID_ANY, "&Update Image List\tF5")
@@ -6437,6 +6454,131 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # No dialog - shouldn't happen if menu item is properly disabled
             show_info(self, "No batch processing is currently running.")
 
+    # ------------------------------------------------------------------ #
+    # Stopping background work                                            #
+    # ------------------------------------------------------------------ #
+    # Every worker this window can start, and how to stop it. Keeping the
+    # inventory in one place is the point: on_close used to carry its own
+    # partial copy that omitted the scan worker, so quitting mid-scan left the
+    # thread running.
+    #
+    # (attribute name, label for logs/status)
+    _WORKER_ATTRS = (
+        ("batch_worker", "batch processing"),
+        ("scan_worker", "directory scan"),
+        ("video_worker", "video extraction"),
+        ("video_desc_worker", "video description"),
+        ("download_worker", "download"),
+        ("followup_worker", "follow-up"),
+    )
+
+    def _running_workers(self) -> list:
+        """Names of workers that are currently alive."""
+        running = []
+        for attr, label in self._WORKER_ATTRS:
+            worker = getattr(self, attr, None)
+            if worker is None:
+                continue
+            try:
+                alive = worker.is_alive()
+            except Exception:
+                # A worker that cannot report liveness is assumed finished
+                # rather than blocking the menu item forever.
+                continue
+            if alive:
+                running.append(label)
+        return running
+
+    def _stop_worker(self, worker) -> bool:
+        """Ask one worker to stop, whichever mechanism it provides."""
+        for method in ("stop", "cancel"):
+            fn = getattr(worker, method, None)
+            if callable(fn):
+                fn()
+                return True
+        # VideoProcessingWorker signals through an event rather than a method.
+        event = getattr(worker, "_stop_event", None)
+        if event is not None and hasattr(event, "set"):
+            event.set()
+            return True
+        return False
+
+    def _stop_all_workers(self, include_batch: bool = True) -> list:
+        """Stop every running worker. Returns the labels of those stopped."""
+        stopped = []
+        for attr, label in self._WORKER_ATTRS:
+            if attr == "batch_worker" and not include_batch:
+                continue
+            worker = getattr(self, attr, None)
+            if worker is None:
+                continue
+            try:
+                if not worker.is_alive():
+                    continue
+            except Exception:
+                continue
+            try:
+                if self._stop_worker(worker):
+                    logger.info(f"Stopped {label} worker")
+                    stopped.append(label)
+                else:
+                    logger.warning(f"{label} worker exposes no stop mechanism")
+            except Exception as exc:
+                logger.warning(f"Failed to stop {label} worker: {exc}")
+        return stopped
+
+    def on_update_stop_processing_ui(self, event):
+        """Enable "Stop All Processing" only while something is running."""
+        try:
+            event.Enable(bool(self._running_workers()))
+        except Exception:
+            event.Enable(False)
+
+    def on_stop_all_processing(self, event):
+        """Menu handler: stop batch processing and every other background job."""
+        running = self._running_workers()
+        if not running:
+            show_info(self, "No processing is currently running.")
+            return
+
+        if not ask_yes_no(
+            self,
+            "Stop all processing?\n\n"
+            f"Currently running: {', '.join(running)}.\n\n"
+            "Descriptions already generated are kept. Images that have not been "
+            "processed yet will be left undescribed.\n\n"
+            "Continue?"
+        ):
+            return
+
+        logger.info(f"Stop All Processing requested; running={running}")
+
+        # A running batch needs more than a thread stop: batch state, per-item
+        # processing flags, the progress dialog and the workspace save are all
+        # handled by on_stop_batch, so delegate rather than duplicate it.
+        if self.batch_worker is not None:
+            try:
+                self.on_stop_batch()
+            except Exception as exc:
+                logger.error(f"on_stop_batch failed during Stop All: {exc}")
+
+        stopped = self._stop_all_workers()
+        remaining = self._running_workers()
+
+        self.SetStatusText(
+            "Stopped: " + ", ".join(stopped) if stopped else "Processing stopped", 0
+        )
+        if remaining:
+            # Threads stop at their next checkpoint; a long API call in flight
+            # can outlive the request. Say so rather than implying it is done.
+            logger.info(f"Workers still winding down: {remaining}")
+            show_info(
+                self,
+                "Stop requested.\n\n"
+                f"Still finishing current work: {', '.join(remaining)}.\n"
+                "These stop once the in-progress item completes."
+            )
+
     def on_stop_batch(self):
         """Stop batch processing permanently"""
         if not self.batch_worker:
@@ -8374,30 +8516,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             except Exception as e:
                 logger.warning(f"Failed to close batch progress dialog: {e}")
 
-        # Stop all background workers
-        workers_stopped = []
-        if self.batch_worker and self.batch_worker.is_alive():
-            logger.info("Stopping batch processing worker")
-            self.batch_worker.stop()
-            workers_stopped.append("batch")
-
-        if self.video_worker and self.video_worker.is_alive():
-            logger.info("Stopping video processing worker")
-            # Video worker uses stop_event
-            if hasattr(self.video_worker, '_stop_event'):
-                self.video_worker._stop_event.set()
-            workers_stopped.append("video")
-
-        if self.download_worker and self.download_worker.is_alive():
-            logger.info("Stopping download worker")
-            if hasattr(self.download_worker, 'stop'):
-                self.download_worker.stop()
-            workers_stopped.append("download")
-
-        if self.followup_worker and self.followup_worker.is_alive():
-            logger.info("Stopping followup worker")
-            workers_stopped.append("followup")
-
+        # Stop all background workers. Shares the inventory with the
+        # "Stop All Processing" menu command; the previous inline version here
+        # omitted the directory scan worker, so quitting mid-scan left it running.
+        workers_stopped = self._stop_all_workers()
         if workers_stopped:
             logger.info(f"Stopped workers: {', '.join(workers_stopped)}")
 
