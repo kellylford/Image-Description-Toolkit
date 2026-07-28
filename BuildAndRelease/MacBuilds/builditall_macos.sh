@@ -77,6 +77,28 @@ echo ""
 
 BUILD_ERRORS=0
 
+# ----------------------------------------------------------------------------
+# Increment helper.
+#
+# Do NOT use the bash post-increment form here. It evaluates to the OLD value,
+# so when the counter is 0 the arithmetic result is 0, which bash reports as
+# exit status 1 -- and under "set -e" that aborts the whole script. The first
+# build failure would kill the run before the second build or the summary,
+# making the "ERRORS: N build failures" branch unreachable.
+# ----------------------------------------------------------------------------
+count_error() {
+    BUILD_ERRORS=$((BUILD_ERRORS + 1))
+}
+
+# ----------------------------------------------------------------------------
+# Remove the previous run's artifacts before building. Without this, a build
+# that fails (or succeeds without emitting anything) leaves the old binary in
+# dist/, and the packaging step below ships it -- a stale app in the DMG,
+# reported as a clean build.
+# ----------------------------------------------------------------------------
+rm -f  "idt/dist/idt"
+rm -rf "imagedescriber/dist/ImageDescriber.app"
+
 # ============================================================================
 echo ""
 echo "[1/2] Building IDT (main toolkit)..."
@@ -88,7 +110,7 @@ if bash build_idt.sh; then
     echo "SUCCESS: IDT built successfully"
 else
     echo "ERROR: IDT build failed!"
-    ((BUILD_ERRORS++))
+    count_error
 fi
 cd ..
 
@@ -104,7 +126,7 @@ if bash build_imagedescriber_wx.sh; then
     echo "SUCCESS: ImageDescriber built successfully"
 else
     echo "ERROR: ImageDescriber build failed!"
-    ((BUILD_ERRORS++))
+    count_error
 fi
 cd ..
 
@@ -141,22 +163,24 @@ if [ $BUILD_ERRORS -eq 0 ]; then
     echo "Packaging applications to $DIST_ALL/..."
     echo ""
 
-    # Copy IDT CLI
-    if [ -f "idt/dist/idt" ]; then
-        cp "idt/dist/idt" "$DIST_ALL/"
-        chmod +x "$DIST_ALL/idt"
-        echo "✓ idt (CLI)"
-    else
-        echo "✗ idt NOT FOUND"
+    # Copy IDT CLI. A missing artifact is fatal: a build step can exit 0 without
+    # emitting anything, and shipping a DMG built from nothing (or from the
+    # previous run's leftovers) is worse than failing here.
+    if [ ! -f "idt/dist/idt" ]; then
+        echo "✗ idt NOT FOUND - the build did not produce an executable"
+        exit 1
     fi
+    cp "idt/dist/idt" "$DIST_ALL/"
+    chmod +x "$DIST_ALL/idt"
+    echo "✓ idt (CLI)"
 
     # Copy ImageDescriber.app (includes integrated Viewer Mode, prompt editor and configuration)
-    if [ -d "imagedescriber/dist/ImageDescriber.app" ]; then
-        cp -R "imagedescriber/dist/ImageDescriber.app" "$DIST_ALL/Applications/"
-        echo "✓ ImageDescriber.app (with integrated Viewer Mode and Tools menu)"
-    else
-        echo "✗ ImageDescriber.app NOT FOUND"
+    if [ ! -d "imagedescriber/dist/ImageDescriber.app" ]; then
+        echo "✗ ImageDescriber.app NOT FOUND - the build did not produce an app bundle"
+        exit 1
     fi
+    cp -R "imagedescriber/dist/ImageDescriber.app" "$DIST_ALL/Applications/"
+    echo "✓ ImageDescriber.app (with integrated Viewer Mode and Tools menu)"
     
     # Copy documentation
     echo ""
@@ -193,7 +217,7 @@ if [ -f "idt/dist/idt" ]; then
         echo "The executable may not work correctly in production."
         echo "Review the errors above and rebuild after fixing."
         echo ""
-        ((BUILD_ERRORS++))
+        count_error
     fi
 fi
 
