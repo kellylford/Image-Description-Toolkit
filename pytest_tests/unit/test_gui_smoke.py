@@ -25,6 +25,7 @@ is least able to report. (3) is the incident itself, as an assertion.
 
 import ast
 import importlib
+import os
 import re
 import sys
 from pathlib import Path
@@ -40,7 +41,34 @@ for _p in (str(_ROOT), str(_GUI_DIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-wx = pytest.importorskip("wx", reason="wxPython not installed in this environment")
+
+#: Set by every CI job that is supposed to exercise the GUI. When set, a
+#: missing wxPython or an unusable wx.App is a FAILURE rather than a skip.
+#:
+#: This exists because the plain `pytest.importorskip("wx")` below hid all 213
+#: tests in this file on every macOS run for as long as the file existed. The
+#: root .venv there had no wxPython, so the whole module vanished at collection
+#: and reported as nothing louder than "collected 605 items / 1 skipped"
+#: (issue #230). A skip that nobody can see is indistinguishable from a pass.
+#:
+#: Unset locally, so a contributor without the GUI extras still gets a clean
+#: run rather than a wall of red.
+REQUIRE_WX = os.environ.get("IDT_REQUIRE_WX") == "1"
+
+try:
+    import wx
+except ImportError as _exc:                                  # pragma: no cover
+    if REQUIRE_WX:
+        raise RuntimeError(
+            "IDT_REQUIRE_WX=1 but wxPython is not importable, so the GUI smoke "
+            f"tests cannot run: {_exc}. Install wxPython into the interpreter "
+            "running pytest, or unset IDT_REQUIRE_WX if this job is not meant "
+            "to cover the GUI."
+        ) from _exc
+    wx = None
+
+pytestmark = pytest.mark.skipif(
+    wx is None, reason="wxPython not installed in this environment")
 
 
 #: Modules that genuinely cannot be imported, each with the reason.
@@ -66,9 +94,38 @@ MODULES = [m for m in ALL_MODULES if m not in UNIMPORTABLE]
 
 @pytest.fixture(scope="module")
 def wx_app():
-    """A real wx.App. Some modules build wx objects at import time."""
-    app = wx.App.Get() or wx.App(False)
+    """A real wx.App. Some modules build wx objects at import time.
+
+    Importing wx and being able to construct an App are different things. On
+    macOS an App needs a framework build of Python and a window server, so a
+    job can have wxPython installed and still be unable to run any of this.
+    That distinction has to be visible, not swallowed.
+    """
+    try:
+        app = wx.App.Get() or wx.App(False)
+    except Exception as exc:                                 # pragma: no cover
+        if REQUIRE_WX:
+            pytest.fail(
+                f"wxPython imports but wx.App() failed: {exc}\n"
+                "On macOS this usually means the interpreter is not a framework "
+                "build, or the job has no window server. Fix the runner, or stop "
+                "setting IDT_REQUIRE_WX for this job and record why -- but do "
+                "not let these tests skip silently."
+            )
+        pytest.skip(f"no usable display for wxPython: {exc}")
     yield app
+
+
+def test_wx_is_present_when_the_job_says_it_must_be():
+    """Makes the environment's own expectation checkable.
+
+    Without this, "IDT_REQUIRE_WX is set but wx is missing" would be caught at
+    import time only, and a job that quietly stopped setting the variable would
+    go back to skipping everything with nothing to notice.
+    """
+    if not REQUIRE_WX:
+        pytest.skip("IDT_REQUIRE_WX not set; GUI coverage is optional here")
+    assert wx is not None, "wxPython missing in a job that requires it"
 
 
 # ---------------------------------------------------------------------------

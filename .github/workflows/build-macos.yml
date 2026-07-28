@@ -83,6 +83,15 @@ jobs:
         ./imagedescriber/.venv/bin/python -m pip install --upgrade pip
         ./imagedescriber/.venv/bin/python -m pip install -r imagedescriber/requirements.txt
 
+    # The unit tests run with the ROOT venv, which installs requirements.txt --
+    # a CLI dependency set with no wxPython in it. test_gui_smoke.py therefore
+    # skipped all 213 of its tests at collection on every macOS run since the
+    # file was added, surfacing as nothing louder than "1 skipped" (issue #230).
+    # wxPython is installed in imagedescriber/.venv, but that is not the
+    # interpreter running pytest.
+    - name: Install wxPython into the root venv (for the GUI smoke tests)
+      run: ./.venv/bin/python -m pip install wxPython
+
     - name: Record installed versions
       run: |
         echo "--- root .venv ---"
@@ -103,6 +112,11 @@ jobs:
       run: ./.venv/bin/python -m compileall -q idt_core cli shared imagedescriber
 
     - name: Run unit tests
+      # IDT_REQUIRE_WX turns "wxPython is missing" from a silent collection-time
+      # skip into a hard failure, so this job cannot quietly stop covering the
+      # GUI again. See pytest_tests/unit/test_gui_smoke.py.
+      env:
+        IDT_REQUIRE_WX: "1"
       run: ./.venv/bin/python -m pytest pytest_tests/unit -v --tb=short
 
     - name: Run smoke tests (GUI-dependent; non-fatal)
