@@ -23,7 +23,11 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "imagedescriber"))
 
-from ai_providers import OllamaProvider, _is_retryable_error  # noqa: E402
+from ai_providers import (  # noqa: E402
+    OllamaProvider,
+    ProviderError,
+    _is_retryable_error,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -121,31 +125,37 @@ def test_transient_statuses_are_retried_then_succeed(failing_server, image, stat
     assert failing_server.requests == 3
 
 
-def test_a_permanent_500_run_reports_a_retryable_error(failing_server, image):
-    """When the server never recovers, the last word must still read transient.
+def test_a_permanent_500_run_raises_a_retryable_failure(failing_server, image):
+    """When the server never recovers, the failure must still read transient.
 
     Callers use that to tell "the model refused" from "the service was down",
     which is the difference between re-running the batch and not bothering.
     """
     failing_server.script = [500]
 
-    result = _describe(failing_server, image)
+    with pytest.raises(ProviderError) as caught:
+        _describe(failing_server, image)
 
+    err = caught.value
     assert failing_server.requests == 4, "initial attempt + 3 retries"
-    assert _is_retryable_error(result), result
-    assert "500" in result
+    assert err.status_code == 500
+    assert err.is_retryable, f"kind={err.kind!r}"
+    assert _is_retryable_error(str(err)), str(err)
 
 
 def test_a_401_is_not_retried(failing_server, image):
     """Retrying a rejected key costs the user four round trips per image."""
     failing_server.script = [401]
 
-    result = _describe(failing_server, image)
+    with pytest.raises(ProviderError) as caught:
+        _describe(failing_server, image)
 
+    err = caught.value
     assert failing_server.requests == 1, (
         f"a 401 was retried {failing_server.requests} times"
     )
-    assert not _is_retryable_error(result), result
+    assert err.status_code == 401
+    assert not err.is_retryable, f"kind={err.kind!r}"
 
 
 def test_token_usage_survives_a_retry(failing_server, image):

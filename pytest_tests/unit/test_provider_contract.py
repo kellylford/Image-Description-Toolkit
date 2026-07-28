@@ -330,9 +330,33 @@ def image(tmp_path, monkeypatch):
 
 
 def _describe(driver, monkeypatch, tmp_path, image_path, outcomes):
+    """Run describe_image, returning its description. Failures propagate."""
     provider, script = driver.build(monkeypatch, tmp_path, outcomes)
     result = provider.describe_image(image_path, "describe this", "test-model")
     return result, script
+
+
+def _describe_expecting_failure(driver, monkeypatch, tmp_path, image_path,
+                                outcomes):
+    """Run describe_image and return the ProviderError it must raise.
+
+    Providers signal failure by raising, not by returning a string. Anything
+    that comes back normally here is a provider that swallowed a failure and
+    handed back something a caller would store as the image's description --
+    the defect in issue #230 -- so that is a test failure, not a pass.
+    """
+    provider, script = driver.build(monkeypatch, tmp_path, outcomes)
+    try:
+        result = provider.describe_image(image_path, "describe this",
+                                         "test-model")
+    except ProviderError as exc:
+        return exc, script
+
+    pytest.fail(
+        f"{type(provider).__name__}.describe_image returned "
+        f"{result!r} instead of raising ProviderError. A caller cannot tell "
+        "that apart from a description."
+    )
 
 
 # ===========================================================================
@@ -388,16 +412,25 @@ def test_drivers_that_skip_http_give_a_reason():
 ])
 def test_http_status_classifies_correctly(driver, status, should_retry,
                                           monkeypatch, tmp_path, image):
-    """The returned string must be classified the way the status implies."""
-    result, _ = _describe(driver, monkeypatch, tmp_path, image,
-                          [("http", status)])
+    """The raised error must classify the way the status implies.
 
-    assert isinstance(result, str) and result, "a provider must return a string"
-    assert _is_retryable_error(result) is should_retry, (
-        f"{_driver_id(driver)} returned {result!r} for HTTP {status}. "
-        f"_is_retryable_error says {not should_retry}, but a {status} is "
-        f"{'transient' if should_retry else 'permanent'}. "
-        "Build the string with format_provider_error() instead of by hand."
+    Retryability is now a field on the exception rather than something
+    inferred from wording, so this checks the field AND the rendered message
+    -- the message is what ends up in logs and in the failure event.
+    """
+    err, _ = _describe_expecting_failure(driver, monkeypatch, tmp_path, image,
+                                         [("http", status)])
+
+    assert err.status_code == status, (
+        f"{_driver_id(driver)} lost the status code: got {err.status_code!r}"
+    )
+    assert err.is_retryable is should_retry, (
+        f"{_driver_id(driver)} classified HTTP {status} as "
+        f"{'retryable' if err.is_retryable else 'permanent'} (kind={err.kind!r}); "
+        f"a {status} is {'transient' if should_retry else 'permanent'}."
+    )
+    assert _is_retryable_error(str(err)) is should_retry, (
+        f"the rendered message disagrees with the exception: {str(err)!r}"
     )
 
 
@@ -423,8 +456,8 @@ def test_five_hundred_then_two_hundred_returns_a_description(
 @pytest.mark.parametrize("driver", HTTP_DRIVERS, ids=_driver_id)
 def test_a_401_is_not_retried(driver, monkeypatch, tmp_path, image):
     """Retrying a bad API key wastes the user's time on every image."""
-    _, script = _describe(driver, monkeypatch, tmp_path, image,
-                          [("http", 401)])
+    _, script = _describe_expecting_failure(driver, monkeypatch, tmp_path,
+                                            image, [("http", 401)])
     assert script.calls == 1, (
         f"{_driver_id(driver)} retried a 401 {script.calls} times"
     )
@@ -433,15 +466,19 @@ def test_a_401_is_not_retried(driver, monkeypatch, tmp_path, image):
 @pytest.mark.parametrize("driver", HTTP_DRIVERS, ids=_driver_id)
 def test_a_persistent_500_gives_up_and_reports_it(
         driver, monkeypatch, tmp_path, image):
-    """Retries are bounded, and the final answer still reads as an error."""
-    result, script = _describe(driver, monkeypatch, tmp_path, image,
-                               [("http", 500)])
+    """Retries are bounded, and the final failure still reads as transient.
+
+    Callers use that to tell "the model refused" from "the service was down",
+    which decides whether re-running the batch is worth anything.
+    """
+    err, script = _describe_expecting_failure(driver, monkeypatch, tmp_path,
+                                              image, [("http", 500)])
     assert script.calls == 4, (
         f"expected initial attempt + 3 retries, saw {script.calls}"
     )
-    assert _is_retryable_error(result), (
+    assert err.is_retryable, (
         f"{_driver_id(driver)} lost the transient marker on the final "
-        f"attempt: {result!r}"
+        f"attempt: kind={err.kind!r}"
     )
 
 
@@ -460,26 +497,28 @@ def test_success_returns_the_description_unchanged(
 
 @pytest.mark.parametrize("driver", DRIVERS, ids=_driver_id)
 def test_timeout_is_treated_as_transient(driver, monkeypatch, tmp_path, image):
-    result, _ = _describe(driver, monkeypatch, tmp_path, image,
-                          [("timeout", None)])
-    assert _is_retryable_error(result), (
-        f"{_driver_id(driver)} reported a timeout as permanent: {result!r}"
+    err, _ = _describe_expecting_failure(driver, monkeypatch, tmp_path, image,
+                                         [("timeout", None)])
+    assert err.is_retryable, (
+        f"{_driver_id(driver)} reported a timeout as permanent: "
+        f"kind={err.kind!r} message={str(err)!r}"
     )
 
 
 @pytest.mark.parametrize("driver", DRIVERS, ids=_driver_id)
-def test_malformed_response_does_not_escape_as_an_exception(
+def test_malformed_response_raises_rather_than_returning_junk(
         driver, monkeypatch, tmp_path, image):
-    """A garbage response must become an error string, not crash the batch.
+    """An unparseable response is a failure and must be raised as one.
 
-    wxPython swallows exceptions in event handlers, so one escaping here shows
-    up to the user as a button that does nothing.
+    This used to assert the opposite -- that a garbage response came back as a
+    string -- which was the bug: workers_wx stored exactly such a string as the
+    image's description. It must still not escape as some *other* exception
+    type, because a caller can only reasonably handle ProviderError.
     """
-    result, _ = _describe(driver, monkeypatch, tmp_path, image,
-                          [("garbage", None)])
-    assert isinstance(result, str) and result, (
-        f"{_driver_id(driver)} returned {result!r} for an unparseable response"
-    )
+    err, _ = _describe_expecting_failure(driver, monkeypatch, tmp_path, image,
+                                         [("garbage", None)])
+    assert str(err), f"{_driver_id(driver)} raised an error with no message"
+    assert err.kind in ErrorKind.ALL, f"unrecognised kind {err.kind!r}"
 
 
 # ===========================================================================
@@ -500,7 +539,12 @@ def test_formatter_output_always_classifies_as_its_kind(kind, status_code):
         provider="Test", kind=kind, status_code=status_code,
         message="something went wrong", timestamp="2026-07-28 12:00:00,000")
 
-    if status_code is not None:
+    if kind == ErrorKind.UNAVAILABLE:
+        # No request was made, so a status code is meaningless and the
+        # formatter ignores it. A provider that is not configured will not
+        # become configured by trying again.
+        expected = False
+    elif status_code is not None:
         expected = kind_for_status(status_code) in RETRYABLE_KINDS
     else:
         expected = kind in RETRYABLE_KINDS
@@ -596,8 +640,11 @@ def test_no_provider_writes_a_status_code_string_by_hand():
     src = (_ROOT / "imagedescriber" / "ai_providers.py").read_text(
         encoding="utf-8")
 
+    # Everything from the status-token helper down to the retry decorator is
+    # the error-formatting layer: the formatter itself, the predicate, and the
+    # two raise helpers, whose docstrings quote the wording they exist to own.
     formatter_start = src.index("def _status_token(")
-    formatter_end = src.index("def provider_error_from_exception(")
+    formatter_end = src.index("def retry_on_api_error(")
     allowed = src[formatter_start:formatter_end]
 
     offenders = []

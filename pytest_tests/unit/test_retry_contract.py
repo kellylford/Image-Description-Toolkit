@@ -30,6 +30,7 @@ sys.path.insert(0, str(_ROOT / "imagedescriber"))
 
 from ai_providers import (  # noqa: E402
     OllamaProvider,
+    ProviderError,
     _is_retryable_error,
     retry_on_api_error,
 )
@@ -170,11 +171,13 @@ class _FakeResponse:
         return {"response": self.text}
 
 
-def test_ollama_http_500_produces_a_retryable_string(tmp_path, monkeypatch):
+def test_ollama_http_500_is_raised_as_a_retryable_failure(tmp_path, monkeypatch):
     """ollama.com's cloud vision backend returns 500/502 intermittently.
 
-    The string OllamaProvider returns for that MUST be one the decorator
-    retries -- this is the bug that shipped for nine months.
+    This is the bug that shipped for nine months. It used to assert that the
+    RETURNED string was recognised as retryable; providers now raise, so the
+    same guarantee is expressed on the exception -- both its retryable field
+    and the message it renders, since the message is what reaches the log.
     """
     monkeypatch.setattr("ai_providers.time.sleep", lambda _s: None)
     monkeypatch.chdir(tmp_path)  # keep api_errors.log out of the repo
@@ -188,12 +191,18 @@ def test_ollama_http_500_produces_a_retryable_string(tmp_path, monkeypatch):
 
     provider = OllamaProvider()
     # describe_image is wrapped by the decorator, so this exhausts the retries
-    # and hands back the final error string.
-    result = provider.describe_image(str(image), "describe", "gemma4:31b-cloud")
+    # and then raises the final failure.
+    with pytest.raises(ProviderError) as caught:
+        provider.describe_image(str(image), "describe", "gemma4:31b-cloud")
 
-    assert _is_retryable_error(result), (
-        f"Ollama's HTTP-error string is not recognised as retryable: {result!r}. "
-        "Every 5xx would become a hard per-image failure."
+    err = caught.value
+    assert err.status_code == 500
+    assert err.is_retryable, (
+        f"Ollama's 5xx was classified {err.kind!r}, so every 5xx would become "
+        "a hard per-image failure."
+    )
+    assert _is_retryable_error(str(err)), (
+        f"the rendered message is not recognised as retryable: {str(err)!r}"
     )
 
 

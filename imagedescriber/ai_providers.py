@@ -200,10 +200,15 @@ class ErrorKind:
     INVALID_REQUEST = "invalid_request"
     SERVER_ERROR = "server_error"
     TIMEOUT = "timeout"
+    #: The provider cannot run at all -- no API key, SDK missing, wrong OS.
+    #: Distinct from AUTH: nothing was ever sent, so there is no status code
+    #: and no request to blame. Permanently non-retryable; retrying a provider
+    #: that is not configured burns the whole batch to no effect.
+    UNAVAILABLE = "unavailable"
     UNKNOWN = "unknown"
 
-    ALL = ("rate_limit", "auth", "invalid_request",
-           "server_error", "timeout", "unknown")
+    ALL = ("rate_limit", "auth", "invalid_request", "server_error",
+           "timeout", "unavailable", "unknown")
 
 
 #: Kinds worth another attempt. This is the ONLY definition of that policy;
@@ -341,6 +346,11 @@ def format_provider_error(provider: str, kind: str, status_code=None,
         return f"Server error from {provider} {suffix}"
     if kind == ErrorKind.TIMEOUT:
         return f"Request timeout - try again later {suffix}"
+    if kind == ErrorKind.UNAVAILABLE:
+        # No request was made, so a status code would be a fiction. The "Error:"
+        # prefix is retained because is_provider_error() recognises it and
+        # these strings predate the formatter.
+        return f"Error: {message}"
     return f"Error generating description: {message} {suffix}"
 
 
@@ -378,6 +388,47 @@ def provider_error_from_exception(exc: BaseException, provider: str,
         message=str(exc),
         timestamp=timestamp,
     )
+
+
+def raise_provider_error(provider: str, kind: str, status_code=None,
+                         message: str = "", timestamp: Optional[str] = None):
+    """Signal a provider failure the only way callers cannot ignore.
+
+    describe_image() used to RETURN these strings. That made a failure
+    indistinguishable from a description by type, and it cost twice:
+
+      * retry_on_api_error had to infer "transient" from wording. Ollama said
+        "Error: HTTP 500" while the decorator matched "status code: 5", so
+        every Ollama 5xx was permanent for nine months (issue #228).
+      * workers_wx checked only that the result was non-empty, so an error
+        string was stored as the image's description, counted in the
+        "X of Y described" stats and exported to HTML (issue #230).
+
+    Raising removes the class of bug rather than guarding against it: a caller
+    that forgets to handle failure now gets a traceback instead of silently
+    recording nonsense. The message reads exactly as the returned string did,
+    so logs and saved diagnostics stay comparable.
+    """
+    raise ProviderError(
+        format_provider_error(provider=provider, kind=kind,
+                              status_code=status_code, message=message,
+                              timestamp=timestamp),
+        status_code=status_code,
+        provider=provider,
+        kind=kind,
+    )
+
+
+def raise_provider_error_from_exception(exc: BaseException, provider: str,
+                                        timestamp: Optional[str] = None):
+    """Classify an SDK/transport exception and re-raise it as a ProviderError."""
+    kind, status_code = classify_provider_exception(exc)
+    raise ProviderError(
+        provider_error_from_exception(exc, provider, timestamp),
+        status_code=status_code,
+        provider=provider,
+        kind=kind,
+    ) from exc
 
 
 def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):
@@ -654,7 +705,7 @@ class OllamaProvider(AIProvider):
                 # Never hand-write this string: the older "Error: HTTP 500"
                 # wording carried no "(status code: NNN)", so retry_on_api_error
                 # treated every 5xx as permanent for nine months.
-                return format_provider_error(
+                raise_provider_error(
                     provider="Ollama",
                     kind=kind_for_status(response.status_code),
                     status_code=response.status_code,
@@ -662,6 +713,11 @@ class OllamaProvider(AIProvider):
                     timestamp=timestamp,
                 )
 
+        except ProviderError:
+            # Raised by this method's own body. Re-raise unchanged;
+            # the generic handler below would re-wrap it and lose the
+            # kind and status_code it already carries.
+            raise
         except Exception as e:
             # Enhanced error logging for Ollama exceptions
             from datetime import datetime
@@ -693,7 +749,7 @@ class OllamaProvider(AIProvider):
             except Exception as log_error:
                 print(f"  Warning: Could not write to error log: {log_error}")
 
-            return provider_error_from_exception(e, "Ollama", timestamp)
+            raise_provider_error_from_exception(e, "Ollama", timestamp)
 
     def get_last_token_usage(self) -> Optional[Dict]:
         """Return token usage from last API call (if available)"""
@@ -858,7 +914,9 @@ class OpenAIProvider(AIProvider):
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         """Generate description using OpenAI SDK with automatic retry and token tracking"""
         if not self.is_available():
-            return "Error: OpenAI API key not configured or SDK not installed"
+            raise_provider_error(
+                provider="OpenAI", kind=ErrorKind.UNAVAILABLE,
+                message="OpenAI API key not configured or SDK not installed")
         
         try:
             # Normalise every image to a resized JPEG before sending to OpenAI.
@@ -1004,6 +1062,11 @@ class OpenAIProvider(AIProvider):
             
             return content
                 
+        except ProviderError:
+            # Raised by this method's own body. Re-raise unchanged;
+            # the generic handler below would re-wrap it and lose the
+            # kind and status_code it already carries.
+            raise
         except Exception as e:
             # Enhanced error logging with detailed diagnostics
             from datetime import datetime
@@ -1063,7 +1126,7 @@ class OpenAIProvider(AIProvider):
                 print(f"  Warning: Could not write to error log: {log_error}")
             
             # One formatter, one classifier -- see format_provider_error.
-            return format_provider_error(
+            raise_provider_error(
                 provider="OpenAI API",
                 kind=kind,
                 status_code=classified_status,
@@ -1221,7 +1284,9 @@ class ClaudeProvider(AIProvider):
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         """Generate description using Claude SDK with automatic retry and token tracking"""
         if not self.is_available():
-            return "Error: Claude API key not configured or SDK not installed"
+            raise_provider_error(
+                provider="Claude", kind=ErrorKind.UNAVAILABLE,
+                message="Claude API key not configured or SDK not installed")
         
         try:
             # Read and encode image
@@ -1275,8 +1340,15 @@ class ClaudeProvider(AIProvider):
             # Extract text from content
             if message.content and len(message.content) > 0:
                 return message.content[0].text
-            return "Error: No content in response"
+            raise_provider_error(
+                provider="Claude API", kind=ErrorKind.UNKNOWN,
+                message="no content in response")
                 
+        except ProviderError:
+            # Raised by this method's own body. Re-raise unchanged;
+            # the generic handler below would re-wrap it and lose the
+            # kind and status_code it already carries.
+            raise
         except Exception as e:
             # Enhanced error logging with detailed diagnostics
             from datetime import datetime
@@ -1336,7 +1408,7 @@ class ClaudeProvider(AIProvider):
                 print(f"  Warning: Could not write to error log: {log_error}")
             
             # One formatter, one classifier -- see format_provider_error.
-            return format_provider_error(
+            raise_provider_error(
                 provider="Claude API",
                 kind=kind,
                 status_code=classified_status,
@@ -1554,10 +1626,10 @@ class MLXProvider(AIProvider):
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         """Run Metal-accelerated vision inference and return a description string."""
         if not self.is_available():
-            return (
-                "Error: MLX provider not available. "
-                "Requires macOS with Apple Silicon and: pip install mlx-vlm"
-            )
+            raise_provider_error(
+                provider="MLX", kind=ErrorKind.UNAVAILABLE,
+                message="MLX provider not available. Requires macOS with "
+                        "Apple Silicon and: pip install mlx-vlm")
 
         temp_jpeg: Optional[str] = None
         try:
@@ -1574,10 +1646,10 @@ class MLXProvider(AIProvider):
             path_obj = Path(image_path)
             temp_jpeg = self._to_jpeg_tempfile(image_path)
             if not temp_jpeg:
-                return (
-                    f"Error: Could not prepare {path_obj.suffix.upper() or 'image'} "
-                    f"for MLX inference"
-                )
+                raise_provider_error(
+                    provider=f"MLX/{model}", kind=ErrorKind.INVALID_REQUEST,
+                    message=f"could not prepare "
+                            f"{path_obj.suffix.upper() or 'image'} for inference")
             use_path = temp_jpeg
 
             # ---- format prompt for the model's chat template ----
@@ -1619,8 +1691,17 @@ class MLXProvider(AIProvider):
                 'finish_reason': 'stop',     # assume stop; no length info from mlx-vlm
             }
 
-            return text.strip() if text else "Error: MLX returned empty response"
+            if not text or not text.strip():
+                raise_provider_error(
+                    provider=f"MLX/{model}", kind=ErrorKind.UNKNOWN,
+                    message="returned an empty response")
+            return text.strip()
 
+        except ProviderError:
+            # Raised by this method's own body. Re-raise unchanged;
+            # the generic handler below would re-wrap it and lose the
+            # kind and status_code it already carries.
+            raise
         except Exception as exc:
             import traceback
             error_type = type(exc).__name__
@@ -1630,7 +1711,7 @@ class MLXProvider(AIProvider):
             # MLX runs on-device, so there is no HTTP status to report. It still
             # goes through the shared formatter: a provider that writes its own
             # error wording is exactly how the retry contract broke before.
-            return provider_error_from_exception(exc, f"MLX/{model}")
+            raise_provider_error_from_exception(exc, f"MLX/{model}")
 
         finally:
             if temp_jpeg:
