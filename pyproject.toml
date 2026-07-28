@@ -91,9 +91,10 @@ show_missing = true
 # addopts deliberately does NOT pass --cov, so targeted runs like
 # `pytest pytest_tests/unit/test_idt_core.py` are unaffected.
 #
-# Measured 20.12% at the issue #228 work (was 13.48%, and before the
-# [tool.coverage.run] source fix, literally nothing).
-fail_under = 19
+# Measured 24.86% after the GUI folder-scope tests (#230) drove the real
+# ImageDescriberFrame. Was 20.12% at the #228 work, 13.48% before it, and --
+# before the [tool.coverage.run] source fix -- literally nothing.
+fail_under = 23
 
 # ---------------------------------------------------------------------------
 # Per-file coverage floors, enforced by tools/check_coverage_floors.py.
@@ -107,7 +108,14 @@ fail_under = 19
 # commit message.
 # ---------------------------------------------------------------------------
 [tool.idt.coverage-floors]
-"imagedescriber/ai_providers.py" = 62.0
+"imagedescriber/ai_providers.py" = 66.0
+# The GUI floors exist because these numbers were 0.00% and 6.37%. They are low
+# in absolute terms and still worth defending: they are what a real frame being
+# constructed and a real workspace being loaded actually exercise, so a drop
+# means that stopped happening.
+"imagedescriber/imagedescriber_wx.py" = 18.0
+"imagedescriber/viewer_components.py" = 23.0
+"idt_core/gui_bridge.py" = 78.0
 "idt_core/providers/base.py" = 100.0
 "idt_core/providers/claude.py" = 45.0
 "idt_core/providers/ollama.py" = 48.0
