@@ -104,11 +104,13 @@ if %ERRORLEVEL% EQU 0 (
     echo SUCCESS: Installer created successfully!
     echo ================================================
     echo.
-    echo Output: dist_all\ImageDescriptionToolkit_Setup_v%VERSION%.exe
+    REM Must match OutputBaseFilename in installer.iss, or this message sends
+    REM people looking for a file that was never produced.
+    echo Output: dist_all\ImageDescriptionToolkitSetup_%VERSION%.exe
     echo.
     echo The installer includes:
-    echo   - idt.exe (CLI)
-    echo   - ImageDescriber.exe (includes integrated Viewer Mode, Prompt Editor and Configure tools)
+    echo   - idt.exe ^(CLI^)
+    echo   - ImageDescriber.exe ^(includes integrated Viewer Mode, Prompt Editor and Configure tools^)
     echo   - Configuration files
     echo   - Documentation
     echo.

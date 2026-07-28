@@ -155,6 +155,6 @@ class TestNoStaleCloudRefusal:
         """OllamaCloudProvider used to return a canned 'vision not supported'
         string for every image, which is wrong now that cloud models report
         vision. It must delegate rather than refuse."""
-        src = (_ROOT / "imagedescriber" / "ai_providers.py").read_text()
+        src = (_ROOT / "imagedescriber" / "ai_providers.py").read_text(encoding="utf-8")
         assert "doesn't support vision capabilities yet" not in src
         assert "vision support is coming soon" not in src

@@ -8,14 +8,14 @@ AI-powered batch image description tool supporting multiple vision models (Ollam
 
 Download the latest installer from the [releases](https://github.com/kellylford/Image-Description-Toolkit/releases) page:
 
-**`ImageDescriptionToolkit_Setup_v4.1.0.exe`** (Windows) or **`IDT-4.1.0.pkg`** / **`IDT-4.1.0.dmg`** (macOS)
+**`ImageDescriptionToolkitSetup_4.5.0.exe`** (Windows) or **`IDT-4.5.0.pkg`** / **`IDT-4.5.0.dmg`** (macOS)
 
 Run the installer - it includes:
 - **idt.exe** - Command-line interface for batch processing and automation
-- **imagedescriber.exe** - GUI with integrated viewer, prompt editor, and configuration manager
+- **ImageDescriber.exe** - GUI with integrated viewer, prompt editor, and configuration manager
 - Full documentation and examples
 
-**Latest Release (v4.1.0):** wxPython migration complete with improved accessibility, 31+ bug fixes, and comprehensive testing.
+**Latest Release (v4.5.0):** Unified workspace model, shared engine for CLI and GUI, web image download, video frame extraction, and comprehensive model updates.
 
 ### Quick Start
 
@@ -65,7 +65,7 @@ idt workflow path/to/images
 ### User Guides
 - **[What's New in v4.1.0](docs/WHATS_NEW_v4.1.0.md)** - wxPython migration, accessibility, code consolidation
 - **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions (Windows)
-- **[macOS User Guide](docs/MACOS_USER_GUIDE.md)** - macOS installation and usage
+- **[macOS Setup](MACOS_SETUP.md)** - macOS installation and usage
 - **[CLI Reference](docs/CLI_REFERENCE.md)** - All commands and options
 
 ### Configuration & Setup
@@ -73,7 +73,7 @@ idt workflow path/to/images
 
 ### Developer Documentation
 - **[Build Guide (Windows)](BuildAndRelease/README.md)** - Windows build instructions
-- **[Build Guide (macOS)](docs/BUILD_MACOS.md)** - macOS build instructions
+- **[Build Guide (macOS)](BuildAndRelease/MacBuilds/README_MACOS.md)** - macOS build instructions
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ## Requirements
@@ -87,7 +87,7 @@ Pre-built Executable**: No Python required - download installer from releases
 - **macOS 10.13+** (High Sierra or later)
 - **Python 3.8+** (system Python or Homebrew)
 - **Installation**: Download .pkg installer or .dmg disk image from releases
-- **Build from Source**: See [macOS Build Guide](docs/BUILD_MACOS.md)
+- **Build from Source**: See [macOS Build Guide](BuildAndRelease/MacBuilds/README_MACOS.md)
 - **AI Providers**: Same as Windows (Ollama, OpenAI, Claude)
 
 **macOS Quick Start:**

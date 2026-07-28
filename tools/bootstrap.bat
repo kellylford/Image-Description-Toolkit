@@ -100,7 +100,7 @@ if errorlevel 1 (
     echo Please check:
     echo   - Internet connection
     echo   - GitHub repository URL
-    echo   - Git credentials (if private repo)
+    echo   - Git credentials ^(if private repo^)
     echo.
     pause
     exit /b 1

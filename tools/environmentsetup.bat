@@ -209,12 +209,12 @@ if "%SETUP_ERRORS%"=="0" (
     echo   3. Or build only GUI:  cd viewer ^&^& .venv\Scripts\activate ^&^& build_viewer.bat
     echo.
 ) else (
-    echo ERRORS ENCOUNTERED: %SETUP_ERRORS% setup step(s) failed
+    echo ERRORS ENCOUNTERED: %SETUP_ERRORS% setup step^(s^) failed
     echo.
     echo Please review the output above for error details.
     echo Common issues:
     echo   - Python not in PATH
-    echo   - No internet connection (can't download packages)
+    echo   - No internet connection ^(can't download packages^)
     echo   - Insufficient permissions
     echo   - Disk space issues
     echo.

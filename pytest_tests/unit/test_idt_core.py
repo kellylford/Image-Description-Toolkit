@@ -159,7 +159,7 @@ class TestProject:
         from idt_core.project import Project
         src, _ = _make_source_tree(tmp_path)
         project = Project.open(src)
-        data = json.loads((project.idt_dir / "project.json").read_text())
+        data = json.loads((project.idt_dir / "project.json").read_text(encoding="utf-8"))
         assert data["version"] == "1.0"
         assert Path(data["source"]) == src
 
@@ -944,8 +944,10 @@ class TestPromptMetadataLabel:
         """
         from pathlib import Path
         root = Path(__file__).resolve().parents[2]
-        gui = (root / "imagedescriber" / "workers_wx.py").read_text()
-        pipe = (root / "idt_core" / "pipeline.py").read_text()
+        # encoding is required: these sources contain non-ASCII, and read_text()
+        # defaults to the locale codec (cp1252 on Windows), which raises there.
+        gui = (root / "imagedescriber" / "workers_wx.py").read_text(encoding="utf-8")
+        pipe = (root / "idt_core" / "pipeline.py").read_text(encoding="utf-8")
 
         # Neither may hand-roll the old bare label
         assert 'f"Context: {' not in gui

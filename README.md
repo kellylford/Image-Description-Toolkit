@@ -8,7 +8,7 @@ AI-powered batch image description tool supporting multiple vision models (Ollam
 
 Download the latest installer from the [releases](https://github.com/kellylford/Image-Description-Toolkit/releases) page:
 
-**`ImageDescriptionToolkit_Setup_v4.5.0.exe`** (Windows) or **`IDT-4.5.0.pkg`** / **`IDT-4.5.0.dmg`** (macOS)
+**`ImageDescriptionToolkitSetup_4.5.0.exe`** (Windows) or **`IDT-4.5.0.pkg`** / **`IDT-4.5.0.dmg`** (macOS)
 
 Run the installer - it includes:
 - **idt.exe** - Command-line interface for batch processing and automation

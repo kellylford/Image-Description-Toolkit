@@ -237,9 +237,9 @@ echo.
 REM Check for geocoding (look for city/state names in descriptions)
 findstr /R /C:"[A-Z][a-z]*, [A-Z][A-Z] [0-9]" "%WORKFLOW_DIR%\descriptions\image_descriptions.txt" >nul 2>&1
 if not errorlevel 1 (
-    echo ✓ Geocoding appears to be working (found city, state patterns)
+    echo ✓ Geocoding appears to be working ^(found city, state patterns^)
 ) else (
-    echo ⚠ Geocoding may not be working (no city, state patterns found)
+    echo ⚠ Geocoding may not be working ^(no city, state patterns found^)
 )
 
 REM Check for geocode cache file

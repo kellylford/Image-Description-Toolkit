@@ -245,8 +245,8 @@ if %FILE_COUNT% neq 5 (
     echo WARNING: Expected 5 test files, found %FILE_COUNT% >> %TEST_LOG%
     echo Continuing anyway...
 ) else (
-    echo ✓ Test data validated (%FILE_COUNT% files)
-    echo ✓ Test data validated (%FILE_COUNT% files) >> %TEST_LOG%
+    echo ✓ Test data validated ^(%FILE_COUNT% files^)
+    echo ✓ Test data validated ^(%FILE_COUNT% files^) >> %TEST_LOG%
 )
 
 REM ============================================================================
@@ -374,7 +374,7 @@ if %VALIDATION_PASSED% equ %VALIDATION_TOTAL% (
         echo ✓ Ollama Setup: SUCCESS  
         echo ✓ Model Downloads: SUCCESS
         echo ✓ Workflow Testing: SUCCESS
-        echo ✓ Output Validation: SUCCESS (%VALIDATION_PASSED%/%VALIDATION_TOTAL%)
+        echo ✓ Output Validation: SUCCESS ^(%VALIDATION_PASSED%/%VALIDATION_TOTAL%^)
         echo ✓ Analysis Tools: SUCCESS
     ) else (
         echo ❌ TESTS FAILED - No workflows created

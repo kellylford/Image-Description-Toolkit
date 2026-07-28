@@ -94,7 +94,7 @@ Located in `MacBuilds/`:
 ### Windows
 - Individual builds: `<app>/dist/<App>.exe`
 - Packaged: `dist_all/bin/` (all executables together)
-- Installer: `dist_all/ImageDescriptionToolkit_Setup_v{version}.exe`
+- Installer: `dist_all/ImageDescriptionToolkitSetup_{version}.exe`
 
 ### macOS
 - Individual builds: `<app>/dist/<App>.app`

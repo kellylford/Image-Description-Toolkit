@@ -217,7 +217,7 @@ echo ===========================================================================
 echo.
 
 if %TOTAL_FAILED% GTR 0 (
-    echo    [FAIL] %TOTAL_FAILED% critical test(s) failed - DO NOT BUILD
+    echo    [FAIL] %TOTAL_FAILED% critical test^(s^) failed - DO NOT BUILD
     echo.
     exit /b 1
 ) else (

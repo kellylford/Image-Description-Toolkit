@@ -261,6 +261,6 @@ if "%BUILD_ERRORS%"=="0" (
 
 if not "%BUILD_ERRORS%"=="0" (
     echo.
-    echo Build completed with %BUILD_ERRORS% error(s).
+    echo Build completed with %BUILD_ERRORS% error^(s^).
     exit /b 1
 )

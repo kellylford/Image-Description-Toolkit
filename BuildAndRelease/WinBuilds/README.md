@@ -34,7 +34,7 @@ This builds all three IDT applications:
 BuildAndRelease\WinBuilds\build_installer.bat
 ```
 
-Creates `ImageDescriptionToolkit_Setup_v{version}.exe` in `dist_all/`.
+Creates `ImageDescriptionToolkitSetup_{version}.exe` in `dist_all/`.
 
 ## Individual Scripts
 
@@ -57,7 +57,7 @@ Creates Windows installer using Inno Setup.
 - All executables built and packaged
 - `installer.iss` configuration file
 
-**Output:** `dist_all/ImageDescriptionToolkit_Setup_v{version}.exe`
+**Output:** `dist_all/ImageDescriptionToolkitSetup_{version}.exe`
 
 ### `installer.iss`
 Inno Setup configuration file defining:
@@ -86,7 +86,7 @@ BuildAndRelease\WinBuilds\builditall_wx
 
 - **Individual builds:** `<app>/dist/<App>.exe`
 - **Packaged executables:** `dist_all/bin/`
-- **Installer:** `dist_all/ImageDescriptionToolkit_Setup_v{version}.exe`
+- **Installer:** `dist_all/ImageDescriptionToolkitSetup_{version}.exe`
 
 ## Troubleshooting
 

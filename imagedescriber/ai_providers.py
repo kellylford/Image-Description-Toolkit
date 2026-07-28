@@ -6,6 +6,7 @@ Ollama, OpenAI, Claude, and MLX providers.
 """
 
 import os
+import re
 import sys
 import requests
 import json
@@ -138,10 +139,36 @@ def sort_claude_models(models: List[str]) -> List[str]:
     return sorted(models, key=get_sort_key)
 
 
+def _is_retryable_error(result: str) -> bool:
+    """True when a provider's error string describes a transient failure.
+
+    Providers report failures by RETURNING a string rather than raising, so the
+    only signal available is the wording. Every provider must therefore spell a
+    transient failure as "(status code: NNN)" for 5xx/429, or mention a timeout.
+
+    This is an implicit contract between each provider's describe_image() and the
+    retry decorator, and it has silently broken twice: Ollama used "Error: HTTP
+    500", and OpenAI/Claude strings did not start with "Error:" as the old guard
+    required. Both meant zero retries on a fully transient failure.
+
+    test_retry_contract.py asserts every provider's error strings satisfy this.
+    """
+    if not isinstance(result, str):
+        return False
+    lowered = result.lower()
+    if "timeout" in lowered:
+        return True
+    match = re.search(r"status code:\s*(\d{3})", lowered)
+    if not match:
+        return False
+    status = int(match.group(1))
+    return status >= 500 or status == 429
+
+
 def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):
     """
     Retry decorator for API calls with exponential backoff.
-    
+
     Args:
         max_retries: Maximum number of retry attempts
         base_delay: Initial delay between retries in seconds
@@ -157,101 +184,25 @@ def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_mu
                 try:
                     result = func(*args, **kwargs)
                     
-                    # Check if result indicates a retryable error
-                    if isinstance(result, str) and result.startswith("Error:"):
-                        # Extract status code if present
-                        if "status code: 5" in result or "status code: 429" in result or "timeout" in result.lower():
-                            if attempt < max_retries:
-                                delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
-                                # Add jitter to prevent thundering herd
-                                jitter = random.uniform(0.1, 0.5) * delay
-                                sleep_time = delay + jitter
-                                
-                                print(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed, retrying in {sleep_time:.1f}s...")
-                                time.sleep(sleep_time)
-                                continue
-                            else:
-                                print(f"  [RETRY] All {max_retries + 1} attempts failed")
-                                return result
-                    
-                    # Success or non-retryable error
-                    if attempt > 0:
-                        print(f"  [RETRY] Success on attempt {attempt + 1}")
-                    return result
-                    
-                except Exception as e:
-                    last_exception = e
-                    
-                    # Determine if error is retryable
-                    error_type = type(e).__name__
-                    error_msg = str(e).lower()
-                    is_retryable = (
-                        'timeout' in error_msg or
-                        'connectionerror' in error_type.lower() or
-                        'httperror' in error_type.lower() or
-                        'ratelimiterror' in error_type.lower() or
-                        hasattr(e, 'status_code') and (e.status_code >= 500 or e.status_code == 429)
-                    )
-                    
-                    if is_retryable and attempt < max_retries:
-                        delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
-                        jitter = random.uniform(0.1, 0.5) * delay
-                        sleep_time = delay + jitter
-                        
-                        print(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed ({error_type}), retrying in {sleep_time:.1f}s...")
-                        time.sleep(sleep_time)
-                        continue
-                    else:
-                        # Non-retryable error or max retries reached
-                        if attempt > 0:
+                    # Check if result indicates a retryable error.
+                    # Deliberately NOT gated on result.startswith("Error:") -- most
+                    # OpenAI/Claude failures come back as "Rate limit exceeded
+                    # (status code: 429) - ..." or "Server error from ... (status
+                    # code: 500) - ...", which never matched that prefix, so 5xx and
+                    # 429 from those providers silently skipped every retry.
+                    if isinstance(result, str) and _is_retryable_error(result):
+                        if attempt < max_retries:
+                            delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
+                            # Add jitter to prevent thundering herd
+                            jitter = random.uniform(0.1, 0.5) * delay
+                            sleep_time = delay + jitter
+
+                            print(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed, retrying in {sleep_time:.1f}s...")
+                            time.sleep(sleep_time)
+                            continue
+                        else:
                             print(f"  [RETRY] All {max_retries + 1} attempts failed")
-                        raise e
-            
-            # This should not be reached, but just in case
-            if last_exception:
-                raise last_exception
-            return None
-            
-        return wrapper
-    return decorator
-
-
-
-def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):
-    """
-    Retry decorator for API calls with exponential backoff.
-    
-    Args:
-        max_retries: Maximum number of retry attempts
-        base_delay: Initial delay between retries in seconds
-        max_delay: Maximum delay between retries in seconds
-        backoff_multiplier: Multiplier for exponential backoff
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception = None
-            
-            for attempt in range(max_retries + 1):  # +1 for initial attempt
-                try:
-                    result = func(*args, **kwargs)
-                    
-                    # Check if result indicates a retryable error
-                    if isinstance(result, str) and result.startswith("Error:"):
-                        # Extract status code if present
-                        if "status code: 5" in result or "status code: 429" in result or "timeout" in result.lower():
-                            if attempt < max_retries:
-                                delay = min(base_delay * (backoff_multiplier ** attempt), max_delay)
-                                # Add jitter to prevent thundering herd
-                                jitter = random.uniform(0.1, 0.5) * delay
-                                sleep_time = delay + jitter
-                                
-                                print(f"  [RETRY] Attempt {attempt + 1}/{max_retries + 1} failed, retrying in {sleep_time:.1f}s...")
-                                time.sleep(sleep_time)
-                                continue
-                            else:
-                                print(f"  [RETRY] All {max_retries + 1} attempts failed")
-                                return result
+                            return result
                     
                     # Success or non-retryable error
                     if attempt > 0:
@@ -472,7 +423,11 @@ class OllamaProvider(AIProvider):
                 except Exception as log_error:
                     print(f"  Warning: Could not write to error log: {log_error}")
                 
-                return f"Error: HTTP {response.status_code} - ({timestamp})"
+                # Phrase this the same way OpenAI/Claude do: retry_on_api_error only
+                # retries results matching "status code: 5" / "status code: 429", so
+                # the older "Error: HTTP 500" wording made every 5xx a hard failure.
+                return (f"Error: Server error from Ollama "
+                        f"(status code: {response.status_code}) - ({timestamp})")
                 
         except Exception as e:
             # Enhanced error logging for Ollama exceptions

@@ -51,7 +51,7 @@ if errorlevel 1 (
     echo.
     echo Common issues:
     echo   - Python not installed or not in PATH
-    echo   - QNAP directory not accessible (\\qnap\home\idt\descriptions)
+    echo   - QNAP directory not accessible ^(\\qnap\home\idt\descriptions^)
     echo   - No workflow results found in the directory
     echo.
     pause
