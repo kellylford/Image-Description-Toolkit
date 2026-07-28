@@ -376,7 +376,7 @@ All accessible via `idt` commands:
 - **`idt stats`** - Performance analysis (tokens, timing, costs)
 - **`idt contentreview`** - Description quality review
 
-## GUI Development (PyQt6)
+## GUI Development (wxPython)
 
 ### Accessibility Requirements (WCAG 2.2 AA)
 - **Single Tab Stops*the app-specific `.spec` file in each app directory

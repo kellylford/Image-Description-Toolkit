@@ -89,15 +89,15 @@ When you build ImageDescriber using the build scripts, the following files are n
 
 ### ✅ Included (No External Dependencies)
 - Python 3.13 runtime
-- PyQt6 (GUI framework)
+- wxPython (GUI framework)
 - Pillow + pillow-heif (image loading, HEIC support)
 - NumPy (numerical operations)
 - All ImageDescriber modules:
   - `ai_providers.py`
   - `data_models.py`
-  - `worker_threads.py`
-  - `ui_components.py`
-  - `dialogs.py`
+  - `workers_wx.py`
+  - `viewer_components.py`
+  - `dialogs_wx.py`
 - Full workspace management
 - HTML export engine
 - Image preview and manipulation

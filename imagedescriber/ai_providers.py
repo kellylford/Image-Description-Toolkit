@@ -144,25 +144,217 @@ def _is_retryable_error(result: str) -> bool:
 
     Providers report failures by RETURNING a string rather than raising, so the
     only signal available is the wording. Every provider must therefore spell a
-    transient failure as "(status code: NNN)" for 5xx/429, or mention a timeout.
+    transient failure as "(status code: NNN)" for 5xx/429, "(status code:
+    timeout)", or "(status code: transient)".
 
     This is an implicit contract between each provider's describe_image() and the
     retry decorator, and it has silently broken twice: Ollama used "Error: HTTP
     500", and OpenAI/Claude strings did not start with "Error:" as the old guard
     required. Both meant zero retries on a fully transient failure.
 
-    test_retry_contract.py asserts every provider's error strings satisfy this.
+    Do not hand-write these strings. Call format_provider_error(), which is the
+    single place the wording is decided and is verified against this function for
+    every error kind. test_provider_contract.py asserts both halves.
     """
     if not isinstance(result, str):
         return False
     lowered = result.lower()
-    if "timeout" in lowered:
-        return True
+
+    # A numeric status is a fact and outranks everything else. Checking the
+    # bare word "timeout" first made "Invalid request - upstream timeout
+    # (status code: 400)" retryable, so a permanently malformed request was
+    # re-sent four times per image.
     match = re.search(r"status code:\s*(\d{3})", lowered)
-    if not match:
-        return False
-    status = int(match.group(1))
-    return status >= 500 or status == 429
+    if match:
+        status = int(match.group(1))
+        return status >= 500 or status == 429
+
+    if re.search(r"status code:\s*transient", lowered):
+        return True
+    # Fallback for failures with no status at all (transport-level timeouts).
+    return "timeout" in lowered
+
+
+# ---------------------------------------------------------------------------
+# Structured provider errors
+#
+# The nine-month Ollama retry bug (issue #228) existed because the contract
+# between a provider's describe_image() and retry_on_api_error() was expressed
+# only in prose: "spell a transient failure like this". Two commits two weeks
+# apart disagreed about the wording and nothing noticed.
+#
+# Everything below exists so that wording is decided in exactly one place:
+#   * ProviderError            -- carries status_code as a field, not English
+#   * classify_provider_exception -- SDK exception -> (kind, status_code)
+#   * format_provider_error    -- (kind, status_code) -> the user-visible string
+#
+# A provider must never build an error string by hand. The kind determines
+# retryability, and format_provider_error guarantees the emitted string
+# classifies that way under _is_retryable_error.
+# ---------------------------------------------------------------------------
+
+class ErrorKind:
+    """The failure categories every provider maps its errors onto."""
+    RATE_LIMIT = "rate_limit"
+    AUTH = "auth"
+    INVALID_REQUEST = "invalid_request"
+    SERVER_ERROR = "server_error"
+    TIMEOUT = "timeout"
+    UNKNOWN = "unknown"
+
+    ALL = ("rate_limit", "auth", "invalid_request",
+           "server_error", "timeout", "unknown")
+
+
+#: Kinds worth another attempt. This is the ONLY definition of that policy;
+#: _is_retryable_error must agree with it for every string the formatter emits.
+RETRYABLE_KINDS = frozenset({
+    ErrorKind.RATE_LIMIT,
+    ErrorKind.SERVER_ERROR,
+    ErrorKind.TIMEOUT,
+})
+
+#: Status placeholder used when a retryable failure has no numeric HTTP status
+#: (e.g. a transport-level error). _is_retryable_error recognises it.
+_TRANSIENT_TOKEN = "transient"
+
+
+def kind_for_status(status_code) -> str:
+    """Map an HTTP status onto an ErrorKind."""
+    try:
+        status = int(status_code)
+    except (TypeError, ValueError):
+        return ErrorKind.UNKNOWN
+    if status == 429:
+        return ErrorKind.RATE_LIMIT
+    if status in (401, 403):
+        return ErrorKind.AUTH
+    if status >= 500:
+        return ErrorKind.SERVER_ERROR
+    if status >= 400:          # 5xx already returned above
+        return ErrorKind.INVALID_REQUEST
+    return ErrorKind.UNKNOWN
+
+
+class ProviderError(Exception):
+    """A provider failure with the HTTP status attached as a field.
+
+    retry_on_api_error's exception branch already inspects e.status_code, so
+    raising this is retried on its own merits without any string parsing.
+    """
+
+    def __init__(self, message: str, status_code=None, provider: str = "",
+                 kind: Optional[str] = None):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.provider = provider
+        self.kind = kind or kind_for_status(status_code)
+
+    @property
+    def is_retryable(self) -> bool:
+        return self.kind in RETRYABLE_KINDS
+
+    def as_description(self, timestamp: Optional[str] = None) -> str:
+        """Render as the string describe_image returns to its caller."""
+        return format_provider_error(
+            provider=self.provider,
+            kind=self.kind,
+            status_code=self.status_code,
+            message=self.message,
+            timestamp=timestamp,
+        )
+
+
+def classify_provider_exception(exc: BaseException):
+    """Map an SDK/transport exception onto (kind, status_code).
+
+    OpenAIProvider and ClaudeProvider used to carry byte-identical copies of
+    this branching. Two copies is two chances to drift; this is one.
+    """
+    if isinstance(exc, ProviderError):
+        return exc.kind, exc.status_code
+
+    error_type = type(exc).__name__
+    error_msg = str(exc)
+
+    status_code = getattr(exc, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+
+    if 'RateLimitError' in error_type or status_code == 429:
+        return ErrorKind.RATE_LIMIT, status_code
+    if 'AuthenticationError' in error_type or status_code == 401:
+        return ErrorKind.AUTH, status_code
+    if 'InvalidRequestError' in error_type or status_code == 400:
+        return ErrorKind.INVALID_REQUEST, status_code
+    if status_code is not None and status_code >= 500:
+        return ErrorKind.SERVER_ERROR, status_code
+    if 'TimeoutError' in error_type or 'timeout' in error_msg.lower():
+        return ErrorKind.TIMEOUT, status_code
+    return ErrorKind.UNKNOWN, status_code
+
+
+def _status_token(kind: str, status_code) -> str:
+    """The text that goes inside "(status code: ...)".
+
+    A numeric status when we have one; otherwise a placeholder chosen so the
+    resulting string still classifies as the kind intends.
+    """
+    if isinstance(status_code, int):
+        return str(status_code)
+    if status_code:                       # a non-empty string status
+        return str(status_code)
+    if kind == ErrorKind.TIMEOUT:
+        return "timeout"
+    if kind in RETRYABLE_KINDS:
+        return _TRANSIENT_TOKEN
+    return "unknown"
+
+
+def format_provider_error(provider: str, kind: str, status_code=None,
+                          message: str = "",
+                          timestamp: Optional[str] = None) -> str:
+    """Build the user-visible failure string for a provider.
+
+    THE single place a provider failure becomes English. Every provider calls
+    this; none writes "(status code: ...)" by hand. That is what makes the
+    retry contract checkable rather than a convention people remember.
+
+    The wording is unchanged from what each provider emitted before it was
+    centralised, so logs and saved descriptions stay comparable.
+    """
+    if timestamp is None:
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+
+    token = _status_token(kind, status_code)
+    suffix = f"(status code: {token}) - ({timestamp})"
+
+    if kind == ErrorKind.RATE_LIMIT:
+        return f"Rate limit exceeded {suffix}"
+    if kind == ErrorKind.AUTH:
+        return f"Authentication failed - check API key {suffix}"
+    if kind == ErrorKind.INVALID_REQUEST:
+        return f"Invalid request - {message} {suffix}"
+    if kind == ErrorKind.SERVER_ERROR:
+        return f"Server error from {provider} {suffix}"
+    if kind == ErrorKind.TIMEOUT:
+        return f"Request timeout - try again later {suffix}"
+    return f"Error generating description: {message} {suffix}"
+
+
+def provider_error_from_exception(exc: BaseException, provider: str,
+                                  timestamp: Optional[str] = None) -> str:
+    """Convenience: classify an exception and format it in one step."""
+    kind, status_code = classify_provider_exception(exc)
+    return format_provider_error(
+        provider=provider,
+        kind=kind,
+        status_code=status_code,
+        message=str(exc),
+        timestamp=timestamp,
+    )
 
 
 def retry_on_api_error(max_retries=3, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0):
@@ -423,12 +615,17 @@ class OllamaProvider(AIProvider):
                 except Exception as log_error:
                     print(f"  Warning: Could not write to error log: {log_error}")
                 
-                # Phrase this the same way OpenAI/Claude do: retry_on_api_error only
-                # retries results matching "status code: 5" / "status code: 429", so
-                # the older "Error: HTTP 500" wording made every 5xx a hard failure.
-                return (f"Error: Server error from Ollama "
-                        f"(status code: {response.status_code}) - ({timestamp})")
-                
+                # Never hand-write this string: the older "Error: HTTP 500"
+                # wording carried no "(status code: NNN)", so retry_on_api_error
+                # treated every 5xx as permanent for nine months.
+                return format_provider_error(
+                    provider="Ollama",
+                    kind=kind_for_status(response.status_code),
+                    status_code=response.status_code,
+                    message=(response.text or "")[:200],
+                    timestamp=timestamp,
+                )
+
         except Exception as e:
             # Enhanced error logging for Ollama exceptions
             from datetime import datetime
@@ -459,9 +656,9 @@ class OllamaProvider(AIProvider):
                     f.write(json.dumps(error_details) + '\n')
             except Exception as log_error:
                 print(f"  Warning: Could not write to error log: {log_error}")
-            
-            return f"Error generating description: {str(e)} - ({timestamp})"
-    
+
+            return provider_error_from_exception(e, "Ollama", timestamp)
+
     def get_last_token_usage(self) -> Optional[Dict]:
         """Return token usage from last API call (if available)"""
         return self.last_usage
@@ -549,7 +746,7 @@ class OpenAIProvider(AIProvider):
     def _load_api_key_from_file(self) -> Optional[str]:
         """Load API key from openai.txt file"""
         try:
-            with open('openai.txt', 'r') as f:
+            with open('openai.txt', 'r', encoding='utf-8') as f:
                 api_key = f.read().strip()
                 return api_key if api_key else None
         except (FileNotFoundError, IOError):
@@ -782,11 +979,13 @@ class OpenAIProvider(AIProvider):
             # Extract detailed error information
             error_type = type(e).__name__
             error_msg = str(e)
-            
+            kind, classified_status = classify_provider_exception(e)
+
             # Log comprehensive error details for debugging
             error_details = {
                 'timestamp': timestamp,
                 'provider': 'OpenAI',
+                'error_kind': kind,
                 'model': model,
                 'image_path': image_path,
                 'error_type': error_type,
@@ -827,20 +1026,15 @@ class OpenAIProvider(AIProvider):
             except Exception as log_error:
                 print(f"  Warning: Could not write to error log: {log_error}")
             
-            # Provide user-friendly error messages based on error type and status code
-            if 'RateLimitError' in error_type or (status_code and status_code == 429):
-                return f"Rate limit exceeded (status code: {status_code or 'unknown'}) - ({timestamp})"
-            elif 'AuthenticationError' in error_type or (status_code and status_code == 401):
-                return f"Authentication failed - check API key (status code: {status_code or 'unknown'}) - ({timestamp})"
-            elif 'InvalidRequestError' in error_type or (status_code and status_code == 400):
-                return f"Invalid request - {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
-            elif status_code and status_code >= 500:
-                return f"Server error from OpenAI API (status code: {status_code}) - ({timestamp})"
-            elif 'TimeoutError' in error_type or 'timeout' in error_msg.lower():
-                return f"Request timeout - try again later (status code: {status_code or 'timeout'}) - ({timestamp})"
-            else:
-                return f"Error generating description: {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
-    
+            # One formatter, one classifier -- see format_provider_error.
+            return format_provider_error(
+                provider="OpenAI API",
+                kind=kind,
+                status_code=classified_status,
+                message=error_msg,
+                timestamp=timestamp,
+            )
+
     def get_last_token_usage(self) -> Optional[Dict]:
         """Get token usage from last API call (for cost tracking and logging)"""
         return self.last_usage
@@ -928,7 +1122,7 @@ class ClaudeProvider(AIProvider):
     def _load_api_key_from_file(self) -> Optional[str]:
         """Load API key from claude.txt file in current directory only"""
         try:
-            with open('claude.txt', 'r') as f:
+            with open('claude.txt', 'r', encoding='utf-8') as f:
                 api_key = f.read().strip()
                 return api_key if api_key else None
         except (FileNotFoundError, IOError):
@@ -1058,11 +1252,13 @@ class ClaudeProvider(AIProvider):
             # Extract detailed error information
             error_type = type(e).__name__
             error_msg = str(e)
-            
+            kind, classified_status = classify_provider_exception(e)
+
             # Log comprehensive error details for debugging
             error_details = {
                 'timestamp': timestamp,
                 'provider': 'Claude',
+                'error_kind': kind,
                 'model': model,
                 'image_path': image_path,
                 'error_type': error_type,
@@ -1103,20 +1299,15 @@ class ClaudeProvider(AIProvider):
             except Exception as log_error:
                 print(f"  Warning: Could not write to error log: {log_error}")
             
-            # Provide user-friendly error messages based on error type and status code
-            if 'RateLimitError' in error_type or (status_code and status_code == 429):
-                return f"Rate limit exceeded (status code: {status_code or 'unknown'}) - ({timestamp})"
-            elif 'AuthenticationError' in error_type or (status_code and status_code == 401):
-                return f"Authentication failed - check API key (status code: {status_code or 'unknown'}) - ({timestamp})"
-            elif 'InvalidRequestError' in error_type or (status_code and status_code == 400):
-                return f"Invalid request - {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
-            elif status_code and status_code >= 500:
-                return f"Server error from Claude API (status code: {status_code}) - ({timestamp})"
-            elif 'TimeoutError' in error_type or 'timeout' in error_msg.lower():
-                return f"Request timeout - try again later (status code: {status_code or 'timeout'}) - ({timestamp})"
-            else:
-                return f"Error generating description: {error_msg} (status code: {status_code or 'unknown'}) - ({timestamp})"
-    
+            # One formatter, one classifier -- see format_provider_error.
+            return format_provider_error(
+                provider="Claude API",
+                kind=kind,
+                status_code=classified_status,
+                message=error_msg,
+                timestamp=timestamp,
+            )
+
     def get_last_token_usage(self) -> Optional[Dict]:
         """Get token usage from last API call (for cost tracking and logging)"""
         return self.last_usage
@@ -1400,7 +1591,10 @@ class MLXProvider(AIProvider):
             error_msg = str(exc)
             print(f"[ERROR] MLX inference error — {error_type}: {error_msg}")
             traceback.print_exc()
-            return f"Error generating description (MLX/{model}): {error_msg}"
+            # MLX runs on-device, so there is no HTTP status to report. It still
+            # goes through the shared formatter: a provider that writes its own
+            # error wording is exactly how the retry contract broke before.
+            return provider_error_from_exception(exc, f"MLX/{model}")
 
         finally:
             if temp_jpeg:

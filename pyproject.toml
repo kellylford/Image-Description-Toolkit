@@ -54,13 +54,19 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["scripts"]
+# scripts/ was emptied of Python in 2a32e6d (legacy removal) and now holds only
+# JSON config. Pointing coverage at it meant every --cov run measured zero files
+# and reported success -- which is how ai_providers.describe_image went nine
+# months with no test at all under a fully green suite (issue #228).
+source = ["idt_core", "imagedescriber", "cli"]
 omit = [
     "*/tests/*",
     "*/test_*",
     "*/__pycache__/*",
     "*/build/*",
-    "*/dist/*"
+    "*/dist/*",
+    "*/.winenv/*",
+    "*/.venv/*"
 ]
 
 [tool.coverage.report]
@@ -77,3 +83,36 @@ exclude_lines = [
 
 precision = 2
 show_missing = true
+
+# A ratchet, not a cliff. Set just below the measured number so it fails on a
+# regression, not on the status quo, and raised as coverage lands.
+#
+# This only applies when a coverage report is actually produced (a --cov run).
+# addopts deliberately does NOT pass --cov, so targeted runs like
+# `pytest pytest_tests/unit/test_idt_core.py` are unaffected.
+#
+# Measured 20.12% at the issue #228 work (was 13.48%, and before the
+# [tool.coverage.run] source fix, literally nothing).
+fail_under = 19
+
+# ---------------------------------------------------------------------------
+# Per-file coverage floors, enforced by tools/check_coverage_floors.py.
+#
+# Worth more than the global number: a global floor is satisfied by covering
+# anything at all, while these name the files where a gap actually shipped a
+# bug. ai_providers.py is where the nine-month Ollama retry defect lived with
+# no test touching describe_image at all.
+#
+# Raise a floor when you add coverage. Lowering one needs a reason in the
+# commit message.
+# ---------------------------------------------------------------------------
+[tool.idt.coverage-floors]
+"imagedescriber/ai_providers.py" = 62.0
+"idt_core/providers/base.py" = 100.0
+"idt_core/providers/claude.py" = 45.0
+"idt_core/providers/ollama.py" = 48.0
+"idt_core/providers/openai_provider.py" = 52.0
+"idt_core/pipeline.py" = 82.0
+"idt_core/workspace.py" = 85.0
+"idt_core/project.py" = 100.0
+"idt_core/image_item.py" = 96.0

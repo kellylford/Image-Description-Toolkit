@@ -73,85 +73,109 @@ echo BUILD SUMMARY
 echo ========================================================================
 echo.
 
-if "%BUILD_ERRORS%"=="0" (
-    echo SUCCESS: All wxPython applications built successfully!
-    echo.
-    
-    REM ========================================================================
-    echo ========================================================================
-    echo PACKAGING ALL APPLICATIONS
-    echo ========================================================================
-    echo.
-    
-    REM Create distribution directory in BuildAndRelease\WinBuilds
-    if not exist "BuildAndRelease\WinBuilds\dist_all" mkdir BuildAndRelease\WinBuilds\dist_all
-    if not exist "BuildAndRelease\WinBuilds\dist_all\bin" mkdir BuildAndRelease\WinBuilds\dist_all\bin
-    
-    REM Clean old files
-    echo Cleaning old package...
-    del /Q BuildAndRelease\WinBuilds\dist_all\bin\*.exe 2>nul
-    del /Q BuildAndRelease\WinBuilds\dist_all\*.md 2>nul
-    del /Q BuildAndRelease\WinBuilds\dist_all\*.txt 2>nul
-    
-    echo Packaging applications...
-    echo.
+REM ============================================================================
+REM Everything below runs at TOP LEVEL. Nothing that decides the exit code may
+REM live inside a parenthesised block that is nested inside another one.
+REM
+REM cmd DISCARDS the exit code of "exit /b N" issued from an if-block that is
+REM itself inside an if-block. The script does terminate and does print its
+REM error, but the caller is told the run succeeded. One level of nesting is
+REM fine; two is not:
+REM
+REM     if "%E%"=="0" ( if not exist x ( exit /b 1 ) )    -- caller sees 0
+REM     if "%E%"=="0" ( exit /b 1 )                       -- caller sees 1
+REM
+REM That is why the missing-artifact guards added in 1488bb5 could not fail a
+REM build: they printed "NOT FOUND" and still exited 0, so a sub-build that
+REM emitted nothing was packaged anyway and the run looked clean. Same defect
+REM class as the unescaped-paren bug, different mechanism. Verified 2026-07-28.
+REM
+REM Flat control flow with goto has no such trap.
+REM pytest_tests/unit/test_build_orchestrators.py runs these paths for real.
+REM ============================================================================
 
-    REM Copy IDT CLI. A missing exe is fatal: never package a partial build.
-    REM These checks exit immediately rather than counting errors, because
-    REM reading a counter set inside this block would need delayed expansion.
-    if not exist "idt\dist\idt.exe" (
-        echo   ✗ idt.exe NOT FOUND - the build did not produce an executable
-        cd /d "%ORIGINAL_DIR%"
-        exit /b 1
-    )
-    copy /Y "idt\dist\idt.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-    if errorlevel 1 (
-        echo   ✗ idt.exe could not be copied into dist_all\bin
-        cd /d "%ORIGINAL_DIR%"
-        exit /b 1
-    )
-    echo   ✓ idt.exe
+if not "%BUILD_ERRORS%"=="0" goto :builds_failed
 
-    REM Copy ImageDescriber (includes Viewer Mode, PromptEditor and IDTConfigure)
-    if not exist "imagedescriber\dist\ImageDescriber.exe" (
-        echo   ✗ ImageDescriber.exe NOT FOUND - the build did not produce an executable
-        cd /d "%ORIGINAL_DIR%"
-        exit /b 1
-    )
-    copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
-    if errorlevel 1 (
-        echo   ✗ ImageDescriber.exe could not be copied into dist_all\bin
-        cd /d "%ORIGINAL_DIR%"
-        exit /b 1
-    )
-    echo   ✓ ImageDescriber.exe ^(with integrated Viewer Mode and tools^)
+echo SUCCESS: All wxPython applications built successfully!
+echo.
+echo ========================================================================
+echo PACKAGING ALL APPLICATIONS
+echo ========================================================================
+echo.
 
-    REM Copy documentation
-    echo.
-    echo Copying documentation...
-    if exist "README.md" copy /Y "README.md" "BuildAndRelease\WinBuilds\dist_all\" >nul
-    if exist "LICENSE" copy /Y "LICENSE" "BuildAndRelease\WinBuilds\dist_all\" >nul
-    
-    echo.
-    echo ========================================================================
-    echo PACKAGING COMPLETE
-    echo ========================================================================
-    echo.
-    echo All applications packaged in: BuildAndRelease\WinBuilds\dist_all\bin\
-    echo.
-    echo Ready for distribution or installer creation.
-    echo.
-    echo Next step: Run build_installer.bat to create Windows installer
-    
-    REM Return to original directory
-    cd /d "%ORIGINAL_DIR%"
-    exit /b 0
-) else (
-    echo ERRORS: %BUILD_ERRORS% build failures encountered
-    echo.
-    echo If .winenv errors, run: winsetup.bat
-    
-    REM Return to original directory
-    cd /d "%ORIGINAL_DIR%"
-    exit /b 1
-)
+REM Create distribution directory in BuildAndRelease\WinBuilds
+if not exist "BuildAndRelease\WinBuilds\dist_all" mkdir BuildAndRelease\WinBuilds\dist_all
+if not exist "BuildAndRelease\WinBuilds\dist_all\bin" mkdir BuildAndRelease\WinBuilds\dist_all\bin
+
+REM Clean old files
+echo Cleaning old package...
+del /Q BuildAndRelease\WinBuilds\dist_all\bin\*.exe 2>nul
+del /Q BuildAndRelease\WinBuilds\dist_all\*.md 2>nul
+del /Q BuildAndRelease\WinBuilds\dist_all\*.txt 2>nul
+
+echo Packaging applications...
+echo.
+
+REM Copy IDT CLI. A missing exe is fatal: never package a partial build.
+if not exist "idt\dist\idt.exe" goto :missing_idt
+copy /Y "idt\dist\idt.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+if errorlevel 1 goto :copy_failed_idt
+echo   ✓ idt.exe
+
+REM Copy ImageDescriber (includes Viewer Mode, PromptEditor and IDTConfigure)
+if not exist "imagedescriber\dist\ImageDescriber.exe" goto :missing_describer
+copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+if errorlevel 1 goto :copy_failed_describer
+echo   ✓ ImageDescriber.exe ^(with integrated Viewer Mode and tools^)
+
+REM Copy documentation
+echo.
+echo Copying documentation...
+if exist "README.md" copy /Y "README.md" "BuildAndRelease\WinBuilds\dist_all\" >nul
+if exist "LICENSE" copy /Y "LICENSE" "BuildAndRelease\WinBuilds\dist_all\" >nul
+
+echo.
+echo ========================================================================
+echo PACKAGING COMPLETE
+echo ========================================================================
+echo.
+echo All applications packaged in: BuildAndRelease\WinBuilds\dist_all\bin\
+echo.
+echo Ready for distribution or installer creation.
+echo.
+echo Next step: Run build_installer.bat to create Windows installer
+
+REM Return to original directory
+cd /d "%ORIGINAL_DIR%"
+exit /b 0
+
+REM ---------------------------------------------------------------------------
+REM Failure exits. Each is at top level, so its code actually reaches the caller.
+REM ---------------------------------------------------------------------------
+
+:missing_idt
+echo   ✗ idt.exe NOT FOUND - the build did not produce an executable
+cd /d "%ORIGINAL_DIR%"
+exit /b 1
+
+:copy_failed_idt
+echo   ✗ idt.exe could not be copied into dist_all\bin
+cd /d "%ORIGINAL_DIR%"
+exit /b 1
+
+:missing_describer
+echo   ✗ ImageDescriber.exe NOT FOUND - the build did not produce an executable
+cd /d "%ORIGINAL_DIR%"
+exit /b 1
+
+:copy_failed_describer
+echo   ✗ ImageDescriber.exe could not be copied into dist_all\bin
+cd /d "%ORIGINAL_DIR%"
+exit /b 1
+
+:builds_failed
+echo ERRORS: %BUILD_ERRORS% build failures encountered
+echo.
+echo If .winenv errors, run: winsetup.bat
+cd /d "%ORIGINAL_DIR%"
+exit /b 1

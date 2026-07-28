@@ -105,7 +105,7 @@ cd ..
 
 All builds include full accessibility support:
 
-### Automatic (via PyQt6)
+### Automatic (via wxPython)
 - VoiceOver compatibility
 - Keyboard navigation
 - High contrast mode

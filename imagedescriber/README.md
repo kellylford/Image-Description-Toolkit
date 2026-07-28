@@ -60,7 +60,7 @@ ImageDescriber provides a professional workspace for managing image description 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.8+ with PyQt6 installed
+- Python 3.11+ with wxPython installed (`pip install -r requirements.txt`)
 - Ollama installed and running with at least one vision model (e.g., llava)
 - Virtual environment activated (recommended)
 
@@ -404,8 +404,8 @@ Example structure:
 
 **App Won't Start**
 - Ensure virtual environment is activated
-- Check PyQt6 installation: `pip install PyQt6`
-- Verify Python version (3.8+)
+- Check wxPython installation: `pip install wxPython`
+- Verify Python version (3.11+)
 
 **No Models Available**
 - Install Ollama vision models: `ollama pull llava`
@@ -442,7 +442,7 @@ The executable will be created in `../dist/imagedescriber_[ARCH]/ImageDescriber/
 ## Architecture
 
 ImageDescriber is built using:
-- **PyQt6**: Modern Qt6 bindings for Python
+- **wxPython**: Native cross-platform GUI toolkit (Windows/macOS)
 - **Ollama Integration**: Direct API communication with Ollama
 - **Document Model**: JSON-based workspace persistence
 - **Worker Threads**: Non-blocking background processing

@@ -24,7 +24,7 @@ Builds IDT for ARM64 Linux systems (Raspberry Pi, Apple Silicon via Rosetta, ARM
 
 **Platform:** Linux ARM64 (via QEMU emulation)  
 **Build Time:** 20-40 minutes (emulation adds overhead)  
-**Note:** GUI apps not built for Linux (PyQt6 complexity)
+**Note:** GUI apps not built for Linux (wxPython complexity)
 
 ## How It Works
 
