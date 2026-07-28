@@ -1367,7 +1367,7 @@ class ChatProcessingWorker(threading.Thread):
                             for filename in ['claude.txt', 'anthropic.txt']:
                                 fp = sp / filename
                                 if fp.exists():
-                                    with open(fp, 'r') as f:
+                                    with open(fp, 'r', encoding='utf-8') as f:
                                         val = f.read().strip()
                                         if val:
                                             api_key_to_use = val

@@ -149,7 +149,10 @@ except ImportError as e:
     import traceback
     # Write error to file for debugging frozen exe
     try:
-        with open('chat_import_error.log', 'w') as f:
+        # encoding is explicit: a traceback can contain non-ASCII, and under the
+        # Windows locale codepage the write would raise inside the except block
+        # below, discarding the very diagnostic we are trying to capture.
+        with open('chat_import_error.log', 'w', encoding='utf-8') as f:
             f.write(f"CHAT IMPORT ERROR: {e}\n")
             f.write(traceback.format_exc())
     except Exception:
@@ -8697,7 +8700,7 @@ if __name__ == "__main__":
 
         crash_log_path = "crash_log.txt"
         try:
-            with open(crash_log_path, "w") as f:
+            with open(crash_log_path, "w", encoding="utf-8") as f:
                 f.write(error_msg)
             print(f"Error logged to {crash_log_path}")
         except Exception:
