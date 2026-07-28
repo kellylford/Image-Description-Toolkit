@@ -20,6 +20,7 @@ from idt_core.workspace import (
     WorkspaceItem,
     WorkspaceDescription,
     BUNDLE_EXT,
+    source_relative_subfolder,
 )
 
 
@@ -125,8 +126,41 @@ def test_add_source_folder_records_provenance(tmp_path, src):
     # manifest records the source folder
     assert any(s["path"] == str(src.resolve()) for s in ws.sources)
     # subfolder grouping preserved on the Day2 item
-    day2 = next(i for i in ws.items() if i.subfolder == "Day2")
+    day2 = next(i for i in ws.items() if i.subfolder == str(Path("Vacation") / "Day2"))
     assert day2.source_path.endswith("beach.jpg")
+
+
+def test_add_source_folder_anchors_source_as_top_level_folder(tmp_path, src):
+    """The source folder itself must be a subfolder component.
+
+    The GUI builds its tree purely from `subfolder`, so a file sitting directly
+    in the source folder needs "Vacation" — not None — or the folder node never
+    exists and every folder-scoped Process command has nothing to scope to.
+    """
+    ws = Workspace.create(tmp_path / "WS")
+    ws.add_source_folder(src, recursive=True)
+
+    by_name = {Path(i.source_path).name: i for i in ws.items() if i.subfolder == "Vacation"}
+    assert set(by_name) == {"beach.jpg", "sunset.jpg"}
+    # nothing may land at the tree root
+    assert all(i.subfolder for i in ws.items())
+
+
+def test_source_relative_subfolder_rule(tmp_path):
+    root = tmp_path / "photos" / "05"
+
+    # file directly in the source folder -> the folder's own name
+    assert source_relative_subfolder(root / "IMG_1.HEIC", root) == "05"
+    # nested file -> source folder name + the nested path
+    assert source_relative_subfolder(root / "Day2" / "IMG.jpg", root) == str(Path("05") / "Day2")
+    # file outside the source folder -> no folder node
+    assert source_relative_subfolder(tmp_path / "elsewhere" / "x.jpg", root) is None
+
+
+def test_source_relative_subfolder_at_filesystem_root(tmp_path):
+    """A drive/share root has no name of its own — must not raise or invent one."""
+    fs_root = Path(tmp_path.anchor)
+    assert source_relative_subfolder(fs_root / "loose.jpg", fs_root) is None
 
 
 def test_description_round_trip(tmp_path, src):
