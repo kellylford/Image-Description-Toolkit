@@ -304,3 +304,65 @@ def test_selecting_an_image_gives_no_folder_scope(frame, cli_style_bundle):
 
     tree.SelectItem(leaves[0])
     assert frame._selected_folder_scope() is None
+
+
+def test_folder_nodes_render_before_loose_root_items(frame, tmp_path):
+    """Folders first, the way every file browser orders them.
+
+    Not cosmetic. The tree groups by subfolder in first-encountered order over
+    date-sorted items, so a workspace whose ROOT-level items are older than its
+    foldered ones met the root group first and appended every one of them
+    before the folder node was created. In a real 539-item workspace that put
+    the source folder at position 30 of 30, below 29 videos and off the bottom
+    of the list -- indistinguishable, to the person looking at it, from the
+    folder node not existing at all.
+
+    This drives refresh_image_list against a workspace built here rather than
+    loaded from a bundle: add_image caches no date, so a bundle-built fixture
+    sorts every item equal and the ordering never reproduces.
+    """
+    from data_models import ImageWorkspace
+
+    def entry(path, subfolder, iso):
+        return {
+            "file_path": str(path),
+            "item_type": "image",
+            "descriptions": [],
+            "subfolder": subfolder,
+            "parent_video": None,
+            "video_metadata": None,
+            "download_url": None,
+            "download_timestamp": None,
+            "alt_text": None,
+            "exif_datetime": iso,
+            "file_mtime": None,
+            "is_missing": False,
+        }
+
+    items = {}
+    # Root-level items dated EARLIER -- this is the trigger.
+    for n in range(4):
+        pth = tmp_path / f"clip{n}.png"
+        items[str(pth)] = entry(pth, None, f"2001-01-0{n + 1}T10:00:00")
+    # Foldered items dated later.
+    for n in range(2):
+        pth = tmp_path / "07" / f"IMG_000{n}.jpg"
+        items[str(pth)] = entry(pth, "07", f"2016-06-0{n + 1}T10:00:00")
+
+    frame.workspace = ImageWorkspace.from_dict({"items": items})
+    frame.refresh_image_list()
+
+    tree = frame.image_list
+    top = _top_level_nodes(tree)
+    labels = [tree.GetItemText(n) for n in top]
+    folder_positions = [i for i, n in enumerate(top) if tree.GetItemData(n) is None]
+    leaf_positions = [i for i, n in enumerate(top) if tree.GetItemData(n) is not None]
+
+    assert folder_positions, f"no folder node at all; top level is {labels}"
+    assert leaf_positions, (
+        "no loose root-level items were rendered, so this test would pass "
+        f"vacuously; top level is {labels}")
+    assert max(folder_positions) < min(leaf_positions), (
+        "a loose root-level item renders before a folder node. With enough of "
+        "them the folder scrolls out of sight and looks missing entirely. "
+        f"order: {labels}")

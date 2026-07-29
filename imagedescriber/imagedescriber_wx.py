@@ -3100,7 +3100,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 parent_node = folder_nodes[accumulated]
             return folder_nodes[subfolder]
 
-        for subfolder_key, items_in_group in subfolder_groups.items():
+        # Folder nodes first, loose root-level items after -- the convention
+        # every file browser uses, and load-bearing here.
+        #
+        # subfolder_groups is ordered by first appearance in date-sorted
+        # mixed_items, so a workspace whose videos happen to be older than its
+        # photos rendered all of them at the root BEFORE creating the folder
+        # node. In a real 539-item bundle that put the source folder at
+        # position 30 of 30, below 29 videos and off the bottom of the tree.
+        # The node existed and held all 195 images; you simply could not see it
+        # without scrolling past everything else, which reads exactly like the
+        # missing-folder-node bug this was supposed to have fixed.
+        ordered_groups = (
+            [(k, v) for k, v in subfolder_groups.items() if k]
+            + [(k, v) for k, v in subfolder_groups.items() if not k]
+        )
+
+        for subfolder_key, items_in_group in ordered_groups:
             parent_node = _get_or_create_folder_node(subfolder_key) if subfolder_key else root
 
             for file_path, item in items_in_group:
