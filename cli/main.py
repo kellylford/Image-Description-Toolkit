@@ -490,7 +490,8 @@ def cmd_describe(args):
         _auto_export_workspace(ws, args.quiet)
 
 
-def _extract_one_video_into_workspace(ws, video: Path, opts) -> list:
+def _extract_one_video_into_workspace(ws, video: Path, opts,
+                                      source_root: Path = None) -> list:
     """
     Extract one video's frames into ws.derived_dir("frames")/<stem>/ and register
     the video (reference item) plus each frame (extracted_frame item) in the
@@ -505,13 +506,32 @@ def _extract_one_video_into_workspace(ws, video: Path, opts) -> list:
     result = extract_frames_to_dir(video, frames_dir, opts)
 
     # Register the video as a reference-mode item (no copy — videos are large).
-    video_wi = ws.get_item(video.name)
+    #
+    # subfolder must be set here explicitly. This is the one place an item is
+    # built by hand instead of through add_image(), so it was missed when the
+    # four inline subfolder computations were unified on
+    # source_relative_subfolder() -- and add_source_folder() defaults to
+    # include_videos=False, so nothing else ever assigned one.
+    #
+    # The result was a CLI bundle whose photos grouped under "07" while its
+    # videos carried subfolder=None and hung off the tree root, so the folder
+    # node held only part of the folder. The GUI's own scan
+    # (on_files_discovered) anchors every discovered file including videos, so
+    # the same folder opened as two different shapes depending on which side
+    # created the workspace.
+    from idt_core.workspace import source_relative_subfolder
+
+    video_subfolder = (
+        source_relative_subfolder(video, source_root) if source_root else None
+    )
+    video_wi = ws.get_item(video.name, video_subfolder)
     if video_wi is None:
         video_wi = WorkspaceItem(
             image=video.name,
             source_path=str(video),
             storage="reference",
             item_type="video",
+            subfolder=video_subfolder,
             is_missing=not video.exists(),
         )
         ws.save_item(video_wi)
@@ -555,7 +575,7 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
     _set_console_title(f"IDT - Extracting Video Frames (0 of {len(videos)})")
     for _n, video in enumerate(videos, start=1):
         try:
-            frame_items = _extract_one_video_into_workspace(ws, video, opts)
+            frame_items = _extract_one_video_into_workspace(ws, video, opts, source)
             total_frames += len(frame_items)
             _set_console_title(
                 f"IDT - Extracting Video Frames ({_n} of {len(videos)}, "
@@ -889,7 +909,7 @@ def cmd_video(args):
         if not args.quiet:
             print(f"  Extracting frames: {video.name}")
         try:
-            frame_items = _extract_one_video_into_workspace(ws, video, opts)
+            frame_items = _extract_one_video_into_workspace(ws, video, opts, source)
             all_frame_items.extend(frame_items)
             if not args.quiet:
                 print(f"    {len(frame_items)} frames -> {ws.derived_dir('frames') / video.stem}")
