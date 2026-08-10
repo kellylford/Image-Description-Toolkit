@@ -84,10 +84,19 @@ An independent review found five defects, all fixed:
 - `release.yml` gate simulated: passes when synced, fails on mismatch, survives a
   no-match `sed` under `set -euo pipefail`.
 
+**Verified against the live releases after publishing v4.5.0 and v4.5.1:**
+- The frozen 4.5.0 `idt.exe` discovers 4.5.1 from the real GitHub API and prints
+  the correct asset URL.
+- `download_asset` fetched the real 193 MB v4.5.1 installer and verified it
+  against the published `SHA256SUMS.txt`.
+- The v4.5.0 installer and DMG in OneDrive match their published checksums; the
+  Windows installer's Authenticode signature reports Valid.
+
 **NOT tested:**
-- **The real download-and-install path.** No release newer than 4.5.0 exists yet,
-  so nothing has actually been downloaded from GitHub and executed. Verified only
-  up to the point where Setup takes over.
+- **The final `os.startfile` handoff to Setup**, and Setup replacing files under
+  a running app. Everything up to that point is now exercised.
+- **The GUI's download flow end to end** — the timer-driven progress dialog was
+  stress-tested with a simulated stream, not a real 193 MB download.
 - **Everything macOS.** Built and tested on Windows only. The DMG, the Finder
   reveal, and the `.app` `CFBundleShortVersionString` fix are unverified on a Mac.
 - **The `Update()`/`Destroy()` crash was never reproduced naturally** — not by the
