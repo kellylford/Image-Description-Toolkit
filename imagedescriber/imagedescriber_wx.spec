@@ -98,7 +98,6 @@ a = Analysis(
         'idt_core.converter',
         'idt_core.updater',
         'idt_core.progress',
-        'idt_core.watcher',
         'idt_core.downloader',
         'idt_core.gallery_exporter',
         'idt_core.video',
