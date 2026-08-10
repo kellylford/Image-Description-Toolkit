@@ -84,13 +84,23 @@ An independent review found five defects, all fixed:
 - `release.yml` gate simulated: passes when synced, fails on mismatch, survives a
   no-match `sed` under `set -euo pipefail`.
 
-**Verified against the live releases after publishing v4.5.0 and v4.5.1:**
-- The frozen 4.5.0 `idt.exe` discovers 4.5.1 from the real GitHub API and prints
-  the correct asset URL.
+**Verified against live releases.** v4.5.0 was published, then a v4.5.1 that was
+identical apart from its version number, purely so 4.5.0 had something newer to
+discover. With both live:
+
+- The frozen 4.5.0 `idt.exe` discovered 4.5.1 from the real GitHub API and
+  printed the correct asset URL.
 - `download_asset` fetched the real 193 MB v4.5.1 installer and verified it
   against the published `SHA256SUMS.txt`.
+- The GUI update prompt appeared and installed 4.5.1 successfully (confirmed by
+  the user).
 - The v4.5.0 installer and DMG in OneDrive match their published checksums; the
   Windows installer's Authenticode signature reports Valid.
+
+**v4.5.1 was then deleted** — release and tag — and `main` reverted to 4.5.0, so
+v4.5.0 is the current release. The 4.5.1 build was scaffolding for this test and
+nothing depended on it. Re-testing later means publishing another throwaway patch
+release the same way.
 
 **NOT tested:**
 - **The final `os.startfile` handoff to Setup**, and Setup replacing files under
