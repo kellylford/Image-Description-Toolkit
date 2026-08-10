@@ -8549,6 +8549,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if (datetime.now() - last).total_seconds() < 24 * 3600:
                         return
                 except ValueError:
+                    # Corrupt or hand-edited timestamp. Treat it as "never
+                    # checked" and let the check run; it rewrites the value.
                     pass
 
             cfg.last_update_check = datetime.now().isoformat(timespec="seconds")
@@ -8618,6 +8620,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     logger.info(f"Update {info['version']} available but skipped by user")
                     return
             except Exception:
+                # Unreadable config. Failing open (showing the dialog) is the
+                # safe direction: worst case the user skips the version again.
                 pass
 
         logger.info(f"Update available: {info['version']}")
@@ -8637,20 +8641,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "",
             "Updating installs both ImageDescriber and the idt command-line tool.",
         ]
+        # Built outside the list literal: a string wrapped across lines inside a
+        # list reads like a missing comma (and CodeQL flags it as one).
         if can_install and sys.platform == "darwin":
-            lines += [
-                "",
+            how = (
                 "The disk image will be downloaded to your Downloads folder and "
                 "shown in Finder. Quit ImageDescriber, then drag the new "
-                "ImageDescriber to Applications.",
-            ]
+                "ImageDescriber to Applications."
+            )
+            lines += ["", how]
         elif can_install:
-            lines += [
-                "",
+            how = (
                 "ImageDescriber will close and the installer will run. Windows "
                 "will ask for administrator permission, because IDT installs to "
-                "the root of your system drive.",
-            ]
+                "the root of your system drive."
+            )
+            lines += ["", how]
         else:
             lines += ["", "The releases page will open in your browser."]
         if notes:

@@ -302,6 +302,8 @@ def _remove_quietly(path):
     try:
         os.remove(path)
     except OSError:
+        # Already gone, or locked by a scanner. This only ever runs on a path we
+        # are abandoning anyway, so a leftover temp file is not worth surfacing.
         pass
 
 
