@@ -6,14 +6,25 @@ AI-powered batch image description tool supporting multiple vision models (Ollam
 
 ### Installation
 
-Download the latest installer from the [releases](https://github.com/kellylford/Image-Description-Toolkit/releases) page:
+Download from the [releases](https://github.com/kellylford/Image-Description-Toolkit/releases) page:
 
-**`ImageDescriptionToolkitSetup_4.5.0.exe`** (Windows) or **`IDT-4.5.0.pkg`** / **`IDT-4.5.0.dmg`** (macOS)
+| File | Platform |
+|---|---|
+| **`ImageDescriptionToolkitSetup-4.5.0-windows.exe`** | Windows 10/11, 64-bit |
+| **`IDT-4.5.0-macos-arm64.dmg`** | macOS 12+, Apple Silicon |
 
-Run the installer - it includes:
-- **idt.exe** - Command-line interface for batch processing and automation
-- **ImageDescriber.exe** - GUI with integrated viewer, prompt editor, and configuration manager
-- Full documentation and examples
+Either one gives you both applications:
+- **idt** - Command-line interface for batch processing and automation
+- **ImageDescriber** - GUI with integrated viewer, prompt editor, and configuration manager
+
+One install covers both; you never update them separately.
+
+Standalone builds are also published if you want a single tool without an installer:
+`idt-4.5.0-windows-x64.exe`, `ImageDescriber-4.5.0-windows-x64.exe`, and
+`idt-4.5.0-macos-arm64.tar.gz`. `SHA256SUMS.txt` lets you verify any download.
+
+No Python required. The Windows installer is signed; the macOS build is signed and
+notarized.
 
 **Latest Release (v4.5.0):** Unified workspace model, shared engine for CLI and GUI, web image download, video frame extraction, and comprehensive model updates.
 
@@ -44,8 +55,8 @@ Results are saved in the `Descriptions/` folder with an HTML viewer.
 # Describe a folder of images
 idt describe path/to/images
 
-# Same thing — workflow and describe are identical
-idt workflow path/to/images
+# Check whether a newer version is available
+idt update
 ```
 
 ## Features
@@ -63,10 +74,9 @@ idt workflow path/to/images
 ## Documentation
 
 ### User Guides
-- **[What's New in v4.1.0](docs/WHATS_NEW_v4.1.0.md)** - wxPython migration, accessibility, code consolidation
-- **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions (Windows)
+- **[Release Notes (v4.5.0)](docs/release-notes-v4.5.0.md)** - What IDT is and what's in the current release
+- **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions, including the full CLI reference
 - **[macOS Setup](MACOS_SETUP.md)** - macOS installation and usage
-- **[CLI Reference](docs/CLI_REFERENCE.md)** - All commands and options
 
 ### Configuration & Setup
 - **[Configuration Guide](docs/CONFIGURATION_GUIDE.md)** - Setup and customization
@@ -77,27 +87,19 @@ idt workflow path/to/images
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ## Requirements
-Pre-built Executable**: No Python required - download installer from releases
+- **Pre-built Executable**: No Python required - download installer from releases
 - **AI Provider** (choose one or more):
   - [Ollama](https://ollama.com) (free, runs locally) - **Recommended for most users**
   - [OpenAI API](https://platform.openai.com/api-keys) (GPT-4o, paid)
   - [Claude API](https://console.anthropic.com) (paid)
 
 ### macOS
-- **macOS 10.13+** (High Sierra or later)
-- **Python 3.8+** (system Python or Homebrew)
-- **Installation**: Download .pkg installer or .dmg disk image from releases
+- **macOS 12 (Monterey) or later**
+- **Apple Silicon** — the published build is arm64 only. Intel Macs need to build from source.
+- **No Python required** for the pre-built app
+- **Installation**: Download `IDT-{version}-macos-arm64.dmg` from releases, open it, and drag ImageDescriber to Applications
 - **Build from Source**: See [macOS Build Guide](BuildAndRelease/MacBuilds/README_MACOS.md)
-- **AI Providers**: Same as Windows (Ollama, OpenAI, Claude)
-
-**macOS Quick Start:**
-```bash
-# Install via Homebrew (if building from source)
-brew install python@3
-
-# Or download pre-built installer from releases
-# Double-click IDT-{version}.pkg or IDT-{version}.dmg
-```
+- **AI Providers**: Same as Windows (Ollama, OpenAI, Claude), plus MLX on Apple Silicon
 
 ### Development (All Platforms)
 - **Python 3.10+** (for development only, not required for built executables)

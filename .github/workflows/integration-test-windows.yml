@@ -196,8 +196,13 @@ jobs:
         Write-Host "PASS: All required workspace directories/files present"
         Write-Host ""
 
-        # Verify images were copied into the bundle (not just referenced)
-        $images = Get-ChildItem -Path "$wsPath\images" -File -ErrorAction SilentlyContinue
+        # Verify images were copied into the bundle (not just referenced).
+        # -Recurse is required: since source_relative_subfolder() landed
+        # (idt_core/workspace.py), the source folder becomes the first path
+        # component, so a folder named testimages copies to
+        # images\testimages\*, not images\*. A flat count here reads 0 and the
+        # step failed for two weeks while the app was behaving correctly.
+        $images = Get-ChildItem -Path "$wsPath\images" -File -Recurse -ErrorAction SilentlyContinue
         Write-Host "Images in bundle: $($images.Count)"
         if ($images.Count -lt 1) {
           Write-Host "ERROR: No images found in $wsPath\images"
@@ -205,7 +210,8 @@ jobs:
         }
 
         # Verify description sidecars were written
-        $sidecars = Get-ChildItem -Path "$wsPath\descriptions" -Filter "*.json" -ErrorAction SilentlyContinue
+        # descriptions\ mirrors images\, so this needs -Recurse for the same reason.
+        $sidecars = Get-ChildItem -Path "$wsPath\descriptions" -Filter "*.json" -Recurse -ErrorAction SilentlyContinue
         Write-Host "Description sidecars: $($sidecars.Count)"
         if ($sidecars.Count -lt 1) {
           Write-Host "ERROR: No description sidecars found in $wsPath\descriptions"
