@@ -116,6 +116,11 @@ fail_under = 23
 "imagedescriber/imagedescriber_wx.py" = 18.0
 "imagedescriber/viewer_components.py" = 23.0
 "idt_core/gui_bridge.py" = 78.0
+# Measured 86.75%. Defended because this module downloads a binary and hands it
+# to os.startfile: the checksum, URL-allowlist and partial-file-cleanup paths
+# must stay tested. Uncovered remainder is the platform branches that cannot run
+# on the CI OS (macOS reveal, os.startfile).
+"idt_core/updater.py" = 85.0
 "idt_core/providers/base.py" = 100.0
 "idt_core/providers/claude.py" = 45.0
 "idt_core/providers/ollama.py" = 48.0
