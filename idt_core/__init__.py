@@ -20,7 +20,7 @@ from .progress import Progress
 from .workspace import Workspace, WorkspaceItem, WorkspaceDescription, BUNDLE_EXT
 from .gui_bridge import gui_workspace_to_bundle, bundle_to_gui_workspace_dict
 
-__version__ = "4.5.0"
+__version__ = "4.5.1"
 
 __all__ = [
     "Project",
