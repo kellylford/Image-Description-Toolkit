@@ -83,6 +83,15 @@ class UserConfig:
     # a downloaded image's HTML alt text as its own description (model "Website Alt
     # Text"), in addition to any AI-generated one. Default on.
     preserve_alt_text: bool = True
+    # Whether ImageDescriber checks GitHub for a newer release at startup. The
+    # manual Help > Check for Updates always runs regardless. See idt_core/updater.py.
+    auto_check_updates: bool = True
+    # A version the user chose "Skip This Version" on; the startup check never
+    # offers that exact version again. Manual checks ignore it.
+    skipped_update_version: Optional[str] = None
+    # ISO timestamp of the last startup check, used to throttle to once a day so
+    # every launch does not hit the GitHub API.
+    last_update_check: Optional[str] = None
 
     def workspace_root_path(self) -> Path:
         """Resolved workspace root. Defaults to ~/Documents/idt."""
@@ -99,12 +108,14 @@ class UserConfig:
         except Exception:
             return cls()
         obj = cls()
-        for key in ("default_provider", "default_model", "default_prompt_name", "workspace_root"):
+        for key in ("default_provider", "default_model", "default_prompt_name", "workspace_root",
+                    "skipped_update_version", "last_update_check"):
             if key in data:
                 setattr(obj, key, data[key])
         obj.custom_prompts = data.get("custom_prompts", {})
         obj.copy_originals = bool(data.get("copy_originals", False))
         obj.preserve_alt_text = bool(data.get("preserve_alt_text", True))
+        obj.auto_check_updates = bool(data.get("auto_check_updates", True))
         return obj
 
     def save(self) -> None:
@@ -116,9 +127,14 @@ class UserConfig:
             "custom_prompts": self.custom_prompts,
             "copy_originals": self.copy_originals,
             "preserve_alt_text": self.preserve_alt_text,
+            "auto_check_updates": self.auto_check_updates,
         }
         if self.workspace_root:
             data["workspace_root"] = self.workspace_root
+        if self.skipped_update_version:
+            data["skipped_update_version"] = self.skipped_update_version
+        if self.last_update_check:
+            data["last_update_check"] = self.last_update_check
         _CONFIG_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def get_prompt_text(self, name: str) -> Optional[str]:

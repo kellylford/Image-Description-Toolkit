@@ -16,6 +16,7 @@ Usage:
   idt models   [--provider NAME]
   idt prompts
   idt config   [--set key=value]
+  idt update
   idt --help
 
 Run "idt <command> --help" for command-specific options.
@@ -1840,6 +1841,40 @@ def cmd_version(args):
     print(f"Python {sys.version.split()[0]}")
     if getattr(sys, "frozen", False):
         print(f"Binary: {sys.executable}")
+    # Deliberately no update check here: `idt version` should be instant and work
+    # offline. Use `idt update` to check.
+
+
+def cmd_update(args):
+    """Report whether a newer release exists. Notify-only by design.
+
+    Downloading and running the installer is the GUI's job (Help > Check for
+    Updates); the installer updates idt and ImageDescriber together, so there is
+    no separate CLI-only download to offer.
+    """
+    from idt_core import updater
+
+    installed = updater.current_version()
+    if not installed:
+        print("Couldn't determine the installed version, so there is nothing to compare.")
+        print(f"Releases: {updater.RELEASES_PAGE}")
+        return
+    print(f"Installed: idt {installed}")
+    try:
+        info = updater.check_for_update()
+    except Exception as exc:
+        print(f"Couldn't check for updates: {exc}")
+        print(f"Releases: {updater.RELEASES_PAGE}")
+        return
+
+    if info is None:
+        print("You are up to date.")
+        return
+
+    print(f"Available: idt {info['version']}")
+    print("")
+    print(f"Download:  {info.get('url') or info.get('page_url') or updater.RELEASES_PAGE}")
+    print("Installing it updates both idt and ImageDescriber.")
 
 
 # ------------------------------------------------------------------ #
@@ -1883,6 +1918,7 @@ Examples:
   idt stats ~/Pictures/ --all                           # across entire photo library
   idt config --set default_provider=anthropic
   idt config --set default_model=claude-opus-4-6
+  idt update                                            # is a newer release out?
 
 Supported providers:
   anthropic  Claude (requires ANTHROPIC_API_KEY)
@@ -2202,6 +2238,16 @@ Supported providers:
 
     p_version = sub.add_parser("version", help="Print version information")
     p_version.set_defaults(func=cmd_version)
+
+    p_update = sub.add_parser(
+        "update",
+        help="Check whether a newer release is available",
+        description=(
+            "Checks GitHub for a newer release and prints where to get it. "
+            "The installer updates both idt and ImageDescriber."
+        ),
+    )
+    p_update.set_defaults(func=cmd_update)
 
     return parser
 

@@ -105,6 +105,8 @@ engine made them easy:
 | `download` | Fetch images from a web page (`--describe` to describe them). |
 | `video` | Extract frames and optionally describe them. |
 | `models` / `prompts` / `guide` | Check models / list prompts / interactive wizard. |
+| `version` | Print the installed version, Python version, and binary path. |
+| `update` | **New** — check whether a newer release is available. |
 
 ---
 
@@ -139,6 +141,49 @@ which noticeably improves descriptions.
 
 ---
 
+## IDT Now Tells You When There's an Update
+
+Until now the only way to learn about a new version was to go back to the GitHub
+releases page and look. v4.5 adds an update check to both tools.
+
+**ImageDescriber** gains two items in the **Help** menu:
+
+- **Check for Updates...** — asks right now, and tells you either that you're up to
+  date or that a newer version exists.
+- **Automatically Check for Updates** — on by default. Once a day at most, shortly
+  after launch, IDT quietly checks. If there's nothing new it says nothing at all;
+  it only speaks up when there's an update.
+
+When an update is found you get three choices: **Download**, **Skip This Version**
+(never asked about that particular version again), or **Later**.
+
+**Windows:** choosing Download fetches the installer, closes ImageDescriber, and
+runs it. Windows will ask for administrator permission, because IDT installs to the
+root of your system drive. Your settings, workspaces, and descriptions are left
+alone.
+
+**macOS:** choosing Download saves the disk image to your Downloads folder and shows
+it in Finder. Quit ImageDescriber, then drag the new ImageDescriber to Applications.
+(Making this as automatic as Windows is on the list.)
+
+**Command line:**
+
+```
+idt update
+```
+
+reports your installed version, whether a newer one exists, and where to get it.
+
+**One update covers both tools.** The Windows installer and the macOS disk image each
+contain `idt` *and* ImageDescriber, so updating from either one updates both. You
+never have to update them separately.
+
+The check reads the public GitHub releases list and nothing else — no account, no
+telemetry, no data sent. Turn it off any time with the Help menu item; **Check for
+Updates** still works on demand when it's off.
+
+---
+
 ## Bug Fixes
 
 - **UTF-8 BOM in stdin mode on Windows.** Reading image paths from stdin in PowerShell
@@ -161,7 +206,9 @@ which noticeably improves descriptions.
   Viewer.
 - **`idt guide` needs an interactive terminal.** If it hangs in a non-interactive
   environment, press Ctrl+C and use `idt describe` directly.
-- **No `idt version` command.** Use `idt --help`. (The old CLI had `idt version`.)
+- **`idt update` is notify-only.** It tells you a new version exists and where to get
+  it, but does not download or install anything. Use the installer (or
+  ImageDescriber's Help > Check for Updates) to actually update.
 - **No automated tests yet for the CLI command layer** (`cli/main.py`). The engine,
   the workspace bundle, the describe pipeline, and the GUI⇄bundle bridge are unit
   tested; the thin CLI argument layer is exercised manually.

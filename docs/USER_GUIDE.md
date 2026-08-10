@@ -151,10 +151,42 @@ IDT uses environment variables for API keys so they are never stored in your wor
 
 ### Updating IDT
 
-**Pre-built executables**
+**Let IDT tell you (easiest)**
 
-1. Download the latest `idt.exe` and `ImageDescriber.exe` (or `ImageDescriber.app` on macOS) from the [releases page](https://github.com/kellylford/Image-Description-Toolkit/releases).
-2. Replace the old executables in your folder (or `/Applications` on macOS).
+IDT checks for updates itself. Once a day at most, shortly after ImageDescriber
+starts, it quietly asks GitHub whether a newer version exists. If there is nothing
+new it says nothing; it only speaks up when there is an update. You can also ask at
+any moment with **Help → Check for Updates...**, and turn the automatic check off
+with **Help → Automatically Check for Updates** (the manual check still works when
+it's off).
+
+When an update is found you get three choices:
+
+| Choice | What happens |
+|---|---|
+| Download | Fetches the new version (see below) |
+| Skip This Version | You are never asked about that particular version again |
+| Later | Ask again tomorrow |
+
+- **Windows:** Download fetches the installer, closes ImageDescriber, and runs it.
+  Windows asks for administrator permission, because IDT installs to the root of
+  your system drive.
+- **macOS:** Download saves the disk image to your Downloads folder and shows it in
+  Finder. Quit ImageDescriber, then drag the new ImageDescriber to Applications.
+
+**One update covers both tools.** The Windows installer and the macOS disk image each
+contain `idt` *and* ImageDescriber, so updating from either one updates both.
+
+From the command line, `idt update` reports your installed version, whether a newer
+one exists, and where to get it. It does not install anything itself.
+
+The check reads the public GitHub releases list and nothing else — no account, no
+telemetry, no data sent.
+
+**Installing an update by hand**
+
+1. Download the latest installer (Windows) or disk image (macOS) from the [releases page](https://github.com/kellylford/Image-Description-Toolkit/releases).
+2. Run the installer, or drag the new `ImageDescriber.app` to `/Applications`. If you use the standalone executables instead, replace the old `idt.exe` and `ImageDescriber.exe` in your folder.
 3. Your existing `.idtw` workspace bundles and `~/.idt/config.json` settings are preserved — no migration needed.
 
 **From source**
@@ -628,7 +660,31 @@ Configuration is stored in `~/.idt/config.json`.
 idt version
 ```
 
-Prints the application version, Python version, and executable path.
+Prints the application version, Python version, and executable path. Never touches
+the network — use `idt update` to check for a newer release.
+
+#### idt update — Check for a Newer Release
+
+```
+idt update
+```
+
+Asks GitHub whether a newer release exists and prints where to get it:
+
+```
+Installed: idt 4.5.0
+Available: idt 4.5.1
+
+Download:  https://github.com/kellylford/Image-Description-Toolkit/releases/download/v4.5.1/ImageDescriptionToolkitSetup-4.5.1-windows.exe
+Installing it updates both idt and ImageDescriber.
+```
+
+This command is notify-only — it downloads and installs nothing. Run the installer
+yourself, or use ImageDescriber's **Help → Check for Updates...**, which can download
+and launch it for you. Either way, one installer updates both tools.
+
+If the check fails (no internet, GitHub unreachable) it says so rather than claiming
+you are up to date.
 
 ---
 
@@ -804,6 +860,8 @@ The application has two modes:
 |---|---|
 | User Guide... | Open this guide |
 | Report an Issue... | Go to the GitHub issue tracker |
+| Check for Updates... | Ask GitHub right now whether a newer version exists |
+| Automatically Check for Updates | Toggle the once-a-day check at startup (on by default) |
 | About | Show version information |
 
 ---

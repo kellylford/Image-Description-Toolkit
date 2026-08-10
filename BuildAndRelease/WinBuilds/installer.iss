@@ -38,6 +38,12 @@ UninstallDisplayName={#MyAppName}
 ChangesEnvironment=yes
 ; Preserve user data during updates
 DirExistsWarning=no
+; In-app updates (Help > Check for Updates) run this installer over a live
+; install. ImageDescriber closes itself first, but an idt.exe console may still
+; be open, so let Setup close what is holding the executables rather than
+; failing on a locked file. No auto-restart: the user relaunches when ready.
+CloseApplications=yes
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

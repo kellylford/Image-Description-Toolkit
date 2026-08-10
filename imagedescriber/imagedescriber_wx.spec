@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import re
 import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
@@ -95,6 +96,7 @@ a = Analysis(
         'idt_core.config',
         'idt_core.config_loader',
         'idt_core.converter',
+        'idt_core.updater',
         'idt_core.progress',
         'idt_core.watcher',
         'idt_core.downloader',
@@ -217,10 +219,11 @@ version_file = project_root / 'VERSION'
 version = '4.0.0'  # Fallback
 if version_file.exists():
     version_text = version_file.read_text().strip()
-    # Extract just the version number (e.g., "4.0.0Beta1 bld050" -> "4.0.0")
-    version = version_text.split()[0].rstrip('Beta1234567890')
-    if not version:
-        version = '4.0.0'
+    # Extract just the numeric version (e.g. "4.0.0Beta1 bld050" -> "4.0.0").
+    # A previous rstrip('Beta1234567890') also ate the trailing digit of a plain
+    # version, so "4.5.0" became "4.5." and CFBundleShortVersionString was invalid.
+    match = re.match(r'\d+(?:\.\d+)*', version_text)
+    version = match.group(0) if match else '4.0.0'
 
 # macOS .app bundle
 app = BUNDLE(

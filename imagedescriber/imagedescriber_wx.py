@@ -821,6 +821,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Cache AI models on startup for faster dialog opening
         wx.CallAfter(self.refresh_ai_models_silent)
 
+        # Silent update check. Delayed rather than CallAfter so it never competes
+        # with the window actually appearing, and so a modal raised from it has a
+        # shown frame to parent to.
+        wx.CallLater(3000, self._auto_check_updates)
+
     # Note: update_window_title() is now provided by ModifiedStateMixin
     # It automatically handles the modified state indicator (*)
     # TODO: Implement proper tab order - requires controls to be siblings or NavigationEnabled
@@ -1722,6 +1727,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         report_issue_item = help_menu.Append(wx.ID_ANY, "&Report an Issue...")
         self.Bind(wx.EVT_MENU, self.on_report_issue, report_issue_item)
+
+        # Accelerators: U is taken by "&User Guide" and A by "&About", so these
+        # use D and K. A duplicate letter cycles instead of activating.
+        check_updates_item = help_menu.Append(wx.ID_ANY, "Check for Up&dates...")
+        self.Bind(wx.EVT_MENU, self.on_check_for_updates, check_updates_item)
+
+        # Checked item rather than a Configure Settings page: the Configure
+        # dialog's category tabs render settings through a ListBox plus an edit
+        # dialog, so a live checkbox does not fit there.
+        self.auto_update_item = help_menu.AppendCheckItem(
+            wx.ID_ANY, "Automatically Chec&k for Updates"
+        )
+        self.auto_update_item.Check(self._get_auto_check_updates())
+        self.Bind(wx.EVT_MENU, self.on_toggle_auto_updates, self.auto_update_item)
 
         help_menu.AppendSeparator()
 
@@ -8483,6 +8502,324 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             webbrowser.open(new_issue_url)
         except Exception as e:
             show_error(self, f"Could not open issue page:\n{e}")
+
+    # ------------------------------------------------------------------ #
+    #  Update checking (see idt_core/updater.py)                          #
+    # ------------------------------------------------------------------ #
+
+    def _get_auto_check_updates(self):
+        """Whether the startup check is enabled. Defaults on if config is unreadable."""
+        try:
+            from idt_core.config import UserConfig
+            return UserConfig.load().auto_check_updates
+        except Exception:
+            return True
+
+    def on_toggle_auto_updates(self, event):
+        """Persist the Help menu's 'Automatically Check for Updates' toggle."""
+        enabled = self.auto_update_item.IsChecked()
+        try:
+            from idt_core.config import UserConfig
+            cfg = UserConfig.load()
+            cfg.auto_check_updates = enabled
+            cfg.save()
+            logger.info(f"Automatic update checks {'enabled' if enabled else 'disabled'}")
+        except Exception as e:
+            logger.error(f"Could not save update preference: {e}", exc_info=True)
+            show_error(self, f"Could not save that preference:\n{e}")
+
+    def _auto_check_updates(self):
+        """Silent startup check. Says nothing at all unless there is an update."""
+        try:
+            from idt_core import updater
+            from idt_core.config import UserConfig
+
+            # Nothing to replace when running from source.
+            if not updater.is_frozen():
+                return
+
+            cfg = UserConfig.load()
+            if not cfg.auto_check_updates:
+                return
+
+            # Once a day, not once a launch.
+            if cfg.last_update_check:
+                try:
+                    last = datetime.fromisoformat(cfg.last_update_check)
+                    if (datetime.now() - last).total_seconds() < 24 * 3600:
+                        return
+                except ValueError:
+                    # Corrupt or hand-edited timestamp. Treat it as "never
+                    # checked" and let the check run; it rewrites the value.
+                    pass
+
+            cfg.last_update_check = datetime.now().isoformat(timespec="seconds")
+            cfg.save()
+        except Exception as e:
+            logger.warning(f"Skipping automatic update check: {e}")
+            return
+
+        self._start_update_check(silent=True)
+
+    def on_check_for_updates(self, event=None):
+        """Help > Check for Updates. Always runs; ignores the throttle and any skip."""
+        self._start_update_check(silent=False)
+
+    def _start_update_check(self, silent):
+        if getattr(self, "_update_check_running", False):
+            return
+        self._update_check_running = True
+        if not silent:
+            self.statusbar.SetStatusText("Checking for updates...", 0)
+        threading.Thread(
+            target=self._update_check_worker, args=(silent,), daemon=True
+        ).start()
+
+    def _update_check_worker(self, silent):
+        """Background thread: one HTTP GET, then hand the result back to the UI."""
+        info, error = None, None
+        try:
+            from idt_core import updater
+            info = updater.check_for_update()
+        except Exception as e:
+            error = e
+        wx.CallAfter(self._on_update_check_done, silent, info, error)
+
+    def _on_update_check_done(self, silent, info, error):
+        """UI thread: report what the check found."""
+        self._update_check_running = False
+        # The check can return after the window is gone.
+        if not self or not self.IsShown():
+            return
+        if not silent:
+            self.statusbar.SetStatusText("", 0)
+
+        if error is not None:
+            logger.warning(f"Update check failed: {error}")
+            if not silent:
+                show_error(self, f"Couldn't check for updates:\n{error}")
+            return
+
+        if info is None:
+            logger.info("Update check: already up to date")
+            if not silent:
+                from idt_core import updater
+                running = updater.current_version()
+                wx.MessageBox(
+                    f"ImageDescriber {running} is up to date." if running
+                    else "No newer version was found.",
+                    "No Updates", wx.OK | wx.ICON_INFORMATION, self
+                )
+            return
+
+        # A version the user skipped is only suppressed for the silent check.
+        if silent:
+            try:
+                from idt_core.config import UserConfig
+                if UserConfig.load().skipped_update_version == info["version"]:
+                    logger.info(f"Update {info['version']} available but skipped by user")
+                    return
+            except Exception:
+                # Unreadable config. Failing open (showing the dialog) is the
+                # safe direction: worst case the user skips the version again.
+                pass
+
+        logger.info(f"Update available: {info['version']}")
+        self._show_update_dialog(info)
+
+    def _show_update_dialog(self, info):
+        from idt_core import updater
+
+        can_install = bool(info.get("url")) and updater.is_frozen()
+
+        notes = (info.get("notes") or "").strip()
+        if len(notes) > 600:
+            notes = notes[:600].rstrip() + "\n..."
+
+        lines = [
+            f"Version {info['version']} is available. You have {updater.current_version()}.",
+            "",
+            "Updating installs both ImageDescriber and the idt command-line tool.",
+        ]
+        # Built outside the list literal: a string wrapped across lines inside a
+        # list reads like a missing comma (and CodeQL flags it as one).
+        if can_install and sys.platform == "darwin":
+            how = (
+                "The disk image will be downloaded to your Downloads folder and "
+                "shown in Finder. Quit ImageDescriber, then drag the new "
+                "ImageDescriber to Applications."
+            )
+            lines += ["", how]
+        elif can_install:
+            how = (
+                "ImageDescriber will close and the installer will run. Windows "
+                "will ask for administrator permission, because IDT installs to "
+                "the root of your system drive."
+            )
+            lines += ["", how]
+        else:
+            lines += ["", "The releases page will open in your browser."]
+        if notes:
+            lines += ["", "What's new:", notes]
+
+        dlg = wx.MessageDialog(
+            self, "\n".join(lines), "Update Available",
+            wx.YES_NO | wx.CANCEL | wx.ICON_INFORMATION
+        )
+        dlg.SetYesNoCancelLabels(
+            "&Download" if can_install else "&Open Releases Page",
+            "&Skip This Version",
+            "&Later",
+        )
+        result = dlg.ShowModal()
+        dlg.Destroy()
+
+        if result == wx.ID_NO:
+            try:
+                from idt_core.config import UserConfig
+                cfg = UserConfig.load()
+                cfg.skipped_update_version = info["version"]
+                cfg.save()
+                logger.info(f"User skipped update {info['version']}")
+            except Exception as e:
+                logger.error(f"Could not record skipped version: {e}", exc_info=True)
+            return
+
+        if result != wx.ID_YES:
+            return
+
+        if not can_install:
+            try:
+                webbrowser.open(info.get("page_url") or updater.RELEASES_PAGE)
+            except Exception as e:
+                show_error(self, f"Could not open the releases page:\n{e}")
+            return
+
+        self._download_update(info)
+
+    def _download_update(self, info):
+        """Download the installer with a cancellable progress dialog.
+
+        The worker thread deliberately does NOT wx.CallAfter into the dialog.
+        wx.ProgressDialog.Update() yields for UI events internally, so a
+        CallAfter posted while the main thread sits inside Update() gets
+        dispatched *from within it* — and a completion callback that destroys the
+        dialog then frees it while its own Update() is still on the C++ stack,
+        which segfaults. Instead the worker writes plain counters and a timer on
+        the main thread reads them, so Update() and Destroy() can never nest.
+        """
+        from idt_core import updater
+
+        self._update_dl_cancelled = False
+        self._update_dl_done_bytes = 0
+        self._update_dl_total_bytes = 0
+        self._update_dl_complete = False
+        self._update_dl_in_tick = False
+
+        dlg = wx.ProgressDialog(
+            "Downloading Update",
+            f"Downloading version {info['version']}...",
+            maximum=100, parent=self,
+            style=wx.PD_APP_MODAL | wx.PD_CAN_ABORT | wx.PD_AUTO_HIDE
+        )
+
+        result = {"path": None, "error": None}
+        timer = wx.Timer(self)
+
+        def on_progress(done, total):
+            # Worker thread: plain int stores, no wx calls.
+            self._update_dl_done_bytes = done
+            self._update_dl_total_bytes = total
+
+        def worker():
+            try:
+                result["path"] = updater.download_asset(
+                    info["url"],
+                    progress=on_progress,
+                    should_cancel=lambda: self._update_dl_cancelled,
+                    checksums_url=info.get("checksums_url"),
+                )
+            except Exception as e:
+                result["error"] = e
+            self._update_dl_complete = True
+
+        def on_tick(event):
+            # A timer event can itself be dispatched from inside Update()'s
+            # yield; this guard is what keeps Destroy() out of that stack.
+            if self._update_dl_in_tick:
+                return
+            self._update_dl_in_tick = True
+            try:
+                if self._update_dl_complete:
+                    timer.Stop()
+                    self.Unbind(wx.EVT_TIMER, handler=on_tick)
+                    dlg.Destroy()
+                    finish()
+                    return
+
+                done = self._update_dl_done_bytes
+                total = self._update_dl_total_bytes
+                mb = 1024 * 1024
+                if total:
+                    keep_going, _ = dlg.Update(
+                        min(99, int(done * 100 / total)),
+                        f"Downloaded {done // mb} MB of {total // mb} MB"
+                    )
+                else:
+                    # An indeterminate bar beats a percentage that lies.
+                    keep_going, _ = dlg.Pulse(f"Downloaded {done // mb} MB")
+                if not keep_going:
+                    self._update_dl_cancelled = True
+            finally:
+                self._update_dl_in_tick = False
+
+        def finish():
+            if result["error"] is not None:
+                logger.error(f"Update download failed: {result['error']}")
+                show_error(self, f"Couldn't download the update:\n{result['error']}")
+                return
+            if result["path"] is None:
+                logger.info("Update download cancelled")
+                return
+            path = result["path"]
+            logger.info(f"Update downloaded to {path}")
+
+            # Catch the common launch failures (antivirus quarantine, a vanished
+            # temp file) while there is still a window to show the error on.
+            if not os.path.exists(path):
+                show_error(self, "The downloaded installer is no longer on disk. "
+                                 "Antivirus software may have removed it.")
+                return
+
+            # On Windows the installer replaces the running executables, so the
+            # app has to be gone before it starts. Close() runs the unsaved-changes
+            # prompt and returns False if the user backs out — in which case the
+            # installer must not run at all. Launching it first would leave Setup
+            # racing a still-open app while the user decides whether to save.
+            if sys.platform != "darwin":
+                if not self.Close():
+                    logger.info("Update postponed: window close was cancelled")
+                    wx.MessageBox(
+                        f"Update not installed.\n\nThe installer is saved at:\n{path}\n\n"
+                        "Run it any time to finish updating.",
+                        "Update Postponed", wx.OK | wx.ICON_INFORMATION, self
+                    )
+                    return
+
+            try:
+                updater.launch_installer(path)
+            except Exception as e:
+                logger.error(f"Could not launch installer: {e}", exc_info=True)
+                # This frame is already closing, so it cannot parent a dialog.
+                wx.MessageBox(
+                    f"Couldn't start the installer:\n{e}\n\n"
+                    f"It is saved at:\n{path}",
+                    "Update Failed", wx.OK | wx.ICON_ERROR, None
+                )
+
+        self.Bind(wx.EVT_TIMER, on_tick, timer)
+        timer.Start(150)
+        threading.Thread(target=worker, daemon=True).start()
 
     def on_about(self, event=None):
         """Show about dialog with version and feature information"""
