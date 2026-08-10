@@ -221,7 +221,9 @@ ImageDescriber_v2.0_AMD64.zip
 - [ ] Automated testing script
 - [ ] Version number in app title bar
 - [ ] First-run wizard in the app itself
-- [ ] Auto-update checker (optional)
+- [x] Auto-update checker — shipped in v4.5 (`idt_core/updater.py`; ImageDescriber
+      Help menu, `idt update`). Notify-and-download; silent self-update via Velopack
+      is the next step.
 - [ ] Telemetry for error reporting (opt-in)
 
 ---

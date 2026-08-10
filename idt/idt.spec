@@ -80,6 +80,7 @@ a = Analysis(
 
         # ---- idt_core new modules ----
         'idt_core.config_loader',
+        'idt_core.updater',
         'idt_core.gallery_exporter',
 
         # ---- jaraco (required by pkg_resources / setuptools >= 75) ----

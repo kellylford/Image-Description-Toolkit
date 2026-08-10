@@ -38,23 +38,44 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Tag must match VERSION
+      # All four must agree. idt_core.__version__ matters most: it is what the
+      # in-app update checker compares against the newest release tag, so drift
+      # there makes an installed copy misreport its own version forever.
+      - name: Tag must match every version source
         shell: bash
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
           TAG_VERSION="${TAG#v}"
           FILE_VERSION="$(tr -d ' \r\n' < VERSION)"
+          CORE_VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' idt_core/__init__.py)"
+          PYPROJECT_VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -1)"
 
-          echo "tag         : $TAG"
-          echo "tag version : $TAG_VERSION"
-          echo "VERSION file: $FILE_VERSION"
+          echo "tag                : $TAG"
+          echo "tag version        : $TAG_VERSION"
+          echo "VERSION file       : $FILE_VERSION"
+          echo "idt_core.__version__: $CORE_VERSION"
+          echo "pyproject.toml     : $PYPROJECT_VERSION"
 
-          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+          fail=0
+          for pair in "VERSION:$FILE_VERSION" \
+                      "idt_core/__init__.py:$CORE_VERSION" \
+                      "pyproject.toml:$PYPROJECT_VERSION"; do
+            name="${pair%%:*}"
+            value="${pair#*:}"
+            if [ -z "$value" ]; then
+              echo "ERROR: could not read a version from $name."
+              fail=1
+            elif [ "$value" != "$TAG_VERSION" ]; then
+              echo "ERROR: $name says '$value' but the tag says '$TAG_VERSION'."
+              fail=1
+            fi
+          done
+
+          if [ "$fail" != "0" ]; then
             echo ""
-            echo "ERROR: tag '$TAG' does not match the VERSION file ('$FILE_VERSION')."
-            echo "A mismatch ships binaries that misreport their own version."
-            echo "Either update VERSION and re-tag, or delete and recreate the tag."
+            echo "A mismatch ships binaries that misreport their own version, which"
+            echo "breaks the in-app update check. Sync all three files and re-tag."
             exit 1
           fi
           echo "OK"
