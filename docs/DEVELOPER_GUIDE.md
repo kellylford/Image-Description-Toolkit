@@ -125,6 +125,57 @@ class BaseProvider:
 - `openai_provider.py` — reads `OPENAI_API_KEY` from environment
 - `claude.py` — reads `ANTHROPIC_API_KEY`
 
+**`ChatProvider`** — a second ABC in the same module, for multi-turn streaming:
+
+```python
+class ChatProvider(ABC):
+    def chat(self, request: ChatRequest) -> Iterator[ChatDelta | ChatUsage]: ...
+    provider_name -> str
+    model_name -> str
+```
+
+Parallel to `BaseProvider`, not derived from it: making `BaseProvider` abstract over chat would break all three concrete providers at import, and MLX has no clean `describe()` form. The intended endgame is that `describe()` becomes a one-turn `chat()` and `BaseProvider` retires — stated in the module docstring so this does not quietly become a permanent second interface.
+
+### `providers/registry.py` — Capability Registry
+
+The single source of truth for what each provider supports. Replaces the deleted `models/provider_configs.py`, whose loss silently disabled chat attachments for every provider.
+
+- `capabilities_for(name) -> ProviderCapabilities` — streaming, system prompt, API key requirement, attachment MIME types. Case-insensitive, alias-aware (`anthropic` → `claude`), and returns a conservative all-False record for unknown names rather than raising.
+- `supports_attachments(name)`, `attachment_wildcard(name)` — what the GUI file dialogs need
+- `model_limits(provider, model) -> (context_window, max_output)` — **returns `None` rather than guessing.** Callers apply their own documented fallback.
+
+### `chat/` — Chat Engine
+
+Provider-agnostic, wx-free, and the backing for three surfaces: `idt chat`, the standalone IDT Chat app, and (eventually) ImageDescriber's chat window.
+
+| Module | Role |
+|---|---|
+| `messages.py` | `Role`, `Attachment`, `ChatMessage`, `ChatSession` |
+| `events.py` | `ChatStarted`/`Delta`/`Usage`/`Retrying`/`Finished`/`Cancelled`/`Failed` |
+| `engine.py` | `ChatEngine` — turn loop, retry, budget, persistence, cancellation |
+| `providers.py` | Pure message formatters plus the three streaming implementations |
+| `store.py` | `ChatStore` protocol, `DirectoryChatStore`, `WorkspaceChatStore` |
+| `tokens.py` | Estimation, context-budget truncation, attachment de-duplication |
+| `errors.py` | Failure classification and retry policy |
+| `attachments.py` | MIME inference, HEIC→JPEG, provider acceptance, size limits |
+| `mlx.py` | Apple Silicon local inference (macOS only, imported lazily) |
+
+**`attachments.prepare_attachments(paths, provider, workdir)`** returns `(attachments, converted_paths, errors)`. One unusable file does not discard the rest — nine good photos and one oversized yields nine attachments and one message. Size limits come from `ProviderCapabilities.size_limit_for()`; `None` there means "no published limit", so no threshold is invented. Callers own `workdir` and delete it.
+
+`mlx.py` is separate from `providers.py` so that macOS-only code does not drag down a coverage measurement taken on Windows. It has no floor for the same reason.
+
+**`ChatEngine.send()` is a generator of events.** Same idiom as `WorkspacePipeline.run()`: yield, and let the caller decide on output. A CLI prints deltas; a wx worker forwards each event with `wx.CallAfter`; a test collects them.
+
+**Cancellation is `gen.close()`.** `GeneratorExit` propagates to the provider, whose `finally` closes the HTTP stream. No flag to poll, no half-torn SDK state. Partial responses are always persisted — a stopped reply is kept, not discarded.
+
+**Two token totals, deliberately.** `ChatSession.context_tokens` is the last exchange (what occupies the window); `billed_tokens` is the sum (what you pay). The old chat window summed per-call `input_tokens`, which already include all prior turns, so its gauge over-counted roughly quadratically.
+
+**Non-streaming providers yield one large delta**, so consumers never branch on whether a provider streams.
+
+### `keys.py`
+
+`resolve_api_key(provider)` — the single key resolver. Order: environment variable, then `image_describer_config.json` → `api_keys` (case-insensitive), then legacy `claude.txt` / `openai_api_key.txt`. Replaced five divergent lookups, one of which checked only the config file and so broke Summarize & Compact for anyone using an environment variable.
+
 ### `embedder.py`
 
 Embeds AI descriptions into image EXIF metadata (PNG/JPEG) and metadata sidecar files.

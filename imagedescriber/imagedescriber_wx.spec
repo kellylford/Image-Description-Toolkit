@@ -106,6 +106,28 @@ a = Analysis(
         'idt_core.providers.claude',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
+        # Capability registry — replaces the deleted models/provider_configs.py.
+        # chat_window_wx imports it at module scope for the Attach Files button,
+        # so a missing entry here breaks chat in frozen builds only.
+        'idt_core.providers.registry',
+        # Chat engine — chat_window_wx runs on this now that
+        # ChatProcessingWorker is gone. Enumerated one by one to match this
+        # file's convention; a missing entry fails only in the frozen build.
+        'idt_core.chat',
+        'idt_core.chat.attachments',
+        'idt_core.chat.mlx',
+        'idt_core.chat.engine',
+        'idt_core.chat.errors',
+        'idt_core.chat.events',
+        'idt_core.chat.messages',
+        'idt_core.chat.providers',
+        'idt_core.chat.store',
+        'idt_core.chat.tokens',
+        'idt_core.keys',
+        # Shared wx bridge between the engine and the UI thread, used by both
+        # this app and the standalone chat client.
+        'shared.chat_worker_wx',
+        'chat_worker_wx',
         'ollama',
         'openai',
         'anthropic',

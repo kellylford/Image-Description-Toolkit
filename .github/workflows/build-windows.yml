@@ -107,6 +107,19 @@ jobs:
         timestamp-rfc3161: http://timestamp.acs.microsoft.com
         timestamp-digest: SHA256
 
+    - name: Sign IDTChat.exe
+      if: env.SIGNING_ENABLED == 'true' && github.event_name != 'pull_request'
+      uses: azure/artifact-signing-action@v2.0.0
+      with:
+        endpoint: https://eus.codesigning.azure.net/
+        signing-account-name: kellylford
+        certificate-profile-name: kellyford-public
+        files-folder: ${{ github.workspace }}\chatapp\dist
+        files-folder-filter: exe
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+
     - name: Package for installer
       run: |
         cd BuildAndRelease/WinBuilds
@@ -144,7 +157,8 @@ jobs:
       run: |
         $targets = @(
           "idt\dist\idt.exe",
-          "imagedescriber\dist\ImageDescriber.exe"
+          "imagedescriber\dist\ImageDescriber.exe",
+          "chatapp\dist\IDTChat.exe"
         ) + (Get-ChildItem "BuildAndRelease\WinBuilds\dist_all\*.exe" | ForEach-Object { $_.FullName })
 
         $failed = $false
@@ -184,4 +198,11 @@ jobs:
       with:
         name: imagedescriber-windows
         path: imagedescriber/dist/ImageDescriber.exe
+        retention-days: 30
+
+    - name: Upload IDT Chat executable
+      uses: actions/upload-artifact@v7
+      with:
+        name: idtchat-windows
+        path: chatapp/dist/IDTChat.exe
         retention-days: 30

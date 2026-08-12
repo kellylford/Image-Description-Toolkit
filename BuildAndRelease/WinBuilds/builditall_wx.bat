@@ -2,9 +2,10 @@
 REM ============================================================================
 REM Build All wxPython Applications for Windows
 REM ============================================================================
-REM This script builds both wxPython-based applications:
+REM This script builds all three applications:
 REM   1. IDT (CLI - no GUI framework)
 REM   2. ImageDescriber (wxPython - includes integrated Viewer Mode, PromptEditor, and IDTConfigure)
+REM   3. IDT Chat (wxPython - standalone accessible chat client)
 REM
 REM NOTE: Uses .winenv virtual environments (created by winsetup.bat)
 REM       This allows .venv (macOS) and .winenv (Windows) to coexist
@@ -32,9 +33,10 @@ REM it -- a stale binary in an installer that reports success.
 REM ============================================================================
 if exist "idt\dist\idt.exe" del /Q "idt\dist\idt.exe"
 if exist "imagedescriber\dist\ImageDescriber.exe" del /Q "imagedescriber\dist\ImageDescriber.exe"
+if exist "chatapp\dist\IDTChat.exe" del /Q "chatapp\dist\IDTChat.exe"
 
 REM ============================================================================
-echo [1/2] Building IDT (CLI)...
+echo [1/3] Building IDT (CLI)...
 echo ========================================================================
 echo.
 echo.
@@ -52,7 +54,7 @@ cd ..
 
 REM ============================================================================
 echo.
-echo [2/2] Building ImageDescriber (wxPython - includes Viewer Mode + PromptEditor + IDTConfigure)...
+echo [2/3] Building ImageDescriber (wxPython - includes Viewer Mode + PromptEditor + IDTConfigure)...
 echo ========================================================================
 echo.
 
@@ -63,6 +65,22 @@ if errorlevel 1 (
     set /a BUILD_ERRORS+=1
 ) else (
     echo SUCCESS: ImageDescriber built successfully
+)
+cd ..
+
+REM ============================================================================
+echo.
+echo [3/3] Building IDT Chat (wxPython - standalone accessible chat client)...
+echo ========================================================================
+echo.
+
+cd chatapp
+call .\build_chatapp.bat
+if errorlevel 1 (
+    echo ERROR: IDT Chat build failed!
+    set /a BUILD_ERRORS+=1
+) else (
+    echo SUCCESS: IDT Chat built successfully
 )
 cd ..
 
@@ -128,6 +146,12 @@ copy /Y "imagedescriber\dist\ImageDescriber.exe" "BuildAndRelease\WinBuilds\dist
 if errorlevel 1 goto :copy_failed_describer
 echo   ✓ ImageDescriber.exe ^(with integrated Viewer Mode and tools^)
 
+REM Copy IDT Chat (standalone accessible chat client)
+if not exist "chatapp\dist\IDTChat.exe" goto :missing_chat
+copy /Y "chatapp\dist\IDTChat.exe" "BuildAndRelease\WinBuilds\dist_all\bin\" >nul
+if errorlevel 1 goto :copy_failed_chat
+echo   ✓ IDTChat.exe
+
 REM Copy documentation
 echo.
 echo Copying documentation...
@@ -170,6 +194,16 @@ exit /b 1
 
 :copy_failed_describer
 echo   ✗ ImageDescriber.exe could not be copied into dist_all\bin
+cd /d "%ORIGINAL_DIR%"
+exit /b 1
+
+:missing_chat
+echo   ✗ IDTChat.exe NOT FOUND - the build did not produce an executable
+cd /d "%ORIGINAL_DIR%"
+exit /b 1
+
+:copy_failed_chat
+echo   ✗ IDTChat.exe could not be copied into dist_all\bin
 cd /d "%ORIGINAL_DIR%"
 exit /b 1
 

@@ -205,6 +205,9 @@ Source: "dist_all\bin\idt.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Note: Viewer is now integrated into ImageDescriber as "Viewer Mode" tab
 Source: "dist_all\bin\ImageDescriber.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Note: PromptEditor and Configure are now integrated into ImageDescriber (Tools menu)
+; Standalone accessible chat client. Ships in the same installer so one update
+; covers every app, per the update checker's single-feed design.
+Source: "dist_all\bin\IDTChat.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Configuration files (from scripts directory)
 Source: "..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
@@ -220,9 +223,11 @@ Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 Name: "{group}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit && echo Type 'idt --help' for usage"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Comment: "Batch image processing (Viewer Mode tab + Tools menu includes Prompt Editor and Configure)"
+Name: "{group}\IDT Chat"; Filename: "{app}\IDTChat.exe"; WorkingDir: "{app}"; Comment: "Accessible chat client for Ollama, Claude and OpenAI"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Image Description Toolkit (CLI)"; Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{autodesktop}\ImageDescriber"; Filename: "{app}\ImageDescriber.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\IDT Chat"; Filename: "{app}\IDTChat.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent unchecked

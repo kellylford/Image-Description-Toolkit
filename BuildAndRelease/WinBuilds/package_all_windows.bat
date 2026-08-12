@@ -42,6 +42,18 @@ if exist "..\..\imagedescriber\dist\ImageDescriber.exe" (
     exit /b 1
 )
 
+REM Copy IDTChat.exe
+REM Required: installer.iss lists it under [Files], so Inno Setup fails the
+REM whole installer build if it is absent from dist_all\bin.
+if exist "..\..\chatapp\dist\IDTChat.exe" (
+    echo Copying IDTChat.exe...
+    copy /Y "..\..\chatapp\dist\IDTChat.exe" "dist_all\bin\"
+) else (
+    echo ERROR: IDTChat.exe not found at ..\..\chatapp\dist\IDTChat.exe
+    echo Run builditall_wx.bat first
+    exit /b 1
+)
+
 echo.
 echo ================================================
 echo Packaging complete!

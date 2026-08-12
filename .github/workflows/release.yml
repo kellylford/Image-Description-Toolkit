@@ -169,6 +169,7 @@ jobs:
           take "*/idt-installer-windows/*.exe"      "ImageDescriptionToolkitSetup-${VERSION}-windows.exe"
           take "*/idt-windows/idt.exe"              "idt-${VERSION}-windows-x64.exe"
           take "*/imagedescriber-windows/*.exe"     "ImageDescriber-${VERSION}-windows-x64.exe"
+          take "*/idtchat-windows/*.exe"            "IDTChat-${VERSION}-windows-x64.exe"
           take "*/idt-macos-arm64-dmg/*.dmg"        "IDT-${VERSION}-macos-arm64.dmg"
           take "*/idt-macos-arm64-cli/*.tar.gz"     "idt-${VERSION}-macos-arm64.tar.gz"
 
@@ -194,6 +195,7 @@ jobs:
             release/ImageDescriptionToolkitSetup-*-windows.exe
             release/idt-*-windows-x64.exe
             release/ImageDescriber-*-windows-x64.exe
+            release/IDTChat-*-windows-x64.exe
             release/IDT-*-macos-arm64.dmg
             release/idt-*-macos-arm64.tar.gz
             release/SHA256SUMS.txt

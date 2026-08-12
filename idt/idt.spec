@@ -76,11 +76,29 @@ a = Analysis(
         'idt_core.providers.claude',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
+        # Capability registry — imported eagerly by idt_core/providers/__init__.py
+        'idt_core.providers.registry',
 
         # ---- idt_core new modules ----
         'idt_core.config_loader',
         'idt_core.updater',
         'idt_core.gallery_exporter',
+        'idt_core.keys',
+
+        # ---- chat engine (powers `idt chat`) ----
+        # Enumerated one by one to match this file's convention. A missing
+        # entry here imports fine in dev mode and fails only in the frozen
+        # build, which is the hardest place to notice it.
+        'idt_core.chat',
+        'idt_core.chat.attachments',
+        'idt_core.chat.mlx',
+        'idt_core.chat.engine',
+        'idt_core.chat.errors',
+        'idt_core.chat.events',
+        'idt_core.chat.messages',
+        'idt_core.chat.providers',
+        'idt_core.chat.store',
+        'idt_core.chat.tokens',
 
         # ---- jaraco (required by pkg_resources / setuptools >= 75) ----
         'jaraco', 'jaraco.text', 'jaraco.functools',

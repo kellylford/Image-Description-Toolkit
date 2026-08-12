@@ -67,7 +67,7 @@ jobs:
       # ------------------------------------------------------------------ #
       - name: CLI help contract
         run: |
-          $cmds = @('describe','export','status','show','embed','video','download','combine','stats','models','prompts','config','guideme')
+          $cmds = @('describe','export','status','show','embed','video','download','combine','stats','models','prompts','config','guideme','chat')
           foreach ($cmd in $cmds) {
             Write-Host "--- idt $cmd --help ---"
             python cli/main.py $cmd --help
