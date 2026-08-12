@@ -164,8 +164,9 @@ download against the release's published SHA-256. On macOS the disk image is sav
 your Downloads folder and shown in Finder; a disk image can't replace a running app,
 so the final drag is yours.
 
-One update covers both applications. The check reads GitHub's public releases list and
-nothing else — no account, no telemetry, nothing sent.
+`idt update` reports only — installing is the installer's job, and one installer
+updates both applications. The check reads GitHub's public releases list and nothing
+else — no account, no telemetry, nothing sent.
 
 ---
 
@@ -198,16 +199,13 @@ idt version     Version information
 
 - **macOS builds are Apple Silicon only.** No Intel Mac build is published. Intel
   users can run from source.
-- **`watch` and `video` still use older per-folder storage**, not the `.idtw` bundle.
-- **Descriptions from before v4.5 aren't picked up automatically.** Old `wf_…` output
-  folders are still readable in the desktop app's viewer.
-- **`idt guideme` needs a real terminal.** In a non-interactive environment it will
-  hang; use `idt describe` directly.
-- **`idt update` only reports.** It doesn't download or install — run the installer,
-  or use the desktop app's update prompt.
-- **HEIC support may need extra pieces** on Windows: the free
-  [HEIF Image Extensions](https://www.microsoft.com/store/productId/9PMMSR1CGPWG)
-  from the Microsoft Store.
+- **Work done before v4.5 isn't converted automatically.** Older `wf_…` output
+  folders still open in the desktop app: **File → Open Workflow Result (Viewer
+  Mode)…** to read one as it is, or **File → Import Workflow (to Workspace)…** to
+  bring its descriptions into a `.idtw` bundle.
+- **`idt guideme` needs a terminal it can read from.** Run from a script or a pipe,
+  it exits immediately with `Error: EOF when reading a line`. Use `idt describe` in
+  scripts.
 - Local models are slower than cloud ones, sometimes much slower, depending on your
   hardware.
 
