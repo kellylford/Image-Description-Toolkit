@@ -226,7 +226,7 @@ All applications are fully accessible:
 
 REQUIREMENTS:
 
-  - macOS 10.13 (High Sierra) or later
+  - An Apple Silicon Mac
   - For AI features: Ollama, OpenAI API, or Anthropic Claude API
 
 GETTING STARTED:

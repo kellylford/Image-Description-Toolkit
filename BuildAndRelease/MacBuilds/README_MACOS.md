@@ -34,7 +34,6 @@ This directory contains the complete macOS build infrastructure for Image Descri
 ## Prerequisites
 
 ### System Requirements
-- macOS 10.13+ (High Sierra or later)
 - Python 3.8+
 - Xcode Command Line Tools (for packaging):
   ```bash

@@ -42,8 +42,7 @@ Both tools produce the same workspace bundles (`.idtw`) — a `.idtw` bundle is 
 
 **macOS (both tools)**
 
-- macOS 12 (Monterey) or later
-- Apple Silicon (M1/M2/M3) or Intel
+- Apple Silicon (M1/M2/M3) for the published build; Intel Macs need to build from source
 - 8 GB RAM minimum; 16 GB recommended for local AI
 - Internet connection for cloud AI providers
 
@@ -806,7 +805,7 @@ The application has two modes:
 | Show Batch Progress | Show the batch progress dialog |
 | Update Image List (F5) | Refresh the image list |
 | Refresh AI Models | Reload available models from all providers |
-| Chat with AI Model | Open the interactive chat window |
+| Chat with AI Model (Ctrl+T) | Open the interactive chat window |
 | Convert HEIC Files... | Convert HEIC/HEIF images to JPEG |
 | Extract Video Frames... | Extract frames from video files |
 | Describe Video with AI... | Generate an AI description for a video |
@@ -972,23 +971,27 @@ Videos in the folder are automatically extracted to frames before the AI step. T
 
 ### The Chat Window
 
-Open with **Process → Chat with AI Model**. Choose a provider and model in the prompt dialog.
+Open with **Process → Chat with AI Model** (`Ctrl+T`). Choose a provider and model in the prompt dialog.
 
-The chat window lets you have a multi-turn conversation with the AI about the selected image. Use it to:
+The chat window is a general-purpose, multi-turn conversation with the AI model of your choice. It is not limited to images — use it for anything, including:
 
-- Ask follow-up questions about details in a description
-- Request alternative phrasing
-- Ask the AI to identify specific elements in the image
-- Explore accessibility phrasing options
+- Asking follow-up questions about a description you generated
+- Requesting alternative phrasing
+- Exploring accessibility phrasing options
+- Any other question you would ask a chat assistant
 
 **Layout**
 
 - **Conversation history** (ListBox) — All messages, navigable with arrow keys. Screen readers announce new messages automatically.
-- **Message detail pane** — Full text of the selected message.
-- **Input field** — Type your message and press Enter to send.
-- **Image context** — The currently selected image is attached to the conversation.
+- **Message detail pane** — Full text of the selected message. Editable so you can select and copy from it; edits are not saved.
+- **Input field** — Type your message. `Enter` sends; `Shift+Enter` starts a new line.
+- **Attach Files** — Attach images to the conversation. Shown only for providers that accept attachments; Claude also accepts PDFs. You can also paste an image straight from the clipboard with `Ctrl+V`.
+- **Change Model** — Switch provider or model mid-conversation. History is kept.
+- **Token usage** — Shows how much of the model's context window the conversation is using.
 
-Chat sessions are saved with the workspace.
+**Starting a chat does not attach the image you have selected.** Every chat begins empty. To ask about a specific image, attach it with **Attach Files** or paste it from the clipboard.
+
+Chat sessions are saved with the workspace and appear as chat items in the item list. Press `Enter` on a saved chat to resume it — the full conversation history is restored, so the model retains context. Attachments from earlier turns are not re-attached when resuming.
 
 ---
 

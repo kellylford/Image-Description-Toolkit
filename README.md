@@ -11,7 +11,7 @@ Download from the [releases](https://github.com/kellylford/Image-Description-Too
 | File | Platform |
 |---|---|
 | **`ImageDescriptionToolkitSetup-4.5.0-windows.exe`** | Windows 10/11, 64-bit |
-| **`IDT-4.5.0-macos-arm64.dmg`** | macOS 12+, Apple Silicon |
+| **`IDT-4.5.0-macos-arm64.dmg`** | macOS, Apple Silicon |
 
 Either one gives you both applications:
 - **idt** - Command-line interface for batch processing and automation
@@ -94,7 +94,6 @@ idt update
   - [Claude API](https://console.anthropic.com) (paid)
 
 ### macOS
-- **macOS 12 (Monterey) or later**
 - **Apple Silicon** — the published build is arm64 only. Intel Macs need to build from source.
 - **No Python required** for the pre-built app
 - **Installation**: Download `IDT-{version}-macos-arm64.dmg` from releases, open it, and drag ImageDescriber to Applications

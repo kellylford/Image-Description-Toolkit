@@ -115,7 +115,6 @@ After successful setup:
 
 ## System Requirements
 
-- macOS 10.14 (Mojave) or later
 - Python 3.10 or later (3.11+ recommended for Apple Silicon)
 - Xcode Command Line Tools
 - At least 2GB free disk space for all virtual environments
