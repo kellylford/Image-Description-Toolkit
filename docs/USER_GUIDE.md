@@ -55,7 +55,8 @@ Both tools produce the same workspace bundles (`.idtw`) — a `.idtw` bundle is 
 **For HEIC/HEIF image support (iPhone photos)**
 
 - `pillow-heif` Python package installed (`pip install pillow-heif`)
-- On Windows, you may also need the [HEIF Image Extensions](https://www.microsoft.com/store/productId/9PMMSR1CGPWG) from the Microsoft Store
+- Nothing else. `pillow-heif` bundles its own decoder, and the packaged Windows and
+  macOS builds ship it, so HEIC works out of the box there
 
 **For video support**
 
@@ -1454,8 +1455,9 @@ The CLI uses no ANSI color codes in interactive mode (`idt guideme`) and all out
 
 **HEIC images not recognized**
 
-- Install `pillow-heif`: `pip install pillow-heif`.
-- On Windows, you may also need to install the [HEIF Image Extensions](https://www.microsoft.com/store/productId/9PMMSR1CGPWG) from the Microsoft Store.
+- Running from source: install `pillow-heif` (`pip install pillow-heif`).
+- Using a packaged build: `pillow-heif` is already included, so a HEIC that isn't
+  recognized is a bug worth reporting rather than a missing dependency.
 
 **The GUI silently does nothing when I click a button**
 

@@ -16,7 +16,7 @@ no uploading your photos anywhere.
 | File | Platform | What it is |
 |---|---|---|
 | **`ImageDescriptionToolkitSetup-4.5.0-windows.exe`** | Windows 10/11, 64-bit | **Start here.** Installs both apps. |
-| **`IDT-4.5.0-macos-arm64.dmg`** | macOS 12+, Apple Silicon | **Start here.** Contains both apps. |
+| **`IDT-4.5.0-macos-arm64.dmg`** | macOS, Apple Silicon | **Start here.** Contains both apps. |
 | `idt-4.5.0-windows-x64.exe` | Windows | Just the command-line tool, no installer |
 | `ImageDescriber-4.5.0-windows-x64.exe` | Windows | Just the GUI, no installer |
 | `idt-4.5.0-macos-arm64.tar.gz` | macOS | Just the command-line tool |
@@ -50,9 +50,10 @@ supervision, or wiring IDT into a script.
 ### The desktop app
 
 1. Install and launch **ImageDescriber**.
-2. **File → Load Directory** and choose a folder of images.
+2. **File → Load Directory** (Ctrl+L) and choose a folder of images.
 3. Pick a provider and a description style.
-4. **Processing → Process All Undescribed**.
+4. **Process → Process Undescribed Images (Entire Workspace)**. To do one folder
+   at a time instead, use **Process → Process Undescribed in Selected Folder**.
 
 That's the whole loop. If you have no AI provider set up yet, see below — start with
 Ollama.
@@ -221,8 +222,11 @@ idt version     Version information
 
 ## Providers as of this release
 
-| Provider | Models |
+The models each provider recommends for describing images. Older generations are
+still selectable; `idt models` lists everything available to you.
+
+| Provider | Recommended models |
 |---|---|
-| Claude | claude-opus-5, claude-sonnet-5, claude-opus-4-8, claude-haiku-4-5 |
-| OpenAI | gpt-5.2, gpt-5.1, gpt-5-mini, gpt-5-nano, o4-mini, o3 |
+| Claude | `claude-opus-5`, `claude-sonnet-5`, `claude-opus-4-8`, `claude-haiku-4-5-20251001` |
+| OpenAI | `gpt-5.2`, `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano`, `o4-mini`, `o3` |
 | Ollama | whatever you've pulled — `idt models --provider ollama` |

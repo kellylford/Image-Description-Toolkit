@@ -7048,7 +7048,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Ensure main window has focus before showing dialog
             self.Raise()
             self.SetFocus()
-            show_info(self, f"Extraction complete! {len(frame_paths)} frames added to workspace.\n\nYou can process them later with 'Process All Undescribed'.")
+            show_info(self, f"Extraction complete! {len(frame_paths)} frames added to workspace.\n\nYou can process them later with Process > Process Undescribed Images (Entire Workspace).")
             # Restore focus after dialog
             self.SetFocus()
             return

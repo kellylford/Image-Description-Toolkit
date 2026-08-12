@@ -2098,7 +2098,7 @@ Supported providers:
         "embed",
         help="Write descriptions into image metadata copies",
         description=(
-            "Copy described images to .idt/embedded/ and write the description "
+            "Copy described images to <bundle>.idtw/embedded/ and write the description "
             "into EXIF ImageDescription and XMP dc:description. Source files are "
             "never modified. HEIC files are converted to JPEG in the copy."
         ),
