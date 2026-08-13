@@ -3,13 +3,13 @@
 # ============================================================================
 # This file contains core dependencies for CLI/script usage.
 # 
-# GUI Applications (viewer, imagedescriber, prompt_editor, idtconfigure):
-#   Each GUI app has its own requirements.txt in its directory with wxPython
-#   Example: cd viewer && pip install -r requirements.txt
+# Standalone applications (idt, imagedescriber):
+#   Each app has its own requirements.txt in its directory
+#   Example: cd imagedescriber && pip install -r requirements.txt
 #
 # Installation options:
 #   CLI/Scripts only:       pip install -r requirements.txt
-#   GUI applications:       See individual app directories
+#   Standalone apps:        See individual app directories
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -86,25 +86,7 @@ pyinstaller>=6.22.0     # Executable bundling for distribution
 # INSTALLATION EXAMPLES
 # ============================================================================
 # 
-# Minimal installation (scripts only, no GUI, no video, no HEIC):
-#   pip install Pillow requests ollama openai anthropic
-#
-# Scripts with HEIC support:
-#   pip install Pillow requests ollama openai anthropic pillow-heif
-#
-# Scripts with video processing and metadata embedding:
-#   pip install Pillow requests ollama openai anthropic opencv-python numpy piexif
-#
-# GUI applications (full featured):
-#   pip install -r requirements.txt
-#
-# Development environment (includes testing):
-#   pip install -r requirements.txt
-#
-# Metadata utilities (optional advanced features):
-#   pip install pyexiv2 ExifRead geopy
-#
-# ======================CLI/scripts only, no video, no HEIC):
+# Minimal installation (CLI/scripts only, no video, no HEIC):
 #   pip install Pillow requests ollama openai anthropic
 #
 # CLI with HEIC support (iPhone photos):
@@ -113,14 +95,27 @@ pyinstaller>=6.22.0     # Executable bundling for distribution
 # CLI with video processing:
 #   pip install Pillow requests ollama openai anthropic opencv-python numpy piexif
 #
-# Full CLI/scripts (all features):
+# Full CLI/scripts (all features, includes testing):
 #   pip install -r requirements.txt
 #
-# GUI applications:
-#   cd viewer && pip install -r requirements.txt
+# Standalone applications (each has its own requirements.txt):
+#   cd idt && pip install -r requirements.txt
 #   cd imagedescriber && pip install -r requirements.txt
-#   cd prompt_editor && pip install -r requirements.txt
-#   cd idtconfigure && - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
+#
+# Metadata utilities (optional advanced features):
+#   pip install pyexiv2 ExifRead geopy
+#
+# ============================================================================
+# NOTES
+# ============================================================================
+#
+# Python 3.13 Compatibility:
+#   - All core dependencies work with Python 3.13+
+#   - pyexiv2 may require compilation on Python 3.13 (optional feature)
+#   - pillow-heif should work but check PyPI for latest wheels
+#
+# API Keys Required:
+#   - OpenAI: Set OPENAI_API_KEY environment variable or create openai.txt
 #   - Claude: Set ANTHROPIC_API_KEY environment variable or create claude.txt
 #   - Ollama: Local installation, no API key needed
 #
