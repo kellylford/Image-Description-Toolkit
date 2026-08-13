@@ -128,11 +128,13 @@ class ChatProvider(ABC):
 
     @property
     @abstractmethod
-    def provider_name(self) -> str: ...
+    def provider_name(self) -> str:
+        """Canonical provider name, e.g. "claude"."""
 
     @property
     @abstractmethod
-    def model_name(self) -> str: ...
+    def model_name(self) -> str:
+        """Model id this instance talks to."""
 
     @abstractmethod
     def chat(self, request: ChatRequest) -> Iterator[ChatYield]:
@@ -142,7 +144,6 @@ class ChatProvider(ABC):
         retries them. They must release network resources in a ``finally`` so
         that a consumer abandoning the generator does not leak a connection.
         """
-        ...
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(model={self.model_name!r})"

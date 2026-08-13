@@ -54,7 +54,7 @@ def test_chat_window_uses_the_real_registry():
     False is behaviourally indistinguishable from "this provider takes no
     attachments" -- which is exactly why the original regression was invisible.
     """
-    wx = pytest.importorskip("wx")  # noqa: F841
+    pytest.importorskip("wx")
     import chat_window_wx
 
     assert chat_window_wx.supports_attachments is registry.supports_attachments

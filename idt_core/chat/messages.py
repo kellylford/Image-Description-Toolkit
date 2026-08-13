@@ -27,7 +27,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Sequence
 
 Role = Literal["system", "user", "assistant"]
 
@@ -284,3 +284,21 @@ class ChatSession:
             modified=raw.get("modified", "") or _now(),
             messages=messages,
         )
+
+
+def conversation_turns(messages: Sequence["ChatMessage"]) -> List["ChatMessage"]:
+    """Only user/assistant turns, and only ones with something to say.
+
+    Lives here rather than beside the providers that use it so that the MLX
+    provider can reach it without importing the module that lazily imports
+    *it* -- that pairing was a genuine import cycle, flagged by CodeQL.
+
+    System turns are handled per-provider. A failed turn that produced no text
+    is skipped: sending an empty assistant message makes some providers reject
+    the whole request.
+    """
+    return [
+        m
+        for m in messages
+        if m.role in ("user", "assistant") and (m.content or m.attachments)
+    ]

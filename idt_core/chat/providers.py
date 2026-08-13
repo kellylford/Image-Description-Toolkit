@@ -22,7 +22,7 @@ import io
 from typing import Iterator, List, Optional, Sequence, Tuple
 
 from ..providers.base import ChatDelta, ChatProvider, ChatRequest, ChatUsage, ChatYield
-from .messages import Attachment, ChatMessage
+from .messages import Attachment, ChatMessage, conversation_turns
 
 #: OpenAI images are resized to this longest edge before upload, matching the
 #: batch describe path in imagedescriber/ai_providers.py.
@@ -93,20 +93,6 @@ def encode_attachment_claude(att: Attachment) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _conversation_turns(messages: Sequence[ChatMessage]) -> List[ChatMessage]:
-    """Only user/assistant turns, and only ones with something to say.
-
-    System turns are handled per-provider. A failed turn that produced no text
-    is skipped: sending an empty assistant message makes some providers reject
-    the whole request.
-    """
-    return [
-        m
-        for m in messages
-        if m.role in ("user", "assistant") and (m.content or m.attachments)
-    ]
-
-
 def format_for_ollama(
     messages: Sequence[ChatMessage], system_prompt: str = ""
 ) -> List[dict]:
@@ -114,7 +100,7 @@ def format_for_ollama(
     out: List[dict] = []
     if system_prompt:
         out.append({"role": "system", "content": system_prompt})
-    for msg in _conversation_turns(messages):
+    for msg in conversation_turns(messages):
         entry = {"role": msg.role, "content": msg.content}
         images = [a for a in msg.attachments if a.is_image]
         if images:
@@ -134,7 +120,7 @@ def format_for_openai(
     out: List[dict] = []
     if system_prompt:
         out.append({"role": "system", "content": system_prompt})
-    for msg in _conversation_turns(messages):
+    for msg in conversation_turns(messages):
         images = [a for a in msg.attachments if a.is_image]
         if images:
             content: List[dict] = [{"type": "text", "text": msg.content}]
@@ -156,7 +142,7 @@ def format_for_claude(
     implementation.
     """
     out: List[dict] = []
-    for msg in _conversation_turns(messages):
+    for msg in conversation_turns(messages):
         if msg.attachments:
             content: List[dict] = [encode_attachment_claude(a) for a in msg.attachments]
             content.append({"type": "text", "text": msg.content})

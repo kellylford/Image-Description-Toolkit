@@ -51,8 +51,42 @@ pytestmark = pytest.mark.skipif(
 APP_SOURCE = _APP_DIR / "chat_app_wx.py"
 
 
+def _accessible_is_supported() -> bool:
+    """True where wx.Accessible can actually be constructed.
+
+    It is a Windows-only feature: on GTK and macOS both the constructor and
+    ``GetAccessible()`` raise NotImplementedError. The production code already
+    guards for that (``_set_accessible_name`` swallows it); these tests did
+    not, which is how three of them failed on the Apple Silicon runner while
+    passing locally.
+    """
+    if wx is None:
+        return False
+    try:
+        app = wx.App.Get() or wx.App(False)  # noqa: F841 - needed for wx.Frame
+        frame = wx.Frame(None)
+    except Exception:
+        return False
+    try:
+        wx.Accessible(wx.TextCtrl(frame))
+        return True
+    except (NotImplementedError, AttributeError):
+        return False
+    finally:
+        frame.Destroy()
+
+
+ACCESSIBLE_SUPPORTED = _accessible_is_supported()
+
+accessible_only = pytest.mark.skipif(
+    not ACCESSIBLE_SUPPORTED,
+    reason="wx.Accessible is Windows-only; unavailable on this platform",
+)
+
+
 @pytest.fixture(scope="module")
 def wx_app():
+    app = None
     try:
         app = wx.App.Get() or wx.App(False)
     except Exception as exc:  # pragma: no cover
@@ -154,6 +188,7 @@ def test_menu_handlers_exist(wx_app):
 # 2b. Screen reader naming
 # ---------------------------------------------------------------------------
 
+@accessible_only
 def test_accessible_name_defers_to_wx_for_list_items(wx_app):
     """childId > 0 is a list item, and must NOT get the control's label.
 
@@ -179,6 +214,7 @@ def test_accessible_name_defers_to_wx_for_list_items(wx_app):
         frame.Destroy()
 
 
+@accessible_only
 def test_list_controls_do_not_get_a_custom_accessible(wx_app):
     """A ListBox reports its own items; overriding that hides them."""
     from chat_app_wx import _set_accessible_name
@@ -201,9 +237,14 @@ def test_history_and_session_lists_keep_their_items_readable(frame):
     frame.history_list.Append("You: hello")
     frame.history_list.Append("fake-1: hi there")
 
-    assert frame.history_list.GetAccessible() is None
+    # Item text is the part that matters on every platform.
     assert frame.history_list.GetString(0) == "You: hello"
-    assert frame.session_list.GetAccessible() is None
+    assert frame.history_list.GetString(1) == "fake-1: hi there"
+    assert frame.history_list.GetName() == "Conversation history"
+
+    if ACCESSIBLE_SUPPORTED:
+        assert frame.history_list.GetAccessible() is None
+        assert frame.session_list.GetAccessible() is None
 
 
 # ---------------------------------------------------------------------------

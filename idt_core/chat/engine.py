@@ -235,15 +235,18 @@ class ChatEngine:
                             yield ChatDelta(item.text)
                     elif isinstance(item, ProviderUsage):
                         usage = item
-            except GeneratorExit:
-                # The consumer abandoned us. Persist what arrived, then let the
-                # exception propagate -- yielding here is illegal.
+            except (GeneratorExit, KeyboardInterrupt, SystemExit):
+                # Not failures -- the caller is going away. Persist what
+                # arrived, then let it propagate: yielding during GeneratorExit
+                # is illegal, and swallowing KeyboardInterrupt would turn a
+                # Ctrl-C in `idt chat` into an "Error:" line instead of an
+                # interrupt.
                 self._commit_assistant(
                     chunks, usage, error="Cancelled", stop_reason="cancelled"
                 )
                 stream.close()
                 raise
-            except BaseException as exc:  # noqa: BLE001 - classified below
+            except Exception as exc:  # noqa: BLE001 - classified below
                 error = classify(exc)
             finally:
                 close = getattr(stream, "close", None)

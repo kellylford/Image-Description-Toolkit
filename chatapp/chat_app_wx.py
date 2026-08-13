@@ -612,6 +612,9 @@ class ChatFrame(wx.Frame):
                 if att.path:
                     size = f"  ({Path(att.path).stat().st_size / 1024:.0f} KB)"
             except OSError:
+                # The file moved or vanished since it was attached. Show the
+                # name without a size; sending validates existence properly
+                # and reports it there.
                 pass
             self.attach_list.Append(f"{att.name or Path(att.path or '').name}{size}")
 

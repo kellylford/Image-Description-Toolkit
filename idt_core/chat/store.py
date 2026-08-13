@@ -36,13 +36,17 @@ __all__ = [
 class ChatStore(Protocol):
     """Persistence for chat sessions."""
 
-    def save(self, session: ChatSession) -> None: ...
+    def save(self, session: ChatSession) -> None:
+        """Write the session, overwriting any previous copy."""
 
-    def load(self, session_id: str) -> Optional[ChatSession]: ...
+    def load(self, session_id: str) -> Optional[ChatSession]:
+        """Return the session, or None if it is absent or unreadable."""
 
-    def list_sessions(self) -> List[ChatSession]: ...
+    def list_sessions(self) -> List[ChatSession]:
+        """Every readable session, most recently modified first."""
 
-    def delete(self, session_id: str) -> bool: ...
+    def delete(self, session_id: str) -> bool:
+        """Remove the session. True if something was removed."""
 
 
 def default_chat_dir() -> Path:

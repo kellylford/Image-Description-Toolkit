@@ -1516,6 +1516,9 @@ def _chat_default_model(provider: str) -> str:
         if available:
             return available[0]
     except Exception:
+        # Ollama may not be running, or may not be installed at all. Fall
+        # through to the module default so `idt chat --model X` still works
+        # without a live service to enumerate.
         pass
     return DEFAULT_MODEL
 

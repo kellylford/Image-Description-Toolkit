@@ -85,6 +85,10 @@ class ChatWorker(threading.Thread):
             try:
                 generator.close()
             except Exception:
+                # Best effort teardown on a thread that is already finishing.
+                # The generator may have raised on its way out, or been closed
+                # already by a concurrent cancel(); either way there is nothing
+                # left to salvage and nobody to report it to.
                 pass
 
     # ---- delivery --------------------------------------------------------

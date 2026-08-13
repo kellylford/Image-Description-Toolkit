@@ -37,7 +37,6 @@ from idt_core.chat import (  # noqa: E402
     ChatRetrying,
     ChatSession,
     ChatStarted,
-    ChatUsage,
     DirectoryChatStore,
     estimate_tokens,
 )
@@ -556,8 +555,12 @@ def test_delete_reports_whether_anything_was_removed(tmp_path):
     session = ChatSession()
     store.save(session)
 
-    assert store.delete(session.id) is True
-    assert store.delete(session.id) is False
+    # Hoisted out of the assert: an assert with a side effect vanishes under
+    # `python -O`, which would silently stop testing deletion at all.
+    first = store.delete(session.id)
+    second = store.delete(session.id)
+    assert first is True
+    assert second is False
 
 
 def test_session_id_cannot_escape_the_store_directory(tmp_path):

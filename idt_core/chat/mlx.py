@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Iterator
 
 from ..providers.base import ChatDelta, ChatProvider, ChatRequest, ChatUsage, ChatYield
-from .providers import _conversation_turns
+from .messages import conversation_turns
 
 __all__ = ["MLXChatProvider"]
 
@@ -109,7 +109,7 @@ class MLXChatProvider(ChatProvider):
                     {"role": "system", "content": request.system_prompt}
                 )
             image_assigned = False
-            for msg in _conversation_turns(request.messages):
+            for msg in conversation_turns(request.messages):
                 if msg.role == "user" and not image_assigned and temp_jpeg:
                     hf_messages.append({
                         "role": "user",
@@ -160,4 +160,6 @@ class MLXChatProvider(ChatProvider):
                 try:
                     _Path(temp_jpeg).unlink()
                 except OSError:
+                    # A leftover temp JPEG in the system temp directory is not
+                    # worth failing a completed reply over.
                     pass
