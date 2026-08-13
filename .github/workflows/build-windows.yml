@@ -56,6 +56,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
+    # Runs before the build because it costs seconds and the failure it finds
+    # costs a full packaging cycle: a lazily-imported module missing from a
+    # spec builds cleanly and only breaks when the frozen app reaches the
+    # function that imports it.
+    - name: Check PyInstaller specs are complete
+      run: python BuildAndRelease/check_spec_completeness.py
+
     - name: Build all Windows apps
       run: |
         cd BuildAndRelease/WinBuilds
