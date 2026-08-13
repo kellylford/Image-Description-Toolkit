@@ -1,0 +1,50 @@
+# ============================================================================
+# IDT Chat - Dependencies
+# ============================================================================
+# The standalone accessible chat client. Install in its own virtual
+# environment:
+#   cd chatapp
+#   python -m venv .venv
+#   .venv\Scripts\activate (Windows) or source .venv/bin/activate (macOS)
+#   pip install -r requirements.txt
+#
+# This is a strict subset of imagedescriber/requirements.txt, so the build
+# scripts fall back to imagedescriber/.venv when chatapp/.venv is absent
+# rather than forcing a second environment to exist.
+#
+# Deliberately absent: opencv, pillow-heif's video companions, MLX and torch.
+# Chat needs a GUI, three provider SDKs and enough Pillow to resize an image
+# before upload. Nothing else. That is why IDTChat.exe is roughly half the
+# size of ImageDescriber.exe.
+#
+# Floors are kept in step with imagedescriber/requirements.txt for the
+# packages both share, so the two apps cannot end up built against different
+# versions of the same SDK.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# REQUIRED - GUI Framework
+# ----------------------------------------------------------------------------
+wxPython>=4.3.1        # Cross-platform GUI framework
+
+# ----------------------------------------------------------------------------
+# REQUIRED - AI Providers
+# ----------------------------------------------------------------------------
+requests>=2.34.2       # HTTP requests
+ollama>=0.6.2          # Ollama Python client
+openai>=2.53.0         # OpenAI API
+anthropic>=0.121.0     # Anthropic Claude API
+
+# ----------------------------------------------------------------------------
+# REQUIRED - Attachments
+# ----------------------------------------------------------------------------
+# Pillow resizes images before upload to the OpenAI API. pillow-heif lets an
+# iPhone HEIC be converted to JPEG on the way in, which every provider needs
+# because none of them decode HEIC.
+Pillow>=12.3.0         # Image processing
+pillow-heif>=1.5.0     # HEIC/HEIF image support
+
+# ----------------------------------------------------------------------------
+# BUILD ONLY
+# ----------------------------------------------------------------------------
+pyinstaller>=6.22.0    # Packaging into IDTChat.exe / IDTChat.app

@@ -16,6 +16,10 @@ OpenCV, Pillow-HEIF, MLX or the description pipeline, so none of that is
 bundled. Chat needs the three provider SDKs and wx, nothing more.
 """
 
+import re
+import sys as _sys
+from pathlib import Path as _Path
+
 from PyInstaller.utils.hooks import collect_all
 
 a = Analysis(
@@ -133,3 +137,32 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
+# ---------------------------------------------------------------------------
+# macOS .app bundle
+#
+# Mirrors imagedescriber_wx.spec. The version is parsed rather than taken
+# whole: VERSION can read "4.5.0Beta1 bld050", and CFBundleShortVersionString
+# must be numeric or the bundle is rejected.
+# ---------------------------------------------------------------------------
+if _sys.platform == 'darwin':
+    _version_file = _Path(SPECPATH).parent / 'VERSION'
+    _version_text = _version_file.read_text().strip() if _version_file.exists() else ''
+    _match = re.match(r'\d+(?:\.\d+)*', _version_text)
+    _version = _match.group(0) if _match else '4.0.0'
+
+    app = BUNDLE(
+        exe,
+        name='IDTChat.app',
+        icon=None,
+        bundle_identifier='com.imagedescriptiontoolkit.chat',
+        version=_version,
+        info_plist={
+            'CFBundleShortVersionString': _version,
+            'CFBundleVersion': _version_text or _version,
+            'CFBundleName': 'IDT Chat',
+            'CFBundleDisplayName': 'IDT Chat',
+            'NSPrincipalClass': 'NSApplication',
+            'NSHighResolutionCapable': 'True',
+        },
+    )

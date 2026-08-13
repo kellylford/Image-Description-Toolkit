@@ -97,6 +97,11 @@ if [ ! -d "imagedescriber/dist/ImageDescriber.app" ]; then
     MISSING_APPS=1
 fi
 
+if [ ! -d "chatapp/dist/IDTChat.app" ]; then
+    echo "ERROR: chatapp/dist/IDTChat.app not found. Please build IDT Chat first."
+    MISSING_APPS=1
+fi
+
 if [ $MISSING_APPS -ne 0 ]; then
     echo ""
     echo "Please run: ./BuildAndRelease/MacBuilds/builditall_macos.sh"
@@ -117,6 +122,7 @@ mkdir -p "$DMG_STAGING/IDT"
 echo "Copying GUI applications..."
 # Use ditto instead of cp to preserve extended attributes and code signatures
 ditto "imagedescriber/dist/ImageDescriber.app" "$DMG_STAGING/IDT/ImageDescriber.app"
+ditto "chatapp/dist/IDTChat.app" "$DMG_STAGING/IDT/IDTChat.app"
 
 # Copy CLI tool directly into IDT folder
 echo "Copying CLI tool..."
@@ -236,6 +242,12 @@ GETTING STARTED:
   3. Switch to Viewer Mode tab to browse existing workflows
   4. Use Editor Mode for batch processing of images
   5. Run ~/Applications/IDT/idt --help for CLI options
+
+  IDT Chat (Applications/IDT/IDTChat.app) is a separate application: an
+  accessible chat client for Ollama, Claude and OpenAI. It is not an image
+  tool -- attachments are supported, but the point is the conversation.
+  Ollama needs no API key, so it works straight away. Press F1 for the
+  keyboard shortcuts.
 
 For documentation and support, see the project repository.
 EOF

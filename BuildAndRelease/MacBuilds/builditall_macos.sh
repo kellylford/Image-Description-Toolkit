@@ -5,6 +5,7 @@
 # This script builds both applications in the Image Description Toolkit:
 #   1. IDT (main command-line toolkit)
 #   2. ImageDescriber (batch processing GUI with integrated Viewer Mode, prompt editor, and configuration)
+#   3. IDT Chat (standalone accessible chat client)
 #
 # Prerequisites:
 #   - Virtual environment set up for ImageDescriber app
@@ -13,6 +14,7 @@
 # Output:
 #   - dist/idt (CLI binary)
 #   - imagedescriber/dist/ImageDescriber.app
+#   - chatapp/dist/IDTChat.app
 # ============================================================================
 
 set -e  # Exit on error
@@ -98,10 +100,11 @@ count_error() {
 # ----------------------------------------------------------------------------
 rm -f  "idt/dist/idt"
 rm -rf "imagedescriber/dist/ImageDescriber.app"
+rm -rf "chatapp/dist/IDTChat.app"
 
 # ============================================================================
 echo ""
-echo "[1/2] Building IDT (main toolkit)..."
+echo "[1/3] Building IDT (main toolkit)..."
 echo "========================================================================"
 echo ""
 
@@ -116,7 +119,7 @@ cd ..
 
 # ============================================================================
 echo ""
-echo "[2/2] Building ImageDescriber..."
+echo "[2/3] Building ImageDescriber..."
 echo "========================================================================"
 echo ""
 
@@ -126,6 +129,22 @@ if bash build_imagedescriber_wx.sh; then
     echo "SUCCESS: ImageDescriber built successfully"
 else
     echo "ERROR: ImageDescriber build failed!"
+    count_error
+fi
+cd ..
+
+# ============================================================================
+echo ""
+echo "[3/3] Building IDT Chat (standalone accessible chat client)..."
+echo "========================================================================"
+echo ""
+
+cd chatapp
+# build_chatapp.sh picks a venv itself: chatapp/.venv, else imagedescriber/.venv
+if bash build_chatapp.sh; then
+    echo "SUCCESS: IDT Chat built successfully"
+else
+    echo "ERROR: IDT Chat build failed!"
     count_error
 fi
 cd ..
@@ -181,6 +200,14 @@ if [ $BUILD_ERRORS -eq 0 ]; then
     fi
     cp -R "imagedescriber/dist/ImageDescriber.app" "$DIST_ALL/Applications/"
     echo "✓ ImageDescriber.app (with integrated Viewer Mode and Tools menu)"
+
+    # Copy IDTChat.app (standalone accessible chat client)
+    if [ ! -d "chatapp/dist/IDTChat.app" ]; then
+        echo "✗ IDTChat.app NOT FOUND - the build did not produce an app bundle"
+        exit 1
+    fi
+    cp -R "chatapp/dist/IDTChat.app" "$DIST_ALL/Applications/"
+    echo "✓ IDTChat.app (accessible chat client)"
     
     # Copy documentation
     echo ""

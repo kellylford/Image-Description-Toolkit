@@ -129,7 +129,7 @@ jobs:
     #  (pre_build_validation.py, validate_build.py) resolve to the venv   #
     #  interpreter that actually has pytest installed.                    #
     # ------------------------------------------------------------------ #
-    - name: Build both macOS applications
+    - name: Build all macOS applications
       run: |
         source .venv/bin/activate
         bash BuildAndRelease/MacBuilds/builditall_macos.sh
@@ -143,7 +143,7 @@ jobs:
         test -x idt/dist/idt
         ./idt/dist/idt version
         ./idt/dist/idt --help
-        for cmd in describe export status show embed video download combine stats models prompts config; do
+        for cmd in describe export status show embed video download combine stats models prompts config chat; do
           echo "--- idt $cmd --help ---"
           ./idt/dist/idt "$cmd" --help > /dev/null
         done
@@ -163,12 +163,25 @@ jobs:
         codesign --verify --verbose=2 "$APP" 2>&1 || \
           echo "NOTE: ad-hoc signature did not pass strict verify (expected until Developer ID signing lands)"
 
+    - name: Verify IDTChat.app bundle
+      run: |
+        set -e
+        APP=chatapp/dist/IDTChat.app
+        test -d "$APP"
+        test -x "$APP/Contents/MacOS/IDTChat"
+        echo "CFBundleIdentifier: $(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Contents/Info.plist")"
+        echo "CFBundleShortVersionString: $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+        echo "--- signature ---"
+        codesign -dvv "$APP" 2>&1 || true
+        codesign --verify --verbose=2 "$APP" 2>&1 ||           echo "NOTE: ad-hoc signature did not pass strict verify (expected until Developer ID signing lands)"
+
     - name: Confirm packaged output
       run: |
         set -e
         ls -la BuildAndRelease/MacBuilds/dist_all
         test -f BuildAndRelease/MacBuilds/dist_all/idt
         test -d BuildAndRelease/MacBuilds/dist_all/Applications/ImageDescriber.app
+        test -d BuildAndRelease/MacBuilds/dist_all/Applications/IDTChat.app
 
     # ------------------------------------------------------------------ #
     #  Developer ID signing                                                #
@@ -262,7 +275,11 @@ jobs:
         xcrun stapler validate "$DMG"
         echo "Gatekeeper accepts the DMG."
 
-    - name: Verify DMG mounts and contains both apps
+    # The DMG is the macOS deliverable, so this is the last place an app can
+    # go missing without anyone noticing. Every shipped app is named here:
+    # earlier this checked only ImageDescriber, which would have let a DMG
+    # without IDTChat.app pass as good.
+    - name: Verify DMG mounts and contains every app
       run: |
         set -e
         DMG=$(ls BuildAndRelease/MacBuilds/dist/*.dmg | head -1)
@@ -272,6 +289,7 @@ jobs:
         hdiutil attach "$DMG" -mountpoint "$MNT" -nobrowse -readonly
         ls -la "$MNT" "$MNT/IDT"
         test -d "$MNT/IDT/ImageDescriber.app"
+        test -d "$MNT/IDT/IDTChat.app"
         test -x "$MNT/IDT/idt"
         test -L "$MNT/Applications"
         hdiutil detach "$MNT"

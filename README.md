@@ -16,7 +16,7 @@ Download from the [releases](https://github.com/kellylford/Image-Description-Too
 Either one gives you all the applications:
 - **idt** - Command-line interface for batch processing and automation
 - **ImageDescriber** - GUI with integrated viewer, prompt editor, and configuration manager
-- **IDT Chat** *(Windows)* - An accessible chat client for Ollama, Claude and OpenAI. Not an image tool: it is a general-purpose chat application built for keyboard and screen reader use.
+- **IDT Chat** - An accessible chat client for Ollama, Claude and OpenAI. Not an image tool: it is a general-purpose chat application built for keyboard and screen reader use.
 
 One install covers them all; you never update them separately.
 

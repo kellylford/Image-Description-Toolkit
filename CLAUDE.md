@@ -31,8 +31,9 @@ cd chatapp && build_chatapp.bat
 
 ### Building (macOS)
 ```bash
-./BuildAndRelease/MacBuilds/builditall_macos.command   # both apps
+./BuildAndRelease/MacBuilds/builditall_macos.command   # all three apps
 cd imagedescriber && ./build_imagedescriber_wx.sh
+cd chatapp && ./build_chatapp.sh
 ```
 
 ### Smoke Testing After Build
