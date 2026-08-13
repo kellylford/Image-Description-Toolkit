@@ -15,7 +15,7 @@ echo.
 echo ========================================================================
 echo BUILD ALL wxPython APPLICATIONS (Windows)
 echo ========================================================================
-echo This script builds ImageDescriber.
+echo This script builds IDT (CLI), ImageDescriber and IDT Chat.
 echo Viewer is now integrated into ImageDescriber (Viewer Mode).
 echo.
 

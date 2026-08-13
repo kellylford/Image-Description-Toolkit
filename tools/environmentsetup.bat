@@ -1,225 +1,43 @@
 @echo off
 REM ============================================================================
-REM Environment Setup - Create Virtual Environments for All Apps
+REM Environment Setup - delegates to winsetup.bat
 REM ============================================================================
-REM This script creates separate virtual environments for all three applications
-REM and installs their dependencies.
+REM This script is the entry point tools\bootstrap.bat calls after cloning the
+REM repository. It does not set anything up itself; winsetup.bat at the project
+REM root is the single implementation.
 REM
-REM What it does:
-REM   1. Creates .winenv for main IDT (root directory)
-REM   2. Creates .winenv for viewer
-REM   3. Creates .winenv for imagedescriber (with integrated tools)
-REM   4. Installs requirements.txt in each venv
+REM WHY THIS IS A SHIM (2026-08-13)
 REM
-REM Prerequisites:
-REM   - Python 3.8+ installed and in PATH
+REM The previous version was a full second implementation that had rotted past
+REM the point of working at all:
 REM
-REM Time: ~5-10 minutes (depending on internet speed)
+REM   - "cd viewer" and "cd idtconfigure" -- both directories were removed when
+REM     Viewer, PromptEditor and Configure were folded into ImageDescriber. cmd
+REM     does not stop on a failed cd, so the script carried on in whatever
+REM     directory it happened to be in and the following "cd .." walked ABOVE
+REM     the project root. Everything after that ran in the wrong place.
+REM   - It created .venv on Windows. The convention is .winenv, precisely so a
+REM     macOS .venv and a Windows .winenv can coexist in one checkout. Nothing
+REM     in the build system looks for a Windows .venv, so even the parts that
+REM     succeeded produced environments no build script would ever find.
+REM   - Step numbering read [1/4], [2/3], [3/3], [5/5].
+REM   - It pointed at releaseitall.bat, which does not exist.
+REM   - It never knew about IDT Chat.
+REM
+REM Because bootstrap.bat calls this file, that was the documented path for a
+REM brand-new contributor. Delegating removes the duplicate rather than
+REM repairing it: two setup scripts is how this one drifted while nobody was
+REM running it.
 REM ============================================================================
 
-echo.
-echo ========================================================================
-echo ENVIRONMENT SETUP FOR ALL APPLICATIONS
-echo ========================================================================
-echo.
-echo This will create virtual environments and install dependencies for:
-echo   1. IDT (main toolkit)
-echo   2. Viewer
-echo   3. ImageDescriber (with integrated prompt editor and configuration)
-echo.
-echo This is a ONE-TIME setup process.
-echo.
-
-set SETUP_ERRORS=0
-
-REM Navigate to project root (one level up from tools)
+REM Project root, one level up from tools\
 cd /d "%~dp0.."
 
-REM ============================================================================
-echo.
-echo [1/4] Setting up IDT (main toolkit)...
-echo ========================================================================
-echo.
-
-if exist ".venv" (
-    echo WARNING: .venv already exists in root directory
-    echo Skipping creation, but will update requirements...
-) else (
-    echo Creating virtual environment...
-    python -m venv .venv
-    if errorlevel 1 (
-        echo ERROR: Failed to create virtual environment for IDT
-        set /a SETUP_ERRORS+=1
-        goto viewer_setup
-    )
-    echo Virtual environment created.
+if not exist "winsetup.bat" (
+    echo ERROR: winsetup.bat not found at the project root: %CD%
+    echo The repository may be incomplete or corrupt.
+    exit /b 1
 )
 
-echo.
-echo Installing dependencies...
-call .venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install IDT dependencies
-    set /a SETUP_ERRORS+=1
-) else (
-    echo SUCCESS: IDT environment ready
-)
-call deactivate
-
-REM ============================================================================
-:viewer_setup
-echo.
-echo [2/3] Setting up Viewer...
-echo ========================================================================
-echo.
-
-cd viewer
-
-if exist ".venv" (
-    echo WARNING: .venv already exists in viewer directory
-    echo Skipping creation, but will update requirements...
-) else (
-    echo Creating virtual environment...
-    python -m venv .venv
-    if errorlevel 1 (
-        echo ERROR: Failed to create virtual environment for Viewer
-        set /a SETUP_ERRORS+=1
-        cd ..
-        goto imagedescriber_setup
-    )
-    echo Virtual environment created.
-)
-
-echo.
-echo Installing dependencies...
-call .venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install Viewer dependencies
-    set /a SETUP_ERRORS+=1
-) else (
-    echo SUCCESS: Viewer environment ready
-)
-call deactivate
-
-cd ..
-
-REM ============================================================================
-:imagedescriber_setup
-echo.
-echo [3/3] Setting up ImageDescriber...
-echo ========================================================================
-echo.
-
-cd imagedescriber
-
-if exist ".venv" (
-    echo WARNING: .venv already exists in imagedescriber directory
-    echo Skipping creation, but will update requirements...
-) else (
-    echo Creating virtual environment...
-    python -m venv .venv
-    if errorlevel 1 (
-        echo ERROR: Failed to create virtual environment for ImageDescriber
-        set /a SETUP_ERRORS+=1
-        cd ..
-        goto idtconfigure_setup
-    )
-    echo Virtual environment created.
-)
-
-echo.
-echo Installing dependencies...
-call .venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install ImageDescriber dependencies
-    set /a SETUP_ERRORS+=1
-) else (
-    echo SUCCESS: ImageDescriber environment ready
-)
-call deactivate
-
-cd ..
-
-REM ============================================================================
-:idtconfigure_setup
-echo.
-echo [5/5] Setting up IDTConfigure...
-echo ========================================================================
-echo.
-
-cd idtconfigure
-
-if exist ".venv" (
-    echo WARNING: .venv already exists in idtconfigure directory
-    echo Skipping creation, but will update requirements...
-) else (
-    echo Creating virtual environment...
-    python -m venv .venv
-    if errorlevel 1 (
-        echo ERROR: Failed to create virtual environment for IDTConfigure
-        set /a SETUP_ERRORS+=1
-        cd ..
-        goto summary
-    )
-    echo Virtual environment created.
-)
-
-echo.
-echo Installing dependencies...
-call .venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install IDTConfigure dependencies
-    set /a SETUP_ERRORS+=1
-) else (
-    echo SUCCESS: IDTConfigure environment ready
-)
-call deactivate
-
-cd ..
-
-REM ============================================================================
-:summary
-echo.
-echo ========================================================================
-echo SETUP SUMMARY
-echo ========================================================================
-echo.
-
-if "%SETUP_ERRORS%"=="0" (
-    echo SUCCESS: All environments set up successfully!
-    echo.
-    echo Virtual environments created:
-    if exist ".venv" echo   - Root:              .venv
-    if exist "viewer\.venv" echo   - Viewer:            viewer\.venv
-    if exist "imagedescriber\.venv" echo   - ImageDescriber:   imagedescriber\.venv (with integrated Tools menu)
-    echo.
-    echo All dependencies installed.
-    echo.
-    echo Next steps:
-    echo   1. Build all apps:     releaseitall.bat
-    echo   2. Or build only IDT:  build_idt.bat
-    echo   3. Or build only GUI:  cd viewer ^&^& .venv\Scripts\activate ^&^& build_viewer.bat
-    echo.
-) else (
-    echo ERRORS ENCOUNTERED: %SETUP_ERRORS% setup step^(s^) failed
-    echo.
-    echo Please review the output above for error details.
-    echo Common issues:
-    echo   - Python not in PATH
-    echo   - No internet connection ^(can't download packages^)
-    echo   - Insufficient permissions
-    echo   - Disk space issues
-    echo.
-)
-
-echo.
-echo ========================================================================
-echo.
+call winsetup.bat
+exit /b %ERRORLEVEL%

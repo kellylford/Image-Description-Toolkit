@@ -4,16 +4,34 @@ echo Building ImageDescriber (wxPython Version) for Windows
 echo ========================================================================
 echo.
 
-REM Auto-activate .winenv if not already in a virtual environment
-if not defined VIRTUAL_ENV (
-    if exist ".winenv\Scripts\activate.bat" (
-        echo Activating .winenv...
-        call .winenv\Scripts\activate.bat
-        set VENV_ACTIVATED=1
-    ) else (
-        echo WARNING: .winenv not found. Run winsetup.bat first.
-        echo Proceeding with system Python...
-    )
+REM ----------------------------------------------------------------------------
+REM Activate THIS app's .winenv. Do not restore the "if not defined VIRTUAL_ENV"
+REM guard that used to wrap this block.
+REM
+REM builditall_wx.bat calls the three sub-builds from a single cmd session, and
+REM none of them deactivate. build_idt.bat runs first and leaves idt\.winenv
+REM active, so the guard was false by the time control reached here and this
+REM app's environment was never activated: ImageDescriber was built against the
+REM CLI venv, which has PyInstaller but no wxPython. The "import wx" check below
+REM then failed and pip installed wxPython into idt\.winenv -- polluting the CLI
+REM environment while imagedescriber\.winenv stayed empty.
+REM
+REM CI never caught it: a fresh runner has no .winenv at all, so the "exist"
+REM branch is false there and everything builds against system Python, which
+REM has the full requirements.txt installed. The bug only reproduces on a
+REM developer machine. Diagnosed 2026-08-13.
+REM
+REM Re-activating over an already-active venv is safe: activate.bat does
+REM "if defined _OLD_VIRTUAL_PATH set PATH=%_OLD_VIRTUAL_PATH%" before
+REM prepending its own Scripts, so activations replace rather than stack.
+REM ----------------------------------------------------------------------------
+if exist ".winenv\Scripts\activate.bat" (
+    echo Activating .winenv...
+    call .winenv\Scripts\activate.bat
+    set VENV_ACTIVATED=1
+) else (
+    echo WARNING: .winenv not found. Run winsetup.bat first.
+    echo Proceeding with system Python...
 )
 echo.
 

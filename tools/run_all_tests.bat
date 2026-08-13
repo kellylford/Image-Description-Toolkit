@@ -122,17 +122,12 @@ echo Checking build infrastructure...
 echo.
 
 REM Check if build infrastructure exists
-if not exist "BuildAndRelease\final_working.spec" (
-    echo [WARN] Missing BuildAndRelease\final_working.spec
+if not exist "BuildAndRelease\WinBuilds\builditall_wx.bat" (
+    echo [WARN] Missing BuildAndRelease\WinBuilds\builditall_wx.bat
     goto :skip_build
 )
 
-if not exist "BuildAndRelease\builditall.bat" (
-    echo [WARN] Missing BuildAndRelease\builditall.bat
-    goto :skip_build
-)
-
-echo [SKIP] PyInstaller test skipped - use BuildAndRelease\builditall.bat for actual builds
+echo [SKIP] PyInstaller test skipped - use BuildAndRelease\WinBuilds\builditall_wx.bat for actual builds
 echo        Reason: Simple builds conflict with 'workflow' package
 echo        Build scripts present and ready to use
 goto :after_build
@@ -151,29 +146,45 @@ echo.
 
 set BAT_ERRORS=0
 
-REM Check key batch files exist
-if not exist "BuildAndRelease\builditall.bat" (
-    echo [WARN] builditall.bat not found
+REM Check key batch files exist.
+REM
+REM Until 2026-08-13 this block checked builditall.bat, packageitall.bat,
+REM releaseitall.bat and BuildAndRelease\build_idt.bat -- none of which had
+REM existed for months. A check that names only absent files reports "build
+REM infrastructure missing" forever and stops meaning anything, which is why
+REM nobody noticed the real build system was never being validated here.
+if not exist "BuildAndRelease\WinBuilds\builditall_wx.bat" (
+    echo [WARN] BuildAndRelease\WinBuilds\builditall_wx.bat not found
     set /a BAT_ERRORS+=1
 )
 
-if not exist "BuildAndRelease\packageitall.bat" (
-    echo [WARN] packageitall.bat not found
+if not exist "BuildAndRelease\WinBuilds\package_all_windows.bat" (
+    echo [WARN] BuildAndRelease\WinBuilds\package_all_windows.bat not found
     set /a BAT_ERRORS+=1
 )
 
-if not exist "BuildAndRelease\releaseitall.bat" (
-    echo [WARN] releaseitall.bat not found
+if not exist "BuildAndRelease\WinBuilds\build_installer.bat" (
+    echo [WARN] BuildAndRelease\WinBuilds\build_installer.bat not found
     set /a BAT_ERRORS+=1
 )
 
-if not exist "BuildAndRelease\build_idt.bat" (
-    echo [WARN] build_idt.bat not found
+if not exist "idt\build_idt.bat" (
+    echo [WARN] idt\build_idt.bat not found
     set /a BAT_ERRORS+=1
 )
 
-if not exist "tools\environmentsetup.bat" (
-    echo [WARN] environmentsetup.bat not found
+if not exist "imagedescriber\build_imagedescriber_wx.bat" (
+    echo [WARN] imagedescriber\build_imagedescriber_wx.bat not found
+    set /a BAT_ERRORS+=1
+)
+
+if not exist "chatapp\build_chatapp.bat" (
+    echo [WARN] chatapp\build_chatapp.bat not found
+    set /a BAT_ERRORS+=1
+)
+
+if not exist "winsetup.bat" (
+    echo [WARN] winsetup.bat not found
     set /a BAT_ERRORS+=1
 )
 
@@ -207,7 +218,7 @@ echo √ Syntax Check PASS = All Python files compile
 echo                       - No syntax errors
 echo                       - All imports resolve
 echo.
-echo O PyInstaller SKIP = Use BuildAndRelease\builditall.bat
+echo O PyInstaller SKIP = Use BuildAndRelease\WinBuilds\builditall_wx.bat
 echo                      - Test intentionally skipped
 echo                      - Actual builds use .spec files
 echo.

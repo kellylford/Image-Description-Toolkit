@@ -52,11 +52,13 @@ The comprehensive test runner (`run_all_tests.py` / `.bat`) runs:
 
 ### 4. Build Scripts Validation
 - Checks existence of critical batch files:
-  - `BuildAndRelease/builditall.bat`
-  - `BuildAndRelease/packageitall.bat`
-  - `BuildAndRelease/releaseitall.bat`
-  - `BuildAndRelease/build_idt.bat`
-  - `tools/environmentsetup.bat`
+  - `BuildAndRelease/WinBuilds/builditall_wx.bat`
+  - `BuildAndRelease/WinBuilds/package_all_windows.bat`
+  - `BuildAndRelease/WinBuilds/build_installer.bat`
+  - `idt/build_idt.bat`
+  - `imagedescriber/build_imagedescriber_wx.bat`
+  - `chatapp/build_chatapp.bat`
+  - `winsetup.bat`
 
 ### 5. Git Status Check
 - Warns if uncommitted changes exist

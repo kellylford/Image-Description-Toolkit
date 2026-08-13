@@ -226,7 +226,21 @@ The build system was updated from PyQt6 to wxPython. Changes include:
 - **Old**: `viewer.app` → **New**: `Viewer.app`
 - **Old**: Single spec file per app → **New**: `*_wx.spec` for wxPython versions
 
-The old `builditall.bat` has been updated to call the new `_wx` build scripts.
+The old `builditall.bat` was deleted on 2026-08-13, along with the duplicate
+`build_installer.bat`, `installer.iss` and `package_all_windows.bat` that sat
+beside it in `BuildAndRelease/`. It still referenced `viewer/`, `idtconfigure/`
+and `prompt_editor/`, none of which exist, and its installer copy had never
+learned about IDT Chat.
+
+The live Windows build system is `BuildAndRelease/WinBuilds/`:
+
+| Script | Role |
+|---|---|
+| `builditall_wx.bat` | Builds all three apps, then packages to `dist_all/bin/` |
+| `package_all_windows.bat` | Collects built exes (also run directly by CI) |
+| `build_installer.bat` | Compiles `installer.iss` via Inno Setup |
+
+macOS equivalents live in `BuildAndRelease/MacBuilds/`.
 
 ## Additional Resources
 
