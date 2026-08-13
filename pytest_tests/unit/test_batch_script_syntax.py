@@ -211,3 +211,46 @@ def test_builditall_calls_subscripts_with_explicit_relative_path():
     text = "\n".join(_read(Path("BuildAndRelease/WinBuilds/builditall_wx.bat")))
     assert "call .\\build_idt.bat" in text
     assert "call .\\build_imagedescriber_wx.bat" in text
+    assert "call .\\build_chatapp.bat" in text
+
+
+#: Every executable the installer ships. Adding an app means adding it here,
+#: and the tests below then insist the whole chain knows about it.
+SHIPPED_EXES = ["idt.exe", "ImageDescriber.exe", "IDTChat.exe"]
+
+
+@pytest.mark.parametrize("exe", SHIPPED_EXES, ids=str)
+def test_every_shipped_exe_is_built_and_packaged(exe):
+    """Both packaging paths must copy every app.
+
+    There are two: builditall_wx.bat packages inline for local builds, and
+    package_all_windows.bat is what CI calls. IDTChat.exe was added to the
+    first and missed in the second, which would have failed the CI installer
+    build at Inno Setup -- installer.iss lists the file, so a missing copy is
+    fatal rather than merely incomplete.
+    """
+    for script in ("builditall_wx.bat", "package_all_windows.bat"):
+        text = "\n".join(_read(Path("BuildAndRelease/WinBuilds") / script))
+        assert exe in text, f"{script} never mentions {exe}"
+
+
+@pytest.mark.parametrize("exe", SHIPPED_EXES, ids=str)
+def test_installer_ships_every_exe(exe):
+    iss = (_ROOT / "BuildAndRelease/WinBuilds/installer.iss").read_text(
+        encoding="utf-8", errors="replace")
+    assert f"dist_all\\bin\\{exe}" in iss, (
+        f"installer.iss has no [Files] entry for {exe}")
+
+
+@pytest.mark.parametrize("exe", ["ImageDescriber.exe", "IDTChat.exe"], ids=str)
+def test_gui_apps_get_a_start_menu_icon(exe):
+    """A GUI app the user cannot find is a GUI app they do not have.
+
+    idt.exe is excluded on purpose: it is a CLI and its Start menu entry opens
+    a console rather than the exe directly.
+    """
+    iss = (_ROOT / "BuildAndRelease/WinBuilds/installer.iss").read_text(
+        encoding="utf-8", errors="replace")
+    group_icons = [ln for ln in iss.splitlines()
+                   if ln.startswith('Name: "{group}\\') and exe in ln]
+    assert group_icons, f"installer.iss has no Start menu icon for {exe}"

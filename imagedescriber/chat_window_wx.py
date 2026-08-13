@@ -12,6 +12,7 @@ Provides a fully accessible chat window with:
 
 import sys
 import os
+import tempfile
 import time
 from pathlib import Path
 from datetime import datetime
@@ -41,27 +42,44 @@ from shared.wx_common import show_error, show_warning, show_info
 
 # Import workers and events - simple imports work since sys.path includes both
 # the project root and the imagedescriber directory
-from workers_wx import (
-    ChatProcessingWorker,
-    EVT_CHAT_UPDATE,
-    EVT_CHAT_COMPLETE,
-    EVT_CHAT_ERROR
-)
 from data_models import ImageItem, ImageWorkspace, ImageDescription
 
-# Import provider attachment capabilities (models/ added to sys.path for frozen compat)
-try:
-    if getattr(sys, 'frozen', False):
-        _models_path = Path(sys.executable).parent / 'models'
-    else:
-        _models_path = Path(__file__).parent.parent / 'models'
-    if str(_models_path) not in sys.path:
-        sys.path.insert(0, str(_models_path))
-    from provider_configs import get_supported_attachments, supports_attachments, get_attachment_wildcard
-except ImportError:
-    def get_supported_attachments(p): return []
-    def supports_attachments(p): return False
-    def get_attachment_wildcard(p): return "All files (*.*)|*.*"
+# Chat inference runs on the shared engine in idt_core.chat. This window used
+# to carry its own copy: ChatProcessingWorker in workers_wx.py hand-rolled one
+# SDK call per provider, ~690 lines, duplicating what the CLI and the
+# standalone chat app now share. Persistence is deliberately NOT delegated --
+# turns are still stored as ImageDescription objects on the chat item, so
+# existing .idtw workspaces keep loading unchanged.
+from idt_core.chat import (
+    ChatCancelled,
+    ChatDelta,
+    ChatEngine,
+    ChatFailed,
+    ChatFinished,
+    ChatMessage,
+    ChatOptions,
+    ChatRetrying,
+    ChatSession,
+    ChatStarted,
+    ChatUsage,
+)
+from idt_core.chat.attachments import prepare_attachments
+from idt_core.chat.messages import Attachment as ChatAttachment
+from idt_core.chat.providers import create_chat_provider
+from idt_core.keys import resolve_api_key
+from shared.chat_worker_wx import ChatWorker
+
+# Provider attachment capabilities.
+#
+# This previously imported models/provider_configs.py behind a try/except that
+# fell back to stubs returning "no capabilities". That module was deleted in
+# commit 16e089b, so the fallback became the only path and the Attach Files
+# button was hidden on every provider. idt_core is bundled in frozen builds,
+# so this import needs no sys.path manipulation and must not be made optional.
+from idt_core.providers.registry import (
+    attachment_wildcard,
+    supports_attachments,
+)
 
 
 class _NamedTextAccessible(wx.Accessible):
@@ -71,6 +89,12 @@ class _NamedTextAccessible(wx.Accessible):
     VoiceOver announces every text field as just "edit".  Subclassing
     wx.Accessible and overriding GetName() feeds the correct label through the
     Cocoa NSAccessibility bridge.
+
+    Only ever attach this to a control with no children. childId 0 is the
+    control itself; anything above 0 is the Nth child, and answering with the
+    control's label there makes a screen reader announce the control name on
+    every arrow key instead of reading the item under the cursor. Children are
+    handed back to wx below so that cannot happen if this is reused.
     """
 
     def __init__(self, win: wx.TextCtrl, label: str):
@@ -78,6 +102,8 @@ class _NamedTextAccessible(wx.Accessible):
         self._label = label
 
     def GetName(self, childId):
+        if childId:
+            return (wx.ACC_NOT_IMPLEMENTED, None)
         return (wx.ACC_OK, self._label)
 
 
@@ -308,6 +334,8 @@ class ChatWindow(wx.Dialog):
         
         self.current_response_chunks = []  # Buffer for streaming response
         self.is_processing = False
+        self.worker = None              # Live ChatWorker, so Stop can reach it
+        self._streaming_index = None    # History row being written into live
         self.pending_attachments: List[Dict[str, str]] = []  # [{path, media_type}, ...]
         # Temp file tracking for HEIC conversion and clipboard paste cleanup
         self._temp_files: List[str] = []
@@ -450,7 +478,10 @@ class ChatWindow(wx.Dialog):
         main_sizer.Add(self.status_text, 0, wx.LEFT | wx.RIGHT, 10)
         
         # Input area
-        input_label = wx.StaticText(panel, label="Your message:")
+        input_label = wx.StaticText(
+            panel,
+            label="Your message (Enter sends, Shift+Enter starts a new line):"
+        )
         main_sizer.Add(input_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         
         self.input_text = wx.TextCtrl(panel, 
@@ -489,7 +520,14 @@ class ChatWindow(wx.Dialog):
         self.send_btn = wx.Button(panel, label="Send (Enter)")
         self.send_btn.SetDefault()
         button_sizer.Add(self.send_btn, 0, wx.ALL, 5)
-        
+
+        # Stop was impossible before the engine migration: the old worker was a
+        # bare thread with no cancellation. Closing the generator now reaches
+        # the provider's finally, and the partial reply is kept.
+        self.stop_btn = wx.Button(panel, label="Stop")
+        self.stop_btn.Enable(False)
+        button_sizer.Add(self.stop_btn, 0, wx.ALL, 5)
+
         self.clear_btn = wx.Button(panel, label="Clear Input")
         button_sizer.Add(self.clear_btn, 0, wx.ALL, 5)
 
@@ -676,10 +714,9 @@ class ChatWindow(wx.Dialog):
         # Intercept Ctrl/Cmd+V at window level for clipboard image paste
         self.Bind(wx.EVT_CHAR_HOOK, self.on_key_down)
         
-        # Bind chat worker events
-        self.Bind(EVT_CHAT_UPDATE, self.on_chat_update)
-        self.Bind(EVT_CHAT_COMPLETE, self.on_chat_complete)
-        self.Bind(EVT_CHAT_ERROR, self.on_chat_error)
+        self.stop_btn.Bind(wx.EVT_BUTTON, self.on_stop_response)
+        # Engine events arrive through ChatWorker calling on_chat_event on the
+        # UI thread, so there are no wx events to bind for them.
         
     def on_send_message(self, event):
         """Send user message and start AI processing"""
@@ -755,199 +792,204 @@ class ChatWindow(wx.Dialog):
         # Start worker thread
         self._start_ai_processing()
         
-    def _start_ai_processing(self):
-        """Start ChatProcessingWorker with full message history"""
-        # Get image path if available (None for text-only chat)
-        image_path = str(self.image_item.file_path) if self.image_item else None
-        
-        # Get API key from config if provider needs one
-        api_key = self._get_api_key_for_provider(self.provider)
-        
-        worker = ChatProcessingWorker(
-            parent_window=self,
-            image_path=image_path,  # None for text-only mode
+    def _build_chat_session(self) -> ChatSession:
+        """Convert the runtime message dicts into an engine ChatSession.
+
+        Built fresh for each turn rather than kept in step with
+        ``self.session['messages']``. Two mutable copies of one conversation is
+        precisely the kind of divergence this migration exists to remove, and
+        the conversion is cheap.
+        """
+        session = ChatSession(
+            id=self.session_id,
+            title=self.session.get('name', ''),
             provider=self.provider,
             model=self.model,
-            messages=self.session['messages'],
-            api_key=api_key
         )
-        worker.start()
+        for msg in self.session['messages']:
+            role = msg.get('role')
+            if role not in ('user', 'assistant'):
+                continue
+            usage = (msg.get('metadata') or {}).get('tokens') or {}
+            session.messages.append(ChatMessage(
+                role=role,
+                content=msg.get('content', ''),
+                attachments=[
+                    ChatAttachment(
+                        media_type=a.get('media_type', 'application/octet-stream'),
+                        path=a.get('path'),
+                    )
+                    for a in msg.get('attachments', [])
+                ],
+                created=msg.get('timestamp', ''),
+                provider=self.provider,
+                model=self.model,
+                input_tokens=int(usage.get('input_tokens', 0) or 0),
+                output_tokens=int(usage.get('output_tokens', 0) or 0),
+            ))
+        return session
+
+    def _make_engine(self) -> Optional[ChatEngine]:
+        """Build an engine for the current provider/model, or report why not."""
+        try:
+            api_key = self._get_api_key_for_provider(self.provider)
+            provider = create_chat_provider(self.provider, self.model, api_key)
+        except Exception as exc:
+            show_error(self, f"Could not start chat:\n{exc}")
+            return None
+        # store=None: this window persists to the workspace itself, in
+        # on_chat_event, exactly as it did before the migration.
+        return ChatEngine(self._build_chat_session(), provider, store=None)
+
+    def _start_ai_processing(self):
+        """Run one turn on the shared chat engine."""
+        engine = self._make_engine()
+        if engine is None:
+            self._finish_processing()
+            return
+
+        # continue_turn, not send: on_send_message has already appended and
+        # persisted the user's message, so send() would record it twice.
+        options = ChatOptions()
+        self.worker = ChatWorker(self, engine, lambda: engine.continue_turn(options))
+        self.stop_btn.Enable(True)
+        self.worker.start()
+
+    def on_stop_response(self, event):
+        """Stop the reply in progress. Whatever arrived is kept."""
+        if self.worker is not None and self.is_processing:
+            self.worker.cancel()
+            self.status_text.SetLabel("Stopping...")
+
+    def _finish_processing(self):
+        """Return the window to the idle state after any turn outcome."""
+        self.is_processing = False
+        self.worker = None
+        self._streaming_index = None
+        self.stop_btn.Enable(False)
+        self.input_text.Enable(True)
+        self.send_btn.Enable(True)
+        self.input_text.SetFocus()
     
     def _get_api_key_for_provider(self, provider: str) -> Optional[str]:
-        """Load API key for the specified provider from various sources
-        
-        Check order:
-        1. Environment variables
-        2. Local text files (legacy support)
-        3. Configuration file (via config_loader)
-        
-        Args:
-            provider: Provider name (ollama, openai, claude)
-            
-        Returns:
-            API key string or None if not found/not needed
+        """Resolve the API key for a provider.
+
+        Delegates to idt_core.keys, which is now the only implementation. This
+        window previously carried its own 130-line lookup, and
+        on_summarize_compact carried a *different* one that consulted the
+        config file only -- so Compact failed with "no API key" for anyone
+        whose key came from an environment variable, in a window where
+        ordinary sending worked. Five such lookups existed across the codebase.
+
+        Returns None for providers that need no key (Ollama, MLX); that is a
+        valid answer, not a failure.
         """
-        # Ollama doesn't need API key (runs locally)
-        if provider.lower() == 'ollama':
-            return None
-        
-        provider_key = provider.lower()
-        
-        # 1. Environment Variables
-        env_map = {
-            'openai': 'OPENAI_API_KEY',
-            'claude': 'ANTHROPIC_API_KEY'
-        }
-        if provider_key in env_map:
-            env_val = os.getenv(env_map[provider_key])
-            if env_val:
-                return env_val
+        return resolve_api_key(provider)
 
-        # 2. Local Text Files (Legacy support)
-        # Common filenames used in this project
-        file_map = {
-            'openai': ['openai_api_key.txt', 'openai.txt'],
-            'claude': ['claude.txt', 'anthropic.txt']
-        }
-        
-        if provider_key in file_map:
-            filenames = file_map[provider_key]
-            # Search locations: CWD, Exe dir, Script dir
-            search_paths = [Path.cwd()]
-            if getattr(sys, 'frozen', False):
-                search_paths.append(Path(sys.executable).parent)
-            else:
-                search_paths.append(Path(__file__).parent)         # imagedescriber/
-                search_paths.append(Path(__file__).parent.parent)  # project root/
-            
-            for sp in search_paths:
-                for fn in filenames:
-                    fp = sp / fn
-                    if fp.exists():
-                        try:
-                            with open(fp, 'r', encoding='utf-8') as f:
-                                val = f.read().strip()
-                                if val:
-                                    return val
-                        except Exception:
-                            pass
+    def on_chat_event(self, event):
+        """Single entry point for every engine event. Always on the UI thread."""
+        if isinstance(event, ChatStarted):
+            if event.dropped_messages:
+                # Previously this was a print() to stdout, which in a windowed
+                # build goes nowhere -- a conversation could silently lose its
+                # beginning with no way for the user to know.
+                note = (f"Dropped the {event.dropped_messages} oldest turn(s) to "
+                        f"stay within the model's context window.")
+                self.status_text.SetLabel(note)
+                self.history_list.Append(f"System: {note}")
+            return
 
-        # 3. Configuration File (Standard method)
-        try:
-            # Robust configuration loading (matching ai_providers.py logic)
-            load_json_config_func = None
+        if isinstance(event, ChatDelta):
+            self._on_stream_delta(event.text)
+            return
 
-            # Try imports
-            try:
-                from idt_core.config_loader import load_json_config
-                load_json_config_func = load_json_config
-            except ImportError:
-                pass
+        if isinstance(event, ChatRetrying):
+            self.status_text.SetLabel(
+                f"{event.error} - retrying (attempt {event.attempt})")
+            return
 
-            config = None
-            if load_json_config_func:
-                try:
-                    config, config_path, source = load_json_config_func('image_describer_config.json')
-                except Exception:
-                    pass
+        if isinstance(event, ChatUsage):
+            return  # Totals are read off the finished message instead.
 
-            # Manual Fallback if config loader failed
-            if not config:
-                import json
-                candidates = []
-                if getattr(sys, 'frozen', False):
-                    base_dir = Path(sys.executable).parent
-                    candidates.append(base_dir / 'image_describer_config.json')
-                    candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
-                    if hasattr(sys, '_MEIPASS'):
-                        candidates.append(Path(sys._MEIPASS) / 'scripts' / 'image_describer_config.json')
-                else:
-                    base_dir = Path(__file__).parent.parent
-                    candidates.append(base_dir / 'scripts' / 'image_describer_config.json')
+        if isinstance(event, ChatFinished):
+            self.on_chat_complete(event.message)
+        elif isinstance(event, ChatCancelled):
+            self.on_chat_complete(event.message, cancelled=True)
+        elif isinstance(event, ChatFailed):
+            self.on_chat_error(event)
 
-                candidates.append(Path.cwd() / 'image_describer_config.json')
+    def _on_stream_delta(self, chunk: str):
+        """Render a chunk into the history row as it arrives.
 
-                for path in candidates:
-                    if path.exists():
-                        try:
-                            with open(path, 'r', encoding='utf-8') as f:
-                                config = json.load(f)
-                                break
-                        except Exception:
-                            continue
-
-            if not config:
-                return None
-
-            # Get API keys dict
-            api_keys = config.get('api_keys', {})
-            
-            # Match provider name (case-insensitive)
-            # Check exact match first
-            if provider_key in api_keys:
-                return api_keys[provider_key]
-                
-            # Check case-insensitive
-            for key_provider, api_key in api_keys.items():
-                if key_provider.lower() == provider_key:
-                    return api_key
-            
-            # Check standard capitalization mappings
-            provider_map = {
-                'openai': ['OpenAI', 'open_ai'],
-                'claude': ['Claude', 'Anthropic', 'anthropic']
-            }
-            
-            if provider_key in provider_map:
-                for variant in provider_map[provider_key]:
-                    if variant in api_keys and api_keys[variant]:
-                        return api_keys[variant]
-            
-            return None
-            
-        except Exception as e:
-            print(f"Error loading API key for {provider}: {e}")
-            return None
-
-    def on_chat_update(self, event):
-        """Handle streaming response chunks"""
-        chunk = event.message_chunk
+        The text is shown but deliberately not announced: a screen reader
+        reading every chunk would be unusable. The completed response is
+        announced once, in on_chat_complete.
+        """
         self.current_response_chunks.append(chunk)
-        
-        # Update status to show we're receiving data
-        chunk_count = len(self.current_response_chunks)
-        self.status_text.SetLabel(f"Receiving response... ({chunk_count} chunks)")
-        
-    def on_chat_complete(self, event):
-        """Handle completed AI response"""
-        full_response = event.full_response
+        partial = "".join(self.current_response_chunks)
+
+        if self._streaming_index is None:
+            self.history_list.Append(f"AI: {partial}")
+            self._streaming_index = self.history_list.GetCount() - 1
+        else:
+            self.history_list.SetString(self._streaming_index, f"AI: {partial}")
+
+        self.message_detail.SetValue(partial)
+        self.status_text.SetLabel(f"Receiving response... ({len(partial):,} chars)")
+
+    def on_chat_complete(self, message, cancelled: bool = False):
+        """Persist and display a finished assistant turn.
+
+        Takes an engine ChatMessage. Persistence is unchanged from before the
+        migration: an ImageDescription on the chat item.
+        """
+        full_response = message.content
+        token_usage = {}
+        if message.input_tokens or message.output_tokens:
+            token_usage = {
+                'input_tokens': message.input_tokens,
+                'output_tokens': message.output_tokens,
+                'total_tokens': message.total_tokens,
+            }
+        metadata = {
+            'provider': self.provider,
+            'model': self.model,
+            'tokens': dict(token_usage),
+        }
+
+        # Drop the in-progress row; the final text is appended below.
+        if self._streaming_index is not None:
+            self.history_list.Delete(self._streaming_index)
+            self._streaming_index = None
 
         # Compact mode: replace history with the summary instead of appending
         if self._compact_pending:
             self._compact_pending = False
             self._apply_compact(full_response)
-            self.is_processing = False
-            self.input_text.Enable(True)
-            self.send_btn.Enable(True)
-            self.input_text.SetFocus()
             self.status_text.SetLabel("")
+            self._finish_processing()
             return
-        
+
+        if cancelled and not full_response.strip():
+            self.status_text.SetLabel("Stopped before any text arrived.")
+            self._finish_processing()
+            return
+
         # Save AI response to session
         timestamp = datetime.now().isoformat()
+        if cancelled:
+            full_response = full_response.rstrip() + "  [stopped]"
         ai_msg = {
             'role': 'assistant',
             'content': full_response,
             'timestamp': timestamp,
-            'metadata': event.metadata
+            'metadata': metadata
         }
         self.session['messages'].append(ai_msg)
-        
+
         # New flow: persist AI turn to chat_item as an ImageDescription
         if self.chat_item is not None:
-            token_usage = getattr(event, 'token_usage', {}) or {}
-            output_tok = (token_usage.get('output_tokens')
-                          or token_usage.get('completion_tokens', 0))
+            output_tok = token_usage.get('output_tokens', 0)
             ai_desc = ImageDescription(
                 text=full_response,
                 prompt_style="ai_response",
@@ -955,26 +997,26 @@ class ChatWindow(wx.Dialog):
                 model=self.model,
                 created=timestamp,
                 completion_tokens=output_tok,
-                metadata=event.metadata,
+                metadata=metadata,
                 token_usage=token_usage
             )
             self.chat_item.add_description(ai_desc)
             self.workspace.mark_modified()
 
-        # Accumulate session token totals and refresh the strip
-        token_usage = getattr(event, 'token_usage', {}) or {}
-        self._session_input_tokens += (token_usage.get('input_tokens')
-                                        or token_usage.get('prompt_tokens', 0))
-        self._session_output_tokens += (token_usage.get('output_tokens')
-                                         or token_usage.get('completion_tokens', 0))
+        # Context usage is the LAST exchange, not a running sum. Every request
+        # re-sends the whole conversation, so each call's input_tokens already
+        # covers all prior turns -- the old code added them up and the gauge
+        # over-counted roughly quadratically.
+        self._session_input_tokens = token_usage.get('input_tokens', 0)
+        self._session_output_tokens = token_usage.get('output_tokens', 0)
         self._update_token_strip()
-        
+
         # Update session modified time
         self.session['modified'] = timestamp
-        
+
         # Display in history ListBox with token count for new flow
         time_str = datetime.fromisoformat(timestamp).strftime("%I:%M %p")
-        token_usage_for_display = getattr(event, 'token_usage', {}) or {}
+        token_usage_for_display = token_usage
         if self.chat_item is not None:
             # New flow: use consistent "You/AI" format with token count
             dt = datetime.fromisoformat(timestamp)
@@ -1006,18 +1048,15 @@ class ChatWindow(wx.Dialog):
         # Clear status
         self.status_text.SetLabel("")
         
-        # Auto-save workspace
-        try:
-            self.workspace.save()
-        except Exception as e:
-            print(f"Warning: Failed to auto-save workspace: {e}")
-        
-        # Re-enable input
-        self.is_processing = False
-        self.input_text.Enable(True)
-        self.send_btn.Enable(True)
-        self.input_text.SetFocus()
-        
+        # ImageWorkspace has no save(); persistence is mark_modified() here
+        # plus the parent's _save_bundle() after this dialog closes. The
+        # old self.workspace.save() calls always raised AttributeError into
+        # a bare except that printed to stdout -- invisible in a windowed
+        # build, so "auto-save" was never happening.
+        self.workspace.mark_modified()
+
+        self._finish_processing()
+
     def _announce_new_message(self, message_text: str):
         """Force screen reader to announce new AI message
         
@@ -1031,28 +1070,40 @@ class ChatWindow(wx.Dialog):
         wx.CallLater(100, self.input_text.SetFocus)
         
     def on_chat_error(self, event):
-        """Handle chat processing error"""
+        """Handle a failed turn.
+
+        Any text that arrived before the failure is kept: the engine records it
+        on the message, and discarding it would throw away a partial answer the
+        user already watched appear.
+        """
         error_msg = event.error
-        
-        # Show error to user
+        partial = event.message.content if event.message else ""
+
+        if self._streaming_index is not None:
+            self.history_list.Delete(self._streaming_index)
+            self._streaming_index = None
+
+        self._compact_pending = False
         show_error(self, f"Chat error:\n{error_msg}")
-        
-        # Add error to history
+
         timestamp = datetime.now().isoformat()
         time_str = datetime.fromisoformat(timestamp).strftime("%I:%M %p")
+        if partial.strip():
+            self.session['messages'].append({
+                'role': 'assistant',
+                'content': partial,
+                'timestamp': timestamp,
+                'metadata': {'provider': self.provider, 'model': self.model},
+            })
+            self.history_list.Append(f"AI ({time_str}) [incomplete]: {partial}")
         error_text = f"System ({time_str}): Error - {error_msg}"
         self.history_list.Append(error_text)
         self.history_list.SetSelection(self.history_list.GetCount() - 1)
-        
-        # Clear status
+
         self.status_text.SetLabel("")
-        
-        # Re-enable input
-        self.is_processing = False
-        self.input_text.Enable(True)
-        self.send_btn.Enable(True)
-        self.input_text.SetFocus()
-        
+        self._finish_processing()
+
+
     def on_clear_input(self, event):
         """Clear the input field"""
         self.input_text.Clear()
@@ -1069,11 +1120,19 @@ class ChatWindow(wx.Dialog):
                 chat_dialog.on_provider_changed(None) # Trigger model update
                 break
         
-        # Try to select current model
+        # Try to select current model.
+        #
+        # Match on client data, not the visible string: every provider appends
+        # entries as Append(display_name, api_id), and for Claude the display
+        # name ("Claude Opus 5") differs from the API id ("claude-opus-5").
+        # Comparing strings therefore never matched a Claude model, so the
+        # dialog always reopened on the first entry in the list. This mirrors
+        # get_selections(), which reads the same client data.
         if self.model:
-            # Find the model in the list
             for i in range(chat_dialog.model_combo.GetCount()):
-                if chat_dialog.model_combo.GetString(i) == self.model:
+                client_data = chat_dialog.model_combo.GetClientData(i)
+                candidate = client_data if client_data is not None else chat_dialog.model_combo.GetString(i)
+                if candidate == self.model:
                     chat_dialog.model_combo.SetSelection(i)
                     break
         
@@ -1101,7 +1160,7 @@ class ChatWindow(wx.Dialog):
             sys_msg = f"System ({time_str}): Switched to {self.provider} - {self.model}"
             self.history_list.Append(sys_msg)
             self.history_list.SetSelection(self.history_list.GetCount() - 1)
-            self.workspace.save()
+            self.workspace.mark_modified()
             
         chat_dialog.Destroy()
 
@@ -1109,19 +1168,8 @@ class ChatWindow(wx.Dialog):
     # File attachment support
     # ------------------------------------------------------------------
 
-    def _infer_media_type(self, path: str) -> str:
-        """Infer MIME type from file extension."""
-        ext = Path(path).suffix.lower()
-        _ext_to_mime = {
-            '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.webp': 'image/webp',
-            '.bmp': 'image/bmp',
-            '.tif': 'image/tiff', '.tiff': 'image/tiff',
-            '.pdf': 'application/pdf',
-        }
-        return _ext_to_mime.get(ext, 'application/octet-stream')
+    # MIME inference moved to idt_core.chat.attachments.infer_media_type,
+    # shared with the standalone chat app and `idt chat`.
 
     def _update_attach_button_state(self):
         """Show/hide the attach button based on whether the current provider supports attachments."""
@@ -1131,51 +1179,45 @@ class ChatWindow(wx.Dialog):
         self.attach_btn.GetParent().Layout()
 
     def on_attach_files(self, event):
-        """Open file picker and queue selected files as pending attachments."""
-        # Build wildcard: start with provider-specific images, then add HEIC
-        wildcard = get_attachment_wildcard(self.provider)
-        # Add HEIC/HEIF to the wildcard if not already present
+        """Open a file picker and queue the chosen files.
+
+        Validation, HEIC conversion and provider size limits all come from
+        idt_core.chat.attachments, shared with the standalone chat app and
+        `idt chat`. This method used to carry its own copy of that logic.
+        """
+        wildcard = attachment_wildcard(self.provider)
+        # HEIC is offered even though no provider reads it: it is converted to
+        # JPEG on the way in.
         if 'heic' not in wildcard.lower():
             wildcard = wildcard.rstrip('|') + '|HEIC/HEIF images (*.heic;*.heif)|*.heic;*.heif'
+
         with wx.FileDialog(self, "Attach files",
                            wildcard=wildcard,
                            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as dlg:
-            if dlg.ShowModal() == wx.ID_OK:
-                for path in dlg.GetPaths():
-                    # Convert HEIC/HEIF to JPEG before attaching (providers can't read HEIC directly)
-                    if Path(path).suffix.lower() in ('.heic', '.heif'):
-                        try:
-                            from idt_core.converter import convert_heic_to_jpg
-                            import tempfile
-                            tmp_dir = tempfile.mkdtemp(prefix="idt_chat_")
-                            jpg_path = str(Path(tmp_dir) / (Path(path).stem + ".jpg"))
-                            convert_heic_to_jpg(path, jpg_path)
-                            self._temp_files.append(jpg_path)
-                            self._temp_dirs.append(tmp_dir)
-                            path = jpg_path
-                            media_type = 'image/jpeg'
-                            self.status_text.SetLabel(
-                                f"HEIC converted to JPEG: {Path(jpg_path).name}"
-                            )
-                        except Exception as e:
-                            show_error(self, f"Could not convert HEIC file: {e}")
-                            continue
-                    else:
-                        media_type = self._infer_media_type(path)
-                    # Guard: enforce per-provider file size limits before queuing
-                    try:
-                        size_bytes = Path(path).stat().st_size
-                        if self.provider == 'claude':
-                            if media_type == 'application/pdf' and size_bytes > 32 * 1024 * 1024:
-                                show_error(self, f"PDF exceeds Claude's 32 MB limit:\n{Path(path).name}")
-                                continue
-                            elif media_type.startswith('image/') and size_bytes > 5 * 1024 * 1024:
-                                show_error(self, f"Image exceeds Claude's 5 MB limit:\n{Path(path).name}")
-                                continue
-                    except Exception:
-                        pass  # Size check is best-effort; let the API report errors
-                    self.pending_attachments.append({'path': path, 'media_type': media_type})
-                self._refresh_attachment_panel()
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            paths = dlg.GetPaths()
+
+        workdir = Path(tempfile.mkdtemp(prefix="idt_chat_"))
+        self._temp_dirs.append(str(workdir))
+        attachments, converted, errors = prepare_attachments(
+            paths, self.provider, workdir)
+
+        for path in converted:
+            self._temp_files.append(str(path))
+        for attachment in attachments:
+            self.pending_attachments.append({
+                'path': attachment.path,
+                'media_type': attachment.media_type,
+            })
+
+        if errors:
+            show_error(self, "Some files were not attached:\n\n" + "\n\n".join(errors))
+        if attachments:
+            self.status_text.SetLabel(
+                f"Attached {len(attachments)} file(s)."
+            )
+        self._refresh_attachment_panel()
 
     def on_remove_attachment(self, event):
         """Remove the selected attachment from the pending queue."""
@@ -1195,7 +1237,26 @@ class ChatWindow(wx.Dialog):
         self.Layout()
 
     def on_key_down(self, event):
-        """Handle Ctrl/Cmd+V to paste a clipboard image as an attachment."""
+        """Window-level key handling: Enter/Shift+Enter in the input, and Ctrl/Cmd+V image paste."""
+        # Enter sends; Shift+Enter inserts a literal newline.
+        #
+        # The input is TE_MULTILINE | TE_PROCESS_ENTER bound to EVT_TEXT_ENTER,
+        # which fires for Enter with or without Shift — so there was no way to
+        # type a line break. Handling both here and consuming the key means
+        # EVT_TEXT_ENTER never fires for Enter, so there is no double-send.
+        # Gated on focus so Enter still activates a focused button and still
+        # works normally in the history list.
+        key = event.GetKeyCode()
+        if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
+            if wx.Window.FindFocus() is self.input_text:
+                if event.ShiftDown():
+                    self.input_text.WriteText("\n")
+                else:
+                    self.on_send_message(event)
+                return  # Consumed either way
+            event.Skip()
+            return
+
         # Let the normal event chain run for everything except Ctrl+V
         is_ctrl = event.ControlDown() or event.CmdDown()
         if is_ctrl and event.GetKeyCode() == ord('V'):
@@ -1231,7 +1292,7 @@ class ChatWindow(wx.Dialog):
         if self.is_processing:
             dlg = wx.MessageDialog(
                 self,
-                "The AI is still responding. Close anyway and lose the current response?",
+                "The AI is still responding. Stop it and close?",
                 "Close Chat",
                 wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
             )
@@ -1239,11 +1300,14 @@ class ChatWindow(wx.Dialog):
             dlg.Destroy()
             if result != wx.ID_YES:
                 return
+            # Cancel rather than abandon. The old worker was left running and
+            # went on posting events to a destroyed window; the worker now
+            # holds a weakref and closing the generator releases the provider's
+            # HTTP stream.
+            if self.worker is not None:
+                self.worker.cancel()
         self._cleanup_temp_files()
-        try:
-            self.workspace.save()
-        except Exception as e:
-            print(f"Warning: Failed to save workspace on close: {e}")
+        self.workspace.mark_modified()
         self.EndModal(wx.ID_CLOSE)
 
     # ------------------------------------------------------------------
@@ -1388,17 +1452,12 @@ class ChatWindow(wx.Dialog):
         self.send_btn.Enable(False)
         self.input_text.Enable(False)
         self.is_processing = True
+        self.current_response_chunks = []
 
-        api_key = self.config.get('api_keys', {}).get(self.provider, '')
-        worker = ChatProcessingWorker(
-            parent_window=self,
-            image_path=None,
-            provider=self.provider,
-            model=self.model,
-            messages=self.session['messages'],
-            api_key=api_key,
-        )
-        worker.start()
+        # Same path as an ordinary turn now, including the same key lookup.
+        # This used to read self.config['api_keys'] directly, which is why
+        # Compact failed for anyone whose key came from the environment.
+        self._start_ai_processing()
 
     def _apply_compact(self, summary: str):
         """Replace active context with the given summary; preserve full history on disk."""
@@ -1438,10 +1497,7 @@ class ChatWindow(wx.Dialog):
         self._update_message_detail(last_idx)
         self.message_count_label.SetLabel(f"Messages: {len(self.session['messages'])}")
 
-        try:
-            self.workspace.save()
-        except Exception:
-            pass
+        self.workspace.mark_modified()
 
     def on_export_conversation(self, event):
         """Save full conversation history to a plain-text file."""

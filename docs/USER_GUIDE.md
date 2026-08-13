@@ -8,14 +8,17 @@
 
 **Image Description Toolkit (IDT)** is a batch AI-powered tool for generating human-quality text descriptions of images and video frames. It supports accessibility workflows, alt-text authoring, image cataloging, and archival documentation.
 
-IDT includes two standalone applications that share the same workspace format and AI provider infrastructure:
+IDT includes three standalone applications that share the same AI provider infrastructure:
 
 | Application | What it is | Best for |
 |---|---|---|
 | **idt** | Command-line tool | Automation, scripting, batch pipelines, server use |
 | **ImageDescriber** | Desktop GUI application | Interactive editing, reviewing, visual workflow |
+| **IDT Chat** | Accessible chat client | Talking to any supported AI model, about anything |
 
-Both tools produce the same workspace bundles (`.idtw`) — a `.idtw` bundle is a **folder** (directory), not a compressed archive. It contains image copies, description sidecars, logs, and reports. You can start a job in the CLI and review results in the GUI—or vice versa.
+`idt` and ImageDescriber produce the same workspace bundles (`.idtw`) — a `.idtw` bundle is a **folder** (directory), not a compressed archive. It contains image copies, description sidecars, logs, and reports. You can start a job in the CLI and review results in the GUI—or vice versa.
+
+**IDT Chat is not about images.** It is a general-purpose chat client that happens to ship with an image toolkit, built for keyboard and screen reader use. See [Part 7](#part-7-idt-chat).
 
 ### Supported AI Providers
 
@@ -606,6 +609,62 @@ idt models [--provider NAME] [--ollama-host URL] [--json]
 ```
 
 For Ollama, queries the running Ollama service. For cloud providers, shows the known model list if the API key is set.
+
+---
+
+#### idt chat — Talk to a Model
+
+Multi-turn conversation from the terminal. Unrelated to images: this is a general-purpose chat command that happens to share the toolkit's provider setup.
+
+```
+idt chat [--provider NAME] [--model ID] [--system TEXT] [--message TEXT]
+         [--resume ID] [--list] [--no-save] [--max-tokens N]
+         [--temperature F] [--quiet]
+```
+
+**Options**
+
+| Option | Description |
+|---|---|
+| `--provider` | `ollama`, `claude` (or `anthropic`), or `openai`. Default `ollama` |
+| `--model` | Model id. Defaults to the provider's default |
+| `--system TEXT` | System prompt for the conversation |
+| `--attach PATH` | Attach a file to the first message. Repeat for several. HEIC is converted to JPEG |
+| `--message`, `-m` | Send one message and exit instead of going interactive |
+| `--resume ID` | Continue a saved conversation |
+| `--list` | List saved conversations and exit |
+| `--no-save` | Do not write the conversation to disk |
+| `--max-tokens N` | Cap the reply length |
+| `--temperature F` | Sampling temperature |
+| `--quiet`, `-q` | Suppress status notes on stderr |
+
+**Examples**
+
+```bash
+idt chat
+```
+
+```bash
+idt chat --provider claude --system "Answer in one sentence." --message "What is HEIC?"
+```
+
+```bash
+idt chat --provider ollama --model llava --attach photo.jpg --message "What is in this picture?"
+```
+
+```bash
+idt chat --list
+```
+
+```bash
+idt chat --resume chat_a1b2c3d4e5f6
+```
+
+Responses stream as they arrive. `Ctrl+C` stops a reply and keeps what arrived; `Ctrl+D` or `/quit` exits. Inside an interactive session, `/system TEXT` sets the system prompt and `/tokens` reports usage.
+
+Conversations are saved to `~/.idt/chats/` in the same format the GUI uses, so they can be opened in [IDT Chat](#part-7-idt-chat).
+
+Ollama needs no API key. Claude and OpenAI read `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, or a key configured in ImageDescriber.
 
 ---
 
@@ -1387,7 +1446,133 @@ for line in sys.stdin:
 
 ---
 
-## Part 7: Accessibility
+## Part 7: IDT Chat
+
+IDT Chat is a standalone chat client for Ollama, Claude and OpenAI. It is not an image tool — attachments are supported, but the point is the conversation.
+
+It exists because mainstream chat applications are poorly suited to screen reader use. The conversation is a list you arrow through, responses are announced once and completely rather than a token at a time, and every action has a keyboard shortcut.
+
+### Starting a conversation
+
+Launch **IDT Chat** from the Start menu, or run `IDTChat.exe`.
+
+The first time you send a message it asks for a provider and model. Ollama needs no API key, so it works with no setup as long as Ollama is running. Claude and OpenAI need a key — see [Setting Up API Keys](#setting-up-api-keys).
+
+### The window
+
+- **Conversations** (left) — every saved conversation. `Enter` opens one.
+- **Conversation history** — the current exchange, one line per turn, each naming who spoke. Arrow keys move through it.
+- **Selected message** — the full text of the highlighted turn. It is editable so you can select and copy from it; edits are not saved.
+- **Your message** — `Enter` sends, `Shift+Enter` starts a new line.
+- **Attachments** — files queued for the next message. The label states the count, so you can check it without moving focus.
+
+### Attaching files
+
+Use **Chat → Attach Files** (`Ctrl+Shift+A`), or paste an image straight from the clipboard with `Ctrl+Shift+V`. Select an attachment and press `Delete` to remove it.
+
+Attachments are sent with your next message and then cleared — the model has seen them, so later turns do not re-upload them.
+
+What each provider accepts:
+
+| Provider | Accepts | Size limit |
+|---|---|---|
+| Ollama | JPEG, PNG, GIF, WebP | None published |
+| OpenAI | JPEG, PNG, GIF, WebP | None published |
+| Claude | JPEG, PNG, GIF, WebP, **PDF** | 5 MB per image, 32 MB per PDF |
+
+**HEIC and HEIF photos from an iPhone are converted to JPEG automatically** — no provider reads HEIC directly.
+
+If you select several files and one cannot be sent, the rest are still attached and a dialog explains which failed and why. The **Attach Files** command is unavailable for providers that take no attachments; switching to such a provider clears anything queued and says so, rather than silently dropping it later.
+
+### How responses are announced
+
+Streaming text is *not* read aloud as it arrives — that would flood a screen reader. Text accumulates silently, then is announced once when complete. Choose how much is said under **View**:
+
+| Setting | What is announced |
+|---|---|
+| Announce the full response | The whole reply |
+| Announce a summary | The first sentence and the word count |
+| Announce nothing | Nothing; the status bar still updates |
+
+Use **View → Read Last Response** (`Ctrl+Shift+R`) to hear a reply again at any time.
+
+### Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `Enter` | Send message |
+| `Shift+Enter` | New line in the message box |
+| `Ctrl+N` | New chat |
+| `Ctrl+M` | Change provider or model |
+| `Ctrl+Shift+A` | Attach files |
+| `Ctrl+Shift+V` | Paste an image from the clipboard |
+| `Delete` | In the conversation list: delete that conversation (with confirmation). In the attachments list: remove that attachment |
+| `Enter` | In the conversation list: open it. In the transcript: read the message again |
+| `Ctrl+Shift+P` | Set the system prompt |
+| `Ctrl+R` | Regenerate the last response |
+| `Ctrl+.` | Stop the response in progress |
+| `Ctrl+Shift+R` | Read the last response again |
+| `Ctrl+C` | Copy the selected message |
+| `Ctrl+Shift+C` | Copy the whole conversation |
+| `Ctrl+E` | Export the conversation |
+| `Ctrl+T` | Token usage |
+| `F1` | Shortcut list |
+
+### System prompts
+
+**Chat → Set System Prompt** (`Ctrl+Shift+P`) sets standing instructions for the conversation — a persona, a required tone, a format to answer in. It is saved with the conversation and applies to every turn.
+
+### Switching models mid-conversation
+
+**Chat → Change Model** (`Ctrl+M`) switches provider or model without losing history. The new model receives everything said so far, and each turn records which model produced it, so the history shows who said what.
+
+### Stopping a response
+
+`Ctrl+.` or the **Stop** button ends a reply in progress. **The partial response is kept**, not discarded — you watched it arrive, so it stays in the transcript.
+
+### Token usage
+
+`Ctrl+T` shows two numbers, which are genuinely different:
+
+- **Context window in use** — the most recent exchange, which is what occupies the model's context.
+- **Billed this conversation** — the sum across every turn, which is what you pay for.
+
+When a conversation outgrows the model's context window, the oldest turns are dropped and the app says so rather than doing it silently.
+
+### Where conversations are stored
+
+Conversations are saved automatically — there is no Save command — one JSON file per conversation:
+
+| Platform | Location |
+|---|---|
+| Windows | `C:\Users\<you>\.idt\chats\` |
+| macOS / Linux | `~/.idt/chats/` |
+
+A conversation is written after **every turn**, so nothing is lost if the app closes unexpectedly. Files are named by conversation id, for example `chat_a1b2c3d4e5f6.json`.
+
+They stay there until you delete them. **File → Delete Chat**, or selecting a conversation and pressing `Delete`, removes the file permanently after asking you to confirm. Nothing else prunes them: there is no age limit and no size cap.
+
+The format is the same one ImageDescriber uses for chat items inside a `.idtw` bundle, so a conversation can be copied between them. Because they are plain JSON, you can also back them up, read them, or delete them with any file manager.
+
+**Attachments are referenced, not copied.** A conversation records the path to a file you attached, not its contents. Moving or deleting the original means it cannot be re-sent, though the text of the conversation is unaffected.
+
+### Chatting from the terminal
+
+The same engine backs `idt chat`:
+
+```bash
+idt chat
+```
+
+```bash
+idt chat --provider claude --system "Answer in one sentence." --message "What is HEIC?"
+```
+
+`idt chat --list` shows saved conversations and `idt chat --resume <id>` continues one. Responses stream to the terminal; `Ctrl+C` stops a reply and keeps what arrived.
+
+---
+
+## Part 8: Accessibility
 
 ### Screen Reader Compatibility
 
@@ -1437,7 +1622,7 @@ The CLI uses no ANSI color codes in interactive mode (`idt guideme`) and all out
 
 ---
 
-## Part 8: Troubleshooting
+## Part 9: Troubleshooting
 
 ### Common Issues
 

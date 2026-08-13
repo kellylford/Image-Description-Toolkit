@@ -13,15 +13,17 @@ Download from the [releases](https://github.com/kellylford/Image-Description-Too
 | **`ImageDescriptionToolkitSetup-4.5.0-windows.exe`** | Windows 10/11, 64-bit |
 | **`IDT-4.5.0-macos-arm64.dmg`** | macOS, Apple Silicon |
 
-Either one gives you both applications:
+Either one gives you all the applications:
 - **idt** - Command-line interface for batch processing and automation
 - **ImageDescriber** - GUI with integrated viewer, prompt editor, and configuration manager
+- **IDT Chat** *(Windows)* - An accessible chat client for Ollama, Claude and OpenAI. Not an image tool: it is a general-purpose chat application built for keyboard and screen reader use.
 
-One install covers both; you never update them separately.
+One install covers them all; you never update them separately.
 
 Standalone builds are also published if you want a single tool without an installer:
-`idt-4.5.0-windows-x64.exe`, `ImageDescriber-4.5.0-windows-x64.exe`, and
-`idt-4.5.0-macos-arm64.tar.gz`. `SHA256SUMS.txt` lets you verify any download.
+`idt-4.5.0-windows-x64.exe`, `ImageDescriber-4.5.0-windows-x64.exe`,
+`IDTChat-4.5.0-windows-x64.exe`, and `idt-4.5.0-macos-arm64.tar.gz`.
+`SHA256SUMS.txt` lets you verify any download.
 
 No Python required. The Windows installer is signed; the macOS build is signed and
 notarized.

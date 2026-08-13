@@ -57,7 +57,7 @@ _BAT_STUB = {
 }
 
 
-def _scaffold_windows(tmp_path, idt=OK, describer=OK, stale=False):
+def _scaffold_windows(tmp_path, idt=OK, describer=OK, chat=OK, stale=False):
     root = tmp_path / "repo"
     (root / "BuildAndRelease" / "WinBuilds").mkdir(parents=True)
     shutil.copy2(_WIN_ORCHESTRATOR,
@@ -67,6 +67,7 @@ def _scaffold_windows(tmp_path, idt=OK, describer=OK, stale=False):
         ("idt", idt, "build_idt.bat", "dist\\idt.exe"),
         ("imagedescriber", describer, "build_imagedescriber_wx.bat",
          "dist\\ImageDescriber.exe"),
+        ("chatapp", chat, "build_chatapp.bat", "dist\\IDTChat.exe"),
     ):
         (root / app).mkdir(exist_ok=True)
         (root / app / script).write_text(
@@ -107,7 +108,7 @@ def test_windows_success_exits_zero_and_packages_fresh_binaries(tmp_path):
     proc = _run_windows(root)
 
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    for name in ("idt.exe", "ImageDescriber.exe"):
+    for name in ("idt.exe", "ImageDescriber.exe", "IDTChat.exe"):
         packaged = _packaged(root) / name
         assert packaged.exists(), f"{name} was not packaged\n{proc.stdout}"
         assert FRESH in packaged.read_text(encoding="ascii")

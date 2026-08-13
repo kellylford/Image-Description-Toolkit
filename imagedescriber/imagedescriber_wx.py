@@ -336,25 +336,15 @@ else:
             EVT_RESCAN_FAILED,
         )
 
-# Import provider capabilities
-try:
-    # Use the same project root resolution as above
-    if getattr(sys, 'frozen', False):
-        _models_path = Path(sys.executable).parent / 'models'
-    else:
-        _models_path = Path(__file__).parent.parent / 'models'
-
-    if str(_models_path) not in sys.path:
-        sys.path.insert(0, str(_models_path))
-
-    from provider_configs import supports_prompts, supports_custom_prompts, get_provider_capabilities
-    from model_options import get_all_options_for_provider, get_default_value
-except ImportError:
-    supports_prompts = lambda p: True
-    supports_custom_prompts = lambda p: False
-    get_provider_capabilities = lambda p: {}
-    get_all_options_for_provider = lambda p: {}
-    get_default_value = lambda p, o: None
+# NOTE: A "provider capabilities" import block lived here until August 2026.
+# It imported provider_configs/model_options from the legacy models/ tree,
+# which was deleted in commit 16e089b, so it always fell through to lambda
+# stubs. None of the five names it defined (supports_prompts,
+# supports_custom_prompts, get_provider_capabilities,
+# get_all_options_for_provider, get_default_value) had a single call site in
+# this file, so the whole block was removed rather than repointed.
+# Provider capabilities now live in idt_core.providers.registry — import
+# capabilities_for() from there if this module ever needs them.
 
 
 # Custom events for thread communication
@@ -1563,7 +1553,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         process_menu.AppendSeparator()
 
-        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with AI Model")
+        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with AI Model\tCtrl+T")
         self.Bind(wx.EVT_MENU, self.on_chat, chat_item)
 
         process_menu.AppendSeparator()

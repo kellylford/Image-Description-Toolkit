@@ -1499,6 +1499,198 @@ def cmd_models(args):
 
 
 # ------------------------------------------------------------------ #
+# chat                                                                 #
+# ------------------------------------------------------------------ #
+
+def _chat_default_model(provider: str) -> str:
+    """Canonical default model for a provider, from its own module."""
+    if provider == "claude":
+        from idt_core.providers.claude import DEFAULT_MODEL
+        return DEFAULT_MODEL
+    if provider == "openai":
+        from idt_core.providers.openai_provider import DEFAULT_MODEL
+        return DEFAULT_MODEL
+    from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
+    try:
+        available = OllamaProvider(model=DEFAULT_MODEL).list_models()
+        if available:
+            return available[0]
+    except Exception:
+        # Ollama may not be running, or may not be installed at all. Fall
+        # through to the module default so `idt chat --model X` still works
+        # without a live service to enumerate.
+        pass
+    return DEFAULT_MODEL
+
+
+def _chat_stream_turn(engine, text, options, quiet=False, attachments=()):
+    """Run one turn, printing deltas as they arrive.
+
+    Ctrl+C cancels the turn rather than the program: the generator is closed,
+    the provider's stream is released, and whatever text arrived is kept.
+    Returns True if the turn completed, False if it was cancelled or failed.
+    """
+    from idt_core.chat import (
+        ChatCancelled, ChatDelta, ChatFailed, ChatFinished, ChatRetrying,
+        ChatStarted,
+    )
+
+    generator = engine.send(text, attachments, options)
+    completed = False
+    try:
+        for event in generator:
+            if isinstance(event, ChatDelta):
+                sys.stdout.write(event.text)
+                sys.stdout.flush()
+            elif isinstance(event, ChatStarted):
+                if event.dropped_messages and not quiet:
+                    print(
+                        f"[dropped {event.dropped_messages} oldest turn(s) to fit "
+                        f"the context window]",
+                        file=sys.stderr,
+                    )
+            elif isinstance(event, ChatRetrying):
+                print(
+                    f"\n[{event.error} — retrying, attempt {event.attempt}]",
+                    file=sys.stderr,
+                )
+            elif isinstance(event, ChatFailed):
+                print(f"\nError: {event.error}", file=sys.stderr)
+            elif isinstance(event, (ChatFinished, ChatCancelled)):
+                completed = isinstance(event, ChatFinished)
+                print()
+    except KeyboardInterrupt:
+        generator.close()
+        print("\n[stopped — partial response kept]", file=sys.stderr)
+    return completed
+
+
+def cmd_chat(args):
+    """
+    Talk to an AI model from the terminal.
+
+    idt chat                                   — interactive session
+    idt chat --message "explain HEIC"          — one-shot
+    idt chat --provider claude --system "Be terse."
+    idt chat --list                            — saved conversations
+    idt chat --resume chat_a1b2c3              — continue one
+    """
+    from idt_core.chat import (
+        ChatEngine, ChatOptions, ChatSession, DirectoryChatStore,
+    )
+    from idt_core.chat.providers import create_chat_provider
+    from idt_core.keys import missing_key_message, requires_api_key, resolve_api_key
+    from idt_core.providers.registry import capabilities_for
+
+    store = None if args.no_save else DirectoryChatStore()
+
+    if args.list_sessions:
+        sessions = DirectoryChatStore().list_sessions()
+        if not sessions:
+            print("No saved conversations.")
+            return
+        print(f"{len(sessions)} saved conversation(s):\n")
+        for session in sessions:
+            turns = sum(1 for m in session.messages if m.role == "user")
+            stamp = (session.modified or "")[:16].replace("T", " ")
+            print(f"  {session.id}  {stamp}  {turns:>3} turn(s)  "
+                  f"{session.display_title()}")
+        return
+
+    # Resume or start fresh.
+    if args.resume:
+        session = DirectoryChatStore().load(args.resume)
+        if session is None:
+            print(f"Error: no saved conversation with id {args.resume!r}",
+                  file=sys.stderr)
+            sys.exit(1)
+    else:
+        session = ChatSession()
+
+    provider_name = args.provider or session.provider or "ollama"
+    canonical = capabilities_for(provider_name).provider
+    if canonical == "unknown":
+        canonical = provider_name.lower()
+
+    model = args.model or (session.model if not args.provider else "") \
+        or _chat_default_model(canonical)
+
+    if args.system is not None:
+        session.system_prompt = args.system
+
+    api_key = resolve_api_key(canonical)
+    if requires_api_key(canonical) and not api_key:
+        print(f"Error: {missing_key_message(canonical)}", file=sys.stderr)
+        sys.exit(1)
+
+    provider = create_chat_provider(canonical, model, api_key)
+    engine = ChatEngine(session, provider, store)
+    options = ChatOptions(
+        max_output_tokens=args.max_tokens,
+        temperature=args.temperature,
+    )
+
+    # Attachments, prepared through the same code the GUIs use so limits,
+    # HEIC conversion and provider support behave identically everywhere.
+    attachments = []
+    if args.attach:
+        from idt_core.chat import prepare_attachments
+
+        attachments, _converted, errors = prepare_attachments(
+            args.attach, canonical)
+        for problem in errors:
+            print(f"Warning: {problem}", file=sys.stderr)
+        if not attachments and not args.message:
+            print("Error: no attachments could be prepared", file=sys.stderr)
+            sys.exit(1)
+
+    # One-shot.
+    if args.message:
+        ok = _chat_stream_turn(engine, args.message, options, quiet=args.quiet,
+                               attachments=attachments)
+        if store and not args.quiet:
+            print(f"[saved as {session.id}]", file=sys.stderr)
+        sys.exit(0 if ok else 1)
+
+    # Interactive.
+    print(f"idt chat — {canonical} / {model}")
+    if session.messages:
+        print(f"Resumed {session.id} ({len(session.messages)} messages)")
+    print("Type your message and press Enter. Ctrl+C stops a reply; "
+          "Ctrl+D or /quit exits.\n")
+
+    while True:
+        try:
+            line = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not line:
+            continue
+        if line in ("/quit", "/exit"):
+            break
+        if line == "/system":
+            print(session.system_prompt or "(no system prompt)")
+            continue
+        if line.startswith("/system "):
+            session.system_prompt = line[len("/system "):].strip()
+            print(f"[system prompt set]")
+            continue
+        if line == "/tokens":
+            print(f"context {session.context_tokens:,} · "
+                  f"billed {session.billed_tokens:,}")
+            continue
+        # Attachments ride along with the first message only; the model has
+        # seen them by the second turn and re-sending would just re-upload.
+        _chat_stream_turn(engine, line, options, quiet=args.quiet,
+                          attachments=attachments)
+        attachments = []
+
+    if store and session.messages:
+        print(f"Saved as {session.id}", file=sys.stderr)
+
+
+# ------------------------------------------------------------------ #
 # watch                                                                #
 # ------------------------------------------------------------------ #
 
@@ -2164,6 +2356,43 @@ Supported providers:
     p_models.set_defaults(func=cmd_models)
 
     # ---------------------------------------------------------------- #
+    # chat                                                             #
+    # ---------------------------------------------------------------- #
+    p_chat = sub.add_parser(
+        "chat",
+        help="Talk to an AI model from the terminal",
+        description=(
+            "Multi-turn chat with Ollama, Claude or OpenAI. Responses stream "
+            "as they arrive. Ctrl+C stops a reply and keeps what arrived; "
+            "Ctrl+D or /quit exits. Conversations are saved to ~/.idt/chats "
+            "and share their format with ImageDescriber's chat items."
+        ),
+    )
+    p_chat.add_argument("--provider", choices=["ollama", "claude", "openai", "anthropic"],
+                        help="Which backend to talk to (default: ollama)")
+    p_chat.add_argument("--model", help="Model id (default: the provider's default)")
+    p_chat.add_argument("--system", metavar="TEXT",
+                        help="System prompt for the conversation")
+    p_chat.add_argument("--message", "-m", metavar="TEXT",
+                        help="Send one message and exit instead of going interactive")
+    p_chat.add_argument("--attach", metavar="PATH", action="append", default=[],
+                        help=("Attach a file to the first message. Repeat for "
+                              "several. HEIC is converted to JPEG."))
+    p_chat.add_argument("--resume", metavar="ID",
+                        help="Continue a saved conversation")
+    p_chat.add_argument("--list", dest="list_sessions", action="store_true",
+                        help="List saved conversations and exit")
+    p_chat.add_argument("--no-save", action="store_true",
+                        help="Do not write the conversation to disk")
+    p_chat.add_argument("--max-tokens", type=int, metavar="N",
+                        help="Cap the reply length")
+    p_chat.add_argument("--temperature", type=float, metavar="F",
+                        help="Sampling temperature")
+    p_chat.add_argument("--quiet", "-q", action="store_true",
+                        help="Suppress status notes on stderr")
+    p_chat.set_defaults(func=cmd_chat)
+
+    # ---------------------------------------------------------------- #
     # watch                                                              #
     # ---------------------------------------------------------------- #
     p_watch = sub.add_parser(
@@ -2276,6 +2505,7 @@ def main():
         "combine":  "IDT - Combining Descriptions",
         "watch":    "IDT - Watching for New Images",
         "guideme":  "IDT - Setup Wizard",
+        "chat":     "IDT - Chat",
     }
     cmd = getattr(args, "command", None)
     if cmd and cmd in _cmd_titles:

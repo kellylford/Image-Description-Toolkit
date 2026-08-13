@@ -129,3 +129,27 @@ fail_under = 23
 "idt_core/workspace.py" = 85.0
 "idt_core/project.py" = 100.0
 "idt_core/image_item.py" = 96.0
+# Chat engine. Floors set at the same time as the code, on purpose: a new
+# module with no floor is exactly what rots, and this one backs three surfaces
+# (the CLI, the standalone app, and eventually ImageDescriber's chat window).
+"idt_core/chat/engine.py" = 95.0
+"idt_core/chat/messages.py" = 90.0
+"idt_core/chat/tokens.py" = 93.0
+"idt_core/chat/events.py" = 95.0
+"idt_core/chat/errors.py" = 82.0
+"idt_core/chat/store.py" = 77.0
+# Lower than the rest, and honestly so: roughly a third of this file is the
+# three SDK streaming calls, which cannot run without a network and a key. The
+# message formatters -- where the wire format is actually easy to get wrong --
+# are pure functions and are covered.
+"idt_core/chat/providers.py" = 62.0
+"idt_core/chat/attachments.py" = 94.0
+# No floor for idt_core/chat/mlx.py on purpose. It is macOS-on-Apple-Silicon
+# only, so on Windows and on CI it measures 0% no matter how correct it is.
+# Splitting it out of providers.py keeps that dead measurement from dragging
+# down a file whose covered parts are genuinely exercised. Add a floor here
+# once there is a Mac runner that can import mlx_vlm.
+# Replaced five divergent key lookups; worth defending because the divergence
+# was the bug (Summarize & Compact checked only the config file).
+"idt_core/keys.py" = 90.0
+"idt_core/providers/registry.py" = 92.0

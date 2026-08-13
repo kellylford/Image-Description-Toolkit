@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Image Description Toolkit (IDT) is an AI-powered batch image/video description tool with two standalone applications:
-- **`idt`** — CLI dispatcher (`idt/idt_cli.py`) routing to all sub-commands
+Image Description Toolkit (IDT) is an AI-powered batch image/video description tool with three standalone applications:
+- **`idt`** — CLI dispatcher (`cli/main.py`) routing to all sub-commands
 - **`ImageDescriber`** — wxPython batch processing GUI (`imagedescriber/imagedescriber_wx.py`) with integrated viewer (`viewer_components.py`), chat (`chat_window_wx.py`), workspace manager (`workspace_manager.py`), prompt editor, and configuration manager
+- **`IDT Chat`** — standalone accessible chat client (`chatapp/chat_app_wx.py`). Not an image tool; a general-purpose chat client for Ollama/Claude/OpenAI built for keyboard and screen reader use.
 
 Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic), and MLX (macOS Apple Silicon, GUI only).
 
@@ -22,9 +23,10 @@ pytest -m unit pytest_tests/   # markers: slow, integration, unit, regression
 
 ### Building (Windows)
 ```batch
-BuildAndRelease\WinBuilds\builditall_wx.bat   # both apps
+BuildAndRelease\WinBuilds\builditall_wx.bat   # all three apps
 cd idt && build_idt.bat                        # CLI only
 cd imagedescriber && build_imagedescriber_wx.bat
+cd chatapp && build_chatapp.bat
 ```
 
 ### Building (macOS)
@@ -75,8 +77,21 @@ All model lists live in the provider modules under `idt_core/providers/`:
 - `idt_core/providers/claude.py` — Claude model list and metadata (sourced from Anthropic SDK)
 - `idt_core/providers/openai_provider.py` — OpenAI model list and metadata (sourced from OpenAI SDK)
 - `idt_core/providers/ollama.py` — Ollama models are dynamic (queries the running Ollama service at runtime)
+- `idt_core/providers/registry.py` — **provider capabilities** (streaming, system prompt, attachment MIME types, API key requirement). Replaced the deleted `models/provider_configs.py`.
 
 Imported by CLI, GUI, and chat features. Never duplicate model lists elsewhere.
+
+### Chat Engine (`idt_core/chat/`)
+Provider-agnostic and **wx-free**. Backs `idt chat`, the standalone IDT Chat app, and eventually ImageDescriber's chat window.
+
+- `ChatEngine.send()` is a **generator of events**, matching `WorkspacePipeline.run()`. Callers decide output.
+- Cancellation is `gen.close()` — `GeneratorExit` reaches the provider's `finally`, which closes the stream. Partial responses are always persisted.
+- API keys resolve through `idt_core/keys.py` only. Do not add a sixth lookup.
+- `ChatSession.context_tokens` (last exchange) and `billed_tokens` (sum) are different numbers — do not conflate them.
+
+**There is exactly one chat implementation.** `ChatProcessingWorker` (~690 lines of inline SDK calls in `workers_wx.py`) was deleted in August 2026. All three surfaces reach the engine through `shared/chat_worker_wx.py`, which marshals events onto the wx UI thread with a `weakref` to the window.
+
+ImageDescriber keeps its own persistence: chat turns are still `ImageDescription` objects on a chat `ImageItem`, so existing `.idtw` workspaces load unchanged. The engine is constructed with `store=None` there.
 
 ### Key Shared Utilities
 - `scripts/list_results.py` — `find_workflow_directories()`, `count_descriptions()`, `format_timestamp()`, `parse_directory_name()`
