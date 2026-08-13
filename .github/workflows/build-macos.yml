@@ -105,6 +105,12 @@ jobs:
     - name: Verify macOS build system structure
       run: bash BuildAndRelease/MacBuilds/verify_macos_build_structure.sh
 
+    # Cheap, and it fails for a reason no build-time error explains well: a
+    # lazily-imported module absent from a spec builds fine and only breaks
+    # when the frozen app calls the function that imports it.
+    - name: Check PyInstaller specs are complete
+      run: ./.venv/bin/python BuildAndRelease/check_spec_completeness.py
+
     - name: Syntax-check core modules
       # compileall over whole packages rather than a hand-listed set of files,
       # so this cannot rot when modules move (it was originally written against
