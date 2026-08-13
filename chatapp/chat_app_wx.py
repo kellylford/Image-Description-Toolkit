@@ -180,11 +180,27 @@ class ProviderDialog(wx.Dialog):
         self._populate_models()
 
     @staticmethod
-    def _provider_names():
-        names = [p for p in list_providers() if p != "ollama cloud"]
-        # MLX needs Apple Silicon; offering it on Windows or Intel would only
-        # produce a runtime error the user cannot act on.
+    def _mlx_is_usable() -> bool:
+        """True only where MLX chat can actually run.
+
+        Platform is not enough. This app's PyInstaller spec excludes mlx and
+        mlx_vlm to keep the binary small, so on a packaged macOS build the
+        machine can be Apple Silicon and the option still fail. Offering a
+        provider that raises the moment it is chosen is worse than not
+        offering it, so the check is "can we import it", not "what OS is this".
+        """
         if sys.platform != "darwin":
+            return False
+        try:
+            import mlx_vlm  # noqa: F401
+        except Exception:
+            return False
+        return True
+
+    @classmethod
+    def _provider_names(cls):
+        names = [p for p in list_providers() if p != "ollama cloud"]
+        if not cls._mlx_is_usable():
             names = [p for p in names if p != "mlx"]
         return names
 

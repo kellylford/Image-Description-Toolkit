@@ -109,6 +109,56 @@ def test_macos_orchestrator_aborts_on_missing_artifact():
     )
 
 
+#: Every app the macOS DMG ships, as (build artifact path, staged name).
+#: Adding an app means adding it here, and the tests below then insist the
+#: whole macOS chain knows about it. The Windows equivalent lives in
+#: test_batch_script_syntax.py; IDTChat was once added to one Windows
+#: packaging script and missed in the other, which is the failure this
+#: mirrors for macOS.
+MACOS_APPS = [
+    ("imagedescriber/dist/ImageDescriber.app", "ImageDescriber.app"),
+    ("chatapp/dist/IDTChat.app", "IDTChat.app"),
+]
+
+_MACOS_DMG = Path("BuildAndRelease/MacBuilds/create_macos_dmg.sh")
+_MACOS_VERIFY = Path("BuildAndRelease/MacBuilds/verify_macos_build_structure.sh")
+
+
+@pytest.mark.parametrize("artifact,staged", MACOS_APPS, ids=lambda v: str(v))
+def test_macos_orchestrator_builds_and_packages_every_app(artifact, staged):
+    text = _read(_MACOS_ORCHESTRATOR)
+    assert f'rm -rf "{artifact}"' in text, (
+        f"builditall_macos.sh must clear the stale {staged} before building"
+    )
+    assert f'if [ ! -d "{artifact}" ]' in text, (
+        f"builditall_macos.sh must abort when {staged} is missing"
+    )
+    assert staged in text, f"builditall_macos.sh never packages {staged}"
+
+
+@pytest.mark.parametrize("artifact,staged", MACOS_APPS, ids=lambda v: str(v))
+def test_dmg_stages_every_app(artifact, staged):
+    """The DMG is the macOS deliverable: an app missing here does not ship."""
+    text = _read(_MACOS_DMG)
+    assert f'if [ ! -d "{artifact}" ]' in text, (
+        f"create_macos_dmg.sh must check for {artifact}"
+    )
+    assert f'ditto "{artifact}"' in text, (
+        f"create_macos_dmg.sh must ditto {staged} into the staging folder "
+        "(ditto, not cp: it preserves code signatures)"
+    )
+
+
+def test_macos_structure_check_covers_the_chat_app():
+    """verify_macos_build_structure.sh runs before the build; it must know the app."""
+    text = _read(_MACOS_VERIFY)
+    for probe in ("chatapp/chatapp.spec",
+                  "chatapp/build_chatapp.sh",
+                  "chatapp/chat_app_wx.py",
+                  "chatapp/requirements.txt"):
+        assert probe in text, f"verify_macos_build_structure.sh does not check {probe}"
+
+
 def test_macos_orchestrator_still_reports_a_summary_after_a_failure():
     """The summary branch was unreachable while ((BUILD_ERRORS++)) aborted the run."""
     text = _read(_MACOS_ORCHESTRATOR)

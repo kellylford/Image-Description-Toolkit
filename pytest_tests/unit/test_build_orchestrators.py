@@ -183,7 +183,7 @@ _SH_STUB = {
 }
 
 
-def _scaffold_macos(tmp_path, idt=OK, describer=OK, stale=False):
+def _scaffold_macos(tmp_path, idt=OK, describer=OK, chat=OK, stale=False):
     root = tmp_path / "repo"
     (root / "BuildAndRelease" / "MacBuilds").mkdir(parents=True)
     shutil.copy2(_MAC_ORCHESTRATOR,
@@ -209,10 +209,13 @@ def _scaffold_macos(tmp_path, idt=OK, describer=OK, stale=False):
         "imagedescriber": ('mkdir -p dist/ImageDescriber.app/Contents\n'
                            'echo "{content}" > '
                            'dist/ImageDescriber.app/Contents/marker'),
+        "chatapp": ('mkdir -p dist/IDTChat.app/Contents\n'
+                    'echo "{content}" > dist/IDTChat.app/Contents/marker'),
     }
     for app, behaviour, script in (
         ("idt", idt, "build_idt.sh"),
         ("imagedescriber", describer, "build_imagedescriber_wx.sh"),
+        ("chatapp", chat, "build_chatapp.sh"),
     ):
         (root / app).mkdir(exist_ok=True)
         body = _SH_STUB[behaviour].format(
@@ -223,10 +226,11 @@ def _scaffold_macos(tmp_path, idt=OK, describer=OK, stale=False):
     if stale:
         (root / "idt" / "dist").mkdir(parents=True, exist_ok=True)
         (root / "idt" / "dist" / "idt").write_text(STALE, encoding="utf-8")
-        app_dir = (root / "imagedescriber" / "dist"
-                   / "ImageDescriber.app" / "Contents")
-        app_dir.mkdir(parents=True, exist_ok=True)
-        (app_dir / "marker").write_text(STALE, encoding="utf-8")
+        for app, bundle in (("imagedescriber", "ImageDescriber.app"),
+                            ("chatapp", "IDTChat.app")):
+            app_dir = root / app / "dist" / bundle / "Contents"
+            app_dir.mkdir(parents=True, exist_ok=True)
+            (app_dir / "marker").write_text(STALE, encoding="utf-8")
 
     (root / "README.md").write_text("readme", encoding="utf-8")
     (root / "LICENSE").write_text("license", encoding="utf-8")
@@ -258,7 +262,13 @@ def test_macos_success_exits_zero_and_packages_fresh_artifacts(tmp_path):
     dist_all = root / "BuildAndRelease" / "MacBuilds" / "dist_all"
     assert (dist_all / "idt").exists(), proc.stdout
     assert (dist_all / "Applications" / "ImageDescriber.app").is_dir()
+    assert (dist_all / "Applications" / "IDTChat.app").is_dir(), proc.stdout
     assert FRESH in (dist_all / "idt").read_text(encoding="utf-8")
+    # Freshness, not just presence: a stale bundle left from a previous run
+    # would satisfy is_dir() while shipping the wrong build.
+    for bundle in ("ImageDescriber.app", "IDTChat.app"):
+        marker = dist_all / "Applications" / bundle / "Contents" / "marker"
+        assert FRESH in marker.read_text(encoding="utf-8"), bundle
 
 
 @needs_bash

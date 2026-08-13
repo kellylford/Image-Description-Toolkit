@@ -28,7 +28,7 @@ IDT includes three standalone applications that share the same AI provider infra
 | Ollama Cloud | — | `ollama_cloud` | Cloud (self-hosted) | No | GUI only |
 | Anthropic Claude | `anthropic` | `claude` | Cloud | Yes | Windows, macOS |
 | OpenAI GPT | `openai` | `openai` | Cloud | Yes | Windows, macOS |
-| MLX (Apple Silicon) | — | `mlx` | Local | No | GUI only, macOS Apple Silicon |
+| MLX (Apple Silicon) | — | `mlx` | Local | No | ImageDescriber only, macOS Apple Silicon |
 
 ---
 
@@ -1222,15 +1222,15 @@ idt describe ~/Photos --provider openai --model gpt-5.2
 
 ---
 
-### MLX — Apple Silicon Local (GUI only, macOS)
+### MLX — Apple Silicon Local (ImageDescriber only, macOS)
 
-MLX runs vision models directly on Apple Silicon (M1/M2/M3/M4) using Apple's Metal GPU via the `mlx-vlm` library. It is the fastest local option on Mac and produces quality comparable to small Ollama models. **MLX is only available in the GUI — it does not appear in the CLI.**
+MLX runs vision models directly on Apple Silicon (M1/M2/M3/M4) using Apple's Metal GPU via the `mlx-vlm` library. It is the fastest local option on Mac and produces quality comparable to small Ollama models. **MLX is only available in ImageDescriber.** It does not appear in the CLI, and IDT Chat does not offer it: that build deliberately omits the MLX libraries to stay small, so the option is hidden rather than shown and failing.
 
 **GUI provider name:** `mlx`
 
 **Setup**
 
-MLX is a GUI-only feature. To enable it, install the `mlx-vlm` package into the same Python environment that runs the ImageDescriber GUI:
+To enable it, install the `mlx-vlm` package into the same Python environment that runs ImageDescriber:
 
 ```bash
 # Activate the GUI's virtual environment first, then:
@@ -1454,7 +1454,7 @@ It exists because mainstream chat applications are poorly suited to screen reade
 
 ### Starting a conversation
 
-Launch **IDT Chat** from the Start menu, or run `IDTChat.exe`.
+Launch **IDT Chat** from the Start menu (Windows) or from `Applications/IDT/IDTChat.app` (macOS).
 
 The first time you send a message it asks for a provider and model. Ollama needs no API key, so it works with no setup as long as Ollama is running. Claude and OpenAI need a key — see [Setting Up API Keys](#setting-up-api-keys).
 
