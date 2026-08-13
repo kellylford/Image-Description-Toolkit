@@ -145,10 +145,11 @@ echo.
 echo Project location: %CD%
 echo.
 echo Next steps:
-echo   1. To build all apps:        releaseitall.bat
-echo   2. To build just IDT:        build_idt.bat
-echo   3. To build individual app:  cd viewer ^&^& .venv\Scripts\activate ^&^& build_viewer.bat
+echo   1. To build all apps:        BuildAndRelease\WinBuilds\builditall_wx.bat
+echo   2. To build just IDT:        cd idt ^&^& build_idt.bat
+echo   3. To create the installer:  BuildAndRelease\WinBuilds\build_installer.bat
 echo.
-echo All distribution packages will be created in: releases\
+echo Built executables are collected in:
+echo   BuildAndRelease\WinBuilds\dist_all\bin\
 echo.
 pause

@@ -53,9 +53,12 @@ This will trigger both Windows AMD64 and Linux ARM64 builds
 1. **Checkout code** - Gets the specified branch from GitHub
 2. **Set up Python 3.11** - Installs Python on Windows Server 2022
 3. **Install dependencies** - Runs `pip install -r requirements.txt` and PyInstaller
-4. **Build all apps** - Runs `builditall.bat`
-5. **Package all apps** - Runs `packageitall.bat`
-6. **Upload artifacts** - Makes ZIP files available for download
+4. **Check specs** - Runs `BuildAndRelease/check_spec_completeness.py`
+5. **Build all apps** - Runs `BuildAndRelease/WinBuilds/builditall_wx.bat`
+6. **Package all apps** - Runs `BuildAndRelease/WinBuilds/package_all_windows.bat`
+7. **Upload artifacts** - Makes the executables available for download
+
+See `.github/workflows/build-windows.yml` for the authoritative step list.
 
 ### Build Time
 - Typical build: 15-30 minutes
@@ -191,7 +194,7 @@ runs-on: windows-2019  # Or windows-latest (currently 2022)
 
 ## Local Build Scripts
 For comparison, local build process:
-- `builditall.bat` - Build all executables
-- `packageitall.bat` - Package into ZIP files
-- `releaseitall.bat` - Complete build + package workflow
+- `winsetup.bat` - One-time: create the `.winenv` environments
+- `BuildAndRelease\WinBuilds\builditall_wx.bat` - Build all three apps, then package to `dist_all\bin\`
+- `BuildAndRelease\WinBuilds\build_installer.bat` - Compile the Inno Setup installer
 - `tools/your_personal_workflow.bat (git-ignored)` - Personal workflow (git-ignored)

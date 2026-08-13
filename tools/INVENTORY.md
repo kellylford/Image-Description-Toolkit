@@ -175,19 +175,39 @@ The tools in this directory work **with** the master build scripts in the root d
 
 ### File Locations:
 ```
-idt/
+Image-Description-Toolkit/
+├── winsetup.bat                    # Active: create .winenv for CLI + wx apps
+├── macsetup.sh                     # Active: macOS equivalent (.command wraps it)
+│
 ├── tools/                          # This directory
 │   ├── bootstrap.bat               # Clone + setup
-│   ├── environmentsetup.bat        # Environment setup
-│   ├── build.bat                   # ARCHIVED
-│   └── create_distribution.bat     # ARCHIVED
+│   └── environmentsetup.bat        # Shim -> winsetup.bat
 │
-├── build_idt.bat                   # Active: Build main IDT
-├── package_idt.bat                 # Active: Package main IDT
-├── builditall.bat                  # Active: Build all 4 apps
-├── packageitall.bat                # Active: Package all 4 apps
-└── releaseitall.bat                # Active: Build + package all
+├── idt/build_idt.bat                             # Active: CLI
+├── imagedescriber/build_imagedescriber_wx.bat    # Active: ImageDescriber
+├── chatapp/build_chatapp.bat                     # Active: IDT Chat
+│
+└── BuildAndRelease/
+    ├── WinBuilds/                  # Active Windows build system
+    │   ├── builditall_wx.bat       #   builds all three, then packages
+    │   ├── package_all_windows.bat #   collects exes (CI runs this directly)
+    │   ├── build_installer.bat     #   compiles installer.iss
+    │   └── installer.iss
+    └── MacBuilds/                  # Active macOS build system
 ```
+
+> **Deleted 2026-08-13:** `builditall.bat`, `build_release.bat`,
+> `build-test-deploy.bat`, `recommended-build-test-deploy.bat`, and the
+> duplicate `build_installer.bat` / `installer.iss` /
+> `package_all_windows.bat` that sat in `BuildAndRelease/` alongside the
+> `WinBuilds/` copies. They built `viewer/`, `idtconfigure/` and
+> `prompt_editor/`, which no longer exist, and called `packageitall.bat` and
+> `releaseitall.bat`, which never existed in this repository at all.
+>
+> Sections below that still mention those scripts, a root Windows `.venv`, or
+> a four-app layout describe the pre-wxPython build system and are retained
+> only as history. `BuildAndRelease/BUILD_SYSTEM_REFERENCE.md` is the current
+> reference.
 
 ---
 

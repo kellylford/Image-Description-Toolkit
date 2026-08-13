@@ -50,6 +50,7 @@ jobs:
         $missing = @()
         if (-not (Test-Path "idt\dist\idt.exe"))                       { $missing += "idt\dist\idt.exe" }
         if (-not (Test-Path "imagedescriber\dist\ImageDescriber.exe")) { $missing += "imagedescriber\dist\ImageDescriber.exe" }
+        if (-not (Test-Path "chatapp\dist\IDTChat.exe"))               { $missing += "chatapp\dist\IDTChat.exe" }
         if ($missing.Count -gt 0) {
           Write-Host "ERROR: Expected build outputs not found:"
           $missing | ForEach-Object { Write-Host "  - $_" }
@@ -58,6 +59,7 @@ jobs:
         Write-Host "Build outputs confirmed:"
         Write-Host "  idt.exe              $(((Get-Item 'idt\dist\idt.exe').Length / 1MB).ToString('0.0')) MB"
         Write-Host "  ImageDescriber.exe   $(((Get-Item 'imagedescriber\dist\ImageDescriber.exe').Length / 1MB).ToString('0.0')) MB"
+        Write-Host "  IDTChat.exe          $(((Get-Item 'chatapp\dist\IDTChat.exe').Length / 1MB).ToString('0.0')) MB"
 
     # ------------------------------------------------------------------ #
     #  3. Install Ollama via winget                                        #
@@ -348,7 +350,31 @@ jobs:
         Write-Host "Process terminated cleanly."
 
     # ------------------------------------------------------------------ #
-    # 12. Upload artifacts                                                  #
+    # 12. Bonus: IDT Chat launch smoke test                                 #
+    #                                                                       #
+    # Same 15-second survival check as ImageDescriber above. A wxPython app #
+    # that is missing a bundled import builds cleanly and dies on startup,  #
+    # so "the exe exists" is not evidence that it runs.                     #
+    # ------------------------------------------------------------------ #
+    - name: Smoke test - IDT Chat launches without crashing
+      continue-on-error: true
+      shell: pwsh
+      run: |
+        Write-Host "Launching IDTChat.exe (15-second survival test)..."
+        $proc = Start-Process -FilePath ".\chatapp\dist\IDTChat.exe" -PassThru
+        Start-Sleep -Seconds 15
+
+        if ($proc.HasExited) {
+          Write-Host "FAIL: IDTChat.exe exited within 15 seconds (exit code $($proc.ExitCode))"
+          exit 1
+        }
+
+        Write-Host "PASS: IDTChat.exe is still running after 15 seconds (PID $($proc.Id))"
+        $proc.Kill()
+        Write-Host "Process terminated cleanly."
+
+    # ------------------------------------------------------------------ #
+    # 13. Upload artifacts                                                  #
     # ------------------------------------------------------------------ #
     - name: Upload idt executable
       uses: actions/upload-artifact@v7
@@ -364,6 +390,14 @@ jobs:
       with:
         name: imagedescriber-windows
         path: imagedescriber/dist/ImageDescriber.exe
+        retention-days: 14
+
+    - name: Upload IDT Chat executable
+      uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: idtchat-windows
+        path: chatapp/dist/IDTChat.exe
         retention-days: 14
 
     - name: Upload workspace bundle (descriptions + report)

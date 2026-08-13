@@ -224,5 +224,5 @@ Start: 2025-10-29T01:23:45Z
 
 Notes:
 
-- No changes to your existing `releaseitall.bat` / `build_installer.bat` flow are required
+- No changes to the `WinBuilds\builditall_wx.bat` / `WinBuilds\build_installer.bat` flow are required
 - The version banner appears automatically in logs and the CLI version output

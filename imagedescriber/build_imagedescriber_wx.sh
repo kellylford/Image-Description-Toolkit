@@ -5,8 +5,35 @@ set -e  # Exit on error
 
 echo "Building ImageDescriber (wxPython)..."
 
-# Activate virtual environment
-source .venv/bin/activate
+# ----------------------------------------------------------------------------
+# Virtual environment.
+#
+# Checked explicitly rather than relying on "source .venv/bin/activate" to fail
+# under set -e: that produced a bare "No such file or directory" with no hint
+# that macsetup.sh is what creates this. Mirrors the handling in
+# chatapp/build_chatapp.sh, which fell back and reported properly while this
+# script did not.
+# ----------------------------------------------------------------------------
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+elif [ -f "../.venv/bin/activate" ]; then
+    echo "imagedescriber/.venv not found; using root .venv"
+    source ../.venv/bin/activate
+else
+    echo "ERROR: no virtual environment found."
+    echo "Expected imagedescriber/.venv (or root .venv)."
+    echo "Run ./macsetup.sh from the project root first."
+    exit 1
+fi
+
+# Fail early rather than after minutes of PyInstaller work. wxPython is the
+# dependency that actually goes missing, and without this check the resulting
+# failure points at the spec file instead of at the environment.
+python -c "import wx" 2>/dev/null || {
+    echo "ERROR: wxPython is not installed in the active environment."
+    echo "Run: pip install -r requirements.txt"
+    exit 1
+}
 
 # Run PyInstaller
 pyinstaller imagedescriber_wx.spec --clean --noconfirm

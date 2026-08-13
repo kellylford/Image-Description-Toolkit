@@ -4,15 +4,20 @@ echo Building IDT Chat for Windows
 echo ========================================================================
 echo.
 
-REM Auto-activate .winenv if not already in a virtual environment
-if not defined VIRTUAL_ENV (
-    if exist "..\imagedescriber\.winenv\Scripts\activate.bat" (
-        echo Activating imagedescriber\.winenv...
-        call ..\imagedescriber\.winenv\Scripts\activate.bat
-    ) else (
-        echo WARNING: .winenv not found. Run winsetup.bat first.
-        echo Proceeding with system Python...
-    )
+REM IDT Chat has no venv of its own -- it shares ImageDescriber's, since both
+REM are wxPython apps built from the same requirements.
+REM
+REM Deliberately NOT guarded by "if not defined VIRTUAL_ENV". builditall_wx.bat
+REM runs the sub-builds in one cmd session and build_idt.bat leaves idt\.winenv
+REM active, so that guard silently built IDT Chat against the CLI venv, which
+REM has no wxPython. Re-activating is safe -- activate.bat restores
+REM %_OLD_VIRTUAL_PATH% before prepending. See build_imagedescriber_wx.bat.
+if exist "..\imagedescriber\.winenv\Scripts\activate.bat" (
+    echo Activating imagedescriber\.winenv...
+    call ..\imagedescriber\.winenv\Scripts\activate.bat
+) else (
+    echo WARNING: .winenv not found. Run winsetup.bat first.
+    echo Proceeding with system Python...
 )
 echo.
 

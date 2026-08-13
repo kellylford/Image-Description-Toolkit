@@ -120,7 +120,10 @@ echo PHASE 3: BUILD ALL APPLICATIONS
 echo ============================================================================
 echo Building IDT applications...
 
-call releaseitall.bat >> %TEST_LOG% 2>&1
+REM Was "call releaseitall.bat" -- a script that does not exist anywhere in this
+REM repository, so Phase 3 could never have run. Points at the live orchestrator
+REM now. Run this script from the project root.
+call BuildAndRelease\WinBuilds\builditall_wx.bat >> %TEST_LOG% 2>&1
 if errorlevel 1 (
     echo ERROR: Build failed!
     echo Check %TEST_LOG% for details.

@@ -81,6 +81,14 @@ if not exist "dist_all\bin\ImageDescriber.exe" (
     set MISSING_FILES=1
 )
 
+REM installer.iss lists IDTChat.exe under [Files], so Inno Setup fails the
+REM compile without it anyway -- but with a raw ISCC error instead of the
+REM actionable message below.
+if not exist "dist_all\bin\IDTChat.exe" (
+    echo ERROR: IDTChat.exe not found
+    set MISSING_FILES=1
+)
+
 if %MISSING_FILES%==1 (
     echo.
     echo Please run:
@@ -111,6 +119,7 @@ if %ERRORLEVEL% EQU 0 (
     echo The installer includes:
     echo   - idt.exe ^(CLI^)
     echo   - ImageDescriber.exe ^(includes integrated Viewer Mode, Prompt Editor and Configure tools^)
+    echo   - IDTChat.exe ^(standalone accessible chat client^)
     echo   - Configuration files
     echo   - Documentation
     echo.
