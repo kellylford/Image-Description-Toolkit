@@ -275,7 +275,11 @@ jobs:
         xcrun stapler validate "$DMG"
         echo "Gatekeeper accepts the DMG."
 
-    - name: Verify DMG mounts and contains both apps
+    # The DMG is the macOS deliverable, so this is the last place an app can
+    # go missing without anyone noticing. Every shipped app is named here:
+    # earlier this checked only ImageDescriber, which would have let a DMG
+    # without IDTChat.app pass as good.
+    - name: Verify DMG mounts and contains every app
       run: |
         set -e
         DMG=$(ls BuildAndRelease/MacBuilds/dist/*.dmg | head -1)
@@ -285,6 +289,7 @@ jobs:
         hdiutil attach "$DMG" -mountpoint "$MNT" -nobrowse -readonly
         ls -la "$MNT" "$MNT/IDT"
         test -d "$MNT/IDT/ImageDescriber.app"
+        test -d "$MNT/IDT/IDTChat.app"
         test -x "$MNT/IDT/idt"
         test -L "$MNT/Applications"
         hdiutil detach "$MNT"
