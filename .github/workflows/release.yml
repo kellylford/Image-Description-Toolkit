@@ -133,7 +133,7 @@ jobs:
       # Reusable workflows share the caller's run, so their artifacts are
       # downloadable here. No name filter: fetch everything both jobs uploaded.
       - name: Download build artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
