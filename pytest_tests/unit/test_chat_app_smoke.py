@@ -20,6 +20,7 @@ Three things are checked:
 
 import ast
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -372,6 +373,75 @@ def test_enter_elsewhere_is_not_swallowed(frame):
     """Enter on a button must still activate it, not be eaten by the frame."""
     assert frame._handle_return(frame.send_btn, shift_down=False) is False
     assert frame._handle_return(None, shift_down=False) is False
+
+
+def test_delete_removes_the_selected_conversation(frame, monkeypatch):
+    """Plain Delete, not a chord — but only when the list has focus."""
+    import chat_app_wx
+    from idt_core.chat import ChatMessage, ChatSession
+
+    doomed = ChatSession(title="Delete me")
+    doomed.add(ChatMessage(role="user", content="x"))
+    frame.store.save(doomed)
+    frame._refresh_sessions()
+    frame.session_list.SetSelection(0)
+
+    monkeypatch.setattr(chat_app_wx.wx, "MessageBox", lambda *a, **k: wx.YES)
+
+    consumed = frame._handle_delete(frame.session_list)
+
+    assert consumed
+    assert frame.store.load(doomed.id) is None
+    assert frame.session_list.GetCount() == 0
+
+
+def test_delete_asks_before_destroying_a_conversation(frame, monkeypatch):
+    import chat_app_wx
+    from idt_core.chat import ChatMessage, ChatSession
+
+    kept = ChatSession(title="Keep me")
+    kept.add(ChatMessage(role="user", content="x"))
+    frame.store.save(kept)
+    frame._refresh_sessions()
+    frame.session_list.SetSelection(0)
+
+    monkeypatch.setattr(chat_app_wx.wx, "MessageBox", lambda *a, **k: wx.NO)
+    frame._handle_delete(frame.session_list)
+
+    assert frame.store.load(kept.id) is not None, "declining must not delete"
+
+
+def test_delete_keeps_its_text_editing_meaning(frame):
+    """The reason this is not a menu accelerator.
+
+    A plain-Delete accelerator on the menu bar is application-wide: it would
+    fire while typing and you could not delete a character in the message box.
+    """
+    assert frame._handle_delete(frame.input_text) is False
+    assert frame._handle_delete(frame.detail) is False
+    assert frame._handle_delete(frame.history_list) is False
+    assert frame._handle_delete(None) is False
+
+
+def test_delete_chat_menu_item_has_no_accelerator():
+    """Guards the above: an accelerator here would break typing."""
+    source = APP_SOURCE.read_text(encoding="utf-8")
+    match = re.search(r'"&?Delete Chat[^"]*"', source)
+    assert match, "Delete Chat menu item not found"
+    assert "\\t" not in match.group(0), (
+        f"Delete Chat must not carry a menu accelerator: {match.group(0)}"
+    )
+
+
+def test_delete_removes_the_selected_attachment(frame, tmp_path):
+    photo = tmp_path / "photo.png"
+    photo.write_bytes(b"png")
+    frame.provider_name = "claude"
+    frame._add_attachments([photo])
+    frame.attach_list.SetSelection(0)
+
+    assert frame._handle_delete(frame.attach_list) is True
+    assert frame.pending_attachments == []
 
 
 def test_shift_enter_only_applies_to_the_message_box(frame):

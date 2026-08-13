@@ -1506,7 +1506,8 @@ Use **View → Read Last Response** (`Ctrl+Shift+R`) to hear a reply again at an
 | `Ctrl+M` | Change provider or model |
 | `Ctrl+Shift+A` | Attach files |
 | `Ctrl+Shift+V` | Paste an image from the clipboard |
-| `Delete` | Remove the selected attachment |
+| `Delete` | In the conversation list: delete that conversation (with confirmation). In the attachments list: remove that attachment |
+| `Enter` | In the conversation list: open it. In the transcript: read the message again |
 | `Ctrl+Shift+P` | Set the system prompt |
 | `Ctrl+R` | Regenerate the last response |
 | `Ctrl+.` | Stop the response in progress |
@@ -1540,7 +1541,20 @@ When a conversation outgrows the model's context window, the oldest turns are dr
 
 ### Where conversations are stored
 
-`~/.idt/chats/`, one JSON file per conversation. The format is the same one ImageDescriber uses for chat items inside a `.idtw` bundle, so a conversation can be moved between them.
+Conversations are saved automatically — there is no Save command — one JSON file per conversation:
+
+| Platform | Location |
+|---|---|
+| Windows | `C:\Users\<you>\.idt\chats\` |
+| macOS / Linux | `~/.idt/chats/` |
+
+A conversation is written after **every turn**, so nothing is lost if the app closes unexpectedly. Files are named by conversation id, for example `chat_a1b2c3d4e5f6.json`.
+
+They stay there until you delete them. **File → Delete Chat**, or selecting a conversation and pressing `Delete`, removes the file permanently after asking you to confirm. Nothing else prunes them: there is no age limit and no size cap.
+
+The format is the same one ImageDescriber uses for chat items inside a `.idtw` bundle, so a conversation can be copied between them. Because they are plain JSON, you can also back them up, read them, or delete them with any file manager.
+
+**Attachments are referenced, not copied.** A conversation records the path to a file you attached, not its contents. Moving or deleting the original means it cannot be re-sent, though the text of the conversation is unaffected.
 
 ### Chatting from the terminal
 

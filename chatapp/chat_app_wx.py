@@ -289,8 +289,11 @@ class ChatFrame(wx.Frame):
 
         file_menu = wx.Menu()
         self._menu_item(file_menu, "&New Chat\tCtrl+N", self.on_new_chat)
-        self._menu_item(file_menu, "&Delete Chat\tCtrl+Shift+Delete",
-                        self.on_delete_chat)
+        # No accelerator on purpose. A menu accelerator is application-wide, so
+        # binding plain Delete here would steal the key from every text field
+        # in the window -- you could not delete a character while typing. It is
+        # handled contextually in on_char_hook instead, which can see focus.
+        self._menu_item(file_menu, "&Delete Chat", self.on_delete_chat)
         file_menu.AppendSeparator()
         self._menu_item(file_menu, "&Export Conversation...\tCtrl+E",
                         self.on_export)
@@ -427,10 +430,8 @@ class ChatFrame(wx.Frame):
         self.attach_btn.Bind(wx.EVT_BUTTON, self.on_attach_files)
         self.remove_attach_btn.Bind(wx.EVT_BUTTON, self.on_remove_attachment)
         self.attach_list.Bind(wx.EVT_LISTBOX, self.on_attachment_selected)
-        self.attach_list.Bind(wx.EVT_KEY_DOWN, self.on_attachment_key)
         self.history_list.Bind(wx.EVT_LISTBOX, self.on_history_selected)
         self.session_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_open_session)
-        self.session_list.Bind(wx.EVT_KEY_DOWN, self.on_session_key)
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
     def _bind_keys(self):
@@ -570,12 +571,6 @@ class ChatFrame(wx.Frame):
         self._reload_history()
         self._set_status(f"Opened {session.display_title()}")
         self.input_text.SetFocus()
-
-    def on_session_key(self, event):
-        if event.GetKeyCode() in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
-            self.on_open_session(event)
-        else:
-            event.Skip()
 
     def on_new_chat(self, _event):
         self.session = ChatSession()
@@ -718,12 +713,6 @@ class ChatFrame(wx.Frame):
 
     def on_attachment_selected(self, _event):
         self.remove_attach_btn.Enable(self.attach_list.GetSelection() != wx.NOT_FOUND)
-
-    def on_attachment_key(self, event):
-        if event.GetKeyCode() in (wx.WXK_DELETE, wx.WXK_BACK):
-            self.on_remove_attachment(event)
-        else:
-            event.Skip()
 
     def _update_attach_controls(self):
         """Reflect whether the current provider takes attachments."""
@@ -988,7 +977,10 @@ class ChatFrame(wx.Frame):
             "Ctrl+M              Change model\n"
             "Ctrl+Shift+A        Attach files\n"
             "Ctrl+Shift+V        Paste image from clipboard\n"
-            "Delete              Remove the selected attachment\n"
+            "Delete              In the conversation list: delete it.\n"
+            "                    In the attachments list: remove it.\n"
+            "Enter               In the conversation list: open it.\n"
+            "                    In the transcript: read the message again.\n"
             "Ctrl+Shift+P        Set system prompt\n"
             "Ctrl+R              Regenerate response\n"
             "Ctrl+.              Stop the current response\n"
@@ -1030,6 +1022,22 @@ class ChatFrame(wx.Frame):
             return True
         return False
 
+    def _handle_delete(self, focused) -> bool:
+        """Act on the Delete key for whichever list has focus. True if consumed.
+
+        Deliberately narrow: only the two list controls. Anywhere else --
+        crucially the message box and the detail pane -- Delete must keep its
+        ordinary text-editing meaning, which is why this is not a menu
+        accelerator.
+        """
+        if focused is self.session_list:
+            self.on_delete_chat(None)
+            return True
+        if focused is self.attach_list:
+            self.on_remove_attachment(None)
+            return True
+        return False
+
     def on_char_hook(self, event):
         """Frame-level key handling.
 
@@ -1043,6 +1051,9 @@ class ChatFrame(wx.Frame):
         key = event.GetKeyCode()
         if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
             if self._handle_return(wx.Window.FindFocus(), event.ShiftDown()):
+                return
+        elif key == wx.WXK_DELETE:
+            if self._handle_delete(wx.Window.FindFocus()):
                 return
         event.Skip()
 
