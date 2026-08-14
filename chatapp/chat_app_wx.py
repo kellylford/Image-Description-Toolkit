@@ -59,7 +59,16 @@ from idt_core.chat import (  # noqa: E402
 )
 from idt_core.chat.messages import Attachment  # noqa: E402
 from idt_core.chat.providers import create_chat_provider  # noqa: E402
-from idt_core.keys import missing_key_message, requires_api_key, resolve_api_key  # noqa: E402
+from idt_core.keys import (  # noqa: E402
+    ENV_VARS,
+    credential_store_name,
+    delete_api_key,
+    key_source,
+    missing_key_message,
+    requires_api_key,
+    resolve_api_key,
+    set_api_key,
+)
 from idt_core.providers.registry import (  # noqa: E402
     attachment_wildcard,
     capabilities_for,
@@ -272,6 +281,135 @@ class ProviderDialog(wx.Dialog):
         return provider, (data or self.model_choice.GetString(index))
 
 
+class ApiKeysDialog(wx.Dialog):
+    """Set API keys for the whole toolkit, not just this app.
+
+    Keys are written to the operating system's credential store (Windows
+    Credential Manager / macOS Keychain), where every IDT surface — this app,
+    ImageDescriber, and the ``idt`` command line — resolves them through
+    ``idt_core.keys``. The dialog never displays a stored key: each provider
+    shows *where* its current key comes from, and takes a new value.
+    """
+
+    PROVIDERS = (
+        ("claude", "Claude (Anthropic)"),
+        ("openai", "OpenAI"),
+        ("ollama.com", "Ollama web search"),
+    )
+
+    _SOURCE_TEXT = {
+        "credential store": "stored in {store}",
+        "config file": "stored in the config file",
+        "legacy file": "stored in a legacy key file",
+    }
+
+    def __init__(self, parent):
+        super().__init__(parent, title="API Keys", size=(620, 360))
+        self._fields = {}
+        self._status_labels = {}
+
+        panel = wx.Panel(self)
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        store = credential_store_name()
+        intro = wx.StaticText(panel, label=(
+            f"Keys are saved to {store or 'the configuration file'} and used "
+            f"by IDT Chat, ImageDescriber, and the idt command line. "
+            f"Existing keys are never shown; enter a value to replace one."
+        ))
+        intro.Wrap(580)
+        outer.Add(intro, 0, wx.ALL, 10)
+
+        grid = wx.FlexGridSizer(rows=len(self.PROVIDERS), cols=4,
+                                vgap=8, hgap=8)
+        grid.AddGrowableCol(1, 1)
+        for provider, label in self.PROVIDERS:
+            grid.Add(wx.StaticText(panel, label=f"{label}:"), 0,
+                     wx.ALIGN_CENTER_VERTICAL)
+            field = wx.TextCtrl(panel, style=wx.TE_PASSWORD,
+                                name=f"{label} API key")
+            self._fields[provider] = field
+            grid.Add(field, 1, wx.EXPAND)
+
+            remove = wx.Button(panel, label="&Remove",
+                               name=f"Remove {label} key")
+            remove.Bind(wx.EVT_BUTTON,
+                        lambda e, p=provider: self.on_remove(p))
+            grid.Add(remove, 0)
+
+            status = wx.StaticText(panel, label="")
+            self._status_labels[provider] = status
+            grid.Add(status, 0, wx.ALIGN_CENTER_VERTICAL)
+        outer.Add(grid, 0, wx.EXPAND | wx.ALL, 10)
+
+        buttons = wx.StdDialogButtonSizer()
+        save = wx.Button(panel, wx.ID_OK, "&Save")
+        buttons.AddButton(save)
+        buttons.AddButton(wx.Button(panel, wx.ID_CANCEL))
+        buttons.Realize()
+        outer.Add(buttons, 0, wx.EXPAND | wx.ALL, 10)
+
+        panel.SetSizer(outer)
+        save.Bind(wx.EVT_BUTTON, self.on_save)
+        save.SetDefault()
+
+        self._refresh_status()
+        first = self._fields[self.PROVIDERS[0][0]]
+        wx.CallAfter(first.SetFocus)
+
+    def _refresh_status(self):
+        store = credential_store_name() or "the credential store"
+        for provider, _label in self.PROVIDERS:
+            source = key_source(provider)
+            if source == "environment":
+                text = (f"using the {ENV_VARS.get(provider, '?')} environment "
+                        f"variable (overrides stored keys)")
+            elif source in self._SOURCE_TEXT:
+                text = self._SOURCE_TEXT[source].format(store=store)
+            else:
+                text = "not set"
+            self._status_labels[provider].SetLabel(text)
+        self.Layout()
+
+    def on_remove(self, provider):
+        removed = delete_api_key(provider)
+        self._refresh_status()
+        remaining = key_source(provider)
+        if removed and remaining is None:
+            message = "Key removed."
+        elif removed:
+            # The store entry is gone but resolution still finds one — say
+            # so, or the user will believe the remaining key is deleted.
+            message = (f"Removed from the credential store, but a key from "
+                       f"the {remaining} still applies.")
+        elif remaining:
+            message = (f"Nothing stored in the credential store to remove; "
+                       f"the current key comes from the {remaining}.")
+        else:
+            message = "No stored key to remove."
+        wx.MessageBox(message, "Remove key", wx.OK | wx.ICON_INFORMATION, self)
+
+    def on_save(self, event):
+        entered = {p: f.GetValue().strip() for p, f in self._fields.items()}
+        entered = {p: v for p, v in entered.items() if v}
+        if not entered:
+            self.EndModal(wx.ID_OK)
+            return
+
+        failed = [p for p, v in entered.items() if not set_api_key(p, v)]
+        if failed:
+            labels = {p: label for p, label in self.PROVIDERS}
+            names = ", ".join(labels.get(p, p) for p in failed)
+            store = credential_store_name()
+            reason = (f"{store} refused the write" if store else
+                      "this platform has no supported credential store")
+            wx.MessageBox(f"Could not save the key for: {names} — {reason}.",
+                          "Save failed", wx.OK | wx.ICON_ERROR, self)
+            self._refresh_status()
+            return
+        self.EndModal(wx.ID_OK)
+
+
 class ChatFrame(wx.Frame):
     """The main window."""
 
@@ -320,6 +458,8 @@ class ChatFrame(wx.Frame):
         file_menu.AppendSeparator()
         self._menu_item(file_menu, "&Export Conversation...\tCtrl+E",
                         self.on_export)
+        file_menu.AppendSeparator()
+        self._menu_item(file_menu, "API &Keys...", self.on_api_keys)
         file_menu.AppendSeparator()
         self._menu_item(file_menu, "E&xit\tCtrl+Q", self.on_exit)
         bar.Append(file_menu, "&File")
@@ -965,6 +1105,19 @@ class ChatFrame(wx.Frame):
         self.engine = None
         if self._ensure_engine():
             self._set_status(f"Now using {self.provider_name}/{self.model_name}")
+
+    def on_api_keys(self, _event):
+        dlg = ApiKeysDialog(self)
+        try:
+            dlg.ShowModal()
+        finally:
+            dlg.Destroy()
+        # A key may have just appeared (or vanished) for the active provider.
+        if requires_api_key(self.provider_name) and not resolve_api_key(
+                self.provider_name):
+            self._set_status(missing_key_message(self.provider_name))
+        else:
+            self._set_status("API keys updated")
 
     def on_system_prompt(self, _event):
         dlg = wx.TextEntryDialog(

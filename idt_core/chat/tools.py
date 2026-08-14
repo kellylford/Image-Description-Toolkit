@@ -210,7 +210,14 @@ def execute_web_tool(name: str, arguments: dict) -> str:
 
 
 def tool_result_summary(name: str, result: str) -> str:
-    """One user-facing line about a finished tool call."""
+    """One user-facing line about a finished tool call.
+
+    Successful results are our own JSON payloads; anything else is an error
+    or "no key" message and must be shown, not papered over — this function
+    once said "Page retrieved" for a fetch that never happened.
+    """
+    if not result or not result.lstrip().startswith("{"):
+        return _clip(result or "Done", 120)
     if name == "web_search":
         try:
             count = len(json.loads(result).get("results", []))

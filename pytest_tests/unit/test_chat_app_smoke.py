@@ -154,16 +154,30 @@ def _bound_handler_names(source: str):
 
 def test_every_bound_handler_exists(wx_app):
     """A renamed method that leaves a stale Bind() is a dead control."""
-    from chat_app_wx import ChatFrame, ProviderDialog
+    from chat_app_wx import ApiKeysDialog, ChatFrame, ProviderDialog
 
     handlers = _bound_handler_names(APP_SOURCE.read_text(encoding="utf-8"))
     assert handlers, "no Bind() handlers found — has the parser drifted?"
 
+    classes = (ChatFrame, ProviderDialog, ApiKeysDialog)
     missing = [
         name for name in sorted(handlers)
-        if not (hasattr(ChatFrame, name) or hasattr(ProviderDialog, name))
+        if not any(hasattr(cls, name) for cls in classes)
     ]
     assert not missing, f"Bind() names methods that do not exist: {missing}"
+
+
+def test_api_keys_dialog_constructs_with_all_providers(wx_app):
+    """The dialog builds headless and offers exactly the shared-key providers."""
+    from chat_app_wx import ApiKeysDialog
+
+    dlg = ApiKeysDialog(None)
+    try:
+        assert set(dlg._fields) == {"claude", "openai", "ollama.com"}
+        for field in dlg._fields.values():
+            assert field.GetValue() == "", "stored keys must never be pre-filled"
+    finally:
+        dlg.Destroy()
 
 
 def test_menu_handlers_exist(wx_app):

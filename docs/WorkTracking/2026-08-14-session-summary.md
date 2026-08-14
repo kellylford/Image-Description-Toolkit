@@ -127,6 +127,41 @@ plus additions to `test_chat_providers.py`, `test_chat_attachments.py`,
 - MLX paths (Windows machine).
 - Claude/OpenAI live turns (no keys in env this session).
 
+## Round 2 (same day): shared key management in the OS credential store
+
+- **`idt_core/keys.py` credential-store backend** — Windows Credential
+  Manager via ctypes/advapi32, macOS Keychain via the `security` CLI; stdlib
+  only (no `keyring` dependency to carry through the specs). New
+  `set_api_key` / `delete_api_key` / `key_source` / `credential_store_name`.
+  Resolution order is now env → **credential store** → config file → legacy
+  files. Blobs are written UTF-16LE (cmdkey convention) and read with a NUL
+  heuristic so hand-added UTF-8 entries still work. Store entries live under
+  service "Image Description Toolkit"; tests point `_CRED_SERVICE` at a
+  scratch name and run a **real** roundtrip on Windows.
+- **IDT Chat: File → API Keys…** — new `ApiKeysDialog` sets Claude / OpenAI /
+  ollama.com keys for the *whole toolkit*. Never displays stored keys; shows
+  where each key comes from (env / store / config / legacy), with per-provider
+  Remove buttons that explain when an env var still overrides.
+- **ImageDescriber settings** — the API Keys tab now lists the three canonical
+  providers (including Ollama Web Search, previously missing) with a status
+  line instead of leaking key prefixes/suffixes as before. Saving writes to
+  the credential store and **migrates the plaintext copy out of the config
+  file**; delete removes from both. Edit no longer pre-fills the current key.
+- **`ai_providers.py` unification** — the GUI describe providers now consult
+  `idt_core.keys.resolve_api_key` first, so store-saved keys reach them.
+  Precedence note: this puts env ahead of config in the GUI, matching chat
+  and the CLI (the old GUI-only order had config winning).
+- **`tool_result_summary` fix** — a failed `web_fetch` was summarised as
+  "Page retrieved"; non-JSON results (errors, missing-key message) now
+  surface as the status line.
+- **Machine setup** — set `OLLAMA_API_KEY` (User scope) from Kelly's key
+  file; running shells predate it, so only new processes see it. With the key
+  in-process, verified the real web-search success path end to end:
+  `[Searching the web: …] [Found 1 result(s)]` and a correct, current answer.
+
+Round-2 NOT tested: the macOS Keychain path against a real Mac (command
+shapes pinned by tests only); the describer configure dialog interactively.
+
 ## Follow-ups (still open on #265)
 - BMP/TIFF images (transcode-on-attach like HEIC, or declare for Ollama).
 - PDF for OpenAI; PDF text extraction for Ollama.

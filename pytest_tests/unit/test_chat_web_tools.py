@@ -102,6 +102,26 @@ class TestExecutor:
         assert names == list(web_tools.WEB_TOOL_NAMES)
 
 
+class TestResultSummaries:
+    def test_a_successful_fetch_says_page_retrieved(self):
+        summary = web_tools.tool_result_summary("web_fetch", '{"url": "x", "content": "y"}')
+        assert summary == "Page retrieved"
+
+    def test_a_failed_fetch_shows_the_error_not_page_retrieved(self):
+        """This lied once: a keyless fetch was summarised as "Page retrieved"."""
+        summary = web_tools.tool_result_summary("web_fetch", "web_fetch failed: HTTP 401 from ollama.com.")
+        assert "Page retrieved" not in summary
+        assert "401" in summary
+
+    def test_the_missing_key_message_reaches_the_status_line(self):
+        summary = web_tools.tool_result_summary("web_search", web_tools.missing_web_key_message())
+        assert "ollama.com" in summary
+
+    def test_search_summaries_count_results(self):
+        summary = web_tools.tool_result_summary("web_search", '{"results": [1, 2, 3]}')
+        assert summary == "Found 3 result(s)"
+
+
 # ---------------------------------------------------------------------------
 # The Ollama tool loop
 # ---------------------------------------------------------------------------

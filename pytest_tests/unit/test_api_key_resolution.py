@@ -39,9 +39,12 @@ def clean_environment(monkeypatch, tmp_path):
     """
     import idt_core.config_loader as loader
 
-    for var in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+    for var in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OLLAMA_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(loader, "load_json_config", lambda *a, **k: {})
+    # Neutralise the OS credential store too: once someone stores a real key
+    # via the settings UI, these tests would otherwise start reading it.
+    monkeypatch.setattr(key_module, "_from_store", lambda name: None)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -249,3 +252,136 @@ def test_plain_ollama_still_needs_no_key(monkeypatch):
     monkeypatch.setenv("OLLAMA_API_KEY", "web-search-key")
     assert key_module.resolve_api_key("ollama") is None
     assert key_module.requires_api_key("ollama.com") is False
+
+
+# ---------------------------------------------------------------------------
+# The OS credential store
+# ---------------------------------------------------------------------------
+
+# Captured at import time, before the autouse fixture swaps it for a stub —
+# reading key_module._from_store inside a fixture would recover the stub.
+_REAL_FROM_STORE = key_module._from_store
+
+
+@pytest.fixture
+def scratch_store(monkeypatch):
+    """Point the store at a scratch service name so no real key is touched."""
+    import uuid
+
+    monkeypatch.setattr(key_module, "_CRED_SERVICE", f"IDT-Test-{uuid.uuid4().hex[:8]}")
+    # Undo the autouse neutralisation for tests that exercise the store.
+    monkeypatch.setattr(key_module, "_from_store", _REAL_FROM_STORE)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows Credential Manager")
+class TestWindowsCredentialStore:
+    def test_roundtrip_write_read_delete(self, scratch_store):
+        assert key_module.set_api_key("claude", "sk-test-roundtrip") is True
+        try:
+            assert key_module.resolve_api_key("claude") == "sk-test-roundtrip"
+            assert key_module.key_source("claude") == "credential store"
+        finally:
+            assert key_module.delete_api_key("claude") is True
+        assert key_module.resolve_api_key("claude") is None
+
+    def test_overwrite_replaces_the_stored_key(self, scratch_store):
+        key_module.set_api_key("openai", "first")
+        key_module.set_api_key("openai", "second")
+        try:
+            assert key_module.resolve_api_key("openai") == "second"
+        finally:
+            key_module.delete_api_key("openai")
+
+    def test_ollama_com_lives_in_the_store_too(self, scratch_store):
+        assert key_module.set_api_key("ollama.com", "web-key") is True
+        try:
+            assert key_module.resolve_api_key("ollama.com") == "web-key"
+        finally:
+            key_module.delete_api_key("ollama.com")
+
+    def test_utf16_blobs_from_other_tools_are_readable(self, scratch_store):
+        """cmdkey and PowerShell write UTF-16LE blobs; so do we. The NUL
+        heuristic must pick the right decoding."""
+        key_module.set_api_key("claude", "interop-key")
+        try:
+            assert key_module._win_read("claude") == "interop-key"
+        finally:
+            key_module.delete_api_key("claude")
+
+
+class TestStoreResolutionOrder:
+    def test_environment_beats_the_store(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "from-env")
+        monkeypatch.setattr(key_module, "_from_store", lambda name: "from-store")
+        assert key_module.resolve_api_key("claude") == "from-env"
+        assert key_module.key_source("claude") == "environment"
+
+    def test_store_beats_the_config_file(self, monkeypatch, config_keys):
+        config_keys({"claude": "from-config"})
+        monkeypatch.setattr(key_module, "_from_store", lambda name: "from-store")
+        assert key_module.resolve_api_key("claude") == "from-store"
+        assert key_module.key_source("claude") == "credential store"
+
+    def test_a_broken_store_degrades_to_config(self, monkeypatch, config_keys):
+        config_keys({"claude": "from-config"})
+
+        def broken(name):
+            raise OSError("store unavailable")
+
+        if sys.platform == "win32":
+            monkeypatch.setattr(key_module, "_win_read", broken)
+        else:
+            monkeypatch.setattr(key_module, "_mac_read", broken)
+        monkeypatch.setattr(key_module, "_from_store", _REAL_FROM_STORE)
+        assert key_module.resolve_api_key("claude") == "from-config"
+
+    def test_set_api_key_rejects_empty_values(self):
+        assert key_module.set_api_key("claude", "") is False
+        assert key_module.set_api_key("claude", "   ") is False
+        assert key_module.set_api_key("", "value") is False
+
+    def test_set_api_key_canonicalises_aliases(self, monkeypatch):
+        written = {}
+        if sys.platform == "win32":
+            monkeypatch.setattr(key_module, "_win_write",
+                                lambda name, value: written.update({name: value}) or True)
+        else:
+            monkeypatch.setattr(key_module, "_mac_write",
+                                lambda name, value: written.update({name: value}) or True)
+        key_module.set_api_key("Anthropic", "sk-x")
+        assert list(written) == ["claude"]
+
+
+class TestMacKeychainCommands:
+    """The macOS path shells out to `security`; pin the exact commands."""
+
+    @pytest.fixture
+    def recorded(self, monkeypatch):
+        calls = []
+
+        class _Result:
+            returncode = 0
+            stdout = "the-secret\n"
+
+        def fake_run(args, **kwargs):
+            calls.append(args)
+            return _Result()
+
+        import subprocess
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        return calls
+
+    def test_read_uses_find_generic_password(self, recorded):
+        assert key_module._mac_read("claude") == "the-secret"
+        assert recorded[0][:2] == ["security", "find-generic-password"]
+        assert "-w" in recorded[0]
+
+    def test_write_uses_add_generic_password_with_update(self, recorded):
+        assert key_module._mac_write("claude", "the-secret") is True
+        assert recorded[0][:2] == ["security", "add-generic-password"]
+        assert "-U" in recorded[0], "-U updates an existing item instead of failing"
+
+    def test_delete_uses_delete_generic_password(self, recorded):
+        assert key_module._mac_delete("claude") is True
+        assert recorded[0][:2] == ["security", "delete-generic-password"]
