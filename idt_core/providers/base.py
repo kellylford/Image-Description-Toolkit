@@ -23,8 +23,8 @@ Nothing here imports a vendor SDK — concrete implementations do that lazily.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Iterator, Optional, Sequence, Union
+from dataclasses import dataclass, field
+from typing import Callable, Iterator, Optional, Sequence, Union
 
 
 @dataclass
@@ -77,6 +77,16 @@ class ChatRequest:
     system_prompt: str = ""
     max_output_tokens: Optional[int] = None
     temperature: Optional[float] = None
+    #: Tool definitions in the provider's wire format, plus the function that
+    #: runs one. Both must be set for tools to be offered; the executor returns
+    #: the tool's output as a string (including error text — a failed tool is
+    #: an answer for the model, not a failed turn).
+    tools: Sequence = ()
+    execute_tool: Optional[Callable[[str, dict], str]] = None
+    #: Reasoning-model thinking. None = auto (providers that can detect a
+    #: thinking-capable model enable separation so <think> text never lands in
+    #: the answer); True/False = explicit request.
+    think: Optional[bool] = None
 
 
 @dataclass
@@ -95,8 +105,33 @@ class ChatUsage:
     stop_reason: str = ""
 
 
+@dataclass
+class ChatThinking:
+    """A chunk of the model's reasoning stream — separate from the answer and
+    never part of the committed message."""
+
+    text: str
+
+
+@dataclass
+class ChatToolCall:
+    """The model asked for a tool; the provider is about to run it."""
+
+    name: str
+    arguments: dict = field(default_factory=dict)
+
+
+@dataclass
+class ChatToolResult:
+    """A tool finished; ``summary`` is a short user-facing line, never the
+    full output (which goes back to the model, not the person)."""
+
+    name: str
+    summary: str = ""
+
+
 #: What a provider's ``chat()`` generator yields.
-ChatYield = Union[ChatDelta, ChatUsage]
+ChatYield = Union[ChatDelta, ChatUsage, ChatThinking, ChatToolCall, ChatToolResult]
 
 
 class ChatProvider(ABC):

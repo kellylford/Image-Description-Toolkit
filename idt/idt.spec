@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 """
 IDT CLI v4.5 - PyInstaller Spec File
 
@@ -15,16 +15,16 @@ PyInstaller is run from the idt/ directory by build_idt.bat.
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 import sys as _sys
 
-# BeautifulSoup4 — used by idt_core.downloader
+# BeautifulSoup4 â€” used by idt_core.downloader
 bs4_datas, bs4_binaries, bs4_hiddenimports = collect_all('bs4')
 
-# OpenCV — used by idt_core.video for frame extraction
+# OpenCV â€” used by idt_core.video for frame extraction
 try:
     cv2_datas, cv2_binaries, cv2_hiddenimports = collect_all('cv2')
 except Exception:
     cv2_datas, cv2_binaries, cv2_hiddenimports = [], [], []
 
-# macOS Apple Silicon only — no-op on Windows
+# macOS Apple Silicon only â€” no-op on Windows
 if _sys.platform == 'darwin':
     try:
         mlx_vlm_datas, mlx_vlm_binaries, mlx_vlm_hiddenimports = collect_all('mlx_vlm')
@@ -40,7 +40,7 @@ else:
 
 a = Analysis(
     ['../cli/main.py'],
-    pathex=['..'],          # project root — makes idt_core, cli all importable
+    pathex=['..'],          # project root â€” makes idt_core, cli all importable
     binaries=bs4_binaries + cv2_binaries + mlx_vlm_binaries + mlx_binaries,
     datas=[
         # Config JSON files (resolution chain requires scripts/ subdir in frozen exe)
@@ -76,7 +76,7 @@ a = Analysis(
         'idt_core.providers.claude',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
-        # Capability registry — imported eagerly by idt_core/providers/__init__.py
+        # Capability registry â€” imported eagerly by idt_core/providers/__init__.py
         'idt_core.providers.registry',
 
         # ---- idt_core new modules ----
@@ -99,6 +99,7 @@ a = Analysis(
         'idt_core.chat.providers',
         'idt_core.chat.store',
         'idt_core.chat.tokens',
+        'idt_core.chat.tools',
 
         # ---- jaraco (required by pkg_resources / setuptools >= 75) ----
         'jaraco', 'jaraco.text', 'jaraco.functools',

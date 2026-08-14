@@ -50,6 +50,9 @@ from idt_core.chat import (  # noqa: E402
     ChatRetrying,
     ChatSession,
     ChatStarted,
+    ChatThinking,
+    ChatToolCall,
+    ChatToolResult,
     ChatUsage,
     DirectoryChatStore,
     prepare_attachments,
@@ -217,7 +220,10 @@ class ProviderDialog(wx.Dialog):
             if provider == "ollama":
                 from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
 
-                models = OllamaProvider(model=DEFAULT_MODEL).list_models()
+                # Chat listing, not the describe listing: chat needs the
+                # `completion` capability, and filtering on vision here hid
+                # every text-only model — often the best chat models installed.
+                models = OllamaProvider(model=DEFAULT_MODEL).list_chat_models()
                 if not models:
                     self.status.SetLabel("No Ollama models found. Is Ollama running?")
             elif provider == "claude":
@@ -283,6 +289,7 @@ class ChatFrame(wx.Frame):
         self._is_streaming = False
         self.pending_attachments = []   # Attachment objects queued for the next turn
         self._temp_dir = None           # Holds HEIC conversions and pasted images
+        self._web_search = False        # Per-window, not persisted with the session
 
         self._build_menu()
         self._build_ui()
@@ -333,6 +340,13 @@ class ChatFrame(wx.Frame):
                         self.on_change_model)
         self._menu_item(chat_menu, "Set S&ystem Prompt...\tCtrl+Shift+P",
                         self.on_system_prompt)
+        chat_menu.AppendSeparator()
+        # A check item, not a command: web search is a mode for the whole
+        # conversation, and the checkmark is what a screen reader reports.
+        self.web_search_item = chat_menu.AppendCheckItem(
+            wx.ID_ANY, "Use &Web Search\tCtrl+Shift+W",
+            "Let the model search the web (Ollama models with tool support)")
+        self.Bind(wx.EVT_MENU, self.on_toggle_web_search, self.web_search_item)
         bar.Append(chat_menu, "&Chat")
 
         edit_menu = wx.Menu()
@@ -745,6 +759,57 @@ class ChatFrame(wx.Frame):
             self._refresh_attachments()
             self._set_status(
                 f"{self.provider_name} does not accept attachments; queue cleared")
+        self._update_web_search_controls()
+
+    # ---- web search ------------------------------------------------------
+
+    def _update_web_search_controls(self):
+        """Web search rides on tool calling, which only the Ollama chat
+        provider implements; on other providers the item is disabled so its
+        state cannot quietly mean nothing."""
+        supported = self.provider_name == "ollama"
+        self.web_search_item.Enable(supported)
+        if not supported and self._web_search:
+            self._web_search = False
+            self.web_search_item.Check(False)
+            self._set_status("Web search is off: only Ollama supports it")
+
+    def on_toggle_web_search(self, _event):
+        if not self.web_search_item.IsChecked():
+            self._web_search = False
+            self._set_status("Web search off")
+            self._announce("Web search off")
+            return
+
+        from idt_core.chat.tools import missing_web_key_message, web_search_available
+
+        if not web_search_available():
+            # Veto rather than let every search fail mid-answer.
+            self.web_search_item.Check(False)
+            self._web_search = False
+            wx.MessageBox(missing_web_key_message(), "Web search needs a key",
+                          wx.OK | wx.ICON_INFORMATION, self)
+            return
+
+        # Warn (but allow) when the model does not report tool support: the
+        # capability probe fails open, and a wrong "no" here would block a
+        # feature that actually works.
+        try:
+            from idt_core.providers.ollama import model_capabilities
+
+            caps = model_capabilities(self.model_name) if self.model_name else None
+            if caps is not None and "tools" not in caps:
+                wx.MessageBox(
+                    f"{self.model_name} does not report tool support, so it "
+                    f"may answer without searching. Models tagged 'tools' on "
+                    f"ollama.com work best.",
+                    "Model may not search", wx.OK | wx.ICON_INFORMATION, self)
+        except Exception:
+            pass
+
+        self._web_search = True
+        self._set_status("Web search on")
+        self._announce("Web search on")
 
     def _cleanup_temp_files(self):
         if self._temp_dir is None:
@@ -800,7 +865,7 @@ class ChatFrame(wx.Frame):
         self.send_btn.Enable(False)
         self._set_status("Waiting for a response…")
 
-        engine, options = self.engine, ChatOptions()
+        engine, options = self.engine, ChatOptions(web_search=self._web_search)
         queued = list(attachments)
         if regenerate:
             start = lambda: engine.regenerate(options)  # noqa: E731
@@ -833,8 +898,29 @@ class ChatFrame(wx.Frame):
             self.detail.ShowPosition(self.detail.GetLastPosition())
             return
 
+        if isinstance(event, ChatThinking):
+            # Status only, never the text: reasoning models produce pages of
+            # scratch work, and narrating it would bury the actual answer.
+            self._set_status("Model is thinking…")
+            return
+
         if isinstance(event, ChatRetrying):
             self._set_status(f"{event.error} — retrying ({event.attempt})")
+            return
+
+        if isinstance(event, ChatToolCall):
+            # The note joins the streaming view so the wait is explained, but
+            # never the saved message — the engine commits only model text.
+            note = event.describe()
+            self._streaming_chunks.append(f"\n[{note}]\n")
+            self.detail.SetValue("".join(self._streaming_chunks))
+            self.detail.ShowPosition(self.detail.GetLastPosition())
+            self._set_status(note + "…")
+            return
+
+        if isinstance(event, ChatToolResult):
+            if event.summary:
+                self._set_status(event.summary)
             return
 
         if isinstance(event, ChatUsage):
@@ -1001,6 +1087,7 @@ class ChatFrame(wx.Frame):
             "Enter               In the conversation list: open it.\n"
             "                    In the transcript: read the message again.\n"
             "Ctrl+Shift+P        Set system prompt\n"
+            "Ctrl+Shift+W        Web search on/off (Ollama)\n"
             "Ctrl+R              Regenerate response\n"
             "Ctrl+.              Stop the current response\n"
             "Ctrl+Shift+R        Read the last response again\n"

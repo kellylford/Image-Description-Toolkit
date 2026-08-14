@@ -204,3 +204,48 @@ def test_missing_key_message_never_contains_a_key(monkeypatch):
     message = key_module.missing_key_message("claude")
     assert "supersecret" not in message
     assert "sk-ant" not in message
+
+
+# ---------------------------------------------------------------------------
+# The config loader's real return shape
+# ---------------------------------------------------------------------------
+
+
+def test_config_keys_survive_the_loaders_tuple_return_shape(monkeypatch):
+    """idt_core.config_loader.load_json_config returns (config, path, source).
+
+    _from_config assumed a bare dict, so anyone whose key existed ONLY in the
+    config file crashed resolution with "'tuple' object has no attribute
+    'get'" — masked in every other test because the fixture stubs the loader
+    with a dict. This test feeds the real shape.
+    """
+    import idt_core.config_loader as loader
+
+    monkeypatch.setattr(
+        loader, "load_json_config",
+        lambda *a, **k: ({"api_keys": {"claude": "sk-from-config"}},
+                         Path("fake.json"), "bundled"),
+    )
+    assert key_module.resolve_api_key("claude") == "sk-from-config"
+
+
+# ---------------------------------------------------------------------------
+# The ollama.com web-search key (not a chat provider)
+# ---------------------------------------------------------------------------
+
+
+def test_ollama_com_key_resolves_from_the_environment(monkeypatch):
+    monkeypatch.setenv("OLLAMA_API_KEY", "web-search-key")
+    assert key_module.resolve_api_key("ollama.com") == "web-search-key"
+
+
+def test_ollama_com_key_resolves_from_config(config_keys):
+    config_keys({"ollama.com": "config-key"})
+    assert key_module.resolve_api_key("ollama.com") == "config-key"
+
+
+def test_plain_ollama_still_needs_no_key(monkeypatch):
+    """The web-search credential must not leak onto the chat provider."""
+    monkeypatch.setenv("OLLAMA_API_KEY", "web-search-key")
+    assert key_module.resolve_api_key("ollama") is None
+    assert key_module.requires_api_key("ollama.com") is False

@@ -131,7 +131,11 @@ def test_engine_layer_stays_free_of_wx():
 # ---------------------------------------------------------------------------
 
 def _bound_handler_names(source: str):
-    """Every ``self.<name>`` passed as a handler to a ``.Bind(...)`` call."""
+    """Every ``self.<name>`` passed as a handler to a ``.Bind(...)`` call.
+
+    Only the second positional argument: ``Bind(event, handler, source)`` —
+    the third is the widget the event comes from, not a handler.
+    """
     tree = ast.parse(source)
     found = set()
     for node in ast.walk(tree):
@@ -140,7 +144,7 @@ def _bound_handler_names(source: str):
         func = node.func
         if not (isinstance(func, ast.Attribute) and func.attr == "Bind"):
             continue
-        for arg in node.args[1:]:
+        for arg in node.args[1:2]:
             if (isinstance(arg, ast.Attribute)
                     and isinstance(arg.value, ast.Name)
                     and arg.value.id == "self"):

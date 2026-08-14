@@ -141,6 +141,59 @@ def test_providers_without_documented_limits_do_not_invent_one(files):
 
 
 # ---------------------------------------------------------------------------
+# Text files -- inlined into the prompt, so every chat provider takes them
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name,expected", [
+    ("notes.txt", "text/plain"),
+    ("run.log", "text/plain"),
+    ("readme.md", "text/markdown"),
+    ("data.csv", "text/csv"),
+    ("script.py", "text/x-python"),
+    ("config.json", "application/json"),
+    ("stack.yml", "application/yaml"),
+])
+def test_text_media_types_from_extension(name, expected):
+    assert infer_media_type(name) == expected
+
+
+def test_text_files_are_accepted_by_every_chat_provider(files):
+    notes = files("notes.txt")
+    for provider in ("ollama", "openai", "claude"):
+        attachment, converted = prepare_attachment(notes, provider)
+        assert attachment.media_type == "text/plain"
+        assert attachment.is_text
+        assert converted is None
+
+
+def test_mlx_still_takes_images_only(files):
+    """MLX is a one-image vision path; text would be silently ignored there."""
+    with pytest.raises(AttachmentError):
+        prepare_attachment(files("notes.txt"), "mlx")
+
+
+def test_oversized_text_is_rejected_at_attach_time(files):
+    """~1 MB of text is more prompt than any model here can take; say so now
+    rather than as an API error mid-conversation."""
+    from idt_core.providers.registry import DEFAULT_MAX_TEXT_BYTES
+
+    big = files("huge.log", DEFAULT_MAX_TEXT_BYTES + 1)
+    with pytest.raises(AttachmentError) as excinfo:
+        prepare_attachment(big, "ollama")
+    assert "huge.log" in str(excinfo.value)
+
+
+def test_rejection_message_lists_extensions_not_mime_subtypes(files):
+    """".jpg, .txt" reads better than "jpeg, plain, x-python"."""
+    odd = files("thing.xyz")
+    with pytest.raises(AttachmentError) as excinfo:
+        prepare_attachment(odd, "ollama")
+    message = str(excinfo.value)
+    assert ".jpg" in message
+    assert ".txt" in message
+
+
+# ---------------------------------------------------------------------------
 # HEIC conversion
 # ---------------------------------------------------------------------------
 

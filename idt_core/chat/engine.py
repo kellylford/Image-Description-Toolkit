@@ -33,6 +33,9 @@ from typing import Iterator, List, Optional, Sequence
 
 from ..providers.base import ChatDelta as ProviderDelta
 from ..providers.base import ChatProvider, ChatRequest
+from ..providers.base import ChatThinking as ProviderThinking
+from ..providers.base import ChatToolCall as ProviderToolCall
+from ..providers.base import ChatToolResult as ProviderToolResult
 from ..providers.base import ChatUsage as ProviderUsage
 from . import tokens as token_tools
 from .errors import ChatError, classify
@@ -44,6 +47,9 @@ from .events import (
     ChatFinished,
     ChatRetrying,
     ChatStarted,
+    ChatThinking,
+    ChatToolCall,
+    ChatToolResult,
     ChatUsage,
 )
 from .messages import Attachment, ChatMessage, ChatSession
@@ -68,6 +74,13 @@ class ChatOptions:
     budget_fraction: float = token_tools.DEFAULT_BUDGET_FRACTION
     #: Overrides the session's system prompt for this turn only.
     system_prompt: Optional[str] = None
+    #: Offer web_search/web_fetch tools (Ollama's hosted search API) to the
+    #: model. Honoured only where the provider supports tool calling — other
+    #: providers ignore it rather than failing the turn.
+    web_search: bool = False
+    #: Reasoning-model thinking: None = auto-detect per model, True/False =
+    #: force. Thinking streams as ChatThinking events and is never saved.
+    thinking: Optional[bool] = None
 
 
 @dataclass
@@ -213,7 +226,16 @@ class ChatEngine:
             system_prompt=self._system_prompt(options),
             max_output_tokens=options.max_output_tokens,
             temperature=options.temperature,
+            think=options.thinking,
         )
+        if options.web_search and self.provider.provider_name == "ollama":
+            # Tool support is provider-specific wire format; only Ollama's
+            # chat loop implements it so far. Elsewhere the flag is ignored
+            # rather than failing a turn the user could otherwise have.
+            from .tools import execute_web_tool, web_tool_definitions
+
+            request.tools = tuple(web_tool_definitions())
+            request.execute_tool = execute_web_tool
 
         attempt = 0
         while True:
@@ -235,6 +257,14 @@ class ChatEngine:
                             yield ChatDelta(item.text)
                     elif isinstance(item, ProviderUsage):
                         usage = item
+                    elif isinstance(item, ProviderThinking):
+                        # Forwarded, never collected: thinking is not part of
+                        # the answer and must not be committed to history.
+                        yield ChatThinking(item.text)
+                    elif isinstance(item, ProviderToolCall):
+                        yield ChatToolCall(name=item.name, arguments=item.arguments)
+                    elif isinstance(item, ProviderToolResult):
+                        yield ChatToolResult(name=item.name, summary=item.summary)
             except (GeneratorExit, KeyboardInterrupt, SystemExit):
                 # Not failures -- the caller is going away. Persist what
                 # arrived, then let it propagate: yielding during GeneratorExit

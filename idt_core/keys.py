@@ -29,9 +29,12 @@ from typing import List, Optional
 __all__ = ["resolve_api_key", "requires_api_key", "missing_key_message", "ENV_VARS"]
 
 #: Canonical provider name -> environment variable.
+#: "ollama.com" is not a chat provider: it is the hosted web-search API used
+#: by the chat tools, kept distinct from "ollama" (which needs no key at all).
 ENV_VARS = {
     "claude": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
+    "ollama.com": "OLLAMA_API_KEY",
 }
 
 #: Canonical provider name -> legacy plain-text filenames, in priority order.
@@ -44,6 +47,7 @@ _LEGACY_FILES = {
 _CONFIG_ALIASES = {
     "claude": ("claude", "anthropic", "Claude", "Anthropic", "ANTHROPIC"),
     "openai": ("openai", "OpenAI", "OPENAI", "open_ai"),
+    "ollama.com": ("ollama.com", "ollama_com", "ollama cloud", "ollama_cloud"),
 }
 
 
@@ -87,8 +91,16 @@ def _from_config(name: str) -> Optional[str]:
     try:
         from .config_loader import load_json_config
 
-        config = load_json_config("image_describer_config.json") or {}
+        loaded = load_json_config("image_describer_config.json")
     except Exception:
+        return None
+
+    # idt_core.config_loader returns (config, path, source); the older
+    # scripts/ loader returns just the dict. Accept both — assuming the dict
+    # shape made every config-file-only key crash resolution with
+    # "'tuple' object has no attribute 'get'".
+    config = loaded[0] if isinstance(loaded, tuple) else loaded
+    if not isinstance(config, dict):
         return None
 
     keys = config.get("api_keys") or {}

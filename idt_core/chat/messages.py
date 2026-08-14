@@ -64,6 +64,26 @@ class Attachment:
     def is_image(self) -> bool:
         return self.media_type.startswith("image/")
 
+    @property
+    def is_text(self) -> bool:
+        """True when the content is inlined into the message text at send time
+        rather than uploaded as a file. The registry owns the definition."""
+        from ..providers.registry import is_text_media_type
+
+        return is_text_media_type(self.media_type)
+
+    def size_bytes(self) -> Optional[int]:
+        """Size without reading the content — token estimation runs in loops,
+        so it must cost a stat, not a read."""
+        if self.data is not None:
+            return len(self.data)
+        if self.path:
+            try:
+                return Path(self.path).stat().st_size
+            except OSError:
+                return None
+        return None
+
     def read_bytes(self) -> bytes:
         """Return the attachment's bytes, reading from disk if needed."""
         if self.data is not None:

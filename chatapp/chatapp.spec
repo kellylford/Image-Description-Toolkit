@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 """
 IDT Chat - PyInstaller Spec File
 
@@ -54,6 +54,7 @@ a = Analysis(
         'idt_core.chat.providers',
         'idt_core.chat.store',
         'idt_core.chat.tokens',
+        'idt_core.chat.tools',
 
         # ---- idt_core support ----
         'idt_core.config',

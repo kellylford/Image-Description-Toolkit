@@ -48,8 +48,22 @@ EXTENSION_MIME_TYPES = {
     ".tif": "image/tiff",
     ".tiff": "image/tiff",
     ".pdf": "application/pdf",
+    # Text-shaped files are inlined into the prompt by the chat formatters,
+    # so they work on every provider. Keep this in step with
+    # registry.TEXT_ATTACHMENT_MIME_TYPES and registry._MIME_TO_EXTENSIONS.
     ".txt": "text/plain",
+    ".log": "text/plain",
     ".md": "text/markdown",
+    ".csv": "text/csv",
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".py": "text/x-python",
+    ".json": "application/json",
+    ".xml": "application/xml",
+    ".yaml": "application/yaml",
+    ".yml": "application/yaml",
 }
 
 #: Converted to JPEG before sending: no provider decodes HEIC.
@@ -125,9 +139,9 @@ def prepare_attachment(
 
     media_type = infer_media_type(source)
     if not capabilities.accepts(media_type):
-        accepted = ", ".join(
-            sorted({m.split("/")[-1] for m in capabilities.attachment_mime_types})
-        )
+        from ..providers.registry import accepted_extensions
+
+        accepted = ", ".join(accepted_extensions(provider)) or "no attachments"
         raise AttachmentError(
             f"{provider} cannot read {source.name} ({media_type}). "
             f"It accepts: {accepted}."

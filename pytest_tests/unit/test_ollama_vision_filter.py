@@ -45,8 +45,10 @@ class _FakeClient:
 def _clear_cache():
     from idt_core.providers import ollama as mod
     mod._VISION_CACHE.clear()
+    mod._CAPS_CACHE.clear()
     yield
     mod._VISION_CACHE.clear()
+    mod._CAPS_CACHE.clear()
 
 
 class TestIdtCoreVisionCheck:
@@ -91,6 +93,76 @@ class TestIdtCoreVisionCheck:
         assert model_has_vision("m", client=c) is True
         assert model_has_vision("m", client=c) is True
         assert calls == ["m"], "capabilities should be queried once per model"
+
+
+# --------------------------------------------------------------------------- #
+# Chat listing — the OPPOSITE filter                                           #
+# --------------------------------------------------------------------------- #
+
+class TestChatCapableFilter:
+    """The chat picker filters on `completion`, not `vision`.
+
+    Applying the vision filter to chat hid every text-only model — often the
+    strongest chat models a user has installed (issue #265).
+    """
+
+    def _provider_with(self, monkeypatch, caps, raise_on=None):
+        import types
+
+        from idt_core.providers.ollama import OllamaProvider
+
+        inner = _FakeClient(caps, raise_on=raise_on)
+
+        class _Model:
+            def __init__(self, name):
+                self.model = name
+
+        class _Listing:
+            def __init__(self, names):
+                self.models = [_Model(n) for n in names]
+
+        class _Client:
+            def __init__(self, host=None):
+                pass
+
+            def list(self):
+                return _Listing(list(caps) + sorted(raise_on or []))
+
+            def show(self, name):
+                return inner.show(name)
+
+        import sys
+        monkeypatch.setitem(sys.modules, "ollama", types.SimpleNamespace(Client=_Client))
+        return OllamaProvider(model="whatever")
+
+    def test_text_only_models_are_offered_for_chat(self, monkeypatch):
+        p = self._provider_with(monkeypatch, {
+            "qwen3:8b": ["completion", "tools", "thinking"],
+            "minicpm-v4.6": ["completion", "vision"],
+        })
+        models = p.list_chat_models()
+        assert "qwen3:8b" in models
+        assert "minicpm-v4.6" in models
+
+    def test_embedding_only_models_are_not_offered_for_chat(self, monkeypatch):
+        """/api/tags lists embedding models; /api/chat rejects them."""
+        p = self._provider_with(monkeypatch, {
+            "nomic-embed-text": ["embedding"],
+            "qwen3:8b": ["completion"],
+        })
+        assert p.list_chat_models() == ["qwen3:8b"]
+
+    def test_chat_listing_fails_open_when_the_probe_errors(self, monkeypatch):
+        p = self._provider_with(monkeypatch, {}, raise_on={"mystery-model"})
+        assert p.list_chat_models() == ["mystery-model"]
+
+    def test_the_describe_listing_still_requires_vision(self, monkeypatch):
+        """The two filters must not converge: describe keeps vision (issue #227)."""
+        p = self._provider_with(monkeypatch, {
+            "qwen3:8b": ["completion", "tools"],
+            "minicpm-v4.6": ["completion", "vision"],
+        })
+        assert p.list_models() == ["minicpm-v4.6"]
 
 
 # --------------------------------------------------------------------------- #
