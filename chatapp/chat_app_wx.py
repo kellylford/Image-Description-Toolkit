@@ -77,6 +77,13 @@ from idt_core.providers.registry import (  # noqa: E402
 )
 
 from shared.chat_worker_wx import ChatWorker  # noqa: E402
+from shared.speech_engine import (  # noqa: E402
+    RATE_PRESET_LABELS,
+    SpeechSettings,
+    default_options,
+    list_speech_options,
+    speaker,
+)
 
 APP_NAME = "IDT Chat"
 
@@ -281,6 +288,115 @@ class ProviderDialog(wx.Dialog):
         return provider, (data or self.model_choice.GetString(index))
 
 
+class SettingsDialog(wx.Dialog):
+    """Application settings, one notebook tab per area.
+
+    Speech is the first tab; the notebook is the point — the next settings
+    area gets a tab here, not another one-off dialog.
+    """
+
+    def __init__(self, parent, speech: SpeechSettings, options):
+        super().__init__(parent, title="Settings", size=(660, 420))
+        self._options = list(options)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        notebook = wx.Notebook(self, name="Settings sections")
+
+        # ---- Speech tab --------------------------------------------------
+        page = wx.Panel(notebook)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.auto_read = wx.CheckBox(
+            page, label="&Read responses aloud when they finish streaming",
+            name="Read responses aloud")
+        self.auto_read.SetValue(speech.enabled)
+        sizer.Add(self.auto_read, 0, wx.ALL, 10)
+
+        grid = wx.FlexGridSizer(rows=2, cols=2, vgap=8, hgap=8)
+        grid.AddGrowableCol(1, 1)
+
+        grid.Add(wx.StaticText(page, label="Speech &engine:"), 0,
+                 wx.ALIGN_CENTER_VERTICAL)
+        self.engine_choice = wx.Choice(
+            page, choices=[option.label for option in self._options],
+            name="Speech engine")
+        grid.Add(self.engine_choice, 1, wx.EXPAND)
+
+        grid.Add(wx.StaticText(page, label="Speaking r&ate:"), 0,
+                 wx.ALIGN_CENTER_VERTICAL)
+        self.rate_choice = wx.Choice(
+            page, choices=[label.capitalize() for label in RATE_PRESET_LABELS],
+            name="Speaking rate")
+        grid.Add(self.rate_choice, 0)
+        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 10)
+
+        self.rate_note = wx.StaticText(page, label="")
+        sizer.Add(self.rate_note, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        page.SetSizer(sizer)
+        notebook.AddPage(page, "Speech")
+        outer.Add(notebook, 1, wx.EXPAND | wx.ALL, 8)
+
+        buttons = wx.StdDialogButtonSizer()
+        ok = wx.Button(self, wx.ID_OK)
+        buttons.AddButton(ok)
+        buttons.AddButton(wx.Button(self, wx.ID_CANCEL))
+        buttons.Realize()
+        outer.Add(buttons, 0, wx.EXPAND | wx.ALL, 8)
+        self.SetSizer(outer)
+        ok.SetDefault()
+
+        # Pre-select the saved engine/voice, falling back to the first entry.
+        selected = 0
+        for i, option in enumerate(self._options):
+            if option.engine == speech.engine and option.voice == speech.voice:
+                selected = i
+                break
+        self.engine_choice.SetSelection(selected)
+
+        try:
+            self.rate_choice.SetSelection(
+                RATE_PRESET_LABELS.index(speech.rate_preset))
+        except ValueError:
+            self.rate_choice.SetSelection(0)
+
+        self.engine_choice.Bind(wx.EVT_CHOICE, lambda e: self._update_rate_state())
+        self._update_rate_state()
+        wx.CallAfter(self.auto_read.SetFocus)
+
+    def _selected_option(self):
+        index = self.engine_choice.GetSelection()
+        if index == wx.NOT_FOUND or index >= len(self._options):
+            return self._options[0]
+        return self._options[index]
+
+    def _update_rate_state(self):
+        option = self._selected_option()
+        self.rate_choice.Enable(option.has_rate)
+        if option.is_screen_reader:
+            # Deliberately no voice/rate control for screen-reader routes:
+            # those belong to the reader's own settings.
+            self.rate_note.SetLabel(
+                "Voice and rate follow your screen reader's own settings.")
+        elif option.has_rate:
+            self.rate_note.SetLabel("")
+        else:
+            self.rate_note.SetLabel("This engine uses its default rate.")
+        self.Layout()
+
+    def get_settings(self) -> SpeechSettings:
+        option = self._selected_option()
+        index = self.rate_choice.GetSelection()
+        preset = (RATE_PRESET_LABELS[index]
+                  if 0 <= index < len(RATE_PRESET_LABELS) else "default")
+        return SpeechSettings(
+            enabled=self.auto_read.GetValue(),
+            engine=option.engine,
+            voice=option.voice,
+            rate_preset=preset,
+        )
+
+
 class ApiKeysDialog(wx.Dialog):
     """Set API keys for the whole toolkit, not just this app.
 
@@ -429,6 +545,14 @@ class ChatFrame(wx.Frame):
         self._temp_dir = None           # Holds HEIC conversions and pasted images
         self._web_search = False        # Per-window, not persisted with the session
 
+        self.speech_settings = SpeechSettings.load()
+        # Probing for engines/voices runs PowerShell (or `say`) and takes a
+        # few seconds; do it now in the background so the Settings dialog
+        # opens instantly with real choices.
+        self._speech_options = None
+        import threading
+        threading.Thread(target=self._probe_speech, daemon=True).start()
+
         self._build_menu()
         self._build_ui()
         self._bind_keys()
@@ -459,6 +583,7 @@ class ChatFrame(wx.Frame):
         self._menu_item(file_menu, "&Export Conversation...\tCtrl+E",
                         self.on_export)
         file_menu.AppendSeparator()
+        self._menu_item(file_menu, "&Settings...", self.on_settings)
         self._menu_item(file_menu, "API &Keys...", self.on_api_keys)
         file_menu.AppendSeparator()
         self._menu_item(file_menu, "E&xit\tCtrl+Q", self.on_exit)
@@ -678,8 +803,12 @@ class ChatFrame(wx.Frame):
             text = f"{text} [attached: {names}]" if text else f"[attached: {names}]"
         if message.error:
             text = f"[{message.error}] {text}" if text else f"[{message.error}]"
-        preview = text[:120] + ("…" if len(text) > 120 else "")
-        return f"{speaker}: {preview}"
+        # The FULL text, not a preview. The window clips it visually, but a
+        # screen reader arrowing the list reads the entire item — same
+        # convention as ImageDescriber's description lists. The 120-char
+        # preview this replaces meant a reader could never hear a whole
+        # response from the transcript list itself.
+        return f"{speaker}: {text}"
 
     def _reload_history(self):
         self.history_list.Clear()
@@ -999,6 +1128,7 @@ class ChatFrame(wx.Frame):
         self._start_turn("", regenerate=True)
 
     def _start_turn(self, text, regenerate=False, attachments=()):
+        speaker.stop()  # a new question should silence the previous answer
         self._is_streaming = True
         self._streaming_chunks = []
         self.stop_btn.Enable(True)
@@ -1015,6 +1145,7 @@ class ChatFrame(wx.Frame):
         self.worker.start()
 
     def on_stop(self, _event):
+        speaker.stop()  # Ctrl+. also silences a response being read aloud
         if self.worker is not None and self._is_streaming:
             self.worker.cancel()
             self._set_status("Stopping…")
@@ -1082,7 +1213,13 @@ class ChatFrame(wx.Frame):
 
         if isinstance(event, ChatFinished):
             self._set_status("Response complete")
-            self._announce(event.message.content)
+            if self.speech_settings.enabled and speaker.speak(
+                    event.message.content, self.speech_settings):
+                # The speech engine is reading it; the focus-flip
+                # announcement on top would say everything twice.
+                pass
+            else:
+                self._announce(event.message.content)
         elif isinstance(event, ChatCancelled):
             self._set_status("Stopped — partial response kept")
             self._announce("Stopped. Partial response kept.")
@@ -1105,6 +1242,37 @@ class ChatFrame(wx.Frame):
         self.engine = None
         if self._ensure_engine():
             self._set_status(f"Now using {self.provider_name}/{self.model_name}")
+
+    def _probe_speech(self):
+        """Background thread: enumerate speech engines and voices once."""
+        try:
+            self._speech_options = list_speech_options()
+        except Exception:
+            self._speech_options = default_options()
+
+    def on_settings(self, _event):
+        options = self._speech_options
+        if options is None:
+            # The startup probe has not finished; probe now rather than
+            # showing a picker missing the user's installed voices.
+            with wx.BusyCursor():
+                self._probe_speech()
+            options = self._speech_options or default_options()
+
+        dlg = SettingsDialog(self, self.speech_settings, options)
+        try:
+            if dlg.ShowModal() == wx.ID_OK:
+                self.speech_settings = dlg.get_settings()
+                try:
+                    self.speech_settings.save()
+                except OSError:
+                    self._set_status("Could not save settings to disk")
+                    return
+                state = "on" if self.speech_settings.enabled else "off"
+                self._set_status(f"Settings saved — automatic reading {state}")
+                self._announce(f"Automatic reading {state}")
+        finally:
+            dlg.Destroy()
 
     def on_api_keys(self, _event):
         dlg = ApiKeysDialog(self)
@@ -1242,7 +1410,7 @@ class ChatFrame(wx.Frame):
             "Ctrl+Shift+P        Set system prompt\n"
             "Ctrl+Shift+W        Web search on/off (Ollama)\n"
             "Ctrl+R              Regenerate response\n"
-            "Ctrl+.              Stop the current response\n"
+            "Ctrl+.              Stop the current response (and speech)\n"
             "Ctrl+Shift+R        Read the last response again\n"
             "Ctrl+C              Copy the selected message\n"
             "Ctrl+Shift+C        Copy the whole conversation\n"
@@ -1322,6 +1490,7 @@ class ChatFrame(wx.Frame):
         self.Close()
 
     def on_close(self, event):
+        speaker.stop()
         # The engine persists after every turn, so there is nothing to save
         # here -- a lost close handler cannot lose the conversation.
         if self.worker is not None and self._is_streaming:

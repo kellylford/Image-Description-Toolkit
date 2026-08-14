@@ -162,6 +162,46 @@ plus additions to `test_chat_providers.py`, `test_chat_attachments.py`,
 Round-2 NOT tested: the macOS Keychain path against a real Mac (command
 shapes pinned by tests only); the describer configure dialog interactively.
 
+## Round 3 (same day): read responses aloud + full-text transcript items
+
+- **Speech via ClaudeSpeak's routers, bundled verbatim** — `shared/speech/`
+  now carries `speak-engine.ps1`/`speak-voices.ps1` (Windows: JAWS COM →
+  NVDA controller DLL → OneCore → SAPI) from TheWorkBench main, and
+  `speak-engine.sh`/`speak-voices.sh` (macOS: VoiceOver AppleScript `output`
+  → `say`) from the `claudespeak-macos` branch (a7a1286, verified on Apple
+  silicon). One IDT adaptation: `speak-engine.sh`'s config reader falls back
+  to `plutil` when `jq` is absent, since jq does not ship with macOS.
+- **`shared/speech_engine.py`** — the harness: `SpeechSettings` (persisted at
+  `~/.idt/chat_speech.json`), engine/voice enumeration (bundled PS probe on
+  Windows; native `say -v '?'` parse on macOS — no jq needed to enumerate),
+  `strip_for_speech` markdown cleanup (code blocks become "Code block
+  omitted", links keep text), and a `Speaker` running the router as a
+  detached hidden process, killing the previous one before the next
+  (ClaudeSpeak's pid model held in-process). Rate is a preset
+  (default/slow/normal/fast/fastest) resolved to each engine's own scale;
+  **screen-reader routes never get voice or rate**, by design.
+- **IDT Chat: File → Settings…** — new tabbed `SettingsDialog`, Speech tab:
+  auto-read on/off, engine picker (Automatic / detected screen readers /
+  every OneCore, SAPI, or macOS voice), rate preset (disabled for screen
+  readers with an explanatory note). Engines are probed in a background
+  thread at startup so the dialog opens instantly.
+- **Wiring** — on `ChatFinished`, if auto-read is on the response is spoken
+  and the focus-flip announcement is suppressed (no double-speaking);
+  sending a new message, Ctrl+., and closing the window all stop speech.
+- **Transcript accessibility fix (user request)** — history-list items now
+  carry the **full** message text instead of a 120-character preview, so a
+  screen reader arrowing the list hears whole responses (visual clipping by
+  width is fine) — same convention as ImageDescriber's description lists.
+- `chatapp.spec`: `shared/speech/*` added to datas, `shared.speech_engine`
+  to hiddenimports.
+- Verified live on Windows: `SPOKE VIA: sapi` in the engine's route log from
+  an end-to-end run through the bundled scripts. JAWS route is exercised
+  daily on this machine by ClaudeSpeak itself (same script, same config
+  shape). Tests: 1187 passed, 1 skipped.
+- Round-3 NOT tested: macOS routes from inside IDT (scripts verified in
+  TheWorkBench, harness command-line pinned by tests only); the Settings
+  dialog interactively with a screen reader; NVDA route (no NVDA running).
+
 ## Follow-ups (still open on #265)
 - BMP/TIFF images (transcode-on-attach like HEIC, or declare for Ollama).
 - PDF for OpenAI; PDF text extraction for Ollama.

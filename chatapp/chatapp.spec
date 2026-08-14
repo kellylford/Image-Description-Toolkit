@@ -29,6 +29,10 @@ a = Analysis(
     datas=[
         ('../scripts/image_describer_config.json', 'scripts'),
         ('../shared/*.py', 'shared'),
+        # ClaudeSpeak speech routers (JAWS/NVDA/OneCore/SAPI on Windows,
+        # VoiceOver/say on macOS), run as detached processes by
+        # shared/speech_engine.py.
+        ('../shared/speech/*', 'shared/speech'),
         ('../VERSION', '.'),
     ],
     hiddenimports=[
@@ -41,6 +45,7 @@ a = Analysis(
         # this app use the same one.
         'shared',
         'shared.chat_worker_wx',
+        'shared.speech_engine',
 
         # ---- idt_core chat engine ----
         'idt_core',
