@@ -202,6 +202,31 @@ shapes pinned by tests only); the describer configure dialog interactively.
   TheWorkBench, harness command-line pinned by tests only); the Settings
   dialog interactively with a screen reader; NVDA route (no NVDA running).
 
+## Round 4 (same day): Claude/OpenAI parity + keys stored for real
+
+- **PDF attachments for OpenAI** — `application/pdf` declared in the
+  registry (32 MB documented cap) and encoded as `file` content parts in
+  `format_for_openai`. Verified live: gpt-4o-mini read a generated PDF and
+  answered its secret word. Ollama still rejects PDFs (its API has no slot).
+- **OpenAI model limits recorded** — every `OPENAI_MODEL_METADATA` entry now
+  carries `context_window`/`max_output` (GPT-5.x 400k/128k, o-series
+  200k/100k, 4o 128k/16k, 4.1 ~1M/32k), closing the documented
+  `model_limits() == (None, None)` gap; the budgeter and gauge get real
+  figures for OpenAI.
+- **Kelly's keys stored** — claude/openai/ollama.com keys (from
+  `OneDrive\idt\keys`) written to Windows Credential Manager via
+  `set_api_key`; resolution verified in a clean process with no key env
+  vars, including a live Claude turn pulling its key purely from the store.
+  Both providers verified working end to end (haiku 4.5 / gpt-4o-mini).
+- **CodeQL findings on PR #266 addressed** — two false-positive
+  "URL substring sanitization" hits in tests made precise, three empty
+  excepts documented, mixed ctypes import style fixed, `self_inner` test
+  fake restructured.
+- **Token cost measured** for the docs: a one-line question is ~24 tokens
+  total on Claude Haiku, ~21 on gpt-4o-mini — thousandths of a cent.
+- **Deferred by agreement:** dynamic Claude/OpenAI model listing (the
+  hardcoded lists go stale silently) — issue #267, after this PR lands.
+
 ## Follow-ups (still open on #265)
 - BMP/TIFF images (transcode-on-attach like HEIC, or declare for Ollama).
 - PDF for OpenAI; PDF text extraction for Ollama.

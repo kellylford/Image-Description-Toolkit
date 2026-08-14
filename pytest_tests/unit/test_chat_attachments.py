@@ -73,17 +73,19 @@ def test_image_is_accepted_by_every_image_provider(files):
         assert converted is None
 
 
-def test_pdf_is_accepted_by_claude_only(files):
+def test_pdf_is_accepted_by_the_document_providers(files):
+    """Claude takes PDFs as document blocks, OpenAI as file content parts.
+    Ollama has no PDF slot in its API at all."""
     pdf = files("doc.pdf")
 
-    attachment, _ = prepare_attachment(pdf, "claude")
-    assert attachment.media_type == "application/pdf"
+    for provider in ("claude", "openai"):
+        attachment, _ = prepare_attachment(pdf, provider)
+        assert attachment.media_type == "application/pdf"
 
-    for provider in ("ollama", "openai"):
-        with pytest.raises(AttachmentError) as excinfo:
-            prepare_attachment(pdf, provider)
-        # The message must say what IS accepted, not just what failed.
-        assert "accepts" in str(excinfo.value)
+    with pytest.raises(AttachmentError) as excinfo:
+        prepare_attachment(pdf, "ollama")
+    # The message must say what IS accepted, not just what failed.
+    assert "accepts" in str(excinfo.value)
 
 
 def test_unknown_file_type_is_rejected_with_its_name(files):

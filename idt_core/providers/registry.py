@@ -162,7 +162,12 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
         system_prompt=True,
         requires_api_key=True,
         is_local=False,
-        attachment_mime_types=_IMAGE_MIMES + TEXT_ATTACHMENT_MIME_TYPES,
+        # PDFs go up as `file` content parts in the chat completions API.
+        attachment_mime_types=_IMAGE_MIMES
+        + ("application/pdf",)
+        + TEXT_ATTACHMENT_MIME_TYPES,
+        # OpenAI's documented cap is 32 MB of file content per request.
+        max_document_bytes=32 * 1024 * 1024,
     ),
     "claude": ProviderCapabilities(
         provider="claude",
@@ -319,9 +324,6 @@ def model_limits(provider_name: str, model: str) -> Tuple[Optional[int], Optiona
 
     Either element is ``None`` when the value is not recorded. Callers must
     supply their own fallback rather than relying on a guess from this module.
-
-    Known gap: ``OPENAI_MODEL_METADATA`` currently records no ``context_window``
-    or ``max_output`` for any model, so OpenAI returns ``(None, None)``.
     """
     key = _canonical(provider_name)
     meta: dict = {}

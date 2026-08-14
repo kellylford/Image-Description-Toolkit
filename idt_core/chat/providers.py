@@ -79,6 +79,18 @@ def encode_image_openai(att: Attachment) -> dict:
     }
 
 
+def encode_pdf_openai(att: Attachment) -> dict:
+    """PDF as a ``file`` content part for the OpenAI chat completions API."""
+    payload = base64.b64encode(att.read_bytes()).decode("utf-8")
+    return {
+        "type": "file",
+        "file": {
+            "filename": att.name or "document.pdf",
+            "file_data": f"data:application/pdf;base64,{payload}",
+        },
+    }
+
+
 def encode_attachment_claude(att: Attachment) -> dict:
     """Image or document content block for the Anthropic messages API."""
     payload = base64.b64encode(att.read_bytes()).decode("utf-8")
@@ -156,9 +168,12 @@ def format_for_openai(
     for msg in conversation_turns(messages):
         text = merge_text_attachments(msg)
         images = [a for a in msg.attachments if a.is_image]
-        if images:
+        pdfs = [a for a in msg.attachments
+                if a.media_type == "application/pdf"]
+        if images or pdfs:
             content: List[dict] = [{"type": "text", "text": text}]
             content.extend(encode_image_openai(a) for a in images)
+            content.extend(encode_pdf_openai(a) for a in pdfs)
             out.append({"role": msg.role, "content": content})
         else:
             out.append({"role": msg.role, "content": text})

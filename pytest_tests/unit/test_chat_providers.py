@@ -184,12 +184,36 @@ def test_claude_encodes_images_with_their_real_media_type():
     assert block["source"]["media_type"] == "image/png"
 
 
-def test_non_image_attachments_are_skipped_by_image_only_providers():
-    """Ollama and OpenAI take images only; a PDF must not be sent as one."""
+def test_ollama_never_sends_a_pdf_as_an_image():
+    """Ollama's API has no PDF slot; a PDF must not ride the images list."""
     history = [ChatMessage(role="user", content="read this", attachments=[PDF])]
+    entry = format_for_ollama(history)[0]
 
-    assert "images" not in format_for_ollama(history)[0]
-    assert format_for_openai(history)[0]["content"] == "read this"
+    assert "images" not in entry
+    assert entry["content"] == "read this"
+
+
+def test_openai_encodes_pdfs_as_file_content_parts():
+    history = [ChatMessage(role="user", content="read this", attachments=[PDF])]
+    entry = format_for_openai(history)[0]
+
+    assert isinstance(entry["content"], list)
+    assert entry["content"][0] == {"type": "text", "text": "read this"}
+    block = entry["content"][1]
+    assert block["type"] == "file"
+    assert block["file"]["filename"] == "doc.pdf"
+    assert block["file"]["file_data"].startswith("data:application/pdf;base64,")
+
+
+def test_openai_model_limits_are_recorded_now():
+    """The registry's documented gap — (None, None) for every OpenAI model —
+    is closed; the budgeter and gauge get real figures."""
+    from idt_core.providers.registry import model_limits
+
+    context, max_output = model_limits("openai", "gpt-4o")
+    assert (context, max_output) == (128_000, 16_384)
+    context, _ = model_limits("openai", "gpt-5.2")
+    assert context == 400_000
 
 
 def test_attachment_bytes_are_read_from_disk_when_not_held_in_memory(tmp_path):
