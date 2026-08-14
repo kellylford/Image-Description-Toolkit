@@ -164,7 +164,7 @@ def credential_store_name() -> str:
 def _win_credential(target: str):
     """(advapi32, CREDENTIAL struct type) — shared by read/write/delete."""
     import ctypes
-    from ctypes import wintypes
+    import ctypes.wintypes as wintypes
 
     class CREDENTIAL(ctypes.Structure):
         _fields_ = [

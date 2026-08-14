@@ -235,6 +235,8 @@ def list_speech_options(timeout: float = 25.0) -> List[SpeechOption]:
                 options.extend(_parse_mac_voices(result.stdout))
             return options
     except Exception:
+        # A failed probe (no PowerShell, timeout, malformed JSON) must
+        # degrade to the static defaults below, never break the settings UI.
         pass
     return default_options()
 
@@ -364,6 +366,9 @@ class Speaker:
             if process.poll() is None:
                 process.kill()
         except Exception:
+            # The process may have exited between poll and kill, or the OS
+            # may refuse; either way there is nothing further to stop, and
+            # raising from stop() would break every caller's cleanup path.
             pass
 
 

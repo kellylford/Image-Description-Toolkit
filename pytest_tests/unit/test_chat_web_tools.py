@@ -49,7 +49,9 @@ class TestExecutor:
     def test_missing_key_returns_instructions_not_an_exception(self, monkeypatch):
         monkeypatch.setattr(web_tools, "_api_key", lambda: None)
         result = web_tools.execute_web_tool("web_search", {"query": "idt"})
-        assert "ollama.com" in result
+        # The exact signup URL, not a substring: the message must send the
+        # user somewhere actionable.
+        assert "https://ollama.com/settings/keys" in result
         assert "OLLAMA_API_KEY" in result
 
     def test_search_results_are_formatted_and_truncated(self, monkeypatch):
@@ -115,7 +117,7 @@ class TestResultSummaries:
 
     def test_the_missing_key_message_reaches_the_status_line(self):
         summary = web_tools.tool_result_summary("web_search", web_tools.missing_web_key_message())
-        assert "ollama.com" in summary
+        assert summary.startswith("Web search needs an ollama.com API key")
 
     def test_search_summaries_count_results(self):
         summary = web_tools.tool_result_summary("web_search", '{"results": [1, 2, 3]}')
@@ -125,6 +127,19 @@ class TestResultSummaries:
 # ---------------------------------------------------------------------------
 # The Ollama tool loop
 # ---------------------------------------------------------------------------
+
+
+class _Stream:
+    """One scripted response stream, closable like the SDK's."""
+
+    def __init__(self, chunks):
+        self._chunks = chunks
+
+    def __iter__(self):
+        return iter(self._chunks)
+
+    def close(self):
+        pass
 
 
 class _Script:
@@ -138,15 +153,7 @@ class _Script:
         self.calls.append(kwargs)
         round_chunks = self._rounds.pop(0) if self._rounds else [
             {"message": {"content": "fallback"}, "done": True}]
-
-        class _Stream:
-            def __iter__(self_inner):
-                return iter(round_chunks)
-
-            def close(self_inner):
-                pass
-
-        return _Stream()
+        return _Stream(round_chunks)
 
 
 def _tool_call(name, arguments):

@@ -1074,6 +1074,8 @@ class ChatFrame(wx.Frame):
                     f"ollama.com work best.",
                     "Model may not search", wx.OK | wx.ICON_INFORMATION, self)
         except Exception:
+            # The capability probe is advisory; a probe failure must not
+            # block enabling web search (fail open, like the probe itself).
             pass
 
         self._web_search = True
