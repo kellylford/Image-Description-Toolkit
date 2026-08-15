@@ -61,6 +61,7 @@ from idt_core.chat import (
     ChatRetrying,
     ChatSession,
     ChatStarted,
+    ChatThinking,
     ChatUsage,
 )
 from idt_core.chat.attachments import prepare_attachments
@@ -901,6 +902,13 @@ class ChatWindow(wx.Dialog):
 
         if isinstance(event, ChatDelta):
             self._on_stream_delta(event.text)
+            return
+
+        if isinstance(event, ChatThinking):
+            # Reasoning models can spend minutes here producing no visible
+            # deltas; without this the window just sits silent. Status only,
+            # never the text — same policy as the standalone chat app.
+            self.status_text.SetLabel("Model is thinking...")
             return
 
         if isinstance(event, ChatRetrying):

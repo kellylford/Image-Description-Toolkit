@@ -21,7 +21,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-from ..providers.registry import capabilities_for
+from ..providers.registry import TEXT_EXTENSION_MIME_TYPES, capabilities_for
 from .messages import Attachment
 
 __all__ = [
@@ -48,22 +48,11 @@ EXTENSION_MIME_TYPES = {
     ".tif": "image/tiff",
     ".tiff": "image/tiff",
     ".pdf": "application/pdf",
-    # Text-shaped files are inlined into the prompt by the chat formatters,
-    # so they work on every provider. Keep this in step with
-    # registry.TEXT_ATTACHMENT_MIME_TYPES and registry._MIME_TO_EXTENSIONS.
-    ".txt": "text/plain",
-    ".log": "text/plain",
-    ".md": "text/markdown",
-    ".csv": "text/csv",
-    ".html": "text/html",
-    ".htm": "text/html",
-    ".css": "text/css",
-    ".js": "text/javascript",
-    ".py": "text/x-python",
-    ".json": "application/json",
-    ".xml": "application/xml",
-    ".yaml": "application/yaml",
-    ".yml": "application/yaml",
+    # Text-shaped files (inlined into the prompt by the chat formatters, so
+    # they work on every provider). The registry owns that table; composing
+    # it in keeps the extension map, the MIME tuple, and the file-dialog
+    # wildcards structurally in step instead of comment-in-step.
+    **TEXT_EXTENSION_MIME_TYPES,
 }
 
 #: Converted to JPEG before sending: no provider decodes HEIC.

@@ -212,3 +212,15 @@ def test_model_limits_returns_none_rather_than_guessing():
     context, max_output = registry.model_limits("claude", "claude-opus-5")
     assert context and context > 0
     assert max_output and max_output > 0
+
+
+def test_the_text_extension_table_drives_every_derived_view():
+    """One table, three consumers: MIME inference, the declared MIME tuple,
+    and the file-dialog wildcards. This is the structural version of the
+    'keep these in step' comment the tables used to rely on."""
+    from idt_core.chat.attachments import infer_media_type
+
+    for extension, mime in registry.TEXT_EXTENSION_MIME_TYPES.items():
+        assert infer_media_type(f"file{extension}") == mime
+        assert mime in registry.TEXT_ATTACHMENT_MIME_TYPES
+        assert f"*{extension}" in registry.attachment_wildcard("ollama")

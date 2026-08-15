@@ -40,22 +40,35 @@ __all__ = [
     "model_limits",
 ]
 
-#: Media types whose content is inlined into the message text by the chat
-#: formatters rather than uploaded as a file. That is why every provider can
-#: accept them, including ones whose API takes images only: the provider never
-#: sees a file, just a longer prompt. ``application/*`` entries are structured
-#: text (JSON and friends) that would not match a ``text/`` prefix check.
-TEXT_ATTACHMENT_MIME_TYPES: Tuple[str, ...] = (
-    "text/plain",
-    "text/markdown",
-    "text/csv",
-    "text/html",
-    "text/css",
-    "text/javascript",
-    "text/x-python",
-    "application/json",
-    "application/xml",
-    "application/yaml",
+#: THE text-attachment table: extension → media type. Everything else about
+#: text attachments derives from this one dict — the MIME tuple below, the
+#: file-dialog wildcard globs, and the extension map in chat/attachments.py —
+#: so adding a new text extension is a one-line change here, not three
+#: parallel edits held together by a comment.
+#:
+#: These files are inlined into the message text by the chat formatters
+#: rather than uploaded, which is why every provider can accept them:
+#: the provider never sees a file, just a longer prompt.
+TEXT_EXTENSION_MIME_TYPES: Dict[str, str] = {
+    ".txt": "text/plain",
+    ".log": "text/plain",
+    ".md": "text/markdown",
+    ".csv": "text/csv",
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".py": "text/x-python",
+    ".json": "application/json",
+    ".xml": "application/xml",
+    ".yaml": "application/yaml",
+    ".yml": "application/yaml",
+}
+
+#: Derived: the media types providers declare. ``application/*`` entries are
+#: structured text (JSON and friends) that would not match a ``text/`` prefix.
+TEXT_ATTACHMENT_MIME_TYPES: Tuple[str, ...] = tuple(
+    dict.fromkeys(TEXT_EXTENSION_MIME_TYPES.values())
 )
 
 
@@ -238,7 +251,16 @@ def supports_attachments(provider_name: str) -> bool:
     return capabilities_for(provider_name).supports_attachments
 
 
-# MIME type -> file extension globs for wx.FileDialog wildcards.
+def _text_mime_globs() -> Dict[str, str]:
+    """MIME → "*.ext;*.ext" derived from TEXT_EXTENSION_MIME_TYPES."""
+    groups: Dict[str, List[str]] = {}
+    for extension, mime in TEXT_EXTENSION_MIME_TYPES.items():
+        groups.setdefault(mime, []).append(f"*{extension}")
+    return {mime: ";".join(globs) for mime, globs in groups.items()}
+
+
+# MIME type -> file extension globs for wx.FileDialog wildcards. Text entries
+# derive from TEXT_EXTENSION_MIME_TYPES; only binary kinds are listed here.
 _MIME_TO_EXTENSIONS: Dict[str, str] = {
     "image/jpeg": "*.jpg;*.jpeg",
     "image/png": "*.png",
@@ -247,16 +269,7 @@ _MIME_TO_EXTENSIONS: Dict[str, str] = {
     "image/bmp": "*.bmp",
     "image/tiff": "*.tif;*.tiff",
     "application/pdf": "*.pdf",
-    "text/plain": "*.txt;*.log",
-    "text/markdown": "*.md",
-    "text/csv": "*.csv",
-    "text/html": "*.html;*.htm",
-    "text/css": "*.css",
-    "text/javascript": "*.js",
-    "text/x-python": "*.py",
-    "application/json": "*.json",
-    "application/xml": "*.xml",
-    "application/yaml": "*.yaml;*.yml",
+    **_text_mime_globs(),
 }
 
 

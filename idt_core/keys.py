@@ -39,6 +39,7 @@ __all__ = [
     "requires_api_key",
     "missing_key_message",
     "set_api_key",
+    "store_api_key",
     "delete_api_key",
     "key_source",
     "credential_store_name",
@@ -305,6 +306,43 @@ def delete_api_key(provider: str) -> bool:
     except Exception:
         return False
     return False
+
+
+def store_api_key(provider: str, value: str) -> str:
+    """Store a key preferring the OS store, falling back to the config file.
+
+    Returns where the key landed — ``"credential store"`` or ``"config
+    file"`` — or ``""`` when both destinations failed. The fallback exists
+    for platforms with no supported store (Linux dev mode): a settings
+    dialog that can only refuse to save is worse than the plaintext config
+    the app has always supported. Both GUI key dialogs go through here so
+    the two surfaces cannot drift apart.
+    """
+    name = _canonical(provider)
+    value = (value or "").strip()
+    if not name or not value:
+        return ""
+
+    if credential_store_name() and set_api_key(name, value):
+        return "credential store"
+
+    try:
+        import json
+
+        from .config_loader import load_json_config
+
+        loaded = load_json_config("image_describer_config.json")
+        if isinstance(loaded, tuple):
+            config, path = loaded[0], loaded[1]
+        else:  # pragma: no cover - older loader shape
+            return ""
+        if not isinstance(config, dict):
+            config = {}
+        config.setdefault("api_keys", {})[name] = value
+        Path(path).write_text(json.dumps(config, indent=2), encoding="utf-8")
+        return "config file"
+    except Exception:
+        return ""
 
 
 def key_source(provider: str) -> Optional[str]:

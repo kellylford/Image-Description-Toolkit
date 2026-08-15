@@ -67,7 +67,7 @@ from idt_core.keys import (  # noqa: E402
     missing_key_message,
     requires_api_key,
     resolve_api_key,
-    set_api_key,
+    store_api_key,
 )
 from idt_core.providers.registry import (  # noqa: E402
     attachment_wildcard,
@@ -512,15 +512,17 @@ class ApiKeysDialog(wx.Dialog):
             self.EndModal(wx.ID_OK)
             return
 
-        failed = [p for p, v in entered.items() if not set_api_key(p, v)]
+        # store_api_key prefers the OS store and falls back to the config
+        # file — same path ImageDescriber's settings use, so a platform
+        # without a credential store can still save keys.
+        failed = [p for p, v in entered.items() if not store_api_key(p, v)]
         if failed:
             labels = {p: label for p, label in self.PROVIDERS}
             names = ", ".join(labels.get(p, p) for p in failed)
-            store = credential_store_name()
-            reason = (f"{store} refused the write" if store else
-                      "this platform has no supported credential store")
-            wx.MessageBox(f"Could not save the key for: {names} — {reason}.",
-                          "Save failed", wx.OK | wx.ICON_ERROR, self)
+            wx.MessageBox(
+                f"Could not save the key for: {names} — neither the "
+                f"credential store nor the configuration file accepted it.",
+                "Save failed", wx.OK | wx.ICON_ERROR, self)
             self._refresh_status()
             return
         self.EndModal(wx.ID_OK)
@@ -1255,11 +1257,14 @@ class ChatFrame(wx.Frame):
     def on_settings(self, _event):
         options = self._speech_options
         if options is None:
-            # The startup probe has not finished; probe now rather than
-            # showing a picker missing the user's installed voices.
-            with wx.BusyCursor():
-                self._probe_speech()
-            options = self._speech_options or default_options()
+            # The startup probe is still running. Never re-probe on the UI
+            # thread — the PowerShell probe can take up to 25 s, which is a
+            # frozen window, and a second concurrent probe besides. Offer
+            # the static engines now; the full voice list is one reopen away.
+            options = default_options()
+            self._set_status(
+                "Still detecting installed voices — reopen Settings in a "
+                "moment for the full list")
 
         dlg = SettingsDialog(self, self.speech_settings, options)
         try:

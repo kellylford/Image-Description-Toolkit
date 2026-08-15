@@ -323,9 +323,16 @@ class OllamaChatProvider(ChatProvider):
         without the capability is an API error, hence omit — and unlike the
         picker probes this one fails CLOSED, because a wrong True breaks the
         turn while a wrong None merely leaves tags in the text.
+
+        An explicit False is also gated on the capability: ``--no-think``
+        against a model that cannot think is already satisfied, and sending
+        the field would fail the very turn the flag exists to speed up. An
+        explicit True is passed through unprobed — the user asked for
+        thinking, and if the model cannot do it the API error saying so is
+        the honest answer.
         """
-        if request.think is not None:
-            return request.think
+        if request.think is True:
+            return True
         try:
             from ..providers.ollama import model_capabilities
 
@@ -335,7 +342,10 @@ class OllamaChatProvider(ChatProvider):
             )
         except Exception:
             caps = None
-        return True if caps and "thinking" in caps else None
+        has_thinking = bool(caps) and "thinking" in caps
+        if request.think is False:
+            return False if has_thinking else None
+        return True if has_thinking else None
 
     def chat(self, request: ChatRequest) -> Iterator[ChatYield]:
         import ollama

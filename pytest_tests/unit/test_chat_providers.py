@@ -225,6 +225,28 @@ def test_attachment_bytes_are_read_from_disk_when_not_held_in_memory(tmp_path):
     assert encode_image_ollama(att) == base64.b64encode(b"on-disk-bytes").decode()
 
 
+def test_attachment_bytes_are_read_from_disk_only_once(tmp_path):
+    """History replays every turn; without caching, a 1 MB attached log
+    would be re-read from disk on every send for the whole conversation."""
+    path = tmp_path / "notes.txt"
+    path.write_text("cached content", encoding="utf-8")
+    att = Attachment("text/plain", path=str(path))
+
+    first = att.read_bytes()
+    path.unlink()  # a second disk read would now fail loudly
+
+    assert att.read_bytes() == first
+
+
+def test_cached_attachment_bytes_never_reach_the_saved_session(tmp_path):
+    path = tmp_path / "notes.txt"
+    path.write_text("secret-ish content", encoding="utf-8")
+    att = Attachment("text/plain", path=str(path))
+    att.read_bytes()
+
+    assert "data" not in att.to_dict(), "only the path is ever serialised"
+
+
 # ---------------------------------------------------------------------------
 # max_tokens -- the hard-coded 2048
 # ---------------------------------------------------------------------------
@@ -525,17 +547,38 @@ def test_think_is_omitted_when_the_probe_fails(monkeypatch, _no_context_probe):
     assert "think" not in calls[0]
 
 
-def test_an_explicit_think_request_skips_the_probe(monkeypatch, _no_context_probe):
+def test_an_explicit_think_on_skips_the_probe(monkeypatch, _no_context_probe):
+    """The user asked for thinking; if the model cannot, the API error saying
+    so is the honest answer — no probe second-guessing."""
     from idt_core.providers import ollama as ollama_mod
 
     def boom(*a, **k):  # pragma: no cover - the assertion is that it never runs
-        raise AssertionError("explicit think must not probe capabilities")
+        raise AssertionError("explicit think=True must not probe capabilities")
 
     monkeypatch.setattr(ollama_mod, "model_capabilities", boom)
+    calls = _scripted_ollama(monkeypatch, [{"message": {"content": "x"}, "done": True}])
+    provider, request = _ollama_request(think=True)
+    list(provider.chat(request))
+    assert calls[0]["think"] is True
+
+
+def test_no_think_is_sent_to_thinking_models(monkeypatch, _no_context_probe):
+    _caps(monkeypatch, ["completion", "thinking"])
     calls = _scripted_ollama(monkeypatch, [{"message": {"content": "x"}, "done": True}])
     provider, request = _ollama_request(think=False)
     list(provider.chat(request))
     assert calls[0]["think"] is False
+
+
+def test_no_think_is_dropped_for_models_without_the_capability(
+        monkeypatch, _no_context_probe):
+    """--no-think on a plain model is already satisfied; sending the field
+    would fail the very turn the flag exists to speed up."""
+    _caps(monkeypatch, ["completion"])
+    calls = _scripted_ollama(monkeypatch, [{"message": {"content": "x"}, "done": True}])
+    provider, request = _ollama_request(think=False)
+    list(provider.chat(request))
+    assert "think" not in calls[0]
 
 
 def test_engine_forwards_thinking_and_never_saves_it():

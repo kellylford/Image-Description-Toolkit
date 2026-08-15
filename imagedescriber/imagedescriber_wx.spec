@@ -1,4 +1,4 @@
-﻿# -*- mode: python ; coding: utf-8 -*-
+# -*- mode: python ; coding: utf-8 -*-
 
 import re
 import sys
@@ -81,7 +81,7 @@ a = Analysis(
         'batch_progress_dialog',  # Phase 3: Batch progress dialog (frozen mode)
         'workspace_stats_dialog',  # Workspace Statistics dialog (frozen mode)
         'workspace_manager',  # .idtw bundle save/load (frozen bare name)
-        # idt_core package â€” EXIF context injection, Save/Import idt Project, XMP embed
+        # idt_core package — EXIF context injection, Save/Import idt Project, XMP embed
         'idt_core',
         'idt_core.project',
         'idt_core.image_item',
@@ -106,11 +106,11 @@ a = Analysis(
         'idt_core.providers.claude',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
-        # Capability registry â€” replaces the deleted models/provider_configs.py.
+        # Capability registry — replaces the deleted models/provider_configs.py.
         # chat_window_wx imports it at module scope for the Attach Files button,
         # so a missing entry here breaks chat in frozen builds only.
         'idt_core.providers.registry',
-        # Chat engine â€” chat_window_wx runs on this now that
+        # Chat engine — chat_window_wx runs on this now that
         # ChatProcessingWorker is gone. Enumerated one by one to match this
         # file's convention; a missing entry fails only in the frozen build.
         'idt_core.chat',
@@ -145,7 +145,7 @@ a = Analysis(
         'bs4.builder._htmlparser',
         'bs4.builder._lxml',
         'soupsieve',  # BeautifulSoup dependency
-        # MLX / Apple Metal (macOS Apple Silicon only â€” no-op on Windows)
+        # MLX / Apple Metal (macOS Apple Silicon only — no-op on Windows)
         'mlx_vlm',
         'mlx',
         'mlx.core',
@@ -166,7 +166,7 @@ a = Analysis(
         'transformers.models.qwen2_5_vl.configuration_qwen2_5_vl',
         'transformers.models.qwen2_5_vl.modeling_qwen2_5_vl',
         'transformers.models.qwen2_5_vl.processing_qwen2_5_vl',
-        # LLaVA modules â€” kept for potential future use, currently broken with
+        # LLaVA modules — kept for potential future use, currently broken with
         # transformers 5.x (patch_size NoneType in LLaVA processor)
         'transformers.models.llava',
         'transformers.models.llava.configuration_llava',
@@ -197,7 +197,7 @@ a = Analysis(
         'transformers.models.mllama.processing_mllama',
         'transformers.models.mllama.image_processing_mllama',
         'transformers.models.mllama.image_processing_mllama_fast',
-        # PyTorch â€” CPU-only, required by transformers processor layer for LLaVA/Phi models
+        # PyTorch — CPU-only, required by transformers processor layer for LLaVA/Phi models
         'torch',
         'torchvision',
         'huggingface_hub',

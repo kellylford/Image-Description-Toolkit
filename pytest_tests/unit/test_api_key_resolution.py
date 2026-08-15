@@ -385,3 +385,51 @@ class TestMacKeychainCommands:
     def test_delete_uses_delete_generic_password(self, recorded):
         assert key_module._mac_delete("claude") is True
         assert recorded[0][:2] == ["security", "delete-generic-password"]
+
+
+# ---------------------------------------------------------------------------
+# store_api_key -- the store-then-config fallback both key dialogs share
+# ---------------------------------------------------------------------------
+
+
+class TestStoreApiKeyFallback:
+    def test_prefers_the_credential_store(self, monkeypatch):
+        monkeypatch.setattr(key_module, "credential_store_name", lambda: "Fake Store")
+        monkeypatch.setattr(key_module, "set_api_key", lambda p, v: True)
+        assert key_module.store_api_key("claude", "sk-x") == "credential store"
+
+    def test_falls_back_to_the_config_file_without_a_store(self, monkeypatch, tmp_path):
+        """A settings dialog that can only refuse to save is worse than the
+        plaintext config the app has always supported."""
+        import json
+
+        import idt_core.config_loader as loader
+
+        config_path = tmp_path / "image_describer_config.json"
+        monkeypatch.setattr(key_module, "credential_store_name", lambda: "")
+        monkeypatch.setattr(
+            loader, "load_json_config",
+            lambda *a, **k: ({"api_keys": {}}, config_path, "test"))
+
+        assert key_module.store_api_key("Anthropic", "sk-x") == "config file"
+        written = json.loads(config_path.read_text(encoding="utf-8"))
+        assert written["api_keys"]["claude"] == "sk-x", "canonical name, not the alias"
+
+    def test_returns_empty_when_both_destinations_fail(self, monkeypatch):
+        import idt_core.config_loader as loader
+
+        monkeypatch.setattr(key_module, "credential_store_name", lambda: "")
+
+        def boom(*a, **k):
+            raise OSError("no config")
+
+        monkeypatch.setattr(loader, "load_json_config", boom)
+        assert key_module.store_api_key("claude", "sk-x") == ""
+
+    def test_rejects_blank_input_before_touching_anything(self, monkeypatch):
+        def do_not_call(*a, **k):  # pragma: no cover
+            raise AssertionError("blank input must not reach a store")
+
+        monkeypatch.setattr(key_module, "set_api_key", do_not_call)
+        assert key_module.store_api_key("claude", "   ") == ""
+        assert key_module.store_api_key("", "value") == ""
