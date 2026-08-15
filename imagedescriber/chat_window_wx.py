@@ -61,6 +61,7 @@ from idt_core.chat import (
     ChatRetrying,
     ChatSession,
     ChatStarted,
+    ChatThinking,
     ChatUsage,
 )
 from idt_core.chat.attachments import prepare_attachments
@@ -903,6 +904,13 @@ class ChatWindow(wx.Dialog):
             self._on_stream_delta(event.text)
             return
 
+        if isinstance(event, ChatThinking):
+            # Reasoning models can spend minutes here producing no visible
+            # deltas; without this the window just sits silent. Status only,
+            # never the text — same policy as the standalone chat app.
+            self.status_text.SetLabel("Model is thinking...")
+            return
+
         if isinstance(event, ChatRetrying):
             self.status_text.SetLabel(
                 f"{event.error} - retrying (attempt {event.attempt})")
@@ -1342,25 +1350,8 @@ class ChatWindow(wx.Dialog):
                 from idt_core.providers.openai_provider import OPENAI_MODEL_METADATA
                 size = OPENAI_MODEL_METADATA.get(self.model, {}).get('context_window', 128_000)
             elif self.provider == 'ollama':
-                try:
-                    import ollama
-                    info = ollama.show(self.model)
-                    # Newer Ollama versions expose model_info with architecture-prefixed keys
-                    model_info = getattr(info, 'model_info', None) or {}
-                    for key, val in model_info.items():
-                        if 'context_length' in key.lower() or 'context_window' in key.lower():
-                            size = int(val)
-                            break
-                    # Fall back to parsing the parameters string (num_ctx N)
-                    if not size:
-                        params_str = getattr(info, 'parameters', '') or ''
-                        for line in params_str.splitlines():
-                            parts = line.strip().lower().split()
-                            if parts and parts[0] == 'num_ctx' and len(parts) >= 2:
-                                size = int(parts[1])
-                                break
-                except Exception:
-                    size = 32_768
+                from idt_core.providers.ollama import model_context_length
+                size = model_context_length(self.model) or 32_768
             elif self.provider == 'mlx':
                 size = 32_768
         except Exception:

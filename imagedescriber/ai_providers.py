@@ -100,6 +100,22 @@ from idt_core.providers.claude import (
 )
 
 
+def _shared_api_key(provider_name: str) -> Optional[str]:
+    """Key from idt_core.keys: env -> OS credential store -> config -> legacy.
+
+    Consulted before this module's own per-provider lookups so a key saved
+    through any IDT surface (the chat app's API Keys dialog, the describer's
+    settings, the credential store directly) reaches these providers too.
+    Note this puts the environment ahead of the config file, matching chat
+    and the CLI — the old GUI-only order had the config winning.
+    """
+    try:
+        from idt_core.keys import resolve_api_key
+        return resolve_api_key(provider_name)
+    except Exception:
+        return None
+
+
 def sort_claude_models(models: List[str]) -> List[str]:
     """
     Sort Claude models by tier (haiku -> sonnet -> opus) then by version.
@@ -762,10 +778,9 @@ class OpenAIProvider(AIProvider):
     def __init__(self, api_key: Optional[str] = None):
         # Try multiple sources for API key in order of preference:
         # 1. Explicitly passed key
-        # 2. Config file (image_describer_config.json)
-        # 3. Environment variable  
-        # 4. openai.txt file in current directory
-        self.api_key = api_key or self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
+        # 2. Shared resolver (env -> credential store -> config -> legacy)
+        # 3. This module's own config/env/file lookups, kept as fallback
+        self.api_key = api_key or _shared_api_key('openai') or self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
         self.timeout = 300
         
         # Initialize OpenAI client with SDK
@@ -867,7 +882,7 @@ class OpenAIProvider(AIProvider):
         if explicit_key:
             self.api_key = explicit_key
         else:
-            self.api_key = self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
+            self.api_key = _shared_api_key('openai') or self._load_api_key_from_config() or os.getenv('OPENAI_API_KEY') or self._load_api_key_from_file()
         
         # Reinitialize client if we have a key
         self.client = None
@@ -1148,7 +1163,7 @@ class ClaudeProvider(AIProvider):
         # 2. Config file (image_describer_config.json)
         # 3. Environment variable  
         # 4. claude.txt file in current directory
-        self.api_key = api_key or self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
+        self.api_key = api_key or _shared_api_key('claude') or self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
         self.timeout = 300
         
         # Initialize Anthropic client with SDK
@@ -1250,7 +1265,7 @@ class ClaudeProvider(AIProvider):
         if explicit_key:
             self.api_key = explicit_key
         else:
-            self.api_key = self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
+            self.api_key = _shared_api_key('claude') or self._load_api_key_from_config() or os.getenv('ANTHROPIC_API_KEY') or self._load_api_key_from_file()
         
         # Reinitialize client if we have a key
         self.client = None

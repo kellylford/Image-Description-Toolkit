@@ -89,11 +89,56 @@ class ChatRetrying:
     delay_seconds: float = 0.0
 
 
+@dataclass
+class ChatThinking:
+    """A chunk of a reasoning model's thinking stream.
+
+    Kept apart from :class:`ChatDelta` so the answer stays clean: thinking is
+    never committed to history, and a screen-reader UI can report "thinking…"
+    without narrating pages of scratch work.
+    """
+
+    text: str
+
+
+@dataclass
+class ChatToolCall:
+    """The model is using a tool (e.g. web search). Informational.
+
+    Emitted so the user can see *why* the reply is taking a moment; the tool's
+    actual output goes back to the model, never through this event.
+    """
+
+    name: str
+    arguments: dict = field(default_factory=dict)
+
+    def describe(self) -> str:
+        """A short line fit for a status bar or a screen reader."""
+        if self.name == "web_search":
+            query = str(self.arguments.get("query", "")).strip()
+            return f"Searching the web: {query}" if query else "Searching the web"
+        if self.name == "web_fetch":
+            url = str(self.arguments.get("url", "")).strip()
+            return f"Reading page: {url}" if url else "Reading a web page"
+        return f"Running tool: {self.name}"
+
+
+@dataclass
+class ChatToolResult:
+    """A tool finished; ``summary`` is one user-facing line."""
+
+    name: str
+    summary: str = ""
+
+
 ChatEvent = Union[
     ChatStarted,
     ChatDelta,
+    ChatThinking,
     ChatUsage,
     ChatRetrying,
+    ChatToolCall,
+    ChatToolResult,
     ChatFinished,
     ChatCancelled,
     ChatFailed,

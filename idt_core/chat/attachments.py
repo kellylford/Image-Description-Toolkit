@@ -21,7 +21,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-from ..providers.registry import capabilities_for
+from ..providers.registry import TEXT_EXTENSION_MIME_TYPES, capabilities_for
 from .messages import Attachment
 
 __all__ = [
@@ -48,8 +48,11 @@ EXTENSION_MIME_TYPES = {
     ".tif": "image/tiff",
     ".tiff": "image/tiff",
     ".pdf": "application/pdf",
-    ".txt": "text/plain",
-    ".md": "text/markdown",
+    # Text-shaped files (inlined into the prompt by the chat formatters, so
+    # they work on every provider). The registry owns that table; composing
+    # it in keeps the extension map, the MIME tuple, and the file-dialog
+    # wildcards structurally in step instead of comment-in-step.
+    **TEXT_EXTENSION_MIME_TYPES,
 }
 
 #: Converted to JPEG before sending: no provider decodes HEIC.
@@ -125,9 +128,9 @@ def prepare_attachment(
 
     media_type = infer_media_type(source)
     if not capabilities.accepts(media_type):
-        accepted = ", ".join(
-            sorted({m.split("/")[-1] for m in capabilities.attachment_mime_types})
-        )
+        from ..providers.registry import accepted_extensions
+
+        accepted = ", ".join(accepted_extensions(provider)) or "no attachments"
         raise AttachmentError(
             f"{provider} cannot read {source.name} ({media_type}). "
             f"It accepts: {accepted}."

@@ -21,7 +21,16 @@ import base64
 import io
 from typing import Iterator, List, Optional, Sequence, Tuple
 
-from ..providers.base import ChatDelta, ChatProvider, ChatRequest, ChatUsage, ChatYield
+from ..providers.base import (
+    ChatDelta,
+    ChatProvider,
+    ChatRequest,
+    ChatThinking,
+    ChatToolCall,
+    ChatToolResult,
+    ChatUsage,
+    ChatYield,
+)
 from .messages import Attachment, ChatMessage, conversation_turns
 
 #: OpenAI images are resized to this longest edge before upload, matching the
@@ -70,6 +79,18 @@ def encode_image_openai(att: Attachment) -> dict:
     }
 
 
+def encode_pdf_openai(att: Attachment) -> dict:
+    """PDF as a ``file`` content part for the OpenAI chat completions API."""
+    payload = base64.b64encode(att.read_bytes()).decode("utf-8")
+    return {
+        "type": "file",
+        "file": {
+            "filename": att.name or "document.pdf",
+            "file_data": f"data:application/pdf;base64,{payload}",
+        },
+    }
+
+
 def encode_attachment_claude(att: Attachment) -> dict:
     """Image or document content block for the Anthropic messages API."""
     payload = base64.b64encode(att.read_bytes()).decode("utf-8")
@@ -93,6 +114,30 @@ def encode_attachment_claude(att: Attachment) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def merge_text_attachments(msg: ChatMessage) -> str:
+    """The turn's text with any text attachments inlined after it.
+
+    This is how a ``.txt``/``.md``/code attachment reaches the model on every
+    provider — as a longer prompt, never as an upload. It therefore works with
+    text-only models too. A file that has gone missing since it was attached
+    becomes a note rather than a failed turn: the conversation history may be
+    replayed long after the file was deleted.
+    """
+    texts = [a for a in msg.attachments if a.is_text]
+    if not texts:
+        return msg.content
+
+    parts = [msg.content] if msg.content else []
+    for att in texts:
+        try:
+            body = att.read_bytes().decode("utf-8", errors="replace")
+        except (OSError, ValueError):
+            parts.append(f"[Attached file {att.name} is no longer available.]")
+            continue
+        parts.append(f"[Attached file: {att.name}]\n{body}")
+    return "\n\n".join(parts)
+
+
 def format_for_ollama(
     messages: Sequence[ChatMessage], system_prompt: str = ""
 ) -> List[dict]:
@@ -101,7 +146,7 @@ def format_for_ollama(
     if system_prompt:
         out.append({"role": "system", "content": system_prompt})
     for msg in conversation_turns(messages):
-        entry = {"role": msg.role, "content": msg.content}
+        entry = {"role": msg.role, "content": merge_text_attachments(msg)}
         images = [a for a in msg.attachments if a.is_image]
         if images:
             entry["images"] = [encode_image_ollama(a) for a in images]
@@ -121,13 +166,17 @@ def format_for_openai(
     if system_prompt:
         out.append({"role": "system", "content": system_prompt})
     for msg in conversation_turns(messages):
+        text = merge_text_attachments(msg)
         images = [a for a in msg.attachments if a.is_image]
-        if images:
-            content: List[dict] = [{"type": "text", "text": msg.content}]
+        pdfs = [a for a in msg.attachments
+                if a.media_type == "application/pdf"]
+        if images or pdfs:
+            content: List[dict] = [{"type": "text", "text": text}]
             content.extend(encode_image_openai(a) for a in images)
+            content.extend(encode_pdf_openai(a) for a in pdfs)
             out.append({"role": msg.role, "content": content})
         else:
-            out.append({"role": msg.role, "content": msg.content})
+            out.append({"role": msg.role, "content": text})
     return out
 
 
@@ -139,16 +188,20 @@ def format_for_claude(
     Returns ``(system, messages)``. This is the one provider where a system
     message must not be prepended to the list — doing so is an API error.
     Attachments come before the text in a content array, matching the previous
-    implementation.
+    implementation. Text attachments are inlined into the text block, never
+    handed to :func:`encode_attachment_claude` — encoding a ``.txt`` as an
+    image block would be an API error.
     """
     out: List[dict] = []
     for msg in conversation_turns(messages):
-        if msg.attachments:
-            content: List[dict] = [encode_attachment_claude(a) for a in msg.attachments]
-            content.append({"type": "text", "text": msg.content})
+        text = merge_text_attachments(msg)
+        uploads = [a for a in msg.attachments if not a.is_text]
+        if uploads:
+            content: List[dict] = [encode_attachment_claude(a) for a in uploads]
+            content.append({"type": "text", "text": text})
             out.append({"role": msg.role, "content": content})
         else:
-            out.append({"role": msg.role, "content": msg.content})
+            out.append({"role": msg.role, "content": text})
     return system_prompt, out
 
 
@@ -159,6 +212,18 @@ def format_for_claude(
 
 class OllamaChatProvider(ChatProvider):
     """Local or cloud Ollama. No API key."""
+
+    #: Never request less than Ollama's own server-side default; asking for a
+    #: smaller cache than the server would allocate anyway buys nothing.
+    MIN_NUM_CTX = 4096
+    #: Cap when the model's trained context length cannot be discovered.
+    #: Matches the budgeter's flat Ollama default in tokens.py.
+    FALLBACK_MAX_NUM_CTX = 32_768
+    #: num_ctx is rounded up to a multiple of this so the KV cache is not
+    #: reallocated on every turn as the conversation grows a few tokens.
+    NUM_CTX_STEP = 2048
+    #: Reply headroom when the caller did not set max_output_tokens.
+    DEFAULT_REPLY_HEADROOM = 2048
 
     def __init__(self, model: str, host: Optional[str] = None):
         self._model = model
@@ -172,29 +237,191 @@ class OllamaChatProvider(ChatProvider):
     def model_name(self) -> str:
         return self._model
 
+    def _num_ctx(self, request: ChatRequest) -> int:
+        """Context size to request for this turn.
+
+        Without an explicit ``num_ctx`` the server applies its own default
+        (4,096 on current builds) regardless of what the model supports, so
+        long conversations were silently truncated server-side while the
+        client-side budgeter believed 32k were available. Request what the
+        conversation actually needs — estimated prompt plus reply headroom,
+        rounded up — capped at the model's trained length. Asking for the full
+        window on every turn would balloon KV-cache memory for no benefit on
+        short chats.
+        """
+        from . import tokens as token_tools
+
+        needed = token_tools.estimate_tokens(request.messages)
+        needed += request.max_output_tokens or self.DEFAULT_REPLY_HEADROOM
+        if request.tools:
+            # Tool rounds append search results the estimate cannot see yet;
+            # Ollama's own web-search guide recommends ~32k for search agents.
+            needed = max(needed, self.FALLBACK_MAX_NUM_CTX)
+        needed = -(-needed // self.NUM_CTX_STEP) * self.NUM_CTX_STEP
+
+        try:
+            from ..providers.ollama import model_context_length
+
+            cap = model_context_length(
+                request.model or self._model,
+                **({"host": self._host} if self._host else {}),
+            )
+        except Exception:
+            cap = None
+        return min(cap or self.FALLBACK_MAX_NUM_CTX, max(self.MIN_NUM_CTX, needed))
+
+    def _request_options(self, request: ChatRequest) -> dict:
+        """The ``options`` dict for /api/chat.
+
+        Before this existed, ``temperature`` and ``max_output_tokens`` were
+        honoured by OpenAI and Claude but silently dropped for Ollama.
+        """
+        options = {"num_ctx": self._num_ctx(request)}
+        if request.temperature is not None:
+            options["temperature"] = request.temperature
+        if request.max_output_tokens:
+            options["num_predict"] = request.max_output_tokens
+        return options
+
+    #: Rounds of tool use before the model is made to answer with what it has.
+    #: A search agent normally needs one or two; the bound exists so a model
+    #: stuck re-searching cannot loop forever on the user's API quota.
+    MAX_TOOL_ROUNDS = 5
+
+    @staticmethod
+    def _tool_call_fields(call) -> Tuple[str, dict]:
+        """(name, arguments) from a tool call, tolerating both the SDK's
+        object shape and plain dicts. Arguments may arrive as a JSON string."""
+        if hasattr(call, "get"):
+            function = call.get("function") or {}
+        else:
+            function = getattr(call, "function", None) or {}
+        if hasattr(function, "get"):
+            name = function.get("name") or ""
+            arguments = function.get("arguments")
+        else:
+            name = getattr(function, "name", "") or ""
+            arguments = getattr(function, "arguments", None)
+        if isinstance(arguments, str):
+            import json
+
+            try:
+                arguments = json.loads(arguments)
+            except ValueError:
+                arguments = {"raw": arguments}
+        if not isinstance(arguments, dict):
+            arguments = {}
+        return name, arguments
+
+    def _effective_think(self, request: ChatRequest):
+        """The ``think`` parameter to send, or None to omit it.
+
+        Auto mode (``request.think is None``) turns thinking separation on for
+        models whose /api/show reports the capability, so their scratch work
+        streams as :class:`ChatThinking` instead of landing inside the saved
+        answer wrapped in ``<think>`` tags. Sending ``think`` to a model
+        without the capability is an API error, hence omit — and unlike the
+        picker probes this one fails CLOSED, because a wrong True breaks the
+        turn while a wrong None merely leaves tags in the text.
+
+        An explicit False is also gated on the capability: ``--no-think``
+        against a model that cannot think is already satisfied, and sending
+        the field would fail the very turn the flag exists to speed up. An
+        explicit True is passed through unprobed — the user asked for
+        thinking, and if the model cannot do it the API error saying so is
+        the honest answer.
+        """
+        if request.think is True:
+            return True
+        try:
+            from ..providers.ollama import model_capabilities
+
+            caps = model_capabilities(
+                request.model or self._model,
+                **({"host": self._host} if self._host else {}),
+            )
+        except Exception:
+            caps = None
+        has_thinking = bool(caps) and "thinking" in caps
+        if request.think is False:
+            return False if has_thinking else None
+        return True if has_thinking else None
+
     def chat(self, request: ChatRequest) -> Iterator[ChatYield]:
         import ollama
 
         client = ollama.Client(host=self._host) if self._host else ollama
-        stream = client.chat(
-            model=request.model or self._model,
-            messages=format_for_ollama(request.messages, request.system_prompt),
-            stream=True,
-        )
+        messages = format_for_ollama(request.messages, request.system_prompt)
+        options = self._request_options(request)
+        tools = list(request.tools) if request.tools and request.execute_tool else None
+        think = self._effective_think(request)
         input_tokens = output_tokens = 0
-        try:
-            for chunk in stream:
-                message = chunk.get("message") or {}
-                text = message.get("content")
-                if text:
-                    yield ChatDelta(text)
-                if chunk.get("done"):
-                    input_tokens = chunk.get("prompt_eval_count") or 0
-                    output_tokens = chunk.get("eval_count") or 0
-        finally:
-            close = getattr(stream, "close", None)
-            if close:
-                close()
+
+        # Round 0 is the ordinary turn. When the model calls tools, their
+        # results are appended as role=tool messages and the loop goes again;
+        # the final iteration withholds the tools so the model must answer.
+        for round_index in range(self.MAX_TOOL_ROUNDS + 1):
+            offer_tools = tools if round_index < self.MAX_TOOL_ROUNDS else None
+            kwargs = {
+                "model": request.model or self._model,
+                "messages": messages,
+                "stream": True,
+                "options": options,
+            }
+            if offer_tools:
+                kwargs["tools"] = offer_tools
+            if think is not None:
+                kwargs["think"] = think
+
+            stream = client.chat(**kwargs)
+            text_parts: List[str] = []
+            tool_calls: List = []
+            try:
+                for chunk in stream:
+                    message = chunk.get("message") or {}
+                    thinking = message.get("thinking")
+                    if thinking:
+                        yield ChatThinking(thinking)
+                    text = message.get("content")
+                    if text:
+                        text_parts.append(text)
+                        yield ChatDelta(text)
+                    calls = message.get("tool_calls")
+                    if calls:
+                        tool_calls.extend(calls)
+                    if chunk.get("done"):
+                        # Sum across rounds: each is a separate model call.
+                        input_tokens += chunk.get("prompt_eval_count") or 0
+                        output_tokens += chunk.get("eval_count") or 0
+            finally:
+                close = getattr(stream, "close", None)
+                if close:
+                    close()
+
+            if not tool_calls:
+                break
+
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": "".join(text_parts),
+                    "tool_calls": tool_calls,
+                }
+            )
+            for call in tool_calls:
+                name, arguments = self._tool_call_fields(call)
+                yield ChatToolCall(name=name, arguments=arguments)
+                try:
+                    result = request.execute_tool(name, arguments)
+                except Exception as exc:  # noqa: BLE001 - a tool must not fail the turn
+                    result = f"Tool {name} failed: {exc}"
+                from .tools import tool_result_summary
+
+                yield ChatToolResult(name=name, summary=tool_result_summary(name, result))
+                messages.append(
+                    {"role": "tool", "content": result, "tool_name": name}
+                )
+
         if input_tokens or output_tokens:
             yield ChatUsage(input_tokens=input_tokens, output_tokens=output_tokens)
 

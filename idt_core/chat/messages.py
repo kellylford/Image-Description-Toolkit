@@ -64,13 +64,40 @@ class Attachment:
     def is_image(self) -> bool:
         return self.media_type.startswith("image/")
 
+    @property
+    def is_text(self) -> bool:
+        """True when the content is inlined into the message text at send time
+        rather than uploaded as a file. The registry owns the definition."""
+        from ..providers.registry import is_text_media_type
+
+        return is_text_media_type(self.media_type)
+
+    def size_bytes(self) -> Optional[int]:
+        """Size without reading the content — token estimation runs in loops,
+        so it must cost a stat, not a read."""
+        if self.data is not None:
+            return len(self.data)
+        if self.path:
+            try:
+                return Path(self.path).stat().st_size
+            except OSError:
+                return None
+        return None
+
     def read_bytes(self) -> bytes:
-        """Return the attachment's bytes, reading from disk if needed."""
+        """Return the attachment's bytes, reading from disk once.
+
+        The wire formatters replay the whole history every turn, so without
+        this cache a 1 MB attached log would be re-read from disk on every
+        subsequent send for the rest of the conversation. ``to_dict`` still
+        serialises only the path, never the cached bytes.
+        """
         if self.data is not None:
             return self.data
         if not self.path:
             raise ValueError(f"attachment {self.name!r} has neither data nor path")
-        return Path(self.path).read_bytes()
+        self.data = Path(self.path).read_bytes()
+        return self.data
 
     def exists(self) -> bool:
         if self.data is not None:

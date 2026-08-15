@@ -151,12 +151,14 @@ def test_empty_provider_name_is_safe():
 # Capability data
 # --------------------------------------------------------------------------
 
-def test_claude_is_the_only_provider_accepting_documents():
-    """Claude accepts PDFs as native document blocks; the others take images only."""
+def test_the_document_providers_are_claude_and_openai():
+    """Claude takes PDFs as document blocks, OpenAI as file content parts;
+    the local providers have no document slot in their APIs."""
     with_docs = [p for p in registry.list_providers()
                  if registry.capabilities_for(p).supports_documents]
-    assert with_docs == ["claude"]
-    assert "application/pdf" in registry.supported_attachments("claude")
+    assert with_docs == ["claude", "openai"]
+    for name in ("claude", "openai"):
+        assert "application/pdf" in registry.supported_attachments(name)
 
 
 def test_local_providers_need_no_api_key():
@@ -210,3 +212,15 @@ def test_model_limits_returns_none_rather_than_guessing():
     context, max_output = registry.model_limits("claude", "claude-opus-5")
     assert context and context > 0
     assert max_output and max_output > 0
+
+
+def test_the_text_extension_table_drives_every_derived_view():
+    """One table, three consumers: MIME inference, the declared MIME tuple,
+    and the file-dialog wildcards. This is the structural version of the
+    'keep these in step' comment the tables used to rely on."""
+    from idt_core.chat.attachments import infer_media_type
+
+    for extension, mime in registry.TEXT_EXTENSION_MIME_TYPES.items():
+        assert infer_media_type(f"file{extension}") == mime
+        assert mime in registry.TEXT_ATTACHMENT_MIME_TYPES
+        assert f"*{extension}" in registry.attachment_wildcard("ollama")

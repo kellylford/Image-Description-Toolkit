@@ -1512,7 +1512,9 @@ def _chat_default_model(provider: str) -> str:
         return DEFAULT_MODEL
     from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
     try:
-        available = OllamaProvider(model=DEFAULT_MODEL).list_models()
+        # Chat-capable models, not vision-capable ones: this default is for
+        # `idt chat`, where a text-only model is a perfectly good pick.
+        available = OllamaProvider(model=DEFAULT_MODEL).list_chat_models()
         if available:
             return available[0]
     except Exception:
@@ -1523,7 +1525,8 @@ def _chat_default_model(provider: str) -> str:
     return DEFAULT_MODEL
 
 
-def _chat_stream_turn(engine, text, options, quiet=False, attachments=()):
+def _chat_stream_turn(engine, text, options, quiet=False, attachments=(),
+                      show_thinking=False):
     """Run one turn, printing deltas as they arrive.
 
     Ctrl+C cancels the turn rather than the program: the generator is closed,
@@ -1532,16 +1535,27 @@ def _chat_stream_turn(engine, text, options, quiet=False, attachments=()):
     """
     from idt_core.chat import (
         ChatCancelled, ChatDelta, ChatFailed, ChatFinished, ChatRetrying,
-        ChatStarted,
+        ChatStarted, ChatThinking, ChatToolCall, ChatToolResult,
     )
 
     generator = engine.send(text, attachments, options)
     completed = False
+    thinking_noted = False
     try:
         for event in generator:
             if isinstance(event, ChatDelta):
                 sys.stdout.write(event.text)
                 sys.stdout.flush()
+            elif isinstance(event, ChatThinking):
+                # Thinking goes to stderr so piping stdout still yields only
+                # the answer. Without --show-thinking, one note explains the
+                # silence instead of pages of scratch work.
+                if show_thinking:
+                    sys.stderr.write(event.text)
+                    sys.stderr.flush()
+                elif not thinking_noted and not quiet:
+                    print("[thinking…]", file=sys.stderr)
+                    thinking_noted = True
             elif isinstance(event, ChatStarted):
                 if event.dropped_messages and not quiet:
                     print(
@@ -1549,6 +1563,12 @@ def _chat_stream_turn(engine, text, options, quiet=False, attachments=()):
                         f"the context window]",
                         file=sys.stderr,
                     )
+            elif isinstance(event, ChatToolCall):
+                if not quiet:
+                    print(f"[{event.describe()}]", file=sys.stderr)
+            elif isinstance(event, ChatToolResult):
+                if not quiet and event.summary:
+                    print(f"[{event.summary}]", file=sys.stderr)
             elif isinstance(event, ChatRetrying):
                 print(
                     f"\n[{event.error} — retrying, attempt {event.attempt}]",
@@ -1625,10 +1645,27 @@ def cmd_chat(args):
 
     provider = create_chat_provider(canonical, model, api_key)
     engine = ChatEngine(session, provider, store)
+
+    web_search = bool(getattr(args, "web_search", False))
+    if web_search:
+        from idt_core.chat.tools import missing_web_key_message, web_search_available
+
+        if canonical != "ollama":
+            print("Warning: --web-search only works with --provider ollama; "
+                  "ignoring it.", file=sys.stderr)
+            web_search = False
+        elif not web_search_available():
+            # Warn now, at the prompt, rather than mid-answer via a failed
+            # tool call — but keep going: the model can still chat without it.
+            print(f"Warning: {missing_web_key_message()}", file=sys.stderr)
+
     options = ChatOptions(
         max_output_tokens=args.max_tokens,
         temperature=args.temperature,
+        web_search=web_search,
+        thinking=getattr(args, "thinking", None),
     )
+    show_thinking = bool(getattr(args, "show_thinking", False))
 
     # Attachments, prepared through the same code the GUIs use so limits,
     # HEIC conversion and provider support behave identically everywhere.
@@ -1647,7 +1684,8 @@ def cmd_chat(args):
     # One-shot.
     if args.message:
         ok = _chat_stream_turn(engine, args.message, options, quiet=args.quiet,
-                               attachments=attachments)
+                               attachments=attachments,
+                               show_thinking=show_thinking)
         if store and not args.quiet:
             print(f"[saved as {session.id}]", file=sys.stderr)
         sys.exit(0 if ok else 1)
@@ -1683,7 +1721,8 @@ def cmd_chat(args):
         # Attachments ride along with the first message only; the model has
         # seen them by the second turn and re-sending would just re-upload.
         _chat_stream_turn(engine, line, options, quiet=args.quiet,
-                          attachments=attachments)
+                          attachments=attachments,
+                          show_thinking=show_thinking)
         attachments = []
 
     if store and session.messages:
@@ -2388,6 +2427,18 @@ Supported providers:
                         help="Cap the reply length")
     p_chat.add_argument("--temperature", type=float, metavar="F",
                         help="Sampling temperature")
+    p_chat.add_argument("--web-search", action="store_true",
+                        help=("Let the model search the web (Ollama only; "
+                              "needs a free ollama.com API key in "
+                              "OLLAMA_API_KEY)"))
+    p_chat.add_argument("--think", dest="thinking", action="store_const",
+                        const=True, default=None,
+                        help="Force reasoning-model thinking on (Ollama)")
+    p_chat.add_argument("--no-think", dest="thinking", action="store_const",
+                        const=False,
+                        help="Force thinking off for faster answers (Ollama)")
+    p_chat.add_argument("--show-thinking", action="store_true",
+                        help="Stream the model's thinking to stderr")
     p_chat.add_argument("--quiet", "-q", action="store_true",
                         help="Suppress status notes on stderr")
     p_chat.set_defaults(func=cmd_chat)

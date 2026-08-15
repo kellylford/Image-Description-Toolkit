@@ -1,2 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Shell scripts keep LF even when checked out on Windows. A CRLF shebang line
+# makes the script unrunnable on macOS, and the bundled speech routers
+# (shared/speech/*.sh) ride into the macOS build from whatever this repo
+# checked out. Same rule ClaudeSpeak uses in TheWorkBench.
+*.sh text eol=lf
+*.command text eol=lf

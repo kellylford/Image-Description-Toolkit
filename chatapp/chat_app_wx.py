@@ -50,13 +50,25 @@ from idt_core.chat import (  # noqa: E402
     ChatRetrying,
     ChatSession,
     ChatStarted,
+    ChatThinking,
+    ChatToolCall,
+    ChatToolResult,
     ChatUsage,
     DirectoryChatStore,
     prepare_attachments,
 )
 from idt_core.chat.messages import Attachment  # noqa: E402
 from idt_core.chat.providers import create_chat_provider  # noqa: E402
-from idt_core.keys import missing_key_message, requires_api_key, resolve_api_key  # noqa: E402
+from idt_core.keys import (  # noqa: E402
+    ENV_VARS,
+    credential_store_name,
+    delete_api_key,
+    key_source,
+    missing_key_message,
+    requires_api_key,
+    resolve_api_key,
+    store_api_key,
+)
 from idt_core.providers.registry import (  # noqa: E402
     attachment_wildcard,
     capabilities_for,
@@ -65,6 +77,13 @@ from idt_core.providers.registry import (  # noqa: E402
 )
 
 from shared.chat_worker_wx import ChatWorker  # noqa: E402
+from shared.speech_engine import (  # noqa: E402
+    RATE_PRESET_LABELS,
+    SpeechSettings,
+    default_options,
+    list_speech_options,
+    speaker,
+)
 
 APP_NAME = "IDT Chat"
 
@@ -217,7 +236,10 @@ class ProviderDialog(wx.Dialog):
             if provider == "ollama":
                 from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
 
-                models = OllamaProvider(model=DEFAULT_MODEL).list_models()
+                # Chat listing, not the describe listing: chat needs the
+                # `completion` capability, and filtering on vision here hid
+                # every text-only model — often the best chat models installed.
+                models = OllamaProvider(model=DEFAULT_MODEL).list_chat_models()
                 if not models:
                     self.status.SetLabel("No Ollama models found. Is Ollama running?")
             elif provider == "claude":
@@ -266,6 +288,246 @@ class ProviderDialog(wx.Dialog):
         return provider, (data or self.model_choice.GetString(index))
 
 
+class SettingsDialog(wx.Dialog):
+    """Application settings, one notebook tab per area.
+
+    Speech is the first tab; the notebook is the point — the next settings
+    area gets a tab here, not another one-off dialog.
+    """
+
+    def __init__(self, parent, speech: SpeechSettings, options):
+        super().__init__(parent, title="Settings", size=(660, 420))
+        self._options = list(options)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        notebook = wx.Notebook(self, name="Settings sections")
+
+        # ---- Speech tab --------------------------------------------------
+        page = wx.Panel(notebook)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.auto_read = wx.CheckBox(
+            page, label="&Read responses aloud when they finish streaming",
+            name="Read responses aloud")
+        self.auto_read.SetValue(speech.enabled)
+        sizer.Add(self.auto_read, 0, wx.ALL, 10)
+
+        grid = wx.FlexGridSizer(rows=2, cols=2, vgap=8, hgap=8)
+        grid.AddGrowableCol(1, 1)
+
+        grid.Add(wx.StaticText(page, label="Speech &engine:"), 0,
+                 wx.ALIGN_CENTER_VERTICAL)
+        self.engine_choice = wx.Choice(
+            page, choices=[option.label for option in self._options],
+            name="Speech engine")
+        grid.Add(self.engine_choice, 1, wx.EXPAND)
+
+        grid.Add(wx.StaticText(page, label="Speaking r&ate:"), 0,
+                 wx.ALIGN_CENTER_VERTICAL)
+        self.rate_choice = wx.Choice(
+            page, choices=[label.capitalize() for label in RATE_PRESET_LABELS],
+            name="Speaking rate")
+        grid.Add(self.rate_choice, 0)
+        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 10)
+
+        self.rate_note = wx.StaticText(page, label="")
+        sizer.Add(self.rate_note, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        page.SetSizer(sizer)
+        notebook.AddPage(page, "Speech")
+        outer.Add(notebook, 1, wx.EXPAND | wx.ALL, 8)
+
+        buttons = wx.StdDialogButtonSizer()
+        ok = wx.Button(self, wx.ID_OK)
+        buttons.AddButton(ok)
+        buttons.AddButton(wx.Button(self, wx.ID_CANCEL))
+        buttons.Realize()
+        outer.Add(buttons, 0, wx.EXPAND | wx.ALL, 8)
+        self.SetSizer(outer)
+        ok.SetDefault()
+
+        # Pre-select the saved engine/voice, falling back to the first entry.
+        selected = 0
+        for i, option in enumerate(self._options):
+            if option.engine == speech.engine and option.voice == speech.voice:
+                selected = i
+                break
+        self.engine_choice.SetSelection(selected)
+
+        try:
+            self.rate_choice.SetSelection(
+                RATE_PRESET_LABELS.index(speech.rate_preset))
+        except ValueError:
+            self.rate_choice.SetSelection(0)
+
+        self.engine_choice.Bind(wx.EVT_CHOICE, lambda e: self._update_rate_state())
+        self._update_rate_state()
+        wx.CallAfter(self.auto_read.SetFocus)
+
+    def _selected_option(self):
+        index = self.engine_choice.GetSelection()
+        if index == wx.NOT_FOUND or index >= len(self._options):
+            return self._options[0]
+        return self._options[index]
+
+    def _update_rate_state(self):
+        option = self._selected_option()
+        self.rate_choice.Enable(option.has_rate)
+        if option.is_screen_reader:
+            # Deliberately no voice/rate control for screen-reader routes:
+            # those belong to the reader's own settings.
+            self.rate_note.SetLabel(
+                "Voice and rate follow your screen reader's own settings.")
+        elif option.has_rate:
+            self.rate_note.SetLabel("")
+        else:
+            self.rate_note.SetLabel("This engine uses its default rate.")
+        self.Layout()
+
+    def get_settings(self) -> SpeechSettings:
+        option = self._selected_option()
+        index = self.rate_choice.GetSelection()
+        preset = (RATE_PRESET_LABELS[index]
+                  if 0 <= index < len(RATE_PRESET_LABELS) else "default")
+        return SpeechSettings(
+            enabled=self.auto_read.GetValue(),
+            engine=option.engine,
+            voice=option.voice,
+            rate_preset=preset,
+        )
+
+
+class ApiKeysDialog(wx.Dialog):
+    """Set API keys for the whole toolkit, not just this app.
+
+    Keys are written to the operating system's credential store (Windows
+    Credential Manager / macOS Keychain), where every IDT surface — this app,
+    ImageDescriber, and the ``idt`` command line — resolves them through
+    ``idt_core.keys``. The dialog never displays a stored key: each provider
+    shows *where* its current key comes from, and takes a new value.
+    """
+
+    PROVIDERS = (
+        ("claude", "Claude (Anthropic)"),
+        ("openai", "OpenAI"),
+        ("ollama.com", "Ollama web search"),
+    )
+
+    _SOURCE_TEXT = {
+        "credential store": "stored in {store}",
+        "config file": "stored in the config file",
+        "legacy file": "stored in a legacy key file",
+    }
+
+    def __init__(self, parent):
+        super().__init__(parent, title="API Keys", size=(620, 360))
+        self._fields = {}
+        self._status_labels = {}
+
+        panel = wx.Panel(self)
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        store = credential_store_name()
+        intro = wx.StaticText(panel, label=(
+            f"Keys are saved to {store or 'the configuration file'} and used "
+            f"by IDT Chat, ImageDescriber, and the idt command line. "
+            f"Existing keys are never shown; enter a value to replace one."
+        ))
+        intro.Wrap(580)
+        outer.Add(intro, 0, wx.ALL, 10)
+
+        grid = wx.FlexGridSizer(rows=len(self.PROVIDERS), cols=4,
+                                vgap=8, hgap=8)
+        grid.AddGrowableCol(1, 1)
+        for provider, label in self.PROVIDERS:
+            grid.Add(wx.StaticText(panel, label=f"{label}:"), 0,
+                     wx.ALIGN_CENTER_VERTICAL)
+            field = wx.TextCtrl(panel, style=wx.TE_PASSWORD,
+                                name=f"{label} API key")
+            self._fields[provider] = field
+            grid.Add(field, 1, wx.EXPAND)
+
+            remove = wx.Button(panel, label="&Remove",
+                               name=f"Remove {label} key")
+            remove.Bind(wx.EVT_BUTTON,
+                        lambda e, p=provider: self.on_remove(p))
+            grid.Add(remove, 0)
+
+            status = wx.StaticText(panel, label="")
+            self._status_labels[provider] = status
+            grid.Add(status, 0, wx.ALIGN_CENTER_VERTICAL)
+        outer.Add(grid, 0, wx.EXPAND | wx.ALL, 10)
+
+        buttons = wx.StdDialogButtonSizer()
+        save = wx.Button(panel, wx.ID_OK, "&Save")
+        buttons.AddButton(save)
+        buttons.AddButton(wx.Button(panel, wx.ID_CANCEL))
+        buttons.Realize()
+        outer.Add(buttons, 0, wx.EXPAND | wx.ALL, 10)
+
+        panel.SetSizer(outer)
+        save.Bind(wx.EVT_BUTTON, self.on_save)
+        save.SetDefault()
+
+        self._refresh_status()
+        first = self._fields[self.PROVIDERS[0][0]]
+        wx.CallAfter(first.SetFocus)
+
+    def _refresh_status(self):
+        store = credential_store_name() or "the credential store"
+        for provider, _label in self.PROVIDERS:
+            source = key_source(provider)
+            if source == "environment":
+                text = (f"using the {ENV_VARS.get(provider, '?')} environment "
+                        f"variable (overrides stored keys)")
+            elif source in self._SOURCE_TEXT:
+                text = self._SOURCE_TEXT[source].format(store=store)
+            else:
+                text = "not set"
+            self._status_labels[provider].SetLabel(text)
+        self.Layout()
+
+    def on_remove(self, provider):
+        removed = delete_api_key(provider)
+        self._refresh_status()
+        remaining = key_source(provider)
+        if removed and remaining is None:
+            message = "Key removed."
+        elif removed:
+            # The store entry is gone but resolution still finds one — say
+            # so, or the user will believe the remaining key is deleted.
+            message = (f"Removed from the credential store, but a key from "
+                       f"the {remaining} still applies.")
+        elif remaining:
+            message = (f"Nothing stored in the credential store to remove; "
+                       f"the current key comes from the {remaining}.")
+        else:
+            message = "No stored key to remove."
+        wx.MessageBox(message, "Remove key", wx.OK | wx.ICON_INFORMATION, self)
+
+    def on_save(self, event):
+        entered = {p: f.GetValue().strip() for p, f in self._fields.items()}
+        entered = {p: v for p, v in entered.items() if v}
+        if not entered:
+            self.EndModal(wx.ID_OK)
+            return
+
+        # store_api_key prefers the OS store and falls back to the config
+        # file — same path ImageDescriber's settings use, so a platform
+        # without a credential store can still save keys.
+        failed = [p for p, v in entered.items() if not store_api_key(p, v)]
+        if failed:
+            labels = {p: label for p, label in self.PROVIDERS}
+            names = ", ".join(labels.get(p, p) for p in failed)
+            wx.MessageBox(
+                f"Could not save the key for: {names} — neither the "
+                f"credential store nor the configuration file accepted it.",
+                "Save failed", wx.OK | wx.ICON_ERROR, self)
+            self._refresh_status()
+            return
+        self.EndModal(wx.ID_OK)
+
+
 class ChatFrame(wx.Frame):
     """The main window."""
 
@@ -283,6 +545,15 @@ class ChatFrame(wx.Frame):
         self._is_streaming = False
         self.pending_attachments = []   # Attachment objects queued for the next turn
         self._temp_dir = None           # Holds HEIC conversions and pasted images
+        self._web_search = False        # Per-window, not persisted with the session
+
+        self.speech_settings = SpeechSettings.load()
+        # Probing for engines/voices runs PowerShell (or `say`) and takes a
+        # few seconds; do it now in the background so the Settings dialog
+        # opens instantly with real choices.
+        self._speech_options = None
+        import threading
+        threading.Thread(target=self._probe_speech, daemon=True).start()
 
         self._build_menu()
         self._build_ui()
@@ -314,6 +585,9 @@ class ChatFrame(wx.Frame):
         self._menu_item(file_menu, "&Export Conversation...\tCtrl+E",
                         self.on_export)
         file_menu.AppendSeparator()
+        self._menu_item(file_menu, "&Settings...", self.on_settings)
+        self._menu_item(file_menu, "API &Keys...", self.on_api_keys)
+        file_menu.AppendSeparator()
         self._menu_item(file_menu, "E&xit\tCtrl+Q", self.on_exit)
         bar.Append(file_menu, "&File")
 
@@ -333,6 +607,13 @@ class ChatFrame(wx.Frame):
                         self.on_change_model)
         self._menu_item(chat_menu, "Set S&ystem Prompt...\tCtrl+Shift+P",
                         self.on_system_prompt)
+        chat_menu.AppendSeparator()
+        # A check item, not a command: web search is a mode for the whole
+        # conversation, and the checkmark is what a screen reader reports.
+        self.web_search_item = chat_menu.AppendCheckItem(
+            wx.ID_ANY, "Use &Web Search\tCtrl+Shift+W",
+            "Let the model search the web (Ollama models with tool support)")
+        self.Bind(wx.EVT_MENU, self.on_toggle_web_search, self.web_search_item)
         bar.Append(chat_menu, "&Chat")
 
         edit_menu = wx.Menu()
@@ -524,8 +805,12 @@ class ChatFrame(wx.Frame):
             text = f"{text} [attached: {names}]" if text else f"[attached: {names}]"
         if message.error:
             text = f"[{message.error}] {text}" if text else f"[{message.error}]"
-        preview = text[:120] + ("…" if len(text) > 120 else "")
-        return f"{speaker}: {preview}"
+        # The FULL text, not a preview. The window clips it visually, but a
+        # screen reader arrowing the list reads the entire item — same
+        # convention as ImageDescriber's description lists. The 120-char
+        # preview this replaces meant a reader could never hear a whole
+        # response from the transcript list itself.
+        return f"{speaker}: {text}"
 
     def _reload_history(self):
         self.history_list.Clear()
@@ -745,6 +1030,59 @@ class ChatFrame(wx.Frame):
             self._refresh_attachments()
             self._set_status(
                 f"{self.provider_name} does not accept attachments; queue cleared")
+        self._update_web_search_controls()
+
+    # ---- web search ------------------------------------------------------
+
+    def _update_web_search_controls(self):
+        """Web search rides on tool calling, which only the Ollama chat
+        provider implements; on other providers the item is disabled so its
+        state cannot quietly mean nothing."""
+        supported = self.provider_name == "ollama"
+        self.web_search_item.Enable(supported)
+        if not supported and self._web_search:
+            self._web_search = False
+            self.web_search_item.Check(False)
+            self._set_status("Web search is off: only Ollama supports it")
+
+    def on_toggle_web_search(self, _event):
+        if not self.web_search_item.IsChecked():
+            self._web_search = False
+            self._set_status("Web search off")
+            self._announce("Web search off")
+            return
+
+        from idt_core.chat.tools import missing_web_key_message, web_search_available
+
+        if not web_search_available():
+            # Veto rather than let every search fail mid-answer.
+            self.web_search_item.Check(False)
+            self._web_search = False
+            wx.MessageBox(missing_web_key_message(), "Web search needs a key",
+                          wx.OK | wx.ICON_INFORMATION, self)
+            return
+
+        # Warn (but allow) when the model does not report tool support: the
+        # capability probe fails open, and a wrong "no" here would block a
+        # feature that actually works.
+        try:
+            from idt_core.providers.ollama import model_capabilities
+
+            caps = model_capabilities(self.model_name) if self.model_name else None
+            if caps is not None and "tools" not in caps:
+                wx.MessageBox(
+                    f"{self.model_name} does not report tool support, so it "
+                    f"may answer without searching. Models tagged 'tools' on "
+                    f"ollama.com work best.",
+                    "Model may not search", wx.OK | wx.ICON_INFORMATION, self)
+        except Exception:
+            # The capability probe is advisory; a probe failure must not
+            # block enabling web search (fail open, like the probe itself).
+            pass
+
+        self._web_search = True
+        self._set_status("Web search on")
+        self._announce("Web search on")
 
     def _cleanup_temp_files(self):
         if self._temp_dir is None:
@@ -794,13 +1132,14 @@ class ChatFrame(wx.Frame):
         self._start_turn("", regenerate=True)
 
     def _start_turn(self, text, regenerate=False, attachments=()):
+        speaker.stop()  # a new question should silence the previous answer
         self._is_streaming = True
         self._streaming_chunks = []
         self.stop_btn.Enable(True)
         self.send_btn.Enable(False)
         self._set_status("Waiting for a response…")
 
-        engine, options = self.engine, ChatOptions()
+        engine, options = self.engine, ChatOptions(web_search=self._web_search)
         queued = list(attachments)
         if regenerate:
             start = lambda: engine.regenerate(options)  # noqa: E731
@@ -810,6 +1149,7 @@ class ChatFrame(wx.Frame):
         self.worker.start()
 
     def on_stop(self, _event):
+        speaker.stop()  # Ctrl+. also silences a response being read aloud
         if self.worker is not None and self._is_streaming:
             self.worker.cancel()
             self._set_status("Stopping…")
@@ -833,8 +1173,29 @@ class ChatFrame(wx.Frame):
             self.detail.ShowPosition(self.detail.GetLastPosition())
             return
 
+        if isinstance(event, ChatThinking):
+            # Status only, never the text: reasoning models produce pages of
+            # scratch work, and narrating it would bury the actual answer.
+            self._set_status("Model is thinking…")
+            return
+
         if isinstance(event, ChatRetrying):
             self._set_status(f"{event.error} — retrying ({event.attempt})")
+            return
+
+        if isinstance(event, ChatToolCall):
+            # The note joins the streaming view so the wait is explained, but
+            # never the saved message — the engine commits only model text.
+            note = event.describe()
+            self._streaming_chunks.append(f"\n[{note}]\n")
+            self.detail.SetValue("".join(self._streaming_chunks))
+            self.detail.ShowPosition(self.detail.GetLastPosition())
+            self._set_status(note + "…")
+            return
+
+        if isinstance(event, ChatToolResult):
+            if event.summary:
+                self._set_status(event.summary)
             return
 
         if isinstance(event, ChatUsage):
@@ -856,7 +1217,13 @@ class ChatFrame(wx.Frame):
 
         if isinstance(event, ChatFinished):
             self._set_status("Response complete")
-            self._announce(event.message.content)
+            if self.speech_settings.enabled and speaker.speak(
+                    event.message.content, self.speech_settings):
+                # The speech engine is reading it; the focus-flip
+                # announcement on top would say everything twice.
+                pass
+            else:
+                self._announce(event.message.content)
         elif isinstance(event, ChatCancelled):
             self._set_status("Stopped — partial response kept")
             self._announce("Stopped. Partial response kept.")
@@ -879,6 +1246,53 @@ class ChatFrame(wx.Frame):
         self.engine = None
         if self._ensure_engine():
             self._set_status(f"Now using {self.provider_name}/{self.model_name}")
+
+    def _probe_speech(self):
+        """Background thread: enumerate speech engines and voices once."""
+        try:
+            self._speech_options = list_speech_options()
+        except Exception:
+            self._speech_options = default_options()
+
+    def on_settings(self, _event):
+        options = self._speech_options
+        if options is None:
+            # The startup probe is still running. Never re-probe on the UI
+            # thread — the PowerShell probe can take up to 25 s, which is a
+            # frozen window, and a second concurrent probe besides. Offer
+            # the static engines now; the full voice list is one reopen away.
+            options = default_options()
+            self._set_status(
+                "Still detecting installed voices — reopen Settings in a "
+                "moment for the full list")
+
+        dlg = SettingsDialog(self, self.speech_settings, options)
+        try:
+            if dlg.ShowModal() == wx.ID_OK:
+                self.speech_settings = dlg.get_settings()
+                try:
+                    self.speech_settings.save()
+                except OSError:
+                    self._set_status("Could not save settings to disk")
+                    return
+                state = "on" if self.speech_settings.enabled else "off"
+                self._set_status(f"Settings saved — automatic reading {state}")
+                self._announce(f"Automatic reading {state}")
+        finally:
+            dlg.Destroy()
+
+    def on_api_keys(self, _event):
+        dlg = ApiKeysDialog(self)
+        try:
+            dlg.ShowModal()
+        finally:
+            dlg.Destroy()
+        # A key may have just appeared (or vanished) for the active provider.
+        if requires_api_key(self.provider_name) and not resolve_api_key(
+                self.provider_name):
+            self._set_status(missing_key_message(self.provider_name))
+        else:
+            self._set_status("API keys updated")
 
     def on_system_prompt(self, _event):
         dlg = wx.TextEntryDialog(
@@ -1001,8 +1415,9 @@ class ChatFrame(wx.Frame):
             "Enter               In the conversation list: open it.\n"
             "                    In the transcript: read the message again.\n"
             "Ctrl+Shift+P        Set system prompt\n"
+            "Ctrl+Shift+W        Web search on/off (Ollama)\n"
             "Ctrl+R              Regenerate response\n"
-            "Ctrl+.              Stop the current response\n"
+            "Ctrl+.              Stop the current response (and speech)\n"
             "Ctrl+Shift+R        Read the last response again\n"
             "Ctrl+C              Copy the selected message\n"
             "Ctrl+Shift+C        Copy the whole conversation\n"
@@ -1082,6 +1497,7 @@ class ChatFrame(wx.Frame):
         self.Close()
 
     def on_close(self, event):
+        speaker.stop()
         # The engine persists after every turn, so there is nothing to save
         # here -- a lost close handler cannot lose the conversation.
         if self.worker is not None and self._is_streaming:

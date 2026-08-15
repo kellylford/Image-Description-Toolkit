@@ -46,6 +46,7 @@ TOKENS_PER_IMAGE = 1_000
 
 def context_window_for(provider: str, model: str = "") -> int:
     """Best known context window for a provider/model pair."""
+    canonical = (provider or "").lower()
     if model:
         try:
             from ..providers.registry import model_limits
@@ -55,7 +56,19 @@ def context_window_for(provider: str, model: str = "") -> int:
                 return recorded
         except ImportError:  # pragma: no cover - registry always ships
             pass
-    return DEFAULT_CONTEXT_WINDOWS.get((provider or "").lower(), FALLBACK_CONTEXT_WINDOW)
+        if canonical == "ollama":
+            # The registry has no per-model figures for Ollama; the server
+            # does. One /api/show per model per process (cached on success),
+            # and a refused connection just means the flat default below.
+            try:
+                from ..providers.ollama import model_context_length
+
+                discovered = model_context_length(model)
+                if discovered:
+                    return discovered
+            except Exception:  # pragma: no cover - probe must never break budgeting
+                pass
+    return DEFAULT_CONTEXT_WINDOWS.get(canonical, FALLBACK_CONTEXT_WINDOW)
 
 
 def estimate_tokens(messages: Sequence[ChatMessage]) -> int:
@@ -66,6 +79,11 @@ def estimate_tokens(messages: Sequence[ChatMessage]) -> int:
         for att in msg.attachments:
             if att.is_image:
                 total += TOKENS_PER_IMAGE
+            elif att.is_text:
+                # Inlined into the prompt by the formatters, so it costs what
+                # its content costs. size_bytes is a stat, not a read — this
+                # function runs inside fit_to_budget's loops.
+                total += max(1, (att.size_bytes() or 0) // CHARS_PER_TOKEN)
     return total
 
 

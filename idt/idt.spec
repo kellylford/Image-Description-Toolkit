@@ -99,6 +99,7 @@ a = Analysis(
         'idt_core.chat.providers',
         'idt_core.chat.store',
         'idt_core.chat.tokens',
+        'idt_core.chat.tools',
 
         # ---- jaraco (required by pkg_resources / setuptools >= 75) ----
         'jaraco', 'jaraco.text', 'jaraco.functools',

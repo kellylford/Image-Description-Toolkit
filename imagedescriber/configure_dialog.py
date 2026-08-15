@@ -38,51 +38,66 @@ logger = logging.getLogger(__name__)
 
 class ApiKeyEditDialog(wx.Dialog):
     """Dialog for adding or editing an API key"""
-    
+
+    #: (display label, canonical name used by idt_core.keys)
+    PROVIDER_CHOICES = [
+        ("OpenAI", "openai"),
+        ("Claude (Anthropic)", "claude"),
+        ("Ollama Web Search", "ollama.com"),
+    ]
+
     def __init__(self, parent, provider="", api_key=""):
         title = "Edit API Key" if provider else "Add API Key"
         super().__init__(parent, title=title, size=(500, 250))
-        
+
         self.provider = provider
         self.api_key = api_key
-        
+
         self.setup_ui()
-        
+
     def setup_ui(self):
         """Create the dialog UI"""
         panel = wx.Panel(self)
         sizer = wx.BoxSizer(wx.VERTICAL)
-        
+
         # Description
         desc_text = wx.StaticText(panel, label="Enter API key details:")
         sizer.Add(desc_text, 0, wx.ALL, 10)
-        
+
         # Form grid
         form_sizer = wx.FlexGridSizer(rows=2, cols=2, vgap=10, hgap=10)
         form_sizer.AddGrowableCol(1, 1)
-        
+
         # Provider selection
         form_sizer.Add(wx.StaticText(panel, label="Provider:"), 0, wx.ALIGN_CENTER_VERTICAL)
-        self.provider_choice = wx.Choice(panel, choices=["OpenAI", "Claude"])
+        labels = [label for label, _canonical in self.PROVIDER_CHOICES]
+        self.provider_choice = wx.Choice(panel, choices=labels)
         if self.provider:
-            # Find index of current provider (case-insensitive)
-            for i, choice in enumerate(["OpenAI", "Claude"]):
-                if choice.lower() == self.provider.lower():
+            for i, (label, canonical) in enumerate(self.PROVIDER_CHOICES):
+                if canonical == self.provider.lower() or label.lower() == self.provider.lower():
                     self.provider_choice.SetSelection(i)
                     break
         else:
             self.provider_choice.SetSelection(0)  # Default to OpenAI
         form_sizer.Add(self.provider_choice, 1, wx.EXPAND)
-        
+
         # API Key text input
         form_sizer.Add(wx.StaticText(panel, label="API Key:"), 0, wx.ALIGN_CENTER_VERTICAL)
-        self.key_text = wx.TextCtrl(panel, value=self.api_key, style=wx.TE_PASSWORD)
+        self.key_text = wx.TextCtrl(panel, value=self.api_key, style=wx.TE_PASSWORD,
+                                    name="API key")
         form_sizer.Add(self.key_text, 1, wx.EXPAND)
-        
+
         sizer.Add(form_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        
+
         # Help text
-        help_text = wx.StaticText(panel, label="Note: API keys are stored in the config file. Keep your config file secure.")
+        from idt_core.keys import credential_store_name
+        store = credential_store_name()
+        if store:
+            note = (f"Keys are saved to {store} and shared by ImageDescriber, "
+                    f"IDT Chat, and the idt command line.")
+        else:
+            note = "Note: API keys are stored in the config file. Keep your config file secure."
+        help_text = wx.StaticText(panel, label=note)
         help_text.SetForegroundColour(wx.Colour(100, 100, 100))
         help_text.Wrap(450)
         sizer.Add(help_text, 0, wx.ALL, 10)
@@ -126,11 +141,11 @@ class ApiKeyEditDialog(wx.Dialog):
         self.EndModal(wx.ID_OK)
     
     def get_values(self):
-        """Get the entered provider and API key"""
-        return (
-            self.provider_choice.GetStringSelection(),
-            self.key_text.GetValue().strip()
-        )
+        """Get the entered (canonical provider name, API key)."""
+        index = self.provider_choice.GetSelection()
+        canonical = (self.PROVIDER_CHOICES[index][1]
+                     if index != wx.NOT_FOUND else "")
+        return canonical, self.key_text.GetValue().strip()
 
 # Ensure project root is on sys.path so sibling modules (shared/) import in dev and frozen modes
 # Works in both development mode (running script) and frozen mode (PyInstaller exe)
@@ -1361,9 +1376,11 @@ class ConfigureDialog(wx.Dialog):
         sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
         
         # Help text
-        help_text = wx.StaticText(panel, 
-            label="API keys are required for OpenAI (GPT-4) and Claude (Anthropic) providers. "
-                  "Ollama does not require an API key as it runs locally.")
+        help_text = wx.StaticText(panel,
+            label="API keys are required for OpenAI and Claude (Anthropic), and for the "
+                  "optional Ollama web search in chat (free key from ollama.com). "
+                  "Ollama itself runs locally and needs no key. Keys are shared with "
+                  "IDT Chat and the idt command line.")
         help_text.SetForegroundColour(wx.Colour(100, 100, 100))
         help_text.Wrap(600)
         sizer.Add(help_text, 0, wx.ALL, 10)
@@ -1378,27 +1395,53 @@ class ConfigureDialog(wx.Dialog):
         
         return panel
     
-    def load_api_keys(self):
-        """Load API keys from config and populate the list"""
-        self.api_keys_list.Clear()
-        
-        # Get api_keys from image_describer config
+    #: Config-file spellings that mean each canonical provider; used when a
+    #: key is migrated out of the plaintext config into the credential store.
+    _CONFIG_SPELLINGS = {
+        "claude": {"claude", "anthropic"},
+        "openai": {"openai", "open_ai", "open ai"},
+        "ollama.com": {"ollama.com", "ollama_com", "ollama cloud", "ollama_cloud"},
+    }
+
+    def _purge_config_key(self, canonical) -> bool:
+        """Drop every config-file spelling of ``canonical``'s key.
+
+        Called after a key is written to the credential store: leaving the
+        plaintext copy behind would defeat the point of the store, and the
+        store already outranks the config in resolution order.
+        """
         config = self.configs.get("image_describer", {})
-        api_keys = config.get("api_keys", {})
-        
-        # Add each key to the list (skip "description" field)
-        for provider, key in api_keys.items():
-            # Skip metadata fields like "description"
-            if provider == "description":
-                continue
-            
-            # Show provider and masked key — skip blank/placeholder entries
-            if isinstance(key, str) and key.strip():  # Only show non-empty keys
-                masked_key = key[:8] + "..." + key[-4:] if len(key) > 12 else "***"
-                display_text = f"{provider}: {masked_key}"
-                index = self.api_keys_list.Append(display_text)
-                # Store full provider name as client data
-                self.api_keys_list.SetClientData(index, provider)
+        api_keys = config.get("api_keys")
+        if not isinstance(api_keys, dict):
+            return False
+        spellings = self._CONFIG_SPELLINGS.get(canonical, {canonical})
+        doomed = [k for k in api_keys
+                  if str(k).strip().lower() in spellings]
+        for key in doomed:
+            del api_keys[key]
+        return bool(doomed)
+
+    def load_api_keys(self):
+        """Populate the list: one row per provider, saying where its key is.
+
+        No key material is shown — the old list displayed the first 8 and
+        last 4 characters of every stored key, which is more of a secret
+        than a settings screen should leak.
+        """
+        from idt_core.keys import key_source
+
+        self.api_keys_list.Clear()
+        for label, canonical in ApiKeyEditDialog.PROVIDER_CHOICES:
+            source = key_source(canonical)
+            status = {
+                "environment": "set via environment variable",
+                "credential store": "stored securely",
+                "config file": "stored in the config file",
+                "legacy file": "stored in a legacy key file",
+                None: "not set",
+            }.get(source, source)
+            index = self.api_keys_list.Append(f"{label}: {status}")
+            self.api_keys_list.SetClientData(index, canonical)
     
     def on_api_key_selected(self, event):
         """Handle API key selection"""
@@ -1410,88 +1453,86 @@ class ConfigureDialog(wx.Dialog):
             self.edit_key_btn.Enable(False)
             self.delete_key_btn.Enable(False)
     
+    def _store_key(self, canonical, api_key):
+        """Save one key: credential store first, config file as fallback.
+
+        When the store takes the key, any plaintext copy in the config is
+        removed — the store outranks the config in resolution order, so a
+        stale config copy would be both a leak and a lie.
+        """
+        from idt_core.keys import credential_store_name, set_api_key
+
+        if credential_store_name() and set_api_key(canonical, api_key):
+            if self._purge_config_key(canonical):
+                self._save_image_describer_config()
+            return True
+
+        # No usable store on this platform: keep the config-file behaviour.
+        config = self.configs.get("image_describer", {})
+        config.setdefault("api_keys", {})[canonical] = api_key
+        self._save_image_describer_config()
+        return True
+
     def on_add_api_key(self, event):
         """Add a new API key"""
         dialog = ApiKeyEditDialog(self)
         if dialog.ShowModal() == wx.ID_OK:
             provider, api_key = dialog.get_values()
-            
-            # Get api_keys from config
-            config = self.configs.get("image_describer", {})
-            if "api_keys" not in config:
-                config["api_keys"] = {}
-            
-            # Add the new key
-            config["api_keys"][provider] = api_key
-            
-            # Save to disk immediately
-            self._save_image_describer_config()
-            
-            # Reload the list
+            self._store_key(provider, api_key)
+            self._reload_provider_api_keys()
             self.load_api_keys()
-        
         dialog.Destroy()
-    
+
     def on_edit_api_key(self, event):
-        """Edit the selected API key"""
+        """Set a new key for the selected provider.
+
+        The current key is never pre-filled: it may live in the credential
+        store, and a settings dialog should not read secrets back just to
+        display them masked.
+        """
         selection = self.api_keys_list.GetSelection()
         if selection == wx.NOT_FOUND:
             return
-        
+
         provider = self.api_keys_list.GetClientData(selection)
-        
-        # Get current API key
-        config = self.configs.get("image_describer", {})
-        api_keys = config.get("api_keys", {})
-        current_key = api_keys.get(provider, "")
-        
-        # Open edit dialog
-        dialog = ApiKeyEditDialog(self, provider=provider, api_key=current_key)
+        dialog = ApiKeyEditDialog(self, provider=provider)
         if dialog.ShowModal() == wx.ID_OK:
             new_provider, new_key = dialog.get_values()
-            
-            # If provider changed, delete old entry
-            if new_provider != provider:
-                del config["api_keys"][provider]
-            
-            # Update with new key
-            config["api_keys"][new_provider] = new_key
-            
-            # Save to disk immediately
-            self._save_image_describer_config()
-            
-            # Reload the list
+            self._store_key(new_provider, new_key)
+            self._reload_provider_api_keys()
             self.load_api_keys()
-        
         dialog.Destroy()
-    
+
     def on_delete_api_key(self, event):
-        """Delete the selected API key"""
+        """Delete the selected provider's stored key"""
+        from idt_core.keys import delete_api_key, key_source
+
         selection = self.api_keys_list.GetSelection()
         if selection == wx.NOT_FOUND:
             return
-        
+
         provider = self.api_keys_list.GetClientData(selection)
-        
+
         # Confirm deletion
         from shared.wx_common import ask_yes_no
         if not ask_yes_no(self, f"Delete API key for {provider}?", "Confirm Delete"):
             return
-        
-        # Get api_keys from config
-        config = self.configs.get("image_describer", {})
-        api_keys = config.get("api_keys", {})
-        
-        # Delete the key
-        if provider in api_keys:
-            del api_keys[provider]
-        
-        # Save to disk immediately
-        self._save_image_describer_config()
-        
-        # Reload the list
+
+        # Remove from the credential store and from the config file.
+        delete_api_key(provider)
+        if self._purge_config_key(provider):
+            self._save_image_describer_config()
+        self._reload_provider_api_keys()
         self.load_api_keys()
-        
+
+        remaining = key_source(provider)
+        if remaining == "environment":
+            from shared.wx_common import show_warning
+            show_warning(
+                self,
+                f"The stored key was removed, but an environment variable "
+                f"still provides a key for {provider}.")
+
         # Disable edit/delete buttons
         self.edit_key_btn.Enable(False)
         self.delete_key_btn.Enable(False)
