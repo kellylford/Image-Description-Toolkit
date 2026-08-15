@@ -433,3 +433,98 @@ class TestStoreApiKeyFallback:
         monkeypatch.setattr(key_module, "set_api_key", do_not_call)
         assert key_module.store_api_key("claude", "   ") == ""
         assert key_module.store_api_key("", "value") == ""
+
+
+# ---------------------------------------------------------------------------
+# key_source ladder, deletion, and per-platform naming
+# ---------------------------------------------------------------------------
+
+
+class TestKeySourceLadder:
+    def test_config_and_legacy_and_absent_sources(self, config_keys, clean_environment):
+        config_keys({"claude": "sk-config"})
+        assert key_module.key_source("claude") == "config file"
+
+    def test_legacy_file_source(self, clean_environment):
+        (clean_environment / "claude.txt").write_text("sk-file", encoding="utf-8")
+        assert key_module.key_source("claude") == "legacy file"
+
+    def test_no_key_anywhere_is_none(self):
+        assert key_module.key_source("claude") is None
+
+    def test_keyless_providers_have_no_source(self):
+        assert key_module.key_source("ollama") is None
+
+    def test_from_env_without_a_variable_mapping(self):
+        assert key_module._from_env("ollama") is None
+
+    def test_a_non_dict_config_payload_is_no_key(self, monkeypatch, tmp_path):
+        import idt_core.config_loader as loader
+
+        monkeypatch.setattr(loader, "load_json_config",
+                            lambda *a, **k: (["not", "a", "dict"], tmp_path / "c.json", "t"))
+        assert key_module._from_config("claude") is None
+
+    def test_an_unreadable_legacy_file_is_skipped(self, clean_environment):
+        # A directory named like the key file: read_text raises OSError.
+        (clean_environment / "claude.txt").mkdir()
+        assert key_module.resolve_api_key("claude") is None
+
+
+class TestDeleteAndPlatforms:
+    def test_delete_returns_true_when_the_store_deletes(self, monkeypatch):
+        if sys.platform == "win32":
+            monkeypatch.setattr(key_module, "_win_delete", lambda name: True)
+        else:
+            monkeypatch.setattr(key_module, "_mac_delete", lambda name: True)
+        assert key_module.delete_api_key("claude") is True
+
+    def test_delete_swallows_store_errors(self, monkeypatch):
+        def boom(name):
+            raise OSError("store broke")
+
+        if sys.platform == "win32":
+            monkeypatch.setattr(key_module, "_win_delete", boom)
+        else:
+            monkeypatch.setattr(key_module, "_mac_delete", boom)
+        assert key_module.delete_api_key("claude") is False
+
+    def test_set_api_key_swallows_store_errors(self, monkeypatch):
+        def boom(name, value):
+            raise OSError("store broke")
+
+        if sys.platform == "win32":
+            monkeypatch.setattr(key_module, "_win_write", boom)
+        else:
+            monkeypatch.setattr(key_module, "_mac_write", boom)
+        assert key_module.set_api_key("claude", "sk-x") is False
+
+    @pytest.mark.parametrize("platform,expected", [
+        ("win32", "Windows Credential Manager"),
+        ("darwin", "macOS Keychain"),
+        ("linux", ""),
+    ])
+    def test_store_name_per_platform(self, monkeypatch, platform, expected):
+        monkeypatch.setattr(key_module.sys, "platform", platform)
+        assert key_module.credential_store_name() == expected
+
+    def test_platforms_without_a_store_resolve_and_delete_to_nothing(self, monkeypatch):
+        monkeypatch.setattr(key_module.sys, "platform", "linux")
+        assert key_module._from_store("claude") is None
+        assert key_module.delete_api_key("claude") is False
+        assert key_module.set_api_key("claude", "sk-x") is False
+
+    def test_store_api_key_repairs_a_non_dict_config(self, monkeypatch, tmp_path):
+        """A corrupt config payload becomes a fresh dict, not a crash."""
+        import json as json_mod
+
+        import idt_core.config_loader as loader
+
+        config_path = tmp_path / "image_describer_config.json"
+        monkeypatch.setattr(key_module, "credential_store_name", lambda: "")
+        monkeypatch.setattr(loader, "load_json_config",
+                            lambda *a, **k: ("not-a-dict", config_path, "t"))
+
+        assert key_module.store_api_key("claude", "sk-x") == "config file"
+        written = json_mod.loads(config_path.read_text(encoding="utf-8"))
+        assert written == {"api_keys": {"claude": "sk-x"}}

@@ -360,3 +360,25 @@ def test_tool_events_do_not_leak_into_the_saved_message():
     list(engine.send("question", options=ChatOptions(web_search=True)))
 
     assert session.messages[-1].content == "clean answer"
+
+
+class TestToolEventDescriptions:
+    """describe() feeds status bars and screen readers; every branch matters."""
+
+    def test_web_search_with_and_without_a_query(self):
+        assert ToolCallEvent("web_search", {"query": "idt"}).describe() == \
+            "Searching the web: idt"
+        assert ToolCallEvent("web_search", {}).describe() == "Searching the web"
+
+    def test_web_fetch_with_and_without_a_url(self):
+        assert ToolCallEvent("web_fetch", {"url": "https://x"}).describe() == \
+            "Reading page: https://x"
+        assert ToolCallEvent("web_fetch", {}).describe() == "Reading a web page"
+
+    def test_unknown_tools_still_get_a_line(self):
+        assert ToolCallEvent("summarize", {}).describe() == "Running tool: summarize"
+
+    def test_usage_totals_are_the_sum(self):
+        from idt_core.chat.events import ChatUsage
+
+        assert ChatUsage(input_tokens=14, output_tokens=10).total_tokens == 24
