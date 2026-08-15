@@ -224,6 +224,28 @@ class OllamaChatProvider(ChatProvider):
     NUM_CTX_STEP = 2048
     #: Reply headroom when the caller did not set max_output_tokens.
     DEFAULT_REPLY_HEADROOM = 2048
+    #: Hard ceiling on what we will ask the server to allocate, regardless of
+    #: what the model was trained for. Discovery reports figures like 262,144
+    #: (gemma4) and 1,048,576 (nemotron); the budgeter will happily fill a
+    #: window that size, and num_ctx then asks Ollama for a KV cache to match
+    #: — far past the RAM/VRAM of the machines this runs on, which fails the
+    #: turn on model load or thrashes the box. Overridable via IDT_MAX_NUM_CTX
+    #: for people with the hardware to back it.
+    DEFAULT_NUM_CTX_CEILING = 131_072
+
+    @classmethod
+    def _num_ctx_ceiling(cls) -> int:
+        import os
+
+        raw = os.environ.get("IDT_MAX_NUM_CTX", "").strip()
+        if raw:
+            try:
+                value = int(raw)
+                if value > 0:
+                    return value
+            except ValueError:
+                pass
+        return cls.DEFAULT_NUM_CTX_CEILING
 
     def __init__(self, model: str, host: Optional[str] = None):
         self._model = model
@@ -263,12 +285,14 @@ class OllamaChatProvider(ChatProvider):
             from ..providers.ollama import model_context_length
 
             cap = model_context_length(
-                request.model or self._model,
-                **({"host": self._host} if self._host else {}),
+                request.model or self._model, host=self._host
             )
         except Exception:
             cap = None
-        return min(cap or self.FALLBACK_MAX_NUM_CTX, max(self.MIN_NUM_CTX, needed))
+        # Two ceilings, both of which must hold: what the model was trained for,
+        # and what we are willing to make the server allocate.
+        cap = min(cap or self.FALLBACK_MAX_NUM_CTX, self._num_ctx_ceiling())
+        return min(cap, max(self.MIN_NUM_CTX, needed))
 
     def _request_options(self, request: ChatRequest) -> dict:
         """The ``options`` dict for /api/chat.
@@ -337,8 +361,7 @@ class OllamaChatProvider(ChatProvider):
             from ..providers.ollama import model_capabilities
 
             caps = model_capabilities(
-                request.model or self._model,
-                **({"host": self._host} if self._host else {}),
+                request.model or self._model, host=self._host
             )
         except Exception:
             caps = None

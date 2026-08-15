@@ -863,7 +863,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.config['copy_originals'] = options['copy_originals']
 
     def get_api_key_for_provider(self, provider: str) -> str:
-        """Get API key for a specific provider from config"""
+        """Get API key for a specific provider.
+
+        The shared resolver comes first (env -> OS credential store -> config
+        -> legacy files). Reading only ``self.config`` used to be enough, but
+        Configure Settings now writes keys to the credential store and deletes
+        the plaintext copy from the config file — so a user who had just saved
+        a key was told by Generate Video Description that no key was set, and
+        pointed back at the very screen where they set it.
+        """
+        try:
+            from idt_core.keys import resolve_api_key
+            shared = resolve_api_key(provider)
+            if shared:
+                return shared
+        except Exception:
+            pass    # fall through to the config-file lookups below
+
         api_keys = self.config.get('api_keys', {})
         # Try case-insensitive lookup
         for key in [provider, provider.capitalize(), provider.upper(), provider.lower()]:

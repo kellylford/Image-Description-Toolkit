@@ -44,11 +44,11 @@ class _FakeClient:
 @pytest.fixture(autouse=True)
 def _clear_cache():
     from idt_core.providers import ollama as mod
-    mod._VISION_CACHE.clear()
-    mod._CAPS_CACHE.clear()
+    mod._SHOW_CACHE.clear()
+    mod._NEGATIVE_AT.clear()
     yield
-    mod._VISION_CACHE.clear()
-    mod._CAPS_CACHE.clear()
+    mod._SHOW_CACHE.clear()
+    mod._NEGATIVE_AT.clear()
 
 
 class TestIdtCoreVisionCheck:

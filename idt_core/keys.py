@@ -162,8 +162,13 @@ def credential_store_name() -> str:
     return ""
 
 
-def _win_credential(target: str):
-    """(advapi32, CREDENTIAL struct type) — shared by read/write/delete."""
+def _win_credential():
+    """(ctypes, advapi32, CREDENTIAL struct type) — shared by read/write/delete.
+
+    Takes no target: it only builds the struct type. It used to accept a
+    ``target`` it never read, which invited callers to assume the returned
+    struct was bound to that credential.
+    """
     import ctypes
     import ctypes.wintypes as wintypes
 
@@ -191,7 +196,7 @@ _CRED_PERSIST_LOCAL_MACHINE = 2
 
 
 def _win_read(name: str) -> Optional[str]:
-    ctypes, advapi, CREDENTIAL = _win_credential(name)
+    ctypes, advapi, CREDENTIAL = _win_credential()
     pointer = ctypes.POINTER(CREDENTIAL)()
     if not advapi.CredReadW(_cred_target(name), _CRED_TYPE_GENERIC, 0,
                             ctypes.byref(pointer)):
@@ -209,7 +214,7 @@ def _win_read(name: str) -> Optional[str]:
 
 
 def _win_write(name: str, secret: str) -> bool:
-    ctypes, advapi, CREDENTIAL = _win_credential(name)
+    ctypes, advapi, CREDENTIAL = _win_credential()
     blob = secret.encode("utf-16-le")
     buffer = ctypes.create_string_buffer(blob, len(blob))
 
@@ -224,7 +229,7 @@ def _win_write(name: str, secret: str) -> bool:
 
 
 def _win_delete(name: str) -> bool:
-    ctypes, advapi, _ = _win_credential(name)
+    ctypes, advapi, _ = _win_credential()
     return bool(advapi.CredDeleteW(_cred_target(name), _CRED_TYPE_GENERIC, 0))
 
 
