@@ -234,14 +234,12 @@ class ProviderDialog(wx.Dialog):
         models = []
         try:
             if provider == "ollama":
-                from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
-
-                # Chat listing, not the describe listing: chat needs the
-                # `completion` capability, and filtering on vision here hid
-                # every text-only model — often the best chat models installed.
-                models = OllamaProvider(model=DEFAULT_MODEL).list_chat_models()
-                if not models:
-                    self.status.SetLabel("No Ollama models found. Is Ollama running?")
+                # Off the UI thread: listing asks /api/show once per installed
+                # model, so with 20-30 models pulled this froze the window for
+                # seconds — and far longer against a remote host or a stopped
+                # daemon, where every probe waits out its own timeout.
+                self._start_ollama_listing()
+                return
             elif provider == "claude":
                 from idt_core.providers.claude import (
                     CLAUDE_MODELS,
@@ -267,6 +265,52 @@ class ProviderDialog(wx.Dialog):
         if requires_api_key(provider) and not resolve_api_key(provider):
             self.status.SetLabel(missing_key_message(provider))
 
+        self._select_model(self._initial_model)
+
+    def _start_ollama_listing(self):
+        """List Ollama chat models on a worker thread, fill the picker after.
+
+        The generation token guards two races: the user switching provider
+        while a listing is in flight (a late result must not repopulate the
+        picker for a different provider), and the dialog being closed before
+        the thread finishes.
+        """
+        import threading
+
+        self._load_token = getattr(self, "_load_token", 0) + 1
+        token = self._load_token
+        self.status.SetLabel("Looking for Ollama models…")
+
+        def work():
+            try:
+                from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
+
+                # Chat listing, not the describe listing: chat needs the
+                # `completion` capability, and filtering on vision here hid
+                # every text-only model — often the best chat models installed.
+                found = OllamaProvider(model=DEFAULT_MODEL).list_chat_models()
+                error = ""
+            except Exception as exc:                        # noqa: BLE001
+                found, error = [], str(exc)
+            wx.CallAfter(self._finish_ollama_listing, token, found, error)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _finish_ollama_listing(self, token, models, error):
+        if token != getattr(self, "_load_token", 0):
+            return                      # superseded by a newer request
+        if not self:
+            return                      # dialog closed while we were listing
+
+        for model_id in models:
+            self.model_choice.Append(model_id, model_id)
+
+        if error:
+            self.status.SetLabel(f"Could not list models: {error}")
+        elif not models:
+            self.status.SetLabel("No Ollama models found. Is Ollama running?")
+        else:
+            self.status.SetLabel("")
         self._select_model(self._initial_model)
 
     def _select_model(self, wanted: str):

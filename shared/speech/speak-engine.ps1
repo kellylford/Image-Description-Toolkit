@@ -208,8 +208,14 @@ $order = switch ($engine) {
 
 # Rates are per-engine scales, so resolve defaults separately rather than inline (PowerShell
 # 5.1 has no `if` expression).
-$oneCoreRate = 6.0
-$sapiRate    = 5
+#
+# IDT adaptation: these defaults apply whenever the config carries no rate, which for IDT is
+# the common case - the "Automatic" engine deliberately resolves no rate, so that a screen
+# reader's own rate is never overridden. Upstream defaulted to 6.0, the TOP of the OneCore
+# scale, so every IDT user with stock settings was read to at maximum speed. Default to the
+# middle of each scale instead: an unset rate should mean "normal", not "fastest".
+$oneCoreRate = 3.0
+$sapiRate    = 0
 if ($null -ne $rate) {
     $oneCoreRate = [double]$rate
     $sapiRate    = [int]$rate

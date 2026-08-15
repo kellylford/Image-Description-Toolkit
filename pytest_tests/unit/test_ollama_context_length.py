@@ -43,9 +43,11 @@ class _FakeClient:
 
 @pytest.fixture(autouse=True)
 def _clear_cache():
-    ollama_mod._CONTEXT_CACHE.clear()
+    ollama_mod._SHOW_CACHE.clear()
+    ollama_mod._NEGATIVE_AT.clear()
     yield
-    ollama_mod._CONTEXT_CACHE.clear()
+    ollama_mod._SHOW_CACHE.clear()
+    ollama_mod._NEGATIVE_AT.clear()
 
 
 class TestModelContextLength:
@@ -95,12 +97,46 @@ class TestModelContextLength:
         assert model_context_length("m", client=c) == 8192
         assert c.calls == ["m"], "should query /api/show once per model"
 
-    def test_failure_is_not_cached(self):
-        """Ollama may simply not be running yet; retry next call."""
+    def test_failure_is_cached_only_briefly(self, monkeypatch):
+        """A failed probe must not be repeated on every turn — an unreachable
+        daemon would then cost a full timeout per message — but it must not be
+        remembered forever either, because Ollama may simply not be running
+        yet. So: cached for _NEGATIVE_TTL_SECONDS, retried after that.
+        """
+        clock = {"now": 1000.0}
+        monkeypatch.setattr(ollama_mod.time, "monotonic", lambda: clock["now"])
+
         c = _FakeClient(_FakeInfo(), raise_on={"m"})
-        model_context_length("m", client=c)
-        model_context_length("m", client=c)
-        assert c.calls == ["m", "m"]
+        assert model_context_length("m", client=c) is None
+        assert model_context_length("m", client=c) is None
+        assert c.calls == ["m"], "a second probe inside the TTL is wasted work"
+
+        clock["now"] += ollama_mod._NEGATIVE_TTL_SECONDS + 1
+        assert model_context_length("m", client=c) is None
+        assert c.calls == ["m", "m"], "after the TTL the daemon is tried again"
+
+    def test_a_recovered_daemon_is_picked_up_after_the_ttl(self, monkeypatch):
+        """The whole point of expiring the negative entry."""
+        clock = {"now": 500.0}
+        monkeypatch.setattr(ollama_mod.time, "monotonic", lambda: clock["now"])
+
+        c = _FakeClient(_FakeInfo(), raise_on={"m"})
+        assert model_context_length("m", client=c) is None
+
+        c._raise_on = set()
+        c._info = _FakeInfo(model_info={"llama.context_length": 8192})
+        clock["now"] += ollama_mod._NEGATIVE_TTL_SECONDS + 1
+        assert model_context_length("m", client=c) == 8192
+
+    def test_the_same_model_on_two_hosts_is_not_confused(self):
+        """A cached answer from one server must never be served for another."""
+        local = _FakeClient(_FakeInfo(model_info={"llama.context_length": 4096}))
+        remote = _FakeClient(_FakeInfo(model_info={"llama.context_length": 262144}))
+
+        assert model_context_length("m", host="http://localhost:11434",
+                                    client=local) == 4096
+        assert model_context_length("m", host="http://box:11434",
+                                    client=remote) == 262144
 
 
 class TestBudgeterIntegration:

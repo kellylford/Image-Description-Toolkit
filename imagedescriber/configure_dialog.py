@@ -71,7 +71,7 @@ class ApiKeyEditDialog(wx.Dialog):
         # Provider selection
         form_sizer.Add(wx.StaticText(panel, label="Provider:"), 0, wx.ALIGN_CENTER_VERTICAL)
         labels = [label for label, _canonical in self.PROVIDER_CHOICES]
-        self.provider_choice = wx.Choice(panel, choices=labels)
+        self.provider_choice = wx.Choice(panel, choices=labels, name="Provider")
         if self.provider:
             for i, (label, canonical) in enumerate(self.PROVIDER_CHOICES):
                 if canonical == self.provider.lower() or label.lower() == self.provider.lower():
@@ -1410,11 +1410,15 @@ class ConfigureDialog(wx.Dialog):
         plaintext copy behind would defeat the point of the store, and the
         store already outranks the config in resolution order.
         """
-        config = self.configs.get("image_describer", {})
+        config = self.configs.setdefault("image_describer", {})
         api_keys = config.get("api_keys")
         if not isinstance(api_keys, dict):
             return False
-        spellings = self._CONFIG_SPELLINGS.get(canonical, {canonical})
+        # The fallback is lowercased because the comparison below is: an
+        # unrecognised provider row (e.g. "Gemini") would otherwise never
+        # match its own config entry and could not be deleted.
+        spellings = self._CONFIG_SPELLINGS.get(
+            canonical, {str(canonical).strip().lower()})
         doomed = [k for k in api_keys
                   if str(k).strip().lower() in spellings]
         for key in doomed:
@@ -1431,6 +1435,7 @@ class ConfigureDialog(wx.Dialog):
         from idt_core.keys import key_source
 
         self.api_keys_list.Clear()
+        known = set()
         for label, canonical in ApiKeyEditDialog.PROVIDER_CHOICES:
             source = key_source(canonical)
             status = {
@@ -1442,6 +1447,24 @@ class ConfigureDialog(wx.Dialog):
             }.get(source, source)
             index = self.api_keys_list.Append(f"{label}: {status}")
             self.api_keys_list.SetClientData(index, canonical)
+            known.update(self._CONFIG_SPELLINGS.get(canonical, {canonical}))
+
+        # Any other key sitting in the config file gets a row of its own.
+        # Listing only the three canonical providers made a key written by an
+        # older build (or by hand) invisible AND undeletable — it stayed in
+        # plaintext in image_describer_config.json with no way to remove it
+        # from this screen.
+        config = self.configs.get("image_describer", {})
+        api_keys = config.get("api_keys")
+        if isinstance(api_keys, dict):
+            for name, value in api_keys.items():
+                if str(name).strip().lower() in known or name == "description":
+                    continue
+                if not (isinstance(value, str) and value.strip()):
+                    continue
+                index = self.api_keys_list.Append(
+                    f"{name}: stored in the config file (unrecognised provider)")
+                self.api_keys_list.SetClientData(index, name)
     
     def on_api_key_selected(self, event):
         """Handle API key selection"""
@@ -1468,7 +1491,11 @@ class ConfigureDialog(wx.Dialog):
             return True
 
         # No usable store on this platform: keep the config-file behaviour.
-        config = self.configs.get("image_describer", {})
+        # setdefault, not get: .get("image_describer", {}) hands back a fresh
+        # throwaway dict when the section is absent, so the key was written
+        # into a temporary that died at return - saved, reported as success,
+        # and gone.
+        config = self.configs.setdefault("image_describer", {})
         config.setdefault("api_keys", {})[canonical] = api_key
         self._save_image_describer_config()
         return True

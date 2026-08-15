@@ -121,7 +121,11 @@ class SpeechSettings:
 
 def _script_dir() -> Path:
     if getattr(sys, "frozen", False):
-        base = Path(getattr(sys, "_MEIPASS", "")) or Path(sys.executable).parent
+        # `Path(x) or fallback` never reaches the fallback: Path("") is
+        # Path("."), which is truthy, so a missing _MEIPASS resolved the
+        # scripts against the current working directory. Test the string.
+        meipass = getattr(sys, "_MEIPASS", "")
+        base = Path(meipass) if meipass else Path(sys.executable).parent
         return base / "shared" / "speech"
     return Path(__file__).resolve().parent / "speech"
 
@@ -249,7 +253,12 @@ _FENCED_CODE = re.compile(r"```.*?```", re.DOTALL)
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")
 _LINK = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 _HEADING = re.compile(r"^#{1,6}\s*", re.MULTILINE)
-_EMPHASIS = re.compile(r"(\*{1,3}|_{1,3})(\S(?:.*?\S)?)\1")
+_EMPHASIS = re.compile(r"(\*{1,3})(\S(?:.*?\S)?)\1")
+# Underscores only count as emphasis at a word boundary. Without the
+# lookarounds this ate the internal underscores of snake_case identifiers:
+# "MAX_TOOL_ROUNDS" was spoken as "MAXTOOLROUNDS" and "some_var_name" as
+# "somevarname" — names that do not exist in the code being discussed.
+_EMPHASIS_UNDERSCORE = re.compile(r"(?<!\w)(_{1,3})(\S(?:.*?\S)?)\1(?!\w)")
 
 
 def strip_for_speech(text: str) -> str:
@@ -265,6 +274,7 @@ def strip_for_speech(text: str) -> str:
     text = _LINK.sub(r"\1", text)
     text = _HEADING.sub("", text)
     text = _EMPHASIS.sub(r"\2", text)
+    text = _EMPHASIS_UNDERSCORE.sub(r"\2", text)
     text = text.replace("|", " ")
     return text.strip()
 

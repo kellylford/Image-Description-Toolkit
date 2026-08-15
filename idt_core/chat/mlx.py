@@ -15,6 +15,7 @@ from typing import Iterator
 
 from ..providers.base import ChatDelta, ChatProvider, ChatRequest, ChatUsage, ChatYield
 from .messages import conversation_turns
+from .providers import merge_text_attachments
 
 __all__ = ["MLXChatProvider"]
 
@@ -110,17 +111,25 @@ class MLXChatProvider(ChatProvider):
                 )
             image_assigned = False
             for msg in conversation_turns(request.messages):
+                # Text attachments are inlined here exactly as every other
+                # formatter does it. MLX's registry entry accepts images only,
+                # so nothing text-shaped can be attached *while on MLX* — but
+                # conversations are provider-agnostic, and a history carrying a
+                # .txt attached under Ollama replays through here. Reading
+                # msg.content directly dropped the file contents silently, and
+                # the model answered about a file it had never been shown.
+                text = merge_text_attachments(msg)
                 if msg.role == "user" and not image_assigned and temp_jpeg:
                     hf_messages.append({
                         "role": "user",
                         "content": [
                             {"type": "image"},
-                            {"type": "text", "text": msg.content},
+                            {"type": "text", "text": text},
                         ],
                     })
                     image_assigned = True
                 else:
-                    hf_messages.append({"role": msg.role, "content": msg.content})
+                    hf_messages.append({"role": msg.role, "content": text})
 
             try:
                 prompt = processor.apply_chat_template(
