@@ -205,13 +205,76 @@ def test_followup_fallback_default_does_not_reintroduce_mlx(frame):
         dlg.Destroy()
 
 
+def test_prompt_editor_matches_the_shared_provider_list(frame):
+    """The mirror-image bug: this picker hardcoded ["ollama","openai","claude"],
+    so a Mac user who *could* run MLX was never offered it here."""
+    import prompt_editor_dialog
+
+    dlg = prompt_editor_dialog.PromptEditorDialog(frame)
+    try:
+        labels = _labels(dlg.provider_combo)
+        assert labels == [key for key, _ in ai_providers.provider_picker_choices()]
+        assert ("mlx" in labels) == _mlx_can_run()
+    finally:
+        dlg.Destroy()
+
+
+def test_prompt_editor_survives_a_provider_it_cannot_offer(frame, monkeypatch):
+    """A config naming an unavailable provider (written on a Mac with MLX,
+    opened on Windows) must not leave the picker blank — `SetStringSelection`
+    fails silently, and saving would then write an empty `default_provider`
+    back to the config file."""
+    import prompt_editor_dialog
+
+    dlg = prompt_editor_dialog.PromptEditorDialog(frame)
+    try:
+        if not dlg.provider_combo.SetStringSelection("definitely-not-a-provider"):
+            dlg.provider_combo.SetSelection(0)
+        assert dlg.provider_combo.GetStringSelection(), "picker left on nothing"
+    finally:
+        dlg.Destroy()
+
+
+def test_prompt_editor_lists_mlx_models_where_mlx_runs(frame, monkeypatch):
+    """The Mac path, exercised on any platform.
+
+    Simulated rather than skipped: this change exists *for* Mac users, and a
+    test that skips everywhere CI runs would never have checked the thing it
+    was written for. Adding MLX to the picker without a matching branch in
+    populate_model_combo() would give Mac users a provider with an empty model
+    list — visible only to them, which is how the original asymmetry survived.
+    """
+    import prompt_editor_dialog
+
+    monkeypatch.setattr(
+        ai_providers, "provider_picker_choices",
+        lambda title_case=True: [("ollama", "Ollama"), ("openai", "OpenAI"),
+                                 ("claude", "Claude"), ("mlx", "MLX")],
+    )
+    monkeypatch.setattr(ai_providers.MLXProvider, "is_available", lambda self: True)
+
+    dlg = prompt_editor_dialog.PromptEditorDialog(frame)
+    try:
+        assert "mlx" in _labels(dlg.provider_combo)
+
+        dlg.provider_combo.SetStringSelection("mlx")
+        dlg.populate_model_combo()
+
+        models = _labels(dlg.default_model_combo)
+        assert len(models) > 1, f"MLX selected but no models listed: {models}"
+        assert any("mlx-community/" in m for m in models), models
+        assert dlg.default_model_combo.IsEnabled()
+    finally:
+        dlg.Destroy()
+
+
 def test_no_dialog_hardcodes_a_provider_list():
     """The regression guard. Each of these dialogs was fixed by routing through
     provider_picker_choices(); a new hardcoded list is how this bug returns."""
     import re
 
     offenders = []
-    for name in ("dialogs_wx.py", "chat_window_wx.py"):
+    for name in ("dialogs_wx.py", "chat_window_wx.py", "prompt_editor_dialog.py"):
         source = (_APP_DIR / name).read_text(encoding="utf-8")
         for match in re.finditer(r"choices\s*=\s*\[[^\]]*\]", source):
             text = match.group(0)

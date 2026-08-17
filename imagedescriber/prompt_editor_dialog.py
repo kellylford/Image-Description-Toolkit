@@ -207,7 +207,20 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         form_sizer.Add(wx.StaticText(default_box, label="AI Provider:"), 0, wx.ALIGN_CENTER_VERTICAL)
         provider_panel = wx.Panel(default_box)
         provider_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.provider_combo = wx.Choice(provider_panel, choices=["ollama", "openai", "claude"])
+        # Same source as every other ImageDescriber provider picker (issue
+        # #271). This list was hardcoded without MLX, so a Mac user who could
+        # run it was never offered it here — the mirror image of the Windows
+        # bug, and just as wrong.
+        try:
+            from ai_providers import provider_picker_choices
+        except ImportError:
+            from imagedescriber.ai_providers import provider_picker_choices
+        self.provider_combo = wx.Choice(
+            provider_panel,
+            # Lowercase keys, not display labels: this dialog compares the
+            # selection against provider names directly.
+            choices=[key for key, _ in provider_picker_choices()],
+        )
         self.provider_combo.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         provider_sizer.Add(self.provider_combo, 0, wx.EXPAND)
         provider_info = wx.StaticText(provider_panel, label="(Can be overridden with --provider flag)")
@@ -327,7 +340,13 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             
             # Load provider and API key if present
             provider = self.config_data.get('default_provider', 'ollama')
-            self.provider_combo.SetStringSelection(provider)
+            # SetStringSelection is silent when the value isn't in the list: the
+            # picker stays on nothing, GetStringSelection returns "", and saving
+            # would then write an empty default_provider back to the config.
+            # Reachable whenever a config names a provider this machine cannot
+            # offer — e.g. one written on a Mac with MLX, opened on Windows.
+            if not self.provider_combo.SetStringSelection(provider):
+                self.provider_combo.SetSelection(0)
             
             api_key = self.config_data.get('api_key', '')
             self.api_key_text.SetValue(api_key)
@@ -424,6 +443,18 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
 
                 catalog_entries = list_models(provider, keep=keep)
                 available_models = [entry.id for entry in catalog_entries]
+
+            elif provider == "mlx":
+                # Offered only where MLX can actually run, so by the time this
+                # branch is reachable the models are real. Includes any repo IDs
+                # the user added under `mlx_extra_models`, which is what
+                # get_available_models() folds in over KNOWN_MODELS.
+                try:
+                    from ai_providers import MLXProvider
+                except ImportError:
+                    from imagedescriber.ai_providers import MLXProvider
+                available_models = MLXProvider().get_available_models()
+
             else:
                 available_models = []
 
