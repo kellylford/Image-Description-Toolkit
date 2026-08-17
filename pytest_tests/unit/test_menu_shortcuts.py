@@ -220,3 +220,45 @@ def test_imagedescriber_refresh_and_rename_are_platform_correct():
         if '"F5"' in line or "\\tF5" in line or "\\tF2" in line:
             assert "darwin" in line, (
                 f"F-keys must be chosen per platform: {line.strip()}")
+
+
+# ---------------------------------------------------------------------------
+# Button mnemonics — the second, hidden accelerator table on macOS
+# ---------------------------------------------------------------------------
+
+def _mnemonic_controls(source: str):
+    """Every button/checkbox label carrying a "&" mnemonic, with its chord.
+
+    wxOSX's ``wxButtonCocoaImpl::SetAcceleratorFromLabel`` turns "&X" into a
+    **Command** key equivalent on the NSButton, and AppKit offers key
+    equivalents to the key window's views before the menu bar. So every one of
+    these is a chord that outranks the entire menu — which is how
+    ``&Attach Files...`` came to own Cmd+A and open the file picker instead of
+    selecting text.
+    """
+    found = {}
+    pattern = re.compile(
+        r"wx\.(?:Button|CheckBox|RadioButton|ToggleButton)\([^)]*?"
+        r'label="([^"]*&[A-Za-z][^"]*)"', re.S)
+    for label in pattern.findall(source):
+        index = label.index("&")
+        found[label] = f"Cmd+{label[index + 1].lower()}"
+    return found
+
+
+@every_app
+def test_mnemonic_labels_are_declared_not_forgotten(app):
+    """Mnemonics are fine — as long as the app takes the chords back.
+
+    This does not forbid "&" in a label: Alt mnemonics are worth having on
+    Windows. It requires that an app carrying them also calls
+    ``clear_command_key_equivalents``, which is what stops macOS turning them
+    into Command chords that beat the menu bar.
+    """
+    source = _source(app)
+    mnemonics = _mnemonic_controls(source)
+    if not mnemonics:
+        return                      # nothing to take back
+    assert "clear_command_key_equivalents" in source, (
+        f"{app} labels controls with mnemonics that become Command chords on "
+        f"macOS, but never reclaims them: {mnemonics}")

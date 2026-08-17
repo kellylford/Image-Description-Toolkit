@@ -325,6 +325,65 @@ def test_cmd_a_selects_text_and_does_not_attach_files(frame):
         f"Commands that ran: {frame.fired}")
 
 
+def _dialog_cases():
+    """Dialogs from both apps whose controls carry "&" mnemonics.
+
+    Named lazily so a missing import skips one case rather than the module.
+    Every one of these was found by disassembling wxOSX's
+    ``wxButtonCocoaImpl::SetAcceleratorFromLabel``, which turns "&X" into a
+    Command key equivalent: "&Remove" and "&Save" in IDT Chat's API keys
+    dialog, "&Browse for Directory..." and the "&Search subdirectories"
+    checkbox in ImageDescriber's.
+    """
+    def api_keys():
+        from chat_app_wx import ApiKeysDialog
+        return ApiKeysDialog(None)
+
+    def directory_selection():
+        sys.path.insert(0, str(_ROOT / "imagedescriber"))
+        from dialogs_wx import DirectorySelectionDialog
+        return DirectorySelectionDialog([], parent=None)
+
+    return [
+        pytest.param(api_keys, id="chat:ApiKeysDialog"),
+        pytest.param(directory_selection, id="describer:DirectorySelectionDialog"),
+    ]
+
+
+@pytest.mark.parametrize("make_dialog", _dialog_cases())
+def test_no_dialog_control_steals_a_command_chord(app, make_dialog, monkeypatch):
+    """Both apps, and the dialogs rather than the frames.
+
+    ImageDescriber's main window has no "&" button labels, so the frame-level
+    call is defensive there; its exposure is entirely in dialogs — which is
+    also where IDT Chat hides four more (&Remove per provider, and &Save).
+    The apps install the Show/ShowModal hook at startup; this asserts the hook
+    actually does the work when a dialog appears.
+    """
+    from shared.mac_accessibility import install_dialog_naming
+
+    install_dialog_naming(wx)       # idempotent; the apps do this in main()
+    monkeypatch.setattr(wx.Dialog, "ShowModal", lambda self: wx.ID_CANCEL)
+
+    try:
+        dialog = make_dialog()
+    except ImportError as exc:
+        pytest.skip(f"dialog unavailable in this environment: {exc}")
+
+    try:
+        dialog.Show()               # the hook runs here
+        wx.Yield()
+        stolen = {title: f"{_describe(mask)}+{key}"
+                  for title, (key, mask) in _button_key_equivalents(dialog).items()
+                  if mask & MOD_CMD}
+        assert not stolen, (
+            f"controls in this dialog claim Command chords, which beat the "
+            f"menu bar while the dialog is key: {stolen}")
+    finally:
+        dialog.Destroy()
+        wx.Yield()
+
+
 def test_no_control_in_the_window_steals_a_command_chord(frame):
     """The half of dispatch a menu dump cannot see.
 
