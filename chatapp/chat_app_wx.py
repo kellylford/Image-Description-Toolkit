@@ -78,6 +78,7 @@ from idt_core.providers.registry import (  # noqa: E402
 
 from shared.chat_worker_wx import ChatWorker  # noqa: E402
 from shared.mac_accessibility import (  # noqa: E402
+    clear_command_key_equivalents,
     install_dialog_naming,
     set_accessible_name as _set_mac_accessible_name,
 )
@@ -716,6 +717,15 @@ class ChatFrame(wx.Frame):
         self._build_menu()
         self._build_ui()
         self._bind_keys()
+
+        # Take back the Command chords wx hands to buttons with a "&" in their
+        # label. Until this ran, "&Attach Files..." owned Cmd+A -- and a
+        # control in the window beats the menu bar, so Cmd+A opened the file
+        # picker instead of selecting text in the message box.
+        stolen = clear_command_key_equivalents(self)
+        if stolen:
+            print(f"reclaimed Command chords from controls: {stolen}",
+                  file=sys.stderr)
 
         self.CreateStatusBar(2)
         self.SetStatusWidths([-3, -1])

@@ -85,7 +85,9 @@ try:
     # every text box, list and picker announces its contents and never its
     # label until this runs. Imported here rather than guarded separately so a
     # packaging mistake fails loudly instead of shipping an unlabelled app.
-    from shared.mac_accessibility import apply_accessible_names, install_dialog_naming
+    from shared.mac_accessibility import (apply_accessible_names,
+                                          clear_command_key_equivalents,
+                                          install_dialog_naming)
 except ImportError as e:
     print(f"ERROR: Could not import shared utilities: {e}")
     print("This is a critical error. ImageDescriber cannot function without shared utilities.")
@@ -758,6 +760,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # what was missing is that nothing carried them to NSAccessibility.
         # No-op off macOS, where SetName is already read.
         apply_accessible_names(self)
+
+        # And take back any Command chord wx gave a button because its
+        # label carries a "&" mnemonic. Those beat the menu bar on
+        # macOS; in IDT Chat one of them had taken Cmd+A from Select All.
+        clear_command_key_equivalents(self)
 
         # Set initial focus to image list for keyboard navigation
         wx.CallAfter(self.image_list.SetFocus)

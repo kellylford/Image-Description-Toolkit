@@ -355,16 +355,30 @@ def test_an_unshifted_chord_never_runs_its_shifted_neighbour(
         f"{chord} ran {forbidden}, which belongs to Shift+{chord}")
 
 
-def test_no_two_native_items_answer_the_same_chord(frame):
-    """Includes wx's own application and Window menus, which no wx-level
-    walk can see -- Quit and Minimize live there."""
-    table = _menu_table()
+def test_no_chord_answers_two_different_commands(frame):
+    """Covers wx's own application and Window menus, which no wx-level walk
+    can see -- Quit and Minimize live there.
+
+    Two menu items on one chord is only a bug when they are different
+    commands. wx puts Quit in the application menu *and* in File, and gives
+    both Cmd+Q however the source leaves the accelerator off; since both quit,
+    that costs the user nothing. The invariant worth enforcing is that a chord
+    never means two different things.
+    """
     seen = {}
-    for path, combo in table.items():
+    for path, combo in _menu_table().items():
         seen.setdefault(combo, []).append(path)
-    clashes = {f"{_describe(mask)}+{key}": paths
-               for (key, mask), paths in seen.items() if len(paths) > 1}
-    assert not clashes, f"one chord, two native menu items: {clashes}"
+
+    clashes = {}
+    for (key, mask), paths in seen.items():
+        if len(paths) < 2:
+            continue
+        # "Quit IDT Chat" and "File > Quit" are the same command; compare on
+        # the leading word of the item title, not the whole path.
+        commands = {path.rsplit(" > ", 1)[-1].split(" ")[0] for path in paths}
+        if len(commands) > 1:
+            clashes[f"{_describe(mask)}+{key}"] = paths
+    assert not clashes, f"one chord, two different commands: {clashes}"
 
 
 def test_the_system_chords_mean_what_macos_means_by_them(frame):
