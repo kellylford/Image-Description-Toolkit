@@ -46,6 +46,10 @@ a = Analysis(
         'shared',
         'shared.chat_worker_wx',
         'shared.speech_engine',
+        # Names controls for VoiceOver through NSAccessibility. ctypes only,
+        # no PyObjC, but it still has to be in the bundle: without it every
+        # text box and list in the macOS build goes back to being unlabelled.
+        'shared.mac_accessibility',
 
         # ---- idt_core chat engine ----
         'idt_core',

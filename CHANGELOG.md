@@ -24,6 +24,33 @@
 **`idt manage-models` — install, remove, and list AI models from the CLI**
 - New command supports `list`, `install`, `remove`, `info`, and `recommend` subcommands for managing Ollama models without leaving the terminal.
 
+### ♿ Accessibility
+
+**IDT Chat: VoiceOver now reads the name of every text box, list and picker (macOS)**
+- Tabbing to a field on macOS announced its contents but never its label. The labels existed — VoiceOver could find them by exploring — but nothing connected them to the control.
+- Cause: wx has no working way to name a control for VoiceOver. `wx.Window.SetAccessible()` raises `NotImplementedError` on macOS (the whole `wx.Accessible` framework is Windows-only), and `SetName()` reaches no NSAccessibility attribute. Measured on wxPython 4.3.1 / wxWidgets 3.3.3: every `wx.TextCtrl`, `wx.ListBox` and `wx.Choice` reported `accessibilityLabel == nil` however it had been named.
+- Fixed by setting the name on the native view through NSAccessibility (new `shared/mac_accessibility.py`, ctypes only — no new dependency). Scroll-backed controls are labelled on their `documentView`, which is the element VoiceOver actually lands on.
+- Windows is untouched: it keeps `SetName` plus the existing `wx.Accessible` for text controls, and list items still report their own text.
+
+**IDT Chat: the standard Edit menu exists, so macOS text editing keys work at all**
+- Cmd+A, Cmd+V, Cmd+X and Cmd+Z did nothing in any text field on macOS, including the API key box — which meant a key could not be pasted in. Cocoa routes `cut:`/`copy:`/`paste:`/`selectAll:`/`undo:` through Edit menu items, and the app had no Edit menu with them.
+- Added Undo, Redo, Cut, Copy, Paste and Select All with the standard wx ids. Redo follows the platform: Cmd+Shift+Z on macOS, Ctrl+Y on Windows.
+
+### 🔧 Chat shortcuts no longer take over platform standards
+
+**IDT Chat: Ctrl+C is Copy again**
+- `Ctrl+C` was bound application-wide to "copy the selected transcript message", so a selection could not be copied out of the message box or the detail pane on either platform. It is now the standard Copy, falling back to copying the highlighted transcript message when there is no text selection (which is the only useful reading of Copy on a list).
+- "Copy Message" remains in the Edit menu without an accelerator; "Copy Whole Conversation" keeps `Ctrl+Shift+C`.
+
+**IDT Chat: accelerators moved off reserved macOS chords**
+- `Ctrl+M` → `Ctrl+Shift+M` (Change Model). Cmd+M minimises the window on macOS, and wx puts Minimize on the automatic Window menu.
+- `Ctrl+Shift+W` → `Ctrl+Shift+K` (Use Web Search). Cmd+W and Cmd+Shift+W are the close-window family.
+- `Ctrl+E` → `Ctrl+Shift+E` (Export Conversation). Cmd+E is "use selection for find"; Cmd+Shift+E is the Mac convention for Export.
+- Help > Keyboard Shortcuts is `F1` on Windows and `Cmd+?` on macOS, where F1 is a hardware key. F1 still works on macOS for anyone whose keyboard sends it.
+- Settings, About and Quit now use `wx.ID_PREFERENCES`, `wx.ID_ABOUT` and `wx.ID_EXIT`, which is what wires the macOS application menu to their handlers. They no longer spell out `Ctrl+,` and `Ctrl+Q` on macOS, where doing so put two menu items on one chord. Windows keeps both accelerators.
+- macOS gains `Cmd+W` (Close Window), which the system offers whether an app implements it or not.
+- Help > Keyboard Shortcuts now names the modifier for the platform you are on — "Cmd+N" on macOS instead of "Ctrl+N".
+
 ### 🗑️ Removed
 
 **Florence-2 / HuggingFace provider removed**
