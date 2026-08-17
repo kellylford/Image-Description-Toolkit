@@ -1,7 +1,23 @@
-"""Give wx controls a name VoiceOver will actually read.
+"""Repair what wx gets wrong natively on macOS: control names, and stolen keys.
 
-Why this exists
----------------
+Two unrelated defects, both fixed by reaching past wx to the native view, and
+both no-ops off macOS.
+
+Keys wx gives away
+------------------
+``wx.Button(panel, label="&Attach Files...")`` is an Alt mnemonic on Windows
+and should be nothing at all on macOS. wxOSX instead turns the ``&`` into a
+**Command key equivalent on the NSButton** — measured on a macOS runner, that
+window's buttons claimed ``Cmd+s``, ``Cmd+t``, ``Cmd+a`` and ``Cmd+r``.
+
+That is not a cosmetic problem. AppKit offers a key equivalent to the key
+window's view hierarchy *before* the main menu, so those buttons outrank the
+menu bar: Cmd+A opened the Attach Files dialog instead of selecting text, with
+a completely correct Edit menu sitting behind it. ``clear_command_key_equivalents``
+takes those chords back.
+
+Why VoiceOver naming is here too
+--------------------------------
 wx has no working way to name a control for VoiceOver. Measured on wxPython
 4.3.1 / wxWidgets 3.3.3 (Apple Silicon):
 
@@ -220,8 +236,78 @@ def set_accessible_help(window, text: str) -> bool:
         return False
 
 
+#: NSEventModifierFlagCommand. Only Command equivalents are taken back: the
+#: default button legitimately holds Return with no modifier, and clearing that
+#: would stop Enter activating it.
+_MOD_COMMAND = 1 << 20
+
+
+def clear_command_key_equivalents(root) -> list[str]:
+    """Take back Command chords wx handed to controls in `root`.
+
+    Returns the titles it cleared, which is what a test asserts on and what a
+    log line should say — silently fixing this would hide a wx regression the
+    next time the mnemonic handling changes.
+
+    Only Command chords are touched. A default button holds Return with an
+    empty modifier mask and must keep it, or Enter stops working.
+    """
+    if not IS_MACOS or _runtime() is None:
+        return []
+    cleared = []
+    try:
+        handle = root.GetHandle()
+    except (AttributeError, RuntimeError):
+        return []
+    if not handle:
+        return []
+
+    window = _send(ctypes.c_void_p(handle), "window")
+    start = _send(window, "contentView") if window else handle
+    if not start:
+        return []
+
+    def walk(view):
+        if _responds(view, "keyEquivalentModifierMask"):
+            mask = _send(view, "keyEquivalentModifierMask", restype=ctypes.c_ulong)
+            key = _to_str(_send(view, "keyEquivalent")) if _responds(
+                view, "keyEquivalent") else ""
+            if key and int(mask) & _MOD_COMMAND:
+                title = (_to_str(_send(view, "title"))
+                         if _responds(view, "title") else "") or "<untitled>"
+                _send(view, "setKeyEquivalent:", ctypes.c_void_p(_nsstring("")),
+                      argtypes=(ctypes.c_void_p,))
+                _send(view, "setKeyEquivalentModifierMask:", ctypes.c_ulong(0),
+                      argtypes=(ctypes.c_ulong,))
+                cleared.append(f"{title} ({_describe_mask(int(mask))}+{key})")
+        subviews = _send(view, "subviews")
+        if subviews:
+            count = _send(subviews, "count", restype=ctypes.c_ulong)
+            for index in range(count):
+                walk(ctypes.c_void_p(_send(
+                    subviews, "objectAtIndex:", ctypes.c_ulong(index),
+                    argtypes=(ctypes.c_ulong,))))
+
+    try:
+        walk(ctypes.c_void_p(start))
+    except Exception:                                       # noqa: BLE001
+        return cleared
+    return cleared
+
+
+def _describe_mask(mask: int) -> str:
+    names = [(_MOD_COMMAND, "Cmd"), (1 << 17, "Shift"), (1 << 19, "Alt"),
+             (1 << 18, "Ctrl")]
+    return "+".join(name for bit, name in names if mask & bit)
+
+
 def install_dialog_naming(wx_module) -> bool:
-    """Name every dialog's controls at the moment it is shown.
+    """Apply both macOS fix-ups to every dialog as it is shown: names, and the
+    Command chords wx hands to buttons.
+
+    (The name predates the second job. It is kept because two apps and the
+    tests import it, and renaming it while fixing a live bug is churn for its
+    own sake.)
 
     The alternative was a call at the end of each dialog's ``__init__`` -- 19
     of them across ImageDescriber, each needing to sit after the controls exist
@@ -246,11 +332,13 @@ def install_dialog_naming(wx_module) -> bool:
 
     def show_modal(self, *args, **kwargs):
         apply_accessible_names(self)
+        clear_command_key_equivalents(self)
         return original_show_modal(self, *args, **kwargs)
 
     def show(self, show=True, *args, **kwargs):
         if show:
             apply_accessible_names(self)
+            clear_command_key_equivalents(self)
         return original_show(self, show, *args, **kwargs)
 
     dialog.ShowModal = show_modal

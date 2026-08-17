@@ -1261,7 +1261,7 @@ idt describe ~/Photos --provider openai --model gpt-5.2
 
 ### MLX — Apple Silicon Local (ImageDescriber only, macOS)
 
-MLX runs vision models directly on Apple Silicon (M1/M2/M3/M4) using Apple's Metal GPU via the `mlx-vlm` library. It is the fastest local option on Mac and produces quality comparable to small Ollama models. **MLX is only available in ImageDescriber.** It does not appear in the CLI, and IDT Chat does not offer it: that build deliberately omits the MLX libraries to stay small, so the option is hidden rather than shown and failing.
+MLX runs vision models directly on Apple Silicon (M1/M2/M3/M4) using Apple's Metal GPU via the `mlx-vlm` library. It is the fastest local option on Mac and produces quality comparable to small Ollama models. **MLX is only available in ImageDescriber.** It does not appear in the CLI, and IDT Chat does not offer it: that build deliberately omits the MLX libraries, which would take it from about 40 MB to around 350 MB. For chat that is a poor trade, because Ollama now runs several models through MLX on Apple Silicon itself — chatting with Ollama on a Mac already gets you the Metal acceleration. To chat with an MLX model directly, use ImageDescriber's own chat window. The picker hides the option rather than showing one that would fail when chosen.
 
 **GUI provider name:** `mlx`
 
@@ -1494,6 +1494,8 @@ It exists because mainstream chat applications are poorly suited to screen reade
 Launch **IDT Chat** from the Start menu (Windows) or from `Applications/IDT/IDTChat.app` (macOS).
 
 The first time you send a message it asks for a provider and model. Ollama needs no API key, so it works with no setup as long as Ollama is running. Claude and OpenAI need a key — see [Setting Up API Keys](#setting-up-api-keys).
+
+**MLX is not offered here, and that is deliberate.** ImageDescriber lists MLX on Apple Silicon and IDT Chat does not, which looks like an oversight and is not. MLX needs Apple's `mlx` and `mlx-vlm` libraries, which would take this app from about 40 MB to around 350 MB — worth paying in ImageDescriber, where describing a folder of photos locally is the whole point, and worth much less for chat, because Ollama now runs several models through MLX on Apple Silicon itself. Chatting with Ollama on a Mac already gets you the Metal acceleration. If you specifically want to chat with an MLX model, use the chat window inside ImageDescriber (**Process → Chat with AI Model**), which offers it. The picker hides MLX rather than listing an option that would fail the moment you chose it.
 
 ### The window
 

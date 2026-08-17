@@ -38,6 +38,17 @@
 - Controls that carried no name at all are now named: the prompt editor's style, provider, API key, model and prompt-name fields; the Configure dialog's per-setting editor (named for the setting it edits); the viewer's description pane; the file-information and description panes in the image detail dialog.
 - ImageDescriber's chat window gains a **Paste Image** button. Ctrl+V was never a route to it on macOS — the main window's Edit menu owns Cmd+V and Cocoa hands it to the focused text control before any key event reaches the dialog — so pasting a screenshot into a chat silently did nothing there.
 
+**Cmd+A opened the Attach Files dialog instead of selecting text (both apps, macOS)**
+- In IDT Chat, with focus in the message box, `Cmd+A` opened the file picker. `Cmd+T` ran Stop rather than Token Usage; `Cmd+R` removed an attachment rather than regenerating.
+- Cause: wxOSX turns the `&` mnemonic in a control's label into a **Command key equivalent on the native NSButton**. `wxButtonCocoaImpl::SetAcceleratorFromLabel` takes the character after the `&`, lowercases it, and sets the modifier mask to Command. On Windows those ampersands are Alt mnemonics and harmless; on macOS `&Attach Files...` becomes ⌘A. And AppKit offers a key equivalent to the key window's view hierarchy **before** the main menu, so that button outranked a completely correct Edit menu.
+- Affected IDT Chat's main window (`&Send`, `S&top`, `&Attach Files...`, `&Remove Attachment`) and its API keys dialog (`&Remove`, `&Save`), plus ImageDescriber's dialogs (`&Browse for Directory...`, `&Embed`, and checkboxes such as `&Search subdirectories recursively` — a `wx.CheckBox` is an NSButton too). ImageDescriber's main window carries no mnemonic labels and was unaffected.
+- Fixed by `clear_command_key_equivalents()`, which walks a window and takes back any Command chord a control claimed. It runs for both frames at construction and for every dialog in both apps, and reports what it cleared rather than fixing it silently. Only Command chords are touched: a default button holds Return with no modifier and must keep it, or Enter stops activating it. Windows mnemonics are unchanged.
+
+**Why no test caught that, and what does now**
+- The existing tests asserted the menu *table* (`Ctrl+A` is bound to `wx.ID_SELECTALL`) and the handler *routing* (given a focused text control, the command calls `SelectAll`). Both were correct the whole time. The bug lived between them, in AppKit's ordering of window views against the menu bar — a layer nothing tested.
+- New `pytest_tests/gui/` tests press chords through Cocoa's own matching: they build an `NSEvent` and offer it to the window and then the menu, in that order. Not `wx.UIActionSimulator`, which posts CGEvents that macOS discards unless the process is trusted for Accessibility — on a runner it would press nothing and pass.
+- A headless guard runs on the Windows CI box too: any app whose control labels carry `&` must also reclaim the macOS chords.
+
 **IDT Chat: the standard Edit menu exists, so macOS text editing keys work at all**
 - Cmd+A, Cmd+V, Cmd+X and Cmd+Z did nothing in any text field on macOS, including the API key box — which meant a key could not be pasted in. Cocoa routes `cut:`/`copy:`/`paste:`/`selectAll:`/`undo:` through Edit menu items, and the app had no Edit menu with them.
 - Added Undo, Redo, Cut, Copy, Paste and Select All with the standard wx ids. Redo follows the platform: Cmd+Shift+Z on macOS, Ctrl+Y on Windows.

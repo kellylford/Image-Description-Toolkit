@@ -125,6 +125,18 @@ jobs:
         IDT_REQUIRE_WX: "1"
       run: ./.venv/bin/python -m pytest pytest_tests/unit -v --tb=short
 
+    # A keyboard shortcut is only correct if pressing it runs the right
+    # command, and no test asserted that until Cmd+A was found opening the
+    # Attach Files dialog while twenty-two green tests said the menu table and
+    # the handler routing were both fine. These press chords through Cocoa's
+    # own key-equivalent matching, which is the layer that was wrong. macOS
+    # only, because that matching is what they exercise; the Windows side is
+    # covered from build-windows.yml.
+    - name: Run GUI keyboard dispatch tests
+      env:
+        IDT_REQUIRE_WX: "1"
+      run: ./.venv/bin/python -m pytest pytest_tests/gui -v --tb=short
+
     - name: Run smoke tests (GUI-dependent; non-fatal)
       continue-on-error: true
       run: ./.venv/bin/python -m pytest pytest_tests/smoke -v --tb=short
