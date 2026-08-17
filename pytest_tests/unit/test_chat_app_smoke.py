@@ -250,6 +250,138 @@ def test_list_controls_do_not_get_a_custom_accessible(wx_app):
         frame.Destroy()
 
 
+macos_only = pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="NSAccessibility naming is the macOS route; Windows uses wx.Accessible",
+)
+
+
+@macos_only
+def test_every_control_is_named_for_voiceover(frame):
+    """Reported bug: tabbing to a field announced its contents, never its name.
+
+    wx names nothing native on macOS -- SetAccessible() raises there, and
+    SetName() reaches no NSAccessibility attribute -- so every text box, list
+    and picker came out anonymous however carefully it had been labelled. The
+    name now goes on the native view, and this reads it back the same way
+    VoiceOver would.
+    """
+    from shared.mac_accessibility import get_accessible_name
+
+    expected = {
+        "input_text": "Your message",
+        "detail": "Selected message",
+        "history_list": "Conversation history",
+        "session_list": "Saved conversations",
+        "attach_list": "Pending attachments",
+    }
+    unnamed = {
+        attribute: get_accessible_name(getattr(frame, attribute))
+        for attribute, label in expected.items()
+        if get_accessible_name(getattr(frame, attribute)) != label
+    }
+    assert not unnamed, f"controls VoiceOver would read unnamed: {unnamed}"
+
+
+@macos_only
+def test_naming_a_list_leaves_its_items_alone(frame):
+    """The name is an added attribute, not a replacement implementation.
+
+    The Windows equivalent of this mistake -- a custom wx.Accessible on a
+    ListBox -- is what made every arrow key announce "Conversation history"
+    instead of the message.
+    """
+    from shared.mac_accessibility import get_accessible_name
+
+    frame.history_list.Append("You: hello")
+    assert get_accessible_name(frame.history_list) == "Conversation history"
+    assert frame.history_list.GetString(0) == "You: hello"
+
+
+# ---------------------------------------------------------------------------
+# 2c. Accelerators
+# ---------------------------------------------------------------------------
+
+def _menu_accelerators(frame):
+    """Every accelerator the built menu bar actually carries -> its label."""
+    found = {}
+    bar = frame.GetMenuBar()
+    for index in range(bar.GetMenuCount()):
+        for item in bar.GetMenu(index).GetMenuItems():
+            if item.IsSeparator():
+                continue
+            accel = item.GetAccel()
+            if accel is not None:
+                found.setdefault(accel.ToString(), []).append(item.GetItemLabelText())
+    return found
+
+
+def test_no_two_commands_share_an_accelerator(frame):
+    """Includes the per-platform ones a source scan cannot see (Redo, help)."""
+    clashes = {a: labels for a, labels in _menu_accelerators(frame).items()
+               if len(labels) > 1}
+    assert not clashes, f"one chord, two commands: {clashes}"
+
+
+@macos_only
+def test_system_chords_are_not_taken_on_macos(frame):
+    """Cmd+M minimises, Cmd+Q quits, Cmd+, opens Settings -- all from macOS.
+
+    wx maps "Ctrl+" to Command, so an innocent-looking Ctrl+M in the source is
+    Cmd+M here. Quit and Settings are supplied by the application menu, so
+    binding them again puts two menu items on one chord.
+    """
+    accelerators = _menu_accelerators(frame)
+    for chord in ("Ctrl+M", "Ctrl+Q", "Ctrl+,"):
+        assert chord not in accelerators, (
+            f"{chord} is macOS's, but it is bound to "
+            f"{accelerators[chord]}")
+
+
+def test_standard_edit_commands_reach_the_focused_text_control(frame):
+    """The routing that stops Ctrl+C meaning "copy the transcript" everywhere."""
+    frame.input_text.SetValue("hello world")
+    frame.input_text.SetSelection(0, 5)
+
+    assert frame._text_command(frame.input_text, "Copy") is True
+    # A list has no text to cut or select; the command must decline, not crash.
+    assert frame._text_command(frame.history_list, "Copy") is False
+    assert frame._text_command(frame.session_list, "SelectAll") is False
+    assert frame._text_command(None, "Paste") is False
+
+    frame.input_text.SetValue("")
+    assert frame._text_command(frame.input_text, "SelectAll") is True
+
+
+def test_copy_falls_back_to_the_selected_message(frame, monkeypatch):
+    """On the transcript there is no selection, so Copy means "copy this one"."""
+    from idt_core.chat import ChatMessage
+
+    frame.session.add(ChatMessage(role="assistant", content="the answer"))
+    frame._reload_history()
+    frame.history_list.SetSelection(0)
+
+    copied = []
+    monkeypatch.setattr(frame, "_copy", copied.append)
+    monkeypatch.setattr(frame, "_focused", lambda: frame.history_list)
+    frame.on_copy(None)
+
+    assert copied == ["the answer"]
+
+
+def test_copy_in_a_text_box_copies_the_selection(frame, monkeypatch):
+    """The regression that mattered: Ctrl+C stole copy from every text field."""
+    frame.input_text.SetValue("typed text")
+    frame.input_text.SetSelection(0, 5)
+
+    copied = []
+    monkeypatch.setattr(frame, "_copy", copied.append)
+    monkeypatch.setattr(frame, "_focused", lambda: frame.input_text)
+    frame.on_copy(None)
+
+    assert copied == [], "the transcript fallback must not run over a selection"
+
+
 def test_history_and_session_lists_keep_their_items_readable(frame):
     """End to end: the real controls must expose item strings, not just a name."""
     frame.history_list.Append("You: hello")

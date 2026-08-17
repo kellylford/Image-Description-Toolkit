@@ -80,6 +80,12 @@ try:
         DescriptionListBox,  # NEW: Accessible listbox for descriptions with full text in screen readers
     )
     from shared.exif_utils import extract_exif_datetime
+    # Names controls for VoiceOver. wx cannot do it on macOS -- SetAccessible()
+    # raises there and SetName() reaches no NSAccessibility attribute -- so
+    # every text box, list and picker announces its contents and never its
+    # label until this runs. Imported here rather than guarded separately so a
+    # packaging mistake fails loudly instead of shipping an unlabelled app.
+    from shared.mac_accessibility import apply_accessible_names, install_dialog_naming
 except ImportError as e:
     print(f"ERROR: Could not import shared utilities: {e}")
     print("This is a critical error. ImageDescriber cannot function without shared utilities.")
@@ -746,6 +752,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.init_ui()
         self.create_menu_bar()
         self.create_status_bar()
+
+        # Publish every control's wx name to VoiceOver. One call covers the
+        # window because the names are already there in the `name=` arguments;
+        # what was missing is that nothing carried them to NSAccessibility.
+        # No-op off macOS, where SetName is already read.
+        apply_accessible_names(self)
 
         # Set initial focus to image list for keyboard navigation
         wx.CallAfter(self.image_list.SetFocus)
@@ -1426,7 +1438,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         save_item = file_menu.Append(wx.ID_SAVE, "&Save Workspace\tCtrl+S")
         self.Bind(wx.EVT_MENU, self.on_save_workspace, save_item)
 
-        save_as_item = file_menu.Append(wx.ID_SAVEAS, "Save Workspace &As...")
+        save_as_item = file_menu.Append(wx.ID_SAVEAS,
+                                        "Save Workspace &As...\tCtrl+Shift+S")
         self.Bind(wx.EVT_MENU, self.on_save_workspace_as, save_as_item)
 
         file_menu.AppendSeparator()
@@ -1450,7 +1463,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         embed_item = file_menu.Append(wx.ID_ANY, "Em&bed Descriptions into Images...")
         self.Bind(wx.EVT_MENU, self.on_embed_descriptions, embed_item)
 
-        export_gallery_item = file_menu.Append(wx.ID_ANY, "Export &HTML Gallery...\tCtrl+Shift+G")
+        # Ctrl+Shift+H, not Ctrl+Shift+G: Cmd+Shift+G is Find Previous on macOS,
+        # and this app has a Find (Ctrl+F), so that pairing is one users expect.
+        export_gallery_item = file_menu.Append(wx.ID_ANY, "Export &HTML Gallery...\tCtrl+Shift+H")
         self.Bind(wx.EVT_MENU, self.on_export_html_gallery, export_gallery_item)
 
         self.workspace_stats_item = file_menu.Append(wx.ID_ANY, "Workspace &Statistics...\tCtrl+I")
@@ -1461,13 +1476,40 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         file_menu.AppendSeparator()
 
-        exit_item = file_menu.Append(wx.ID_EXIT, "E&xit\tCtrl+Q")
-        self.Bind(wx.EVT_MENU, self.on_close, exit_item)
+        if sys.platform == 'darwin':
+            # Cmd+W closes the window on macOS whether an app implements it or
+            # not, so leaving it unbound is a missing behaviour, not a spare key.
+            close_item = file_menu.Append(wx.ID_CLOSE, "&Close Window\tCtrl+W")
+            self.Bind(wx.EVT_MENU, self.on_exit, close_item)
+
+        # No accelerator on macOS: the application menu already supplies Cmd+Q
+        # for this item (wx routes it here through wx.ID_EXIT), and spelling it
+        # out again puts two menu items on one chord.
+        exit_label = "E&xit" if sys.platform == 'darwin' else "E&xit\tCtrl+Q"
+        exit_item = file_menu.Append(wx.ID_EXIT, exit_label)
+        self.Bind(wx.EVT_MENU, self.on_exit, exit_item)
 
         menubar.Append(file_menu, "&File")
 
         # Edit menu
+        #
+        # The standard ids matter beyond tidiness: macOS dispatches
+        # cut:/copy:/paste:/selectAll:/undo: to the focused control through
+        # these menu items, so a missing item is a key that does nothing in
+        # every text field in the app. Undo and Redo were missing, which is
+        # exactly what Cmd+Z did here -- nothing.
         edit_menu = wx.Menu()
+
+        undo_item = edit_menu.Append(wx.ID_UNDO, "&Undo\tCtrl+Z")
+        self.Bind(wx.EVT_MENU, self.on_undo, undo_item)
+
+        # Redo is Cmd+Shift+Z on macOS and Ctrl+Y on Windows; both are the
+        # convention on their own platform.
+        redo_key = "Ctrl+Shift+Z" if sys.platform == 'darwin' else "Ctrl+Y"
+        redo_item = edit_menu.Append(wx.ID_REDO, f"&Redo\t{redo_key}")
+        self.Bind(wx.EVT_MENU, self.on_redo, redo_item)
+
+        edit_menu.AppendSeparator()
 
         cut_item = edit_menu.Append(wx.ID_CUT, "&Cut\tCtrl+X")
         self.Bind(wx.EVT_MENU, self.on_cut, cut_item)
@@ -1559,7 +1601,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         process_menu.AppendSeparator()
 
-        refresh_list_item = process_menu.Append(wx.ID_ANY, "&Update Image List\tF5")
+        # F5 is the Windows refresh key. On a Mac it is a hardware key (often
+        # dictation or keyboard brightness), where the convention is Cmd+R.
+        refresh_key = "Ctrl+R" if sys.platform == 'darwin' else "F5"
+        refresh_list_item = process_menu.Append(
+            wx.ID_ANY, f"&Update Image List\t{refresh_key}")
         self.Bind(wx.EVT_MENU, self.on_refresh_image_list, refresh_list_item)
 
         process_menu.AppendSeparator()
@@ -1585,7 +1631,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         process_menu.AppendSeparator()
 
-        rename_item = process_menu.Append(wx.ID_ANY, "&Rename Item")
+        # F2 is the Windows rename key and this menu never carried it. Left
+        # unbound on macOS, where F2 is a hardware key and renaming is Return.
+        rename_label = "&Rename Item" if sys.platform == 'darwin' else "&Rename Item\tF2"
+        rename_item = process_menu.Append(wx.ID_ANY, rename_label)
         self.Bind(wx.EVT_MENU, self.on_rename_item, rename_item)
 
         menubar.Append(process_menu, "&Process")
@@ -1675,7 +1724,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Tools menu
         tools_menu = wx.Menu()
 
-        edit_prompts_item = tools_menu.Append(wx.ID_ANY, "Edit &Prompts...\tCtrl+P")
+        # Ctrl+Shift+P, not Ctrl+P: Ctrl+P / Cmd+P is Print on both platforms,
+        # and it is the kind of key people press reflexively. Ctrl+Shift+P is
+        # also what IDT Chat uses for its prompt command.
+        edit_prompts_item = tools_menu.Append(wx.ID_ANY, "Edit &Prompts...\tCtrl+Shift+P")
         self.Bind(wx.EVT_MENU, self.on_edit_prompts, edit_prompts_item)
 
         # Configure Settings - use platform-specific menu ID and accelerator
@@ -1728,7 +1780,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Help menu
         help_menu = wx.Menu()
 
-        user_guide_item = help_menu.Append(wx.ID_ANY, "&User Guide...")
+        # The help key, which this menu never had: F1 on Windows, Cmd+? on
+        # macOS, where F1 is a hardware key.
+        help_key = "Ctrl+?" if sys.platform == 'darwin' else "F1"
+        user_guide_item = help_menu.Append(wx.ID_ANY, f"&User Guide...\t{help_key}")
         self.Bind(wx.EVT_MENU, self.on_user_guide, user_guide_item)
 
         report_issue_item = help_menu.Append(wx.ID_ANY, "&Report an Issue...")
@@ -2139,6 +2194,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.save_desc_btn.Enable(True)
 
     # Edit Menu Handlers
+
+    def on_undo(self, event):
+        """Handle undo from Edit menu.
+
+        The item exists mainly for macOS: Cocoa routes undo: to the focused
+        control through this menu item, so without it Cmd+Z did nothing in any
+        text field in the application.
+        """
+        control = self.FindFocus()
+        if control and hasattr(control, 'Undo'):
+            try:
+                control.Undo()
+            except Exception:
+                pass
+
+    def on_redo(self, event):
+        """Handle redo from Edit menu"""
+        control = self.FindFocus()
+        if control and hasattr(control, 'Redo'):
+            try:
+                control.Redo()
+            except Exception:
+                pass
 
     def on_cut(self, event):
         """Handle cut from Edit menu"""
@@ -8074,7 +8152,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
-        text_ctrl = wx.TextCtrl(dlg, value=summary_text,
+        text_ctrl = wx.TextCtrl(dlg, value=summary_text, name="All descriptions",
                                style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
         sizer.Add(text_ctrl, 1, wx.ALL | wx.EXPAND, 10)
 
@@ -8929,6 +9007,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logging.error(f"Error showing About dialog: {e}", exc_info=True)
             show_error(self, f"Could not show About dialog:\n{e}")
 
+    def on_exit(self, event):
+        """File > Exit, and Close Window on macOS.
+
+        Routed through Close() rather than straight to on_close. A menu item
+        delivers a wx.CommandEvent, and on_close finishes with
+        ``event.CanVeto()``, which exists only on wx.CloseEvent -- so
+        cancelling the unsaved-changes prompt from the menu raised
+        AttributeError inside the handler, silently, the way wx always swallows
+        them. Close() posts a real EVT_CLOSE and on_close does the rest.
+        """
+        self.Close()
+
     def on_close(self, event):
         """Handle application close"""
         logger.info("Application close requested")
@@ -9080,6 +9170,13 @@ def main():
             pass
 
     app = wx.App()
+
+    # Name every dialog's controls for VoiceOver as it is shown. Installed once
+    # here rather than at the end of each dialog's __init__: there are nineteen
+    # of them, the call has to land after the controls exist and before the
+    # dialog appears, and the twentieth dialog somebody adds would not have it.
+    install_dialog_naming(wx)
+
     frame = ImageDescriberFrame()
 
     if args.viewer:

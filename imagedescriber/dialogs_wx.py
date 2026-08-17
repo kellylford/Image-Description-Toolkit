@@ -37,6 +37,10 @@ from shared.wx_common import (
     open_file_dialog,
     save_file_dialog,
 )
+from shared.mac_accessibility import (
+    set_accessible_help as set_mac_accessible_help,
+    set_accessible_name as set_mac_accessible_name,
+)
 
 try:
     from idt_core.config_loader import load_json_config
@@ -60,21 +64,34 @@ except ImportError:
 
 
 def set_accessible_name(widget, name):
-    """Safely set accessible name if supported"""
-    if hasattr(widget, 'SetAccessibleName'):
-        try:
-            widget.SetAccessibleName(name)
-        except Exception:
-            pass  # Silently ignore if not supported
+    """Name a widget for screen readers, on both platforms.
+
+    This used to call ``widget.SetAccessibleName()`` behind a ``hasattr``
+    guard. **wxPython has no such method** -- the guard was always False, so
+    every one of the calls in this file did nothing at all, on Windows as much
+    as on macOS. The dialogs looked carefully labelled and were not.
+
+    ``SetName`` is the method that exists, and it is what NVDA and Narrator
+    read. macOS needs the name pushed to NSAccessibility on top, because wx
+    carries it nowhere there.
+    """
+    try:
+        widget.SetName(name)
+    except (AttributeError, RuntimeError):
+        return
+    set_mac_accessible_name(widget, name)   # no-op off macOS
 
 
 def set_accessible_description(widget, desc):
-    """Safely set accessible description if supported"""
-    if hasattr(widget, 'SetAccessibleDescription'):
-        try:
-            widget.SetAccessibleDescription(desc)
-        except Exception:
-            pass  # Silently ignore if not supported
+    """Attach a longer explanation, where the platform has somewhere for it.
+
+    Same story as above: ``SetAccessibleDescription`` does not exist in
+    wxPython either. macOS does have somewhere to put this -- the control's
+    accessibility help, read after its name -- and Windows has no wx-level
+    equivalent, so there it stays a no-op. Kept rather than deleted because the
+    call sites carry real explanations worth speaking.
+    """
+    set_mac_accessible_help(widget, desc)
 
 
 class DirectorySelectionDialog(wx.Dialog):
@@ -247,7 +264,7 @@ class ApiKeyDialog(wx.Dialog):
         # File selection
         file_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        self.file_text = wx.TextCtrl(self)
+        self.file_text = wx.TextCtrl(self, name="Configuration file path")
         self.file_text.SetHint("Path to API key file or API key")
         file_sizer.Add(self.file_text, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         
@@ -1301,6 +1318,7 @@ class ImageDetailDialog(wx.Dialog):
         file_path = Path(self.image_item.file_path)
         info_text = wx.TextCtrl(
             panel,
+            name="File information",
             style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP,
             value=f"File: {file_path.name}\n"
                   f"Path: {file_path.parent}\n"
@@ -1334,6 +1352,7 @@ class ImageDetailDialog(wx.Dialog):
                 # Description text
                 desc_text = wx.TextCtrl(
                     panel,
+                    name="Description text",
                     style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP,
                     value=desc.text,
                     size=(-1, 100)

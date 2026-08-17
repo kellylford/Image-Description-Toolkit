@@ -77,6 +77,10 @@ from idt_core.providers.registry import (  # noqa: E402
 )
 
 from shared.chat_worker_wx import ChatWorker  # noqa: E402
+from shared.mac_accessibility import (  # noqa: E402
+    install_dialog_naming,
+    set_accessible_name as _set_mac_accessible_name,
+)
 from shared.speech_engine import (  # noqa: E402
     RATE_PRESET_LABELS,
     SpeechSettings,
@@ -86,6 +90,10 @@ from shared.speech_engine import (  # noqa: E402
 )
 
 APP_NAME = "IDT Chat"
+
+#: True on macOS. wx maps every "Ctrl+" accelerator to Command here, so the
+#: same accelerator string has to clear two sets of platform conventions.
+_MAC = wx.Platform == "__WXMAC__"
 
 #: How much a screen reader should say when a response arrives.
 ANNOUNCE_FULL = "full"
@@ -133,14 +141,24 @@ class _NamedAccessible(wx.Accessible):
 
 
 def _set_accessible_name(control: wx.Window, label: str) -> None:
-    """Name a control for screen readers.
+    """Name a control for screen readers, on both platforms.
 
-    Only text controls get the custom accessible. Item-bearing controls such as
-    wx.ListBox already report their items correctly, and overriding their
-    accessible risks masking the item text — which is the whole point of using
-    a ListBox for the conversation.
+    Three mechanisms, because no one of them works everywhere:
+
+    * ``SetName`` — what wx itself carries, and what NVDA and Narrator read for
+      most Windows controls.
+    * ``wx.Accessible`` — needed on Windows for text controls, whose name does
+      not otherwise reach MSAA. **Only** text controls get one: item-bearing
+      controls such as wx.ListBox already report their items correctly, and a
+      custom accessible on those risks masking the item text — which is the
+      whole point of using a ListBox for the conversation.
+    * ``NSAccessibility`` — the macOS route, and it applies to *every* control
+      type, because there wx names none of them. This is the fix for tabbing to
+      a field and hearing its contents but never its label: VoiceOver was
+      reading the value because there was no name to read.
     """
     control.SetName(label)
+    _set_mac_accessible_name(control, label)    # no-op off macOS
     if not isinstance(control, wx.TextCtrl):
         return
     try:
@@ -437,6 +455,7 @@ class SettingsDialog(wx.Dialog):
 
         outer = wx.BoxSizer(wx.VERTICAL)
         notebook = wx.Notebook(self, name="Settings sections")
+        _set_accessible_name(notebook, "Settings sections")
 
         # ---- Speech tab --------------------------------------------------
         page = wx.Panel(notebook)
@@ -456,6 +475,7 @@ class SettingsDialog(wx.Dialog):
         self.engine_choice = wx.Choice(
             page, choices=[option.label for option in self._options],
             name="Speech engine")
+        _set_accessible_name(self.engine_choice, "Speech engine")
         grid.Add(self.engine_choice, 1, wx.EXPAND)
 
         grid.Add(wx.StaticText(page, label="Speaking r&ate:"), 0,
@@ -463,6 +483,7 @@ class SettingsDialog(wx.Dialog):
         self.rate_choice = wx.Choice(
             page, choices=[label.capitalize() for label in RATE_PRESET_LABELS],
             name="Speaking rate")
+        _set_accessible_name(self.rate_choice, "Speaking rate")
         grid.Add(self.rate_choice, 0)
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -580,6 +601,7 @@ class ApiKeysDialog(wx.Dialog):
                      wx.ALIGN_CENTER_VERTICAL)
             field = wx.TextCtrl(panel, style=wx.TE_PASSWORD,
                                 name=f"{label} API key")
+            _set_accessible_name(field, f"{label} API key")
             self._fields[provider] = field
             grid.Add(field, 1, wx.EXPAND)
 
@@ -708,6 +730,30 @@ class ChatFrame(wx.Frame):
     # ---- construction ----------------------------------------------------
 
     def _build_menu(self):
+        """The menu bar, and the accelerators it must not steal.
+
+        Every "Ctrl+" below is Command on macOS, so each accelerator has to
+        clear both platforms' conventions. Three rules came out of that:
+
+        * **Never take a system chord.** Cmd+M is Minimize (wx puts it on the
+          automatic Window menu), Cmd+W is Close, Cmd+Q is Quit, Cmd+, is
+          Settings. Change Model moved off Ctrl+M for the first, and Web Search
+          off Ctrl+Shift+W for the second; Quit and Settings are handled by id
+          rather than by binding the key a second time.
+        * **Standard editing keys belong to the focused control.** Ctrl+C used
+          to mean "copy the selected transcript message" application-wide,
+          which meant you could not copy a selection out of the message box.
+          It is now a normal Copy that falls back to the transcript, and the
+          rest of the standard Edit menu exists for the first time — on macOS
+          that menu is what makes Cmd+A, Cmd+V and Cmd+Z work *at all*, since
+          Cocoa routes those through menu items and there was no Edit menu.
+        * **wx.ID_PREFERENCES / wx.ID_ABOUT / wx.ID_EXIT are wiring, not
+          decoration.** macOS puts Settings, About and Quit on the application
+          menu, and those entries reach these handlers only when the items
+          carry the standard ids. They also must not repeat the accelerator
+          the application menu already supplies, or two menu items answer to
+          the same chord.
+        """
         bar = wx.MenuBar()
 
         file_menu = wx.Menu()
@@ -718,14 +764,42 @@ class ChatFrame(wx.Frame):
         # handled contextually in on_char_hook instead, which can see focus.
         self._menu_item(file_menu, "&Delete Chat", self.on_delete_chat)
         file_menu.AppendSeparator()
-        self._menu_item(file_menu, "&Export Conversation...\tCtrl+E",
+        # Ctrl+Shift+E, not Ctrl+E: Cmd+E is "use selection for find" on macOS,
+        # and Cmd+Shift+E is what Mac apps use for Export.
+        self._menu_item(file_menu, "&Export Conversation...\tCtrl+Shift+E",
                         self.on_export)
         file_menu.AppendSeparator()
-        self._menu_item(file_menu, "&Settings...", self.on_settings)
+        self._menu_item(file_menu, self._accel("&Settings...", "Ctrl+,"),
+                        self.on_settings, wx.ID_PREFERENCES)
         self._menu_item(file_menu, "API &Keys...", self.on_api_keys)
         file_menu.AppendSeparator()
-        self._menu_item(file_menu, "E&xit\tCtrl+Q", self.on_exit)
+        if _MAC:
+            # Cmd+W closes the window on macOS whether an app implements it or
+            # not; with one window that is the same as quitting.
+            self._menu_item(file_menu, "&Close Window\tCtrl+W", self.on_exit,
+                            wx.ID_CLOSE)
+        self._menu_item(file_menu, self._accel("E&xit", "Ctrl+Q"),
+                        self.on_exit, wx.ID_EXIT)
         bar.Append(file_menu, "&File")
+
+        edit_menu = wx.Menu()
+        self._menu_item(edit_menu, "&Undo\tCtrl+Z", self.on_undo, wx.ID_UNDO)
+        redo = "Ctrl+Shift+Z" if _MAC else "Ctrl+Y"
+        self._menu_item(edit_menu, f"&Redo\t{redo}", self.on_redo, wx.ID_REDO)
+        edit_menu.AppendSeparator()
+        self._menu_item(edit_menu, "Cu&t\tCtrl+X", self.on_cut, wx.ID_CUT)
+        self._menu_item(edit_menu, "&Copy\tCtrl+C", self.on_copy, wx.ID_COPY)
+        self._menu_item(edit_menu, "&Paste\tCtrl+V", self.on_paste, wx.ID_PASTE)
+        self._menu_item(edit_menu, "Select &All\tCtrl+A", self.on_select_all,
+                        wx.ID_SELECTALL)
+        edit_menu.AppendSeparator()
+        # No accelerator: Copy already does this when the transcript has focus.
+        # The item is here so the command is discoverable, and so it works from
+        # anywhere in the window.
+        self._menu_item(edit_menu, "Copy &Message", self.on_copy_message)
+        self._menu_item(edit_menu, "Copy W&hole Conversation\tCtrl+Shift+C",
+                        self.on_copy_all)
+        bar.Append(edit_menu, "&Edit")
 
         chat_menu = wx.Menu()
         self._menu_item(chat_menu, "&Send Message\tCtrl+Return", self.on_send)
@@ -736,26 +810,26 @@ class ChatFrame(wx.Frame):
         chat_menu.AppendSeparator()
         self.attach_menu_item = self._menu_item(
             chat_menu, "&Attach Files...\tCtrl+Shift+A", self.on_attach_files)
+        # A paste variant, and safe as one: nothing in this app is rich text,
+        # so there is no "paste and match style" for it to displace.
         self._menu_item(chat_menu, "&Paste Image\tCtrl+Shift+V",
                         self.on_paste_image)
         chat_menu.AppendSeparator()
-        self._menu_item(chat_menu, "Change &Model...\tCtrl+M",
+        # Ctrl+Shift+M, not Ctrl+M: Cmd+M minimises the window on macOS.
+        self._menu_item(chat_menu, "Change &Model...\tCtrl+Shift+M",
                         self.on_change_model)
         self._menu_item(chat_menu, "Set S&ystem Prompt...\tCtrl+Shift+P",
                         self.on_system_prompt)
         chat_menu.AppendSeparator()
         # A check item, not a command: web search is a mode for the whole
         # conversation, and the checkmark is what a screen reader reports.
+        # Ctrl+Shift+K, not Ctrl+Shift+W: Cmd+W and Cmd+Shift+W are the
+        # close-window family on macOS.
         self.web_search_item = chat_menu.AppendCheckItem(
-            wx.ID_ANY, "Use &Web Search\tCtrl+Shift+W",
+            wx.ID_ANY, "Use &Web Search\tCtrl+Shift+K",
             "Let the model search the web (Ollama models with tool support)")
         self.Bind(wx.EVT_MENU, self.on_toggle_web_search, self.web_search_item)
         bar.Append(chat_menu, "&Chat")
-
-        edit_menu = wx.Menu()
-        self._menu_item(edit_menu, "&Copy Message\tCtrl+C", self.on_copy_message)
-        self._menu_item(edit_menu, "Copy &All\tCtrl+Shift+C", self.on_copy_all)
-        bar.Append(edit_menu, "&Edit")
 
         view_menu = wx.Menu()
         self._menu_item(view_menu, "&Read Last Response\tCtrl+Shift+R",
@@ -772,14 +846,28 @@ class ChatFrame(wx.Frame):
         bar.Append(view_menu, "&View")
 
         help_menu = wx.Menu()
-        self._menu_item(help_menu, "&Keyboard Shortcuts\tF1", self.on_shortcuts)
-        self._menu_item(help_menu, "&About", self.on_about)
+        # F1 is the Windows help key; on macOS it is a hardware key and the
+        # convention is Cmd+? instead.
+        shortcuts_key = "Ctrl+?" if _MAC else "F1"
+        self._menu_item(help_menu, f"&Keyboard Shortcuts\t{shortcuts_key}",
+                        self.on_shortcuts)
+        self._menu_item(help_menu, "&About", self.on_about, wx.ID_ABOUT)
         bar.Append(help_menu, "&Help")
 
         self.SetMenuBar(bar)
 
-    def _menu_item(self, menu, label, handler):
-        item = menu.Append(wx.ID_ANY, label)
+    @staticmethod
+    def _accel(label: str, key: str) -> str:
+        """`label` with `key` attached, except where macOS supplies the key.
+
+        Settings and Quit already answer to Cmd+, and Cmd+Q from the
+        application menu. Spelling the accelerator out again would put two menu
+        items on one chord.
+        """
+        return label if _MAC else f"{label}\t{key}"
+
+    def _menu_item(self, menu, label, handler, item_id=wx.ID_ANY):
+        item = menu.Append(item_id, label)
         self.Bind(wx.EVT_MENU, handler, item)
         return item
 
@@ -1467,6 +1555,94 @@ class ChatFrame(wx.Frame):
             "model's window. Billed is the sum across every turn.",
             "Token Usage", wx.OK | wx.ICON_INFORMATION, self)
 
+    # ---- standard editing -------------------------------------------------
+    #
+    # These exist because a menu accelerator is application-wide. Ctrl+C bound
+    # straight to "copy the selected transcript message" meant Ctrl+C did that
+    # *everywhere*, including in the message box, so a selection could not be
+    # copied out of it. Each command now asks who has focus first.
+    #
+    # On macOS most of these never run: Cocoa dispatches cut:/copy:/paste:/
+    # selectAll:/undo: to the focused NSTextView before wx sees a menu command,
+    # which is the behaviour we want and the reason the Edit menu has to exist
+    # there at all -- without it, Cmd+A and Cmd+V do nothing in any text field,
+    # including the API key box. wx only falls back to sending the command
+    # event when nothing native claimed it, i.e. exactly when focus is on a
+    # list, which is where the transcript fallback belongs.
+    #
+    # On Windows the accelerator reaches the frame first, so the routing below
+    # is what makes the standard keys behave normally.
+
+    @staticmethod
+    def _focused():
+        """The control with focus. A seam, so the routing can be tested.
+
+        Same reason ``_handle_return`` takes its focused window as an argument:
+        driving real focus in a test is unreliable, and the routing is the part
+        worth asserting.
+        """
+        return wx.Window.FindFocus()
+
+    @staticmethod
+    def _text_command(focused, method: str) -> bool:
+        """Run a standard edit command on a focused text control.
+
+        True when it was run, so the caller knows not to fall back. A command
+        the control cannot currently do (Copy with no selection, Paste with an
+        empty clipboard) counts as not run.
+        """
+        if not isinstance(focused, wx.TextCtrl):
+            return False
+        can = getattr(focused, "Can" + method, None)   # SelectAll has no Can*
+        if can is not None and not can():
+            return False
+        getattr(focused, method)()
+        return True
+
+    def on_undo(self, event):
+        if not self._text_command(self._focused(), "Undo"):
+            event.Skip()
+
+    def on_redo(self, event):
+        if not self._text_command(self._focused(), "Redo"):
+            event.Skip()
+
+    def on_cut(self, event):
+        if not self._text_command(self._focused(), "Cut"):
+            event.Skip()
+
+    def on_copy(self, event):
+        """Copy the selection, or the selected message when there is none.
+
+        The fallback is deliberate: on the transcript there is no text
+        selection to copy, and "copy what I am pointing at" is the only useful
+        reading of Copy there. It also covers the detail pane with nothing
+        selected, where copying the message being displayed is what was meant.
+        """
+        if self._text_command(self._focused(), "Copy"):
+            return
+        self.on_copy_message(event)
+
+    def on_paste(self, event):
+        """Paste text, or queue an image from the clipboard as an attachment."""
+        if self._text_command(self._focused(), "Paste"):
+            return
+        if self._clipboard_has_image():
+            self.on_paste_image(event)
+
+    def on_select_all(self, event):
+        if not self._text_command(self._focused(), "SelectAll"):
+            event.Skip()
+
+    @staticmethod
+    def _clipboard_has_image() -> bool:
+        if not wx.TheClipboard.Open():
+            return False
+        try:
+            return wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP))
+        finally:
+            wx.TheClipboard.Close()
+
     def _copy(self, text):
         if not text:
             return
@@ -1538,29 +1714,52 @@ class ChatFrame(wx.Frame):
             lines.append("")
         return "\n".join(lines)
 
+    def _shortcut_lines(self):
+        """The shortcut list, named for the platform the user is on.
+
+        wx turns every "Ctrl+" accelerator into Command on macOS, so a list
+        that says Ctrl there is simply wrong -- and unusable read aloud.
+        """
+        mod = "Cmd" if _MAC else "Ctrl"
+        rows = [
+            ("Enter", "Send message"),
+            ("Shift+Enter", "New line in the message box"),
+            (f"{mod}+Return", "Send message (from anywhere in the window)"),
+            ("", ""),
+            ("Enter", "In the conversation list: open it."),
+            ("", "In the transcript: read the message again."),
+            ("Delete", "In the conversation list: delete it."),
+            ("", "In the attachments list: remove it."),
+            ("", ""),
+            (f"{mod}+N", "New chat"),
+            (f"{mod}+Shift+M", "Change model"),
+            (f"{mod}+Shift+P", "Set system prompt"),
+            (f"{mod}+Shift+K", "Web search on/off (Ollama)"),
+            (f"{mod}+R", "Regenerate response"),
+            (f"{mod}+.", "Stop the current response (and speech)"),
+            ("", ""),
+            (f"{mod}+Shift+A", "Attach files"),
+            (f"{mod}+Shift+V", "Paste image from clipboard"),
+            ("", ""),
+            (f"{mod}+X / {mod}+C / {mod}+V", "Cut, copy, paste"),
+            (f"{mod}+A", "Select all"),
+            (f"{mod}+Z", "Undo"),
+            (f"{mod}+Shift+Z" if _MAC else "Ctrl+Y", "Redo"),
+            (f"{mod}+C", "In the transcript: copy the selected message"),
+            (f"{mod}+Shift+C", "Copy the whole conversation"),
+            ("", ""),
+            (f"{mod}+Shift+R", "Read the last response again"),
+            (f"{mod}+T", "Token usage"),
+            (f"{mod}+Shift+E", "Export conversation"),
+            (f"{mod}+?" if _MAC else "F1", "This list"),
+        ]
+        width = max(len(keys) for keys, _text in rows) + 2
+        return "\n".join(
+            f"{keys.ljust(width)}{text}".rstrip() for keys, text in rows)
+
     def on_shortcuts(self, _event):
-        wx.MessageBox(
-            "Enter               Send message\n"
-            "Shift+Enter         New line in the message box\n"
-            "Ctrl+N              New chat\n"
-            "Ctrl+M              Change model\n"
-            "Ctrl+Shift+A        Attach files\n"
-            "Ctrl+Shift+V        Paste image from clipboard\n"
-            "Delete              In the conversation list: delete it.\n"
-            "                    In the attachments list: remove it.\n"
-            "Enter               In the conversation list: open it.\n"
-            "                    In the transcript: read the message again.\n"
-            "Ctrl+Shift+P        Set system prompt\n"
-            "Ctrl+Shift+W        Web search on/off (Ollama)\n"
-            "Ctrl+R              Regenerate response\n"
-            "Ctrl+.              Stop the current response (and speech)\n"
-            "Ctrl+Shift+R        Read the last response again\n"
-            "Ctrl+C              Copy the selected message\n"
-            "Ctrl+Shift+C        Copy the whole conversation\n"
-            "Ctrl+E              Export conversation\n"
-            "Ctrl+T              Token usage\n"
-            "F1                  This list",
-            "Keyboard Shortcuts", wx.OK | wx.ICON_INFORMATION, self)
+        wx.MessageBox(self._shortcut_lines(), "Keyboard Shortcuts",
+                      wx.OK | wx.ICON_INFORMATION, self)
 
     def on_about(self, _event):
         wx.MessageBox(
@@ -1625,6 +1824,12 @@ class ChatFrame(wx.Frame):
         elif key == wx.WXK_DELETE:
             if self._handle_delete(wx.Window.FindFocus()):
                 return
+        elif key == wx.WXK_F1 and _MAC:
+            # The Mac help key is Cmd+?, which is what the menu carries. F1 is
+            # honoured too for anyone arriving from the Windows build whose
+            # keyboard actually sends it.
+            self.on_shortcuts(None)
+            return
         event.Skip()
 
     # ---- shutdown --------------------------------------------------------
@@ -1646,6 +1851,9 @@ class ChatFrame(wx.Frame):
 class ChatApp(wx.App):
     def OnInit(self):
         self.SetAppName(APP_NAME)
+        # Belt and braces for the dialogs: each one already names its controls
+        # as it builds them, and this names anything added later that forgets.
+        install_dialog_naming(wx)
         frame = ChatFrame()
         frame.Show()
         self.SetTopWindow(frame)
