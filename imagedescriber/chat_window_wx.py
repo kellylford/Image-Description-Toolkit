@@ -146,7 +146,18 @@ class ChatDialog(wx.Dialog):
         provider_label.SetMinSize((100, -1))
         provider_sizer.Add(provider_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
-        self.provider_choice = wx.Choice(self, choices=['Ollama', 'OpenAI', 'Claude', 'MLX'])
+        # Providers that cannot run on this machine are left out rather than
+        # offered and then failing when picked — MLX is Apple Silicon only, and
+        # this list used to include it on Windows (issue #271).
+        try:
+            from ai_providers import provider_picker_choices
+        except ImportError:
+            from imagedescriber.ai_providers import provider_picker_choices
+        # Labels lowercase to the provider keys ("MLX" -> "mlx"), which is what
+        # get_selections() and on_provider_changed() already rely on.
+        self.provider_choice = wx.Choice(
+            self, choices=[label for _, label in provider_picker_choices()]
+        )
         self.provider_choice.SetSelection(0)  # Default to Ollama
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         provider_sizer.Add(self.provider_choice, 1, wx.ALL | wx.EXPAND, 5)

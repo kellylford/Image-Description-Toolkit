@@ -19,9 +19,9 @@ against the capability data:
 * ``test_chat_window_uses_the_real_registry`` compares function identity. A
   reintroduced stub is a different object and fails, even though it has the
   same name and the same signature and returns a perfectly plausible False.
-* ``test_every_picker_provider_is_registered`` reads the provider list out of
-  the chat picker's own source. A provider added to the dropdown without a
-  registry entry cannot slip through silently -- the test fails and names it.
+* ``test_every_picker_provider_is_registered`` asks the picker what it offers.
+  A provider added to the dropdown without a registry entry cannot slip through
+  silently -- the test fails and names it.
 
 Testing ``capabilities_for('claude').supports_attachments is True`` alone would
 not have caught the original bug: the registry was never wrong, it was absent.
@@ -87,18 +87,23 @@ def test_capability_import_is_not_optional():
 
 
 def _picker_providers():
-    """Provider names offered by ChatDialog's dropdown, read from its source.
+    """Provider names offered by ChatDialog's dropdown.
 
-    Asserts on the way through: a regex that silently stopped matching would
-    turn every caller into a vacuous pass, which is the same class of quiet
-    failure this file exists to catch.
+    This used to parse the literal list out of ``chat_window_wx.py`` with a
+    regex, because the list was hardcoded there. Issue #271 replaced that
+    literal with a call to ``ai_providers.provider_picker_choices()`` — the
+    dropdown was offering MLX on Windows, where it cannot run — so the regex
+    found no quoted strings and its own "parsed as empty" guard fired. That
+    guard did its job: it turned a silently vacuous test into a failing one.
+
+    Asking the function is strictly better than scraping the source. It returns
+    what the dialog will actually show, including the platform filtering, so a
+    provider cannot reach the dropdown without passing the checks below.
     """
-    source = _CHAT_WINDOW_SOURCE.read_text(encoding="utf-8")
-    match = re.search(r"wx\.Choice\(\s*self,\s*choices=\[(.*?)\]", source, re.DOTALL)
-    assert match, "could not locate the provider picker in chat_window_wx.py"
+    from ai_providers import provider_picker_choices
 
-    picker = re.findall(r"['\"]([^'\"]+)['\"]", match.group(1))
-    assert picker, "provider picker parsed as empty"
+    picker = [key for key, _ in provider_picker_choices()]
+    assert picker, "provider picker returned no providers"
     return picker
 
 

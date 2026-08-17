@@ -1932,6 +1932,57 @@ def get_available_providers() -> Dict[str, AIProvider]:
     return providers
 
 
+#: Provider order for the GUI pickers, and the display label for each.
+#: Ordered deliberately: Ollama first because it is the free local option the
+#: docs tell people to start with.
+_PICKER_PROVIDERS = (
+    ("ollama", "Ollama"),
+    ("openai", "OpenAI"),
+    ("claude", "Claude"),
+    ("mlx", "MLX"),
+)
+
+
+def provider_picker_choices(title_case: bool = True) -> List[tuple]:
+    """``[(key, label), ...]`` for a provider picker, minus what cannot run here.
+
+    Every ImageDescriber provider dropdown goes through this. They used to
+    hardcode the list, which is how MLX came to be offered on Windows, where
+    it is impossible: MLX is Apple Silicon only, and choosing it could only
+    ever fail (issue #271).
+
+    Availability is asked of the provider itself rather than re-tested here.
+    ``MLXProvider.is_available()`` checks the platform **and** whether
+    ``mlx_vlm`` imports, and both halves matter: the PyInstaller specs can
+    exclude mlx_vlm to keep the binary small, so a packaged macOS build on
+    Apple Silicon can still be unable to run it. A platform check alone would
+    offer a provider that raises the moment it is picked.
+
+    Ollama is always listed even when the daemon is down — unlike MLX, it is
+    installable on this machine, and hiding it would tell someone their setup
+    is impossible when it is merely not running yet.
+    """
+    try:
+        available = set(get_available_providers())
+    except Exception:                                       # noqa: BLE001
+        # A picker with the full list is a bad day; a picker with no list at
+        # all is a broken dialog. Degrade toward showing too much.
+        logging.getLogger(__name__).warning(
+            "Could not determine available providers; showing the full list"
+        )
+        available = {key for key, _ in _PICKER_PROVIDERS}
+
+    out = []
+    for key, label in _PICKER_PROVIDERS:
+        # Only the platform-gated providers are filtered. A missing API key is
+        # a fixable setup step the dialogs already explain, not a reason to
+        # hide the provider and leave the user with no way to discover it.
+        if key == "mlx" and key not in available:
+            continue
+        out.append((key, label if title_case else key))
+    return out
+
+
 def get_all_providers() -> Dict[str, AIProvider]:
     """Get all AI providers (available and unavailable)"""
     return {

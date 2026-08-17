@@ -410,9 +410,18 @@ class FollowupQuestionDialog(wx.Dialog):
         self.original_model = original_model
         self.config = config
         self.cached_ollama_models = cached_ollama_models  # Use cached models to avoid blocking
-        # Only show providers that are actually configured/available on this machine.
-        # Falls back to full list if caller did not supply one.
-        self.available_providers = available_providers or ["ollama", "openai", "claude", "mlx"]
+        # Only show providers that are actually configured/available on this
+        # machine. The caller normally passes this; the fallback is used when
+        # its own lookup raised. That fallback used to be a hardcoded list
+        # including "mlx", which put MLX back in front of Windows users
+        # whenever the caller's try/except fired (issue #271).
+        if not available_providers:
+            try:
+                from ai_providers import provider_picker_choices
+            except ImportError:
+                from imagedescriber.ai_providers import provider_picker_choices
+            available_providers = [key for key, _ in provider_picker_choices()]
+        self.available_providers = available_providers
         self.question = ""
         self.selected_provider = original_provider
         self.selected_model = original_model
@@ -886,11 +895,28 @@ class ProcessingOptionsDialog(wx.Dialog):
         provider_label = wx.StaticText(panel, label="&Provider:")
         provider_sizer.Add(provider_label, 0, wx.ALL, 5)
         
-        self.provider_choice = wx.Choice(panel, choices=["Ollama", "OpenAI", "Claude", "MLX"])
-        # Set from default_provider in config (case-insensitive match)
+        # Providers that cannot run on this machine are left out rather than
+        # offered and then failing when picked — MLX is Apple Silicon only, and
+        # this list used to include it on Windows (issue #271).
+        try:
+            from ai_providers import provider_picker_choices
+        except ImportError:
+            from imagedescriber.ai_providers import provider_picker_choices
+        provider_keys = [key for key, _ in provider_picker_choices()]
+        self.provider_choice = wx.Choice(
+            panel, choices=[label for _, label in provider_picker_choices()]
+        )
+        # Set from default_provider in config (case-insensitive match).
+        # Looked up in the list actually built, not a fixed {name: index} map —
+        # that map assumed MLX was always present at index 3, so filtering the
+        # list would have silently pointed every provider at the wrong entry.
         default_provider = self.config.get('default_provider', 'ollama').lower()
-        provider_map = {'ollama': 0, 'openai': 1, 'claude': 2, 'mlx': 3}
-        self.provider_choice.SetSelection(provider_map.get(default_provider, 0))
+        try:
+            self.provider_choice.SetSelection(provider_keys.index(default_provider))
+        except ValueError:
+            # Configured provider isn't offered here (e.g. an .idtw saved on a
+            # Mac with MLX, opened on Windows). Fall back to the first entry.
+            self.provider_choice.SetSelection(0)
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
         provider_sizer.Add(self.provider_choice, 0, wx.ALL | wx.EXPAND, 5)
