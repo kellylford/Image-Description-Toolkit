@@ -65,6 +65,10 @@
 - Update Image List is `F5` on Windows and `Cmd+R` on macOS, where F5 is a hardware key. Rename Item gains `F2` on Windows, the standard rename key, which it never had.
 - Added: `Ctrl+Shift+S` for Save Workspace As (a standard that was unbound), `Cmd+W` for Close Window on macOS, and a help key for the User Guide — `F1` on Windows, `Cmd+?` on macOS.
 
+**ImageDescriber: cancelling "save your changes?" from File > Exit no longer breaks silently**
+- File > Exit was bound straight to the `EVT_CLOSE` handler, which ends by calling `event.CanVeto()`. A menu item delivers a `wx.CommandEvent`, which has no such method, so choosing Exit and then cancelling the unsaved-changes prompt raised `AttributeError` inside the handler — swallowed by wx, as they always are, taking the "cancelled but cannot veto" fallback with it.
+- Exit now goes through `Close()`, which posts a real close event.
+
 ### 🗑️ Removed
 
 **Florence-2 / HuggingFace provider removed**

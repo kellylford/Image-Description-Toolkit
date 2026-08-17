@@ -199,6 +199,23 @@ exists in apps with rich text or a font panel, which this is not.
 The Edit menu's Cut/Copy/Paste/Select All already routed to the focused control
 via `FindFocus()`, so those needed nothing beyond Undo and Redo joining them.
 
+### One bug found by adding to a path
+
+Adding Cmd+W meant binding a second menu item to the close handler, which is
+when the existing one turned out to be wrong: File > Exit was bound straight to
+`on_close`, the `EVT_CLOSE` handler, which ends with
+
+```python
+if event.CanVeto():
+    event.Veto()
+```
+
+A menu item delivers a `wx.CommandEvent`, which has no `CanVeto`. So choosing
+Exit and then cancelling the unsaved-changes prompt raised `AttributeError`
+inside the handler — swallowed, the way wx always swallows them — and took the
+"cancelled but cannot veto, force the close" fallback with it. Both items now
+go through `Close()`, which posts a real close event.
+
 ## Files changed
 
 - `shared/mac_accessibility.py` — new. NSAccessibility naming via ctypes:

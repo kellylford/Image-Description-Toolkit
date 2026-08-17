@@ -235,7 +235,8 @@ class ViewerPanel(wx.Panel):
         left_sizer.Add(desc_list_label, 0, wx.ALL, 5)
         
         # Description ListBox (Accessible)
-        self.desc_list = DescriptionListBox(left_panel, style=wx.LB_SINGLE)
+        self.desc_list = DescriptionListBox(left_panel, name="Descriptions",
+                                            style=wx.LB_SINGLE)
         left_sizer.Add(self.desc_list, 1, wx.EXPAND | wx.ALL, 5)
         
         left_panel.SetSizer(left_sizer)

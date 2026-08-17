@@ -1480,14 +1480,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Cmd+W closes the window on macOS whether an app implements it or
             # not, so leaving it unbound is a missing behaviour, not a spare key.
             close_item = file_menu.Append(wx.ID_CLOSE, "&Close Window\tCtrl+W")
-            self.Bind(wx.EVT_MENU, self.on_close, close_item)
+            self.Bind(wx.EVT_MENU, self.on_exit, close_item)
 
         # No accelerator on macOS: the application menu already supplies Cmd+Q
         # for this item (wx routes it here through wx.ID_EXIT), and spelling it
         # out again puts two menu items on one chord.
         exit_label = "E&xit" if sys.platform == 'darwin' else "E&xit\tCtrl+Q"
         exit_item = file_menu.Append(wx.ID_EXIT, exit_label)
-        self.Bind(wx.EVT_MENU, self.on_close, exit_item)
+        self.Bind(wx.EVT_MENU, self.on_exit, exit_item)
 
         menubar.Append(file_menu, "&File")
 
@@ -9006,6 +9006,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             logging.error(f"Error showing About dialog: {e}", exc_info=True)
             show_error(self, f"Could not show About dialog:\n{e}")
+
+    def on_exit(self, event):
+        """File > Exit, and Close Window on macOS.
+
+        Routed through Close() rather than straight to on_close. A menu item
+        delivers a wx.CommandEvent, and on_close finishes with
+        ``event.CanVeto()``, which exists only on wx.CloseEvent -- so
+        cancelling the unsaved-changes prompt from the menu raised
+        AttributeError inside the handler, silently, the way wx always swallows
+        them. Close() posts a real EVT_CLOSE and on_close does the rest.
+        """
+        self.Close()
 
     def on_close(self, event):
         """Handle application close"""
