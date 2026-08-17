@@ -110,6 +110,11 @@ a = Analysis(
         # chat_window_wx imports it at module scope for the Attach Files button,
         # so a missing entry here breaks chat in frozen builds only.
         'idt_core.providers.registry',
+        # Model catalog + its disk cache. Reached only through function-level
+        # imports (registry.model_limits, ai_providers, the model pickers),
+        # which is exactly the shape hiddenimports exists for.
+        'idt_core.providers.catalog',
+        'idt_core.providers.model_cache',
         # Chat engine — chat_window_wx runs on this now that
         # ChatProcessingWorker is gone. Enumerated one by one to match this
         # file's convention; a missing entry fails only in the frozen build.

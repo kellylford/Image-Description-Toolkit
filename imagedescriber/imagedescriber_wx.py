@@ -7621,11 +7621,59 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return None
 
     def refresh_ai_models_silent(self):
-        """Silently refresh AI model cache on startup (no dialogs)"""
-        try:
-            self.refresh_ollama_models()
-        except Exception:
-            pass  # Silent failure on startup
+        """Refresh cached model lists at startup, on a worker thread.
+
+        This runs during window construction (via wx.CallAfter from __init__),
+        so everything it does happens before the user can use the app. It used
+        to do the Ollama query inline on the UI thread, which was already a
+        stall against a remote or stopped daemon; issue #267 added Claude and
+        OpenAI listings on top, and three network calls on the UI thread would
+        have meant a window that appears and then does not respond.
+
+        Nothing here touches wx state -- results are applied in
+        _apply_refreshed_models on the UI thread, which is also where the
+        re-entry flag is cleared.
+        """
+        import threading
+
+        if getattr(self, '_model_refresh_running', False):
+            return
+        self._model_refresh_running = True
+
+        def work():
+            models, error = None, ""
+            try:
+                from ai_providers import get_available_providers
+                providers = get_available_providers()
+                if 'ollama' in providers:
+                    models = providers['ollama'].get_available_models()
+                else:
+                    models = []
+            except Exception as exc:                        # noqa: BLE001
+                models, error = None, str(exc)
+
+            try:
+                # Claude/OpenAI, via the model catalog. Only refreshes when the
+                # cache has expired, so this is usually a no-op.
+                from ai_providers import refresh_models_from_apis
+                refresh_models_from_apis()
+            except Exception:                               # noqa: BLE001
+                pass                    # a stale model list is not worth a dialog
+
+            wx.CallAfter(self._apply_refreshed_models, models, error)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_refreshed_models(self, models, error):
+        """UI thread: store what the startup refresh found."""
+        self._model_refresh_running = False
+        if not self:
+            return
+        self.cached_ollama_models = models
+        if self.workspace:
+            self.workspace.cached_ollama_models = models
+        if error:
+            self.SetStatusText(f"Error refreshing models: {error}", 0)
 
     def on_refresh_image_list(self, event):
         """Handle Update Image List menu item / F5 - force a full list refresh."""
@@ -7637,11 +7685,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         wx.BeginBusyCursor()
         try:
             models = self.refresh_ollama_models()
+
+            # Claude and OpenAI too. Forced rather than "if stale": the user
+            # asked, and silently declining because a 24-hour timer has not
+            # elapsed would read as the menu item doing nothing.
+            api_counts = {}
+            try:
+                from idt_core.providers import catalog
+                for provider in ("claude", "openai"):
+                    catalog.invalidate(provider)
+                    entries = catalog.refresh_models(provider, force=True)
+                    if entries is not None:
+                        api_counts[provider] = len(entries)
+            except Exception:                               # noqa: BLE001
+                pass
+
+            extra = ""
+            if api_counts:
+                extra = "\n\n" + "\n".join(
+                    f"{name.title()}: {count} model(s)"
+                    for name, count in sorted(api_counts.items())
+                )
+
             if models is not None:
                 count = len(models)
                 model_list = "\\n".join(models) if models else "No Ollama models found"
-                show_info(self, f"Successfully refreshed {count} Ollama model(s):\\n\\n{model_list}")
+                show_info(self, f"Successfully refreshed {count} Ollama model(s):\\n\\n{model_list}{extra}")
                 self.SetStatusText(f"Refreshed {count} Ollama model(s)", 0)
+            elif api_counts:
+                # Ollama is unreachable but the API providers refreshed, so this
+                # is a partial success rather than the flat failure it used to
+                # report.
+                show_info(self, f"Could not reach Ollama, but refreshed:{extra}")
+                self.SetStatusText("Refreshed cloud model lists", 0)
             else:
                 show_warning(self, "Failed to refresh models", "Could not connect to Ollama. Make sure it's running.")
         finally:

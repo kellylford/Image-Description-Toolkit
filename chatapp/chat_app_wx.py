@@ -231,41 +231,44 @@ class ProviderDialog(wx.Dialog):
         self.model_choice.Clear()
         self.status.SetLabel("")
 
-        models = []
-        try:
-            if provider == "ollama":
-                # Off the UI thread: listing asks /api/show once per installed
-                # model, so with 20-30 models pulled this froze the window for
-                # seconds — and far longer against a remote host or a stopped
-                # daemon, where every probe waits out its own timeout.
-                self._start_ollama_listing()
-                return
-            elif provider == "claude":
-                from idt_core.providers.claude import (
-                    CLAUDE_MODELS,
-                    format_claude_model_for_display,
-                )
+        if provider == "ollama":
+            # Off the UI thread: listing asks /api/show once per installed
+            # model, so with 20-30 models pulled this froze the window for
+            # seconds — and far longer against a remote host or a stopped
+            # daemon, where every probe waits out its own timeout.
+            self._start_ollama_listing()
+            return
 
-                for model_id in CLAUDE_MODELS:
+        if provider in ("claude", "openai"):
+            # Painted synchronously from the model catalog, which never touches
+            # the network: with no cache and no key this is exactly the curated
+            # list, so the picker is filled the instant the dialog opens and is
+            # never empty. The live refresh happens behind it (issue #267).
+            try:
+                from idt_core.providers import catalog
+
+                # `keep` so a model the account no longer lists — but which the
+                # user has selected — cannot silently vanish and leave them on
+                # whatever happens to be first.
+                entries = catalog.cached_models(
+                    provider, keep=[self._initial_model] if self._initial_model else []
+                )
+                for entry in entries:
                     # Display name shown, API id kept as client data. Reading
                     # the client data is what makes pre-selection work.
-                    self.model_choice.Append(
-                        format_claude_model_for_display(model_id), model_id
-                    )
-            elif provider == "openai":
-                from idt_core.providers.openai_provider import OPENAI_MODELS
+                    self.model_choice.Append(entry.display(), entry.id)
+            except Exception as exc:                        # noqa: BLE001
+                self.status.SetLabel(f"Could not list models: {exc}")
 
-                models = list(OPENAI_MODELS)
-        except Exception as exc:
-            self.status.SetLabel(f"Could not list models: {exc}")
-
-        for model_id in models:
-            self.model_choice.Append(model_id, model_id)
-
-        if requires_api_key(provider) and not resolve_api_key(provider):
-            self.status.SetLabel(missing_key_message(provider))
+            if requires_api_key(provider) and not resolve_api_key(provider):
+                self.status.SetLabel(missing_key_message(provider))
+            self._select_model(self._initial_model)
+            self._start_catalog_refresh(provider)
+            return
 
         self._select_model(self._initial_model)
+
+    # -- Ollama -----------------------------------------------------------
 
     def _start_ollama_listing(self):
         """List Ollama chat models on a worker thread, fill the picker after.
@@ -312,6 +315,95 @@ class ProviderDialog(wx.Dialog):
         else:
             self.status.SetLabel("")
         self._select_model(self._initial_model)
+
+    # -- Claude / OpenAI ---------------------------------------------------
+
+    def _displayed_ids(self):
+        return [self.model_choice.GetClientData(i)
+                for i in range(self.model_choice.GetCount())]
+
+    def _start_catalog_refresh(self, provider):
+        """Ask the provider's API for its current model list, on a worker.
+
+        Only when the cached list has actually expired, so opening this dialog
+        repeatedly does not mean an API call each time.
+        """
+        import threading
+
+        self._load_token = getattr(self, "_load_token", 0) + 1
+        token = self._load_token
+        # What was selected when we painted. If it differs by the time the
+        # refresh lands, the user has been working in the control and must not
+        # have it rebuilt underneath them.
+        painted_selection = self._selected_id()
+
+        def work():
+            try:
+                from idt_core.providers import catalog
+
+                if not catalog.is_stale(provider):
+                    return
+                entries = catalog.refresh_if_stale(provider)
+                if entries is None:
+                    return              # nothing changed, or the fetch failed
+                found = [(e.display(), e.id) for e in entries]
+            except Exception:           # noqa: BLE001
+                # A refresh is an improvement on what is already shown, never a
+                # prerequisite for it. Failing quietly leaves the cached list in
+                # place, which is the correct outcome and already on screen.
+                return
+            wx.CallAfter(self._finish_catalog_refresh, token, provider,
+                         painted_selection, found)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _finish_catalog_refresh(self, token, provider, painted_selection, found):
+        """Fold a refreshed list into the picker, or decline to.
+
+        Rebuilding a wx.Choice underneath someone is not a neutral act: it moves
+        the selection and makes a screen reader re-announce the control. So the
+        list is only rebuilt when doing so is both necessary and safe, and the
+        rest of the time the news goes to the status line, which is polite text
+        rather than an interruption.
+        """
+        if token != getattr(self, "_load_token", 0):
+            return                      # superseded by a newer request
+        if not self:
+            return                      # dialog closed while we were listing
+        if self.provider_choice.GetStringSelection() != provider:
+            return                      # user switched provider meanwhile
+
+        new_ids = [model_id for _label, model_id in found]
+        if new_ids == self._displayed_ids():
+            return                      # identical — do not touch the control
+
+        added = [m for m in new_ids if m not in set(self._displayed_ids())]
+
+        if self._selected_id() != painted_selection:
+            # They have started choosing. Tell them, do not rebuild.
+            self.status.SetLabel(
+                "Model list updated — reopen this dialog to see the changes."
+            )
+            return
+
+        keep = self._selected_id() or self._initial_model
+        self.model_choice.Clear()
+        for label, model_id in found:
+            self.model_choice.Append(label, model_id)
+        self._select_model(keep)
+
+        if added:
+            count = len(added)
+            plural = "" if count == 1 else "s"
+            self.status.SetLabel(f"Model list updated — {count} new model{plural}.")
+        else:
+            self.status.SetLabel("Model list updated.")
+
+    def _selected_id(self):
+        index = self.model_choice.GetSelection()
+        if index == wx.NOT_FOUND:
+            return ""
+        return self.model_choice.GetClientData(index) or ""
 
     def _select_model(self, wanted: str):
         if wanted:

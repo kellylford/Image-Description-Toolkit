@@ -91,13 +91,21 @@ class TestCLIEntryPoints:
             assert "Traceback" not in stdout, "guideme should not crash with a traceback"
 
     def test_idt_models_launches(self):
-        """idt models should exit cleanly (may have no models if Ollama isn't running)."""
+        """idt models should exit cleanly (may have no models if Ollama isn't running).
+
+        The 30s allowance is for a cold run on a developer machine that has both
+        API keys: since issue #267 this command asks Anthropic and OpenAI for
+        their model lists when the cache has expired, at 8s apiece, on top of
+        the Ollama probe. CI has no keys, so it never makes those calls and
+        finishes in well under a second -- meaning the timeout that matters here
+        is the local one, and 15s left too little room. A warm cache is ~0.4s.
+        """
         result = subprocess.run(
             _CLI + ["models"],
             capture_output=True,
             encoding="utf-8",
             errors="replace",
-            timeout=15,
+            timeout=30,
         )
         assert result.returncode in (0, 1), \
             f"models should exit cleanly (got {result.returncode})"

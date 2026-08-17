@@ -116,9 +116,9 @@ class BaseProvider:
     
     def describe(self, image_bytes: bytes, mime_type: str, prompt: str) -> DescriptionResult:
         """Return DescriptionResult(text, model, provider, tokens, etc.)"""
-    
-    def list_models(self) -> list[str]:        # available models for this provider
 ```
+
+`list_models()` is **not** part of this ABC, despite what this guide used to say. Only `OllamaProvider` has it (plus `list_chat_models()`), because only Ollama needs an instance — a host — to answer the question. For Claude and OpenAI, listing is a module-level function and the answer is assembled by the catalog; see below.
 
 **Implementations:**
 - `ollama.py` — connects to `http://localhost:11434`
@@ -142,7 +142,33 @@ The single source of truth for what each provider supports. Replaces the deleted
 
 - `capabilities_for(name) -> ProviderCapabilities` — streaming, system prompt, API key requirement, attachment MIME types. Case-insensitive, alias-aware (`anthropic` → `claude`), and returns a conservative all-False record for unknown names rather than raising.
 - `supports_attachments(name)`, `attachment_wildcard(name)` — what the GUI file dialogs need
-- `model_limits(provider, model) -> (context_window, max_output)` — **returns `None` rather than guessing.** Callers apply their own documented fallback.
+- `model_limits(provider, model) -> (context_window, max_output)` — **returns `None` rather than guessing.** Callers apply their own documented fallback. Delegates to the catalog below; it is called on every chat turn, so it is free of network *and* disk access.
+
+### `providers/catalog.py` + `providers/model_cache.py` — Model Catalog
+
+Which models a provider offers, and what we know about each (issue #267). Claude and OpenAI model lists used to be hardcoded, so a model released today stayed invisible until someone edited a file and cut a build, while a retired one stayed in every picker and failed at request time.
+
+Both APIs list their models; neither reports context window, max output, cost, or capability flags. So the split is:
+
+- **The live list decides what exists.** `GET /v1/models`, via `claude.list_models_live()` / `openai_provider.list_models_live()`.
+- **The curated tables decide what we know.** `CLAUDE_MODELS` / `OPENAI_MODELS` and their `*_MODEL_METADATA` dicts are now the metadata layer, the display ordering, and the offline fallback — not the source of truth for existence.
+- **Unrecognised models still appear**, labelled, with `context_window`/`max_output` left `None` so they flow through the documented fallbacks rather than a guess.
+
+**Curated always wins.** A live listing contributes existence, a display name, and a creation timestamp for ordering — never limits. If a fetched entry could blank a recorded context window, the token budgeter would silently drop to a flat guess.
+
+Reading, cheapest first:
+
+| Call | Network | Disk | Safe on the UI thread |
+|---|---|---|---|
+| `model_entry(provider, id)` | no | no | yes |
+| `cached_models(provider, keep=…)` | no | once per process | yes |
+| `refresh_models(provider)` / `refresh_if_stale(provider)` | yes | yes | **no — worker threads only** |
+
+`keep=` names models that must survive every filter — pass the user's current selection, so a retired model cannot vanish and silently move them onto a different one.
+
+The cache lives in `~/.idt/models/<provider>.json`, one file per provider, keyed by a hash of the API key so switching accounts never serves the wrong entitlements. A corrupt, stale, foreign, or future-dated cache all read as "nothing cached", falling back to the curated list. `IDT_MODEL_CACHE_DIR` overrides the location (the test suite points it at a tmp_path).
+
+OpenAI's endpoint returns ~126 ids for a normal account, most of them not chat models. `openai_provider.filter_chat_model_ids()` is a pure function with a table test: it drops non-chat ids by **whole-token** match (never substring — that would hide a future `gpt-6-audio-native`) and collapses dated snapshots behind their base id, keeping the newest when no base exists. `idt models --all` bypasses it.
 
 ### `chat/` — Chat Engine
 

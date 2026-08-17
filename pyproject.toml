@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "idt"
-version = "4.5.0"
+version = "4.5.1"
 description = "Image Description Toolkit — AI-powered batch image description for accessibility"
 requires-python = ">=3.11"
 dependencies = [
@@ -122,9 +122,24 @@ fail_under = 23
 # on the CI OS (macOS reveal, os.startfile).
 "idt_core/updater.py" = 85.0
 "idt_core/providers/base.py" = 100.0
-"idt_core/providers/claude.py" = 45.0
+# Both raised from 45/52 when issue #267 added the live-listing fetchers and
+# their tests. The remaining uncovered part of each file is the provider class
+# itself -- the SDK describe() call, which needs a network and a key.
+# 70 rather than the ~76-78 measured, and the gap is deliberate: this file's
+# number moves a few points between runs depending on whether the machine has an
+# API key and a warm model cache (which decide whether the live-listing path is
+# exercised at all). A floor set against the best observed run would fail on CI,
+# where neither is true, for reasons unrelated to any change.
+"idt_core/providers/claude.py" = 70.0
 "idt_core/providers/ollama.py" = 48.0
-"idt_core/providers/openai_provider.py" = 52.0
+"idt_core/providers/openai_provider.py" = 76.0
+# The model catalog (issue #267): live listing merged with curated metadata.
+# Floors set with the code, for the reason stated in the chat-engine note below.
+# High on purpose -- these two hold the invariant that a live listing can never
+# overwrite a recorded context window, and nothing else in the suite would
+# notice if that broke. Uncovered remainder is defensive degradation paths.
+"idt_core/providers/catalog.py" = 90.0
+"idt_core/providers/model_cache.py" = 95.0
 "idt_core/pipeline.py" = 82.0
 "idt_core/workspace.py" = 85.0
 "idt_core/project.py" = 100.0

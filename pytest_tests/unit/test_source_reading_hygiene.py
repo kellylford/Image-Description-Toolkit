@@ -52,7 +52,26 @@ _NOT_OUR_SOURCE = {
 
 
 def _is_project_source(path: Path) -> bool:
-    return not (_NOT_OUR_SOURCE & set(path.parts))
+    """True when ``path`` is one of this project's own source files.
+
+    Matched against the path **relative to the repo root**, not its absolute
+    parts. Those are different whenever the repo itself lives inside a directory
+    that shares a name with an exclusion, and one of them is routine: Claude
+    Code checks worktrees out under ``.claude/worktrees/<branch>/``, so every
+    absolute path contains ``.claude``, every file was excluded, and the scan
+    below found zero modules and failed -- in a worktree only, for a reason
+    nothing in the failure message pointed at.
+
+    The vacuity guard in :func:`test_there_are_tests_to_scan` is what caught
+    that, and it is why this function must never be "fixed" by removing it.
+    """
+    try:
+        relative = path.relative_to(_ROOT)
+    except ValueError:
+        # Outside the repo entirely -- judge it on the full path, since there is
+        # no root to make it relative to.
+        relative = path
+    return not (_NOT_OUR_SOURCE & set(relative.parts))
 
 
 def _test_sources():

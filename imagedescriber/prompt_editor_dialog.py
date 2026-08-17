@@ -404,39 +404,55 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 models_response = ollama.list()
                 available_models = [model.model for model in models_response['models']]
                 
-            elif provider == "openai":
-                # Load from canonical list - supports both frozen and dev mode
+            elif provider in ("openai", "claude"):
+                # Live-backed list from the model catalog (issue #267). Read from
+                # its cache, so the Refresh models button and the provider combo
+                # both stay instant.
                 try:
-                    from ai_providers import DEV_OPENAI_MODELS
+                    from ai_providers import list_models
                 except ImportError:
-                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
-                available_models = list(DEV_OPENAI_MODELS)
-                
-            elif provider == "claude":
-                # Claude models - sourced from central registry via ai_providers
-                available_models = list(DEV_CLAUDE_MODELS) if AI_PROVIDERS_AVAILABLE else []
+                    from imagedescriber.ai_providers import list_models
+                # Only carry the configured model over when it belongs to THIS
+                # provider. `default_model` in image_describer_config.json is an
+                # Ollama model by default, so passing it unconditionally added
+                # "minicpm-v4.6" to the Claude and OpenAI lists.
+                configured = self.config_data.get('default_model', '')
+                configured_provider = str(
+                    self.config_data.get('default_provider', '')
+                ).lower()
+                keep = [configured] if configured_provider == provider else []
+
+                catalog_entries = list_models(provider, keep=keep)
+                available_models = [entry.id for entry in catalog_entries]
             else:
                 available_models = []
-            
+
             if not available_models:
                 self.default_model_combo.Append("No models available")
                 self.default_model_combo.SetSelection(0)
                 self.default_model_combo.Enable(False)
                 return
-            
+
             self.default_model_combo.Enable(True)
-            
+
             # Add models to combo box
             for model_name in available_models:
-                # For Claude models, prefer friendly names from CLAUDE_MODEL_METADATA
-                claude_meta = CLAUDE_MODEL_METADATA.get(model_name, {})
-                if claude_meta.get('name'):
-                    # Use friendly display name (e.g. "Claude Sonnet 4.5")
-                    display_text = claude_meta['name']
-                    description = claude_meta.get('description', '')
-                    recommended = claude_meta.get('recommended', False)
-                else:
-                    # Fallback: look in config_data (used for Ollama/OpenAI)
+                display_text = ""
+                if provider in ("openai", "claude"):
+                    # One source for the label, covering both providers. The old
+                    # code only found friendly names in CLAUDE_MODEL_METADATA and
+                    # otherwise fell through to config_data['available_models'],
+                    # which holds Ollama entries only -- so every OpenAI model
+                    # rendered as a bare id with an empty description.
+                    entry = next(
+                        (e for e in catalog_entries if e.id == model_name), None
+                    )
+                    if entry is not None:
+                        display_text = entry.display()
+                        if entry.recommended:
+                            display_text += " (Recommended)"
+
+                if not display_text:
                     model_info = self.config_data.get('available_models', {}).get(model_name, {})
                     description = model_info.get('description', '')
                     recommended = model_info.get('recommended', False)
@@ -445,7 +461,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                         display_text += " (Recommended)"
                     if description:
                         display_text += f" - {description}"
-                
+
                 self.default_model_combo.Append(display_text, model_name)
             
             # Set current default

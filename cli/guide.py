@@ -245,23 +245,49 @@ def _step_model(provider: str) -> str:
         _ensure_ollama_model(choice, installed)
         return choice
 
-    if provider == "anthropic":
-        from idt_core.providers.claude import CLAUDE_MODELS
-        print("Available Claude models:")
-        choice = get_choice("Select a model", CLAUDE_MODELS, default=1, allow_back=True)
-        if choice in ("BACK", "EXIT"):
-            return choice
-        return choice
-
-    if provider == "openai":
-        from idt_core.providers.openai_provider import OPENAI_MODELS
-        print("Available OpenAI models:")
-        choice = get_choice("Select a model", OPENAI_MODELS, default=1, allow_back=True)
-        if choice in ("BACK", "EXIT"):
-            return choice
-        return choice
+    if provider in ("anthropic", "openai"):
+        return _choose_api_model(provider)
 
     return get_input("Enter model name")
+
+
+def _choose_api_model(provider: str) -> str:
+    """Pick a Claude or OpenAI model from the catalog.
+
+    Reads the cache rather than refreshing: this is a wizard step, and making
+    the user wait on a network round trip -- possibly one that times out -- in
+    the middle of it would be a poor trade for a list that `idt models
+    --refresh` can update whenever they like.
+
+    Menu entries are labelled but the *id* is returned, because that is what
+    every downstream command needs.
+    """
+    from idt_core.providers import catalog
+
+    label = "Claude" if provider == "anthropic" else "OpenAI"
+    try:
+        entries = catalog.cached_models(provider)
+    except Exception:
+        entries = []
+
+    if not entries:
+        return get_input(f"Enter {label} model name")
+
+    print(f"Available {label} models:")
+    labels = []
+    for entry in entries:
+        text = entry.display()
+        if entry.id != text:
+            text = f"{text}  [{entry.id}]"
+        if entry.recommended:
+            text += "  (recommended)"
+        labels.append(text)
+
+    choice = get_choice("Select a model", labels, default=1, allow_back=True)
+    if choice in ("BACK", "EXIT"):
+        return choice
+    # get_choice returns the label it was given; map it back to the model id.
+    return entries[labels.index(choice)].id
 
 
 def _step_source() -> tuple[str, str, dict]:

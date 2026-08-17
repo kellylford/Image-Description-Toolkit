@@ -74,6 +74,11 @@ a = Analysis(
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
         'idt_core.providers.registry',
+        # Model catalog + its disk cache. Reached only through function-level
+        # imports (registry.model_limits, ProviderDialog), which is exactly the
+        # shape hiddenimports exists for.
+        'idt_core.providers.catalog',
+        'idt_core.providers.model_cache',
 
         # ---- wxPython ----
         'wx', 'wx.adv', 'wx.lib', 'wx.lib.newevent',

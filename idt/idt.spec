@@ -78,6 +78,11 @@ a = Analysis(
         'idt_core.providers.openai_provider',
         # Capability registry — imported eagerly by idt_core/providers/__init__.py
         'idt_core.providers.registry',
+        # Model catalog + its disk cache. Reached only through function-level
+        # imports (registry.model_limits, the pickers), which is exactly the
+        # shape hiddenimports exists for.
+        'idt_core.providers.catalog',
+        'idt_core.providers.model_cache',
 
         # ---- idt_core new modules ----
         'idt_core.config_loader',

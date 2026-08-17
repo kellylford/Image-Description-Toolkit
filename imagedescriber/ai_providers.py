@@ -96,8 +96,79 @@ from idt_core.providers.claude import (
     CLAUDE_MODEL_METADATA,
     get_claude_model_info,
     format_claude_model_for_display,
-    get_claude_api_id_from_display,
 )
+
+# ---------------------------------------------------------------------------
+# Model listing for the GUI
+# ---------------------------------------------------------------------------
+#
+# Everything in imagedescriber/ reaches model information through this module
+# rather than importing idt_core directly, and that indirection is load-bearing:
+# these files are imported flat in a frozen build (`from ai_providers import X`)
+# and as a package in development, so every new direct idt_core import inside a
+# dialog is another hidden import that works locally and fails only in the
+# packaged app.
+#
+# DEV_CLAUDE_MODELS and DEV_OPENAI_MODELS above are now the *curated* lists --
+# the offline fallback and the metadata layer, not the live answer. They stay
+# for compatibility, but a caller that wants what the account can actually use
+# should call list_models() (issue #267).
+
+
+def list_models(provider: str, keep=()) -> list:
+    """Models available for a provider, as ModelEntry records.
+
+    Never blocks: this reads the catalog's cache, so it is safe to call
+    directly from a wx event handler. Refreshing from the API happens on a
+    worker thread at startup and behind the Refresh AI Models menu item.
+
+    ``keep`` names models that must appear whatever the listing says -- pass the
+    user's current selection, so a model the provider has retired cannot vanish
+    out from under a dialog and silently move them to a different one.
+    """
+    try:
+        from idt_core.providers import catalog
+
+        return catalog.cached_models(provider, keep=[k for k in keep if k])
+    except Exception as exc:                                    # noqa: BLE001
+        # Local logger, not a module-level one: this file has no module-scope
+        # `logger` and adding a reference to one would be a NameError at call
+        # time -- inside a wx handler, where it surfaces as a control that
+        # silently does nothing. See the worked example in CLAUDE.md.
+        logging.getLogger(__name__).warning(
+            f"Could not list {provider} models: {exc}"
+        )
+        return []
+
+
+def model_info(provider: str, model_id: str):
+    """Everything known about one model, as a ModelEntry. Never raises."""
+    from idt_core.providers import catalog
+
+    return catalog.model_entry(provider, model_id)
+
+
+def refresh_models_from_apis(providers=("claude", "openai")) -> dict:
+    """Refresh the cached model lists. **Blocking -- worker threads only.**
+
+    Returns ``{provider: count}`` for providers that actually refreshed, so a
+    caller can report what changed. Providers with no key, a fresh cache, or an
+    unreachable endpoint are simply absent from the result; none of those is an
+    error worth interrupting anyone about.
+    """
+    from idt_core.providers import catalog
+
+    refreshed = {}
+    for provider in providers:
+        try:
+            entries = catalog.refresh_if_stale(provider)
+            if entries is not None:
+                refreshed[provider] = len(entries)
+        except Exception as exc:                                # noqa: BLE001
+            logging.getLogger(__name__).debug(
+                f"Model refresh for {provider} failed: {exc}"
+            )
+    return refreshed
 
 
 def _shared_api_key(provider_name: str) -> Optional[str]:
@@ -897,33 +968,27 @@ class OpenAIProvider(AIProvider):
                 print(f"Warning: Failed to reinitialize OpenAI client: {e}")
     
     def get_available_models(self) -> List[str]:
-        """Get list of available OpenAI models"""
-        # DEVELOPMENT MODE: Return hardcoded models for faster testing
+        """Get list of available OpenAI models.
+
+        Delegates to the model catalog (issue #267), which merges a live
+        /v1/models listing with our curated metadata and caches the result.
+
+        What this replaced is worth recording, because it looked like it was
+        already doing the right thing: it *did* call `client.models.list()`, and
+        then intersected the response with the hardcoded list. A live query that
+        can only ever subtract from a static list cannot surface a new model --
+        the one thing listing exists to do -- so every model released after the
+        list was last edited stayed invisible while the code appeared to check.
+        """
         if DEV_MODE_HARDCODED_MODELS:
             # Return in defined order (newest/best first) without sorting
             return DEV_OPENAI_MODELS.copy() if self.is_available() else []
-        
-        # ORIGINAL DETECTION CODE (preserved for when dev mode is disabled)
+
         if not self.is_available():
             return []
-        
-        try:
-            # Use SDK to list models
-            models_response = self.client.models.list()
-            # Filter for vision-capable models only
-            # As of 2026: gpt-5.x, gpt-4o, gpt-4.1, gpt-4-turbo, o1 support vision
-            # Plain gpt-4 does NOT support vision
-            # Filter to only known-good vision models by matching our canonical list
-            known_good = set(DEV_OPENAI_MODELS)
-            vision_models = [model.id for model in models_response.data if model.id in known_good]
-            # Sort to match our preferred order
-            vision_models.sort(key=lambda m: DEV_OPENAI_MODELS.index(m) if m in DEV_OPENAI_MODELS else 999)
-            return vision_models if vision_models else DEV_OPENAI_MODELS.copy()
-        except Exception:
-            pass
-        
-        # Fallback to known vision models (in preference order)
-        return DEV_OPENAI_MODELS.copy()
+
+        entries = list_models("openai")
+        return [entry.id for entry in entries] or DEV_OPENAI_MODELS.copy()
     
     @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
@@ -1280,20 +1345,27 @@ class ClaudeProvider(AIProvider):
                 print(f"Warning: Failed to reinitialize Anthropic client: {e}")
     
     def get_available_models(self) -> List[str]:
-        """Get list of available Claude models"""
-        # DEVELOPMENT MODE: Return hardcoded models for faster testing
+        """Get list of available Claude models.
+
+        This used to say "Claude doesn't have a models endpoint" and return the
+        hardcoded list. It does have one -- `GET /v1/models` -- and the comment
+        outlived the fact by long enough that nobody rechecked it. The catalog
+        asks it now (issue #267).
+
+        Still sorted haiku -> sonnet -> opus afterwards: that is this GUI's own
+        cheapest-first ordering, deliberately different from the catalog's
+        curated best-first order, and both are wanted where they are.
+        """
         if DEV_MODE_HARDCODED_MODELS:
             # Use smart sorting: haiku -> sonnet -> opus (cheapest to most expensive)
             return sort_claude_models(DEV_CLAUDE_MODELS.copy()) if self.is_available() else []
-        
-        # ORIGINAL DETECTION CODE (preserved for when dev mode is disabled)
+
         if not self.is_available():
             return []
-        
-        # Claude doesn't have a models endpoint, so we return the known models
-        # All Claude models support vision natively
-        # Sort by tier and version for easier selection
-        return sort_claude_models(DEV_CLAUDE_MODELS.copy())
+
+        entries = list_models("claude")
+        ids = [entry.id for entry in entries] or DEV_CLAUDE_MODELS.copy()
+        return sort_claude_models(ids)
     
     @retry_on_api_error(max_retries=3, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:

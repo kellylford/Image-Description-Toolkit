@@ -337,24 +337,23 @@ def model_limits(provider_name: str, model: str) -> Tuple[Optional[int], Optiona
 
     Either element is ``None`` when the value is not recorded. Callers must
     supply their own fallback rather than relying on a guess from this module.
+
+    Delegates to :mod:`idt_core.providers.catalog`, which holds the curated
+    tables and the live-listing merge in one place.  Two properties of that
+    delegation are load-bearing and are asserted in the tests:
+
+    * **Curated metadata wins.**  A live listing contributes which models exist,
+      never what their limits are.  If a fetched entry could shadow a recorded
+      ``context_window``, the chat token budgeter would silently fall back to a
+      flat guess with nothing to notice.
+    * **No I/O.**  ``tokens.context_window_for`` calls this on every chat turn,
+      so ``catalog.model_entry`` answers from the curated tables alone -- not a
+      network call, and not even a ``stat()`` of the model cache.
     """
-    key = _canonical(provider_name)
-    meta: dict = {}
     try:
-        if key == "claude":
-            from .claude import CLAUDE_MODEL_METADATA
-
-            meta = CLAUDE_MODEL_METADATA.get(model, {})
-        elif key == "openai":
-            from .openai_provider import OPENAI_MODEL_METADATA
-
-            meta = OPENAI_MODEL_METADATA.get(model, {})
-    except ImportError:
+        from .catalog import model_entry
+    except ImportError:  # pragma: no cover - catalog always ships
         return (None, None)
 
-    context = meta.get("context_window")
-    max_output = meta.get("max_output")
-    return (
-        int(context) if context else None,
-        int(max_output) if max_output else None,
-    )
+    entry = model_entry(provider_name, model)
+    return (entry.context_window, entry.max_output)

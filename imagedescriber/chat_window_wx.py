@@ -221,26 +221,23 @@ class ChatDialog(wx.Dialog):
                     self.model_combo.Append('llava:latest', 'llava:latest')
                     self.model_combo.SetSelection(0)
                     
-            elif provider == 'openai':
-                # Load from canonical list - supports both frozen and dev mode
+            elif provider in ('openai', 'claude'):
+                # Live-backed list from the model catalog (issue #267), read
+                # from its cache so this stays instant on the UI thread.
                 try:
-                    from ai_providers import DEV_OPENAI_MODELS
+                    from ai_providers import list_models
                 except ImportError:
-                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
-                for model in DEV_OPENAI_MODELS:
-                    self.model_combo.Append(model, model)
-                self.model_combo.SetStringSelection('gpt-4o')
-                
-            elif provider == 'claude':
-                # Import the official Claude models list with friendly display names
-                from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
-                for model in DEV_CLAUDE_MODELS:
-                    display = CLAUDE_MODEL_METADATA.get(model, {}).get('name', model)
-                    self.model_combo.Append(display, model)  # client data = API ID
-                # Set to first available model (list is ordered by recommendation)
+                    from imagedescriber.ai_providers import list_models
+                for entry in list_models(provider):
+                    # Display name shown, API id as client data — get_selections()
+                    # returns the client data, which is what gets sent.
+                    self.model_combo.Append(entry.display(), entry.id)
+                # First entry: the catalog keeps the curated best-first order.
+                # OpenAI used to hardcode SetStringSelection('gpt-4o') here,
+                # which silently defaulted every new chat to a legacy model.
                 if self.model_combo.GetCount() > 0:
                     self.model_combo.SetSelection(0)
-                
+
             elif provider == 'mlx':
                 # Apple MLX Metal GPU inference (macOS only) — no API key required
                 try:
@@ -262,7 +259,10 @@ class ChatDialog(wx.Dialog):
                 self.model_combo.Append('gpt-4o', 'gpt-4o')
                 self.model_combo.SetSelection(0)
             elif provider == 'claude':
-                # Use first model from official Claude models list with friendly display name
+                # Use first model from the curated list with its friendly name.
+                # The curated list, not the catalog: this is the handler for the
+                # catalog itself having failed, so reaching for it again here
+                # would just raise a second time inside an except block.
                 from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
                 if DEV_CLAUDE_MODELS:
                     api_id = DEV_CLAUDE_MODELS[0]
@@ -1340,20 +1340,21 @@ class ChatWindow(wx.Dialog):
         t.start()
 
     def _fetch_context_window_bg(self):
-        """Background thread: look up context window size for the current model."""
+        """Background thread: look up context window size for the current model.
+
+        One call, because ``context_window_for`` already *is* this logic: the
+        registry figure first, then a live /api/show probe for Ollama, then a
+        per-provider default. This used to reimplement all three inline, with
+        its own copies of 200_000 / 128_000 / 32_768 -- so a model whose recorded
+        window changed, or any model added since, got the old number here and the
+        right one everywhere else, with the token gauge quietly disagreeing with
+        the budgeter that actually drops turns.
+        """
         size = 0
         try:
-            if self.provider == 'claude':
-                from idt_core.providers.claude import CLAUDE_MODEL_METADATA
-                size = CLAUDE_MODEL_METADATA.get(self.model, {}).get('context_window', 200_000)
-            elif self.provider == 'openai':
-                from idt_core.providers.openai_provider import OPENAI_MODEL_METADATA
-                size = OPENAI_MODEL_METADATA.get(self.model, {}).get('context_window', 128_000)
-            elif self.provider == 'ollama':
-                from idt_core.providers.ollama import model_context_length
-                size = model_context_length(self.model) or 32_768
-            elif self.provider == 'mlx':
-                size = 32_768
+            from idt_core.chat.tokens import context_window_for
+
+            size = context_window_for(self.provider, self.model)
         except Exception:
             pass
         wx.CallAfter(self._on_context_window_fetched, size)

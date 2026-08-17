@@ -1,133 +1,60 @@
 # Image Description Toolkit — Documentation
 
-Welcome to the IDT documentation. The published accessible version of this documentation is available at the project GitHub Pages site.
+Welcome to the IDT documentation. The published accessible version is available at the
+project GitHub Pages site.
 
-## Main Documentation
+## Start here
 
-### Getting Started
-- **[USER_GUIDE.md](USER_GUIDE.md)** — Complete user guide for both the `idt` CLI and ImageDescriber GUI (v4.5)
-- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** — Developer reference: architecture, build system, conventions
-- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** — Configuration files, API keys, and customization
-- **[CI_WORKFLOWS.md](CI_WORKFLOWS.md)** — GitHub Actions: what each workflow does, when it runs, signing and release setup
-- **[WHATS_NEW — v4.5](release-notes-v4.5.0.md)** — Latest features and changes in v4.5
+- **[USER_GUIDE.md](USER_GUIDE.md)** — the complete guide to all three apps: the `idt`
+  command line tool, the ImageDescriber GUI, and IDT Chat. Part 2 is the full command
+  reference, with every option and worked examples.
+- **[Release notes — v4.5.1](release-notes-v4.5.1.md)** — what IDT is, how to install it,
+  and what changed most recently.
 
-### Configuration & Customization
-- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Complete guide to config files and customization
-- **[PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md)** - How to create effective prompts for AI models
-- **[WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md)** - Downloading and describing images from websites
+## By topic
 
-### Core Documentation Structure
+| Document | What it covers |
+|---|---|
+| [USER_GUIDE.md](USER_GUIDE.md) | Installation, first workflow, every CLI command, both GUIs, accessibility, troubleshooting |
+| [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) | Config files, API keys, customization |
+| [WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md) | Downloading and describing images from websites |
+| [IMAGE_FORMAT_SUPPORT.md](IMAGE_FORMAT_SUPPORT.md) | Which image and video formats are supported, and how HEIC is handled |
+| [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Architecture, `idt_core` inventory, build system, testing, conventions |
+| [CI_WORKFLOWS.md](CI_WORKFLOWS.md) | GitHub Actions: what each workflow does, signing, and how a release is cut |
+| [CLI_INVENTORY.md](CLI_INVENTORY.md) | A point-in-time audit of the v4.5 CLI against the previous one. Historical — see the user guide for current behaviour |
+| [IDT Style Guide.md](IDT%20Style%20Guide.md) | Writing style for documentation and UI text |
 
-```
-docs/
-├── USER_GUIDE.md              # 📖 Start here! Complete getting started guide
-├── CLI_REFERENCE.md           # 🔧 Complete command reference
-├── WHATS_NEW_v3.5.0.md       # 🆕 Latest features and updates
-├── CONFIGURATION_GUIDE.md     # ⚙️  Config files and customization
-├── PROMPT_WRITING_GUIDE.md    # ✍️  How to write effective prompts
-├── WEB_DOWNLOAD_GUIDE.md      # 🌐 Download images from websites
-├── worktracking/              # 📝 Development planning documents
-└── archive/                   # 📦 Historical and technical documents
-```
+## Component documentation
 
-## 🚀 Quick Navigation
+- **[imagedescriber/README.md](../imagedescriber/README.md)** — the batch processing GUI
+- **[tools/README.md](../tools/README.md)** — additional utilities
 
-### I want to...
+## Where to look for...
 
-**Get started with IDT**
-→ [USER_GUIDE.md](USER_GUIDE.md) - Complete setup and first workflow
+**Getting started** → [USER_GUIDE.md](USER_GUIDE.md), Part 1
 
-**Find a specific command**
-→ [CLI_REFERENCE.md](CLI_REFERENCE.md) - All commands with examples
+**A specific command** → [USER_GUIDE.md](USER_GUIDE.md), Part 2. There is no separate
+CLI reference file; the command documentation lives in the user guide so there is one
+place to keep current.
 
-**Configure IDT for my needs**
-→ [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) - Config files and customization
+**Which AI provider to use** → [USER_GUIDE.md](USER_GUIDE.md), Part 4. Run
+`idt models` to see what your own API keys give you access to.
 
-**See what's new in v3.5.0**
-→ [WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md) - Latest features and changes
+**Writing prompts** → [USER_GUIDE.md](USER_GUIDE.md), Part 5
 
-**Download images from websites**
-→ [WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md) - Web download guide
+**Screen reader and keyboard use** → [USER_GUIDE.md](USER_GUIDE.md), Part 8. Accessibility
+is the point of this toolkit rather than a feature of it, so it is covered throughout
+rather than only there.
 
-**Write better prompts**
-→ [PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md) - Prompt optimization guide
+**Development history** → [WorkTracking/](WorkTracking/) — session summaries and planning
+documents.
 
-**Understand analysis tools**
-→ [../analysis/README.md](../analysis/README.md) - Analysis tools documentation
+## Documentation standards
 
-**Build from source**
-→ [archive/BUILD_REFERENCE.md](archive/BUILD_REFERENCE.md) - Build instructions
-
-**Understand the codebase**
-→ [archive/AI_AGENT_REFERENCE.md](archive/AI_AGENT_REFERENCE.md) - Developer reference
-
-## 📂 Component Documentation
-
-Individual components have their own README files:
-
-- **[analysis/README.md](../analysis/README.md)** - Analysis tools (combine descriptions, stats, content review)
-- **[imagedescriber/README.md](../imagedescriber/README.md)** - Batch processing GUI (includes Viewer Mode, prompt editor, and configuration)
-- **[tools/README.md](../tools/README.md)** - Additional utilities
-- **[bat/README.md](../bat/README.md)** - Batch file reference
-
-## 📋 By User Type
-
-### **New Users**
-1. [USER_GUIDE.md](USER_GUIDE.md) - Installation and first workflow
-2. [WHATS_NEW_v3.5.0.md](WHATS_NEW_v3.5.0.md) - See the latest features
-3. [PROMPT_WRITING_GUIDE.md](PROMPT_WRITING_GUIDE.md) - Creating effective prompts
-4. [CLI_REFERENCE.md](CLI_REFERENCE.md) - Command reference when needed
-
-### **Power Users**
-1. [CLI_REFERENCE.md](CLI_REFERENCE.md) - Complete command reference
-2. [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) - Customize with config files
-3. [WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md) - Download images from websites
-4. [analysis/README.md](../analysis/README.md) - Advanced analysis workflows
-
-### **Developers**
-1. [archive/AI_AGENT_REFERENCE.md](archive/AI_AGENT_REFERENCE.md) - Code structure
-2. [archive/BUILD_REFERENCE.md](archive/BUILD_REFERENCE.md) - Build system
-3. [worktracking/](worktracking/) - Development planning
-
-### **Accessibility Users**
-1. [USER_GUIDE.md](USER_GUIDE.md) - All features designed for screen readers
-2. [CLI_REFERENCE.md](CLI_REFERENCE.md) - Keyboard-friendly command reference
-3. The entire toolkit is WCAG 2.2 AA compliant
-
-## 🔍 What's New in v3.5.0
-
-See **[WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md)** for complete details!
-
-### Major Features
-- **Build versioning & validation** - Professional build numbering and automated validation
-- **Metadata extraction & geocoding** - GPS, dates, camera info with OpenStreetMap integration (ON by default)
-- **Video metadata embedding** - Extract and preserve GPS/date metadata from videos to frames
-- **Custom configuration priority** - Config files now properly respect default settings
-- **Web image download** - Download and describe images directly from websites
-- **Interactive image gallery** - Compare AI model outputs side-by-side
-
-### Documentation Improvements
-- **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - New "Configuration Priority Order" section
-- **[WEB_DOWNLOAD_GUIDE.md](WEB_DOWNLOAD_GUIDE.md)** - Complete web download documentation
-- **[WHATS_NEW_v3.5.0-beta.md](WHATS_NEW_v3.5.0-beta.md)** - Comprehensive feature list and changes
-- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - Complete config file guide
-
-## 🆘 Need Help?
-
-1. **Check the [USER_GUIDE.md](USER_GUIDE.md)** - Covers 90% of common questions
-2. **Search the [CLI_REFERENCE.md](CLI_REFERENCE.md)** - Complete command documentation
-3. **Look in [archive/](archive/)** - Technical and historical documentation
-4. **Check component READMEs** - Specific functionality documentation
-
-## 📝 Documentation Standards
-
-All IDT documentation follows these principles:
-- **Accessibility-first** - Screen reader friendly formatting
-- **Example-driven** - Every concept has working examples
-- **Progressive complexity** - Basic → Advanced usage patterns
-- **Cross-referenced** - Easy navigation between related topics
-- **Current** - Updated with each release
+- **Accessibility-first** — screen reader friendly formatting throughout
+- **Example-driven** — concepts come with working examples
+- **Current** — updated with each release, and links are checked against files that exist
 
 ---
 
-*Last updated: November 1, 2025 - v3.5.0-beta documentation*
+*Last updated: 2026-08-16 — v4.5.1*

@@ -12,6 +12,22 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+@pytest.fixture(autouse=True)
+def isolate_model_cache(tmp_path, monkeypatch):
+    """Point the provider model cache at a scratch directory, for every test.
+
+    ``registry.model_limits()`` reaches the model catalog, which can consult a
+    cache under ``~/.idt``. Without this, whether a test passes depends on
+    whether the developer has run ``idt models --refresh`` on that machine --
+    green in CI, red locally, for a reason nothing in the test file mentions.
+
+    Autouse rather than opt-in on purpose: the tests that would be affected are
+    the ones that never mention models (``test_chat_engine``, ``test_chat_providers``),
+    so requiring them to ask for isolation is exactly how the gap reappears.
+    """
+    monkeypatch.setenv("IDT_MODEL_CACHE_DIR", str(tmp_path / "model_cache"))
+
+
 @pytest.fixture
 def project_root_path():
     """Return the project root directory path."""

@@ -359,40 +359,36 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
             return "Local Ollama models have no API cost. Requires Ollama running locally."
         return f"{model_id} — Local AI model running via Ollama. No API key or cloud cost."
 
-    if provider == "openai":
-        from idt_core.providers.openai_provider import OPENAI_MODEL_METADATA
-        meta = OPENAI_MODEL_METADATA.get(model_id)
-        if not meta:
-            return f"{model_id} — OpenAI model. See openai.com/api/pricing for cost details."
-        parts: list[str] = []
-        if meta.get("recommended"):
-            parts.append("★ Recommended")
-        cost = meta.get("cost", "")
-        if cost:
-            parts.append(cost)
-        desc = meta.get("description", "")
-        if desc:
-            parts.append(desc)
-        line = " | ".join(parts)
-        notes = meta.get("notes", "")
-        if notes:
-            line = (line + "\n⚠ " + notes) if line else ("⚠ " + notes)
-        return line
+    if provider in ("openai", "claude"):
+        # Read through the model catalog so a model the API lists but we ship no
+        # metadata for says so plainly, rather than falling back to a generic
+        # "see the pricing page" line that reads as though we knew nothing was
+        # unusual about it (issue #267).
+        from idt_core.providers import catalog
 
-    if provider == "claude":
-        from idt_core.providers.claude import CLAUDE_MODEL_METADATA
-        meta = CLAUDE_MODEL_METADATA.get(model_id, {})
-        if not meta:
-            return f"{model_id} — Anthropic Claude model. See anthropic.com/pricing for costs."
-        parts = []
-        if meta.get("recommended"):
+        entry = catalog.model_entry(provider, model_id)
+        vendor = "OpenAI" if provider == "openai" else "Anthropic Claude"
+        pricing = ("openai.com/api/pricing" if provider == "openai"
+                   else "anthropic.com/pricing")
+
+        if entry.source == "live":
+            return (
+                f"{model_id} — newly released {vendor} model. IDT has no recorded "
+                f"context window or cost for it yet, so token budgeting uses a "
+                f"conservative default. See {pricing} for cost details."
+            )
+
+        parts: list[str] = []
+        if entry.recommended:
             parts.append("★ Recommended")
-        cost = meta.get("cost", "")
-        if cost:
-            parts.append(cost)
-        desc = meta.get("description", "")
-        if desc:
-            parts.append(desc)
+        if entry.cost:
+            parts.append(entry.cost)
+        if entry.description:
+            parts.append(entry.description)
+        if entry.source == "retired":
+            parts.append("no longer offered by the API for this account")
+        if not parts:
+            return f"{model_id} — {vendor} model. See {pricing} for cost details."
         return " | ".join(parts)
 
     return ""
@@ -583,6 +579,18 @@ class FollowupQuestionDialog(wx.Dialog):
             # First call — default to the model used for the original description
             current_model_id = self.original_model
 
+        # A model id only means anything within its own provider. The captured
+        # id above belongs to whichever provider was showing a moment ago, so
+        # once the user switches, carrying it forward would put (and select) an
+        # OpenAI model in the Claude list.
+        previous_provider = getattr(self, '_populated_provider', None)
+        if previous_provider is None:
+            same_provider = provider == str(self.original_provider or '').lower()
+        else:
+            same_provider = provider == previous_provider
+        keep_current = [current_model_id] if (same_provider and current_model_id) else []
+        self._populated_provider = provider
+
         # Clear choices
         self.model_combo.Clear()
         
@@ -611,21 +619,20 @@ class FollowupQuestionDialog(wx.Dialog):
                     for model in [DEFAULT_OLLAMA_MODEL, "llava", "llama3.2-vision", "moondream"]:
                         self.model_combo.Append(model)
                         
-            elif provider == "openai":
-                # Load from canonical list - supports both frozen and dev mode
+            elif provider in ("openai", "claude"):
+                # Live-backed list from the model catalog (issue #267), read
+                # from its cache so this stays instant on the UI thread.
+                # `keep` holds on to the model already selected, so one the
+                # provider has retired cannot disappear and quietly move the
+                # user to a different model mid-dialog.
                 try:
-                    from ai_providers import DEV_OPENAI_MODELS
+                    from ai_providers import list_models
                 except ImportError:
-                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
-                for model in DEV_OPENAI_MODELS:
-                    self.model_combo.Append(model)
-                    
-            elif provider == "claude":
-                # Import the official Claude models list with friendly display names
-                from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
-                for model in DEV_CLAUDE_MODELS:
-                    display = CLAUDE_MODEL_METADATA.get(model, {}).get("name", model)
-                    self.model_combo.Append(display, model)  # client data = API ID
+                    from imagedescriber.ai_providers import list_models
+                for entry in list_models(provider, keep=keep_current):
+                    # Display name shown, API id as client data — the client
+                    # data is what get_values() returns and what gets sent.
+                    self.model_combo.Append(entry.display(), entry.id)
 
             elif provider == "mlx":
                 try:
@@ -1000,6 +1007,26 @@ class ProcessingOptionsDialog(wx.Dialog):
         text = _get_model_description_text(provider, model_id)
         self.model_desc_text.ChangeValue(text)
     
+    def _select_model_id(self, model_id) -> bool:
+        """Select the entry whose API id is ``model_id``. True if one matched.
+
+        By client data rather than by display string: the label is a friendly
+        name ("Claude Opus 5") while everything stored in config and sent to the
+        API is the id, so matching on the visible text finds nothing for every
+        Claude model.
+        """
+        if not model_id:
+            return False
+        for i in range(self.model_combo.GetCount()):
+            try:
+                data = self.model_combo.GetClientData(i)
+            except Exception:
+                data = None
+            if (data or self.model_combo.GetString(i)) == model_id:
+                self.model_combo.SetSelection(i)
+                return True
+        return False
+
     def populate_models_for_provider(self):
         """Populate model list based on selected provider"""
         provider = self.provider_choice.GetStringSelection().lower()
@@ -1037,24 +1064,35 @@ class ProcessingOptionsDialog(wx.Dialog):
                 else:
                     self.model_combo.Append(DEFAULT_OLLAMA_MODEL)
                     self.model_combo.SetSelection(0)
-            elif provider == "openai":
-                # Load from canonical list - supports both frozen and dev mode
+            elif provider in ("openai", "claude"):
+                # Live-backed list from the model catalog (issue #267), read
+                # from its cache so this stays instant on the UI thread.
                 try:
-                    from ai_providers import DEV_OPENAI_MODELS
+                    from ai_providers import list_models
                 except ImportError:
-                    from imagedescriber.ai_providers import DEV_OPENAI_MODELS
-                for model in DEV_OPENAI_MODELS:
-                    self.model_combo.Append(model)
-                self.model_combo.SetStringSelection("gpt-4o")
-            elif provider == "claude":
-                # Import the official Claude models list with friendly display names
-                from ai_providers import DEV_CLAUDE_MODELS, CLAUDE_MODEL_METADATA
-                for model in DEV_CLAUDE_MODELS:
-                    display = CLAUDE_MODEL_METADATA.get(model, {}).get("name", model)
-                    self.model_combo.Append(display, model)  # client data = API ID
-                # Set to first available model (list is ordered by recommendation)
-                if self.model_combo.GetCount() > 0:
-                    self.model_combo.SetSelection(0)
+                    from imagedescriber.ai_providers import list_models
+
+                # Only carry the configured model over as `keep` when it belongs
+                # to THIS provider. A model id is meaningless outside its own
+                # provider, so passing it unconditionally put "gpt-5.2" into the
+                # Claude list -- and selected it -- the moment the user switched
+                # provider in this dialog.
+                configured = self.config.get('default_model', '')
+                configured_provider = str(self.config.get('provider', '')).lower()
+                keep = [configured] if configured_provider == provider else []
+
+                entries = list_models(provider, keep=keep)
+                for entry in entries:
+                    # Display name shown, API id as client data.
+                    self.model_combo.Append(entry.display(), entry.id)
+
+                # Prefer the configured default, then the first entry -- the
+                # catalog keeps the curated best-first order. This used to be a
+                # hardcoded SetStringSelection("gpt-4o") for OpenAI, which
+                # quietly defaulted every new batch to a legacy model.
+                if not (keep and self._select_model_id(configured)):
+                    if self.model_combo.GetCount() > 0:
+                        self.model_combo.SetSelection(0)
             elif provider == "mlx":
                 # Show known MLX models; user can also type any HuggingFace repo ID
                 try:

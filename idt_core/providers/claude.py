@@ -9,7 +9,12 @@ from typing import Optional
 
 from .base import BaseProvider, DescriptionResult
 
-# Model list sourced from the Anthropic SDK (anthropic.types.model).
+# The list below is no longer the source of truth for *which* models exist --
+# `catalog.py` asks `GET /v1/models` that, and this list is the offline fallback
+# plus the metadata layer (issue #267). It is still the source of truth for
+# context_window / max_output / cost / recommended, and for display order, none
+# of which the API reports.
+#
 # All Claude models support vision natively. Updated July 2026.
 CLAUDE_MODELS = [
     # Current generation — 5.x
@@ -129,15 +134,110 @@ def format_claude_model_for_display(model_id: str, include_description: bool = F
     return name
 
 
-def get_claude_api_id_from_display(display_name_or_id: str) -> str:
-    for api_id, meta in CLAUDE_MODEL_METADATA.items():
-        if meta.get("name") == display_name_or_id:
-            return api_id
-    return display_name_or_id
+# `get_claude_api_id_from_display` was removed here. It mapped a display name
+# back to an API id by scanning CLAUDE_MODEL_METADATA, falling through to
+# returning its argument unchanged. Harmless while every model was in that dict;
+# actively wrong once the catalog can list models that are not, because the
+# fallback would hand a *display string* to the API as a model id. It had no
+# callers -- every picker stores the api id as wx client data, which is the
+# right way to do this -- so it went rather than being fixed into a trap that
+# works until it doesn't.
 
 
 # Alias kept for import compatibility
 DEV_CLAUDE_MODELS = CLAUDE_MODELS
+
+
+# ---------------------------------------------------------------------------
+# Live listing
+# ---------------------------------------------------------------------------
+
+#: Pages of the models endpoint. The account's list is short enough that this is
+#: really a "fetch it all in one request" number with headroom.
+_PAGE_SIZE = 100
+
+#: Bound on how many pages we will walk. A malformed pagination response that
+#: kept reporting another page would otherwise spin forever on a worker thread,
+#: where nothing would ever surface it.
+_MAX_PAGES = 20
+
+
+def list_models_live(client=None, api_key: Optional[str] = None,
+                     timeout: float = 8.0) -> list:
+    """Ask the API which Claude models this account can use.
+
+    Returns ``{"id", "name", "created"}`` records -- the shape ``catalog`` merges
+    and ``model_cache`` stores. Deliberately *not* ``ModelEntry``: building those
+    is the catalog's job, and keeping it there is what stops a live response from
+    ever constructing an entry that could shadow curated limits.
+
+    ``client`` is injectable so tests never reach the network, matching
+    ``ollama._show(client=...)``.
+
+    Raises rather than swallowing. The caller (``catalog.refresh_models``) has
+    the cache to fall back on and the negative-TTL bookkeeping to do, and it
+    cannot do either if a failure arrives disguised as an empty list.
+    """
+    if client is None:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key, timeout=timeout)
+
+    out: list = []
+    seen: set = set()
+    page = client.models.list(limit=_PAGE_SIZE)
+
+    for _ in range(_MAX_PAGES):
+        for model in getattr(page, "data", None) or []:
+            model_id = str(getattr(model, "id", "") or "")
+            # `type` is "model" for real entries; anything else is a shape we
+            # do not recognise and should not be putting in a picker.
+            if not model_id or getattr(model, "type", "model") != "model":
+                continue
+            if model_id in seen:
+                continue
+            seen.add(model_id)
+            out.append({
+                "id": model_id,
+                "name": str(getattr(model, "display_name", "") or "").strip(),
+                "created": _created_timestamp(model),
+            })
+
+        has_next = getattr(page, "has_next_page", None)
+        try:
+            if not (callable(has_next) and has_next()):
+                break
+            page = page.get_next_page()
+        except Exception:
+            # Pagination is a convenience here, not a requirement -- the first
+            # page already holds every model any real account has. Losing the
+            # rest is better than losing the whole refresh.
+            break
+
+    return out
+
+
+def _created_timestamp(model) -> float:
+    """`created_at` as a sortable number, or 0 when it is missing or odd.
+
+    The SDK hands back a ``datetime``; older or stubbed shapes may give a string
+    or a number. This is only ever an ordering signal for models we have no
+    metadata for, so an unparseable value costs a position in the list, nothing
+    more.
+    """
+    raw = getattr(model, "created_at", None)
+    if raw is None:
+        return 0.0
+    timestamp = getattr(raw, "timestamp", None)
+    if callable(timestamp):
+        try:
+            return float(timestamp())
+        except (ValueError, OSError, OverflowError):
+            return 0.0
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 class ClaudeProvider(BaseProvider):

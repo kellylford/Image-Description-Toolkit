@@ -1438,13 +1438,63 @@ def cmd_combine(args):
 # models                                                               #
 # ------------------------------------------------------------------ #
 
+def _api_model_results(provider: str, args) -> dict:
+    """Model listing for one of the API-backed providers (Claude, OpenAI).
+
+    Cache-first, like every picker: whatever the catalog already knows is the
+    answer, and a refresh is attempted only when the cache has expired or
+    ``--refresh`` asked for one. That keeps `idt models` fast on the common path
+    and, more importantly, keeps it working with no network at all.
+    """
+    from idt_core.keys import ENV_VARS, key_source, resolve_api_key
+    from idt_core.providers import catalog
+
+    if not resolve_api_key(provider):
+        # Resolved through keys.py rather than os.environ: this used to check
+        # the environment variable directly and so reported "no key" for anyone
+        # whose key lived in the Windows Credential Manager or the config file.
+        return {"status": "no_key", "models": [], "details": [],
+                "env_var": ENV_VARS.get(provider, "")}
+
+    refreshed = None
+    if getattr(args, "refresh", False):
+        catalog.invalidate(provider)
+        refreshed = catalog.refresh_models(
+            provider, include_all=getattr(args, "all_models", False), force=True
+        )
+    elif catalog.is_stale(provider):
+        refreshed = catalog.refresh_if_stale(
+            provider, include_all=getattr(args, "all_models", False)
+        )
+
+    entries = catalog.cached_models(provider)
+    return {
+        "status": "live" if refreshed is not None else "cached",
+        "models": [entry.id for entry in entries],
+        "details": [
+            {
+                "id": entry.id,
+                "name": entry.name,
+                "source": entry.source,
+                "context_window": entry.context_window,
+                "max_output": entry.max_output,
+                "recommended": entry.recommended,
+            }
+            for entry in entries
+        ],
+        "key_source": key_source(provider) or "",
+    }
+
+
 def cmd_models(args):
     """
     Check which AI models are available.
 
-    idt models                     — check all providers
-    idt models --provider ollama   — list Ollama models
-    idt models --provider anthropic — verify Claude API access
+    idt models                      — check all providers
+    idt models --provider ollama    — list Ollama models
+    idt models --provider anthropic — list Claude models for this account
+    idt models --refresh            — ignore the cache and ask the APIs now
+    idt models --all                — skip the OpenAI chat-model filter
     """
     results = {}
 
@@ -1458,23 +1508,16 @@ def cmd_models(args):
         except Exception as e:
             results["ollama"] = {"status": "error", "error": str(e)}
 
-    # Anthropic
-    if not args.provider or args.provider == "anthropic":
-        import os
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            from idt_core.providers.claude import CLAUDE_MODELS
-            results["anthropic"] = {"status": "key_found", "models": CLAUDE_MODELS}
-        else:
-            results["anthropic"] = {"status": "no_key", "models": []}
-
-    # OpenAI
-    if not args.provider or args.provider == "openai":
-        import os
-        if os.environ.get("OPENAI_API_KEY"):
-            from idt_core.providers.openai_provider import OPENAI_MODELS
-            results["openai"] = {"status": "key_found", "models": OPENAI_MODELS}
-        else:
-            results["openai"] = {"status": "no_key", "models": []}
+    # Anthropic / OpenAI. Both go through the model catalog, which asks the
+    # provider's own /v1/models endpoint and merges the answer with our curated
+    # metadata (issue #267).
+    for name, canonical in (("anthropic", "claude"), ("openai", "openai")):
+        if args.provider and args.provider != name:
+            continue
+        try:
+            results[name] = _api_model_results(canonical, args)
+        except Exception as e:                                  # noqa: BLE001
+            results[name] = {"status": "error", "error": str(e), "models": []}
 
     if args.json_out:
         print(json.dumps(results, indent=2))
@@ -1487,13 +1530,24 @@ def cmd_models(args):
             print(f"\n{provider} ({len(models)} models available):")
             for m in models:
                 print(f"    {m}")
-        elif status == "key_found":
-            print(f"\n{provider} (API key found, {len(models)} known models):")
-            for m in models:
-                print(f"    {m}")
+        elif status in ("live", "cached"):
+            freshness = "from the API" if status == "live" else "cached"
+            print(f"\n{provider} ({len(models)} models, {freshness}):")
+            for detail in info.get("details", []):
+                label = detail["name"] or detail["id"]
+                notes = []
+                if detail["source"] == "live":
+                    notes.append("new — details unknown")
+                if detail["recommended"]:
+                    notes.append("recommended")
+                suffix = f"  ({', '.join(notes)})" if notes else ""
+                if label != detail["id"]:
+                    print(f"    {detail['id']}  —  {label}{suffix}")
+                else:
+                    print(f"    {detail['id']}{suffix}")
         elif status == "no_key":
-            key = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
-            print(f"\n{provider}: no API key ({key} not set)")
+            env_var = info.get("env_var") or "the provider's API key"
+            print(f"\n{provider}: no API key ({env_var} not set)")
         else:
             print(f"\n{provider}: error — {info.get('error', 'unknown')}")
 
@@ -1503,12 +1557,35 @@ def cmd_models(args):
 # ------------------------------------------------------------------ #
 
 def _chat_default_model(provider: str) -> str:
-    """Canonical default model for a provider, from its own module."""
-    if provider == "claude":
-        from idt_core.providers.claude import DEFAULT_MODEL
-        return DEFAULT_MODEL
-    if provider == "openai":
-        from idt_core.providers.openai_provider import DEFAULT_MODEL
+    """Canonical default model for a provider.
+
+    For the API providers this is the module default, *if the account still has
+    it*. A hardcoded default that the provider has since retired is the exact
+    failure issue #267 is about: it looks fine until the first request comes back
+    as an API error. When the catalog knows the default is gone, the first
+    recommended model that does exist is used instead.
+    """
+    if provider in ("claude", "openai"):
+        if provider == "claude":
+            from idt_core.providers.claude import DEFAULT_MODEL
+        else:
+            from idt_core.providers.openai_provider import DEFAULT_MODEL
+
+        try:
+            from idt_core.providers import catalog
+
+            entries = catalog.cached_models(provider)
+            if any(entry.id == DEFAULT_MODEL for entry in entries):
+                return DEFAULT_MODEL
+            for entry in entries:
+                if entry.recommended:
+                    return entry.id
+            if entries:
+                return entries[0].id
+        except Exception:
+            # The catalog is an improvement on the module default, never a
+            # prerequisite for having one.
+            pass
         return DEFAULT_MODEL
     from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
     try:
@@ -2392,6 +2469,11 @@ Supported providers:
                           default="http://localhost:11434")
     p_models.add_argument("--json", dest="json_out", action="store_true",
                           help="Output as JSON")
+    p_models.add_argument("--refresh", action="store_true",
+                          help="Ignore the cache and ask the APIs now")
+    p_models.add_argument("--all", dest="all_models", action="store_true",
+                          help="Include every model the API reports, skipping "
+                               "the filter that hides non-chat OpenAI models")
     p_models.set_defaults(func=cmd_models)
 
     # ---------------------------------------------------------------- #

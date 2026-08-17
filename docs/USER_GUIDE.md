@@ -605,10 +605,39 @@ Press `Ctrl+C` to stop. Useful for monitoring a downloads folder or a folder rec
 Show which models are available from each provider.
 
 ```
-idt models [--provider NAME] [--ollama-host URL] [--json]
+idt models [--provider NAME] [--ollama-host URL] [--json] [--refresh] [--all]
 ```
 
-For Ollama, queries the running Ollama service. For cloud providers, shows the known model list if the API key is set.
+**Options**
+
+| Option | Description |
+|---|---|
+| `--provider` | `ollama`, `anthropic`, or `openai`. Omit to check all three |
+| `--ollama-host URL` | Ollama service address. Default `http://localhost:11434` |
+| `--json` | Machine-readable output |
+| `--refresh` | Ignore the cached list and ask the APIs right now |
+| `--all` | Include every model the API reports, skipping the filter that hides non-chat OpenAI models (speech, images, embeddings) |
+
+Every provider is asked what *your account* can actually use, rather than showing a list built into the app:
+
+- **Ollama** — queries the running Ollama service.
+- **Claude and OpenAI** — query the provider's model list using your API key. The result is cached for 24 hours, so the command is instant after the first run and keeps working with no network. Without an API key you get the built-in list instead.
+
+Models the app has no details for still appear, marked `new — details unknown`. That is deliberate: a model released today shows up today, rather than waiting for the next version of IDT. Token budgeting falls back to a conservative default for those until IDT records the real figures.
+
+Models your account cannot use simply do not appear. Previously they stayed on the list and failed only when you tried to use them.
+
+**Examples**
+
+```bash
+idt models
+```
+
+```bash
+idt models --provider openai --refresh
+```
+
+Descriptions and costs come from IDT's own records. When a model is too new for IDT to know about, the row says so rather than guessing.
 
 ---
 
@@ -1181,12 +1210,16 @@ Claude models produce the highest quality, most detailed descriptions. Requires 
 
 **Available models**
 
+IDT asks Anthropic which models your account can use, so the list in every picker is the real one rather than a copy baked into the app. Run `idt models --provider anthropic` to see yours. A few of the common ones:
+
 | Model | Characteristics |
 |---|---|
 | `claude-opus-5` | Flagship; highest intelligence and description depth |
 | `claude-sonnet-5` | Best balance of speed and intelligence |
 | `claude-opus-4-8` | Most intelligent 4.x model; strong value |
 | `claude-haiku-4-5-20251001` | Fastest Claude model; very good quality |
+
+Your account may show more or fewer than these. A model Anthropic has released since your copy of IDT was built appears too, marked `new — details unknown`.
 
 **CLI example**
 
@@ -1206,6 +1239,8 @@ Requires an OpenAI API key. Good for workflows already integrated with OpenAI.
 
 **Available models**
 
+As with Claude, IDT asks OpenAI what your account can use. Run `idt models --provider openai` to see yours — most accounts have far more than the handful listed here.
+
 | Model | Characteristics |
 |---|---|
 | `gpt-5.2` | Best available; highest quality vision and reasoning |
@@ -1213,6 +1248,8 @@ Requires an OpenAI API key. Good for workflows already integrated with OpenAI.
 | `gpt-5-nano` | Fastest and most affordable GPT-5 |
 | `o4-mini` | Fast cost-efficient reasoning |
 | `o3` | Powerful reasoning for complex tasks |
+
+OpenAI's account list also contains speech, image-generation, embedding and moderation models, which cannot describe pictures or hold a conversation. IDT hides those so the picker stays usable with a keyboard and screen reader. If something you need is missing, `idt models --provider openai --all` shows the unfiltered list.
 
 **CLI example**
 

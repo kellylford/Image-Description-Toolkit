@@ -14,14 +14,21 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from .image_item import ImageItem
+from .providers.claude import DEFAULT_MODEL as _DEFAULT_CLAUDE_MODEL
 from .scanner import scan_images
+
+# Imported rather than spelled out: this was the literal "claude-opus-4-6", and
+# it had already drifted away from the provider module's own default. A new
+# project should start on whatever the current default is, and there should be
+# one place that decides what that is (issue #267). Safe at module scope --
+# claude.py imports the anthropic SDK inside its provider class, not here.
 
 
 @dataclass
 class ProjectConfig:
     """Per-project settings, stored in project.json alongside source/model/prompt history."""
     default_provider: str = "anthropic"
-    default_model: str = "claude-opus-4-6"
+    default_model: str = _DEFAULT_CLAUDE_MODEL
     default_prompt_name: str = "detailed"
     default_prompt_text: str = ""  # empty means use the built-in text for default_prompt_name
 
@@ -66,7 +73,7 @@ class Project:
         cfg_data = data.get("config", {})
         config = ProjectConfig(
             default_provider=cfg_data.get("default_provider", "anthropic"),
-            default_model=cfg_data.get("default_model", "claude-opus-4-6"),
+            default_model=cfg_data.get("default_model", _DEFAULT_CLAUDE_MODEL),
             default_prompt_name=cfg_data.get("default_prompt_name", "detailed"),
             default_prompt_text=cfg_data.get("default_prompt_text", ""),
         )
