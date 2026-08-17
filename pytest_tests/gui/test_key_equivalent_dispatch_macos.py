@@ -197,10 +197,24 @@ def frame(app, tmp_path, monkeypatch):
     window.fired = fired
     window.Show()
     window.Raise()
+
+    # Cocoa routes an unhandled key equivalent's action through the *key*
+    # window's responder chain. Without a key window the chord matches a menu
+    # item and then performs nothing, which looks exactly like a broken app.
+    nsapp = _send(_objc.objc_getClass(b"NSApplication"), "sharedApplication")
+    _send(nsapp, "activateIgnoringOtherApps:", ctypes.c_bool(True),
+          argtypes=(ctypes.c_bool,))
+    _send(_ns_window(window), "makeKeyAndOrderFront:", None,
+          argtypes=(ctypes.c_void_p,))
     wx.Yield()
+
     yield window
     window.Destroy()
     wx.Yield()
+
+
+def _window_is_key(frame) -> bool:
+    return bool(_send(_ns_window(frame), "isKeyWindow", restype=ctypes.c_bool))
 
 
 def _ns_window(frame):
@@ -298,6 +312,13 @@ def test_cmd_a_selects_text_and_does_not_attach_files(frame):
         pytest.skip(
             "nothing claimed Cmd+A, so this run proves nothing about dispatch "
             f"— the window is probably not key on this runner. Menu: {table}")
+
+    if frame.input_text.GetStringSelection() != "hello world" and not _window_is_key(frame):
+        pytest.skip(
+            "the chord reached the menu (not a control, which is the bug this "
+            "guards), but the window is not key on this runner so the "
+            "responder chain performed nothing. The dispatch assertions above "
+            "still ran; only the end-to-end selection could not be observed.")
 
     assert frame.input_text.GetStringSelection() == "hello world", (
         f"Cmd+A was claimed by the {where} but selected nothing. "
