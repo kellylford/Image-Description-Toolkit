@@ -56,13 +56,25 @@ def wx_app():
 
 
 @pytest.fixture(autouse=True)
-def offline_catalog(monkeypatch):
-    """No network, and a deterministic key regardless of the machine."""
+def offline_catalog(monkeypatch, wx_app):
+    """No network, and a deterministic key regardless of the machine.
+
+    Two separate places resolve a key and both have to be pinned, which is the
+    part that caught this file out: the catalog asks via ``_api_key_for``, and
+    the dialog *independently* calls ``resolve_api_key`` to decide whether to
+    show "No API key found ...". Patching only the first passed on a developer
+    machine with a real key and failed on CI, which has none -- an
+    environment-dependent test, of exactly the kind this session was fixing
+    elsewhere.
+    """
+    import chat_app_wx
+
     monkeypatch.setattr(catalog, "_api_key_for", lambda _p: "test-key")
     monkeypatch.setattr(
         catalog, "_fetch",
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no network in tests")),
     )
+    monkeypatch.setattr(chat_app_wx, "resolve_api_key", lambda _p: "test-key")
     catalog.invalidate()
     yield
     catalog.invalidate()
@@ -143,13 +155,18 @@ def test_an_identical_list_does_not_touch_the_control(wx_app):
     try:
         found = [(dlg.model_choice.GetString(i), dlg.model_choice.GetClientData(i))
                  for i in range(dlg.model_choice.GetCount())]
-        before = dlg.model_choice.GetSelection()
+        before_selection = dlg.model_choice.GetSelection()
+        # Whatever the label already says -- it may legitimately carry a
+        # missing-key notice. The contract is that a no-op refresh does not
+        # *change* it, which is what to assert; asserting "" instead would be
+        # asserting that a key exists on the machine running the test.
+        before_label = dlg.status.GetLabel()
 
         dlg._finish_catalog_refresh(dlg._load_token, "claude",
                                     dlg._selected_id(), found)
 
-        assert dlg.model_choice.GetSelection() == before
-        assert dlg.status.GetLabel() == ""
+        assert dlg.model_choice.GetSelection() == before_selection
+        assert dlg.status.GetLabel() == before_label
     finally:
         dlg.Destroy()
 
