@@ -132,7 +132,18 @@ IDT does not include an AI model. Choose one:
 | **[Ollama](https://ollama.com)** | Free | Your machine | **Recommended to start.** Nothing leaves your computer. The Windows installer can set it up for you. |
 | **Claude** (Anthropic) | Paid API | Cloud | Highest quality. Needs `ANTHROPIC_API_KEY`. |
 | **OpenAI GPT** | Paid API | Cloud | Needs `OPENAI_API_KEY`. |
-| **MLX** | Free | Your Mac | Apple Silicon only, desktop app only. |
+| **MLX** | Free | Your Mac | Apple Silicon only, and **ImageDescriber only** — see below. |
+
+**Why MLX is in ImageDescriber but not IDT Chat.** MLX needs Apple's `mlx` and
+`mlx-vlm` libraries, which are large: bundling them into IDT Chat would take it
+from about 40 MB to around 350 MB. That is worth paying in ImageDescriber,
+where describing a folder of photos locally is the whole point. It is worth
+much less in a chat client, because Ollama now runs several models through MLX
+on Apple Silicon itself — chatting with Ollama on a Mac already gets you the
+Metal acceleration, without a second copy of the libraries. If you specifically
+want to chat with an MLX model, ImageDescriber's own chat window offers it. IDT
+Chat hides the option rather than listing one that would fail the moment you
+picked it.
 
 With Ollama you also need a vision model — `ollama pull minicpm-v4.6` gets you one.
 8 GB of RAM is a realistic minimum for local models; cloud providers have no such

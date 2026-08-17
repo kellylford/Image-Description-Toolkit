@@ -203,19 +203,71 @@ def frame(app, tmp_path, monkeypatch):
     wx.Yield()
 
 
-def _press(frame, characters, modifiers):
-    """Send a chord through Cocoa's own key-equivalent matching.
+def _ns_window(frame):
+    """The NSWindow behind a wx frame."""
+    return _send(ctypes.c_void_p(frame.GetHandle()), "window")
 
-    Returns whether the menu claimed it. False means no item matched -- which
-    on a runner can also mean the window never became key, so a test that
-    depends on the chord being claimed should say which it is.
+
+def _button_key_equivalents(frame):
+    """Every view in the window that claims a key equivalent.
+
+    This is the half of dispatch a menu dump cannot see. AppKit offers a key
+    equivalent to the key window's view hierarchy *before* the main menu, so a
+    control that claims a chord beats a perfectly correct menu bar. Buttons are
+    the usual culprit, because a "&" mnemonic in a wx label -- Alt+A on Windows,
+    where it is harmless -- can arrive here as a Command key equivalent.
+    """
+    found = {}
+
+    def walk(view):
+        if _responds(view, "keyEquivalent"):
+            key = _to_str(_send(view, "keyEquivalent"))
+            if key:
+                mask = _send(view, "keyEquivalentModifierMask",
+                             restype=ctypes.c_ulong)
+                title = _to_str(_send(view, "title")) if _responds(view, "title") else ""
+                found[title or "<untitled>"] = (key, int(mask))
+        subviews = _send(view, "subviews")
+        if subviews:
+            count = _send(subviews, "count", restype=ctypes.c_ulong)
+            for index in range(count):
+                walk(ctypes.c_void_p(_send(
+                    subviews, "objectAtIndex:", ctypes.c_ulong(index),
+                    argtypes=(ctypes.c_ulong,))))
+
+    content = _send(_ns_window(frame), "contentView")
+    if content:
+        walk(ctypes.c_void_p(content))
+    return found
+
+
+def _responds(obj, selector) -> bool:
+    return bool(_send(
+        obj, "respondsToSelector:",
+        ctypes.c_void_p(_objc.sel_registerName(selector.encode())),
+        restype=ctypes.c_bool, argtypes=(ctypes.c_void_p,)))
+
+
+def _press(frame, characters, modifiers):
+    """Send a chord the way AppKit does: the window first, then the menu.
+
+    Order matters and getting it wrong hides the bug. NSApplication offers a
+    key equivalent to the key window's view hierarchy before consulting the
+    main menu, so a test that asks the menu directly will report a correct menu
+    table while the user watches the wrong command run.
     """
     del frame.fired[:]
-    handled = _send(_main_menu(), "performKeyEquivalent:",
-                    ctypes.c_void_p(_key_event(characters, modifiers)),
+    event = ctypes.c_void_p(_key_event(characters, modifiers))
+
+    handled = _send(_ns_window(frame), "performKeyEquivalent:", event,
                     restype=ctypes.c_bool, argtypes=(ctypes.c_void_p,))
+    where = "window"
+    if not handled:
+        handled = _send(_main_menu(), "performKeyEquivalent:", event,
+                        restype=ctypes.c_bool, argtypes=(ctypes.c_void_p,))
+        where = "menu" if handled else "nothing"
     wx.Yield()
-    return bool(handled)
+    return bool(handled), where
 
 
 # --- the tests -------------------------------------------------------------
@@ -231,21 +283,41 @@ def test_cmd_a_selects_text_and_does_not_attach_files(frame):
     frame.input_text.SetSelection(0, 0)
     wx.Yield()
 
-    claimed = _press(frame, "a", MOD_CMD)
+    claimed, where = _press(frame, "a", MOD_CMD)
 
-    table = {k: f"{_describe(v[1])}+{v[0]}" for k, v in _menu_table().items()}
+    buttons = {k: f"{_describe(v[1])}+{v[0]}"
+               for k, v in _button_key_equivalents(frame).items()}
+    assert where != "window", (
+        f"Cmd+A was swallowed by a control in the window before the menu saw "
+        f"it. Views claiming a key equivalent: {buttons}")
     assert "on_attach_files" not in frame.fired, (
-        f"Cmd+A ran the wrong command: {frame.fired}. Native menu: {table}")
+        f"Cmd+A ran the wrong command: {frame.fired}")
 
     if not claimed:
+        table = {k: f"{_describe(v[1])}+{v[0]}" for k, v in _menu_table().items()}
         pytest.skip(
-            "the menu claimed no item for Cmd+A, so this run proves nothing "
-            "about dispatch — the window is probably not key on this runner. "
-            f"Native menu: {table}")
+            "nothing claimed Cmd+A, so this run proves nothing about dispatch "
+            f"— the window is probably not key on this runner. Menu: {table}")
 
     assert frame.input_text.GetStringSelection() == "hello world", (
-        f"Cmd+A was claimed by the menu but selected nothing. "
-        f"Commands that ran: {frame.fired}. Native menu: {table}")
+        f"Cmd+A was claimed by the {where} but selected nothing. "
+        f"Commands that ran: {frame.fired}")
+
+
+def test_no_control_in_the_window_steals_a_command_chord(frame):
+    """The half of dispatch a menu dump cannot see.
+
+    A "&" in a wx button label is an Alt mnemonic on Windows and nothing on
+    macOS — unless wx turns it into a Command key equivalent on the NSButton,
+    in which case that button quietly outranks the entire menu bar, because
+    AppKit asks the key window before it asks the menu.
+    """
+    stolen = {title: f"{_describe(mask)}+{key}"
+              for title, (key, mask) in _button_key_equivalents(frame).items()
+              if mask & MOD_CMD}
+    assert not stolen, (
+        f"controls in the window claim Command chords, which beat the menu "
+        f"bar: {stolen}")
 
 
 def test_cmd_shift_a_is_the_one_that_attaches(frame):
