@@ -324,18 +324,33 @@ def test_no_two_commands_share_an_accelerator(frame):
 
 
 @macos_only
-def test_system_chords_are_not_taken_on_macos(frame):
-    """Cmd+M minimises, Cmd+Q quits, Cmd+, opens Settings -- all from macOS.
+def test_system_chords_only_ever_mean_the_system_command(frame):
+    """A macOS system chord may carry the platform's meaning and nothing else.
 
     wx maps "Ctrl+" to Command, so an innocent-looking Ctrl+M in the source is
-    Cmd+M here. Quit and Settings are supplied by the application menu, so
-    binding them again puts two menu items on one chord.
+    Cmd+M here -- and Cmd+M is Minimize, which wx puts on the Window menu it
+    builds itself. Nothing of ours may claim it.
+
+    Cmd+Q is different, and CI is what taught us the difference: this test
+    first asserted the chord was absent, because the source deliberately
+    leaves the accelerator off the Exit item on macOS. It is present anyway.
+    **wxOSX gives the wx.ID_EXIT item Cmd+Q itself**, and relabels it "Quit".
+    That is the correct outcome -- the item *is* the Quit command -- so what
+    matters is that the chord means Quit, not that it is missing. The bug this
+    guards against is a system chord landing on some unrelated command, which
+    is what Ctrl+M for Change Model was.
     """
     accelerators = _menu_accelerators(frame)
-    for chord in ("Ctrl+M", "Ctrl+Q", "Ctrl+,"):
-        assert chord not in accelerators, (
-            f"{chord} is macOS's, but it is bound to "
-            f"{accelerators[chord]}")
+
+    assert "Ctrl+M" not in accelerators, (
+        f"Cmd+M minimises the window on macOS, but it is bound to "
+        f"{accelerators['Ctrl+M']}")
+
+    for chord, meaning in (("Ctrl+Q", "quit"), ("Ctrl+,", "settings")):
+        for label in accelerators.get(chord, []):
+            assert meaning in label.lower(), (
+                f"{chord} is macOS's own chord for {meaning}, but here it is "
+                f"bound to {label!r}")
 
 
 def test_standard_edit_commands_reach_the_focused_text_control(frame):
