@@ -281,6 +281,12 @@ class SettingEditDialog(wx.Dialog):
                 form_sizer.Add(self.editor, 0, wx.EXPAND)
             
             logger.info("setup_ui: Editor widget created: %s", type(self.editor).__name__)
+
+            # Whichever branch built it, the editor is the only control here
+            # and the setting's name is the only label it can be given: the
+            # visible "Value:" static text says nothing about *which* value,
+            # and on macOS nothing connects it to the field anyway.
+            self.editor.SetName(f"{self.setting_name} value")
             
             # Add range/limits info if available
             if "range" in self.setting_info:

@@ -28,6 +28,7 @@ try:
         ask_yes_no
     )
     from shared.exif_utils import extract_exif_date_string
+    from shared.mac_accessibility import apply_accessible_names
 except ImportError:
     # Fallback for dev/frozen paths
     DescriptionListBox = wx.ListBox # Fallback
@@ -35,6 +36,8 @@ except ImportError:
     show_info = wx.MessageBox
     def ask_yes_no(parent, message, caption):
         return wx.MessageBox(message, caption, wx.YES_NO) == wx.YES
+    def apply_accessible_names(root):
+        return 0
 
 class WorkflowMonitor(threading.Thread):
     """Background thread for monitoring workflow progress"""
@@ -262,7 +265,8 @@ class ViewerPanel(wx.Panel):
         desc_label = wx.StaticText(right_panel, label="Description:")
         desc_label.SetCanFocus(False)  # Prevent tab stop on label
         right_sizer.Add(desc_label, 0, wx.ALL, 5)
-        self.desc_text = wx.TextCtrl(right_panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
+        self.desc_text = wx.TextCtrl(right_panel, name="Description",
+                                     style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_WORDWRAP)
         right_sizer.Add(self.desc_text, 1, wx.EXPAND | wx.ALL, 5)
         
         # Action Buttons
@@ -286,7 +290,12 @@ class ViewerPanel(wx.Panel):
         
         main_sizer.Add(self.splitter, 1, wx.EXPAND | wx.ALL, 0)
         self.SetSizer(main_sizer)
-        
+
+        # This panel is built when the user switches to viewer mode, long after
+        # the frame named its own children, so it names its own.
+        apply_accessible_names(self)
+
+
     def bind_events(self):
         """Bind events"""
         self.desc_list.Bind(wx.EVT_LISTBOX, self.on_selection_changed)

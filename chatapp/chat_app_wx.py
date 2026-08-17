@@ -78,6 +78,7 @@ from idt_core.providers.registry import (  # noqa: E402
 
 from shared.chat_worker_wx import ChatWorker  # noqa: E402
 from shared.mac_accessibility import (  # noqa: E402
+    install_dialog_naming,
     set_accessible_name as _set_mac_accessible_name,
 )
 from shared.speech_engine import (  # noqa: E402
@@ -1850,6 +1851,9 @@ class ChatFrame(wx.Frame):
 class ChatApp(wx.App):
     def OnInit(self):
         self.SetAppName(APP_NAME)
+        # Belt and braces for the dialogs: each one already names its controls
+        # as it builds them, and this names anything added later that forgets.
+        install_dialog_naming(wx)
         frame = ChatFrame()
         frame.Show()
         self.SetTopWindow(frame)

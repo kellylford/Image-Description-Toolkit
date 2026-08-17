@@ -156,7 +156,8 @@ class ChatDialog(wx.Dialog):
         # Labels lowercase to the provider keys ("MLX" -> "mlx"), which is what
         # get_selections() and on_provider_changed() already rely on.
         self.provider_choice = wx.Choice(
-            self, choices=[label for _, label in provider_picker_choices()]
+            self, choices=[label for _, label in provider_picker_choices()],
+            name="AI provider"
         )
         self.provider_choice.SetSelection(0)  # Default to Ollama
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
@@ -171,7 +172,7 @@ class ChatDialog(wx.Dialog):
         model_sizer.Add(model_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
         # ACCESSIBILITY FIX: Use wx.Choice instead of wx.ComboBox to avoid macOS VoiceOver crash
-        self.model_combo = wx.Choice(self)
+        self.model_combo = wx.Choice(self, name="Model")
         model_sizer.Add(self.model_combo, 1, wx.ALL | wx.EXPAND, 5)
         
         main_sizer.Add(model_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -546,6 +547,15 @@ class ChatWindow(wx.Dialog):
         self.attach_btn = wx.Button(panel, label="Attach Files...")
         button_sizer.Add(self.attach_btn, 0, wx.ALL, 5)
 
+        # Ctrl+V is not a route to this on macOS: the main window's Edit menu
+        # owns Cmd+V, and Cocoa hands it to the focused text control before any
+        # key event reaches this dialog's char hook. A button is the only way
+        # the command is reachable on both platforms -- and it is the more
+        # discoverable one for a screen reader user in any case.
+        self.paste_image_btn = wx.Button(panel, label="Paste Image",
+                                         name="Paste image from clipboard")
+        button_sizer.Add(self.paste_image_btn, 0, wx.ALL, 5)
+
         self.commands_btn = wx.Button(panel, label="Session ▾")
         button_sizer.Add(self.commands_btn, 0, wx.ALL, 5)
 
@@ -719,6 +729,7 @@ class ChatWindow(wx.Dialog):
         self.close_btn.Bind(wx.EVT_BUTTON, self.on_close)
         self.input_text.Bind(wx.EVT_TEXT_ENTER, self.on_send_message)
         self.attach_btn.Bind(wx.EVT_BUTTON, self.on_attach_files)
+        self.paste_image_btn.Bind(wx.EVT_BUTTON, self.on_paste_image)
         self.remove_attach_btn.Bind(wx.EVT_BUTTON, self.on_remove_attachment)
         self.commands_btn.Bind(wx.EVT_BUTTON, self.on_commands_menu)
         # History list selection drives the message detail area
@@ -1194,6 +1205,7 @@ class ChatWindow(wx.Dialog):
         """Show/hide the attach button based on whether the current provider supports attachments."""
         can_attach = supports_attachments(self.provider)
         self.attach_btn.Show(can_attach)
+        self.paste_image_btn.Show(can_attach)
         # Ensure layout reflects visibility change
         self.attach_btn.GetParent().Layout()
 
@@ -1276,35 +1288,56 @@ class ChatWindow(wx.Dialog):
             event.Skip()
             return
 
-        # Let the normal event chain run for everything except Ctrl+V
+        # Let the normal event chain run for everything except Ctrl+V holding an
+        # image. Windows only, in practice: on macOS the main window's Edit menu
+        # owns Cmd+V and Cocoa gives it to the focused text control before any
+        # key event arrives here, which is what the Paste Image button is for.
         is_ctrl = event.ControlDown() or event.CmdDown()
         if is_ctrl and event.GetKeyCode() == ord('V'):
-            if wx.TheClipboard.Open():
-                if wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP)):
-                    bmp_data = wx.BitmapDataObject()
-                    if wx.TheClipboard.GetData(bmp_data):
-                        wx.TheClipboard.Close()
-                        # Save bitmap to a temp PNG file and queue it
-                        try:
-                            import tempfile
-                            tmp_dir = tempfile.mkdtemp(prefix="idt_paste_")
-                            self._temp_dirs.append(tmp_dir)
-                            png_path = str(Path(tmp_dir) / "pasted_image.png")
-                            img = bmp_data.GetBitmap().ConvertToImage()
-                            img.SaveFile(png_path, wx.BITMAP_TYPE_PNG)
-                            self._temp_files.append(png_path)
-                            self.pending_attachments.append(
-                                {'path': png_path, 'media_type': 'image/png'}
-                            )
-                            self._refresh_attachment_panel()
-                            self.status_text.SetLabel("Clipboard image added as attachment.")
-                            return  # Consumed — don't propagate further
-                        except Exception as e:
-                            wx.TheClipboard.Close() if wx.TheClipboard.IsOpened() else None
-                            self.status_text.SetLabel(f"Clipboard paste failed: {e}")
-                            return
-                wx.TheClipboard.Close()
+            if self._attach_clipboard_image():
+                return  # Consumed — don't propagate further
         event.Skip()  # Let normal Ctrl+V text paste work in TextCtrl
+
+    def _attach_clipboard_image(self) -> bool:
+        """Queue a bitmap sitting on the clipboard. True if one was queued."""
+        if not wx.TheClipboard.Open():
+            return False
+        try:
+            if not wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_BITMAP)):
+                return False
+            bmp_data = wx.BitmapDataObject()
+            if not wx.TheClipboard.GetData(bmp_data):
+                return False
+        finally:
+            if wx.TheClipboard.IsOpened():
+                wx.TheClipboard.Close()
+
+        try:
+            import tempfile
+            tmp_dir = tempfile.mkdtemp(prefix="idt_paste_")
+            self._temp_dirs.append(tmp_dir)
+            png_path = str(Path(tmp_dir) / "pasted_image.png")
+            img = bmp_data.GetBitmap().ConvertToImage()
+            img.SaveFile(png_path, wx.BITMAP_TYPE_PNG)
+            self._temp_files.append(png_path)
+            self.pending_attachments.append(
+                {'path': png_path, 'media_type': 'image/png'}
+            )
+            self._refresh_attachment_panel()
+            self.status_text.SetLabel("Clipboard image added as attachment.")
+            return True
+        except Exception as e:
+            self.status_text.SetLabel(f"Clipboard paste failed: {e}")
+            return False
+
+    def on_paste_image(self, event):
+        """Paste Image button: queue the clipboard image, or say there is none."""
+        if not supports_attachments(self.provider):
+            self.status_text.SetLabel(
+                f"{self.provider} does not accept attachments.")
+            return
+        if not self._attach_clipboard_image():
+            self.status_text.SetLabel("No image on the clipboard.")
 
     def on_close(self, event):
         """Handle close — guard if AI is mid-response, then cleanup and save."""

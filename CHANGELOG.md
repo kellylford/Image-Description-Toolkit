@@ -32,6 +32,12 @@
 - Fixed by setting the name on the native view through NSAccessibility (new `shared/mac_accessibility.py`, ctypes only — no new dependency). Scroll-backed controls are labelled on their `documentView`, which is the element VoiceOver actually lands on.
 - Windows is untouched: it keeps `SetName` plus the existing `wx.Accessible` for text controls, and list items still report their own text.
 
+**ImageDescriber: the same naming fix, and 31 accessibility calls that had never done anything**
+- `dialogs_wx.set_accessible_name()` called `widget.SetAccessibleName()` behind a `hasattr` guard. **wxPython has no such method** — the guard was always False, so every one of its 31 call sites did nothing, on Windows as much as on macOS. The dialogs looked carefully labelled and were not. It now sets the wx name (which NVDA and Narrator read) and the NSAccessibility label. `set_accessible_description()` was dead for the same reason and now becomes the control's macOS accessibility help.
+- Every dialog names its controls for VoiceOver as it is shown, through a single hook installed at startup rather than a call at the end of each of nineteen dialogs.
+- Controls that carried no name at all are now named: the prompt editor's style, provider, API key, model and prompt-name fields; the Configure dialog's per-setting editor (named for the setting it edits); the viewer's description pane; the file-information and description panes in the image detail dialog.
+- ImageDescriber's chat window gains a **Paste Image** button. Ctrl+V was never a route to it on macOS — the main window's Edit menu owns Cmd+V and Cocoa hands it to the focused text control before any key event reaches the dialog — so pasting a screenshot into a chat silently did nothing there.
+
 **IDT Chat: the standard Edit menu exists, so macOS text editing keys work at all**
 - Cmd+A, Cmd+V, Cmd+X and Cmd+Z did nothing in any text field on macOS, including the API key box — which meant a key could not be pasted in. Cocoa routes `cut:`/`copy:`/`paste:`/`selectAll:`/`undo:` through Edit menu items, and the app had no Edit menu with them.
 - Added Undo, Redo, Cut, Copy, Paste and Select All with the standard wx ids. Redo follows the platform: Cmd+Shift+Z on macOS, Ctrl+Y on Windows.
@@ -50,6 +56,14 @@
 - Settings, About and Quit now use `wx.ID_PREFERENCES`, `wx.ID_ABOUT` and `wx.ID_EXIT`, which is what wires the macOS application menu to their handlers. They no longer spell out `Ctrl+,` and `Ctrl+Q` on macOS, where doing so put two menu items on one chord. Windows keeps both accelerators.
 - macOS gains `Cmd+W` (Close Window), which the system offers whether an app implements it or not.
 - Help > Keyboard Shortcuts now names the modifier for the platform you are on — "Cmd+N" on macOS instead of "Ctrl+N".
+
+**ImageDescriber: Print, Find Previous and Quit given back to the platform**
+- `Ctrl+P` → `Ctrl+Shift+P` (Edit Prompts). Ctrl+P / Cmd+P is Print on both platforms and is pressed reflexively; the app does not print.
+- `Ctrl+Shift+G` → `Ctrl+Shift+H` (Export HTML Gallery). Cmd+Shift+G is Find Previous on macOS, and this app has a Find.
+- Exit no longer spells out `Ctrl+Q` on macOS, where the application menu already supplies Cmd+Q for the same item — it had been bound twice. Windows keeps `Ctrl+Q`.
+- **Undo and Redo added to the Edit menu.** They were absent, which on macOS meant Cmd+Z did nothing in any text field in the application. Redo is Cmd+Shift+Z on macOS, Ctrl+Y on Windows.
+- Update Image List is `F5` on Windows and `Cmd+R` on macOS, where F5 is a hardware key. Rename Item gains `F2` on Windows, the standard rename key, which it never had.
+- Added: `Ctrl+Shift+S` for Save Workspace As (a standard that was unbound), `Cmd+W` for Close Window on macOS, and a help key for the User Guide — `F1` on Windows, `Cmd+?` on macOS.
 
 ### 🗑️ Removed
 

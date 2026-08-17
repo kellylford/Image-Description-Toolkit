@@ -58,6 +58,12 @@ a = Analysis(
         'wx.lib.newevent',
         'shared.wx_common',
         'shared',
+        # Names controls for VoiceOver through NSAccessibility. Without it in
+        # the bundle the macOS build starts with every text box, list and
+        # picker unlabelled -- and the import is a hard failure at startup, so
+        # leaving it out is loud rather than silent.
+        'shared.mac_accessibility',
+        'mac_accessibility',
         'imagedescriber.ai_providers',
         'imagedescriber.data_models',
         'imagedescriber.dialogs_wx',

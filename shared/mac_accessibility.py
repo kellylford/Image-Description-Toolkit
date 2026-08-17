@@ -141,6 +141,124 @@ def set_accessible_name(window, label: str) -> bool:
         return False
 
 
+#: wx's own default names, handed out when a control was constructed without
+#: ``name=``. They are class names, not labels ("text", "listBox"), and pushing
+#: them to VoiceOver would be worse than silence.
+_WX_DEFAULT_NAMES = frozenset((
+    "text", "listBox", "choice", "comboBox", "checkBox", "radioBox",
+    "radioButton", "button", "staticText", "staticBox", "staticBitmap",
+    "treeCtrl", "listCtrl", "dataView", "notebook", "panel", "dialog",
+    "frame", "scrolledWindow", "spinCtrl", "spinButton", "slider", "gauge",
+    "searchCtrl", "toolBar", "statusBar", "splitter", "collapsiblePane",
+    "checkListBox", "genericDirCtrl", "filePickerCtrl", "dirPickerCtrl",
+    "colourPickerCtrl", "fontPickerCtrl", "htmlWindow", "grid", "message",
+    "sliderCtrl", "bmpButton", "toggleButton",
+))
+
+
+#: Classes the walk leaves alone. These are not tab stops, and their own text
+#: *is* what a screen reader should read; giving them a separate name risks
+#: changing that announcement for no gain. Matched by class name so this module
+#: stays importable without wx.
+_NOT_NAMED = frozenset(("StaticText", "StaticBox", "StaticBitmap", "StaticLine"))
+
+
+def apply_accessible_names(root) -> int:
+    """Publish every wx control name under `root` to VoiceOver.
+
+    ``name=`` in a control's constructor is already the convention in this
+    codebase, and it is what Windows screen readers read. This walks the window
+    tree and gives each of those names to NSAccessibility as well, so one call
+    at the end of a window's construction covers the whole window instead of a
+    line per control.
+
+    Controls still carrying wx's default name are skipped: those were built
+    without a label, and announcing "listBox" is worse than announcing nothing.
+    Add ``name=`` to the control instead.
+
+    Returns how many controls were named, which is worth asserting in a test --
+    a window that silently names nothing looks exactly like one that needs no
+    naming.
+    """
+    if not IS_MACOS:
+        return 0
+    named = 0
+    try:
+        children = list(root.GetChildren())
+    except (AttributeError, RuntimeError):
+        return 0
+    for child in children:
+        try:
+            label = child.GetName()
+        except (AttributeError, RuntimeError):
+            label = ""
+        if (label and label not in _WX_DEFAULT_NAMES
+                and type(child).__name__ not in _NOT_NAMED):
+            if set_accessible_name(child, label):
+                named += 1
+        named += apply_accessible_names(child)
+    return named
+
+
+def set_accessible_help(window, text: str) -> bool:
+    """Attach a longer explanation to `window` for VoiceOver.
+
+    Read after the name, so it suits the "what will this button do" text the
+    dialogs already carry. Windows has no wx-level equivalent, which is why
+    this is macOS-only rather than part of ``set_accessible_name``.
+    """
+    if not IS_MACOS or not text:
+        return False
+    try:
+        view = _target_view(window)
+        if view is None or not _responds(view, "setAccessibilityHelp:"):
+            return False
+        _send(view, "setAccessibilityHelp:", ctypes.c_void_p(_nsstring(text)),
+              argtypes=(ctypes.c_void_p,))
+        return True
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def install_dialog_naming(wx_module) -> bool:
+    """Name every dialog's controls at the moment it is shown.
+
+    The alternative was a call at the end of each dialog's ``__init__`` -- 19
+    of them across ImageDescriber, each needing to sit after the controls exist
+    and before the dialog appears, and every one of them silently absent from
+    the twentieth dialog somebody adds. Hooking ``Show``/``ShowModal`` gets the
+    timing right by construction and cannot be forgotten.
+
+    Takes the wx module as an argument so this file stays importable without
+    wx, which is what lets the naming logic be tested on its own.
+
+    Returns True if the hook was installed: False off macOS, or if it is
+    already in place.
+    """
+    if not IS_MACOS:
+        return False
+    dialog = wx_module.Dialog
+    if getattr(dialog, "_idt_accessible_naming", False):
+        return False
+
+    original_show_modal = dialog.ShowModal
+    original_show = dialog.Show
+
+    def show_modal(self, *args, **kwargs):
+        apply_accessible_names(self)
+        return original_show_modal(self, *args, **kwargs)
+
+    def show(self, show=True, *args, **kwargs):
+        if show:
+            apply_accessible_names(self)
+        return original_show(self, show, *args, **kwargs)
+
+    dialog.ShowModal = show_modal
+    dialog.Show = show
+    dialog._idt_accessible_naming = True
+    return True
+
+
 def get_accessible_name(window) -> str | None:
     """The name VoiceOver would read for `window`, or None.
 

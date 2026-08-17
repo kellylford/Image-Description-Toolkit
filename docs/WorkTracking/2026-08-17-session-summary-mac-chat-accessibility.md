@@ -118,31 +118,135 @@ paste-and-match-style, which needs rich text this app does not have;
 Help > Keyboard Shortcuts now says "Cmd" on macOS instead of "Ctrl", which was
 simply wrong text being read aloud to the people most likely to be reading it.
 
+## 3. The same two problems in ImageDescriber
+
+Asked to fix "this sort of issue" in the other apps. The CLI has no UI to fix,
+so this is ImageDescriber. It had both problems and one more.
+
+### 31 accessibility calls that had never done anything
+
+`dialogs_wx.py` has a helper:
+
+```python
+def set_accessible_name(widget, name):
+    if hasattr(widget, 'SetAccessibleName'):
+        widget.SetAccessibleName(name)
+```
+
+**wxPython has no `SetAccessibleName`.** Nor `SetAccessibleDescription`. The
+guard was always False, so all 31 calls did nothing — on Windows as much as on
+macOS. Provider pickers, model pickers, the follow-up question box, the
+processing-options tabs, the whole HTML gallery dialog: every one of them
+*looked* carefully labelled in the source and was announced as nothing.
+
+Fixed by making the helper set the name wx actually has (`SetName`, which is
+what NVDA and Narrator read) plus the NSAccessibility label. The description
+helper now sets the macOS accessibility help, which is the nearest real thing;
+Windows has no wx-level equivalent, so it stays a no-op there and says so.
+
+### Naming the rest
+
+`apply_accessible_names(window)` walks a window tree and publishes every wx
+name to NSAccessibility, skipping wx's own class-name defaults ("listBox",
+"text") because announcing those is worse than silence. One call at the end of
+the main window's construction covers it; `wx.StaticText` is left alone so its
+own text is still what gets read.
+
+For dialogs the call is installed once, as a hook on `Show`/`ShowModal`, rather
+than at the end of each dialog's `__init__`. There are nineteen dialog classes;
+the call has to land after the controls exist and before the dialog appears;
+and the twentieth dialog somebody adds would not have it. The hook gets the
+timing right by construction and cannot be forgotten.
+
+Controls that carried no name at all were given one: the prompt editor's five
+fields, the Configure dialog's generic per-setting editor (named for the
+setting it is editing, since the visible label just says "Value:"), the
+viewer's description pane, and two panes in the image detail dialog.
+
+### A paste that could not work on macOS
+
+ImageDescriber's chat window queues a clipboard image on Ctrl+V, from an
+`EVT_CHAR_HOOK`. On macOS that hook never runs: the main window's Edit menu
+owns Cmd+V, and Cocoa gives the key equivalent to the focused text control
+before any key event reaches the dialog. Pasting a screenshot into a chat
+silently did nothing there.
+
+There is no way to win that key back — nor should the app try, since Cmd+V in a
+text field must paste text. So the command got a **Paste Image button**, which
+is reachable on both platforms and more discoverable with a screen reader than
+a key nobody documented. The Ctrl+V path stays for Windows; both now go through
+one method.
+
+### Accelerators
+
+| Command | Was | Now | Why |
+|---|---|---|---|
+| Edit Prompts | `Ctrl+P` | `Ctrl+Shift+P` | **Print**, on both platforms — the clearest Windows conflict in the app |
+| Export HTML Gallery | `Ctrl+Shift+G` | `Ctrl+Shift+H` | Cmd+Shift+G is Find Previous, and this app has a Find |
+| Exit | `Ctrl+Q` | `Ctrl+Q` on Windows only | the macOS application menu already supplies Cmd+Q for the same item |
+| Undo / Redo | *absent* | `Ctrl+Z` / `Ctrl+Shift+Z` (mac) or `Ctrl+Y` (win) | Cmd+Z did nothing in any text field |
+| Update Image List | `F5` | `F5` on Windows, `Cmd+R` on macOS | F5 is a hardware key on a Mac |
+| Rename Item | *none* | `F2` on Windows | the Windows rename key, never bound |
+| Save Workspace As | *none* | `Ctrl+Shift+S` | a standard that was going spare |
+| Close Window | *absent* | `Cmd+W`, macOS only | the system offers it regardless |
+| User Guide | *none* | `F1` on Windows, `Cmd+?` on macOS | the Help menu had no help key |
+
+Left alone after checking: `Ctrl+T` (chat), `Ctrl+I` (statistics — Cmd+I is Get
+Info, which is what it does), `Ctrl+U` (load from URL), `Ctrl+L` (load
+directory), `Ctrl+Shift+A/D/U` (filters). Each shadows a convention that only
+exists in apps with rich text or a font panel, which this is not.
+
+The Edit menu's Cut/Copy/Paste/Select All already routed to the focused control
+via `FindFocus()`, so those needed nothing beyond Undo and Redo joining them.
+
 ## Files changed
 
-- `shared/mac_accessibility.py` — new. NSAccessibility naming via ctypes.
+- `shared/mac_accessibility.py` — new. NSAccessibility naming via ctypes:
+  `set_accessible_name`, `set_accessible_help`, `apply_accessible_names` (the
+  tree walk) and `install_dialog_naming` (the Show/ShowModal hook). Deliberately
+  wx-free — it takes the wx module as an argument where it needs one — so the
+  selection logic can be tested without wx or a display.
 - `chatapp/chat_app_wx.py` — naming applied to every control; Edit menu; the
   standard-id wiring; contextual edit-command routing; regenerated shortcut
-  help.
-- `chatapp/chatapp.spec` — `shared.mac_accessibility` added to hiddenimports.
-  The `shared/*.py` glob copies it as data; without the hidden import the
-  frozen macOS build goes straight back to unlabelled controls.
-- `pytest_tests/unit/test_chat_app_shortcuts.py` — new, no wx required.
+  help; the dialog hook installed at startup.
+- `imagedescriber/imagedescriber_wx.py` — Undo/Redo, the accelerator moves, the
+  window-tree naming call and the dialog hook.
+- `imagedescriber/dialogs_wx.py` — the two dead helpers made real, which is what
+  revives 31 call sites.
+- `imagedescriber/chat_window_wx.py` — Paste Image button, clipboard logic
+  extracted, provider and model pickers named.
+- `imagedescriber/prompt_editor_dialog.py`, `configure_dialog.py`,
+  `viewer_components.py` — names for controls that had none.
+- `chatapp/chatapp.spec`, `imagedescriber/imagedescriber_wx.spec` —
+  `shared.mac_accessibility` added to hiddenimports. Without it the frozen
+  macOS builds go straight back to unlabelled controls.
+- `pytest_tests/unit/test_menu_shortcuts.py` — was
+  `test_chat_app_shortcuts.py`; now parametrised over both apps.
+- `pytest_tests/unit/test_mac_accessibility.py` — new, no wx required.
 - `pytest_tests/unit/test_chat_app_smoke.py` — VoiceOver naming, accelerator
   uniqueness, and edit-routing tests.
 
 ## Testing
 
-**Ran: 1261 passed, 282 skipped, 1 pre-existing failure** (`test_entry_points ::
+**Ran: 1288 passed, 286 skipped, 1 pre-existing failure** (`test_entry_points ::
 test_imagedescriber_launches`, which fails because wxPython is not installed in
-this machine's project venv — unrelated to this change).
+this machine's project venv — unrelated to these changes).
 
-The 13 new `test_chat_app_shortcuts.py` tests are source-level on purpose: no
-wx, no display, so they run on the Windows CI box, which is the only place a
-Mac-only mistake would otherwise go unnoticed. **Verified non-vacuous** — six of
-them were run against the pre-fix source and all six failed for the right
-reason (Ctrl+M reserved, Ctrl+Shift+W reserved, Ctrl+Q double-bound, no
-standard Edit ids, Ctrl+C not `wx.ID_COPY`, no application-menu ids).
+The 27 `test_menu_shortcuts.py` and 12 `test_mac_accessibility.py` tests are
+source-level or stub-driven on purpose: no wx, no display, so they run on the
+Windows CI box, which is the only place a Mac-only mistake would otherwise go
+unnoticed. `IS_MACOS` is patched *on* rather than skipped around, so the naming
+logic is exercised on every platform.
+
+**Verified non-vacuous** against the pre-fix sources:
+
+- IDT Chat, six checks: Ctrl+M reserved, Ctrl+Shift+W reserved, Ctrl+Q
+  double-bound, no standard Edit ids, Ctrl+C not `wx.ID_COPY`, no
+  application-menu ids.
+- ImageDescriber, six checks: Ctrl+P on Print, no Undo/Redo ids, Ctrl+Q
+  double-bound, no help key, Ctrl+Shift+S missing, F5 not per-platform.
+
+All twelve failed on the old code and pass on the new.
 
 ### Not tested
 
@@ -158,8 +262,14 @@ standard Edit ids, Ctrl+C not `wx.ID_COPY`, no application-menu ids).
   the app. A logout/login (or restarting the Dock) should clear it; if IDT Chat
   itself will not launch, that is the reason, not this change. The tests that
   need a `wx.App` are written and will run wherever one can start.
-- **Windows.** Not run at all this session. The changes that reach it are the
-  Edit menu routing (new, and the fix for Ctrl+C there too), the moved
-  accelerators, and `wx.ID_PREFERENCES`/`ID_ABOUT`/`ID_EXIT` on the File and
-  Help items — all worth a pass with NVDA before release.
-- **A frozen build.** `chatapp.spec` changed; no macOS `.app` was built.
+- **Windows.** Not run at all this session. What reaches it: the Edit menu
+  routing in IDT Chat (new, and the fix for Ctrl+C there too), Undo/Redo and the
+  moved accelerators in ImageDescriber, `F2` for rename, `Ctrl+Shift+S` for
+  Save As, and — the big one — 31 `set_accessible_name()` calls in
+  `dialogs_wx.py` that now do something on Windows for the first time. That
+  last one is worth a pass with NVDA before release: those dialogs have never
+  been heard with real names.
+- **The ImageDescriber dialog hook against real wx.** `install_dialog_naming`
+  patches `wx.Dialog.Show`/`ShowModal`; it is covered by stub-driven tests, and
+  the wx-level behaviour has not been exercised because no `wx.App` would start
+  here.

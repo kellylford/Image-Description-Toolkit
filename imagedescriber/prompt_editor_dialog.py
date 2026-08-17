@@ -199,7 +199,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         
         # Default prompt style
         form_sizer.Add(wx.StaticText(default_box, label="Default Style:"), 0, wx.ALIGN_CENTER_VERTICAL)
-        self.default_prompt_combo = wx.Choice(default_box)
+        self.default_prompt_combo = wx.Choice(default_box, name="Default prompt style")
         self.default_prompt_combo.Bind(wx.EVT_CHOICE, self.on_default_changed)
         form_sizer.Add(self.default_prompt_combo, 1, wx.EXPAND)
         
@@ -217,6 +217,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             from imagedescriber.ai_providers import provider_picker_choices
         self.provider_combo = wx.Choice(
             provider_panel,
+            name="AI provider",
             # Lowercase keys, not display labels: this dialog compares the
             # selection against provider names directly.
             choices=[key for key, _ in provider_picker_choices()],
@@ -233,7 +234,8 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         form_sizer.Add(wx.StaticText(default_box, label="API Key:"), 0, wx.ALIGN_CENTER_VERTICAL)
         api_key_panel = wx.Panel(default_box)
         api_key_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.api_key_text = wx.TextCtrl(api_key_panel, style=wx.TE_PASSWORD)
+        self.api_key_text = wx.TextCtrl(api_key_panel, style=wx.TE_PASSWORD,
+                                        name="API key")
         self.api_key_text.SetHint("Enter API key or leave empty to use environment variable")
         self.api_key_text.Bind(wx.EVT_TEXT, self.on_default_changed)
         api_key_sizer.Add(self.api_key_text, 1, wx.EXPAND)
@@ -248,7 +250,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         form_sizer.Add(wx.StaticText(default_box, label="Default Model:"), 0, wx.ALIGN_CENTER_VERTICAL)
         model_panel = wx.Panel(default_box)
         model_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.default_model_combo = wx.Choice(model_panel)
+        self.default_model_combo = wx.Choice(model_panel, name="Default model")
         self.default_model_combo.Bind(wx.EVT_CHOICE, self.on_default_changed)
         model_sizer.Add(self.default_model_combo, 1, wx.EXPAND)
         self.refresh_models_btn = wx.Button(model_panel, label="Refresh", size=(60, -1))
@@ -272,7 +274,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         name_box = wx.StaticBox(panel, label="Prompt Name")
         name_sizer = wx.StaticBoxSizer(name_box, wx.VERTICAL)
         
-        self.prompt_name_text = wx.TextCtrl(name_box)
+        self.prompt_name_text = wx.TextCtrl(name_box, name="Prompt name")
         self.prompt_name_text.Bind(wx.EVT_TEXT, self.on_prompt_name_changed)
         name_sizer.Add(self.prompt_name_text, 0, wx.EXPAND | wx.ALL, 5)
         
