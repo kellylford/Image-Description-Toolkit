@@ -109,7 +109,14 @@ def test_model_info_for_an_unknown_model_invents_nothing():
 def test_claude_get_available_models_is_sorted_cheapest_first():
     """This GUI orders haiku -> sonnet -> opus, deliberately differing from the
     catalog's curated best-first order. Both orderings are wanted, each in its
-    own place, so the sort must survive the switch to the catalog."""
+    own place, so the sort must survive the switch to the catalog.
+
+    Needs the SDK: without it the provider returns [] by design, and the
+    assertion below reads as a sorting regression when it is really a missing
+    dependency. Skipping is the honest result -- CI installs the SDK and runs
+    the check for real.
+    """
+    pytest.importorskip("anthropic")
     provider = ai_providers.ClaudeProvider(api_key="test-key")
     models = provider.get_available_models()
     assert models, "no models returned"
@@ -121,7 +128,11 @@ def test_claude_get_available_models_is_sorted_cheapest_first():
 def test_openai_get_available_models_is_no_longer_capped_by_the_static_list(monkeypatch):
     """The bug this replaced: the live response was intersected with the
     hardcoded list, so a listing could only ever subtract from it and a newly
-    released model could never appear."""
+    released model could never appear.
+
+    Needs the SDK for the same reason as the Claude test above.
+    """
+    pytest.importorskip("openai")
     monkeypatch.setattr(
         catalog, "_fetch",
         lambda *a, **k: [{"id": i, "name": "", "created": n} for n, i in enumerate(

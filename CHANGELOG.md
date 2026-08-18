@@ -49,6 +49,32 @@
 - New `pytest_tests/gui/` tests press chords through Cocoa's own matching: they build an `NSEvent` and offer it to the window and then the menu, in that order. Not `wx.UIActionSimulator`, which posts CGEvents that macOS discards unless the process is trusted for Accessibility — on a runner it would press nothing and pass.
 - A headless guard runs on the Windows CI box too: any app whose control labels carry `&` must also reclaim the macOS chords.
 
+**Alt+C opened the attachments list instead of the Chat menu (IDT Chat, Windows)**
+- The Windows counterpart of the Cmd+A bug above, and the same shape: a control in the window outranked the menu bar. `Atta&chments` claimed Alt+C, so `&Chat` never opened. `&Conversations` claimed it as well, so the two also fought each other. `Conversation &history` took Alt+H from `&Help` the same way.
+- Cause: wx runs a frame's child panel through `IsDialogMessage` before the frame handles `WM_SYSCHAR`, so a panel control answers Alt+letter first. On Windows the menu bar titles and every mnemonic in the window share one namespace, and the window wins.
+- The three labels now read `Attachme&nts`, `Conversati&ons` and `Conversation h&istory` — Alt+N, Alt+O and Alt+I. F, E, C, V and H belong to the menu bar; `_build_ui` documents that.
+
+**Nine Alt letters were claimed twice in ImageDescriber's menus**
+- A repeated mnemonic inside an open menu is not a shortcut: the letter cycles the highlight between the candidates and waits for Enter. `&Cut` and `&Copy` both answered C, and `&Save Workspace` and `Workspace &Statistics` both answered S.
+- The Process menu had four such pairs (C, U, V and R), Descriptions had D, View had I, Tools had I, and the AI Info submenu had O. Relabelled to `Cu&t`, `Workspace S&tatistics`, `Update &Image List`, `Chat &with AI Model`, `Describe Video with &AI`, `Re&name Item`, `Copy Image + Descrip&tion`, `&Find Images`, `AI I&nfo`, `Op&enAI Usage Dashboard` and `P&references`. Three dialogs had the same problem and were fixed with it.
+- None of these are accelerator changes: every `Ctrl+` chord in both apps is unchanged.
+
+**The shortcuts are written down, and the gap that hid all of this is closed**
+- New `docs/KEYBOARD_SHORTCUTS.md`: every accelerator and every Alt mnemonic in both apps, on both platforms, with the chords the operating systems have already claimed and the rules a new shortcut has to clear.
+- `test_menu_shortcuts.py` had covered accelerators and the macOS Command-equivalent trap, but nothing looked at what a `&` does on **Windows** — which is why a letter could be claimed twice, or taken from the menu bar, with every test passing.
+- New `pytest_tests/unit/test_mnemonics.py` checks all four: no control takes a menu bar letter, no two controls in a window share one, no menu repeats one, and no dialog repeats one. Source-level, so it runs without a display; the mistake is one you cannot see on a Mac at all, since macOS has no Alt mnemonics.
+- `pytest_tests/gui/test_alt_mnemonics_windows.py` builds the real frames and reads the labels off the live widgets, which is the only way to see one the app writes at runtime — the attachments label is rewritten by `_refresh_attachments`, so the mnemonic users actually met came from there and not from the constructor.
+- A 22-agent review then checked all 184 shortcuts against the source and found two collisions both test layers had missed, each a shape a naive scan cannot see: `ApiKeysDialog` builds one `&Remove` button **per provider**, so one source string put three live buttons on Alt+R; and `ProcessingOptionsDialog` had the notebook tab `&General` and the checkbox `&Geocode…` on that same page, because a `&` in a page title reaches the native tab control. The button lost its mnemonic (three of them cannot share one) and the checkbox became `Ge&ocode`. `test_mnemonics.py` now counts widgets built in a loop as multiple claims and reads `AddPage` titles.
+
+**ImageDescriber's single-key shortcuts are written down for the first time**
+- `on_key_press` binds bare `P`, `R`, `M`, `C`, `F` and `Z`, plus `F2`, `Ctrl+S` and `Ctrl+V`, through `EVT_CHAR_HOOK` — so they run before any menu accelerator, and are suppressed only while a text field has focus. None of them appeared in any documentation.
+- Three consequences are now recorded rather than discovered: `F2` and the bare letters are **not** platform-gated, so `F2` renames on macOS even though the menu accelerator is Windows-only; `Ctrl+V` outside a text field pastes a clipboard *image* rather than performing Edit > Paste; and each bare letter costs the workspace tree and description list the first-letter type-ahead navigation they would otherwise give — pressing `C` in the tree opens the chat window instead of jumping to the first item starting with C.
+- No behaviour was changed here. The type-ahead cost in particular is a deliberate Qt6-parity choice, and whether to keep it is a product decision, not a bug fix.
+
+**Three tests that read the developer's environment instead of pinning it**
+- `test_streaming_does_not_announce_each_chunk` failed on any machine with read-aloud enabled and passed everywhere else. `ChatFrame` calls `SpeechSettings.load()`, so the test inherited whatever the person running it had configured — and `_finish_turn` skips the announcement when speech is on and `speaker.speak()` succeeds, precisely so a response is not read twice. The fixture pins the setting off now, and two new tests cover the other branch explicitly: speech-on suppresses the announcement, and a speech engine that fails still announces.
+- The two `ai_providers` model-listing tests failed without the `anthropic` and `openai` SDKs installed, where the provider returns `[]` by design. That reads as a sorting regression rather than a missing dependency, so both now `importorskip` the SDK.
+
 **IDT Chat: the standard Edit menu exists, so macOS text editing keys work at all**
 - Cmd+A, Cmd+V, Cmd+X and Cmd+Z did nothing in any text field on macOS, including the API key box — which meant a key could not be pasted in. Cocoa routes `cut:`/`copy:`/`paste:`/`selectAll:`/`undo:` through Edit menu items, and the app had no Edit menu with them.
 - Added Undo, Redo, Cut, Copy, Paste and Select All with the standard wx ids. Redo follows the platform: Cmd+Shift+Z on macOS, Ctrl+Y on Windows.

@@ -444,11 +444,26 @@ def _pump(predicate, timeout=5.0):
 
 @pytest.fixture
 def frame(wx_app, tmp_path):
+    """A ChatFrame with its speech setting pinned off.
+
+    ``ChatFrame`` calls ``SpeechSettings.load()``, which reads the *developer's
+    own* configuration. That made the announcement tests depend on whoever ran
+    them: ``_finish_turn`` skips ``_announce`` when speech is enabled and
+    ``speaker.speak()`` succeeds, precisely so a response is not read twice. So
+    on a machine with read-aloud turned on there were no announcements to
+    count, and ``test_streaming_does_not_announce_each_chunk`` failed --
+    while passing on CI, where nothing is configured.
+
+    Pinning it here makes the announcement path deterministic;
+    ``test_speech_replaces_the_announcement`` covers the other branch
+    explicitly rather than leaving it to the ambient config.
+    """
     from chat_app_wx import ChatFrame
     from idt_core.chat import DirectoryChatStore
 
     frame = ChatFrame()
     frame.store = DirectoryChatStore(tmp_path)
+    frame.speech_settings.enabled = False
     yield frame
     frame.Destroy()
     wx.YieldIfNeeded()
@@ -499,6 +514,48 @@ def test_streaming_does_not_announce_each_chunk(frame):
     # Four chunks arrived; exactly one announcement, carrying the whole reply.
     assert len(announced) == 1
     assert announced[0] == "abcd"
+
+
+def test_speech_replaces_the_announcement(frame, monkeypatch):
+    """With read-aloud on, the response is spoken instead of announced.
+
+    The other half of the branch the fixture pins off. Doing both would say
+    the whole reply twice -- once through the speech engine and once through
+    the focus flip a screen reader picks up.
+    """
+    import chat_app_wx
+    from idt_core.chat import ChatEngine
+
+    spoken, announced = [], []
+    monkeypatch.setattr(chat_app_wx.speaker, "speak",
+                        lambda text, settings: spoken.append(text) or True)
+    frame.speech_settings.enabled = True
+    frame._announce = lambda text: announced.append(text)
+    frame.engine = ChatEngine(frame.session, _FakeProvider(
+        chunks=["a", "b", "c", "d"]), frame.store)
+    frame._start_turn("hi")
+    assert _pump(lambda: not frame._is_streaming)
+
+    assert spoken == ["abcd"]
+    assert announced == []
+
+
+def test_announcement_returns_when_speech_cannot_speak(frame, monkeypatch):
+    """A speech engine that fails must not swallow the announcement."""
+    import chat_app_wx
+    from idt_core.chat import ChatEngine
+
+    announced = []
+    monkeypatch.setattr(chat_app_wx.speaker, "speak",
+                        lambda text, settings: False)
+    frame.speech_settings.enabled = True
+    frame._announce = lambda text: announced.append(text)
+    frame.engine = ChatEngine(frame.session, _FakeProvider(
+        chunks=["a", "b"]), frame.store)
+    frame._start_turn("hi")
+    assert _pump(lambda: not frame._is_streaming)
+
+    assert announced == ["ab"]
 
 
 def test_silent_policy_announces_nothing(frame):

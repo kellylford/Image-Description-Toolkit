@@ -869,7 +869,7 @@ The application has two modes:
 | Import Workflow (to Workspace)... | — | Import descriptions from a CLI workflow output |
 | Export Descriptions... | — | Save descriptions as text or HTML |
 | Embed Descriptions into Images... | — | Write descriptions into image metadata |
-| Export HTML Gallery... | Ctrl+Shift+G | Create an interactive HTML image gallery |
+| Export HTML Gallery... | Ctrl+Shift+H | Create an interactive HTML image gallery |
 | Workspace Statistics... | Ctrl+I | Show statistics: counts, tokens, costs, providers |
 | Open Workflow Result (Viewer Mode)... | — | Open a CLI workflow result in Viewer Mode |
 | Exit | Ctrl+Q | Close the application |
@@ -931,7 +931,7 @@ The application has two modes:
 
 | Item | Shortcut | Description |
 |---|---|---|
-| Edit Prompts... | Ctrl+P | Create, edit, and manage AI prompt templates |
+| Edit Prompts... | Ctrl+Shift+P | Create, edit, and manage AI prompt templates |
 | Configure Settings... | Ctrl+Shift+C | Open the settings dialog |
 | Install Ollama... | — | Instructions for installing the local Ollama server |
 | Install FFmpeg (for video GPS)... | — | Instructions for installing FFmpeg |
@@ -1106,7 +1106,7 @@ In Viewer Mode:
 
 **Export HTML Gallery**
 
-**File → Export HTML Gallery...** (`Ctrl+Shift+G`) produces an interactive gallery:
+**File → Export HTML Gallery...** (`Ctrl+Shift+H`) produces an interactive gallery:
 
 - Responsive design (works on desktop and mobile browsers)
 - Thumbnails with full descriptions visible on click
@@ -1348,7 +1348,7 @@ See [The Prompt Editor (GUI)](#the-prompt-editor-gui) below.
 
 ### The Prompt Editor (GUI)
 
-**Tools → Edit Prompts...** (`Ctrl+P`) opens the prompt editor.
+**Tools → Edit Prompts...** (`Ctrl+Shift+P`) opens the prompt editor.
 
 **Left panel:** List of all available prompts (built-in and custom).
 
@@ -1837,6 +1837,12 @@ MyTrip.idtw/                        Workspace bundle (a folder ending in .idtw)
 
 ## Appendix D: Keyboard Shortcut Reference
 
+The shortcuts you are most likely to reach for. For the complete set —
+every menu item in both apps, every Alt mnemonic on Windows, and the
+chords the operating systems have already claimed — see
+[KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md), which is checked against
+the source by the test suite.
+
 ### Global Shortcuts
 
 | Action | Windows / Linux | macOS |
@@ -1847,7 +1853,7 @@ MyTrip.idtw/                        Workspace bundle (a folder ending in .idtw)
 | Load Directory | Ctrl+L | Cmd+L |
 | Refresh Folder from Disk | Ctrl+Shift+R | Cmd+Shift+R |
 | Load from URL | Ctrl+U | Cmd+U |
-| Export HTML Gallery | Ctrl+Shift+G | Cmd+Shift+G |
+| Export HTML Gallery | Ctrl+Shift+H | Cmd+Shift+H |
 | Workspace Statistics | Ctrl+I | Cmd+I |
 | Exit / Quit | Ctrl+Q | Cmd+Q |
 
@@ -1869,7 +1875,7 @@ MyTrip.idtw/                        Workspace bundle (a folder ending in .idtw)
 | Filter: Described Only | Ctrl+Shift+D |
 | Filter: Undescribed Only | Ctrl+Shift+U |
 | Find Images (search bar) | Ctrl+F |
-| Edit Prompts | Ctrl+P |
+| Edit Prompts | Ctrl+Shift+P |
 | Configure Settings | Ctrl+Shift+C |
 
 ### Image List Navigation

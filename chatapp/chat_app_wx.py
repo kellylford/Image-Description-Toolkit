@@ -606,7 +606,11 @@ class ApiKeysDialog(wx.Dialog):
             self._fields[provider] = field
             grid.Add(field, 1, wx.EXPAND)
 
-            remove = wx.Button(panel, label="&Remove",
+            # No mnemonic: this button is built once per provider, and three
+            # live "&Remove" buttons would put three controls on Alt+R, where
+            # the key cycles the highlight instead of pressing anything. The
+            # accessible name carries which key it removes.
+            remove = wx.Button(panel, label="Remove",
                                name=f"Remove {label} key")
             remove.Bind(wx.EVT_BUTTON,
                         lambda e, p=provider: self.on_remove(p))
@@ -882,12 +886,24 @@ class ChatFrame(wx.Frame):
         return item
 
     def _build_ui(self):
+        """The window contents, and the Alt letters they may not take.
+
+        On Windows the mnemonics in these labels share one namespace with the
+        menu bar titles, and the panel wins: wx runs the frame's child panel
+        through ``IsDialogMessage`` before the menu bar ever sees WM_SYSCHAR.
+        So "Attachme&nts" did not merely duplicate "&Conversations" -- between
+        them they took Alt+C away from the Chat menu entirely, and
+        "Conversation &history" took Alt+H from Help.
+
+        F, E, C, V and H therefore belong to the menu bar. Everything below
+        picks from what is left, and no two controls may pick the same letter.
+        """
         panel = wx.Panel(self)
         outer = wx.BoxSizer(wx.HORIZONTAL)
 
         # --- left: saved conversations ---
         left = wx.BoxSizer(wx.VERTICAL)
-        left.Add(wx.StaticText(panel, label="&Conversations:"), 0, wx.ALL, 4)
+        left.Add(wx.StaticText(panel, label="Conversati&ons:"), 0, wx.ALL, 4)
         self.session_list = wx.ListBox(panel, style=wx.LB_SINGLE,
                                        name="Saved conversations")
         _set_accessible_name(self.session_list, "Saved conversations")
@@ -898,7 +914,7 @@ class ChatFrame(wx.Frame):
         # --- right: the conversation ---
         right = wx.BoxSizer(wx.VERTICAL)
 
-        right.Add(wx.StaticText(panel, label="Conversation &history:"), 0,
+        right.Add(wx.StaticText(panel, label="Conversation h&istory:"), 0,
                   wx.LEFT | wx.TOP, 4)
         self.history_list = wx.ListBox(panel, style=wx.LB_SINGLE,
                                        name="Conversation history")
@@ -932,7 +948,7 @@ class ChatFrame(wx.Frame):
         # Pending attachments. Kept visible even when empty rather than shown
         # and hidden: a control that appears and disappears is disorienting
         # with a screen reader, and the count in the label carries the state.
-        self.attach_label = wx.StaticText(panel, label="Atta&chments: none")
+        self.attach_label = wx.StaticText(panel, label="Attachme&nts: none")
         right.Add(self.attach_label, 0, wx.LEFT, 4)
         self.attach_list = wx.ListBox(panel, style=wx.LB_SINGLE,
                                       name="Pending attachments")
@@ -1155,11 +1171,11 @@ class ChatFrame(wx.Frame):
 
         count = len(self.pending_attachments)
         if count == 0:
-            self.attach_label.SetLabel("Atta&chments: none")
+            self.attach_label.SetLabel("Attachme&nts: none")
         elif count == 1:
-            self.attach_label.SetLabel("Atta&chments: 1 file")
+            self.attach_label.SetLabel("Attachme&nts: 1 file")
         else:
-            self.attach_label.SetLabel(f"Atta&chments: {count} files")
+            self.attach_label.SetLabel(f"Attachme&nts: {count} files")
         self.remove_attach_btn.Enable(count > 0)
 
     def _attachments_supported(self) -> bool:

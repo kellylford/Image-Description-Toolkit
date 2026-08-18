@@ -168,6 +168,7 @@ Always show stats: `"XX%, X of Y images described"`. Live mode adds `"(Live)"` s
 Create `docs/WorkTracking/YYYY-MM-DD-session-summary.md` for non-trivial sessions. Include: files changed, decisions, test results, what was NOT tested.
 
 ## Additional Reference
+- `docs/KEYBOARD_SHORTCUTS.md` — every accelerator and Alt mnemonic in both GUIs, Windows and macOS, plus the rules a new one must clear
 - `docs/DEVELOPER_GUIDE.md` — comprehensive developer guide (architecture, `idt_core` inventory, CLI commands, build system, testing, conventions)
 - `.github/copilot-instructions.md` — full agent guidelines and protocols
 - `docs/WorkTracking/PRE_COMMIT_VERIFICATION_CHECKLIST.md` — pre-commit checklist

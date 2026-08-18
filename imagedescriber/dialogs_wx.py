@@ -817,7 +817,7 @@ class ProcessingOptionsDialog(wx.Dialog):
 
         self.geocode_cb = wx.CheckBox(
             panel,
-            label="&Geocode GPS coordinates to city/state (requires internet)",
+            label="Ge&ocode GPS coordinates to city/state (requires internet)",
             name="Geocode GPS coordinates to city/state"
         )
         # Read from flat key first; fall back to the nested Configure Settings path.
@@ -988,7 +988,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         custom_prompt_label = wx.StaticText(
             panel,
-            label="&Enter a custom prompt to override the selected style:"
+            label="Enter a c&ustom prompt to override the selected style:"
         )
         custom_prompt_sizer.Add(custom_prompt_label, 0, wx.ALL, 5)
         
@@ -1634,7 +1634,7 @@ class ExportHtmlGalleryDialog(wx.Dialog):
         desc_sel_sizer.Add(self._desc_newest_rb, 0, wx.LEFT | wx.TOP, 6)
 
         self._desc_oldest_rb = wx.RadioButton(
-            self, label='O&ldest only',
+            self, label='Oldest onl&y',
             name='Show oldest description only'
         )
         set_accessible_name(self._desc_oldest_rb, 'Show oldest description only')
@@ -1997,7 +1997,7 @@ class EmbedDescriptionsDialog(wx.Dialog):
         desc_sel_sizer.Add(latest_note, 0, wx.LEFT | wx.BOTTOM, 8)
 
         self._all_rb = wx.RadioButton(
-            self, label='A&ll descriptions combined',
+            self, label='All &descriptions combined',
             name='All descriptions combined'
         )
         desc_sel_sizer.Add(self._all_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
@@ -2030,7 +2030,7 @@ class EmbedDescriptionsDialog(wx.Dialog):
         mode_sizer.Add(copy_note, 0, wx.LEFT | wx.BOTTOM, 8)
 
         self._inplace_rb = wx.RadioButton(
-            self, label='&Embed into original files', name='In-place mode'
+            self, label='Embed into &original files', name='In-place mode'
         )
         mode_sizer.Add(self._inplace_rb, 0, wx.LEFT | wx.TOP | wx.RIGHT, 8)
 

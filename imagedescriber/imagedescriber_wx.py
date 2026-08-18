@@ -1475,7 +1475,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         export_gallery_item = file_menu.Append(wx.ID_ANY, "Export &HTML Gallery...\tCtrl+Shift+H")
         self.Bind(wx.EVT_MENU, self.on_export_html_gallery, export_gallery_item)
 
-        self.workspace_stats_item = file_menu.Append(wx.ID_ANY, "Workspace &Statistics...\tCtrl+I")
+        self.workspace_stats_item = file_menu.Append(wx.ID_ANY, "Workspace S&tatistics...\tCtrl+I")
         self.Bind(wx.EVT_MENU, self.on_workspace_stats, self.workspace_stats_item)
 
         open_workflow_result = file_menu.Append(wx.ID_ANY, "Open &Workflow Result (Viewer Mode)...")
@@ -1518,7 +1518,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         edit_menu.AppendSeparator()
 
-        cut_item = edit_menu.Append(wx.ID_CUT, "&Cut\tCtrl+X")
+        cut_item = edit_menu.Append(wx.ID_CUT, "Cu&t\tCtrl+X")
         self.Bind(wx.EVT_MENU, self.on_cut, cut_item)
 
         copy_item = edit_menu.Append(wx.ID_COPY, "&Copy\tCtrl+C")
@@ -1612,7 +1612,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # dictation or keyboard brightness), where the convention is Cmd+R.
         refresh_key = "Ctrl+R" if sys.platform == 'darwin' else "F5"
         refresh_list_item = process_menu.Append(
-            wx.ID_ANY, f"&Update Image List\t{refresh_key}")
+            wx.ID_ANY, f"Update &Image List\t{refresh_key}")
         self.Bind(wx.EVT_MENU, self.on_refresh_image_list, refresh_list_item)
 
         process_menu.AppendSeparator()
@@ -1622,7 +1622,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         process_menu.AppendSeparator()
 
-        chat_item = process_menu.Append(wx.ID_ANY, "&Chat with AI Model\tCtrl+T")
+        chat_item = process_menu.Append(wx.ID_ANY, "Chat &with AI Model\tCtrl+T")
         self.Bind(wx.EVT_MENU, self.on_chat, chat_item)
 
         process_menu.AppendSeparator()
@@ -1633,14 +1633,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         extract_video_item = process_menu.Append(wx.ID_ANY, "Extract &Video Frames...")
         self.Bind(wx.EVT_MENU, self.on_extract_video, extract_video_item)
 
-        describe_video_item = process_menu.Append(wx.ID_ANY, "Describe &Video with AI...")
+        describe_video_item = process_menu.Append(wx.ID_ANY, "Describe Video with &AI...")
         self.Bind(wx.EVT_MENU, self.on_describe_video, describe_video_item)
 
         process_menu.AppendSeparator()
 
-        # F2 is the Windows rename key and this menu never carried it. Left
-        # unbound on macOS, where F2 is a hardware key and renaming is Return.
-        rename_label = "&Rename Item" if sys.platform == 'darwin' else "&Rename Item\tF2"
+        # F2 is the Windows rename key. The *accelerator* is left off on
+        # macOS, where F2 is a hardware key -- but note that on_key_press
+        # handles F2 through EVT_CHAR_HOOK with no platform guard, so the key
+        # renames on a Mac too. See docs/KEYBOARD_SHORTCUTS.md.
+        rename_label = "Re&name Item" if sys.platform == 'darwin' else "Re&name Item\tF2"
         rename_item = process_menu.Append(wx.ID_ANY, rename_label)
         self.Bind(wx.EVT_MENU, self.on_rename_item, rename_item)
 
@@ -1674,7 +1676,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         copy_image_item = desc_menu.Append(wx.ID_ANY, "Copy &Image")
         self.Bind(wx.EVT_MENU, self.on_copy_image, copy_image_item)
 
-        copy_image_desc_item = desc_menu.Append(wx.ID_ANY, "Copy Image + &Description")
+        copy_image_desc_item = desc_menu.Append(wx.ID_ANY, "Copy Image + Descrip&tion")
         self.Bind(wx.EVT_MENU, self.on_copy_image_and_description, copy_image_desc_item)
 
         desc_menu.AppendSeparator()
@@ -1723,7 +1725,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.Bind(wx.EVT_MENU, self.on_toggle_image_previews, self.show_preview_item)
 
         view_menu.AppendSeparator()
-        self.find_images_item = view_menu.AppendCheckItem(wx.ID_ANY, "Find &Images...\tCtrl+F")
+        self.find_images_item = view_menu.AppendCheckItem(wx.ID_ANY, "&Find Images...\tCtrl+F")
         self.Bind(wx.EVT_MENU, self.on_toggle_search_bar, self.find_images_item)
 
         menubar.Append(view_menu, "&View")
@@ -1741,7 +1743,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # On macOS, wx.ID_PREFERENCES automatically gets Cmd+, and moves to app menu
         # Don't specify accelerator text - the system handles it and VoiceOver reads it correctly
         if sys.platform == 'darwin':
-            configure_item = tools_menu.Append(wx.ID_PREFERENCES, "&Preferences...")
+            configure_item = tools_menu.Append(wx.ID_PREFERENCES, "P&references...")
         else:
             configure_item = tools_menu.Append(wx.ID_ANY, "&Configure Settings...\tCtrl+Shift+C")
         self.Bind(wx.EVT_MENU, self.on_configure_settings,configure_item)
@@ -1771,7 +1773,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         ollama_models_item = ai_info_menu.Append(wx.ID_ANY, "&Ollama Models...")
         self.Bind(wx.EVT_MENU, self.on_ollama_models_info, ollama_models_item)
 
-        openai_usage_item = ai_info_menu.Append(wx.ID_ANY, "&OpenAI Usage Dashboard...")
+        openai_usage_item = ai_info_menu.Append(wx.ID_ANY, "Op&enAI Usage Dashboard...")
         self.Bind(wx.EVT_MENU, self.on_openai_usage_info, openai_usage_item)
 
         claude_usage_item = ai_info_menu.Append(wx.ID_ANY, "&Claude Usage Dashboard...")
@@ -1780,7 +1782,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         mlx_models_item = ai_info_menu.Append(wx.ID_ANY, "&MLX Community Models (HuggingFace)...")
         self.Bind(wx.EVT_MENU, self.on_mlx_models_info, mlx_models_item)
 
-        tools_menu.AppendSubMenu(ai_info_menu, "AI &Info")
+        tools_menu.AppendSubMenu(ai_info_menu, "AI I&nfo")
 
         menubar.Append(tools_menu, "&Tools")
 
