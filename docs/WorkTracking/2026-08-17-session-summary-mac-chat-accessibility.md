@@ -290,3 +290,102 @@ All twelve failed on the old code and pass on the new.
   patches `wx.Dialog.Show`/`ShowModal`; it is covered by stub-driven tests, and
   the wx-level behaviour has not been exercised because no `wx.App` would start
   here.
+
+---
+
+# Later the same day: Cmd+A opened the file picker
+
+The user ran the delivered build and, within a minute, found that pressing
+Cmd+A with focus in IDT Chat's message box opened the Attach Files dialog.
+Twenty-two tests were green at the time. This section is mostly about why.
+
+## The bug
+
+wxOSX turns the `&` mnemonic in a control's label into a **Command key
+equivalent on the native NSButton**. Confirmed by disassembling
+`wxButtonCocoaImpl::SetAcceleratorFromLabel` in the shipped
+`libwx_osx_cocoau_core-3.3.3.0.0.dylib`:
+
+```
+idx = wxControlBase::FindAccelIndex(label)   # position of the char after '&'
+ch  = label[idx]; ch.MakeLower()
+[btn setKeyEquivalent: ch]
+[btn setKeyEquivalentModifierMask: 0x100000]   # NSEventModifierFlagCommand
+```
+
+So `wx.Button(panel, label="&Attach Files...")` is Cmd+A. On Windows that
+ampersand is an Alt mnemonic and harmless.
+
+The second half is the ordering: **AppKit offers a key equivalent to the key
+window's view hierarchy before the main menu.** A control that claims a chord
+therefore outranks the menu bar. The Edit menu was correct throughout — it was
+never consulted.
+
+Twenty-eight controls across eight windows were affected; the inventory
+shipped to the user as `IDT-macOS-impacted-dialogs.md`. Notable beyond Cmd+A:
+`S&top` held Cmd+T over Token Usage, `&Remove Attachment` held Cmd+R over
+Regenerate, two ImageDescriber dialogs held Cmd+C over Copy, and Export HTML
+Gallery held six chords including Cmd+N and Cmd+O.
+
+## Why the tests missed it, which is the part worth keeping
+
+The tests asserted two things, both of which were true the whole time:
+
+1. the menu **table** — `Ctrl+A` is bound to `wx.ID_SELECTALL`;
+2. the handler **routing** — given a focused text control, the command calls
+   `SelectAll()`.
+
+Nothing asserted that *pressing the key* runs the command. The failure lived
+between those two facts, in a dispatch layer neither of them touches. Green
+tests plus a broken app is what that gap looks like from outside.
+
+The first harness written to find it was **also wrong**, in the same way: it
+called `performKeyEquivalent:` on the main menu directly, which skips the view
+hierarchy — so it reported a correct menu table and missed the bug entirely.
+Only the user's exact repro ("focus in the message box, Cmd+A, the picker
+opens") forced the question of what runs *before* the menu.
+
+## The fix
+
+`clear_command_key_equivalents()` walks a window and clears any Command chord
+a control claimed. Only Command chords: a default button holds Return with an
+empty modifier mask and must keep it, or Enter stops activating it. It runs
+for both frames at construction and for every dialog through the existing
+Show/ShowModal hook, and it **reports what it cleared** rather than fixing it
+silently — the shipped binary prints, at startup:
+
+    reclaimed Command chords from controls: ['Send (Cmd+s)', 'Stop (Cmd+t)',
+      'Attach Files... (Cmd+a)', 'Remove Attachment (Cmd+r)']
+
+which is how the artifact itself was verified, not just CI.
+
+## Testing
+
+`pytest_tests/gui/test_key_equivalent_dispatch_macos.py` builds an `NSEvent`
+and offers it to the window and then the menu, in that order, then asserts
+which layer claimed the chord. Deliberately **not** `wx.UIActionSimulator`:
+that posts CGEvents, which macOS discards unless the process is trusted for
+Accessibility, so on a runner it would press nothing and pass — a vacuous test
+exactly where a real one is needed.
+
+A headless guard in `test_menu_shortcuts.py` runs on the Windows box too: any
+app whose control labels carry `&` must also call
+`clear_command_key_equivalents`.
+
+Three of my own mistakes in this area, all one shape — verifying on the
+platform the code targets and not on the one that also has to import or
+dispatch it:
+
+1. the menu table was right, the dispatch was wrong;
+2. the first harness measured the menu, not the window;
+3. the new test module loaded `libobjc` in its module body, so it raised at
+   *collection* on the Windows coverage runner (`find_library("objc")` returns
+   None there). A `skipif` marker skips tests; it does not stop the module
+   body running.
+
+## Not verified
+
+- **VoiceOver and NVDA**, still. Nothing here changed that.
+- **The remaining dialogs individually.** The fix is one mechanism applied to
+  every window, and two dialogs (one per app) are asserted; the other six in
+  the inventory rely on the same call rather than each having a test.
