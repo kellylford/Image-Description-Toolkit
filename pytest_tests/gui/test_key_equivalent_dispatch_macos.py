@@ -39,12 +39,29 @@ wx = pytest.importorskip("wx")
 
 
 # --- the small slice of the Objective-C runtime this needs -----------------
+#
+# Loaded behind a platform guard, not just the skipif above. A marker skips
+# tests; it does not stop the module body running, and pytest imports every
+# module it collects on every platform. Loading libobjc unguarded made this
+# file raise at *collection* time on the Windows coverage runner --
+# "LoadLibrary() argument 1 must be str, not None", because find_library
+# returns None there -- which turned a macOS-only test into a Windows failure.
 
-_objc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("objc"))
-_objc.sel_registerName.restype = ctypes.c_void_p
-_objc.sel_registerName.argtypes = [ctypes.c_char_p]
-_objc.objc_getClass.restype = ctypes.c_void_p
-_objc.objc_getClass.argtypes = [ctypes.c_char_p]
+def _load_objc():
+    if sys.platform != "darwin":
+        return None
+    path = ctypes.util.find_library("objc")
+    if not path:
+        return None
+    library = ctypes.cdll.LoadLibrary(path)
+    library.sel_registerName.restype = ctypes.c_void_p
+    library.sel_registerName.argtypes = [ctypes.c_char_p]
+    library.objc_getClass.restype = ctypes.c_void_p
+    library.objc_getClass.argtypes = [ctypes.c_char_p]
+    return library
+
+
+_objc = _load_objc()
 
 
 def _send(obj, selector, *args, restype=ctypes.c_void_p, argtypes=()):
