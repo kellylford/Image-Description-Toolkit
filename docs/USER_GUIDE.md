@@ -1537,25 +1537,43 @@ Use **View → Read Last Response** (`Ctrl+Shift+R`) to hear a reply again at an
 
 ### Keyboard shortcuts
 
+On macOS every `Ctrl` below is `Cmd`. The complete list for both applications,
+including the Windows `Alt` keys, is in
+[KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md); **Help → Keyboard Shortcuts**
+(`F1`, or `Cmd+?` on a Mac) shows it in the app, named for the platform you
+are on.
+
 | Key | Action |
 |---|---|
 | `Enter` | Send message |
 | `Shift+Enter` | New line in the message box |
+| `Ctrl+Return` | Send from anywhere in the window |
 | `Ctrl+N` | New chat |
-| `Ctrl+M` | Change provider or model |
+| `Ctrl+Shift+M` | Change provider or model |
 | `Ctrl+Shift+A` | Attach files |
 | `Ctrl+Shift+V` | Paste an image from the clipboard |
 | `Delete` | In the conversation list: delete that conversation (with confirmation). In the attachments list: remove that attachment |
 | `Enter` | In the conversation list: open it. In the transcript: read the message again |
 | `Ctrl+Shift+P` | Set the system prompt |
+| `Ctrl+Shift+K` | Turn web search on or off (Ollama models with tool support) |
 | `Ctrl+R` | Regenerate the last response |
-| `Ctrl+.` | Stop the response in progress |
+| `Ctrl+.` | Stop the response in progress (and stop it being read aloud) |
 | `Ctrl+Shift+R` | Read the last response again |
-| `Ctrl+C` | Copy the selected message |
+| `Ctrl+C` | Copy — the selection in a text box, or the selected message when the transcript has focus |
 | `Ctrl+Shift+C` | Copy the whole conversation |
-| `Ctrl+E` | Export the conversation |
+| `Ctrl+Shift+E` | Export the conversation |
 | `Ctrl+T` | Token usage |
 | `F1` | Shortcut list |
+
+`Ctrl+Shift+M` rather than `Ctrl+M`, and `Ctrl+Shift+E` rather than `Ctrl+E`,
+because wx maps every `Ctrl` accelerator to `Cmd` on macOS: `Cmd+M` minimises
+the window and `Cmd+E` is "use selection for find". `Ctrl+C` is a normal Copy
+so you can copy a selection out of the message box.
+
+On Windows, `Alt` reaches the menus and the controls: `Alt+F` `Alt+E` `Alt+C`
+`Alt+V` `Alt+H` for the five menus, and `Alt+O` conversations, `Alt+I`
+transcript, `Alt+M` selected message, `Alt+Y` your message, `Alt+N`
+attachments, `Alt+S` Send, `Alt+T` Stop, `Alt+A` Attach, `Alt+R` Remove.
 
 ### System prompts
 
@@ -1563,7 +1581,7 @@ Use **View → Read Last Response** (`Ctrl+Shift+R`) to hear a reply again at an
 
 ### Switching models mid-conversation
 
-**Chat → Change Model** (`Ctrl+M`) switches provider or model without losing history. The new model receives everything said so far, and each turn records which model produced it, so the history shows who said what.
+**Chat → Change Model** (`Ctrl+Shift+M`) switches provider or model without losing history. The new model receives everything said so far, and each turn records which model produced it, so the history shows who said what.
 
 ### Stopping a response
 
