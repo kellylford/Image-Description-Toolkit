@@ -19,7 +19,7 @@ wxPython>=4.3.1        # Cross-platform GUI framework
 Pillow>=12.3.0         # Image processing
 pillow-heif>=1.5.0    # HEIC/HEIF image support
 opencv-python>=5.0.0.93 # Video frame extraction
-numpy>=2.5.0          # Array operations (required by opencv)
+numpy>=2.5.2          # Array operations (required by opencv)
 piexif>=1.1.3          # EXIF metadata embedding for video frames
 
 # ----------------------------------------------------------------------------
