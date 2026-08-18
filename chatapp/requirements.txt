@@ -32,7 +32,7 @@ wxPython>=4.3.1        # Cross-platform GUI framework
 # ----------------------------------------------------------------------------
 requests>=2.34.2       # HTTP requests
 ollama>=0.6.2          # Ollama Python client
-openai>=2.53.0         # OpenAI API
+openai>=3.1.0         # OpenAI API
 anthropic>=0.121.0     # Anthropic Claude API
 
 # ----------------------------------------------------------------------------
