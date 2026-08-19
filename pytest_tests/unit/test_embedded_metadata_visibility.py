@@ -101,6 +101,21 @@ def _read_tiff_tag(path: Path, tag: int):
     return Image.open(path).tag_v2.get(tag)
 
 
+def _page_count(path: Path) -> int:
+    """Number of frames in a multi-page image."""
+    from PIL import Image
+
+    img = Image.open(path)
+    count = 0
+    try:
+        while True:
+            img.seek(count)
+            count += 1
+    except EOFError:
+        pass
+    return count
+
+
 def _still_opens(path: Path) -> None:
     """A file with metadata nothing can read is a bug; a file nothing can open is worse."""
     from PIL import Image
@@ -219,6 +234,78 @@ class TestTiffVisibility:
             raw = bytes(raw)
         assert raw.decode("utf-16-le").rstrip("\x00") == DESCRIPTION
 
+    @pytest.mark.regression
+    def test_multipage_tiff_keeps_every_page(self, tmp_path):
+        """Scanned documents are multi-page, and a plain save() keeps only one.
+
+        Pillow's save() writes the frame currently seeked unless save_all is
+        passed, so a four-page scan came back as one page with no error raised.
+        In-place mode overwrites the only copy, making it unrecoverable.
+        """
+        from PIL import Image
+
+        from idt_core.embedder import embed_image_file
+
+        colours = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+        pages = [Image.new("RGB", (40, 30), c) for c in colours]
+        src = tmp_path / "scan.tif"
+        pages[0].save(src, "TIFF", save_all=True, append_images=pages[1:])
+
+        dest = tmp_path / "scan_out.tif"
+        embed_image_file(src, DESCRIPTION, dest)
+
+        assert _page_count(dest) == 4, "pages were dropped"
+        out = Image.open(dest)
+        for index, colour in enumerate(colours):
+            out.seek(index)
+            assert out.convert("RGB").getpixel((5, 5)) == colour, f"page {index} wrong"
+
+    @pytest.mark.regression
+    def test_multipage_tiff_still_gets_the_description(self, tmp_path):
+        """The page fix must not cost the description.
+
+        `seek()` rewrites tag_v2 in place rather than returning a new object, so
+        setting the tags before walking the frames left them wiped by the time
+        of the save — pages preserved, description silently gone.
+        """
+        from PIL import Image
+
+        from idt_core.embedder import embed_image_file, _TIFF_IMAGE_DESCRIPTION
+
+        pages = [Image.new("RGB", (20, 20), c) for c in [(1, 2, 3), (4, 5, 6)]]
+        src = tmp_path / "two.tif"
+        pages[0].save(src, "TIFF", save_all=True, append_images=pages[1:])
+
+        dest = tmp_path / "two_out.tif"
+        embed_image_file(src, DESCRIPTION, dest)
+        assert _read_tiff_tag(dest, _TIFF_IMAGE_DESCRIPTION) == DESCRIPTION
+
+    @pytest.mark.regression
+    def test_multipage_tiff_in_place_keeps_pages(self, tmp_path):
+        """In-place mode is where page loss is unrecoverable — no copy to fall back on."""
+        from PIL import Image
+
+        from idt_core.embedder import embed_image_file
+
+        pages = [Image.new("RGB", (20, 20), c) for c in [(1, 2, 3), (4, 5, 6), (7, 8, 9)]]
+        path = tmp_path / "inplace_multi.tif"
+        pages[0].save(path, "TIFF", save_all=True, append_images=pages[1:])
+
+        embed_image_file(path, DESCRIPTION, path)
+        assert _page_count(path) == 3
+
+    def test_compression_is_not_silently_dropped(self, tmp_path):
+        """Rewriting the file must not turn an LZW archive into an uncompressed one."""
+        from PIL import Image
+
+        from idt_core.embedder import embed_image_file
+
+        src = tmp_path / "lzw.tif"
+        Image.new("RGB", (400, 300), (10, 20, 30)).save(src, "TIFF", compression="tiff_lzw")
+        dest = tmp_path / "lzw_out.tif"
+        embed_image_file(src, DESCRIPTION, dest)
+        assert Image.open(dest).info.get("compression") == "tiff_lzw"
+
     def test_pixels_are_preserved(self, tmp_path):
         """Pillow rewrites the whole file for TIFF, so check it rewrites it faithfully."""
         from PIL import Image
@@ -334,103 +421,160 @@ class TestWindowsExplorerColumns:
 # ------------------------------------------------------------------ #
 # The macOS instructions in the user guide, checked against macOS        #
 # ------------------------------------------------------------------ #
+#
+# Three different readers, because they fail in different ways:
+#
+#   xattr     — Finder comments are an extended attribute. No index, no
+#               framework, works on any Mac including a bare CI runner.
+#   ImageIO   — the framework Preview, Get Info and the Spotlight importer all
+#               sit on. Needs pyobjc but no running daemon.
+#   Spotlight — mdls, the command printed in the guide. Needs an indexed
+#               volume, which GitHub's runners do not have.
+#
+# Only the last one is allowed to skip.
 
-def _spotlight_attributes(path: Path) -> tuple[dict, str]:
-    """Read a file's Spotlight attributes, returning (attributes, source_tool).
+_FINDER_COMMENT_XATTR = "com.apple.metadata:kMDItemFinderComment"
 
-    `mdls` is the command the user guide gives, so it is tried first. It reads
-    the Spotlight *index*, which on a CI runner may never have seen the temp
-    directory -- a null answer there says nothing about the file.
 
-    `mdimport -t` runs the same importer directly against the file, no index
-    involved. If mdimport produces the description and mdls does not, the
-    metadata is correct and only the index is missing, so the test still passes
-    and records which tool answered.
-    """
-    attributes: dict[str, str] = {}
-
-    probe = subprocess.run(
-        ["mdls", str(path)], capture_output=True, text=True, timeout=60,
+def _imageio_properties(path: Path) -> dict:
+    """Read image metadata through ImageIO, the way macOS's own viewers do."""
+    Quartz = pytest.importorskip(
+        "Quartz", reason="pyobjc-framework-Quartz not installed",
     )
-    if probe.returncode == 0:
-        for line in probe.stdout.splitlines():
-            key, sep, value = line.partition("=")
-            if sep and value.strip() not in ("(null)", ""):
-                attributes[key.strip()] = value.strip().strip('"')
-    if attributes.get("kMDItemDescription"):
-        return attributes, "mdls"
+    from CoreFoundation import CFURLCreateFromFileSystemRepresentation
 
-    forced = subprocess.run(
-        ["mdimport", "-t", "-d2", str(path)], capture_output=True, text=True, timeout=60,
+    url = CFURLCreateFromFileSystemRepresentation(
+        None, str(path).encode("utf-8"), len(str(path).encode("utf-8")), False,
     )
-    combined = forced.stdout + forced.stderr
-    match = re.search(r'kMDItemDescription\s*=\s*"?(.*?)"?[;\n]', combined)
-    if match:
-        attributes["kMDItemDescription"] = match.group(1).strip()
-        return attributes, "mdimport"
-
-    if os.environ.get("IDT_REQUIRE_SPOTLIGHT") == "1":
-        pytest.fail(
-            "Neither mdls nor mdimport reported kMDItemDescription. The user "
-            "guide tells macOS readers to use exactly these tools.\n"
-            f"mdls rc={probe.returncode}\nmdimport output:\n{combined[:1000]}"
-        )
-    pytest.skip("Spotlight metadata unavailable (set IDT_REQUIRE_SPOTLIGHT=1 to fail instead)")
+    source = Quartz.CGImageSourceCreateWithURL(url, None)
+    assert source is not None, f"ImageIO could not open {path.name}"
+    properties = Quartz.CGImageSourceCopyPropertiesAtIndex(source, 0, None)
+    assert properties is not None, f"ImageIO returned no properties for {path.name}"
+    return dict(properties)
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="macOS Spotlight metadata")
-class TestMacosSpotlightMetadata:
-    """The guide tells macOS readers to use Get Info, Spotlight and mdls.
+def _spotlight_description(path: Path):
+    """Return what `mdls` reports, or None if Spotlight has nothing to say.
 
-    All three read the same place: kMDItemDescription, which macOS populates
-    from the XMP dc:description packet the embedder writes. Asserting on that
-    key is asserting on what Get Info displays, without needing a GUI.
+    mdls reads the Spotlight *index*. A CI runner never indexes its temp
+    directories, so a null answer there is a fact about the machine and not
+    about the file — hence None rather than a failure.
+    """
+    out = subprocess.run(
+        ["mdls", "-name", "kMDItemDescription", str(path)],
+        capture_output=True, text=True, timeout=60,
+    )
+    if out.returncode != 0 or "(null)" in out.stdout:
+        return None
+    _, sep, value = out.stdout.partition("=")
+    return value.strip().strip('"') if sep else None
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS metadata")
+class TestMacosFinderCommentCaveat:
+    """The guide warns that Finder's Comments column is not the description.
+
+    Finder comments live in an extended attribute, so this needs no Spotlight
+    index and no framework — it runs anywhere, including a bare CI runner.
     """
 
-    def test_jpeg_description_reaches_spotlight(self, tmp_path):
-        attributes, _ = _spotlight_attributes(_embed(tmp_path, ".jpg", "JPEG"))
-        assert attributes["kMDItemDescription"] == DESCRIPTION
+    def test_embedding_writes_no_finder_comment(self, tmp_path):
+        """If embedding ever populated this, the guide's warning would be wrong.
 
-    def test_png_description_reaches_spotlight(self, tmp_path):
-        attributes, _ = _spotlight_attributes(_embed(tmp_path, ".png", "PNG"))
-        assert attributes["kMDItemDescription"] == DESCRIPTION
-
-    def test_unicode_survives_to_spotlight(self, tmp_path):
-        attributes, _ = _spotlight_attributes(
-            _embed(tmp_path, ".jpg", "JPEG", UNICODE_DESCRIPTION)
-        )
-        assert attributes["kMDItemDescription"] == UNICODE_DESCRIPTION
-
-    def test_finder_comment_is_not_where_the_description_lands(self, tmp_path):
-        """The caveat in the guide, made checkable.
-
-        Finder's "Comments" column shows kMDItemFinderComment, an xattr Finder
-        keeps on the side. Embedding must not populate it -- if it ever did, the
-        guide's warning would be wrong and readers would be told to ignore a
-        column that works.
-        """
-        attributes, _ = _spotlight_attributes(_embed(tmp_path, ".jpg", "JPEG"))
-        assert not attributes.get("kMDItemFinderComment"), (
-            "embedding wrote a Finder comment; the user guide says it does not"
-        )
-
-    def test_mdls_command_from_the_guide_runs_verbatim(self, tmp_path):
-        """The guide prints `mdls -name kMDItemDescription photo.jpg`.
-
-        Run that exact form, so a typo in the documented command is caught here
-        rather than by a reader pasting it into Terminal.
+        Readers would then be told to ignore a column that actually works.
         """
         path = _embed(tmp_path, ".jpg", "JPEG")
         out = subprocess.run(
-            ["mdls", "-name", "kMDItemDescription", str(path)],
-            capture_output=True, text=True, timeout=60,
+            ["xattr", "-p", _FINDER_COMMENT_XATTR, str(path)],
+            capture_output=True, text=True, timeout=30,
         )
-        assert out.returncode == 0, out.stderr
-        assert "kMDItemDescription" in out.stdout
-        if "(null)" in out.stdout:
-            _spotlight_attributes(path)   # skips or fails with the fuller diagnosis
-        else:
-            assert DESCRIPTION in out.stdout
+        assert out.returncode != 0, (
+            f"embedding set a Finder comment ({out.stdout.strip()}); the user "
+            "guide says Finder's Comments column stays empty"
+        )
+
+    def test_the_xattr_probe_can_actually_detect_one(self, tmp_path):
+        """Guard against the assertion above passing because the probe is broken.
+
+        A test that checks for absence proves nothing unless presence is
+        detectable — so set a comment by hand and confirm it is seen.
+        """
+        path = _embed(tmp_path, ".jpg", "JPEG")
+        written = subprocess.run(
+            ["xattr", "-w", _FINDER_COMMENT_XATTR, "a hand-written note", str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert written.returncode == 0, f"could not set xattr: {written.stderr}"
+        out = subprocess.run(
+            ["xattr", "-p", _FINDER_COMMENT_XATTR, str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert out.returncode == 0 and "hand-written" in out.stdout
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS ImageIO")
+class TestMacosImageIoMetadata:
+    """Get Info, Preview and the Spotlight importer all read through ImageIO.
+
+    Querying it directly is the closest thing to opening Get Info that a
+    headless runner can do, and unlike mdls it needs no indexed volume.
+    """
+
+    def test_jpeg_description_is_visible_to_imageio(self, tmp_path):
+        properties = _imageio_properties(_embed(tmp_path, ".jpg", "JPEG"))
+        rendered = str(properties)
+        assert DESCRIPTION in rendered, (
+            "macOS's own image framework cannot see the description:\n"
+            f"{rendered[:2000]}"
+        )
+
+    def test_tiff_description_is_visible_to_imageio(self, tmp_path):
+        """TIFF gets IFD tags and no XMP, so it needs checking separately."""
+        properties = _imageio_properties(_embed(tmp_path, ".tif", "TIFF"))
+        assert DESCRIPTION in str(properties)
+
+    def test_png_description_is_visible_to_imageio(self, tmp_path):
+        properties = _imageio_properties(_embed(tmp_path, ".png", "PNG"))
+        assert DESCRIPTION in str(properties)
+
+    def test_unicode_survives_to_imageio(self, tmp_path):
+        properties = _imageio_properties(
+            _embed(tmp_path, ".jpg", "JPEG", UNICODE_DESCRIPTION)
+        )
+        assert UNICODE_DESCRIPTION in str(properties)
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS Spotlight")
+class TestMacosSpotlight:
+    """The `mdls` command the guide prints, run verbatim.
+
+    This is the one reader allowed to skip: it depends on an indexed volume,
+    and GitHub's macOS runners index nothing. Set IDT_REQUIRE_SPOTLIGHT=1 on a
+    real Mac to turn the skip into a failure.
+    """
+
+    def _require_or_skip(self, value, path: Path):
+        if value is not None:
+            return value
+        if os.environ.get("IDT_REQUIRE_SPOTLIGHT") == "1":
+            pytest.fail(
+                f"mdls reported nothing for {path.name}. The user guide tells "
+                "macOS readers to use exactly this command."
+            )
+        pytest.skip(
+            "Spotlight has not indexed this path (normal on CI). "
+            "Set IDT_REQUIRE_SPOTLIGHT=1 on an indexed Mac to require it."
+        )
+
+    def test_documented_mdls_command_returns_the_description(self, tmp_path):
+        path = _embed(tmp_path, ".jpg", "JPEG")
+        value = self._require_or_skip(_spotlight_description(path), path)
+        assert value == DESCRIPTION
+
+    def test_png_description_reaches_spotlight(self, tmp_path):
+        path = _embed(tmp_path, ".png", "PNG")
+        value = self._require_or_skip(_spotlight_description(path), path)
+        assert value == DESCRIPTION
 
 
 # ------------------------------------------------------------------ #

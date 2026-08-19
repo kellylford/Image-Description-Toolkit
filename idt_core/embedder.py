@@ -434,15 +434,29 @@ def _embed_tiff(path: Path, description: str) -> None:
     carrying over the other tags it parsed into tag_v2.
     """
     try:
-        from PIL import Image
+        from PIL import Image, ImageSequence
 
         img = Image.open(path)
+
+        # Multi-page TIFF is the normal shape for scanned documents, and a plain
+        # save() keeps only the frame currently seeked. Without save_all this
+        # silently drops pages 2..N — and in-place mode drops them off the only
+        # copy. Every frame is materialised before the write, because the write
+        # goes to the file still being read.
+        frames = [frame.copy() for frame in ImageSequence.Iterator(img)]
+
+        # Read the IFD only after that iteration. seek() rewrites tag_v2 in
+        # place rather than handing back a new object, so tags set before
+        # iterating are silently wiped by the walk to the last page.
+        img.seek(0)
         ifd = img.tag_v2
         ifd[_TIFF_IMAGE_DESCRIPTION] = description
         # XPComment is UCS-2 with a trailing NUL — what Windows Explorer reads
         # into its "Comments" column.
         ifd[_TIFF_XP_COMMENT] = description.encode("utf-16-le") + b"\x00\x00"
-        img.save(path, "TIFF", tiffinfo=ifd)
+
+        extra = {"save_all": True, "append_images": frames[1:]} if len(frames) > 1 else {}
+        frames[0].save(path, "TIFF", tiffinfo=ifd, **extra)
     except Exception as exc:
         raise RuntimeError(f"TIFF embed failed for {path.name}: {exc}") from exc
 
