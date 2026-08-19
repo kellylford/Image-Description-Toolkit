@@ -1,0 +1,103 @@
+name: "Tests (macOS)"
+
+# The suite ran on windows-latest only. macOS had a *build* job and no test job,
+# so anything platform-specific to macOS was unverified by CI -- including the
+# thing that prompted this workflow: the user guide tells macOS readers to find
+# embedded descriptions with Get Info, Spotlight and `mdls`, and nothing checked
+# that those return anything.
+#
+# What a GitHub runner can and cannot verify, established by running it:
+#
+#   xattr     ✓ Finder comments are an extended attribute. No daemon involved.
+#   ImageIO   ✓ The framework Get Info, Preview and the Spotlight importer all
+#               sit on. Needs pyobjc, no daemon.
+#   mdls      ✗ Reads the Spotlight index. Runners index nothing, so mdls exits
+#               0 and reports (null) for every file.
+#   mdimport  ✗ Crashes on the runner: 'NSInvalidArgumentException ... -[NSNull
+#               length]' before printing anything.
+#
+# So the Spotlight cases skip here by design and the ImageIO cases carry the
+# load, being one framework layer below the same answer. Run the suite on a real
+# Mac with IDT_REQUIRE_SPOTLIGHT=1 to exercise `mdls` itself.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test-macos:
+    name: "Suite on macOS"
+    runs-on: macos-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install pyobjc for the ImageIO checks
+        # ImageIO is how Get Info and Preview read an image's metadata. Querying
+        # it directly is the closest a headless runner gets to opening Get Info.
+        run: pip install pyobjc-framework-Quartz
+
+      - name: Verify Quartz is importable
+        # An importorskip that always skips is indistinguishable from a pass.
+        run: python -c "import Quartz; print('Quartz OK')"
+
+      - name: Report Spotlight state
+        # Diagnostic only. If the ImageIO cases ever start failing, the first
+        # question is what this runner actually has -- answer it here rather
+        # than by guessing.
+        run: |
+          echo "mdls:     $(command -v mdls || echo MISSING)"
+          echo "mdimport: $(command -v mdimport || echo MISSING)"
+          mdutil -s / || true
+
+      - name: Embedded-metadata visibility on macOS
+        # Run this before the full suite so a failure here is unmissable rather
+        # than buried in 1700 dots.
+        run: |
+          python -m pytest pytest_tests/unit/test_embedded_metadata_visibility.py -v --no-cov
+        env:
+          IDT_QUIET_CONFIG_LOG: "1"
+
+      - name: Prove the macOS cases actually ran
+        # A green run above means nothing if every darwin-only case skipped
+        # because sys.platform was misread or a class was renamed. pytest's exit
+        # code is checked separately from the count, because piping it into a
+        # counter would otherwise swallow a failing run: this step's default
+        # shell is `bash -e`, which does not set pipefail.
+        run: |
+          set -o pipefail
+          python -m pytest pytest_tests/unit/test_embedded_metadata_visibility.py \
+            --no-cov -q -k "TestMacosFinderCommentCaveat or TestMacosImageIoMetadata" \
+            | tee macos-cases.txt
+          # pytest's summary is "===== 7 passed, 41 deselected in 0.2s =====",
+          # so the count is mid-line -- do not anchor with ^.
+          grep -qE '[1-9][0-9]* passed' macos-cases.txt \
+            || { echo "::error::The macOS ImageIO/xattr cases did not run."; cat macos-cases.txt; exit 1; }
+          if grep -qE '[1-9][0-9]* skipped' macos-cases.txt; then
+            echo "::error::A macOS case that must run was skipped:"; cat macos-cases.txt; exit 1
+          fi
+        env:
+          IDT_QUIET_CONFIG_LOG: "1"
+
+      - name: Run the full suite
+        run: python -m pytest pytest_tests/ -q --no-cov
+        env:
+          IDT_QUIET_CONFIG_LOG: "1"

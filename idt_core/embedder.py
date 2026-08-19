@@ -14,7 +14,11 @@ For PNG:
   - iTXt chunk "XML:com.adobe.xmp" → XMP dc:description for modern apps
 
 For WebP:
-  - EXIF UserComment + XMP dc:description
+  - EXIF UserComment  → Windows "Comments" column
+
+For TIFF:
+  - ImageDescription tag (270) → Windows "Title" and "Subject" columns
+  - XPComment tag (40092)      → Windows "Comments" column
 
 HEIC originals in copy mode use the .idt/ JPEG conversion if available;
 otherwise they are converted fresh and that copy is embedded into.
@@ -45,6 +49,10 @@ _XML = "http://www.w3.org/XML/1998/namespace"
 
 _XMP_JPEG_HEADER = b"http://ns.adobe.com/xap/1.0/\x00"
 _EXIF_HEADER     = b"Exif\x00\x00"
+
+# TIFF/EXIF tag numbers used by the TIFF branch
+_TIFF_IMAGE_DESCRIPTION = 270
+_TIFF_XP_COMMENT        = 40092
 
 # ------------------------------------------------------------------ #
 # Result type                                                          #
@@ -87,13 +95,7 @@ def embed_image_file(
     """
     if dest == source:
         # In-place mode: embed directly, no copy step
-        suffix = source.suffix.lower()
-        if suffix in (".jpg", ".jpeg", ".tif", ".tiff"):
-            _embed_jpeg(source, description)
-        elif suffix == ".png":
-            _embed_png(source, description)
-        elif suffix == ".webp":
-            _embed_webp(source, description)
+        _embed_by_format(source, description)
         return
 
     if not overwrite and dest.exists():
@@ -102,13 +104,25 @@ def embed_image_file(
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, dest)
 
-    suffix = dest.suffix.lower()
-    if suffix in (".jpg", ".jpeg", ".tif", ".tiff"):
-        _embed_jpeg(dest, description)
+    _embed_by_format(dest, description)
+
+
+def _embed_by_format(path: Path, description: str) -> None:
+    """Dispatch to the right embedder for *path*'s extension.
+
+    Unknown formats are left alone: the copy still exists, it just carries no
+    description. Never guess a format -- running the JPEG segment writer over a
+    TIFF corrupts the file, which is exactly what this dispatcher exists to stop.
+    """
+    suffix = path.suffix.lower()
+    if suffix in (".jpg", ".jpeg"):
+        _embed_jpeg(path, description)
     elif suffix == ".png":
-        _embed_png(dest, description)
+        _embed_png(path, description)
     elif suffix == ".webp":
-        _embed_webp(dest, description)
+        _embed_webp(path, description)
+    elif suffix in (".tif", ".tiff"):
+        _embed_tiff(path, description)
 
 
 class Embedder:
@@ -171,14 +185,8 @@ class Embedder:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(work_src, dest)
 
-        embed_suffix = dest.suffix.lower()
-        if embed_suffix in (".jpg", ".jpeg"):
-            _embed_jpeg(dest, description)
-        elif embed_suffix == ".png":
-            _embed_png(dest, description)
-        elif embed_suffix == ".webp":
-            _embed_webp(dest, description)
         # Other formats: copy is made but no metadata written (rare)
+        _embed_by_format(dest, description)
 
         return dest
 
@@ -411,6 +419,46 @@ def _embed_png(path: Path, description: str) -> None:
         img.save(path, "PNG", pnginfo=meta)
     except Exception as exc:
         raise RuntimeError(f"PNG embed failed for {path.name}: {exc}") from exc
+
+
+# ------------------------------------------------------------------ #
+# TIFF embedding                                                       #
+# ------------------------------------------------------------------ #
+
+def _embed_tiff(path: Path, description: str) -> None:
+    """Write ImageDescription + XPComment tags into a TIFF in place.
+
+    TIFF keeps its tags in the IFD, not in JPEG APP segments, so this cannot
+    reuse _embed_jpeg: injecting an APP1 segment overwrites the "II*\\0" magic
+    and leaves a file nothing can open. Pillow rewrites the whole file,
+    carrying over the other tags it parsed into tag_v2.
+    """
+    try:
+        from PIL import Image, ImageSequence
+
+        img = Image.open(path)
+
+        # Multi-page TIFF is the normal shape for scanned documents, and a plain
+        # save() keeps only the frame currently seeked. Without save_all this
+        # silently drops pages 2..N — and in-place mode drops them off the only
+        # copy. Every frame is materialised before the write, because the write
+        # goes to the file still being read.
+        frames = [frame.copy() for frame in ImageSequence.Iterator(img)]
+
+        # Read the IFD only after that iteration. seek() rewrites tag_v2 in
+        # place rather than handing back a new object, so tags set before
+        # iterating are silently wiped by the walk to the last page.
+        img.seek(0)
+        ifd = img.tag_v2
+        ifd[_TIFF_IMAGE_DESCRIPTION] = description
+        # XPComment is UCS-2 with a trailing NUL — what Windows Explorer reads
+        # into its "Comments" column.
+        ifd[_TIFF_XP_COMMENT] = description.encode("utf-16-le") + b"\x00\x00"
+
+        extra = {"save_all": True, "append_images": frames[1:]} if len(frames) > 1 else {}
+        frames[0].save(path, "TIFF", tiffinfo=ifd, **extra)
+    except Exception as exc:
+        raise RuntimeError(f"TIFF embed failed for {path.name}: {exc}") from exc
 
 
 # ------------------------------------------------------------------ #

@@ -6,38 +6,43 @@ This document lists which image formats support embedding AI-generated descripti
 
 | Format | File Extensions | Embedding Method | Notes |
 |--------|-----------------|------------------|-------|
-| **JPEG** | .jpg, .jpeg | EXIF via piexif | Lossless insertion—no image re-encoding |
-| **TIFF** | .tif, .tiff | EXIF via piexif | Lossless insertion—no image re-encoding |
-| **PNG** | .png | tEXt metadata chunk | Preserves existing text chunks; standardized metadata structure |
+| **JPEG** | .jpg, .jpeg | EXIF via piexif + XMP packet | Lossless insertion—no image re-encoding |
+| **TIFF** | .tif, .tiff | IFD tags via Pillow | File is rewritten; pixel data is unchanged |
+| **PNG** | .png | tEXt metadata chunk + XMP iTXt chunk | Preserves existing text chunks; standardized metadata structure |
 | **WebP** | .webp | EXIF blob | Requires re-save at quality 95 or lossless setting |
 | **HEIC/HEIF** | .heic, .heif | Convert → JPEG | Original is left unmodified; conversion happens in copy workflow |
 
 ### Embedding Locations
 
-- **JPEG/TIFF**: `EXIF ImageDescription` (main metadata), `EXIF UserComment` (attribution with model + timestamp)
-- **PNG**: `tEXt` chunk key: `Description` (also includes XMP `dc:description` via Adobe XMP format)
-- **WebP**: EXIF blob (same fields as JPEG)
+- **JPEG**: `EXIF UserComment` and XMP `dc:description`
+- **TIFF**: `ImageDescription` tag (270) and `XPComment` tag (40092)
+- **PNG**: `tEXt` chunk key `Description`, plus XMP `dc:description` in an `XML:com.adobe.xmp` iTXt chunk
+- **WebP**: `EXIF UserComment`
 - **HEIC/HEIF**: Converted to JPEG, then embedded using JPEG method
 
-### Important: Windows File Explorer Display Limitation
+TIFF cannot reuse the JPEG writer: TIFF keeps its metadata in the IFD, and injecting a
+JPEG APP1 segment overwrites the byte-order magic and leaves an unopenable file. This was
+a live bug until the format dispatcher in `idt_core/embedder.py` gained a TIFF branch.
 
-**PNG metadata IS embedded correctly, but Windows doesn't show it in Properties → Details.**
+### Which Windows Explorer Column Shows the Description
 
-- **JPEG**: Windows reads EXIF metadata → displays in "Comments" field ✓
-- **PNG**: Windows does NOT read tEXt chunks or XMP → "Comments" field remains empty ✗
+Windows maps the underlying tags onto its own property names, and the mapping differs by
+format. Measured on Windows 11 via the shell property system, and pinned by
+`pytest_tests/unit/test_embedded_metadata_visibility.py`:
 
-**The metadata is still there.** To verify:
+| Format | "Comments" column | "Title" column |
+|--------|-------------------|----------------|
+| **JPEG** | ✓ (from EXIF UserComment) | ✓ (from XMP `dc:description`) |
+| **PNG** | ✗ — PNG has no EXIF | ✓ (from the XMP iTXt chunk) |
+| **WebP** | ✓ (from EXIF UserComment) | ✗ — no XMP is written |
+| **TIFF** | ✓ (from XPComment) | ✓ (from ImageDescription) |
 
-1. **Online viewer** (easiest): Upload to https://exif.tools/ → see full tEXt chunks
-2. **Command-line**: `exiftool IMG_4499.PNG`
-3. **Python**:
-   ```python
-   from PIL import Image
-   img = Image.open('IMG_4499.PNG')
-   print(img.text['Description'])  # Full description text
-   ```
+So **Comments** is the right column for JPEG and WebP, and PNG users need **Title** instead.
+The earlier claim that Windows shows nothing at all for PNG was wrong: Windows does read the
+XMP packet, it just does not surface it under "Comments".
 
-**Why the difference?** JPEG embeds metadata in EXIF IFD (a standardized binary format). PNG uses tEXt chunks (text key-value pairs). Windows only exposes EXIF data in its UI, not PNG tEXt. Most modern image viewers, online tools, and mobile apps correctly read PNG tEXt metadata.
+See [USER_GUIDE.md](USER_GUIDE.md) → *Embedding Descriptions into Images* for the keyboard
+steps to switch a column on, and for the macOS equivalents.
 
 ---
 
@@ -125,10 +130,11 @@ If you need to confirm that descriptions were successfully embedded:
 
 | Format | Method | Command |
 |--------|--------|---------|
-| **JPEG** | Windows Properties → Details → Comments | ✓ Works natively |
-| **PNG** | Online tool | `exiftool file.png` or https://exif.tools/ |
-| **TIFF** | Windows Properties → Details → Comments | ✓ Works natively |
-| **WebP** | Online tool | `exiftool file.webp` or https://exif.tools/ |
+| **JPEG** | Windows Properties → Details → Comments or Title | ✓ Works natively |
+| **PNG** | Windows Properties → Details → Title | ✓ Works natively (not under Comments) |
+| **TIFF** | Windows Properties → Details → Comments or Title | ✓ Works natively |
+| **WebP** | Windows Properties → Details → Comments | ✓ Works natively |
+| **All formats** | macOS | `mdls -name kMDItemDescription file` |
 | **All formats** | Python | `from PIL import Image; img = Image.open(path); print(img.text.get('Description'))` |
 
 ---
@@ -148,4 +154,4 @@ If you need to confirm that descriptions were successfully embedded:
 
 For now, the existing format coverage is sufficient and well-maintained.
 
-**Note on PNG verification:** PNG metadata is reliably embedded but not visible in Windows File Explorer. Use the verification methods above to confirm the data is present.
+**Note on PNG verification:** PNG descriptions do not appear under Windows' "Comments" property, only under "Title". If Comments looks empty for a PNG, that is the expected mapping, not a failed embed.

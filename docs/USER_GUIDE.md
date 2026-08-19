@@ -1444,6 +1444,63 @@ Key points:
 - HEIC sources are converted to JPEG before embedding (HEIC is a read-only format for this purpose).
 - In-place mode (modify originals) requires explicit confirmation and is not recommended unless you have backups.
 
+#### Where the Description Is Stored
+
+Different image formats have different metadata containers, so IDT writes to whichever fields that format actually supports:
+
+| Format | Fields written |
+|--------|----------------|
+| JPEG | EXIF UserComment, XMP `dc:description` |
+| PNG | tEXt `Description` chunk, XMP `dc:description` |
+| WebP | EXIF UserComment |
+| TIFF | ImageDescription tag, XPComment tag |
+
+This matters for the next two sections: which field a format gets determines where the description shows up on your desktop. PNG files, for example, have no EXIF at all, so the Windows **Comments** column stays empty for them and you need the **Title** column instead.
+
+#### Reading Embedded Descriptions on Windows
+
+File Explorer can show the description as a column in Details view, which means you can read every description in a folder by arrowing down the list.
+
+1. Open the folder holding the embedded copies (`<workspace>/embedded/`).
+2. Switch to **Details** view (**Ctrl+Shift+6**, or the **View** menu).
+3. Press **Tab** until focus reaches the column headers.
+4. Press **Shift+F10** for the context menu of available columns.
+5. Turn on **Comments** (JPEG, WebP and TIFF) or **Title** (JPEG, PNG and TIFF).
+
+If the column you want is not on the short list, choose **More...** at the bottom of that menu and find it in the full list.
+
+Once the column is on, arrow through the file list and the description is announced along with the file name. To read a single file's description instead, select it and press **Alt+Enter** for **Properties**, then move to the **Details** tab—the description appears under **Description → Title** and **Comments**.
+
+You can also search on the embedded text: type it into the Explorer search box and Windows matches against these fields, so `sunset` finds every photo whose description mentions one.
+
+**Choosing a column:**
+
+| Your files are | Turn on |
+|----------------|---------|
+| JPEG (the usual case) | **Comments** or **Title**—both are filled |
+| PNG | **Title** (PNG has no EXIF, so **Comments** stays blank) |
+| WebP | **Comments**—requires the Microsoft WebP Image Extension (see below) |
+| TIFF | **Comments** or **Title** |
+
+**WebP needs a codec.** Explorer reads WebP metadata through the Microsoft WebP Image Extension. Windows 11 installs normally have it, but on Windows Server or a stripped-down build it may be missing—and without it Explorer shows *no* image columns for WebP at all, not just an empty Comments. If Dimensions is blank too, install the extension from the Microsoft Store.
+
+#### Reading Embedded Descriptions on macOS
+
+macOS has no Finder column for embedded descriptions—the **Comments** column in Finder's list view shows *Spotlight Comments*, which is a note stored separately by Finder, not the description inside the file. Turning it on will show nothing. Use one of these instead:
+
+- **Finder Get Info** — select the file and press **Cmd+I**. The description appears in the **More Info** section. This is the quickest way to check a single file, and VoiceOver reads the field directly.
+- **Preview** — open the image, then **Tools → Show Inspector** (**Cmd+I**). The **ⓘ** tab has **General**, **Exif** and **TIFF** panes showing the raw fields.
+- **Spotlight search** — the description is indexed, so searching for a word from it finds the photo.
+- **Terminal** — `mdls -name kMDItemDescription photo.jpg` prints the description for one file. To list a whole folder:
+
+  ```bash
+  for f in *.jpg; do echo "$f: $(mdls -raw -name kMDItemDescription "$f")"; done
+  ```
+
+- **Photos** — importing an embedded copy brings the description in as the photo's caption, where it is visible in the Info pane and searchable.
+
+Unlike Windows, macOS needs no per-format advice here: Get Info and Preview read through ImageIO, which reports the description for JPEG, PNG, WebP and TIFF alike.
+
 ---
 
 ### Combining Multiple Workspaces

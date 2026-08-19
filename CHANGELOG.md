@@ -113,7 +113,21 @@
 - Removed: `idt_core/providers/florence.py`, the GUI `HuggingFaceProvider`, provider wiring in the CLI/guide/config dialogs, the Florence hidden imports from `idt.spec` / `imagedescriber_wx.spec`, the Florence-only dependencies (`transformers`, `torch`, `torchvision`, `einops`, `timm`) from the top-level `requirements.txt`, and `docs/HUGGINGFACE_PROVIDER_GUIDE.md`.
 - The macOS-only MLX provider and its `torch`/`transformers` dependencies are unaffected.
 
+### 📚 Documentation
+
+**The user guide now says how to read an embedded description back**
+- Embedding shipped without telling anyone where the description ends up. **User Guide → Embedding Descriptions into Images** now covers it for both platforms.
+- Windows: switch File Explorer to Details view, tab to the column headers, **Shift+F10**, and turn on **Comments** or **Title** — plus which column each format actually fills, since PNG has no EXIF and only appears under Title.
+- macOS: **Cmd+I** for Get Info, Preview's Inspector, Spotlight, `mdls`, and Photos captions. Also states plainly that Finder's **Comments** column is a Spotlight note stored by Finder, *not* the embedded description, so switching it on shows nothing.
+- `IMAGE_FORMAT_SUPPORT.md` corrected against measured behavior: it claimed Windows shows no PNG metadata at all (it shows it under Title), and described TIFF as lossless piexif insertion (it was the corrupting path fixed below).
+
 ### 🔧 Bug Fixes
+
+**Embedding a description into a TIFF no longer destroys the file**
+- `.tif` and `.tiff` were routed to the JPEG writer, which injected a JPEG APP1 segment over the `II*\0` byte-order magic. The result was not a TIFF missing its description — it was a file Pillow, File Explorer and Preview all refused to open. Nothing raised; the embed reported success.
+- TIFF now gets its own writer, setting `ImageDescription` (270) and `XPComment` (40092) through Pillow, so the description reaches Explorer's **Title**, **Subject** and **Comments** columns.
+- Format dispatch moved into one `_embed_by_format()` helper. An unrecognized extension is copied and left alone rather than being handed to a writer that guesses.
+- `pytest_tests/unit/test_embedded_metadata_visibility.py` reads the embedded files back the way each OS does — EXIF UserComment, XMP `dc:description`, PNG chunks, TIFF tags, and on Windows the actual Explorer column values via the shell property system. Seven of its cases fail against the old code.
 
 **`idt guideme` no longer shows MLX as a provider option on Windows (issue #111)**
 - MLX (Apple Metal) is now only listed as a provider choice on macOS.
