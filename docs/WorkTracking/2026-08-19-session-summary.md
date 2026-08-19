@@ -14,8 +14,9 @@ have no way to confirm anything happened.
 | `docs/USER_GUIDE.md` | Expanded *Embedding Descriptions into Images* with a field-by-format table and two new subsections: Windows and macOS access steps |
 | `docs/IMAGE_FORMAT_SUPPORT.md` | Corrected three claims that measurement contradicted |
 | `idt_core/embedder.py` | New `_embed_by_format()` dispatcher; new `_embed_tiff()`; TIFF no longer routed to the JPEG writer |
-| `pytest_tests/unit/test_embedded_metadata_visibility.py` | New — 35 tests |
+| `pytest_tests/unit/test_embedded_metadata_visibility.py` | New — 48 tests |
 | `CHANGELOG.md` | Documentation and Bug Fixes entries under Unreleased |
+| `.github/workflows/test-macos.yml` | New — the suite had never run on macOS |
 
 ## What was measured, not assumed
 
@@ -52,31 +53,6 @@ is copied and left alone instead of handed to whichever writer looked closest.
 `_embed_one()` in the `Embedder` class never had the TIFF branch, so project-mode
 embeds silently skipped metadata for TIFF rather than corrupting it. It now goes
 through the same dispatcher and gets the tags.
-
-## Test coverage
-
-Before: `TestEmbedder` and `TestXmpInjection` in `test_idt_core.py` proved copies
-land in the right place and carry XMP. Nothing asserted *which* tag any format
-got, so nothing would have caught a change that left an Explorer column blank —
-or the TIFF corruption.
-
-New file reads the files back the way each OS does:
-
-- EXIF UserComment via piexif (JPEG, WebP)
-- XMP `dc:description` extracted and parsed (JPEG, PNG)
-- PNG tEXt and iTXt chunks
-- TIFF tags 270 and 40092
-- Unicode round-trip per format — UserComment is UCS-2, XMP is UTF-8
-- Every embedded file still opens
-- Sources never modified; unknown formats byte-identical after copy
-- **Windows only:** actual Explorer column values via the shell property system,
-  asserting the exact instruction the guide gives
-- The guide itself still contains the Windows steps, the macOS steps and the
-  Spotlight Comments caveat
-
-Result: 35 passed. Against the pre-fix embedder, 7 fail.
-
-Full suite: 1715 passed, 34 skipped.
 
 ## Reviewed, then fixed
 
