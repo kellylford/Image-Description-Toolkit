@@ -23,6 +23,8 @@ were routed through the JPEG writer, which injected an APP1 segment over the
 Pillow, Explorer and Preview all refused to open.
 """
 
+import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -76,8 +78,6 @@ def _read_exif_user_comment(path: Path) -> str:
 
 def _read_xmp_description(path: Path) -> str:
     """XMP dc:description — what macOS Spotlight, Preview and Photos read."""
-    import re
-
     from idt_core.embedder import _extract_xmp_from_jpeg
 
     if path.suffix.lower() in (".jpg", ".jpeg"):
@@ -329,6 +329,108 @@ class TestWindowsExplorerColumns:
     def test_tiff_appears_in_comments_column(self, tmp_path):
         columns = _explorer_columns(_embed(tmp_path, ".tif", "TIFF"))
         assert columns.get("Comments") == DESCRIPTION
+
+
+# ------------------------------------------------------------------ #
+# The macOS instructions in the user guide, checked against macOS        #
+# ------------------------------------------------------------------ #
+
+def _spotlight_attributes(path: Path) -> tuple[dict, str]:
+    """Read a file's Spotlight attributes, returning (attributes, source_tool).
+
+    `mdls` is the command the user guide gives, so it is tried first. It reads
+    the Spotlight *index*, which on a CI runner may never have seen the temp
+    directory -- a null answer there says nothing about the file.
+
+    `mdimport -t` runs the same importer directly against the file, no index
+    involved. If mdimport produces the description and mdls does not, the
+    metadata is correct and only the index is missing, so the test still passes
+    and records which tool answered.
+    """
+    attributes: dict[str, str] = {}
+
+    probe = subprocess.run(
+        ["mdls", str(path)], capture_output=True, text=True, timeout=60,
+    )
+    if probe.returncode == 0:
+        for line in probe.stdout.splitlines():
+            key, sep, value = line.partition("=")
+            if sep and value.strip() not in ("(null)", ""):
+                attributes[key.strip()] = value.strip().strip('"')
+    if attributes.get("kMDItemDescription"):
+        return attributes, "mdls"
+
+    forced = subprocess.run(
+        ["mdimport", "-t", "-d2", str(path)], capture_output=True, text=True, timeout=60,
+    )
+    combined = forced.stdout + forced.stderr
+    match = re.search(r'kMDItemDescription\s*=\s*"?(.*?)"?[;\n]', combined)
+    if match:
+        attributes["kMDItemDescription"] = match.group(1).strip()
+        return attributes, "mdimport"
+
+    if os.environ.get("IDT_REQUIRE_SPOTLIGHT") == "1":
+        pytest.fail(
+            "Neither mdls nor mdimport reported kMDItemDescription. The user "
+            "guide tells macOS readers to use exactly these tools.\n"
+            f"mdls rc={probe.returncode}\nmdimport output:\n{combined[:1000]}"
+        )
+    pytest.skip("Spotlight metadata unavailable (set IDT_REQUIRE_SPOTLIGHT=1 to fail instead)")
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS Spotlight metadata")
+class TestMacosSpotlightMetadata:
+    """The guide tells macOS readers to use Get Info, Spotlight and mdls.
+
+    All three read the same place: kMDItemDescription, which macOS populates
+    from the XMP dc:description packet the embedder writes. Asserting on that
+    key is asserting on what Get Info displays, without needing a GUI.
+    """
+
+    def test_jpeg_description_reaches_spotlight(self, tmp_path):
+        attributes, _ = _spotlight_attributes(_embed(tmp_path, ".jpg", "JPEG"))
+        assert attributes["kMDItemDescription"] == DESCRIPTION
+
+    def test_png_description_reaches_spotlight(self, tmp_path):
+        attributes, _ = _spotlight_attributes(_embed(tmp_path, ".png", "PNG"))
+        assert attributes["kMDItemDescription"] == DESCRIPTION
+
+    def test_unicode_survives_to_spotlight(self, tmp_path):
+        attributes, _ = _spotlight_attributes(
+            _embed(tmp_path, ".jpg", "JPEG", UNICODE_DESCRIPTION)
+        )
+        assert attributes["kMDItemDescription"] == UNICODE_DESCRIPTION
+
+    def test_finder_comment_is_not_where_the_description_lands(self, tmp_path):
+        """The caveat in the guide, made checkable.
+
+        Finder's "Comments" column shows kMDItemFinderComment, an xattr Finder
+        keeps on the side. Embedding must not populate it -- if it ever did, the
+        guide's warning would be wrong and readers would be told to ignore a
+        column that works.
+        """
+        attributes, _ = _spotlight_attributes(_embed(tmp_path, ".jpg", "JPEG"))
+        assert not attributes.get("kMDItemFinderComment"), (
+            "embedding wrote a Finder comment; the user guide says it does not"
+        )
+
+    def test_mdls_command_from_the_guide_runs_verbatim(self, tmp_path):
+        """The guide prints `mdls -name kMDItemDescription photo.jpg`.
+
+        Run that exact form, so a typo in the documented command is caught here
+        rather than by a reader pasting it into Terminal.
+        """
+        path = _embed(tmp_path, ".jpg", "JPEG")
+        out = subprocess.run(
+            ["mdls", "-name", "kMDItemDescription", str(path)],
+            capture_output=True, text=True, timeout=60,
+        )
+        assert out.returncode == 0, out.stderr
+        assert "kMDItemDescription" in out.stdout
+        if "(null)" in out.stdout:
+            _spotlight_attributes(path)   # skips or fails with the fuller diagnosis
+        else:
+            assert DESCRIPTION in out.stdout
 
 
 # ------------------------------------------------------------------ #

@@ -1,0 +1,81 @@
+name: "Tests (macOS)"
+
+# The suite ran on windows-latest only. macOS had a *build* job and no test job,
+# so anything platform-specific to macOS was unverified by CI -- including the
+# thing that prompted this workflow: the user guide tells macOS readers to find
+# embedded descriptions with Get Info, Spotlight and `mdls`, and nothing checked
+# that those actually return the description.
+#
+# Get Info, Spotlight search and mdls all read kMDItemDescription, which macOS
+# populates from the XMP packet the embedder writes. Asserting on that key on
+# real Apple hardware is asserting on what a reader following the guide sees.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test-macos:
+    name: "Suite on macOS"
+    runs-on: macos-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Report the Spotlight tools available
+        # Diagnostic, not a gate. If the embedded-metadata job below fails on a
+        # runner, the first question is whether mdls/mdimport are present and
+        # whether indexing is on -- answer it here rather than by guessing.
+        run: |
+          echo "mdls:     $(command -v mdls || echo MISSING)"
+          echo "mdimport: $(command -v mdimport || echo MISSING)"
+          mdutil -s / || true
+
+      - name: Embedded-metadata visibility on macOS
+        # Run this before the full suite so a failure here is unmissable rather
+        # than buried in 1700 dots. IDT_REQUIRE_SPOTLIGHT turns "Spotlight had
+        # nothing to say" from a skip into a failure: a macOS check that always
+        # skips is indistinguishable from a pass, which is the trap the coverage
+        # job documents.
+        run: |
+          python -m pytest pytest_tests/unit/test_embedded_metadata_visibility.py \
+            -v --no-cov -p no:randomly
+        env:
+          IDT_QUIET_CONFIG_LOG: "1"
+          IDT_REQUIRE_SPOTLIGHT: "1"
+
+      - name: Prove the macOS cases actually ran
+        # A green run above means nothing if every darwin-only test was skipped
+        # because sys.platform was misread or the class was renamed.
+        run: |
+          python -m pytest pytest_tests/unit/test_embedded_metadata_visibility.py \
+            -q --no-cov -p no:randomly -k TestMacosSpotlightMetadata \
+            | tee macos-cases.txt
+          grep -qE '[1-9][0-9]* passed' macos-cases.txt \
+            || { echo "No macOS Spotlight test passed -- they all skipped."; exit 1; }
+        env:
+          IDT_QUIET_CONFIG_LOG: "1"
+          IDT_REQUIRE_SPOTLIGHT: "1"
+
+      - name: Run the full suite
+        run: python -m pytest pytest_tests/ -q --no-cov
+        env:
+          IDT_QUIET_CONFIG_LOG: "1"
