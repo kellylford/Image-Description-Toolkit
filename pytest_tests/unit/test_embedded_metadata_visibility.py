@@ -11,8 +11,9 @@ So these tests read the files back the way the operating system does:
 
   Windows Explorer "Comments"  ← EXIF UserComment (JPEG, WebP) / XPComment (TIFF)
   Windows Explorer "Title"     ← XMP dc:description (JPEG, PNG) / ImageDescription (TIFF)
-  macOS Get Info / Spotlight   ← XMP dc:description
-  Apple Photos caption         ← XMP dc:description
+  macOS Get Info / Preview     ← ImageIO, which reports the description as IPTC
+                                 Caption/Abstract and EXIF UserComment
+  macOS Spotlight, mdls        ← kMDItemDescription, off the same importer
 
 Change a tag number here and a documented, screen-reader-accessible way of
 getting at these descriptions quietly stops working, with no error anywhere.
@@ -436,21 +437,40 @@ class TestWindowsExplorerColumns:
 _FINDER_COMMENT_XATTR = "com.apple.metadata:kMDItemFinderComment"
 
 
-def _imageio_properties(path: Path) -> dict:
-    """Read image metadata through ImageIO, the way macOS's own viewers do."""
+def _imageio_descriptions(path: Path) -> dict:
+    """Return the description-bearing fields macOS's own image framework reports.
+
+    Get Info, Preview and the Spotlight importer all read through ImageIO, so
+    these are the values a reader following the guide ends up looking at.
+
+    The individual fields are pulled out rather than matching against str() of
+    the whole dictionary: an NSDictionary renders non-ASCII escaped, so a
+    stringified compare fails on accented text that is in fact stored correctly.
+    """
     Quartz = pytest.importorskip(
         "Quartz", reason="pyobjc-framework-Quartz not installed",
     )
     from CoreFoundation import CFURLCreateFromFileSystemRepresentation
 
-    url = CFURLCreateFromFileSystemRepresentation(
-        None, str(path).encode("utf-8"), len(str(path).encode("utf-8")), False,
-    )
+    encoded = str(path).encode("utf-8")
+    url = CFURLCreateFromFileSystemRepresentation(None, encoded, len(encoded), False)
     source = Quartz.CGImageSourceCreateWithURL(url, None)
     assert source is not None, f"ImageIO could not open {path.name}"
     properties = Quartz.CGImageSourceCopyPropertiesAtIndex(source, 0, None)
     assert properties is not None, f"ImageIO returned no properties for {path.name}"
-    return dict(properties)
+
+    wanted = {
+        "iptc_caption": ("{IPTC}", "Caption/Abstract"),
+        "exif_user_comment": ("{Exif}", "UserComment"),
+        "tiff_image_description": ("{TIFF}", "ImageDescription"),
+        "png_description": ("{PNG}", "Description"),
+    }
+    found = {}
+    for name, (section, key) in wanted.items():
+        value = (properties.get(section) or {}).get(key)
+        if value:
+            found[name] = str(value)
+    return found
 
 
 def _spotlight_description(path: Path):
@@ -518,30 +538,41 @@ class TestMacosImageIoMetadata:
 
     Querying it directly is the closest thing to opening Get Info that a
     headless runner can do, and unlike mdls it needs no indexed volume.
+
+    Measured on macos-latest: JPEG comes back as both IPTC Caption/Abstract and
+    EXIF UserComment, and PNG and TIFF are visible too. Asserting that at least
+    one recognised field holds the exact text keeps the check honest across
+    formats without pinning macOS's internal choice of field.
     """
 
-    def test_jpeg_description_is_visible_to_imageio(self, tmp_path):
-        properties = _imageio_properties(_embed(tmp_path, ".jpg", "JPEG"))
-        rendered = str(properties)
-        assert DESCRIPTION in rendered, (
-            "macOS's own image framework cannot see the description:\n"
-            f"{rendered[:2000]}"
+    def _assert_visible(self, path: Path, expected: str) -> None:
+        found = _imageio_descriptions(path)
+        assert found, (
+            f"macOS's image framework reports no description at all for "
+            f"{path.name} — Get Info would be empty"
         )
+        assert expected in found.values(), (
+            f"no ImageIO field holds the description for {path.name}: {found}"
+        )
+
+    def test_jpeg_description_is_visible_to_imageio(self, tmp_path):
+        self._assert_visible(_embed(tmp_path, ".jpg", "JPEG"), DESCRIPTION)
 
     def test_tiff_description_is_visible_to_imageio(self, tmp_path):
         """TIFF gets IFD tags and no XMP, so it needs checking separately."""
-        properties = _imageio_properties(_embed(tmp_path, ".tif", "TIFF"))
-        assert DESCRIPTION in str(properties)
+        self._assert_visible(_embed(tmp_path, ".tif", "TIFF"), DESCRIPTION)
 
     def test_png_description_is_visible_to_imageio(self, tmp_path):
-        properties = _imageio_properties(_embed(tmp_path, ".png", "PNG"))
-        assert DESCRIPTION in str(properties)
+        self._assert_visible(_embed(tmp_path, ".png", "PNG"), DESCRIPTION)
+
+    def test_webp_description_is_visible_to_imageio(self, tmp_path):
+        self._assert_visible(_embed(tmp_path, ".webp", "WEBP"), DESCRIPTION)
 
     def test_unicode_survives_to_imageio(self, tmp_path):
-        properties = _imageio_properties(
-            _embed(tmp_path, ".jpg", "JPEG", UNICODE_DESCRIPTION)
+        """Accents and CJK must arrive intact, not mojibake in Get Info."""
+        self._assert_visible(
+            _embed(tmp_path, ".jpg", "JPEG", UNICODE_DESCRIPTION), UNICODE_DESCRIPTION
         )
-        assert UNICODE_DESCRIPTION in str(properties)
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS Spotlight")
