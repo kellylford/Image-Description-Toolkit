@@ -164,7 +164,10 @@ class TestPngVisibility:
         from PIL import Image
 
         dest = _embed(tmp_path, ".png", "PNG")
-        assert Image.open(dest).text["Description"] == DESCRIPTION
+        # Opened outside the assert: python -O strips assert statements, and a
+        # check whose only file read lives inside one silently stops running.
+        chunks = Image.open(dest).text
+        assert chunks["Description"] == DESCRIPTION
 
     def test_xmp_chunk_carries_description(self, tmp_path):
         """PNG has no EXIF, so the guide tells PNG users to use the Title column."""
@@ -305,7 +308,8 @@ class TestTiffVisibility:
         Image.new("RGB", (400, 300), (10, 20, 30)).save(src, "TIFF", compression="tiff_lzw")
         dest = tmp_path / "lzw_out.tif"
         embed_image_file(src, DESCRIPTION, dest)
-        assert Image.open(dest).info.get("compression") == "tiff_lzw"
+        info = Image.open(dest).info
+        assert info.get("compression") == "tiff_lzw"
 
     def test_pixels_are_preserved(self, tmp_path):
         """Pillow rewrites the whole file for TIFF, so check it rewrites it faithfully."""
@@ -317,7 +321,8 @@ class TestTiffVisibility:
         before = Image.open(src).tobytes()
         dest = tmp_path / "out.tif"
         embed_image_file(src, DESCRIPTION, dest)
-        assert Image.open(dest).tobytes() == before
+        after = Image.open(dest).tobytes()
+        assert after == before
 
 
 # ------------------------------------------------------------------ #
@@ -601,17 +606,17 @@ class TestMacosSpotlight:
     """
 
     def _require_or_skip(self, value, path: Path):
-        if value is not None:
-            return value
-        if os.environ.get("IDT_REQUIRE_SPOTLIGHT") == "1":
-            pytest.fail(
-                f"mdls reported nothing for {path.name}. The user guide tells "
-                "macOS readers to use exactly this command."
+        if value is None:
+            if os.environ.get("IDT_REQUIRE_SPOTLIGHT") == "1":
+                pytest.fail(
+                    f"mdls reported nothing for {path.name}. The user guide "
+                    "tells macOS readers to use exactly this command."
+                )
+            pytest.skip(
+                "Spotlight has not indexed this path (normal on CI). "
+                "Set IDT_REQUIRE_SPOTLIGHT=1 on an indexed Mac to require it."
             )
-        pytest.skip(
-            "Spotlight has not indexed this path (normal on CI). "
-            "Set IDT_REQUIRE_SPOTLIGHT=1 on an indexed Mac to require it."
-        )
+        return value
 
     def test_documented_mdls_command_returns_the_description(self, tmp_path):
         path = _embed(tmp_path, ".jpg", "JPEG")
