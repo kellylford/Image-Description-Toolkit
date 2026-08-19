@@ -281,6 +281,34 @@ platform, and checked against the source by the test suite.
 
 ---
 
+## Also in 4.5: embedded descriptions you can actually find, and a TIFF fix
+
+Descriptions can be written into the image files themselves, so they travel with the
+photo. The guide explained how to put them in and never said how to get them back out,
+which made the whole feature hard to trust: you get a folder of copies and no way to
+confirm anything happened.
+
+**The user guide now says where to look**, on both platforms. On Windows: switch File
+Explorer to Details view, tab to the column headers, press `Shift+F10`, and turn on
+**Comments** or **Title** — then arrowing down the list reads each description along with
+its file name. Which column works depends on the format, so the guide spells that out;
+PNG has no EXIF at all and only appears under Title. On macOS: `Cmd+I` for Get Info,
+Preview's Inspector, Spotlight, `mdls`, or Photos captions. It also warns that Finder's
+**Comments** column is a note Finder keeps on the side and *not* the embedded
+description — switching it on shows nothing, which looks exactly like a failed embed.
+
+**Embedding into a TIFF used to destroy the file.** `.tif` and `.tiff` were handed to the
+JPEG writer, which injected a JPEG segment over the TIFF byte-order magic. The result was
+not a TIFF missing its description; it was a file Pillow, Explorer and Preview all refused
+to open. Nothing raised an error — the embed reported success and handed back dead files.
+TIFF now has its own writer, and multi-page TIFFs keep every page.
+
+Every claim in the new instructions is checked by the test suite against the real thing:
+the actual Explorer column values on Windows, and on macOS the ImageIO framework that Get
+Info and Preview read through.
+
+---
+
 ## Built to be usable without sight
 
 The desktop app is built for screen reader users, not merely checked afterwards.
