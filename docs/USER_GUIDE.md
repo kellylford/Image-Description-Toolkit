@@ -1479,8 +1479,10 @@ You can also search on the embedded text: type it into the Explorer search box a
 |----------------|---------|
 | JPEG (the usual case) | **Comments** or **Title**—both are filled |
 | PNG | **Title** (PNG has no EXIF, so **Comments** stays blank) |
-| WebP | **Comments** |
+| WebP | **Comments**—requires the Microsoft WebP Image Extension (see below) |
 | TIFF | **Comments** or **Title** |
+
+**WebP needs a codec.** Explorer reads WebP metadata through the Microsoft WebP Image Extension. Windows 11 installs normally have it, but on Windows Server or a stripped-down build it may be missing—and without it Explorer shows *no* image columns for WebP at all, not just an empty Comments. If Dimensions is blank too, install the extension from the Microsoft Store.
 
 #### Reading Embedded Descriptions on macOS
 

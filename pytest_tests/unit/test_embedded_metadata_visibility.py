@@ -411,7 +411,23 @@ class TestWindowsExplorerColumns:
         assert columns.get("Title") == DESCRIPTION
 
     def test_webp_appears_in_comments_column(self, tmp_path):
+        """WebP needs a codec Windows does not always ship.
+
+        Explorer reads WebP properties through the Microsoft WebP Image
+        Extension. Windows 11 desktop installs have it; Server images and CI
+        runners do not, and without it the shell has no property handler for
+        .webp at all — every image column comes back empty, not just Comments.
+
+        Distinguish the two: no Dimensions means no handler, which is a fact
+        about the machine. Dimensions but no Comments means the embed is broken.
+        """
         columns = _explorer_columns(_embed(tmp_path, ".webp", "WEBP"))
+        if not columns.get("Dimensions"):
+            pytest.skip(
+                "no WebP property handler on this machine (Microsoft WebP Image "
+                "Extension not installed) — Explorer shows no WebP image "
+                "columns at all, so Comments cannot be checked"
+            )
         assert columns.get("Comments") == DESCRIPTION
 
     def test_tiff_appears_in_comments_column(self, tmp_path):
