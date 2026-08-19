@@ -1497,6 +1497,8 @@ macOS has no Finder column for embedded descriptions—the **Comments** column i
 
 - **Photos** — importing an embedded copy brings the description in as the photo's caption, where it is visible in the Info pane and searchable.
 
+Unlike Windows, macOS needs no per-format advice here: Get Info and Preview read through ImageIO, which reports the description for JPEG, PNG, WebP and TIFF alike.
+
 ---
 
 ### Combining Multiple Workspaces

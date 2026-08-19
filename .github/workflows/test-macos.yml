@@ -87,9 +87,11 @@ jobs:
           python -m pytest pytest_tests/unit/test_embedded_metadata_visibility.py \
             --no-cov -q -k "TestMacosFinderCommentCaveat or TestMacosImageIoMetadata" \
             | tee macos-cases.txt
-          grep -qE '^[0-9]+ passed' macos-cases.txt \
-            || { echo "::error::The macOS ImageIO/xattr cases did not run."; exit 1; }
-          if grep -qE 'skipped' macos-cases.txt; then
+          # pytest's summary is "===== 7 passed, 41 deselected in 0.2s =====",
+          # so the count is mid-line -- do not anchor with ^.
+          grep -qE '[1-9][0-9]* passed' macos-cases.txt \
+            || { echo "::error::The macOS ImageIO/xattr cases did not run."; cat macos-cases.txt; exit 1; }
+          if grep -qE '[1-9][0-9]* skipped' macos-cases.txt; then
             echo "::error::A macOS case that must run was skipped:"; cat macos-cases.txt; exit 1
           fi
         env:
