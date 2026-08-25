@@ -533,6 +533,25 @@ class ClaudeChatProvider(ChatProvider):
             pass
         return self.FALLBACK_MAX_OUTPUT
 
+    def _request_kwargs(self, request: ChatRequest, messages: list, system: str) -> dict:
+        """The keyword arguments for ``client.messages.stream``.
+
+        ``temperature`` is deliberately absent: the anthropic SDK removed
+        ``temperature``/``top_p``/``top_k`` in 1.0.0, because current Claude
+        models do not use those sampling parameters. Passing one raises
+        ``TypeError`` before the request is ever sent, so it cannot be left in
+        as a harmless no-op. ``idt chat`` warns when ``--temperature`` is given
+        for Claude rather than dropping it silently.
+        """
+        kwargs = {
+            "model": request.model or self._model,
+            "max_tokens": self._max_output(request),
+            "messages": messages,
+        }
+        if system:
+            kwargs["system"] = system
+        return kwargs
+
     def chat(self, request: ChatRequest) -> Iterator[ChatYield]:
         import anthropic
 
@@ -543,18 +562,10 @@ class ClaudeChatProvider(ChatProvider):
         )
         system, messages = format_for_claude(request.messages, request.system_prompt)
 
-        kwargs = {
-            "model": request.model or self._model,
-            "max_tokens": self._max_output(request),
-            "messages": messages,
-        }
-        if system:
-            kwargs["system"] = system
-        if request.temperature is not None:
-            kwargs["temperature"] = request.temperature
-
         final = None
-        with client.messages.stream(**kwargs) as stream:
+        with client.messages.stream(
+            **self._request_kwargs(request, messages, system)
+        ) as stream:
             for text in stream.text_stream:
                 if text:
                     yield ChatDelta(text)

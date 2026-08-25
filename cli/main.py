@@ -1736,9 +1736,18 @@ def cmd_chat(args):
             # tool call — but keep going: the model can still chat without it.
             print(f"Warning: {missing_web_key_message()}", file=sys.stderr)
 
+    temperature = args.temperature
+    if temperature is not None and canonical == "claude":
+        # Current Claude models do not use sampling parameters, and the
+        # anthropic SDK removed the argument entirely in 1.0.0. Say so here
+        # rather than letting the flag look like it did something.
+        print("Warning: --temperature is not supported by Claude models; "
+              "ignoring it.", file=sys.stderr)
+        temperature = None
+
     options = ChatOptions(
         max_output_tokens=args.max_tokens,
-        temperature=args.temperature,
+        temperature=temperature,
         web_search=web_search,
         thinking=getattr(args, "thinking", None),
     )
@@ -2508,7 +2517,7 @@ Supported providers:
     p_chat.add_argument("--max-tokens", type=int, metavar="N",
                         help="Cap the reply length")
     p_chat.add_argument("--temperature", type=float, metavar="F",
-                        help="Sampling temperature")
+                        help="Sampling temperature (not supported by Claude)")
     p_chat.add_argument("--web-search", action="store_true",
                         help=("Let the model search the web (Ollama only; "
                               "needs a free ollama.com API key in "
