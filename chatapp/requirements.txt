@@ -47,4 +47,4 @@ pillow-heif>=1.5.0     # HEIC/HEIF image support
 # ----------------------------------------------------------------------------
 # BUILD ONLY
 # ----------------------------------------------------------------------------
-pyinstaller>=6.22.0    # Packaging into IDTChat.exe / IDTChat.app
+pyinstaller>=6.22.2    # Packaging into IDTChat.exe / IDTChat.app
