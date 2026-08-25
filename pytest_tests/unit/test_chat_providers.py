@@ -275,6 +275,48 @@ def test_unknown_claude_model_falls_back_rather_than_crashing():
 
 
 # ---------------------------------------------------------------------------
+# Sampling parameters -- removed from the anthropic SDK in 1.0.0
+# ---------------------------------------------------------------------------
+
+
+def test_claude_never_sends_temperature():
+    """anthropic 1.0.0 raises TypeError on temperature/top_p/top_k.
+
+    A request carrying a temperature must still build a valid kwargs dict --
+    the flag is dropped (and warned about in the CLI), not forwarded.
+    """
+    provider = ClaudeChatProvider("claude-opus-5")
+    request = ChatRequest(messages=[], model="claude-opus-5", temperature=0.2)
+
+    kwargs = provider._request_kwargs(request, messages=[], system="")
+
+    assert "temperature" not in kwargs
+    assert "top_p" not in kwargs
+    assert "top_k" not in kwargs
+
+
+def test_claude_request_kwargs_keep_the_parameters_that_still_exist():
+    provider = ClaudeChatProvider("claude-opus-5")
+    request = ChatRequest(messages=[], model="claude-opus-5", max_output_tokens=500)
+
+    kwargs = provider._request_kwargs(
+        request, messages=[{"role": "user", "content": "hi"}], system="Be terse."
+    )
+
+    assert kwargs["model"] == "claude-opus-5"
+    assert kwargs["max_tokens"] == 500
+    assert kwargs["messages"] == [{"role": "user", "content": "hi"}]
+    assert kwargs["system"] == "Be terse."
+
+
+def test_claude_omits_system_when_there_is_none():
+    provider = ClaudeChatProvider("claude-opus-5")
+    request = ChatRequest(messages=[], model="claude-opus-5")
+
+    assert "system" not in provider._request_kwargs(request, messages=[], system="")
+
+
+# ---------------------------------------------------------------------------
 # Text attachments -- inlined into the message text on every provider
 # ---------------------------------------------------------------------------
 

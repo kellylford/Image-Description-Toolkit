@@ -1243,7 +1243,7 @@ class ClaudeProvider(AIProvider):
             except Exception as e:
                 print(f"Warning: Failed to initialize Anthropic client: {e}")
         elif self.api_key and not HAS_ANTHROPIC:
-            print("Warning: anthropic package not installed. Install with: pip install anthropic>=0.18.0")
+            print("Warning: anthropic package not installed. Install with: pip install anthropic>=1.0.0")
         
         # Token usage tracking (for cost estimation and logging)
         self.last_usage = None
