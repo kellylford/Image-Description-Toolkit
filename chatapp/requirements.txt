@@ -32,8 +32,8 @@ wxPython>=4.3.1        # Cross-platform GUI framework
 # ----------------------------------------------------------------------------
 requests>=2.34.2       # HTTP requests
 ollama>=0.6.2          # Ollama Python client
-openai>=3.3.1          # OpenAI API
-anthropic>=1.0.0       # Anthropic Claude API
+openai>=3.8.0          # OpenAI API
+anthropic>=1.4.0       # Anthropic Claude API
 
 # ----------------------------------------------------------------------------
 # REQUIRED - Attachments
@@ -42,7 +42,7 @@ anthropic>=1.0.0       # Anthropic Claude API
 # iPhone HEIC be converted to JPEG on the way in, which every provider needs
 # because none of them decode HEIC.
 Pillow>=12.3.0         # Image processing
-pillow-heif>=1.5.0     # HEIC/HEIF image support
+pillow-heif>=1.6.0     # HEIC/HEIF image support
 
 # ----------------------------------------------------------------------------
 # BUILD ONLY
