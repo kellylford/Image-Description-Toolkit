@@ -1,42 +1,40 @@
 version: 2
+
+# One grouped PR per ecosystem per week, covering every manifest at once.
+#
+# Before this, each package in each directory got its own PR: the 9/14 sweep
+# arrived as 13 PRs for 5 packages, 9 of them strict subsets of the others.
+# Worse, the per-directory split let one package land at different floors in
+# different manifests — pillow-heif was opened for /idt, /imagedescriber and
+# /tools/show_metadata but not for /, /chatapp or pyproject.toml, which would
+# have written three different floors for one package into the tree.
+#
+# `directories` (plural) puts every manifest in a single PR, so a package moves
+# everywhere at once or not at all, and `groups` collapses all packages in that
+# ecosystem into that one PR.
+
 updates:
-  # Root requirements (core CLI/scripts)
+  # All Python manifests — root requirements.txt + pyproject.toml, the three
+  # app requirements files, and the show_metadata tool.
   - package-ecosystem: "pip"
-    directory: "/"
+    directories:
+      - "/"
+      - "/idt"
+      - "/imagedescriber"
+      - "/chatapp"          # was missing entirely until 9/14; its openai,
+                            # anthropic and pillow-heif pins went untracked
+      - "/tools/show_metadata"
     schedule:
       interval: "weekly"
     labels:
       - "dependencies"
       - "python"
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
 
-  # IDT CLI app
-  - package-ecosystem: "pip"
-    directory: "/idt"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-
-  # ImageDescriber GUI app
-  - package-ecosystem: "pip"
-    directory: "/imagedescriber"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-
-  # show_metadata tool
-  - package-ecosystem: "pip"
-    directory: "/tools/show_metadata"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "python"
-
-  # GitHub Actions
+  # GitHub Actions used by the workflows.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -44,3 +42,7 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

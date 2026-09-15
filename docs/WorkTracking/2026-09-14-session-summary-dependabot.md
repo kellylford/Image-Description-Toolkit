@@ -132,3 +132,64 @@ Building the audit venv under the session scratchpad failed with a confusing
 on a file that was present on disk. The path was 263 characters — over Windows'
 260-char `MAX_PATH`. Rebuilding at a short path fixed it. Worth remembering for
 any future venv under the long worktree/scratchpad paths.
+
+---
+
+## Follow-up: automating this (same session)
+
+After #320 merged, all 13 Dependabot PRs were closed as superseded and two
+config changes landed to stop this sweep shape from recurring.
+
+### Dependabot now opens one grouped PR per ecosystem
+
+`.github/dependabot.yml` moved from `directory` (singular, one entry per app) to
+`directories` (plural) plus a `groups` block matching `*`. Every Python manifest
+now updates in a single weekly PR, so a package moves everywhere at once or not
+at all — which is exactly the failure this sweep hit, where pillow-heif was
+opened for three manifests and skipped in three others.
+
+**`/chatapp` was missing from `dependabot.yml` entirely** and has been added. Its
+`openai`, `anthropic`, `pillow-heif` and `wxPython` pins had never been tracked
+by Dependabot at all. That is part of why the pillow-heif coverage was uneven.
+
+### Auto-merge waits for checks itself, and does not touch branch protection
+
+`.github/workflows/dependabot-auto-merge.yml` merges a Dependabot PR once every
+check on it has passed.
+
+It deliberately does **not** use GitHub's native auto-merge. Native auto-merge
+waits only for checks branch protection marks *required*, and `main` currently
+requires none — so turning it on as-is would merge Dependabot PRs instantly,
+without waiting for CI at all. Making the seven checks required is not an option
+either: `build-windows.yml` and `build-macos.yml` carry `paths-ignore` for
+`docs/**` and `**.md`, so they never run on a docs-only PR. A required check that
+never runs leaves the PR waiting on a status that will never report — which would
+have deadlocked every session-summary PR, including #300 and this file.
+
+So the wait lives in the workflow, where it applies to Dependabot PRs only.
+Branch protection is unchanged.
+
+The workflow uses `pull_request_target` because Dependabot-authored events get a
+read-only `GITHUB_TOKEN`. It never checks out the PR's code — the only untrusted
+input is the PR number — so the usual `pull_request_target` hazard does not apply.
+
+Two details that would otherwise bite:
+
+- It filters its own check out of the rollup by `workflowName`. Without that it
+  waits on itself and never merges.
+- An empty rollup means "checks have not registered yet", not "everything
+  passed". It waits rather than merging into a vacuum.
+
+Decision logic was tested against 13 rollup states (green, queued, in-progress,
+failure, cancelled, timed-out, skipped, legacy `StatusContext` entries, self-only,
+and empty) — all produced the intended merge/wait/abort verdict. The jq
+expressions were also run through `gh`'s gojq against the real #320 rollup.
+
+### Known risk, accepted
+
+"All seven checks green" has twice failed to mean "good" in this repo: the 8/25
+anthropic bump was green and still shipped a `TypeError`, and merging the 9/14
+pillow-heif PRs as-opened would have written three inconsistent floors. Both
+would now auto-merge. The grouping change removes the second failure mode; the
+first is a real residual risk, accepted deliberately in exchange for not hand-
+reviewing a dozen PRs a week. The weekly grouped PR is the place to look.

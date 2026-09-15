@@ -1,0 +1,101 @@
+name: Dependabot auto-merge
+
+# Merges a Dependabot PR once every check on it has passed.
+#
+# Why this waits for checks itself instead of using GitHub's native auto-merge:
+# native auto-merge only waits for checks that branch protection marks
+# *required*, and `main` requires none. Making them required is not an option
+# either — build-windows.yml and build-macos.yml carry `paths-ignore` for
+# `docs/**` and `**.md`, so they never run on a docs-only PR. A required check
+# that never runs leaves the PR waiting for a status that will never report,
+# which would deadlock every session-summary PR. So the wait lives here, where
+# it can apply to Dependabot PRs only.
+#
+# pull_request_target (not pull_request) because Dependabot-authored events get
+# a read-only GITHUB_TOKEN. pull_request_target runs this file as it exists on
+# main with the base-branch token. It never checks out the PR's code — the only
+# untrusted input is the PR number — so the usual pull_request_target hazard
+# does not apply.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# One run per PR; a new push supersedes the old wait.
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Wait for all checks, then merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          # This workflow's own check must be excluded or it waits on itself.
+          SELF: Dependabot auto-merge
+        run: |
+          set -euo pipefail
+
+          # Give the other workflows a moment to register their checks, so an
+          # empty rollup is not mistaken for "everything passed".
+          sleep 60
+
+          deadline=$(( $(date +%s) + 45*60 ))
+          while :; do
+            if [ "$(date +%s)" -gt "$deadline" ]; then
+              echo "::error::Timed out waiting for checks on #$PR."
+              exit 1
+            fi
+
+            rollup=$(gh pr view "$PR" --repo "$REPO" --json statusCheckRollup \
+              --jq '[.statusCheckRollup[] | select(.workflowName != env.SELF)]' \
+              2>/dev/null) || { echo "rollup query failed; retrying"; sleep 30; continue; }
+
+            total=$(jq 'length' <<<"$rollup")
+            if [ "$total" -eq 0 ]; then
+              echo "No checks reported yet; waiting."
+              sleep 30
+              continue
+            fi
+
+            # CheckRun entries use status/conclusion; StatusContext entries use state.
+            pending=$(jq '[.[] | select(
+              (.status? // "") != "COMPLETED" and (.state? // "") != "SUCCESS"
+                and (.state? // "") != "FAILURE" and (.state? // "") != "ERROR"
+            )] | length' <<<"$rollup")
+
+            failed=$(jq '[.[] | select(
+              ((.conclusion? // "") | IN("FAILURE","TIMED_OUT","CANCELLED","ACTION_REQUIRED","STARTUP_FAILURE"))
+              or ((.state? // "") | IN("FAILURE","ERROR"))
+            )] | length' <<<"$rollup")
+
+            if [ "$failed" -gt 0 ]; then
+              echo "::error::$failed check(s) failed on #$PR — not merging."
+              jq -r '.[] | select(
+                ((.conclusion? // "") | IN("FAILURE","TIMED_OUT","CANCELLED","ACTION_REQUIRED","STARTUP_FAILURE"))
+                or ((.state? // "") | IN("FAILURE","ERROR"))
+              ) | "  FAILED: \(.name // .context)"' <<<"$rollup"
+              exit 1
+            fi
+
+            if [ "$pending" -eq 0 ]; then
+              echo "All $total check(s) passed on #$PR."
+              break
+            fi
+
+            echo "$pending of $total check(s) still running; waiting."
+            sleep 30
+          done
+
+          gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
+          echo "Merged #$PR."
