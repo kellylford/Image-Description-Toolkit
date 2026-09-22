@@ -32,8 +32,8 @@ wxPython>=4.3.1        # Cross-platform GUI framework
 # ----------------------------------------------------------------------------
 requests>=2.34.2       # HTTP requests
 ollama>=0.6.2          # Ollama Python client
-openai>=3.13.0          # OpenAI API
-anthropic>=1.5.0       # Anthropic Claude API
+openai>=3.16.2          # OpenAI API
+anthropic>=1.7.0       # Anthropic Claude API
 
 # ----------------------------------------------------------------------------
 # REQUIRED - Attachments
@@ -47,4 +47,4 @@ pillow-heif>=1.7.0     # HEIC/HEIF image support
 # ----------------------------------------------------------------------------
 # BUILD ONLY
 # ----------------------------------------------------------------------------
-pyinstaller>=6.22.2    # Packaging into IDTChat.exe / IDTChat.app
+pyinstaller>=6.22.3    # Packaging into IDTChat.exe / IDTChat.app
