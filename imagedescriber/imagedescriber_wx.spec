@@ -110,6 +110,7 @@ a = Analysis(
         'idt_core.providers',
         'idt_core.providers.base',
         'idt_core.providers.claude',
+        'idt_core.providers.claude_code',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
         # Capability registry — replaces the deleted models/provider_configs.py.
@@ -126,6 +127,8 @@ a = Analysis(
         # file's convention; a missing entry fails only in the frozen build.
         'idt_core.chat',
         'idt_core.chat.attachments',
+        'idt_core.chat.claude_code',
+        'idt_core.chat.encoding',
         'idt_core.chat.mlx',
         'idt_core.chat.engine',
         'idt_core.chat.errors',

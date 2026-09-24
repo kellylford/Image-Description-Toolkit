@@ -90,6 +90,11 @@ except ImportError:
     DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
 
 
+# "claude-code" -> "Claude Code". idt_core imports the same way in dev and
+# frozen builds, so no try/except fallback is needed.
+from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
+
+
 class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
     """Dialog for editing image description prompts"""
     
@@ -425,7 +430,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 models_response = ollama.list()
                 available_models = [model.model for model in models_response['models']]
                 
-            elif provider in ("openai", "claude"):
+            elif provider in ("openai", "claude", "claude-code"):
                 # Live-backed list from the model catalog (issue #267). Read from
                 # its cache, so the Refresh models button and the provider combo
                 # both stay instant.
@@ -471,7 +476,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             # Add models to combo box
             for model_name in available_models:
                 display_text = ""
-                if provider in ("openai", "claude"):
+                if provider in ("openai", "claude", "claude-code"):
                     # One source for the label, covering both providers. The old
                     # code only found friendly names in CLAUDE_MODEL_METADATA and
                     # otherwise fell through to config_data['available_models'],
@@ -508,7 +513,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                         
         except Exception as e:
             # Fallback on error
-            error_msg = f"{provider.title()} not available: {e}"
+            error_msg = f"{_display_provider(provider)} not available: {e}"
             print(f"Warning: {error_msg}")
             self.default_model_combo.Append(error_msg)
             self.default_model_combo.SetSelection(0)

@@ -30,6 +30,7 @@ from .messages import ChatMessage
 DEFAULT_CONTEXT_WINDOWS = {
     "openai": 128_000,
     "claude": 200_000,
+    "claude-code": 200_000,
     "ollama": 32_768,
     "mlx": 32_768,
 }

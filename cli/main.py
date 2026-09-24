@@ -57,6 +57,14 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
         from idt_core.providers.claude import ClaudeProvider, DEFAULT_MODEL
         return ClaudeProvider(model=model or DEFAULT_MODEL)
 
+    if provider == "claude-code":
+        from idt_core.providers.claude_code import ClaudeCodeProvider, DEFAULT_MODEL
+        try:
+            return ClaudeCodeProvider(model=model or DEFAULT_MODEL)
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+
     if provider == "ollama":
         from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
         return OllamaProvider(model=model or DEFAULT_MODEL, host=ollama_host)
@@ -66,7 +74,7 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
         return OpenAIProvider(model=model or DEFAULT_MODEL)
 
     print(f"Unknown provider: {provider!r}", file=sys.stderr)
-    print("Valid providers: anthropic, ollama, openai", file=sys.stderr)
+    print("Valid providers: anthropic, claude-code, ollama, openai", file=sys.stderr)
     sys.exit(1)
 
 
@@ -105,8 +113,9 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
 def _provider_args(p: argparse.ArgumentParser) -> None:
     """Add the standard provider/model/ollama-host arguments."""
     p.add_argument(
-        "--provider", choices=["anthropic", "ollama", "openai"],
-        help="AI provider (default: from config, else ollama)",
+        "--provider", choices=["anthropic", "claude-code", "ollama", "openai"],
+        help="AI provider (default: from config, else ollama). "
+             "claude-code uses your Claude subscription via the claude CLI",
     )
     p.add_argument("--model", metavar="NAME", help="Model name")
     p.add_argument(
@@ -1493,6 +1502,7 @@ def cmd_models(args):
     idt models                      — check all providers
     idt models --provider ollama    — list Ollama models
     idt models --provider anthropic — list Claude models for this account
+    idt models --provider claude-code — Claude on your subscription
     idt models --refresh            — ignore the cache and ask the APIs now
     idt models --all                — skip the OpenAI chat-model filter
     """
@@ -1518,6 +1528,12 @@ def cmd_models(args):
             results[name] = _api_model_results(canonical, args)
         except Exception as e:                                  # noqa: BLE001
             results[name] = {"status": "error", "error": str(e), "models": []}
+
+    # Claude Code: no model listing to fetch -- the CLI resolves tier aliases --
+    # but whether it is installed and signed in to a subscription is exactly
+    # what someone running this wants to know.
+    if not args.provider or args.provider == "claude-code":
+        results["claude-code"] = _claude_code_model_results()
 
     if args.json_out:
         print(json.dumps(results, indent=2))
@@ -1548,8 +1564,26 @@ def cmd_models(args):
         elif status == "no_key":
             env_var = info.get("env_var") or "the provider's API key"
             print(f"\n{provider}: no API key ({env_var} not set)")
+        elif status == "unavailable":
+            print(f"\n{provider}: {info.get('error', 'not available')}")
         else:
             print(f"\n{provider}: error — {info.get('error', 'unknown')}")
+
+
+def _claude_code_model_results() -> dict:
+    """``idt models`` entry for Claude Code: its models, and whether it can run."""
+    from idt_core.providers.claude_code import (
+        CLAUDE_CODE_MODELS, ClaudeCodeError, check_subscription, is_available,
+    )
+
+    if not is_available():
+        return {"status": "unavailable", "models": [],
+                "error": "Claude Code is not installed (https://claude.com/claude-code)"}
+    try:
+        check_subscription(force=True)
+    except ClaudeCodeError as exc:
+        return {"status": "unavailable", "models": [], "error": str(exc)}
+    return {"status": "ok", "models": list(CLAUDE_CODE_MODELS)}
 
 
 # ------------------------------------------------------------------ #
@@ -1565,6 +1599,10 @@ def _chat_default_model(provider: str) -> str:
     as an API error. When the catalog knows the default is gone, the first
     recommended model that does exist is used instead.
     """
+    if provider == "claude-code":
+        from idt_core.providers.claude_code import DEFAULT_MODEL
+
+        return DEFAULT_MODEL
     if provider in ("claude", "openai"):
         if provider == "claude":
             from idt_core.providers.claude import DEFAULT_MODEL
@@ -1669,6 +1707,7 @@ def cmd_chat(args):
     idt chat                                   — interactive session
     idt chat --message "explain HEIC"          — one-shot
     idt chat --provider claude --system "Be terse."
+    idt chat --provider claude-code            — Claude on your subscription
     idt chat --list                            — saved conversations
     idt chat --resume chat_a1b2c3              — continue one
     """
@@ -1737,7 +1776,7 @@ def cmd_chat(args):
             print(f"Warning: {missing_web_key_message()}", file=sys.stderr)
 
     temperature = args.temperature
-    if temperature is not None and canonical == "claude":
+    if temperature is not None and canonical in ("claude", "claude-code"):
         # Current Claude models do not use sampling parameters, and the
         # anthropic SDK removed the argument entirely in 1.0.0. Say so here
         # rather than letting the flag look like it did something.
@@ -2472,7 +2511,7 @@ Supported providers:
         "models",
         help="Show available AI models for each provider",
     )
-    p_models.add_argument("--provider", choices=["anthropic", "ollama", "openai"],
+    p_models.add_argument("--provider", choices=["anthropic", "claude-code", "ollama", "openai"],
                           help="Show only this provider")
     p_models.add_argument("--ollama-host", metavar="URL",
                           default="http://localhost:11434")
@@ -2492,13 +2531,14 @@ Supported providers:
         "chat",
         help="Talk to an AI model from the terminal",
         description=(
-            "Multi-turn chat with Ollama, Claude or OpenAI. Responses stream "
+            "Multi-turn chat with Ollama, Claude, Claude Code (your Claude "
+            "subscription) or OpenAI. Responses stream "
             "as they arrive. Ctrl+C stops a reply and keeps what arrived; "
             "Ctrl+D or /quit exits. Conversations are saved to ~/.idt/chats "
             "and share their format with ImageDescriber's chat items."
         ),
     )
-    p_chat.add_argument("--provider", choices=["ollama", "claude", "openai", "anthropic"],
+    p_chat.add_argument("--provider", choices=["ollama", "claude", "claude-code", "openai", "anthropic"],
                         help="Which backend to talk to (default: ollama)")
     p_chat.add_argument("--model", help="Model id (default: the provider's default)")
     p_chat.add_argument("--system", metavar="TEXT",

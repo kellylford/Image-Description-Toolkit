@@ -31,6 +31,7 @@ from ..providers.base import (
     ChatUsage,
     ChatYield,
 )
+from .encoding import encode_attachment_claude, merge_text_attachments  # noqa: F401 (re-exported)
 from .messages import Attachment, ChatMessage, conversation_turns
 
 #: OpenAI images are resized to this longest edge before upload, matching the
@@ -91,51 +92,9 @@ def encode_pdf_openai(att: Attachment) -> dict:
     }
 
 
-def encode_attachment_claude(att: Attachment) -> dict:
-    """Image or document content block for the Anthropic messages API."""
-    payload = base64.b64encode(att.read_bytes()).decode("utf-8")
-    if att.media_type == "application/pdf":
-        return {
-            "type": "document",
-            "source": {
-                "type": "base64",
-                "media_type": "application/pdf",
-                "data": payload,
-            },
-        }
-    return {
-        "type": "image",
-        "source": {"type": "base64", "media_type": att.media_type, "data": payload},
-    }
-
-
 # ---------------------------------------------------------------------------
 # Message formatting — pure, and therefore testable
 # ---------------------------------------------------------------------------
-
-
-def merge_text_attachments(msg: ChatMessage) -> str:
-    """The turn's text with any text attachments inlined after it.
-
-    This is how a ``.txt``/``.md``/code attachment reaches the model on every
-    provider — as a longer prompt, never as an upload. It therefore works with
-    text-only models too. A file that has gone missing since it was attached
-    becomes a note rather than a failed turn: the conversation history may be
-    replayed long after the file was deleted.
-    """
-    texts = [a for a in msg.attachments if a.is_text]
-    if not texts:
-        return msg.content
-
-    parts = [msg.content] if msg.content else []
-    for att in texts:
-        try:
-            body = att.read_bytes().decode("utf-8", errors="replace")
-        except (OSError, ValueError):
-            parts.append(f"[Attached file {att.name} is no longer available.]")
-            continue
-        parts.append(f"[Attached file: {att.name}]\n{body}")
-    return "\n\n".join(parts)
 
 
 def format_for_ollama(
@@ -613,9 +572,15 @@ def create_chat_provider(
 
         return MLXChatProvider(model)
 
+    if canonical == "claude-code":
+        # Lazy, like MLX: only the chosen provider's module is loaded.
+        from .claude_code import ClaudeCodeChatProvider
+
+        return ClaudeCodeChatProvider(model)
+
     factory = _PROVIDERS.get(canonical)
     if factory is None:
-        known = ", ".join(sorted(list(_PROVIDERS) + ["mlx"]))
+        known = ", ".join(sorted(list(_PROVIDERS) + ["claude-code", "mlx"]))
         raise ValueError(f"unknown chat provider {provider!r}; known: {known}")
 
     if canonical == "ollama":

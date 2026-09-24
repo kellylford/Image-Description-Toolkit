@@ -32,6 +32,7 @@ __all__ = [
     "TEXT_ATTACHMENT_MIME_TYPES",
     "is_text_media_type",
     "capabilities_for",
+    "display_name",
     "list_providers",
     "supports_attachments",
     "supported_attachments",
@@ -88,6 +89,9 @@ class ProviderCapabilities:
     """What a provider supports, independent of which model is selected."""
 
     provider: str
+    #: Name shown to people. ``provider.title()`` got most of these right by
+    #: accident and "claude-code" wrong ("Claude-Code").
+    display_name: str = ""
     streaming: bool = False
     system_prompt: bool = False
     requires_api_key: bool = False
@@ -152,6 +156,7 @@ _IMAGE_MIMES: Tuple[str, ...] = (
 _REGISTRY: Dict[str, ProviderCapabilities] = {
     "ollama": ProviderCapabilities(
         provider="ollama",
+        display_name="Ollama",
         streaming=True,
         system_prompt=True,
         requires_api_key=False,
@@ -160,6 +165,7 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
     ),
     "ollama cloud": ProviderCapabilities(
         provider="ollama cloud",
+        display_name="Ollama Cloud",
         streaming=True,
         system_prompt=True,
         # Authenticates via Ollama Cloud login rather than an API key field.
@@ -171,6 +177,7 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
     ),
     "openai": ProviderCapabilities(
         provider="openai",
+        display_name="OpenAI",
         streaming=True,
         system_prompt=True,
         requires_api_key=True,
@@ -184,6 +191,7 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
     ),
     "claude": ProviderCapabilities(
         provider="claude",
+        display_name="Claude",
         streaming=True,
         system_prompt=True,
         requires_api_key=True,
@@ -196,8 +204,22 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
         max_image_bytes=5 * 1024 * 1024,
         max_document_bytes=32 * 1024 * 1024,
     ),
+    "claude-code": ProviderCapabilities(
+        provider="claude-code",
+        display_name="Claude Code",
+        streaming=True,
+        system_prompt=True,
+        # Runs on the user's Claude subscription through the `claude` CLI;
+        # signing in there replaces an API key.
+        requires_api_key=False,
+        is_local=False,
+        # PDFs are left out until verified through the CLI's stream-json input.
+        attachment_mime_types=_IMAGE_MIMES + TEXT_ATTACHMENT_MIME_TYPES,
+        max_image_bytes=5 * 1024 * 1024,
+    ),
     "mlx": ProviderCapabilities(
         provider="mlx",
+        display_name="MLX",
         # MLX generates in one shot; the chat engine adapts it by yielding a
         # single delta so consumers cannot tell the difference.
         streaming=False,
@@ -213,6 +235,9 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
 # Aliases for names the GUI and config files use for the same provider.
 _ALIASES: Dict[str, str] = {
     "anthropic": "claude",
+    "claude code": "claude-code",
+    "claude_code": "claude-code",
+    "claudecode": "claude-code",
     "ollama_cloud": "ollama cloud",
     "ollamacloud": "ollama cloud",
     "open ai": "openai",
@@ -234,6 +259,16 @@ def capabilities_for(provider_name: str) -> ProviderCapabilities:
     crashing a GUI event handler (where wx would swallow the traceback).
     """
     return _REGISTRY.get(_canonical(provider_name), _UNKNOWN)
+
+
+def display_name(provider_name: str) -> str:
+    """Human-readable provider name: "claude-code" -> "Claude Code".
+
+    Unknown names fall back to title case, which is what every caller did
+    before this existed.
+    """
+    caps = capabilities_for(provider_name)
+    return caps.display_name or (provider_name or "").strip().title()
 
 
 def list_providers() -> List[str]:

@@ -22,6 +22,11 @@ from typing import Optional
 SEP_LINE = "─" * 44  # reused in mark_complete()
 
 
+# "claude-code" -> "Claude Code". idt_core imports the same way in dev and
+# frozen builds, so no try/except fallback is needed.
+from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
+
+
 class BatchProgressDialog(wx.Dialog):
     """Modeless dialog showing batch processing progress and controls"""
     
@@ -265,7 +270,7 @@ class BatchProgressDialog(wx.Dialog):
         # ── Job Settings section ─────────────────────────────────────────────
         if self.batch_provider or self.batch_model or self.batch_prompt:
             if self.batch_provider:
-                self.stats_list.Append(f"Provider:                   {self.batch_provider.title()}")
+                self.stats_list.Append(f"Provider:                   {_display_provider(self.batch_provider)}")
             if self.batch_model:
                 self.stats_list.Append(f"Model:                      {self.batch_model}")
             if self.batch_prompt:

@@ -9,7 +9,7 @@ Image Description Toolkit (IDT) is an AI-powered batch image/video description t
 - **`ImageDescriber`** — wxPython batch processing GUI (`imagedescriber/imagedescriber_wx.py`) with integrated viewer (`viewer_components.py`), chat (`chat_window_wx.py`), workspace manager (`workspace_manager.py`), prompt editor, and configuration manager
 - **`IDT Chat`** — standalone accessible chat client (`chatapp/chat_app_wx.py`). Not an image tool; a general-purpose chat client for Ollama/Claude/OpenAI built for keyboard and screen reader use.
 
-Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic), and MLX (macOS Apple Silicon, GUI only).
+Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic API), Claude Code (Claude on the user's subscription via the `claude` CLI, provider key `claude-code`), and MLX (macOS Apple Silicon, GUI only).
 
 ## Commands
 
@@ -78,6 +78,7 @@ All model lists live in the provider modules under `idt_core/providers/`:
 - `idt_core/providers/claude.py` — Claude model list and metadata (sourced from Anthropic SDK)
 - `idt_core/providers/openai_provider.py` — OpenAI model list and metadata (sourced from OpenAI SDK)
 - `idt_core/providers/ollama.py` — Ollama models are dynamic (queries the running Ollama service at runtime)
+- `idt_core/providers/claude_code.py` — Claude Code provider: runs `claude -p` per request, billed to the user's subscription. Refuses to run unless `claude auth status` reports a claude.ai login, and strips `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_BASE_URL` from the child. Never use `--bare` there (bare mode is API-key only). Chat side: `idt_core/chat/claude_code.py`.
 - `idt_core/providers/registry.py` — **provider capabilities** (streaming, system prompt, attachment MIME types, API key requirement). Replaced the deleted `models/provider_configs.py`.
 
 Imported by CLI, GUI, and chat features. Never duplicate model lists elsewhere.

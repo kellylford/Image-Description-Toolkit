@@ -28,6 +28,7 @@ IDT includes three standalone applications that share the same AI provider infra
 | Ollama Cloud | — | `ollama_cloud` | Cloud (self-hosted) | No | GUI only |
 | Anthropic Claude | `anthropic` | `claude` | Cloud | Yes | Windows, macOS |
 | OpenAI GPT | `openai` | `openai` | Cloud | Yes | Windows, macOS |
+| Claude Code (your Claude subscription) | `claude-code` | `claude-code` | Cloud | No — sign in to Claude Code | Windows, macOS |
 | MLX (Apple Silicon) | — | `mlx` | Local | No | ImageDescriber only, macOS Apple Silicon |
 
 ---
@@ -1153,6 +1154,7 @@ All menu items, buttons, and interactive controls are reachable by keyboard. Arr
 > | `anthropic` | `claude` | Same provider; Anthropic Claude models |
 > | `ollama` | `ollama` | Same name in both |
 > | `openai` | `openai` | Same name in both |
+> | `claude-code` | `claude-code` | Same name in both; shown as "Claude Code" in pickers |
 > | — | `ollama_cloud` | GUI only; remote Ollama server |
 > | — | `mlx` | GUI only; Apple Silicon local models |
 
@@ -1256,6 +1258,50 @@ OpenAI's account list also contains speech, image-generation, embedding and mode
 ```bash
 idt describe ~/Photos --provider openai --model gpt-5.2
 ```
+
+---
+
+### Claude Code — Your Claude Subscription (Windows and macOS)
+
+If you pay for Claude Pro or Max, IDT can use that subscription instead of an API key. Requests go through the Claude Code app, so they count against your plan's usage limits and never charge an API account. It works everywhere the other providers do: `idt describe`, `idt chat`, ImageDescriber (describing and chat) and IDT Chat.
+
+**CLI and GUI provider name:** `claude-code` (shown as **Claude Code** in pickers)
+
+**Setup**
+
+1. Install Claude Code from [claude.com/claude-code](https://claude.com/claude-code).
+2. Sign in with your Claude account, not an Anthropic Console account:
+
+   ```bash
+   claude auth login
+   ```
+
+3. Check it: `idt models --provider claude-code` lists the models when you are signed in, and says what is wrong when you are not.
+
+IDT refuses to use Claude Code when it is signed in any other way (for example with an API key), because that would bill an API account instead of your subscription. Claude Code only appears in the pickers when it is installed.
+
+**Models**
+
+| Model | Characteristics |
+|---|---|
+| `haiku` | Fastest; uses the least of your plan's usage. A good default for large folders |
+| `sonnet` | More detail and better at reading text in images |
+| `opus` | Most capable; uses your plan's usage fastest |
+
+These names always mean the current model of each tier.
+
+**How much of your plan it uses**
+
+Each image is sent on its own, with a short instruction and no extras, so it costs about what the same request would through the API: roughly 1,900 input tokens for a phone photo plus the length of the description. Batches draw on the same allowance as your normal Claude use, and a large batch can use up a 5-hour window. When that happens, IDT reports the limit message and the remaining images can be described later.
+
+**CLI examples**
+
+```bash
+idt describe ~/Photos --provider claude-code --model haiku
+idt chat --provider claude-code --model sonnet
+```
+
+**Limits compared with the Claude API provider:** no PDF attachments in chat yet, no web search in chat, and `--temperature` is ignored. This is for your own use of your own subscription; it runs as whoever is signed in to Claude Code on the computer.
 
 ---
 

@@ -235,11 +235,23 @@ class ProviderDialog(wx.Dialog):
             return False
         return True
 
+    @staticmethod
+    def _claude_code_is_usable() -> bool:
+        """True when the `claude` CLI is installed. Sign-in is checked when a
+        chat starts, where the error can say how to fix it."""
+        try:
+            from idt_core.providers.claude_code import is_available
+        except Exception:                                   # noqa: BLE001
+            return False
+        return is_available()
+
     @classmethod
     def _provider_names(cls):
         names = [p for p in list_providers() if p != "ollama cloud"]
         if not cls._mlx_is_usable():
             names = [p for p in names if p != "mlx"]
+        if not cls._claude_code_is_usable():
+            names = [p for p in names if p != "claude-code"]
         return names
 
     def _on_provider(self, _event):
@@ -283,6 +295,26 @@ class ProviderDialog(wx.Dialog):
                 self.status.SetLabel(missing_key_message(provider))
             self._select_model(self._initial_model)
             self._start_catalog_refresh(provider)
+            return
+
+        if provider == "claude-code":
+            # Tier aliases the CLI resolves ("haiku", "sonnet", "opus"): nothing
+            # to fetch, so no background refresh either.
+            try:
+                from idt_core.providers import catalog
+
+                for entry in catalog.curated_models(provider):
+                    self.model_choice.Append(entry.display(), entry.id)
+            except Exception as exc:                        # noqa: BLE001
+                # Left in place: the sign-in hint below would be wrong advice
+                # for an empty picker.
+                self.status.SetLabel(f"Could not list models: {exc}")
+            else:
+                self.status.SetLabel(
+                    "Uses your Claude subscription through Claude Code. "
+                    "Sign in first with: claude auth login"
+                )
+            self._select_model(self._initial_model)
             return
 
         self._select_model(self._initial_model)

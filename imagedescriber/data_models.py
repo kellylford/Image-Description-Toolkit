@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 WORKSPACE_VERSION = "3.0"
 
 
+# "claude-code" -> "Claude Code". idt_core imports the same way in dev and
+# frozen builds, so no try/except fallback is needed.
+from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
+
+
 class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
@@ -278,7 +283,7 @@ class ImageWorkspace:
             session_name = f"Chat: {Path(image_path).name}"
             image_path_str = str(image_path)
         else:
-            session_name = f"Chat: {provider.title()} ({model})"
+            session_name = f"Chat: {_display_provider(provider)} ({model})"
             image_path_str = None
         
         self.chat_sessions[session_id] = {

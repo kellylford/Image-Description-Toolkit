@@ -83,6 +83,19 @@ from idt_core.providers.registry import (
 )
 
 
+# "claude-code" -> "Claude Code". idt_core imports the same way in dev and
+# frozen builds, so no try/except fallback is needed.
+from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
+
+
+# Picker label -> provider key ("Claude Code" -> "claude-code"). Not
+# .lower(): that only works while every label is its key in title case.
+try:
+    from ai_providers import provider_key as _provider_key  # frozen mode
+except ImportError:
+    from imagedescriber.ai_providers import provider_key as _provider_key  # dev mode
+
+
 class _NamedTextAccessible(wx.Accessible):
     """Provides an accessible name for wx.TextCtrl so VoiceOver reads the label.
 
@@ -153,8 +166,8 @@ class ChatDialog(wx.Dialog):
             from ai_providers import provider_picker_choices
         except ImportError:
             from imagedescriber.ai_providers import provider_picker_choices
-        # Labels lowercase to the provider keys ("MLX" -> "mlx"), which is what
-        # get_selections() and on_provider_changed() already rely on.
+        # Labels map back to keys through _provider_key(), not .lower():
+        # "Claude Code" is the label for the "claude-code" key.
         self.provider_choice = wx.Choice(
             self, choices=[label for _, label in provider_picker_choices()],
             name="AI provider"
@@ -195,7 +208,7 @@ class ChatDialog(wx.Dialog):
         try:
             selected = self.provider_choice.GetStringSelection()
             if selected:  # Guard against empty selection
-                provider = selected.lower()
+                provider = _provider_key(selected)
         except Exception:
             pass  # Use default 'ollama'
         
@@ -233,7 +246,7 @@ class ChatDialog(wx.Dialog):
                     self.model_combo.Append('llava:latest', 'llava:latest')
                     self.model_combo.SetSelection(0)
                     
-            elif provider in ('openai', 'claude'):
+            elif provider in ('openai', 'claude', 'claude-code'):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 try:
@@ -292,7 +305,7 @@ class ChatDialog(wx.Dialog):
         else:
             model = self.model_combo.GetStringSelection()
         return {
-            'provider': self.provider_choice.GetStringSelection().lower(),
+            'provider': _provider_key(self.provider_choice.GetStringSelection()),
             'model': model
         }
 
@@ -329,7 +342,7 @@ class ChatWindow(wx.Dialog):
         elif image_item:
             title = f"Chat: {Path(image_item.file_path).name}"
         else:
-            title = f"Chat with AI: {provider.title()} ({model})"
+            title = f"Chat with AI: {_display_provider(provider)} ({model})"
         
         super().__init__(parent, title=title,
                         size=(800, 700), 
@@ -424,7 +437,7 @@ class ChatWindow(wx.Dialog):
             name = f"Chat: {Path(self.image_item.file_path).name}"
             image_path = str(self.image_item.file_path)
         else:
-            name = f"Chat: {self.provider.title()} ({self.model})"
+            name = f"Chat: {_display_provider(self.provider)} ({self.model})"
             image_path = None
         
         return {
@@ -1145,7 +1158,7 @@ class ChatWindow(wx.Dialog):
         
         # Pre-select current
         for i in range(chat_dialog.provider_choice.GetCount()):
-            if chat_dialog.provider_choice.GetString(i).lower() == self.provider.lower():
+            if _provider_key(chat_dialog.provider_choice.GetString(i)) == _provider_key(self.provider):
                 chat_dialog.provider_choice.SetSelection(i)
                 chat_dialog.on_provider_changed(None) # Trigger model update
                 break

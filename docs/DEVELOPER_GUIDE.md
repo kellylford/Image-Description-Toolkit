@@ -15,6 +15,7 @@ Both apps open and write the same `.idtw` bundle format. Users' source images ar
 - Ollama (local/cloud models: llama3.2-vision, qwen2-vl, llava, etc.)
 - OpenAI (GPT-4o, GPT-4o-mini)
 - Anthropic Claude (claude-opus-4-6, claude-haiku-4-5-20251001)
+- Claude Code (`claude-code`): Claude on the user's Pro/Max subscription through the `claude` CLI. Each request is one `claude -p` run with stream-json input, a short `--system-prompt` and no tools, so an image costs about what it does through the API (1,876 input tokens for a 12-megapixel photo, measured). Earlier chat turns are sent as a labelled transcript, because the CLI ignores assistant turns on stdin. See `idt_core/providers/claude_code.py` and `idt_core/chat/claude_code.py`.
 - MLX (macOS Apple Silicon, GUI only — Qwen3-VL and compatible models via mlx-vlm)
 
 ### Dual Execution Model
