@@ -63,6 +63,15 @@ except ImportError:
     DEFAULT_OLLAMA_MODEL = DEFAULT_OLLAMA_MODEL
 
 
+def _display_provider(provider) -> str:
+    """"claude-code" -> "Claude Code"; see idt_core.providers.registry.display_name."""
+    try:
+        from idt_core.providers.registry import display_name
+        return display_name(str(provider or ""))
+    except Exception:                                       # noqa: BLE001
+        return str(provider or "").title()
+
+
 def set_accessible_name(widget, name):
     """Name a widget for screen readers, on both platforms.
 
@@ -302,6 +311,19 @@ class ApiKeyDialog(wx.Dialog):
 # model dropdown.
 # ---------------------------------------------------------------------------
 
+def _provider_key(label: str) -> str:
+    """Provider key for a picker selection ("Claude Code" -> "claude-code").
+
+    Through ai_providers.provider_key rather than ``.lower()``, which breaks as
+    soon as a label is not simply its key in title case.
+    """
+    try:
+        from ai_providers import provider_key
+    except ImportError:
+        from imagedescriber.ai_providers import provider_key
+    return provider_key(label)
+
+
 def _get_model_description_text(provider: str, model_id: str) -> str:
     """Return a one-or-two-line guidance string for the selected model.
 
@@ -375,6 +397,16 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
         if not model_id:
             return "Local Ollama models have no API cost. Requires Ollama running locally."
         return f"{model_id} — Local AI model running via Ollama. No API key or cloud cost."
+
+    if provider == "claude-code":
+        from idt_core.providers import catalog
+
+        entry = catalog.model_entry(provider, model_id)
+        parts = ["★ Recommended"] if entry.recommended else []
+        if entry.description:
+            parts.append(entry.description)
+        parts.append("Uses your Claude subscription through Claude Code; no API key or API charges")
+        return " | ".join(parts)
 
     if provider in ("openai", "claude"):
         # Read through the model catalog so a model the API lists but we ship no
@@ -482,7 +514,7 @@ class FollowupQuestionDialog(wx.Dialog):
             original_model_display = self.original_model
         original_label = wx.StaticText(
             self,
-            label=f"Original: {self.original_provider.title()} - {original_model_display}"
+            label=f"Original: {_display_provider(self.original_provider)} - {original_model_display}"
         )
         original_label.SetFont(original_label.GetFont().MakeItalic())
         model_sizer.Add(original_label, 0, wx.ALL, 5)
@@ -575,7 +607,7 @@ class FollowupQuestionDialog(wx.Dialog):
         """Refresh the description text below the model choice widget."""
         if not hasattr(self, 'model_desc_text'):
             return
-        provider = self.provider_choice.GetStringSelection().lower()
+        provider = _provider_key(self.provider_choice.GetStringSelection())
         selection = self.model_combo.GetSelection()
         model_id = ""
         if selection != wx.NOT_FOUND:
@@ -645,7 +677,7 @@ class FollowupQuestionDialog(wx.Dialog):
                     for model in [DEFAULT_OLLAMA_MODEL, "llava", "llama3.2-vision", "moondream"]:
                         self.model_combo.Append(model)
                         
-            elif provider in ("openai", "claude"):
+            elif provider in ("openai", "claude", "claude-code"):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 # `keep` holds on to the model already selected, so one the
@@ -1038,7 +1070,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         """Refresh the description text below the model choice widget."""
         if not hasattr(self, 'model_desc_text'):
             return
-        provider = self.provider_choice.GetStringSelection().lower()
+        provider = _provider_key(self.provider_choice.GetStringSelection())
         selection = self.model_combo.GetSelection()
         model_id = ""
         if selection != wx.NOT_FOUND:
@@ -1072,7 +1104,7 @@ class ProcessingOptionsDialog(wx.Dialog):
 
     def populate_models_for_provider(self):
         """Populate model list based on selected provider"""
-        provider = self.provider_choice.GetStringSelection().lower()
+        provider = _provider_key(self.provider_choice.GetStringSelection())
         
         # Clear the model choices (wx.Choice is safe with VoiceOver, no focus workaround needed)
         self.model_combo.Clear()
@@ -1107,7 +1139,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                 else:
                     self.model_combo.Append(DEFAULT_OLLAMA_MODEL)
                     self.model_combo.SetSelection(0)
-            elif provider in ("openai", "claude"):
+            elif provider in ("openai", "claude", "claude-code"):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 try:
@@ -1243,7 +1275,7 @@ class ProcessingOptionsDialog(wx.Dialog):
             'geocode_enabled': self.geocode_cb.GetValue(),
             'embed_after_process': self.embed_after_process_cb.GetValue(),
             'copy_originals': self.copy_originals_cb.GetValue(),
-            'provider': self.provider_choice.GetStringSelection().lower(),
+            'provider': _provider_key(self.provider_choice.GetStringSelection()),
             'model': model,
             'prompt_style': self.prompt_choice.GetStringSelection(),
             'custom_prompt': self.custom_prompt_input.GetValue(),

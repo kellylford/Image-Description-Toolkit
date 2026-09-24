@@ -128,6 +128,11 @@ def _curated_tables(provider: str) -> Tuple[Sequence[str], Dict[str, dict]]:
         from .openai_provider import OPENAI_MODEL_METADATA, OPENAI_MODELS
 
         return OPENAI_MODELS, OPENAI_MODEL_METADATA
+    if provider == "claude-code":
+        # Tier aliases resolved by the CLI; there is no live listing to merge.
+        from .claude_code import CLAUDE_CODE_MODEL_METADATA, CLAUDE_CODE_MODELS
+
+        return CLAUDE_CODE_MODELS, CLAUDE_CODE_MODEL_METADATA
     return (), {}
 
 

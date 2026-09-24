@@ -132,8 +132,10 @@ def _step_provider() -> str:
     print("  ollama    - Local models on your machine (no API key)")
     print("  anthropic - Claude (requires ANTHROPIC_API_KEY)")
     print("  openai    - GPT-4o (requires OPENAI_API_KEY)")
+    print("  claude-code - Claude on your Claude subscription, through the")
+    print("                Claude Code app (no API key; run 'claude auth login')")
     print()
-    providers = ["ollama", "anthropic", "openai"]
+    providers = ["ollama", "anthropic", "openai", "claude-code"]
     choice = get_choice("Which provider?", providers, default=1)
     return choice
 
@@ -145,6 +147,9 @@ def _step_api_key(provider: str) -> bool:
     """
     import os
     _header(f"Step 2: API Key — {provider.upper()}")
+
+    if provider == "claude-code":
+        return _check_claude_code()
 
     env_var = {
         "anthropic": "ANTHROPIC_API_KEY",
@@ -218,6 +223,21 @@ def _ensure_ollama_model(model: str, installed: list[str]) -> bool:
     return _ollama_pull(model)
 
 
+def _check_claude_code() -> bool:
+    """Claude Code replaces the API key step: it must be installed and signed
+    in to a claude.ai subscription, or every request would fail."""
+    from idt_core.providers.claude_code import ClaudeCodeError, check_subscription
+
+    try:
+        check_subscription(force=True)
+    except ClaudeCodeError as exc:
+        print(f"Warning: {exc}")
+        print()
+        return get_yes_no("Continue anyway?", default=False)
+    print("Claude Code is signed in to your Claude subscription. No API key needed.")
+    return True
+
+
 def _step_model(provider: str) -> str:
     _header("Step 3: Model")
 
@@ -245,7 +265,7 @@ def _step_model(provider: str) -> str:
         _ensure_ollama_model(choice, installed)
         return choice
 
-    if provider in ("anthropic", "openai"):
+    if provider in ("anthropic", "openai", "claude-code"):
         return _choose_api_model(provider)
 
     return get_input("Enter model name")
@@ -264,7 +284,7 @@ def _choose_api_model(provider: str) -> str:
     """
     from idt_core.providers import catalog
 
-    label = "Claude" if provider == "anthropic" else "OpenAI"
+    label = {"anthropic": "Claude", "claude-code": "Claude Code"}.get(provider, "OpenAI")
     try:
         entries = catalog.cached_models(provider)
     except Exception:

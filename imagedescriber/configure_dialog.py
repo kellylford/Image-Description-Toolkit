@@ -506,8 +506,8 @@ class ConfigureDialog(wx.Dialog):
                     "file": "image_describer",
                     "path": ["default_provider"],
                     "type": "choice",
-                    "choices": ["ollama", "openai", "claude"],
-                    "description": "Default AI provider to use when processing images. Ollama runs locally, OpenAI and Claude require API keys."
+                    "choices": ["ollama", "openai", "claude", "claude-code"],
+                    "description": "Default AI provider to use when processing images. Ollama runs locally, OpenAI and Claude require API keys, and claude-code uses your Claude subscription through the Claude Code app (sign in with 'claude auth login')."
                 },
                 "default_model": {
                     "file": "image_describer",

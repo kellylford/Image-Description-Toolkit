@@ -22,6 +22,15 @@ from typing import Optional
 SEP_LINE = "─" * 44  # reused in mark_complete()
 
 
+def _display_provider(provider) -> str:
+    """"claude-code" -> "Claude Code"; see idt_core.providers.registry.display_name."""
+    try:
+        from idt_core.providers.registry import display_name
+        return display_name(str(provider or ""))
+    except Exception:                                       # noqa: BLE001
+        return str(provider or "").title()
+
+
 class BatchProgressDialog(wx.Dialog):
     """Modeless dialog showing batch processing progress and controls"""
     
@@ -265,7 +274,7 @@ class BatchProgressDialog(wx.Dialog):
         # ── Job Settings section ─────────────────────────────────────────────
         if self.batch_provider or self.batch_model or self.batch_prompt:
             if self.batch_provider:
-                self.stats_list.Append(f"Provider:                   {self.batch_provider.title()}")
+                self.stats_list.Append(f"Provider:                   {_display_provider(self.batch_provider)}")
             if self.batch_model:
                 self.stats_list.Append(f"Model:                      {self.batch_model}")
             if self.batch_prompt:

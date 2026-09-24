@@ -361,6 +361,15 @@ ProcessingProgressEvent, EVT_PROCESSING_PROGRESS = wx.lib.newevent.NewEvent()
 ProcessingErrorEvent, EVT_PROCESSING_ERROR = wx.lib.newevent.NewEvent()
 
 
+def _display_provider(provider) -> str:
+    """"claude-code" -> "Claude Code"; see idt_core.providers.registry.display_name."""
+    try:
+        from idt_core.providers.registry import display_name
+        return display_name(str(provider or ""))
+    except Exception:                                       # noqa: BLE001
+        return str(provider or "").title()
+
+
 def _format_chat_name(provider: str, model: str, dt=None) -> str:
     """Return a display name for a new chat session.
 
@@ -373,7 +382,7 @@ def _format_chat_name(provider: str, model: str, dt=None) -> str:
     hour = dt.hour % 12 or 12
     ampm = "A" if dt.hour < 12 else "P"
     date_str = f"{dt.month}/{dt.day}/{dt.year} {hour}:{dt.minute:02d}{ampm}"
-    return f"Chat - {provider.title()} {model} - {date_str}"
+    return f"Chat - {_display_provider(provider)} {model} - {date_str}"
 
 
 def format_image_metadata(metadata: dict) -> list:
@@ -5942,12 +5951,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if "not available" in error_msg.lower():
             # Extract provider name if present
             provider_name = None
-            for prov in ["openai", "claude", "ollama"]:
+            # "claude-code" first: "claude" is a substring of it, and the
+            # API-key advice below is wrong for a subscription login.
+            for prov in ["claude code", "openai", "claude", "ollama"]:
                 if prov in error_msg.lower():
                     provider_name = prov
                     break
 
-            if provider_name in ["openai", "claude"]:
+            if provider_name == "claude code":
+                error_msg += "\n\nPossible reasons:\n" \
+                           "• Claude Code is not installed, or not signed in\n" \
+                           "• Your plan's usage limit has been reached\n\n" \
+                           "To fix: run 'claude auth login' in a terminal and sign in " \
+                           "with your Claude account"
+            elif provider_name in ["openai", "claude"]:
                 error_msg += f"\n\nPossible reasons:\n" \
                            f"• API key not configured\n" \
                            f"• API key invalid or expired\n" \

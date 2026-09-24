@@ -91,15 +91,32 @@ def test_a_broken_availability_check_shows_too_much_not_too_little(monkeypatch):
 
     monkeypatch.setattr(ai_providers, "get_available_providers", boom)
     keys = [key for key, _ in ai_providers.provider_picker_choices()]
-    assert keys == ["ollama", "openai", "claude", "mlx"]
+    assert keys == ["ollama", "openai", "claude", "claude-code", "mlx"]
 
 
-def test_labels_lowercase_to_provider_keys():
-    """ChatDialog derives the provider with `GetStringSelection().lower()`, so
-    a label that doesn't lowercase to its key would route to the wrong
-    provider."""
-    for key, label in ai_providers.provider_picker_choices():
-        assert label.lower() == key
+def test_every_label_maps_back_to_its_key():
+    """Dialogs read the provider back from the picker's label. They used to do
+    it with `.lower()`, which routes "Claude Code" to "claude code" -- no
+    provider's key. provider_key() must invert every label, and leave keys
+    (and the old lowercased form) alone."""
+    for key, label in ai_providers._PICKER_PROVIDERS:
+        assert ai_providers.provider_key(label) == key
+        assert ai_providers.provider_key(key) == key
+    assert ai_providers.provider_key("claude code") == "claude-code"
+
+
+def test_claude_code_is_hidden_when_the_cli_is_not_installed(monkeypatch):
+    """Installing Claude Code happens outside this app, so -- like MLX off
+    Apple Silicon -- offering it would only produce an error when picked."""
+    monkeypatch.setattr(ai_providers._claude_code_provider, "is_available", lambda: False)
+    keys = [key for key, _ in ai_providers.provider_picker_choices()]
+    assert "claude-code" not in keys
+
+
+def test_claude_code_is_offered_when_the_cli_is_installed(monkeypatch):
+    monkeypatch.setattr(ai_providers._claude_code_provider, "is_available", lambda: True)
+    choices = dict(ai_providers.provider_picker_choices())
+    assert choices.get("claude-code") == "Claude Code"
 
 
 # ---------------------------------------------------------------------------

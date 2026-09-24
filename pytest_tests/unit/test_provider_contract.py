@@ -31,6 +31,7 @@ sys.path.insert(0, str(_ROOT / "imagedescriber"))
 
 from ai_providers import (  # noqa: E402
     AIProvider,
+    ClaudeCodeProvider,
     ClaudeProvider,
     ErrorKind,
     MLXProvider,
@@ -297,11 +298,50 @@ class _MLXDriver(ProviderDriver):
         return provider, script
 
 
+class _ClaudeCodeDriver(ProviderDriver):
+    provider_class = ClaudeCodeProvider
+    speaks_http = False
+    no_http_reason = (
+        "Claude Code runs the `claude` CLI as a subprocess. The CLI owns the "
+        "HTTP connection and its own retries, and reports failure as text in "
+        "its result record, never as a status code. Its failures are covered "
+        "by the success/timeout/garbage cases below."
+    )
+
+    def build(self, monkeypatch, tmp_path, outcomes):
+        from idt_core.providers import claude_code
+        from idt_core.providers.claude_code import ClaudeCodeError
+
+        script = _Script(outcomes)
+
+        def run_claude(content, model, system_prompt, **_kwargs):
+            kind, value = script.next()
+            if kind == "ok":
+                yield ("result", {"result": value, "is_error": False,
+                                  "usage": {"input_tokens": 10, "output_tokens": 5}})
+                return
+            if kind == "timeout":
+                raise ClaudeCodeError("Claude Code did not finish within 300s")
+            if kind == "garbage":
+                raise ClaudeCodeError("Claude Code returned no result: exit code 1")
+            if kind == "http":
+                yield ("result", {"result": f"API Error: {value}", "is_error": True})
+                return
+            raise _ScriptExhausted(kind)
+
+        # No CLI, no sign-in, no subprocess: the transport is run_claude.
+        monkeypatch.setattr(claude_code, "find_claude", lambda: "claude")
+        monkeypatch.setattr(claude_code, "check_subscription", lambda *a, **k: None)
+        monkeypatch.setattr(claude_code, "run_claude", run_claude)
+        return ClaudeCodeProvider(), script
+
+
 DRIVERS = [
     _OllamaDriver(),
     _OllamaCloudDriver(),
     _OpenAIDriver(),
     _ClaudeDriver(),
+    _ClaudeCodeDriver(),
     _MLXDriver(),
 ]
 

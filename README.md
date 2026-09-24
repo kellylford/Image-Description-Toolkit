@@ -1,6 +1,6 @@
 # Image Description Toolkit
 
-AI-powered batch image description tool supporting multiple vision models (Ollama, OpenAI GPT-4o, Claude).
+AI-powered batch image description tool supporting multiple vision models (Ollama, OpenAI GPT-4o, Claude — through the API or through your Claude subscription).
 
 ## Quick Start
 
@@ -64,7 +64,7 @@ idt update
 ## Features
 
 - **Two Powerful Applications**: GUI for visual workflow, CLI for automation
-- **Multiple AI Providers**: Ollama (local), OpenAI, Claude
+- **Multiple AI Providers**: Ollama (local), OpenAI, Claude (API key), Claude Code (your Claude Pro/Max subscription, no API key)
 - **Batch Processing**: Process directories of images automatically
 - **Video Frame Extraction**: Extract and describe frames from videos
 - **Integrated Viewer**: Browse and monitor workflows in real-time (built into GUI)

@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 WORKSPACE_VERSION = "3.0"
 
 
+def _display_provider(provider) -> str:
+    """"claude-code" -> "Claude Code"; see idt_core.providers.registry.display_name."""
+    try:
+        from idt_core.providers.registry import display_name
+        return display_name(str(provider or ""))
+    except Exception:                                       # noqa: BLE001
+        return str(provider or "").title()
+
+
 class ImageDescription:
     """Represents a single description for an image"""
     def __init__(self, text: str, model: str = "", prompt_style: str = "", 
@@ -278,7 +287,7 @@ class ImageWorkspace:
             session_name = f"Chat: {Path(image_path).name}"
             image_path_str = str(image_path)
         else:
-            session_name = f"Chat: {provider.title()} ({model})"
+            session_name = f"Chat: {_display_provider(provider)} ({model})"
             image_path_str = None
         
         self.chat_sessions[session_id] = {

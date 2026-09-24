@@ -1899,6 +1899,71 @@ class MLXProvider(AIProvider):
             return None
 
 
+class ClaudeCodeProvider(AIProvider):
+    """Claude through the ``claude`` CLI, billed to the user's Claude subscription.
+
+    A thin adapter over ``idt_core.providers.claude_code``, which owns the CLI
+    invocation, the subscription check and the environment scrubbing that keeps
+    requests off any API account. Needs no API key: signing in to Claude Code
+    (``claude auth login``) is the setup step.
+    """
+
+    def __init__(self):
+        self.last_usage = None
+
+    def get_provider_name(self) -> str:
+        return "Claude Code"
+
+    def is_available(self) -> bool:
+        """True when the CLI is installed. Sign-in is checked at first use,
+        where a clear error can be shown, not on every picker refresh."""
+        try:
+            from idt_core.providers.claude_code import is_available
+            return is_available()
+        except Exception:                                   # noqa: BLE001
+            return False
+
+    def get_available_models(self) -> List[str]:
+        if not self.is_available():
+            return []
+        from idt_core.providers.claude_code import CLAUDE_CODE_MODELS
+        return list(CLAUDE_CODE_MODELS)
+
+    @retry_on_api_error(max_retries=2, base_delay=2.0, max_delay=30.0)
+    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
+        from idt_core.converter import load_for_api
+        from idt_core.providers.claude_code import (
+            DEFAULT_MODEL, ClaudeCodeError, ClaudeCodeProvider as _CoreProvider,
+        )
+
+        try:
+            core = _CoreProvider(model=model or DEFAULT_MODEL)
+            image_bytes, mime_type = load_for_api(Path(image_path))
+            result = core.describe(image_bytes, mime_type, prompt)
+        except ClaudeCodeError as exc:
+            message = str(exc)
+            lowered = message.lower()
+            if "did not finish within" in lowered:
+                kind = ErrorKind.TIMEOUT
+            elif "not signed in" in lowered or "not installed" in lowered \
+                    or "claude auth login" in lowered:
+                # Setup problems: no request was made, and retrying cannot help.
+                kind = ErrorKind.UNAVAILABLE
+            else:
+                # Includes a used-up plan allowance, which resets in hours --
+                # retrying within seconds would only repeat the failure.
+                kind = ErrorKind.UNKNOWN
+            raise_provider_error(provider="Claude Code", kind=kind, message=message)
+
+        self.last_usage = {
+            'prompt_tokens': result.input_tokens or 0,
+            'completion_tokens': result.output_tokens or 0,
+            'total_tokens': (result.input_tokens or 0) + (result.output_tokens or 0),
+            'model': model,
+        }
+        return result.text
+
+
 # ---------------------------------------------------------------------------
 # Global provider instances
 # ---------------------------------------------------------------------------
@@ -1907,6 +1972,7 @@ _ollama_provider = OllamaProvider()
 _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
+_claude_code_provider = ClaudeCodeProvider()
 _mlx_provider = MLXProvider()
 
 
@@ -1926,6 +1992,9 @@ def get_available_providers() -> Dict[str, AIProvider]:
     if _claude_provider.is_available():
         providers['claude'] = _claude_provider
 
+    if _claude_code_provider.is_available():
+        providers['claude-code'] = _claude_code_provider
+
     if _mlx_provider.is_available():
         providers['mlx'] = _mlx_provider
 
@@ -1939,8 +2008,31 @@ _PICKER_PROVIDERS = (
     ("ollama", "Ollama"),
     ("openai", "OpenAI"),
     ("claude", "Claude"),
+    ("claude-code", "Claude Code"),
     ("mlx", "MLX"),
 )
+
+#: Providers hidden from pickers when they cannot run on this machine. MLX
+#: needs Apple Silicon; Claude Code needs the `claude` CLI installed, which is
+#: done outside this app -- unlike a missing API key, nothing in a dialog can
+#: fix it.
+_GATED_PROVIDERS = ("mlx", "claude-code")
+
+
+def provider_key(value: str) -> str:
+    """The provider key for a picker label or key, e.g. "Claude Code" -> "claude-code".
+
+    Dialogs used to derive the key with ``GetStringSelection().lower()``,
+    which only works while every label is its key in title case. "Claude
+    Code" lowercases to "claude code", which is no provider's key, so every
+    picker read goes through here instead.
+    """
+    text = (value or "").strip()
+    for key, label in _PICKER_PROVIDERS:
+        if text == label or text.lower() == key:
+            return key
+    lowered = text.lower()
+    return {"claude code": "claude-code", "claude_code": "claude-code"}.get(lowered, lowered)
 
 
 def provider_picker_choices(title_case: bool = True) -> List[tuple]:
@@ -1977,7 +2069,7 @@ def provider_picker_choices(title_case: bool = True) -> List[tuple]:
         # Only the platform-gated providers are filtered. A missing API key is
         # a fixable setup step the dialogs already explain, not a reason to
         # hide the provider and leave the user with no way to discover it.
-        if key == "mlx" and key not in available:
+        if key in _GATED_PROVIDERS and key not in available:
             continue
         out.append((key, label if title_case else key))
     return out
@@ -1990,5 +2082,6 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'ollama_cloud': _ollama_cloud_provider,
         'openai': _openai_provider,
         'claude': _claude_provider,
+        'claude-code': _claude_code_provider,
         'mlx': _mlx_provider,
     }

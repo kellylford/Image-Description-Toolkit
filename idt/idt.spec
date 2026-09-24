@@ -74,6 +74,7 @@ a = Analysis(
         'idt_core.providers',
         'idt_core.providers.base',
         'idt_core.providers.claude',
+        'idt_core.providers.claude_code',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
         # Capability registry — imported eagerly by idt_core/providers/__init__.py
@@ -96,6 +97,7 @@ a = Analysis(
         # build, which is the hardest place to notice it.
         'idt_core.chat',
         'idt_core.chat.attachments',
+        'idt_core.chat.claude_code',
         'idt_core.chat.mlx',
         'idt_core.chat.engine',
         'idt_core.chat.errors',

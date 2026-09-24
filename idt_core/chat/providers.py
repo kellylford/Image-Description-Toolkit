@@ -613,9 +613,16 @@ def create_chat_provider(
 
         return MLXChatProvider(model)
 
+    if canonical == "claude-code":
+        # Lazy for the same reason as MLX, plus claude_code imports helpers
+        # from this module.
+        from .claude_code import ClaudeCodeChatProvider
+
+        return ClaudeCodeChatProvider(model)
+
     factory = _PROVIDERS.get(canonical)
     if factory is None:
-        known = ", ".join(sorted(list(_PROVIDERS) + ["mlx"]))
+        known = ", ".join(sorted(list(_PROVIDERS) + ["claude-code", "mlx"]))
         raise ValueError(f"unknown chat provider {provider!r}; known: {known}")
 
     if canonical == "ollama":
