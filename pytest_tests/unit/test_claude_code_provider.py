@@ -182,7 +182,8 @@ def test_oversized_images_are_shrunk_below_the_api_limit():
     assert len(buf.getvalue()) > claude_code.MAX_IMAGE_BYTES
     data, mime = claude_code.fit_image(buf.getvalue(), "image/png")
     assert mime == "image/jpeg" and len(data) <= claude_code.MAX_IMAGE_BYTES
-    assert max(Image.open(io.BytesIO(data)).size) == claude_code.FIT_LONG_EDGE
+    fitted = Image.open(io.BytesIO(data))
+    assert max(fitted.size) == claude_code.FIT_LONG_EDGE
     small = b"\xff\xd8small"
     assert claude_code.fit_image(small, "image/jpeg") == (small, "image/jpeg")
 

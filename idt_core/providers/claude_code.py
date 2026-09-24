@@ -9,7 +9,7 @@ Overhead. A default ``claude -p`` carries Claude Code's full system prompt and
 tool definitions, and opening an image with the Read tool costs extra turns —
 about 17,700 input tokens and 3 turns per image when measured. Instead the
 content goes in as Messages-API content blocks on stdin (``--input-format
-stream-json``), with a short ``--system-prompt`` and no tools: one turn, and an
+stream-json``), with a short system prompt (from a file) and no tools: one turn, and an
 image costs about what it costs through the API (1,876 input tokens for a
 12-megapixel photo, measured).
 
@@ -252,6 +252,7 @@ def _record_stats(data: dict) -> None:
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(keep) + "\n")
     except OSError:
+        # Diagnostics only: an unwritable stats file must not fail a description.
         pass
 
 
@@ -334,6 +335,8 @@ def run_claude(
             proc.stdin.write(payload)
             proc.stdin.close()
         except (OSError, ValueError):
+            # The process died or was killed (timeout, Stop) before reading
+            # everything; the reader loop reports that, not this thread.
             pass
 
     def drain_stderr():

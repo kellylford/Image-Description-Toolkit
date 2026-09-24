@@ -30,6 +30,7 @@ from ..providers.claude_code import (
     run_claude,
     usage_tokens,
 )
+from .encoding import encode_attachment_claude, merge_text_attachments
 from .messages import ChatMessage, conversation_turns
 
 #: Appended to the system prompt whenever earlier turns are sent as a transcript.
@@ -43,10 +44,6 @@ TRANSCRIPT_NOTE = (
 
 def _turn_blocks(msg: ChatMessage, label: Optional[str]) -> List[dict]:
     """Content blocks for one turn: uploads first, then its text."""
-    # Imported here: providers.py lazily imports this module, so importing it
-    # at module scope would be a cycle.
-    from .providers import encode_attachment_claude, merge_text_attachments
-
     blocks = [encode_attachment_claude(a) for a in msg.attachments if not a.is_text]
     text = merge_text_attachments(msg)
     if label:

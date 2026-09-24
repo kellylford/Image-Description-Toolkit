@@ -98,6 +98,7 @@ a = Analysis(
         'idt_core.chat',
         'idt_core.chat.attachments',
         'idt_core.chat.claude_code',
+        'idt_core.chat.encoding',
         'idt_core.chat.mlx',
         'idt_core.chat.engine',
         'idt_core.chat.errors',

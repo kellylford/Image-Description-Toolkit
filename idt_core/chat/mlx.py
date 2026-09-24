@@ -15,7 +15,7 @@ from typing import Iterator
 
 from ..providers.base import ChatDelta, ChatProvider, ChatRequest, ChatUsage, ChatYield
 from .messages import conversation_turns
-from .providers import merge_text_attachments
+from .encoding import merge_text_attachments
 
 __all__ = ["MLXChatProvider"]
 
