@@ -63,13 +63,17 @@ except ImportError:
     DEFAULT_OLLAMA_MODEL = DEFAULT_OLLAMA_MODEL
 
 
-def _display_provider(provider) -> str:
-    """"claude-code" -> "Claude Code"; see idt_core.providers.registry.display_name."""
-    try:
-        from idt_core.providers.registry import display_name
-        return display_name(str(provider or ""))
-    except Exception:                                       # noqa: BLE001
-        return str(provider or "").title()
+# "claude-code" -> "Claude Code". idt_core imports the same way in dev and
+# frozen builds, so no try/except fallback is needed.
+from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
+
+
+# Picker label -> provider key ("Claude Code" -> "claude-code"). Not
+# .lower(): that only works while every label is its key in title case.
+try:
+    from ai_providers import provider_key as _provider_key  # frozen mode
+except ImportError:
+    from imagedescriber.ai_providers import provider_key as _provider_key  # dev mode
 
 
 def set_accessible_name(widget, name):
@@ -310,19 +314,6 @@ class ApiKeyDialog(wx.Dialog):
 # FollowupQuestionDialog to build the contextual description shown below the
 # model dropdown.
 # ---------------------------------------------------------------------------
-
-def _provider_key(label: str) -> str:
-    """Provider key for a picker selection ("Claude Code" -> "claude-code").
-
-    Through ai_providers.provider_key rather than ``.lower()``, which breaks as
-    soon as a label is not simply its key in title case.
-    """
-    try:
-        from ai_providers import provider_key
-    except ImportError:
-        from imagedescriber.ai_providers import provider_key
-    return provider_key(label)
-
 
 def _get_model_description_text(provider: str, model_id: str) -> str:
     """Return a one-or-two-line guidance string for the selected model.

@@ -1929,7 +1929,9 @@ class ClaudeCodeProvider(AIProvider):
         from idt_core.providers.claude_code import CLAUDE_CODE_MODELS
         return list(CLAUDE_CODE_MODELS)
 
-    @retry_on_api_error(max_retries=2, base_delay=2.0, max_delay=30.0)
+    # One retry, not the usual three: each attempt can take the full 300 s
+    # CLI timeout, and the CLI already retries transient API errors itself.
+    @retry_on_api_error(max_retries=1, base_delay=2.0, max_delay=30.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         from idt_core.converter import load_for_api
         from idt_core.providers.claude_code import (
@@ -2031,8 +2033,15 @@ def provider_key(value: str) -> str:
     for key, label in _PICKER_PROVIDERS:
         if text == label or text.lower() == key:
             return key
-    lowered = text.lower()
-    return {"claude code": "claude-code", "claude_code": "claude-code"}.get(lowered, lowered)
+    # Anything else resolves through the registry's alias table, so an alias
+    # added there reaches the GUI too. The one GUI key that differs from the
+    # registry's canonical name is Ollama Cloud's.
+    from idt_core.providers.registry import capabilities_for
+
+    canonical = capabilities_for(text).provider
+    if canonical == "unknown":
+        return text.lower()
+    return {"ollama cloud": "ollama_cloud"}.get(canonical, canonical)
 
 
 def provider_picker_choices(title_case: bool = True) -> List[tuple]:

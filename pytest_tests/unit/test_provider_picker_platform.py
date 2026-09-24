@@ -102,7 +102,11 @@ def test_every_label_maps_back_to_its_key():
     for key, label in ai_providers._PICKER_PROVIDERS:
         assert ai_providers.provider_key(label) == key
         assert ai_providers.provider_key(key) == key
-    assert ai_providers.provider_key("claude code") == "claude-code"
+    # Aliases come from the registry, so every one of them reaches the GUI.
+    for alias in ("claude code", "claude_code", "claudecode", "anthropic"):
+        assert ai_providers.provider_key(alias) in ("claude-code", "claude")
+    assert ai_providers.provider_key("claudecode") == "claude-code"
+    assert ai_providers.provider_key("Ollama Cloud") == "ollama_cloud"
 
 
 def test_claude_code_is_hidden_when_the_cli_is_not_installed(monkeypatch):

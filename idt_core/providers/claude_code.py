@@ -207,12 +207,27 @@ def check_subscription(claude: Optional[str] = None, force: bool = False) -> Non
 # ---------------------------------------------------------------------------
 
 
-def build_command(claude: str, model: str, system_prompt: str,
+def build_command(claude: str, model: str, system_prompt_file: str,
                   partial: bool = False) -> List[str]:
+    """The ``claude -p`` command line.
+
+    The system prompt travels in a file, never as an argument: an npm install
+    on Windows is ``claude.cmd``, whose arguments pass through cmd.exe, where
+    a chat system prompt containing ``&``, ``%`` or a quote would be split or
+    expanded -- and a long one would hit the 32K command-line limit.
+
+    ``disableAllHooks`` and ``--setting-sources project,local`` keep the
+    user's own Claude Code setup out of every request: a Stop hook in
+    ~/.claude/settings.json (read-aloud, notifications) would otherwise fire
+    once per image. The working directory is an empty scratch folder, so the
+    project and local sources are empty too.
+    """
     cmd = [
         claude, "-p",
         "--model", model,
-        "--system-prompt", system_prompt,
+        "--system-prompt-file", system_prompt_file,
+        "--settings", '{"disableAllHooks": true}',
+        "--setting-sources", "project,local",
         "--tools", "",
         "--strict-mcp-config",
         "--disable-slash-commands",
@@ -296,9 +311,11 @@ def run_claude(
     # An empty scratch directory as the working directory, so Claude Code does
     # not pick up whatever project (and CLAUDE.md) the app happens to run in.
     scratch = tempfile.mkdtemp(prefix="idt-cc-")
+    prompt_file = Path(scratch) / "system_prompt.txt"
     try:
+        prompt_file.write_text(system_prompt, encoding="utf-8")
         proc = subprocess.Popen(
-            build_command(claude, model, system_prompt, partial),
+            build_command(claude, model, str(prompt_file), partial),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", errors="replace",
             cwd=scratch, env=_child_env(extra_env), creationflags=_no_window(),
@@ -375,6 +392,37 @@ def run_claude(
 # ---------------------------------------------------------------------------
 
 
+#: The API refuses images over 5 MB once base64-encoded, and base64 grows the
+#: payload by a third. The first prototype never hit this because Claude
+#: Code's Read tool resized for it; sending the bytes inline means doing it here.
+MAX_IMAGE_BYTES = 3_700_000
+
+#: Long edge for a downscaled image. The API resizes anything larger to about
+#: this before the model sees it, so nothing visible is lost.
+FIT_LONG_EDGE = 1568
+
+
+def fit_image(image_bytes: bytes, mime_type: str) -> Tuple[bytes, str]:
+    """``(bytes, mime)`` small enough to send; unchanged when it already is.
+
+    A 24 or 48 MP phone JPEG, or a large PNG scan, is over the limit and
+    would otherwise fail on every attempt.
+    """
+    if len(image_bytes) <= MAX_IMAGE_BYTES:
+        return image_bytes, mime_type
+    import io
+
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(image_bytes))
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    img.thumbnail((FIT_LONG_EDGE, FIT_LONG_EDGE), Image.Resampling.LANCZOS)
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=85)
+    return out.getvalue(), "image/jpeg"
+
+
 def image_block(image_bytes: bytes, mime_type: str) -> dict:
     return {
         "type": "image",
@@ -406,6 +454,7 @@ class ClaudeCodeProvider(BaseProvider):
         return self._model
 
     def describe(self, image_bytes: bytes, mime_type: str, prompt: str) -> DescriptionResult:
+        image_bytes, mime_type = fit_image(image_bytes, mime_type)
         content = [image_block(image_bytes, mime_type), {"type": "text", "text": prompt}]
         data = None
         for kind, value in run_claude(

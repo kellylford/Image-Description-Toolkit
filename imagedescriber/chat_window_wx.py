@@ -83,13 +83,17 @@ from idt_core.providers.registry import (
 )
 
 
-def _display_provider(provider) -> str:
-    """"claude-code" -> "Claude Code"; see idt_core.providers.registry.display_name."""
-    try:
-        from idt_core.providers.registry import display_name
-        return display_name(str(provider or ""))
-    except Exception:                                       # noqa: BLE001
-        return str(provider or "").title()
+# "claude-code" -> "Claude Code". idt_core imports the same way in dev and
+# frozen builds, so no try/except fallback is needed.
+from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
+
+
+# Picker label -> provider key ("Claude Code" -> "claude-code"). Not
+# .lower(): that only works while every label is its key in title case.
+try:
+    from ai_providers import provider_key as _provider_key  # frozen mode
+except ImportError:
+    from imagedescriber.ai_providers import provider_key as _provider_key  # dev mode
 
 
 class _NamedTextAccessible(wx.Accessible):
@@ -304,15 +308,6 @@ class ChatDialog(wx.Dialog):
             'provider': _provider_key(self.provider_choice.GetStringSelection()),
             'model': model
         }
-
-
-def _provider_key(label: str) -> str:
-    """Provider key for a picker label ("Claude Code" -> "claude-code")."""
-    try:
-        from ai_providers import provider_key
-    except ImportError:
-        from imagedescriber.ai_providers import provider_key
-    return provider_key(label)
 
 
 class ChatWindow(wx.Dialog):

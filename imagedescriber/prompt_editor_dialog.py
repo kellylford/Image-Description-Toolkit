@@ -90,13 +90,9 @@ except ImportError:
     DEFAULT_OLLAMA_MODEL = "minicpm-v4.6"
 
 
-def _display_provider(provider) -> str:
-    """"claude-code" -> "Claude Code"; see idt_core.providers.registry.display_name."""
-    try:
-        from idt_core.providers.registry import display_name
-        return display_name(str(provider or ""))
-    except Exception:                                       # noqa: BLE001
-        return str(provider or "").title()
+# "claude-code" -> "Claude Code". idt_core imports the same way in dev and
+# frozen builds, so no try/except fallback is needed.
+from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
 
 
 class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):

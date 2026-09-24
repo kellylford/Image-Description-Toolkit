@@ -306,11 +306,14 @@ class ProviderDialog(wx.Dialog):
                 for entry in catalog.curated_models(provider):
                     self.model_choice.Append(entry.display(), entry.id)
             except Exception as exc:                        # noqa: BLE001
+                # Left in place: the sign-in hint below would be wrong advice
+                # for an empty picker.
                 self.status.SetLabel(f"Could not list models: {exc}")
-            self.status.SetLabel(
-                "Uses your Claude subscription through Claude Code. "
-                "Sign in first with: claude auth login"
-            )
+            else:
+                self.status.SetLabel(
+                    "Uses your Claude subscription through Claude Code. "
+                    "Sign in first with: claude auth login"
+                )
             self._select_model(self._initial_model)
             return
 

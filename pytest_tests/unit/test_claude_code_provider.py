@@ -45,11 +45,16 @@ def test_child_environment_cannot_reach_an_api_account(monkeypatch):
 
 def test_command_never_uses_bare_mode():
     """--bare accepts only API-key auth, which is the one thing to avoid."""
-    cmd = build_command("claude", "haiku", "sys")
+    cmd = build_command("claude", "haiku", "prompt.txt")
     assert "--bare" not in cmd
     # Overhead controls: no tools, own system prompt, no saved session.
     assert cmd[cmd.index("--tools") + 1] == ""
-    assert cmd[cmd.index("--system-prompt") + 1] == "sys"
+    # From a file, never argv: claude.cmd would hand argv to cmd.exe.
+    assert cmd[cmd.index("--system-prompt-file") + 1] == "prompt.txt"
+    assert "--system-prompt" not in cmd
+    # The user's own hooks (read-aloud, notifications) must not fire per image.
+    assert json.loads(cmd[cmd.index("--settings") + 1]) == {"disableAllHooks": True}
+    assert cmd[cmd.index("--setting-sources") + 1] == "project,local"
     assert "--no-session-persistence" in cmd
     assert "--include-partial-messages" not in cmd
     assert "--include-partial-messages" in build_command("claude", "haiku", "s", partial=True)
@@ -146,6 +151,40 @@ def fake_cli(tmp_path, monkeypatch):
 
 def _text(mode):
     return [{"type": "text", "text": mode}]
+
+
+def test_system_prompt_reaches_the_cli_through_a_file(tmp_path, monkeypatch):
+    """Characters cmd.exe would mangle arrive intact, because they never touch argv."""
+    script = tmp_path / "echo_cli.py"
+    script.write_text(textwrap.dedent('''
+        import json, sys
+        sys.stdin.readline()
+        prompt = open(sys.argv[1], encoding="utf-8").read()
+        print(json.dumps({"type": "result", "is_error": False, "result": prompt}))
+    '''), encoding="utf-8")
+    monkeypatch.setattr(
+        claude_code, "build_command",
+        lambda claude, model, prompt_file, partial=False: [sys.executable, str(script), prompt_file],
+    )
+    tricky = 'Say "hi" & echo %PATH% | more'
+    events = list(run_claude(_text("ok"), "haiku", tricky, claude="x"))
+    assert events[-1][1]["result"] == tricky
+
+
+def test_oversized_images_are_shrunk_below_the_api_limit():
+    import io
+
+    from PIL import Image
+
+    noisy = Image.frombytes("RGB", (3000, 2400), os.urandom(3000 * 2400 * 3))
+    buf = io.BytesIO()
+    noisy.save(buf, format="PNG")
+    assert len(buf.getvalue()) > claude_code.MAX_IMAGE_BYTES
+    data, mime = claude_code.fit_image(buf.getvalue(), "image/png")
+    assert mime == "image/jpeg" and len(data) <= claude_code.MAX_IMAGE_BYTES
+    assert max(Image.open(io.BytesIO(data)).size) == claude_code.FIT_LONG_EDGE
+    small = b"\xff\xd8small"
+    assert claude_code.fit_image(small, "image/jpeg") == (small, "image/jpeg")
 
 
 def test_run_streams_deltas_then_one_result(fake_cli):
