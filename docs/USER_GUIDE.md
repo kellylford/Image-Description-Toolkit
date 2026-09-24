@@ -1292,7 +1292,24 @@ These names always mean the current model of each tier.
 
 **How much of your plan it uses**
 
-Each image is sent on its own, with a short instruction and no extras, so it costs about what the same request would through the API: roughly 1,900 input tokens for a phone photo plus the length of the description. Batches draw on the same allowance as your normal Claude use, and a large batch can use up a 5-hour window. When that happens, IDT reports the limit message and the remaining images can be described later.
+Very little. Each image is sent on its own, with a short instruction and none of Claude Code's usual extras, so it costs about what the same request would through the API: roughly 1,850 input tokens for a phone photo plus the length of the description.
+
+A measured example, from 9/24/2026 on a Claude **Pro** plan:
+
+| | |
+|---|---|
+| Folder | 103 iPhone photos, `haiku`, "narrative" prompt |
+| Result | 103 described, no errors, in 22.5 minutes (about 13 seconds per image) |
+| Tokens | about 1,830 in and 690 out per image |
+| Plan usage | at most about 4% of the 5-hour limit, shared with other Claude use in the same window; the weekly limit did not visibly move |
+
+That suggests a Pro plan can describe a couple of thousand photos with `haiku` in one 5-hour window. Max plans have larger limits. Your own numbers will vary with:
+
+- **Model** — `sonnet` uses roughly twice as much per image as `haiku`, and `opus` roughly five times.
+- **Prompt** — a prompt that asks for long, detailed descriptions produces more output, and output is the larger share of the cost.
+- **Everything else you do with Claude** — describing images draws on the same allowance as your chats and Claude Code sessions. A long coding session can use more than a folder of photos.
+
+To see the effect of a run, check your usage in Claude's settings before and after it. If a batch does reach a limit, IDT reports the limit message for the images it could not describe; run the batch again after the window resets to finish the rest. `idt describe` skips images that already have descriptions on its own; in ImageDescriber, turn on **Skip images that already have descriptions** in the processing options (it is off by default), or the finished images are described again.
 
 **CLI examples**
 
@@ -1596,7 +1613,12 @@ It exists because mainstream chat applications are poorly suited to screen reade
 
 Launch **IDT Chat** from the Start menu (Windows) or from `Applications/IDT/IDTChat.app` (macOS).
 
-The first time you send a message it asks for a provider and model. Ollama needs no API key, so it works with no setup as long as Ollama is running. Claude and OpenAI need a key — see [Setting Up API Keys](#setting-up-api-keys).
+The first time you send a message it asks for a provider and model. Two providers need no API key:
+
+- **Ollama** works with no setup as long as Ollama is running.
+- **claude-code** uses your Claude Pro or Max subscription through the Claude Code app. Sign in once with `claude auth login`; the provider is only listed when Claude Code is installed. See [Claude Code — Your Claude Subscription](#claude-code--your-claude-subscription-windows-and-macos).
+
+**claude** and **openai** need an API key — see [Setting Up API Keys](#setting-up-api-keys).
 
 **MLX is not offered here, and that is deliberate.** ImageDescriber lists MLX on Apple Silicon and IDT Chat does not, which looks like an oversight and is not. MLX needs Apple's `mlx` and `mlx-vlm` libraries, which would take this app from about 40 MB to around 350 MB — worth paying in ImageDescriber, where describing a folder of photos locally is the whole point, and worth much less for chat, because Ollama now runs several models through MLX on Apple Silicon itself. Chatting with Ollama on a Mac already gets you the Metal acceleration. If you specifically want to chat with an MLX model, use the chat window inside ImageDescriber (**Process → Chat with AI Model**), which offers it. The picker hides MLX rather than listing an option that would fail the moment you chose it.
 
