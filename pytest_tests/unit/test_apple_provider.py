@@ -730,9 +730,10 @@ def test_a_safety_refusal_reads_as_a_refusal_not_a_server_fault():
 
     Left alone the user sees a JSON blob and the word 500, which reads as "the
     server broke, try later". It is neither: the refusal is deterministic for a
-    given image and prompt (measured 0 successes in 11 retries), and it comes
-    back in 0.3s rather than the usual 4-6s because nothing is generated. The
-    thing that does work is a different prompt, so the message says so.
+    exact prompt string (stable across fresh servers), and it comes back in 0.3s
+    rather than the usual 4-6s because nothing is generated. The thing that does
+    work is a different prompt, so the message says so -- without naming a style,
+    because which one works varies by image.
     """
     from idt_core.chat.errors import classify
 
@@ -750,6 +751,9 @@ def test_a_safety_refusal_reads_as_a_refusal_not_a_server_fault():
     message = str(excinfo.value)
     assert "declined" in message
     assert "prompt style" in message, "the message must name the thing that works"
+    # Deliberately does NOT name a specific style: which one works varies by
+    # image, and two people hit different ones on the same photo.
+    assert "accessibility" not in message and "detailed" not in message
     assert "500" not in message, "a 500 in the text reads as a transient fault"
     assert not classify(excinfo.value).retryable, (
         "retrying resends the identical image and prompt, which is refused again"

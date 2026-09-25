@@ -145,18 +145,23 @@ _LICENSE_MARKER = "NOT AGREED"
 #: like everything else, so without this it reads as a transient server fault
 #: and shows the user a JSON blob for something with a plain cause.
 #:
-#: Measured 9/24/2026 against a photo of two taxidermy mounts: refusal is
-#: **deterministic** for a given image and prompt (0 of 11 retries succeeded),
-#: arrives in 0.3s rather than the usual 4-6s (so it is an input-side check,
-#: before any generation), and does not affect later requests. But it is
-#: sensitive to prompt wording as well as image content -- the same photo was
-#: described fine by `accessibility` and `detailed` while `concise` was always
-#: refused. So the useful advice is "change the prompt", not "try again".
+#: Measured 9/24/2026 against a photo of two taxidermy mounts. Refusal is
+#: **stable for an exact prompt string** -- the same bytes give the same answer
+#: every time, across fresh servers -- and arrives in 0.3s rather than the usual
+#: 4-6s, so it is an input-side check before any generation. It does not affect
+#: later requests.
+#:
+#: Which strings land on which side is **not predictable**, and does not track
+#: meaning: truncating a working prompt below ~200 characters flips it, a single
+#: leading newline flips it (a leading space does not), and one metadata prefix
+#: flipped it while a longer one did not. Two people hit different styles on the
+#: same photo. So the message says "try another style" without promising which:
+#: naming one that then fails is worse than naming none.
 _GUARDRAIL_MARKER = "safety guardrails were triggered"
 GUARDRAIL_HINT = (
     "Apple Intelligence declined to describe this image: its safety guardrails "
-    "were triggered. Retrying will not help, but a different prompt style often "
-    "does -- try 'accessibility' or 'detailed'."
+    "were triggered. Retrying the same request will not help, but a different "
+    "prompt style often does -- which one varies by image, so try a few."
 )
 
 _CONTEXT_MARKER = "exceeded the model's context size"
