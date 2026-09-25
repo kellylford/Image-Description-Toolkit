@@ -648,6 +648,12 @@ def _transport_message(exc: BaseException) -> str:
     if isinstance(exc, TimeoutError):
         return (f"Apple Intelligence timed out after "
                 f"{int(DESCRIBE_TIMEOUT_SECONDS)}s waiting for a response")
+    if isinstance(exc, (BrokenPipeError, ConnectionResetError)):
+        # The server drops the connection rather than answering when a request
+        # is too large -- what several full-size photos in one chat turn used to
+        # produce. "Broken pipe" tells the user nothing they can act on.
+        return ("Apple Intelligence closed the connection, which usually means "
+                "the request was too large. Try fewer or smaller images.")
     return f"Apple Intelligence request failed: {exc}"
 
 

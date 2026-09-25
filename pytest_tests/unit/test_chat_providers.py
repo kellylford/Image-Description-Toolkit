@@ -735,3 +735,49 @@ def test_apple_never_sends_a_pdf():
     messages = format_for_apple(
         [ChatMessage(role="user", content="read this", attachments=[PDF])], "")
     assert messages[-1]["content"] == "read this"
+
+
+def test_apple_downscales_a_large_attachment(tmp_path):
+    """Full-size phone photos break a chat turn outright.
+
+    Reported from IDT Chat: attaching two photos and asking "describe this
+    image" returned a blank answer. The server had closed the connection --
+    8.5 MB and 14 MB of JPEG in one request -- and the failure surfaced as an
+    empty message. Downscaling to 1600px took the same pair to 950 KB and it
+    answered normally, so the encoder resizes like the OpenAI one does.
+
+    The describe path still sends images untouched on purpose: it sends one at
+    a time and the server downscales internally.
+    """
+    pytest.importorskip("PIL")
+    import base64 as _b64
+    import io as _io
+
+    from PIL import Image
+
+    from idt_core.chat.apple import MAX_IMAGE_DIM, encode_image
+
+    big = tmp_path / "big.jpg"
+    Image.new("RGB", (4032, 3024), "teal").save(big, format="JPEG", quality=95)
+    att = Attachment("image/jpeg", path=str(big), name="big.jpg")
+
+    part = encode_image(att)
+    payload = part["image_url"]["url"].split(",", 1)[1]
+    decoded = Image.open(_io.BytesIO(_b64.b64decode(payload)))
+
+    assert max(decoded.size) <= MAX_IMAGE_DIM, (
+        f"sent a {decoded.size} image; several of these in one turn close the "
+        "connection and the user sees an empty reply"
+    )
+
+
+def test_apple_leaves_a_small_attachment_alone():
+    """No pointless re-encode: a small image is already fine."""
+    part = encode_image_apple_small()
+    assert part["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def encode_image_apple_small():
+    from idt_core.chat.apple import encode_image
+
+    return encode_image(PNG)
