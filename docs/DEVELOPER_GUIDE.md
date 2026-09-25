@@ -529,3 +529,5 @@ For changes to `idt_core/`, `cli/main.py`, `imagedescriber/imagedescriber_wx.py`
 - `docs/worktracking/PRE_COMMIT_VERIFICATION_CHECKLIST.md` — pre-commit checklist
 - `BuildAndRelease/BUILD_SYSTEM_REFERENCE.md` — build troubleshooting
 - `docs/archive/AI_AGENT_REFERENCE.md` — CLI reference, image optimization, provider limits
+
+<!-- CI isolation probe: this branch changes nothing else. -->
