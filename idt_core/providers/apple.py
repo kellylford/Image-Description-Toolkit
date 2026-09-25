@@ -141,6 +141,24 @@ _LICENSE_MARKER = "NOT AGREED"
 #: forever, because the next attempt sends the same oversized transcript. The
 #: message is rewritten so it classifies as permanent and tells the user what to
 #: do about it.
+#: The on-device model declines some images outright. It arrives as HTTP 500
+#: like everything else, so without this it reads as a transient server fault
+#: and shows the user a JSON blob for something with a plain cause.
+#:
+#: Measured 9/24/2026 against a photo of two taxidermy mounts: refusal is
+#: **deterministic** for a given image and prompt (0 of 11 retries succeeded),
+#: arrives in 0.3s rather than the usual 4-6s (so it is an input-side check,
+#: before any generation), and does not affect later requests. But it is
+#: sensitive to prompt wording as well as image content -- the same photo was
+#: described fine by `accessibility` and `detailed` while `concise` was always
+#: refused. So the useful advice is "change the prompt", not "try again".
+_GUARDRAIL_MARKER = "safety guardrails were triggered"
+GUARDRAIL_HINT = (
+    "Apple Intelligence declined to describe this image: its safety guardrails "
+    "were triggered. Retrying will not help, but a different prompt style often "
+    "does -- try 'accessibility' or 'detailed'."
+)
+
 _CONTEXT_MARKER = "exceeded the model's context size"
 CONTEXT_HINT = (
     "This conversation is too long for the on-device model, which holds about "
@@ -535,6 +553,8 @@ class FmServer:
             conn.close()
             if _CONTEXT_MARKER in detail:
                 raise AppleFMError(CONTEXT_HINT)
+            if _GUARDRAIL_MARKER in detail:
+                raise AppleFMError(GUARDRAIL_HINT)
             raise AppleFMError(
                 f"Apple Intelligence returned HTTP {response.status}: {detail or 'no detail'}"
             )

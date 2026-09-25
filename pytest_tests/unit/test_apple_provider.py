@@ -687,10 +687,14 @@ class _FailingServer:
     def open_chat(self, _payload, _timeout):
         # open_chat itself raises for a non-200, which is what is under test,
         # so this reproduces that path rather than returning a response.
-        from idt_core.providers.apple import CONTEXT_HINT, _CONTEXT_MARKER
+        from idt_core.providers.apple import (
+            CONTEXT_HINT, GUARDRAIL_HINT, _CONTEXT_MARKER, _GUARDRAIL_MARKER,
+        )
 
         if _CONTEXT_MARKER in self._detail:
             raise AppleFMError(CONTEXT_HINT)
+        if _GUARDRAIL_MARKER in self._detail:
+            raise AppleFMError(GUARDRAIL_HINT)
         raise AppleFMError(
             f"Apple Intelligence returned HTTP {self._status}: {self._detail}")
 
@@ -719,3 +723,34 @@ def test_a_directory_owned_by_another_user_is_never_reaped(monkeypatch, tmp_path
 
     assert signals == [], "a directory this user does not own must be left alone"
     assert planted.exists()
+
+
+def test_a_safety_refusal_reads_as_a_refusal_not_a_server_fault():
+    """The model declining an image arrives as HTTP 500, like every other error.
+
+    Left alone the user sees a JSON blob and the word 500, which reads as "the
+    server broke, try later". It is neither: the refusal is deterministic for a
+    given image and prompt (measured 0 successes in 11 retries), and it comes
+    back in 0.3s rather than the usual 4-6s because nothing is generated. The
+    thing that does work is a different prompt, so the message says so.
+    """
+    from idt_core.chat.errors import classify
+
+    detail = ('{"error":{"message":"The model\'s safety guardrails were '
+              'triggered.","code":"500","type":"server_error"}}')
+    server = _FailingServer(500, detail)
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(apple, "_server", server)
+        with pytest.raises(AppleFMError) as excinfo:
+            apple.post_chat({})
+    finally:
+        monkey.undo()
+
+    message = str(excinfo.value)
+    assert "declined" in message
+    assert "prompt style" in message, "the message must name the thing that works"
+    assert "500" not in message, "a 500 in the text reads as a transient fault"
+    assert not classify(excinfo.value).retryable, (
+        "retrying resends the identical image and prompt, which is refused again"
+    )
