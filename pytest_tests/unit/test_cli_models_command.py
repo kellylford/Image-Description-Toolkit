@@ -16,10 +16,8 @@ No network: the catalog's fetch seam is patched, the same way test_updater.py
 patches ``_fetch_releases`` rather than reaching for a real feed.
 """
 
-import io
 import json
 import sys
-from contextlib import redirect_stdout
 from pathlib import Path
 
 import pytest
@@ -70,18 +68,27 @@ def no_network(monkeypatch):
     catalog.invalidate()
 
 
-def _run(args) -> str:
-    buffer = io.StringIO()
-    with redirect_stdout(buffer):
-        cli_main.cmd_models(args)
-    return buffer.getvalue()
+def _run(args, capsys) -> str:
+    """Run ``cmd_models`` and return what it printed.
+
+    Uses pytest's own capture rather than ``redirect_stdout``. The two do not
+    compose: ``redirect_stdout`` swaps ``sys.stdout`` and restores it on exit,
+    while pytest's capture manager owns that attribute and re-asserts it at
+    points this code does not control. When that happened mid-call, every print
+    went to the console and the buffer came back empty -- so the test failed
+    saying the command printed nothing, while the captured output directly
+    below the failure showed the entire list. It reproduced only in CI, on two
+    jobs out of three, which is the most expensive kind of test bug there is.
+    """
+    cli_main.cmd_models(args)
+    return capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------
 # The key-lookup fix
 # ---------------------------------------------------------------------------
 
-def test_a_key_outside_the_environment_is_found(monkeypatch):
+def test_a_key_outside_the_environment_is_found(monkeypatch, capsys):
     """The regression: a key in the credential store used to report "no key".
 
     Patched at ``keys.resolve_api_key`` -- the seam the whole app resolves
@@ -94,15 +101,15 @@ def test_a_key_outside_the_environment_is_found(monkeypatch):
     monkeypatch.setattr(cli_main_keys(), "key_source",
                         lambda provider: "credential store")
 
-    out = _run(_Args(provider="anthropic"))
+    out = _run(_Args(provider="anthropic"), capsys)
     assert "no API key" not in out
     assert "claude-opus-5" in out
 
 
-def test_no_key_anywhere_says_so_and_names_the_variable(monkeypatch):
+def test_no_key_anywhere_says_so_and_names_the_variable(monkeypatch, capsys):
     monkeypatch.setattr(cli_main_keys(), "resolve_api_key", lambda provider: None)
 
-    out = _run(_Args(provider="anthropic"))
+    out = _run(_Args(provider="anthropic"), capsys)
     assert "no API key" in out
     assert "ANTHROPIC_API_KEY" in out
 
@@ -118,7 +125,7 @@ def cli_main_keys():
 # Offline behaviour
 # ---------------------------------------------------------------------------
 
-def test_with_a_key_but_no_network_the_curated_list_still_prints(monkeypatch):
+def test_with_a_key_but_no_network_the_curated_list_still_prints(monkeypatch, capsys):
     """The fallback that makes this safe to ship: a failing fetch degrades to
     the list the command printed before any of this existed."""
     monkeypatch.setattr(cli_main_keys(), "resolve_api_key", lambda p: "some-key")
@@ -128,18 +135,18 @@ def test_with_a_key_but_no_network_the_curated_list_still_prints(monkeypatch):
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("offline")),
     )
 
-    out = _run(_Args(provider="anthropic"))
+    out = _run(_Args(provider="anthropic"), capsys)
     for model_id in CLAUDE_MODELS:
         assert model_id in out
 
 
-def test_a_provider_error_does_not_take_down_the_whole_command(monkeypatch):
+def test_a_provider_error_does_not_take_down_the_whole_command(monkeypatch, capsys):
     """One provider failing must not hide the others."""
     def boom(provider, args):
         raise RuntimeError("something unexpected")
 
     monkeypatch.setattr(cli_main, "_api_model_results", boom)
-    out = _run(_Args(provider="anthropic"))
+    out = _run(_Args(provider="anthropic"), capsys)
     assert "error" in out.lower()
 
 
@@ -147,37 +154,37 @@ def test_a_provider_error_does_not_take_down_the_whole_command(monkeypatch):
 # Output shape
 # ---------------------------------------------------------------------------
 
-def test_json_models_is_still_a_list_of_plain_ids(monkeypatch):
+def test_json_models_is_still_a_list_of_plain_ids(monkeypatch, capsys):
     monkeypatch.setattr(cli_main_keys(), "resolve_api_key", lambda p: "some-key")
     monkeypatch.setattr(cli_main_keys(), "key_source", lambda p: "environment")
 
-    payload = json.loads(_run(_Args(provider="anthropic", json_out=True)))
+    payload = json.loads(_run(_Args(provider="anthropic", json_out=True), capsys))
     models = payload["anthropic"]["models"]
     assert isinstance(models, list)
     assert all(isinstance(m, str) for m in models)
     assert models == list(CLAUDE_MODELS)
 
 
-def test_json_details_carry_the_richer_information(monkeypatch):
+def test_json_details_carry_the_richer_information(monkeypatch, capsys):
     monkeypatch.setattr(cli_main_keys(), "resolve_api_key", lambda p: "some-key")
     monkeypatch.setattr(cli_main_keys(), "key_source", lambda p: "environment")
 
-    payload = json.loads(_run(_Args(provider="anthropic", json_out=True)))
+    payload = json.loads(_run(_Args(provider="anthropic", json_out=True), capsys))
     detail = payload["anthropic"]["details"][0]
     assert detail["id"] == CLAUDE_MODELS[0]
     assert detail["context_window"] == 200_000
     assert detail["source"] == "curated"
 
 
-def test_no_key_json_reports_the_variable_to_set(monkeypatch):
+def test_no_key_json_reports_the_variable_to_set(monkeypatch, capsys):
     monkeypatch.setattr(cli_main_keys(), "resolve_api_key", lambda p: None)
 
-    payload = json.loads(_run(_Args(provider="anthropic", json_out=True)))
+    payload = json.loads(_run(_Args(provider="anthropic", json_out=True), capsys))
     assert payload["anthropic"]["status"] == "no_key"
     assert payload["anthropic"]["env_var"] == "ANTHROPIC_API_KEY"
 
 
-def test_a_new_model_is_marked_in_the_text_output(monkeypatch):
+def test_a_new_model_is_marked_in_the_text_output(monkeypatch, capsys):
     """A model we have no metadata for must not look like one we vouch for."""
     monkeypatch.setattr(cli_main_keys(), "resolve_api_key", lambda p: "some-key")
     monkeypatch.setattr(cli_main_keys(), "key_source", lambda p: "environment")
@@ -188,7 +195,7 @@ def test_a_new_model_is_marked_in_the_text_output(monkeypatch):
                              ["claude-opus-5", "claude-sonnet-5", "claude-opus-9"])],
     )
 
-    out = _run(_Args(provider="anthropic", refresh=True))
+    out = _run(_Args(provider="anthropic", refresh=True), capsys)
     assert "claude-opus-9" in out
     assert catalog.NEW_MODEL_NOTE in out
 
@@ -197,13 +204,13 @@ def test_a_new_model_is_marked_in_the_text_output(monkeypatch):
 # Default model selection
 # ---------------------------------------------------------------------------
 
-def test_the_default_model_is_used_when_the_account_still_has_it():
+def test_the_default_model_is_used_when_the_account_still_has_it(capsys):
     from idt_core.providers.claude import DEFAULT_MODEL
 
     assert cli_main._chat_default_model("claude") == DEFAULT_MODEL
 
 
-def test_a_retired_default_falls_back_to_a_recommended_model(monkeypatch):
+def test_a_retired_default_falls_back_to_a_recommended_model(monkeypatch, capsys):
     """The exact failure issue #267 describes: a hardcoded default the provider
     has since withdrawn looks fine until the first request errors."""
     from idt_core.providers.claude import DEFAULT_MODEL
@@ -216,7 +223,7 @@ def test_a_retired_default_falls_back_to_a_recommended_model(monkeypatch):
     assert any(e.id == chosen and e.recommended for e in survivors)
 
 
-def test_default_model_selection_survives_a_broken_catalog(monkeypatch):
+def test_default_model_selection_survives_a_broken_catalog(monkeypatch, capsys):
     """The catalog improves this choice; it must never be required for one."""
     from idt_core.providers.claude import DEFAULT_MODEL
 
@@ -236,7 +243,7 @@ def test_default_model_selection_survives_a_broken_catalog(monkeypatch):
 # Intelligence and an HTTP 400 on every image in the run.
 # ---------------------------------------------------------------------------
 
-def test_a_foreign_default_model_does_not_reach_apple():
+def test_a_foreign_default_model_does_not_reach_apple(capsys):
     """The bug, stated directly: default_model=moondream, --provider apple."""
     from cli.main import _resolve_model
     from idt_core.providers.apple import DEFAULT_MODEL
@@ -244,20 +251,20 @@ def test_a_foreign_default_model_does_not_reach_apple():
     assert _resolve_model("apple", "moondream") == DEFAULT_MODEL
 
 
-def test_apples_own_model_is_left_alone():
+def test_apples_own_model_is_left_alone(capsys):
     from cli.main import _resolve_model
 
     assert _resolve_model("apple", "system") == "system"
 
 
-def test_no_model_resolves_to_the_providers_default():
+def test_no_model_resolves_to_the_providers_default(capsys):
     from cli.main import _resolve_model
     from idt_core.providers.apple import DEFAULT_MODEL
 
     assert _resolve_model("apple", None) == DEFAULT_MODEL
 
 
-def test_other_providers_are_not_second_guessed():
+def test_other_providers_are_not_second_guessed(capsys):
     """Deliberately narrow. A Claude or Ollama model name we do not recognise
     may still be real -- only a fixed single-model provider can be sure."""
     from cli.main import _resolve_model
