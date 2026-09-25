@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [4.6.1] - 2026-09-25
+
+Maintenance release. The two providers added in 4.6.0 are unchanged; these are
+fixes found while using them.
+
+### 🐛 Bug Fixes
+
+**Apple Intelligence retries when its model manager drops a request (#334)**
+- Apple's on-device model occasionally fails to load for a single request, reporting `ModelManagerServices.ModelManagerError error 1001` as an HTTP 500 — indistinguishable in shape from a safety refusal, which is permanent. This one is not: measured twice in a 90-image run, and both images described fine on a retry.
+- Anything the provider did not specifically recognise was classified as permanent, so each of those images was lost to a failure that fixes itself. Model-manager failures are now marked retryable and retried, and the retry count went from one to two because an attempt against a local model costs seconds.
+- Retryability is decided by the status code the provider sets, not by matching the wording of a user-facing message. Matching wording is how this class of bug returns.
+
+**`idt describe --provider claude-code` warns about a foreign default model (#335)**
+- `default_model` is a single global setting while `--provider` is chosen per run, so a machine whose default is an Ollama model sent that name to Claude Code, which refused every image with a message about model catalogs.
+- It now warns once, before the run, naming the model, Claude Code's actual options, and where the value came from. The model is still sent: Claude Code accepts full model ids and new names as they ship, so substituting one could silently run a cheaper model than asked for.
+
+
 ## [4.6.0] - 2026-09-25
 
 ### ✨ New Features
