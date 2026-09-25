@@ -98,6 +98,41 @@ and 4/4 in repeated runs, and identical across three freshly started servers.
 while `narrative`, `detailed`, `accessibility` and `artistic` all worked. So do not trust
 any list of "safe" styles, including the examples above — try a few.
 
+### All twelve built-in prompts, one image
+
+Run through the built CLI with `BuildAndRelease/MacBuilds/test_prompts_apple.command`,
+which does exactly this sweep and prints the table:
+
+| chars | prompt | result |
+|---:|---|---|
+| 66 | `simple` | **refused** |
+| 107 | `concise` | **refused** |
+| 115 | `aialttext` | **refused** |
+| 271 | `mood` | **refused** |
+| 305 | `comparison` | described |
+| 319 | `functional` | described |
+| 325 | `artistic` | described |
+| 327 | `narrative` | described |
+| 350 | `accessibility` | described |
+| 389 | `colorful` | described |
+| 449 | `detailed` | described |
+| 638 | `technical` | described |
+
+Eight described, four refused, and **the split is exactly by length**: everything at or
+below 271 characters was refused, everything at or above 305 was described. Truncating a
+working prompt reproduces it — `narrative` cut to 200 characters is refused, cut to 240 it
+is described — so the effect is the prompt's size, not its wording.
+
+That is not a complete theory: `mood` at 271 characters is refused while a 240-character
+truncation of `narrative` is described, so content still matters at the margin. But length
+is the one variable that separates this table cleanly.
+
+**The accessibility-shaped prompts are the short ones.** `aialttext` is the prompt written
+specifically for alt text, and `simple` is the one for a plain short description. Both are
+refused on this image, while the verbose styles are not. Anyone using the Apple provider
+for alt text is therefore more likely to meet a refusal than someone asking for a
+paragraph of art criticism — which is the opposite of useful.
+
 ### Apple's own accessibility feature describes it fine
 
 VoiceOver's image description produced a full, accurate description of this same photo —
