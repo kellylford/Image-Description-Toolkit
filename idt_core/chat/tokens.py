@@ -33,7 +33,8 @@ DEFAULT_CONTEXT_WINDOWS = {
     "claude-code": 200_000,
     "ollama": 32_768,
     "mlx": 32_768,
-    "apple": 65_536,
+    # Measured, not published: 4,060 prompt tokens accepted, 5,060 refused.
+    "apple": 4_096,
 }
 
 FALLBACK_CONTEXT_WINDOW = 32_768

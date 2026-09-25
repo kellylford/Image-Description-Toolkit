@@ -16,6 +16,7 @@ at the seams, so these run on CI.
 """
 
 import json
+import os
 import platform
 import sys
 from pathlib import Path
@@ -29,6 +30,7 @@ if str(_ROOT) not in sys.path:
 from idt_core.providers import apple  # noqa: E402
 from idt_core.providers.apple import (  # noqa: E402
     APPLE_MODELS,
+    APPLE_MODEL_METADATA,
     DEFAULT_MODEL,
     AppleFMError,
     AppleProvider,
@@ -389,6 +391,8 @@ def test_socket_path_stays_short_enough_to_bind(monkeypatch):
     started = {}
 
     class _Proc:
+        pid = 4242
+
         def poll(self):
             return None
 
@@ -413,3 +417,290 @@ def test_socket_path_stays_short_enough_to_bind(monkeypatch):
         assert started["cmd"][:3] == ["/usr/bin/fm", "serve", "--socket"]
     finally:
         server.stop()
+
+
+# ---------------------------------------------------------------------------
+# Review fixes: things that were wrong in the first cut of this provider
+# ---------------------------------------------------------------------------
+
+def test_the_context_window_is_the_measured_one():
+    """It was 65,536 in the first cut, invented rather than measured.
+
+    The server accepted a 4,060-token prompt and refused a 5,060-token one, so
+    the real window is 4,096. The chat budgeter trims against this number: at
+    65,536 it would happily build a conversation sixteen times too large, and
+    every turn would fail with a context error no retry could fix.
+    """
+    from idt_core.chat.tokens import DEFAULT_CONTEXT_WINDOWS
+
+    assert APPLE_MODEL_METADATA["system"]["context_window"] == 4096
+    assert DEFAULT_CONTEXT_WINDOWS["apple"] == 4096, (
+        "the budgeter's default must match the catalog entry"
+    )
+
+
+def test_a_too_long_conversation_reads_as_permanent_not_as_a_500():
+    """The server reports it as HTTP 500, which classifies as retryable.
+
+    Retrying sends the same oversized transcript, so it fails identically,
+    forever. The message is rewritten to say what to do instead.
+    """
+    from idt_core.chat.errors import classify
+
+    detail = ('{"error":{"type":"server_error","message":"The session\'s '
+              'transcript exceeded the model\'s context size.","code":"500"}}')
+    server = _FailingServer(500, detail)
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(apple, "_server", server)
+        with pytest.raises(AppleFMError) as excinfo:
+            apple.post_chat({})
+    finally:
+        monkey.undo()
+
+    message = str(excinfo.value)
+    assert "4,096" in message and "new chat" in message
+    assert "500" not in message, "a 500 in the text is read as a transient error"
+    assert not classify(excinfo.value).retryable
+
+
+def test_a_real_server_error_still_says_so():
+    """Only the context case is rewritten; other failures keep their status."""
+    server = _FailingServer(503, "upstream exploded")
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(apple, "_server", server)
+        with pytest.raises(AppleFMError) as excinfo:
+            apple.post_chat({})
+    finally:
+        monkey.undo()
+    assert "503" in str(excinfo.value)
+
+
+def test_a_socket_timeout_mid_read_is_an_apple_error_not_a_bare_oserror(monkeypatch):
+    """It used to escape past every ``except AppleFMError`` in the callers.
+
+    describe_image would then raise an unclassified OSError instead of a
+    ProviderError, which a batch worker cannot tell from a crash.
+    """
+    class _TimingOutResponse:
+        def read(self):
+            raise TimeoutError("timed out")
+
+        def __iter__(self):
+            raise TimeoutError("timed out")
+
+    class _Server:
+        def __init__(self):
+            self.closed = False
+
+        def open_chat(self, _payload, _timeout):
+            outer = self
+
+            class _Conn:
+                def close(self):
+                    outer.closed = True
+
+            return _Conn(), _TimingOutResponse()
+
+    server = _Server()
+    monkeypatch.setattr(apple, "_server", server)
+
+    with pytest.raises(AppleFMError) as excinfo:
+        apple.post_chat({})
+    assert "timed out" in str(excinfo.value).lower(), (
+        "callers classify on this text; a timeout must still read as one"
+    )
+    assert server.closed, "the connection must be closed even when the read fails"
+
+
+def test_a_stream_that_dies_mid_answer_is_an_apple_error(monkeypatch):
+    server = _Server = None  # noqa: F841 - readability of the block below
+
+    class _DyingResponse:
+        def __iter__(self):
+            yield b'data: {"choices":[{"delta":{"content":"a "}}]}\n'
+            raise ConnectionResetError("connection reset by peer")
+
+    class _S:
+        def __init__(self):
+            self.closed = False
+
+        def open_chat(self, _payload, _timeout):
+            outer = self
+
+            class _Conn:
+                def close(self):
+                    outer.closed = True
+
+            return _Conn(), _DyingResponse()
+
+    s = _S()
+    monkeypatch.setattr(apple, "_server", s)
+
+    stream = apple.stream_chat({})
+    assert next(stream) == ("delta", "a ")
+    with pytest.raises(AppleFMError):
+        next(stream)
+    assert s.closed
+
+
+def test_describe_caps_the_reply_length(monkeypatch):
+    """Every other provider bounds its output; with a 4,096-token window an
+    unbounded reply would eat the budget the image needs."""
+    captured = {}
+
+    def post_chat(payload, **_kwargs):
+        captured.update(payload)
+        return {"choices": [{"message": {"content": "a desk"}}]}
+
+    monkeypatch.setattr(apple, "post_chat", post_chat)
+    _provider(monkeypatch).describe(JPEG, "image/jpeg", "describe it")
+    assert captured["max_completion_tokens"] == apple.DESCRIBE_MAX_OUTPUT_TOKENS
+
+
+def test_an_unavailable_model_stops_the_server_it_started(monkeypatch):
+    """Otherwise the next request reuses that server, skips the health check,
+    and reports a raw HTTP error instead of "turn on Apple Intelligence"."""
+    server = apple.FmServer()
+    stopped = []
+
+    monkeypatch.setattr(apple, "check_ready", lambda *a, **k: None)
+    monkeypatch.setattr(apple.subprocess, "Popen",
+                        lambda *a, **k: _LiveProc())
+    monkeypatch.setattr(
+        apple.FmServer, "_get_json",
+        lambda self, path, timeout: {
+            "models": [{"name": "system", "available": False,
+                        "reason": "Apple Intelligence is not enabled."}]})
+    original = apple.FmServer._cleanup_locked
+
+    def cleanup(self):
+        stopped.append(True)
+        original(self)
+
+    monkeypatch.setattr(apple.FmServer, "_cleanup_locked", cleanup)
+
+    with pytest.raises(AppleFMError) as excinfo:
+        server.ensure_running(fm="/usr/bin/fm")
+    assert "Apple Intelligence is not enabled." in str(excinfo.value)
+    assert stopped, "the server it just started must be stopped"
+    assert not server.is_running()
+
+
+# ---------------------------------------------------------------------------
+# Reaping servers left behind by a run that was killed
+# ---------------------------------------------------------------------------
+
+def test_an_orphaned_server_is_killed_when_its_owner_is_gone(monkeypatch, tmp_path):
+    """atexit does not run when an app is force-quit, and the child is in its
+    own session, so it survives holding the model in memory."""
+    stale = tmp_path / "idt-fm-stale"
+    stale.mkdir()
+    (stale / apple.OWNER_FILE).write_text(
+        json.dumps({"owner_pid": 999001, "server_pid": 999002}), encoding="utf-8")
+
+    killed = []
+    monkeypatch.setattr(apple, "SOCKET_ROOT", str(tmp_path))
+    monkeypatch.setattr(apple, "_pid_alive", lambda pid: pid == 999002)
+    monkeypatch.setattr(apple.os, "kill", lambda pid, sig: killed.append((pid, sig)))
+
+    apple._reap_orphans()
+
+    assert killed == [(999002, apple.signal.SIGTERM)]
+    assert not stale.exists()
+
+
+def test_a_live_owners_server_is_left_alone(monkeypatch, tmp_path):
+    """A second IDT running right now must keep its own server."""
+    live = tmp_path / "idt-fm-live"
+    live.mkdir()
+    (live / apple.OWNER_FILE).write_text(
+        json.dumps({"owner_pid": os.getpid(), "server_pid": 999002}),
+        encoding="utf-8")
+
+    signals = []
+    monkeypatch.setattr(apple, "SOCKET_ROOT", str(tmp_path))
+    # _pid_alive probes with os.kill(pid, 0), so record the signal, not the call.
+    monkeypatch.setattr(apple.os, "kill",
+                        lambda pid, sig: signals.append((pid, sig)))
+
+    apple._reap_orphans()
+
+    assert all(sig == 0 for _pid, sig in signals), (
+        f"a live owner's server was signalled: {signals}"
+    )
+    assert live.exists()
+
+
+def test_a_directory_without_an_owner_file_is_never_touched(monkeypatch, tmp_path):
+    """An unowned socket costs nothing; a wrong kill costs someone's run."""
+    unknown = tmp_path / "idt-fm-unknown"
+    unknown.mkdir()
+    monkeypatch.setattr(apple, "SOCKET_ROOT", str(tmp_path))
+    apple._reap_orphans()
+    assert unknown.exists()
+
+
+def test_reaping_survives_an_unreadable_socket_root(monkeypatch):
+    """Best effort: cleanup must never stop a new server from starting."""
+    monkeypatch.setattr(apple, "SOCKET_ROOT", "/nonexistent-path-for-a-test")
+    apple._reap_orphans()
+
+
+class _LiveProc:
+    pid = 4242
+
+    def poll(self):
+        return None
+
+    def terminate(self):
+        pass
+
+    def kill(self):
+        pass
+
+    def wait(self, timeout=None):
+        return 0
+
+
+class _FailingServer:
+    """A server whose endpoint answers with an HTTP error."""
+
+    def __init__(self, status, detail):
+        self._status, self._detail = status, detail
+
+    def open_chat(self, _payload, _timeout):
+        # open_chat itself raises for a non-200, which is what is under test,
+        # so this reproduces that path rather than returning a response.
+        from idt_core.providers.apple import CONTEXT_HINT, _CONTEXT_MARKER
+
+        if _CONTEXT_MARKER in self._detail:
+            raise AppleFMError(CONTEXT_HINT)
+        raise AppleFMError(
+            f"Apple Intelligence returned HTTP {self._status}: {self._detail}")
+
+
+def test_a_directory_owned_by_another_user_is_never_reaped(monkeypatch, tmp_path):
+    """/tmp is world-writable. Without an ownership check, another account
+    could plant an owner file naming a dead owner and any pid it liked, and
+    have IDT SIGTERM a process of this user's that it has no business killing.
+    """
+    planted = tmp_path / "idt-fm-planted"
+    planted.mkdir()
+    (planted / apple.OWNER_FILE).write_text(
+        json.dumps({"owner_pid": 999001, "server_pid": 999002}), encoding="utf-8")
+
+    signals = []
+    monkeypatch.setattr(apple, "SOCKET_ROOT", str(tmp_path))
+    # Captured first: apple.os IS os, so a lambda calling os.getuid() would
+    # call the patched version and recurse.
+    someone_else = os.getuid() + 1
+    monkeypatch.setattr(apple.os, "getuid", lambda: someone_else)
+    monkeypatch.setattr(apple.os, "kill",
+                        lambda pid, sig: signals.append((pid, sig)))
+
+    apple._reap_orphans()
+
+    assert signals == [], "a directory this user does not own must be left alone"
+    assert planted.exists()

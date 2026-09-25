@@ -42,6 +42,7 @@ import json
 import os
 import platform
 import shutil
+import signal
 import socket
 import subprocess
 import tempfile
@@ -76,15 +77,18 @@ APPLE_MODELS = ["system"]
 DEFAULT_MODEL = "system"
 
 #: Picker metadata, read by ``catalog`` like the other providers' tables.
-#: ``context_window`` is Apple's published on-device figure. ``max_output`` is
-#: left unset: the server honours whatever ``max_completion_tokens`` we ask for
-#: and documents no ceiling, and the catalog contract is that an unknown number
-#: stays None rather than becoming a guess.
+#:
+#: ``context_window`` is **measured, not published**: the server accepted a
+#: 4,060-token prompt and refused a 5,060-token one with "The session's
+#: transcript exceeded the model's context size" (9/24/2026, macOS 27.2), which
+#: puts the real window at 4,096. It is small — an order of magnitude under the
+#: cloud providers — and it is what the chat budgeter trims against, so getting
+#: it wrong means conversations that grow until every turn fails.
 APPLE_MODEL_METADATA: dict = {
     "system": {
         "name": "On-device (Apple Intelligence)",
         "description": "Runs on this Mac. No API key, no account, no cost, works offline",
-        "context_window": 65536,
+        "context_window": 4096,
         "supports_vision": True,
         "cost": "free",
         "recommended": True,
@@ -96,6 +100,12 @@ APPLE_MODEL_METADATA: dict = {
 FM_PATH = "/usr/bin/fm"
 
 DESCRIBE_TIMEOUT_SECONDS = 300
+
+#: Ceiling on one description, matching Ollama's ``num_predict`` and MLX's
+#: ``MAX_TOKENS``. It matters more here than elsewhere: the context window is
+#: only 4,096 tokens, so an unbounded reply eats the budget the image itself
+#: needs. Sent as ``max_completion_tokens`` -- ``max_tokens`` is ignored.
+DESCRIBE_MAX_OUTPUT_TOKENS = 600
 
 #: How long to wait for a freshly spawned ``fm serve`` to answer /health.
 #: Measured at ~1s on an M-series Mac; the margin covers a first run that has to
@@ -125,6 +135,17 @@ LICENSE_HINT = (
 
 #: Substring of the CLI's refusal when the terms have not been accepted.
 _LICENSE_MARKER = "NOT AGREED"
+
+#: The server reports a too-long conversation as HTTP 500, which every text
+#: classifier in this codebase reads as a transient server error and retries --
+#: forever, because the next attempt sends the same oversized transcript. The
+#: message is rewritten so it classifies as permanent and tells the user what to
+#: do about it.
+_CONTEXT_MARKER = "exceeded the model's context size"
+CONTEXT_HINT = (
+    "This conversation is too long for the on-device model, which holds about "
+    "4,096 tokens in total. Start a new chat, or remove some attachments."
+)
 
 
 class AppleFMError(RuntimeError):
@@ -242,6 +263,73 @@ class _UnixHTTPConnection(http.client.HTTPConnection):
 # ---------------------------------------------------------------------------
 
 
+#: Where per-run socket directories live. Under /tmp rather than the default
+#: temp dir because macOS caps a Unix socket path near 104 bytes, and the
+#: per-user /var/folders path leaves too little room for the rest.
+SOCKET_ROOT = "/tmp"
+SOCKET_DIR_PREFIX = "idt-fm-"
+OWNER_FILE = "owner.json"
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Someone else's process now holds that pid; it is not ours to reap.
+        return True
+    except OSError:
+        return True
+    return True
+
+
+def _reap_orphans() -> None:
+    """Stop ``fm serve`` processes left behind by runs that were killed.
+
+    Only directories whose owning IDT process is gone are touched, so a second
+    IDT running right now keeps its own server. Best effort throughout: a
+    failure to clean up must never stop a new server from starting.
+
+    ``/tmp`` is world-writable, so a directory is trusted only when this user
+    owns it. Without that check another account could plant an owner file
+    naming a dead owner and any pid it liked, and make IDT send SIGTERM to a
+    process of the user's that has nothing to do with this.
+    """
+    try:
+        names = os.listdir(SOCKET_ROOT)
+    except OSError:
+        return
+    for name in names:
+        if not name.startswith(SOCKET_DIR_PREFIX):
+            continue
+        path = os.path.join(SOCKET_ROOT, name)
+        try:
+            if os.stat(path).st_uid != os.getuid():
+                continue
+        except OSError:
+            continue
+        try:
+            with open(os.path.join(path, OWNER_FILE), encoding="utf-8") as fh:
+                record = json.load(fh)
+        except (OSError, ValueError):
+            # No owner file: either a directory we are creating right now, or
+            # one from a build that predates this. Leave it alone rather than
+            # guess -- an unowned socket costs nothing, a wrong kill costs a run.
+            continue
+        owner_pid = record.get("owner_pid")
+        server_pid = record.get("server_pid")
+        if not isinstance(owner_pid, int) or _pid_alive(owner_pid):
+            continue
+        if isinstance(server_pid, int) and _pid_alive(server_pid):
+            try:
+                os.kill(server_pid, signal.SIGTERM)
+            except OSError:
+                pass
+        shutil.rmtree(path, ignore_errors=True)
+
+
+
 class FmServer:
     """One ``fm serve`` process, started on demand and shared by every request.
 
@@ -282,10 +370,10 @@ class FmServer:
         fm = fm or find_fm()
         check_ready(fm)
 
-        # Under /tmp, not the default temp dir: a Unix socket path is capped at
-        # ~104 bytes on macOS and the per-user /var/folders path eats most of
-        # that before the filename. mkdtemp still gives the directory 0700.
-        self._dir = tempfile.mkdtemp(prefix="idt-fm-", dir="/tmp")
+        # See SOCKET_ROOT for why this is not the default temp dir. mkdtemp
+        # still gives the directory 0700.
+        _reap_orphans()
+        self._dir = tempfile.mkdtemp(prefix=SOCKET_DIR_PREFIX, dir=SOCKET_ROOT)
         self._socket_path = os.path.join(self._dir, "fm.sock")
         self._log_path = os.path.join(self._dir, "fm.log")
 
@@ -310,8 +398,25 @@ class FmServer:
         finally:
             log.close()
 
+        self._write_owner_file()
         self._await_health_locked()
         return self._socket_path
+
+    def _write_owner_file(self) -> None:
+        """Record who owns this server, so a later run can reap it.
+
+        ``atexit`` handles an ordinary exit, but not a crash or a force-quit --
+        and a wx app being killed is not rare. The child is in its own session,
+        so it survives, holding the on-device model in memory with nothing left
+        to stop it. This file is what lets the next run notice.
+        """
+        try:
+            with open(os.path.join(self._dir, OWNER_FILE), "w",
+                      encoding="utf-8") as fh:
+                json.dump({"owner_pid": os.getpid(), "server_pid": self._proc.pid}, fh)
+        except OSError:
+            # Bookkeeping only: failing to write it must not fail the run.
+            pass
 
     def _await_health_locked(self) -> None:
         deadline = time.monotonic() + SERVER_START_TIMEOUT
@@ -327,7 +432,15 @@ class FmServer:
                 last_error = str(exc)
                 time.sleep(0.1)
                 continue
-            self._check_model_available(health)
+            try:
+                self._check_model_available(health)
+            except AppleFMError:
+                # Apple Intelligence is off or still downloading. Stop the
+                # server rather than leaving one running for the rest of the
+                # session: the next attempt would otherwise reuse it, skip this
+                # check and fail with a raw HTTP error instead of this advice.
+                self._cleanup_locked()
+                raise
             return
         detail = self._log_tail() or last_error or "no response"
         self._cleanup_locked()
@@ -414,6 +527,8 @@ class FmServer:
         if response.status != 200:
             detail = response.read().decode("utf-8", "replace").strip()[:300]
             conn.close()
+            if _CONTEXT_MARKER in detail:
+                raise AppleFMError(CONTEXT_HINT)
             raise AppleFMError(
                 f"Apple Intelligence returned HTTP {response.status}: {detail or 'no detail'}"
             )
@@ -479,6 +594,11 @@ def post_chat(payload: dict, timeout: float = DESCRIBE_TIMEOUT_SECONDS) -> dict:
     conn, response = _server.open_chat(payload, timeout)
     try:
         raw = response.read().decode("utf-8", "replace")
+    except OSError as exc:
+        # A socket timeout or a dropped connection mid-read. Without this it
+        # escapes as a bare OSError, past every ``except AppleFMError`` in the
+        # callers, and the GUI stores it as a failure with no classification.
+        raise AppleFMError(_transport_message(exc))
     finally:
         conn.close()
     try:
@@ -487,6 +607,17 @@ def post_chat(payload: dict, timeout: float = DESCRIBE_TIMEOUT_SECONDS) -> dict:
         raise AppleFMError(
             f"Apple Intelligence returned an unreadable response: {raw[:200]!r}"
         )
+
+
+def _transport_message(exc: BaseException) -> str:
+    """Wording for a socket-level failure, keeping "timed out" readable.
+
+    Callers classify on this text, so a timeout has to still look like one.
+    """
+    if isinstance(exc, TimeoutError):
+        return (f"Apple Intelligence timed out after "
+                f"{int(DESCRIBE_TIMEOUT_SECONDS)}s waiting for a response")
+    return f"Apple Intelligence request failed: {exc}"
 
 
 def stream_chat(payload: dict,
@@ -499,7 +630,7 @@ def stream_chat(payload: dict,
     conn, response = _server.open_chat(payload, timeout)
     final: dict = {}
     try:
-        for raw_line in response:
+        for raw_line in _iter_lines(response):
             line = raw_line.decode("utf-8", "replace").strip()
             if not line.startswith("data:"):
                 continue
@@ -521,6 +652,20 @@ def stream_chat(payload: dict,
     finally:
         conn.close()
     yield ("done", final)
+
+
+def _iter_lines(response) -> Iterator[bytes]:
+    """Iterate an SSE body, turning socket failures into AppleFMError.
+
+    A stream that dies mid-answer raises OSError from deep inside the ``for``,
+    which would otherwise reach the chat engine as a transport exception no
+    provider claims.
+    """
+    try:
+        for line in response:
+            yield line
+    except OSError as exc:
+        raise AppleFMError(_transport_message(exc))
 
 
 def response_text(data: dict) -> str:
@@ -621,6 +766,7 @@ class AppleProvider(BaseProvider):
         payload = build_payload(
             describe_messages(image_bytes, mime_type, prompt),
             self._model, stream=False,
+            max_output_tokens=DESCRIBE_MAX_OUTPUT_TOKENS,
         )
         data = post_chat(payload)
         input_tokens, output_tokens = usage_tokens(data)

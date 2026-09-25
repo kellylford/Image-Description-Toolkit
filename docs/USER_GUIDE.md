@@ -1362,6 +1362,8 @@ Speed and privacy. A description takes about four to six seconds per image on an
 
 It is a small model compared with Claude or GPT, so expect shorter, plainer descriptions with less interpretation and less confidence on fine text inside an image. If you want the most detailed result, use a cloud provider; if you want something free, fast and completely private, this is the one to reach for.
 
+**Context note.** The on-device model holds about 4,096 tokens in total — an order of magnitude less than the cloud models. That is plenty for describing images, but chats hit the limit quickly. When one does, IDT says so and asks you to start a new conversation rather than retrying something that cannot succeed.
+
 **Speed note.** The first image of a run is slower than the rest, because IDT starts the on-device model then. ImageDescriber says so in the progress dialog. Later images in the same run reuse it.
 
 **CLI examples**
@@ -1371,7 +1373,7 @@ idt describe ~/Photos --provider apple
 idt chat --provider apple
 ```
 
-**Limits compared with the cloud providers:** no PDF attachments in chat (the model takes images and text only), no web search in chat, and only the one model. Because everything runs locally, there is no rate limit and no bill.
+**Limits compared with the cloud providers:** no PDF attachments in chat (the model takes images and text only), no web search in chat, only the one model, and a much smaller context window (about 4,096 tokens). Because everything runs locally, there is no rate limit and no bill.
 
 ---
 

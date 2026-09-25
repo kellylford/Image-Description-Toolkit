@@ -2016,13 +2016,17 @@ class AppleProvider(AIProvider):
         except AppleFMError as exc:
             message = str(exc)
             lowered = message.lower()
-            if "did not start within" in lowered:
+            if "did not start within" in lowered or "timed out" in lowered:
+                # Server start, or the request itself. Both are worth one retry:
+                # the model may simply have been paging in.
                 kind = ErrorKind.TIMEOUT
             elif ("sudo fm license" in lowered or "macos 27" in lowered
                     or "not ready" in lowered or "/usr/bin/fm" in lowered):
                 # Setup problems: no request was made, and retrying cannot help.
                 kind = ErrorKind.UNAVAILABLE
             else:
+                # Includes a prompt too long for the 4,096-token window, which
+                # is permanent: the same image and prompt would fail again.
                 kind = ErrorKind.UNKNOWN
             raise_provider_error(provider="Apple Intelligence", kind=kind, message=message)
 
