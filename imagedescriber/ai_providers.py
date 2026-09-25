@@ -1999,10 +1999,14 @@ class AppleProvider(AIProvider):
         from idt_core.providers.apple import APPLE_MODELS
         return list(APPLE_MODELS)
 
-    # One retry: the model is local, so the transient network failures the
-    # default three retries exist for cannot happen here. A second attempt
+    # Two retries. The original reasoning ("one, because the model is local")
+    # was about network flakiness, and missed that Apple's own model manager
+    # drops requests: measured twice in a 90-image run, one recovering on the
+    # second attempt. Attempts here cost seconds, not the 300 s a cloud call
+    # can, so a third is cheap insurance against losing an image outright.
+    # A second attempt
     # still covers a server that died between requests.
-    @retry_on_api_error(max_retries=1, base_delay=1.0, max_delay=10.0)
+    @retry_on_api_error(max_retries=2, base_delay=1.0, max_delay=10.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         from idt_core.converter import load_for_api
         from idt_core.providers.apple import (
@@ -2017,10 +2021,13 @@ class AppleProvider(AIProvider):
             message = str(exc)
             lowered = message.lower()
             status = getattr(exc, "status_code", None)
-            if "could not load its model" in lowered:
-                # Apple's model manager dropped the request. Measured twice in
-                # one 90-image run and both images described fine on a retry,
-                # so this must be retried rather than losing the image.
+            if isinstance(status, int) and 500 <= status < 600:
+                # Apple's model manager dropped the request; the provider marks
+                # those 503 because they succeed on a retry. Read the status,
+                # never the sentence: matching the wording would mean that
+                # rewording a user-facing hint silently stops the retry and
+                # starts losing images again, with nothing to catch it. That is
+                # the defect issue #228 was about.
                 kind = ErrorKind.SERVER_ERROR
             elif "did not start within" in lowered or "timed out" in lowered:
                 # Server start, or the request itself. Both are worth one retry:

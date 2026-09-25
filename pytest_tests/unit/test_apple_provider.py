@@ -815,3 +815,42 @@ def test_a_refusal_is_still_permanent():
 
     assert excinfo.value.status_code is None
     assert not classify(excinfo.value).retryable
+
+
+def test_the_gui_retries_on_the_status_not_on_the_wording(monkeypatch, tmp_path):
+    """Rewording the hint must not silently stop the retry.
+
+    The first cut of this branched on "could not load its model" appearing in
+    the message. These hints have already been reworded twice; the next edit
+    would have quietly restored the behaviour this fix exists to remove, with
+    no test failing. Classification reads the status code instead.
+    """
+    import sys as _sys
+
+    _sys.path.insert(0, str(_ROOT / "imagedescriber"))
+    import ai_providers
+
+    from idt_core.providers import apple as core_apple
+
+    monkeypatch.setattr(ai_providers.time, "sleep", lambda _s: None)
+    monkeypatch.chdir(tmp_path)
+    image = tmp_path / "img.jpg"
+    image.write_bytes(b"\xff\xd8\xff\xe0not-a-real-jpeg")
+
+    # A hint whose wording shares nothing with the old substring match.
+    monkeypatch.setattr(core_apple, "check_ready", lambda *a, **k: None)
+    calls = []
+
+    def post_chat(_payload, **_kwargs):
+        calls.append(1)
+        raise core_apple.AppleFMError("Some future wording entirely.", status_code=503)
+
+    monkeypatch.setattr(core_apple, "post_chat", post_chat)
+
+    with pytest.raises(ai_providers.ProviderError) as excinfo:
+        ai_providers.AppleProvider().describe_image(str(image), "describe", "system")
+
+    assert excinfo.value.is_retryable, (
+        "a 503 from the provider must stay retryable however the hint is worded"
+    )
+    assert len(calls) > 1, "it must actually have retried"
