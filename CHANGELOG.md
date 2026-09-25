@@ -1,5 +1,40 @@
 ## [Unreleased]
 
+## [4.6.0] - 2026-09-25
+
+### ✨ New Features
+
+**Apple Intelligence — descriptions that never leave your Mac (issue #324)**
+- New provider `apple`, shown as **Apple Intelligence**, runs Apple's on-device model on macOS 27. No API key, no account, no network, and no cost however many images you describe.
+- Available in `idt describe`/`download`/`video`/`watch`, `idt chat`, `idt models`, `guideme`, ImageDescriber (describing, follow-up questions, chat, prompt editor, settings) and IDT Chat.
+- Roughly 4–6 seconds per image once warm; the first image of a run also pays for starting the on-device model, and ImageDescriber says so in the progress dialog.
+- Requires macOS 27 on Apple Silicon, Apple Intelligence switched on, and a one-time `sudo fm license` — machine-wide, needs an administrator, and cannot be done for you. IDT detects each of those and says which one is missing rather than failing opaquely. The provider is hidden entirely on machines that cannot run it.
+- One model, `system`. Apple's Private Cloud Compute model is not offered: it refuses any process that is not Terminal, so it would be a picker entry that never works.
+- Nothing new to install or bundle — it talks to the `fm` binary macOS already ships, so neither installer grows.
+- Its context window is about 4,096 tokens, an order of magnitude under the cloud models. That is ample for describing images but chats reach the limit quickly, and IDT now says so plainly instead of retrying something that cannot succeed.
+
+**Claude Code — Claude on your Pro or Max subscription (#325, #326)**
+- New provider `claude-code` runs Claude through the Claude Code app, billed against your existing subscription instead of an API key. Sign in once with `claude auth login`.
+- Same reach as above: CLI, ImageDescriber and IDT Chat. Choose `haiku`, `sonnet` or `opus`; the CLI resolves each to the current model of that tier, so the list cannot go stale.
+- Measured cost per image is about what the same request costs through the API — roughly 1,850 input tokens for a phone photo — because each request sends the image inline with a short system prompt and no tools, rather than letting Claude Code open the file with its own tooling.
+- Refuses to run unless it is signed in to a claude.ai subscription, so it can never quietly bill an API account.
+- A measured figure for planning: 103 images used at most about 4% of a five-hour window on a Pro plan.
+
+### 🐛 Bug Fixes
+
+**A configured default model no longer reaches the wrong provider**
+- `default_model` is global while `--provider` is chosen per run, so `idt describe --provider apple` on a machine whose default is an Ollama model sent that name to Apple Intelligence and failed on every image. A provider with one fixed model now falls back to its own default.
+
+**Stop sending `temperature` to the Anthropic SDK (#298)**
+- The anthropic SDK removed `temperature` in 1.0.0, so passing it raised a `TypeError` before the request was ever sent. `idt chat` now warns that the flag does not apply to Claude rather than dropping it silently.
+
+### 🔧 Maintenance
+
+- `anthropic` requirement raised to `>=1.0.0` (#299), plus dependency sweeps across every requirements file (#290, #293, #297, #320, #322, #323).
+- Dependabot updates are grouped and auto-merged when every check passes (#321).
+
+## [4.5.0] - 2026-08-19
+
 ### ✨ New Features
 
 **`idt workflow --show-descriptions on` — live description output (issue #115)**
