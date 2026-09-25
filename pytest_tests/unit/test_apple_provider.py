@@ -559,12 +559,15 @@ def test_describe_caps_the_reply_length(monkeypatch):
     assert captured["max_completion_tokens"] == apple.DESCRIBE_MAX_OUTPUT_TOKENS
 
 
-def test_an_unavailable_model_stops_the_server_it_started(monkeypatch):
+def test_an_unavailable_model_stops_the_server_it_started(monkeypatch, tmp_path):
     """Otherwise the next request reuses that server, skips the health check,
     and reports a raw HTTP error instead of "turn on Apple Intelligence"."""
     server = apple.FmServer()
     stopped = []
 
+    # A real temp root: the module's own is the literal /tmp, which does not
+    # exist on the Windows runner.
+    monkeypatch.setattr(apple, "SOCKET_ROOT", str(tmp_path))
     monkeypatch.setattr(apple, "check_ready", lambda *a, **k: None)
     monkeypatch.setattr(apple.subprocess, "Popen",
                         lambda *a, **k: _LiveProc())
@@ -592,6 +595,15 @@ def test_an_unavailable_model_stops_the_server_it_started(monkeypatch):
 # Reaping servers left behind by a run that was killed
 # ---------------------------------------------------------------------------
 
+#: The reaping tests below drive POSIX pids, uids and signals. The provider
+#: cannot run off macOS at all, so there is nothing to assert there -- and
+#: ``os.getuid`` does not even exist on Windows, where the coverage job runs.
+posix_only = pytest.mark.skipif(
+    not hasattr(os, "getuid"), reason="POSIX pids and uids"
+)
+
+
+@posix_only
 def test_an_orphaned_server_is_killed_when_its_owner_is_gone(monkeypatch, tmp_path):
     """atexit does not run when an app is force-quit, and the child is in its
     own session, so it survives holding the model in memory."""
@@ -611,6 +623,7 @@ def test_an_orphaned_server_is_killed_when_its_owner_is_gone(monkeypatch, tmp_pa
     assert not stale.exists()
 
 
+@posix_only
 def test_a_live_owners_server_is_left_alone(monkeypatch, tmp_path):
     """A second IDT running right now must keep its own server."""
     live = tmp_path / "idt-fm-live"
@@ -633,6 +646,7 @@ def test_a_live_owners_server_is_left_alone(monkeypatch, tmp_path):
     assert live.exists()
 
 
+@posix_only
 def test_a_directory_without_an_owner_file_is_never_touched(monkeypatch, tmp_path):
     """An unowned socket costs nothing; a wrong kill costs someone's run."""
     unknown = tmp_path / "idt-fm-unknown"
@@ -681,6 +695,7 @@ class _FailingServer:
             f"Apple Intelligence returned HTTP {self._status}: {self._detail}")
 
 
+@posix_only
 def test_a_directory_owned_by_another_user_is_never_reaped(monkeypatch, tmp_path):
     """/tmp is world-writable. Without an ownership check, another account
     could plant an owner file naming a dead owner and any pid it liked, and

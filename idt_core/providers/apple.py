@@ -296,6 +296,12 @@ def _reap_orphans() -> None:
     naming a dead owner and any pid it liked, and make IDT send SIGTERM to a
     process of the user's that has nothing to do with this.
     """
+    if not hasattr(os, "getuid"):
+        # Not POSIX, so there is no uid to check ownership against -- and this
+        # provider cannot run here anyway, so there is nothing of ours to reap.
+        # Guarded rather than assumed: today the only caller is behind a Darwin
+        # check, but that is a property of the call graph, not of this function.
+        return
     try:
         names = os.listdir(SOCKET_ROOT)
     except OSError:
