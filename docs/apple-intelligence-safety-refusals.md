@@ -67,20 +67,43 @@ The reading is a hunting-trophy / animal-death judgment. **This is inference:** 
 returns no category and no score, only the sentence above. The crops establish *what* in
 the frame is responsible; they cannot establish *why* Apple classes it that way.
 
-### It also depends on the prompt
+### It also depends on the prompt — unpredictably
 
 The same image, same day, same machine:
 
-| Prompt | Result |
+| Prompt sent | Result |
 |---|---|
-| `narrative` alone | 6 described / 0 refused |
-| `narrative` with any prefix — including IDT's own `"Capture metadata (not visible in the image): "` | 0 / 9 |
-| `concise` | 0 / 6 |
-| `accessibility` | described |
-| `detailed` | described |
+| `narrative` (327 chars) | described 4/4 |
+| `narrative` truncated to 200 chars or less | refused |
+| `narrative` truncated to 240 chars or more | described |
+| `narrative` with a leading **space** | described |
+| `narrative` with a leading **newline** | refused |
+| `narrative` with trailing spaces or trailing text | described (trailing never mattered) |
+| `narrative` with the metadata prefix `"…: Sep 7, 2026"` | refused |
+| `narrative` with the metadata prefix `"…: Seattle, Washington  Sep 7, 2026"` | **described** |
+| `concise` (107 chars) | refused |
+| `"Describe this image."` / `"Write alt text for this image."` / `"Describe this image for a screen reader user."` | all refused |
 
-So the image sits *near* the threshold rather than over it. The animals supply the
-signal; some prompt wordings push it across and others do not.
+**The decision does not track meaning.** A prompt that works stops working if you put a
+newline in front of it, while a space is fine. Trailing text never changes anything, so
+only the start of the prompt seems to matter — yet `"Describe this image."` is refused
+while a 327-character prompt that *begins with those exact words* is described. One
+metadata prefix flips it and a longer, more specific one does not.
+
+What it is *not*: random. The same exact string gives the same answer every time — 10/10
+and 4/4 in repeated runs, and identical across three freshly started servers.
+
+**Different people hit different styles.** On this photo, one run refused `narrative` and
+`detailed` while `accessibility` and `artistic` worked; another machine refused `concise`
+while `narrative`, `detailed`, `accessibility` and `artistic` all worked. So do not trust
+any list of "safe" styles, including the examples above — try a few.
+
+### Apple's own accessibility feature describes it fine
+
+VoiceOver's image description produced a full, accurate description of this same photo —
+both mounts, the window and blinds, the fire extinguisher cabinet, even the illegible
+labels. Same vendor, same device, no refusal. Whatever guardrail configuration the
+Foundation Models endpoint applies is evidently not the one behind VoiceOver.
 
 A practical consequence: **EXIF metadata being enabled made the difference** on this
 image, because the pipeline prepends that `Capture metadata…` line to the prompt. Turning
@@ -89,9 +112,13 @@ every other image, which is not a trade worth making for one photo in 520.
 
 ### Retrying does not help; a different prompt does
 
-Refusal is deterministic for a given (image, prompt) pair: **0 successes in 11 retries**
-with an unchanged prompt. That is why IDT classifies it as permanent and does not retry —
-a retry would resend byte-for-byte the same request and cost another round trip.
+Refusal is stable for an exact prompt string: **0 successes in 11 retries** with an
+unchanged prompt, and the same answer across three freshly started servers. That is why
+IDT classifies it as permanent and does not retry — a retry resends byte-for-byte the
+same request.
+
+Changing the prompt is what works. Which change works is not predictable, so try more
+than one.
 
 ### A refusal does not poison the session
 
@@ -147,8 +174,10 @@ any text at all to `narrative` and watch it flip.
 ## If you hit this on your own images
 
 1. **Do not retry.** It is deterministic.
-2. **Change the prompt style.** `accessibility` and `detailed` described this image every
-   time. That is the whole fix in most cases.
+2. **Change the prompt style, and try more than one.** Which styles work varies by image
+   and by exact prompt text — `detailed` described this photo on one machine and was
+   refused on another. Longer, more elaborate prompts did better than short ones in every
+   test here, which is the only pattern that held.
 3. **Turn EXIF metadata off for that one image** if a prompt change is not enough — the
    metadata prefix is sometimes what tips it over.
 4. **Use another provider** for images that refuse under every prompt. Claude, OpenAI and
