@@ -164,6 +164,31 @@ refusal was at image 372 and everything after it succeeded.
 
 ---
 
+## A different failure that looks the same
+
+Not every HTTP 500 from this provider is a refusal. Seen in a 90-image run:
+
+```
+{"error":{"message":"The operation couldn't be completed.
+          (ModelManagerServices.ModelManagerError error 1001.)",
+          "code":"500","type":"server_error"}}
+```
+
+That is Apple's model manager failing to load the model for one request, and
+unlike a refusal it is **transient**. Both images that hit it described fine when
+tried again — one succeeded three times out of three, the other on the second
+attempt. IDT now recognises it, marks it retryable, and the retry usually makes it
+invisible.
+
+The two are worth keeping straight because they call for opposite responses:
+
+| | Safety refusal | Model manager error |
+|---|---|---|
+| Message | "safety guardrails were triggered" | "ModelManagerServices.ModelManagerError" |
+| Stable for the same request? | yes, every time | no — usually succeeds on a retry |
+| Time to fail | ~0.3s | varies |
+| What helps | a different prompt style | trying again |
+
 ## Reproduce it yourself
 
 From the repository root, with the Apple provider working (`idt models --provider apple`):

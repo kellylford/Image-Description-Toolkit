@@ -2016,7 +2016,13 @@ class AppleProvider(AIProvider):
         except AppleFMError as exc:
             message = str(exc)
             lowered = message.lower()
-            if "did not start within" in lowered or "timed out" in lowered:
+            status = getattr(exc, "status_code", None)
+            if "could not load its model" in lowered:
+                # Apple's model manager dropped the request. Measured twice in
+                # one 90-image run and both images described fine on a retry,
+                # so this must be retried rather than losing the image.
+                kind = ErrorKind.SERVER_ERROR
+            elif "did not start within" in lowered or "timed out" in lowered:
                 # Server start, or the request itself. Both are worth one retry:
                 # the model may simply have been paging in.
                 kind = ErrorKind.TIMEOUT
@@ -2028,7 +2034,8 @@ class AppleProvider(AIProvider):
                 # Includes a prompt too long for the 4,096-token window, which
                 # is permanent: the same image and prompt would fail again.
                 kind = ErrorKind.UNKNOWN
-            raise_provider_error(provider="Apple Intelligence", kind=kind, message=message)
+            raise_provider_error(provider="Apple Intelligence", kind=kind,
+                                 status_code=status, message=message)
 
         self.last_usage = {
             'prompt_tokens': result.input_tokens or 0,

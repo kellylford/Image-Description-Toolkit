@@ -164,6 +164,17 @@ GUARDRAIL_HINT = (
     "prompt style often does -- which one varies by image, so try a few."
 )
 
+#: Apple's model manager drops a request now and then -- measured twice in one
+#: 90-image run, and both images described fine on a retry (one succeeded 3/3,
+#: the other on the second attempt). It arrives as HTTP 500 like everything
+#: else, so without this it was classified as permanent and the image was lost
+#: for a failure that fixes itself.
+_MODEL_MANAGER_MARKER = "ModelManagerError"
+MODEL_MANAGER_HINT = (
+    "Apple Intelligence could not load its model for this request. This is "
+    "usually momentary and succeeds when tried again."
+)
+
 _CONTEXT_MARKER = "exceeded the model's context size"
 CONTEXT_HINT = (
     "This conversation is too long for the on-device model, which holds about "
@@ -172,7 +183,17 @@ CONTEXT_HINT = (
 
 
 class AppleFMError(RuntimeError):
-    """Apple Intelligence is unavailable, unlicensed, or a request failed."""
+    """Apple Intelligence is unavailable, unlicensed, or a request failed.
+
+    ``status_code`` carries an HTTP status when one is worth acting on. The
+    chat classifier reads it off the exception before it falls back to matching
+    the message text, so a transient failure can be marked as such without
+    smuggling the word "500" into a sentence shown to the user.
+    """
+
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 # ---------------------------------------------------------------------------
@@ -560,6 +581,10 @@ class FmServer:
                 raise AppleFMError(CONTEXT_HINT)
             if _GUARDRAIL_MARKER in detail:
                 raise AppleFMError(GUARDRAIL_HINT)
+            if _MODEL_MANAGER_MARKER in detail:
+                # 503 rather than the 500 the server sent: this one is worth
+                # retrying, and the status is what both classifiers read first.
+                raise AppleFMError(MODEL_MANAGER_HINT, status_code=503)
             raise AppleFMError(
                 f"Apple Intelligence returned HTTP {response.status}: {detail or 'no detail'}"
             )

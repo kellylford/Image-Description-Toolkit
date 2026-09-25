@@ -688,13 +688,16 @@ class _FailingServer:
         # open_chat itself raises for a non-200, which is what is under test,
         # so this reproduces that path rather than returning a response.
         from idt_core.providers.apple import (
-            CONTEXT_HINT, GUARDRAIL_HINT, _CONTEXT_MARKER, _GUARDRAIL_MARKER,
+            CONTEXT_HINT, GUARDRAIL_HINT, MODEL_MANAGER_HINT,
+            _CONTEXT_MARKER, _GUARDRAIL_MARKER, _MODEL_MANAGER_MARKER,
         )
 
         if _CONTEXT_MARKER in self._detail:
             raise AppleFMError(CONTEXT_HINT)
         if _GUARDRAIL_MARKER in self._detail:
             raise AppleFMError(GUARDRAIL_HINT)
+        if _MODEL_MANAGER_MARKER in self._detail:
+            raise AppleFMError(MODEL_MANAGER_HINT, status_code=503)
         raise AppleFMError(
             f"Apple Intelligence returned HTTP {self._status}: {self._detail}")
 
@@ -758,3 +761,57 @@ def test_a_safety_refusal_reads_as_a_refusal_not_a_server_fault():
     assert not classify(excinfo.value).retryable, (
         "retrying resends the identical image and prompt, which is refused again"
     )
+
+
+def test_a_model_manager_failure_is_transient_and_retried():
+    """Apple's model manager drops a request now and then.
+
+    Found in a 90-image run: two images failed with ModelManagerError 1001, and
+    both described fine when tried again -- one succeeded three times out of
+    three, the other on the second attempt. It arrives as HTTP 500 with
+    ``"type":"server_error"`` like every other failure, so before this it was
+    classified as permanent and the image was simply lost.
+    """
+    from idt_core.chat.errors import classify
+
+    detail = ('{"error":{"message":"The operation couldn\u2019t be completed. '
+              '(ModelManagerServices.ModelManagerError error 1001.)",'
+              '"code":"500","type":"server_error"}}')
+    server = _FailingServer(500, detail)
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(apple, "_server", server)
+        with pytest.raises(AppleFMError) as excinfo:
+            apple.post_chat({})
+    finally:
+        monkey.undo()
+
+    error = excinfo.value
+    assert "could not load its model" in str(error)
+    assert error.status_code == 503, (
+        "the status is what both classifiers read before the message text"
+    )
+    assert classify(error).retryable, (
+        "a retry of this exact request usually succeeds; not retrying loses "
+        "the image for a failure that fixes itself"
+    )
+
+
+def test_a_refusal_is_still_permanent():
+    """The neighbouring case, so the two cannot be conflated later: a safety
+    refusal is also an HTTP 500 and must NOT become retryable."""
+    from idt_core.chat.errors import classify
+
+    detail = ('{"error":{"message":"The model\'s safety guardrails were '
+              'triggered.","code":"500","type":"server_error"}}')
+    server = _FailingServer(500, detail)
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(apple, "_server", server)
+        with pytest.raises(AppleFMError) as excinfo:
+            apple.post_chat({})
+    finally:
+        monkey.undo()
+
+    assert excinfo.value.status_code is None
+    assert not classify(excinfo.value).retryable
