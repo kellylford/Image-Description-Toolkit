@@ -22,6 +22,16 @@
 
 ### 🐛 Bug Fixes
 
+**IDT Chat: attaching more than one photo to a message returned a blank answer (#329)**
+- Apple Intelligence answered a single image but came back empty with two or more. The images were sent at full size — 8 to 14 MB each for a phone photo — and the local server closed the connection rather than answering. The failure surfaced as an empty message with "Broken pipe" behind it.
+- Chat attachments are now scaled to 1600px before sending, as the OpenAI chat path already did. Two photos that previously failed go from 22 MB to under 1 MB and answer normally.
+- Describing images is unaffected and still sends them untouched: it sends one at a time, and the on-device server scales them itself.
+
+**Apple Intelligence says when it has declined an image, instead of showing a server error (#329)**
+- The on-device model refuses some pictures. That arrived as `HTTP 500` with a JSON body saying `"type":"server_error"`, which reads as a fault worth retrying. It is neither a fault nor worth retrying.
+- It now reads: *Apple Intelligence declined to describe this image: its safety guardrails were triggered. Retrying the same request will not help, but a different prompt style often does.*
+- Which style works varies by image, so none is named. `docs/apple-intelligence-safety-refusals.md` records what was measured, including that the shorter prompts — among them `aialttext` and `simple` — are the ones most often refused.
+
 **A configured default model no longer reaches the wrong provider**
 - `default_model` is global while `--provider` is chosen per run, so `idt describe --provider apple` on a machine whose default is an Ollama model sent that name to Apple Intelligence and failed on every image. A provider with one fixed model now falls back to its own default.
 

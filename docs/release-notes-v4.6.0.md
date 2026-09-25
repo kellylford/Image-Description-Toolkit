@@ -66,6 +66,15 @@ If you want something free, fast and completely private, this is the one to reac
 for. Every prompt style works with it — `detailed`, `accessibility`, `artistic` and
 the rest each change the output the way they do everywhere else.
 
+**It refuses some pictures.** The on-device model declines certain images outright —
+IDT says so plainly, and the run carries on to the next one. Retrying the same request
+will not help, but a different prompt style often will, and which one is not
+predictable: on one photo of a museum taxidermy display, `narrative` and `detailed`
+worked on one machine while `accessibility` and `artistic` worked on another. The
+shorter styles are refused most often, `aialttext` and `simple` among them, which is
+worth knowing if you are generating alt text. `docs/apple-intelligence-safety-refusals.md`
+records everything that was measured, and ships a script that reproduces it.
+
 One limit worth knowing: the on-device model holds about 4,096 tokens in total, an
 order of magnitude less than the cloud models. That is ample for describing images,
 but **chats** reach the limit quickly. When one does, IDT says so and asks you to
@@ -372,6 +381,8 @@ idt version     Version information
 - **A brand-new model's cost and context window are unknown to IDT** until a later
   release records them. It is still usable; `idt stats` may show no cost estimate for
   it, and long conversations are trimmed conservatively.
+- **Apple Intelligence declines some images.** Not a fault and not worth retrying;
+  try a different prompt style. See the note above.
 - **Apple Intelligence holds about 4,096 tokens.** Fine for describing images; short
   for chat. IDT tells you when a conversation has outgrown it.
 - **Apple Intelligence needs a one-time `sudo fm license`** run by an administrator.
