@@ -128,6 +128,12 @@ def _curated_tables(provider: str) -> Tuple[Sequence[str], Dict[str, dict]]:
         from .openai_provider import OPENAI_MODEL_METADATA, OPENAI_MODELS
 
         return OPENAI_MODELS, OPENAI_MODEL_METADATA
+    if provider == "apple":
+        # One on-device model, no live listing: the machine either has Apple
+        # Intelligence or it does not.
+        from .apple import APPLE_MODEL_METADATA, APPLE_MODELS
+
+        return APPLE_MODELS, APPLE_MODEL_METADATA
     if provider == "claude-code":
         # Tier aliases resolved by the CLI; there is no live listing to merge.
         from .claude_code import CLAUDE_CODE_MODEL_METADATA, CLAUDE_CODE_MODELS

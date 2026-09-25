@@ -572,6 +572,12 @@ def create_chat_provider(
 
         return MLXChatProvider(model)
 
+    if canonical == "apple":
+        # Lazy, like MLX: the macOS-only module never loads elsewhere.
+        from .apple import AppleChatProvider
+
+        return AppleChatProvider(model)
+
     if canonical == "claude-code":
         # Lazy, like MLX: only the chosen provider's module is loaded.
         from .claude_code import ClaudeCodeChatProvider
@@ -580,7 +586,7 @@ def create_chat_provider(
 
     factory = _PROVIDERS.get(canonical)
     if factory is None:
-        known = ", ".join(sorted(list(_PROVIDERS) + ["claude-code", "mlx"]))
+        known = ", ".join(sorted(list(_PROVIDERS) + ["apple", "claude-code", "mlx"]))
         raise ValueError(f"unknown chat provider {provider!r}; known: {known}")
 
     if canonical == "ollama":

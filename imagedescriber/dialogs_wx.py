@@ -389,6 +389,18 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
             return "Local Ollama models have no API cost. Requires Ollama running locally."
         return f"{model_id} — Local AI model running via Ollama. No API key or cloud cost."
 
+    if provider == "apple":
+        from idt_core.providers import catalog
+
+        entry = catalog.model_entry(provider, model_id)
+        # The catalog entry already says it is local, free and offline, so the
+        # note adds what a picker cannot see: the machine requirement and the
+        # one-time setup step, which needs an administrator.
+        parts = [entry.description] if entry.description else []
+        parts.append("Needs macOS 27 on Apple Silicon, with the terms accepted "
+                     "once via 'sudo fm license'")
+        return " | ".join(parts)
+
     if provider == "claude-code":
         from idt_core.providers import catalog
 
@@ -668,7 +680,7 @@ class FollowupQuestionDialog(wx.Dialog):
                     for model in [DEFAULT_OLLAMA_MODEL, "llava", "llama3.2-vision", "moondream"]:
                         self.model_combo.Append(model)
                         
-            elif provider in ("openai", "claude", "claude-code"):
+            elif provider in ("openai", "claude", "claude-code", "apple"):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 # `keep` holds on to the model already selected, so one the
@@ -1130,7 +1142,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                 else:
                     self.model_combo.Append(DEFAULT_OLLAMA_MODEL)
                     self.model_combo.SetSelection(0)
-            elif provider in ("openai", "claude", "claude-code"):
+            elif provider in ("openai", "claude", "claude-code", "apple"):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 try:

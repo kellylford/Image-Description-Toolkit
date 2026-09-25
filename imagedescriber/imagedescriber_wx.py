@@ -5948,8 +5948,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Extract provider name if present
             provider_name = None
             # "claude-code" first: "claude" is a substring of it, and the
-            # API-key advice below is wrong for a subscription login.
-            for prov in ["claude code", "openai", "claude", "ollama"]:
+            # API-key advice below is wrong for a subscription login. Apple
+            # Intelligence needs neither a key nor a login, so it is separate
+            # again.
+            for prov in ["claude code", "apple intelligence", "openai", "claude", "ollama"]:
                 if prov in error_msg.lower():
                     provider_name = prov
                     break
@@ -5960,6 +5962,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                            "• Your plan's usage limit has been reached\n\n" \
                            "To fix: run 'claude auth login' in a terminal and sign in " \
                            "with your Claude account"
+            elif provider_name == "apple intelligence":
+                error_msg += "\n\nPossible reasons:\n" \
+                           "• This Mac is not running macOS 27 on Apple Silicon\n" \
+                           "• Apple Intelligence is turned off, or its model is " \
+                           "still downloading\n" \
+                           "• The Foundation Models terms have not been accepted\n\n" \
+                           "To fix: turn on Apple Intelligence in System Settings, " \
+                           "then run 'sudo fm license' once in Terminal"
             elif provider_name in ["openai", "claude"]:
                 error_msg += f"\n\nPossible reasons:\n" \
                            f"• API key not configured\n" \

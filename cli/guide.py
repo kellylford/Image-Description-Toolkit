@@ -134,8 +134,17 @@ def _step_provider() -> str:
     print("  openai    - GPT-4o (requires OPENAI_API_KEY)")
     print("  claude-code - Claude on your Claude subscription, through the")
     print("                Claude Code app (no API key; run 'claude auth login')")
-    print()
     providers = ["ollama", "anthropic", "openai", "claude-code"]
+
+    # Apple Intelligence is offered only where it could actually run. Unlike a
+    # missing API key, "buy a Mac running macOS 27" is not a setup step, so
+    # listing it elsewhere would be an option that can never be chosen.
+    from idt_core.providers.apple import is_available as _apple_available
+
+    if _apple_available():
+        print("  apple     - Apple Intelligence on this Mac (no API key, works offline)")
+        providers.append("apple")
+    print()
     choice = get_choice("Which provider?", providers, default=1)
     return choice
 
@@ -150,6 +159,9 @@ def _step_api_key(provider: str) -> bool:
 
     if provider == "claude-code":
         return _check_claude_code()
+
+    if provider == "apple":
+        return _check_apple()
 
     env_var = {
         "anthropic": "ANTHROPIC_API_KEY",
@@ -238,6 +250,22 @@ def _check_claude_code() -> bool:
     return True
 
 
+def _check_apple() -> bool:
+    """Apple Intelligence replaces the API key step: the machine either has it
+    set up or it does not, and the one setup step needs an administrator."""
+    from idt_core.providers.apple import AppleFMError, check_ready
+
+    try:
+        check_ready()
+    except AppleFMError as exc:
+        print(f"Warning: {exc}")
+        print()
+        return get_yes_no("Continue anyway?", default=False)
+    print("Apple Intelligence is ready on this Mac. No API key needed, and "
+          "descriptions never leave the machine.")
+    return True
+
+
 def _step_model(provider: str) -> str:
     _header("Step 3: Model")
 
@@ -265,7 +293,7 @@ def _step_model(provider: str) -> str:
         _ensure_ollama_model(choice, installed)
         return choice
 
-    if provider in ("anthropic", "openai", "claude-code"):
+    if provider in ("anthropic", "openai", "claude-code", "apple"):
         return _choose_api_model(provider)
 
     return get_input("Enter model name")
@@ -284,7 +312,8 @@ def _choose_api_model(provider: str) -> str:
     """
     from idt_core.providers import catalog
 
-    label = {"anthropic": "Claude", "claude-code": "Claude Code"}.get(provider, "OpenAI")
+    label = {"anthropic": "Claude", "claude-code": "Claude Code",
+             "apple": "Apple Intelligence"}.get(provider, "OpenAI")
     try:
         entries = catalog.cached_models(provider)
     except Exception:

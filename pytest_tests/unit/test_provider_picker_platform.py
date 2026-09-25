@@ -63,6 +63,27 @@ def test_mlx_is_offered_only_where_it_can_run():
     )
 
 
+def test_apple_is_offered_only_where_it_can_run():
+    """Apple Intelligence needs macOS 27 on Apple Silicon.
+
+    Same shape as the MLX rule and for the same reason: picking a provider the
+    machine cannot run can only fail, and "install macOS 27" is not a setup step
+    a dialog can offer.
+    """
+    can_run = ai_providers.AppleProvider().is_available()
+    offered = any(key == "apple" for key, _ in ai_providers.provider_picker_choices())
+    assert offered == can_run, (
+        f"Apple Intelligence offered={offered} but is_available()={can_run} "
+        f"on {platform.system()}"
+    )
+
+
+@pytest.mark.skipif(platform.system() == "Darwin",
+                    reason="Apple Intelligence can run on macOS")
+def test_apple_is_never_offered_off_macos():
+    assert "apple" not in [key for key, _ in ai_providers.provider_picker_choices()]
+
+
 @pytest.mark.skipif(platform.system() == "Darwin", reason="MLX can run on macOS")
 def test_mlx_is_never_offered_off_macos():
     """Explicit form of the reported bug: Windows and Linux, never."""
@@ -91,7 +112,10 @@ def test_a_broken_availability_check_shows_too_much_not_too_little(monkeypatch):
 
     monkeypatch.setattr(ai_providers, "get_available_providers", boom)
     keys = [key for key, _ in ai_providers.provider_picker_choices()]
-    assert keys == ["ollama", "openai", "claude", "claude-code", "mlx"]
+    # Every provider, gated ones included: with the probe broken there is
+    # nothing left to gate on, and the fallback deliberately errs towards
+    # showing an option that might fail over showing none at all.
+    assert keys == [key for key, _ in ai_providers._PICKER_PROVIDERS]
 
 
 def test_every_label_maps_back_to_its_key():

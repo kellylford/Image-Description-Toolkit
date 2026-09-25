@@ -225,3 +225,42 @@ def test_default_model_selection_survives_a_broken_catalog(monkeypatch):
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("catalog is unhappy")),
     )
     assert cli_main._chat_default_model("claude") == DEFAULT_MODEL
+
+
+# ---------------------------------------------------------------------------
+# Per-provider model resolution
+#
+# `default_model` is global while `--provider` is per-run, so a configured
+# default belonging to another provider used to be sent verbatim. With
+# `--provider apple` that meant an Ollama model name reaching Apple
+# Intelligence and an HTTP 400 on every image in the run.
+# ---------------------------------------------------------------------------
+
+def test_a_foreign_default_model_does_not_reach_apple():
+    """The bug, stated directly: default_model=moondream, --provider apple."""
+    from cli.main import _resolve_model
+    from idt_core.providers.apple import DEFAULT_MODEL
+
+    assert _resolve_model("apple", "moondream") == DEFAULT_MODEL
+
+
+def test_apples_own_model_is_left_alone():
+    from cli.main import _resolve_model
+
+    assert _resolve_model("apple", "system") == "system"
+
+
+def test_no_model_resolves_to_the_providers_default():
+    from cli.main import _resolve_model
+    from idt_core.providers.apple import DEFAULT_MODEL
+
+    assert _resolve_model("apple", None) == DEFAULT_MODEL
+
+
+def test_other_providers_are_not_second_guessed():
+    """Deliberately narrow. A Claude or Ollama model name we do not recognise
+    may still be real -- only a fixed single-model provider can be sure."""
+    from cli.main import _resolve_model
+
+    for provider in ("ollama", "anthropic", "openai", "claude-code"):
+        assert _resolve_model(provider, "something-unfamiliar") == "something-unfamiliar"

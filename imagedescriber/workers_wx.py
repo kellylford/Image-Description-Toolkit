@@ -1049,6 +1049,18 @@ class BatchProcessingWorker(threading.Thread):
                 )
                 wx.PostEvent(self.parent_window, evt)
 
+            # Apple Intelligence: the first image also pays for starting the
+            # local `fm serve` and paging the model in, so say so rather than
+            # letting the dialog sit silent for several seconds.
+            if self.provider.lower() == 'apple':
+                evt = ProgressUpdateEventData(
+                    file_path="",
+                    message="⏳ Starting Apple Intelligence on this Mac — please wait…",
+                    current=0,
+                    total=total
+                )
+                wx.PostEvent(self.parent_window, evt)
+
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():

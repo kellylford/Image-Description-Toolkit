@@ -31,6 +31,7 @@ sys.path.insert(0, str(_ROOT / "imagedescriber"))
 
 from ai_providers import (  # noqa: E402
     AIProvider,
+    AppleProvider,
     ClaudeCodeProvider,
     ClaudeProvider,
     ErrorKind,
@@ -336,12 +337,54 @@ class _ClaudeCodeDriver(ProviderDriver):
         return ClaudeCodeProvider(), script
 
 
+class _AppleDriver(ProviderDriver):
+    provider_class = AppleProvider
+    speaks_http = False
+    no_http_reason = (
+        "Apple Intelligence talks to a local `fm serve` over a Unix socket on "
+        "this machine. There is no remote, no account and no rate limiter, so "
+        "401, 429, 502 and 503 cannot arise; the statuses that can (a 400 for a "
+        "bad request) are permanent and surface as message text. Its real "
+        "failure modes -- server start timeout, unreadable response -- are "
+        "covered by the timeout and garbage cases below."
+    )
+
+    def build(self, monkeypatch, tmp_path, outcomes):
+        from idt_core.providers import apple
+        from idt_core.providers.apple import AppleFMError
+
+        script = _Script(outcomes)
+
+        def post_chat(_payload, **_kwargs):
+            kind, value = script.next()
+            if kind == "ok":
+                return {"choices": [{"message": {"content": value},
+                                     "finish_reason": "stop"}],
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5}}
+            if kind == "timeout":
+                raise AppleFMError(
+                    "Apple Intelligence server did not start within 45s: no response")
+            if kind == "garbage":
+                raise AppleFMError(
+                    "Apple Intelligence returned an unreadable response: '<html>'")
+            if kind == "http":
+                raise AppleFMError(
+                    f"Apple Intelligence returned HTTP {value}: invalid_request_error")
+            raise _ScriptExhausted(kind)
+
+        # No macOS check, no subprocess, no socket: the transport is post_chat.
+        monkeypatch.setattr(apple, "check_ready", lambda *a, **k: None)
+        monkeypatch.setattr(apple, "post_chat", post_chat)
+        return AppleProvider(), script
+
+
 DRIVERS = [
     _OllamaDriver(),
     _OllamaCloudDriver(),
     _OpenAIDriver(),
     _ClaudeDriver(),
     _ClaudeCodeDriver(),
+    _AppleDriver(),
     _MLXDriver(),
 ]
 

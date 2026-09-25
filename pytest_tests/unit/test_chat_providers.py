@@ -660,6 +660,8 @@ def test_engine_forwards_thinking_and_never_saves_it():
     ("Claude", "claude"),
     ("anthropic", "claude"),
     ("OpenAI", "openai"),
+    ("apple", "apple"),
+    ("Apple Intelligence", "apple"),
 ])
 def test_factory_resolves_aliases_and_case(name, expected):
     provider = create_chat_provider(name, "some-model", "key")
@@ -677,3 +679,59 @@ def test_local_providers_are_not_handed_an_api_key():
     """Ollama takes a host, not a key; passing one would be a TypeError."""
     provider = create_chat_provider("ollama", "llava", "should-be-ignored")
     assert provider.provider_name == "ollama"
+
+
+# ---------------------------------------------------------------------------
+# Apple Intelligence
+#
+# Its formatter is written in idt_core/chat/apple.py rather than reusing
+# format_for_openai, because providers.py imports that module lazily and a
+# top-level import back would close an import cycle. Same shape, so the same
+# expectations apply -- which is exactly why they are asserted here rather than
+# assumed.
+# ---------------------------------------------------------------------------
+
+
+def test_apple_always_sends_a_system_message():
+    """The on-device model is given a role even when the caller sets none;
+    without one it answers as a general assistant mid-conversation."""
+    from idt_core.chat.apple import format_for_apple
+
+    messages = format_for_apple(_conversation(), "")
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"], "an empty system prompt would be pointless"
+
+
+def test_apple_takes_the_system_prompt_as_a_leading_message():
+    from idt_core.chat.apple import format_for_apple
+
+    messages = format_for_apple(_conversation(), "Be terse.")
+    assert messages[0] == {"role": "system", "content": "Be terse."}
+    assert [m["role"] for m in messages[1:]] == ["user", "assistant", "user"]
+
+
+def test_apple_turns_with_images_become_a_content_array():
+    from idt_core.chat.apple import format_for_apple
+
+    messages = format_for_apple(
+        [ChatMessage(role="user", content="what is this?", attachments=[PNG])], "")
+    content = messages[-1]["content"]
+    assert content[0] == {"type": "text", "text": "what is this?"}
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def test_apple_plain_turns_stay_strings():
+    from idt_core.chat.apple import format_for_apple
+
+    messages = format_for_apple([ChatMessage(role="user", content="hello")], "")
+    assert messages[-1]["content"] == "hello"
+
+
+def test_apple_never_sends_a_pdf():
+    """The on-device model takes images and text only; a PDF encoded as an
+    image part would fail the turn rather than degrade."""
+    from idt_core.chat.apple import format_for_apple
+
+    messages = format_for_apple(
+        [ChatMessage(role="user", content="read this", attachments=[PDF])], "")
+    assert messages[-1]["content"] == "read this"

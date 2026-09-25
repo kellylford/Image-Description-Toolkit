@@ -29,6 +29,7 @@ IDT includes three standalone applications that share the same AI provider infra
 | Anthropic Claude | `anthropic` | `claude` | Cloud | Yes | Windows, macOS |
 | OpenAI GPT | `openai` | `openai` | Cloud | Yes | Windows, macOS |
 | Claude Code (your Claude subscription) | `claude-code` | `claude-code` | Cloud | No — sign in to Claude Code | Windows, macOS |
+| Apple Intelligence (on-device) | `apple` | `apple` | Local | No | macOS 27+, Apple Silicon |
 | MLX (Apple Silicon) | — | `mlx` | Local | No | ImageDescriber only, macOS Apple Silicon |
 
 ---
@@ -1155,6 +1156,7 @@ All menu items, buttons, and interactive controls are reachable by keyboard. Arr
 > | `ollama` | `ollama` | Same name in both |
 > | `openai` | `openai` | Same name in both |
 > | `claude-code` | `claude-code` | Same name in both; shown as "Claude Code" in pickers |
+> | `apple` | `apple` | Same name in both; shown as "Apple Intelligence" in pickers |
 > | — | `ollama_cloud` | GUI only; remote Ollama server |
 > | — | `mlx` | GUI only; Apple Silicon local models |
 
@@ -1319,6 +1321,59 @@ idt chat --provider claude-code --model sonnet
 ```
 
 **Limits compared with the Claude API provider:** no PDF attachments in chat yet, no web search in chat, and `--temperature` is ignored. This is for your own use of your own subscription; it runs as whoever is signed in to Claude Code on the computer.
+
+---
+
+### Apple Intelligence — On This Mac (macOS 27 and later)
+
+macOS 27 can describe images with Apple's own on-device model, and IDT uses it as a provider. Nothing is uploaded: the model runs on the Mac's Neural Engine, so it needs no API key, no account and no internet connection, and it costs nothing however many images you describe. It works everywhere the other providers do: `idt describe`, `idt chat`, ImageDescriber (describing and chat) and IDT Chat.
+
+**CLI and GUI provider name:** `apple` (shown as **Apple Intelligence** in pickers)
+
+**What you need**
+
+- A Mac with Apple Silicon running macOS 27 or later. Intel Macs and older macOS cannot run it, and the option is hidden there rather than offered and failing.
+- Apple Intelligence turned on in **System Settings → Apple Intelligence & Siri**, with its model downloaded.
+- Apple's Foundation Models terms accepted once on the machine.
+
+**Setup**
+
+The terms are the only setup step, and IDT cannot do it for you: accepting them applies to everyone who uses the Mac, so it has to be run by an administrator. Open Terminal and run:
+
+```bash
+sudo fm license
+```
+
+Then check it:
+
+```bash
+idt models --provider apple
+```
+
+That lists the model when the Mac is ready, and says what is wrong when it is not — wrong macOS, Apple Intelligence switched off, or the terms not yet accepted. ImageDescriber and IDT Chat show the same information when you pick the provider.
+
+**Models**
+
+There is one: `system`, shown as **On-device (Apple Intelligence)**. Apple also offers a Private Cloud Compute model, but it is unavailable to apps launched outside Terminal, so IDT does not list it.
+
+**What it is good at**
+
+Speed and privacy. A description takes about four to six seconds per image on an M-series Mac, with no network round trip and no usage limit to watch. It reads scenes accurately — objects, colours, foreground and background, left-to-right placement — which is what alt text usually needs.
+
+It is a small model compared with Claude or GPT, so expect shorter, plainer descriptions with less interpretation and less confidence on fine text inside an image. If you want the most detailed result, use a cloud provider; if you want something free, fast and completely private, this is the one to reach for.
+
+**Context note.** The on-device model holds about 4,096 tokens in total — an order of magnitude less than the cloud models. That is plenty for describing images, but chats hit the limit quickly. When one does, IDT says so and asks you to start a new conversation rather than retrying something that cannot succeed.
+
+**Speed note.** The first image of a run is slower than the rest, because IDT starts the on-device model then. ImageDescriber says so in the progress dialog. Later images in the same run reuse it.
+
+**CLI examples**
+
+```bash
+idt describe ~/Photos --provider apple
+idt chat --provider apple
+```
+
+**Limits compared with the cloud providers:** no PDF attachments in chat (the model takes images and text only), no web search in chat, only the one model, and a much smaller context window (about 4,096 tokens). Because everything runs locally, there is no rate limit and no bill.
 
 ---
 
@@ -1616,6 +1671,7 @@ Launch **IDT Chat** from the Start menu (Windows) or from `Applications/IDT/IDTC
 The first time you send a message it asks for a provider and model. Two providers need no API key:
 
 - **Ollama** works with no setup as long as Ollama is running.
+- **apple** runs Apple Intelligence on the Mac itself. No API key, no account, no cost, and images never leave the machine; needs macOS 27 on Apple Silicon and a one-time `sudo fm license`. See [Apple Intelligence — On This Mac](#apple-intelligence--on-this-mac-macos-27-and-later).
 - **claude-code** uses your Claude Pro or Max subscription through the Claude Code app. Sign in once with `claude auth login`; the provider is only listed when Claude Code is installed. See [Claude Code — Your Claude Subscription](#claude-code--your-claude-subscription-windows-and-macos).
 
 **claude** and **openai** need an API key — see [Setting Up API Keys](#setting-up-api-keys).

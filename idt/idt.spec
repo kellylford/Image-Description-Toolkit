@@ -73,6 +73,7 @@ a = Analysis(
         'idt_core.logger',
         'idt_core.providers',
         'idt_core.providers.base',
+        'idt_core.providers.apple',
         'idt_core.providers.claude',
         'idt_core.providers.claude_code',
         'idt_core.providers.ollama',
@@ -97,6 +98,7 @@ a = Analysis(
         # build, which is the hardest place to notice it.
         'idt_core.chat',
         'idt_core.chat.attachments',
+        'idt_core.chat.apple',
         'idt_core.chat.claude_code',
         'idt_core.chat.encoding',
         'idt_core.chat.mlx',
