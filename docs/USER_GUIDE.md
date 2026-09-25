@@ -1364,6 +1364,8 @@ It is a small model compared with Claude or GPT, so expect shorter, plainer desc
 
 **Context note.** The on-device model holds about 4,096 tokens in total — an order of magnitude less than the cloud models. That is plenty for describing images, but chats hit the limit quickly. When one does, IDT says so and asks you to start a new conversation rather than retrying something that cannot succeed.
 
+**If it refuses an image.** Apple Intelligence declines some pictures outright — it says so, and the run carries on. Retrying will not help, but a different prompt style usually will: `accessibility` and `detailed` are the ones to try first. See [Apple Intelligence: when it refuses to describe an image](apple-intelligence-safety-refusals.md) for what triggers it and how to test it yourself.
+
 **Speed note.** The first image of a run is slower than the rest, because IDT starts the on-device model then. ImageDescriber says so in the progress dialog. Later images in the same run reuse it.
 
 **CLI examples**
