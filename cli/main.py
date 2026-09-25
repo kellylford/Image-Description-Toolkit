@@ -52,22 +52,47 @@ def _set_console_title(title: str) -> None:
 # ------------------------------------------------------------------ #
 
 def _resolve_model(provider: str, model: Optional[str]) -> Optional[str]:
-    """Drop a configured default model that belongs to a different provider.
+    """Deal with a configured default model that belongs to a different provider.
 
     ``default_model`` is global while ``--provider`` is per-run, so on a machine
-    whose default is an Ollama model ``idt describe --provider apple`` would ask
-    Apple Intelligence for "moondream" and get an HTTP 400 per image. Apple
-    Intelligence has exactly one model, so the mismatch is knowable before the
-    request and the provider's own default is the only sensible reading of it.
+    whose default is an Ollama model, ``idt describe --provider apple`` asked
+    Apple Intelligence for "moondream" and got an HTTP 400 per image.
 
-    Deliberately narrow: it corrects providers with a fixed, single-model list,
-    not ones where a wrong-looking model name might still be real.
+    Two providers, two answers, because the certainty differs:
+
+    * **apple** has exactly one model, ``system``. Any other name is wrong with
+      no ambiguity, and there is only one thing it could have meant, so it is
+      corrected silently.
+    * **claude-code** offers three tier aliases but the CLI also takes full
+      model ids, and takes new ones as Anthropic ships them. A name we do not
+      recognise may still be perfectly valid, so substituting one would risk
+      silently running a cheaper model than the user asked for. It warns and
+      sends the name through unchanged.
+
+    Everything else is left alone: a wrong-looking model name elsewhere might
+    simply be one this build has not heard of.
     """
     if provider == "apple":
         from idt_core.providers.apple import APPLE_MODELS, DEFAULT_MODEL
 
         if model not in APPLE_MODELS:
             return DEFAULT_MODEL
+
+    if provider == "claude-code" and model:
+        from idt_core.providers.claude_code import CLAUDE_CODE_MODELS
+
+        if model not in CLAUDE_CODE_MODELS:
+            # Once, before the run, rather than as a wall of identical failures
+            # afterwards: without this the CLI refuses every image with a
+            # message about model catalogs and `behavesAs` rows, which says
+            # nothing about the actual mistake.
+            print(
+                f"Warning: model {model!r} is not one Claude Code offers "
+                f"({', '.join(CLAUDE_CODE_MODELS)}). It came from your "
+                "configured default_model, which is shared across providers. "
+                "Sending it anyway -- pass --model to choose deliberately.",
+                file=sys.stderr,
+            )
     return model
 
 
