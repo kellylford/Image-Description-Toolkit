@@ -1966,6 +1966,75 @@ class ClaudeCodeProvider(AIProvider):
         return result.text
 
 
+class AppleProvider(AIProvider):
+    """Apple Intelligence — on-device descriptions through the macOS 27 ``fm`` CLI.
+
+    A thin adapter over ``idt_core.providers.apple``, which owns the server
+    lifecycle, the readiness checks and the wire format. Needs no API key and no
+    account: images never leave the Mac.
+    """
+
+    def __init__(self):
+        self.last_usage = None
+
+    def get_provider_name(self) -> str:
+        return "Apple Intelligence"
+
+    def is_available(self) -> bool:
+        """True on an Apple Silicon Mac with macOS 27's ``fm`` present.
+
+        The licence and whether Apple Intelligence is switched on are checked at
+        first use, where the error can name the fix, rather than on every picker
+        refresh -- both would cost a subprocess.
+        """
+        try:
+            from idt_core.providers.apple import is_available
+            return is_available()
+        except Exception:                                   # noqa: BLE001
+            return False
+
+    def get_available_models(self) -> List[str]:
+        if not self.is_available():
+            return []
+        from idt_core.providers.apple import APPLE_MODELS
+        return list(APPLE_MODELS)
+
+    # One retry: the model is local, so the transient network failures the
+    # default three retries exist for cannot happen here. A second attempt
+    # still covers a server that died between requests.
+    @retry_on_api_error(max_retries=1, base_delay=1.0, max_delay=10.0)
+    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
+        from idt_core.converter import load_for_api
+        from idt_core.providers.apple import (
+            DEFAULT_MODEL, AppleFMError, AppleProvider as _CoreProvider,
+        )
+
+        try:
+            core = _CoreProvider(model=model or DEFAULT_MODEL)
+            image_bytes, mime_type = load_for_api(Path(image_path))
+            result = core.describe(image_bytes, mime_type, prompt)
+        except AppleFMError as exc:
+            message = str(exc)
+            lowered = message.lower()
+            if "did not start within" in lowered:
+                kind = ErrorKind.TIMEOUT
+            elif ("sudo fm license" in lowered or "macos 27" in lowered
+                    or "not ready" in lowered or "/usr/bin/fm" in lowered):
+                # Setup problems: no request was made, and retrying cannot help.
+                kind = ErrorKind.UNAVAILABLE
+            else:
+                kind = ErrorKind.UNKNOWN
+            raise_provider_error(provider="Apple Intelligence", kind=kind, message=message)
+
+        self.last_usage = {
+            'prompt_tokens': result.input_tokens or 0,
+            'completion_tokens': result.output_tokens or 0,
+            'total_tokens': (result.input_tokens or 0) + (result.output_tokens or 0),
+            'model': result.model,
+        }
+        return result.text
+
+
 # ---------------------------------------------------------------------------
 # Global provider instances
 # ---------------------------------------------------------------------------
@@ -1975,6 +2044,7 @@ _ollama_cloud_provider = OllamaCloudProvider()
 _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
 _claude_code_provider = ClaudeCodeProvider()
+_apple_provider = AppleProvider()
 _mlx_provider = MLXProvider()
 
 
@@ -1997,6 +2067,9 @@ def get_available_providers() -> Dict[str, AIProvider]:
     if _claude_code_provider.is_available():
         providers['claude-code'] = _claude_code_provider
 
+    if _apple_provider.is_available():
+        providers['apple'] = _apple_provider
+
     if _mlx_provider.is_available():
         providers['mlx'] = _mlx_provider
 
@@ -2011,14 +2084,15 @@ _PICKER_PROVIDERS = (
     ("openai", "OpenAI"),
     ("claude", "Claude"),
     ("claude-code", "Claude Code"),
+    ("apple", "Apple Intelligence"),
     ("mlx", "MLX"),
 )
 
 #: Providers hidden from pickers when they cannot run on this machine. MLX
-#: needs Apple Silicon; Claude Code needs the `claude` CLI installed, which is
-#: done outside this app -- unlike a missing API key, nothing in a dialog can
-#: fix it.
-_GATED_PROVIDERS = ("mlx", "claude-code")
+#: needs Apple Silicon; Claude Code needs the `claude` CLI installed; Apple
+#: Intelligence needs macOS 27 on Apple Silicon. All three are settled outside
+#: this app -- unlike a missing API key, nothing in a dialog can fix them.
+_GATED_PROVIDERS = ("mlx", "claude-code", "apple")
 
 
 def provider_key(value: str) -> str:
@@ -2092,5 +2166,6 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'openai': _openai_provider,
         'claude': _claude_provider,
         'claude-code': _claude_code_provider,
+        'apple': _apple_provider,
         'mlx': _mlx_provider,
     }

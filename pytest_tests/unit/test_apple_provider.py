@@ -1,0 +1,415 @@
+"""Apple Intelligence provider — the divergences that bite, pinned down.
+
+The endpoint is OpenAI-shaped but not OpenAI-compatible, and two of the three
+differences fail *silently*: a request that omits ``stream`` gets an event
+stream where it expected JSON, and ``max_tokens`` is accepted and ignored.
+Neither produces an error, so neither would be caught by a test that only
+asserts "a description came back". They are asserted directly here.
+
+The license check has its own regression test for the same reason: ``fm models``
+exits non-zero whenever any model is unavailable, and ``pcc`` always is from a
+process that is not Terminal — so reading the exit status would report every
+correctly licensed Mac as unlicensed.
+
+Nothing here starts a server, runs ``fm`` or needs macOS: the transport is faked
+at the seams, so these run on CI.
+"""
+
+import json
+import platform
+import sys
+from pathlib import Path
+
+import pytest
+
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from idt_core.providers import apple  # noqa: E402
+from idt_core.providers.apple import (  # noqa: E402
+    APPLE_MODELS,
+    DEFAULT_MODEL,
+    AppleFMError,
+    AppleProvider,
+    build_payload,
+    describe_messages,
+    image_part,
+    response_text,
+    usage_tokens,
+)
+
+pytestmark = pytest.mark.unit
+
+JPEG = b"\xff\xd8\xff\xe0fake-jpeg-bytes"
+
+
+# ---------------------------------------------------------------------------
+# The request body
+# ---------------------------------------------------------------------------
+
+def test_stream_is_always_stated_explicitly():
+    """The server's default is stream=true, the opposite of the OpenAI API.
+
+    Omitting the field hands a JSON caller ``text/event-stream``, whose body
+    fails to parse as an empty document — the failure that cost three attempts
+    when this provider was first measured.
+    """
+    for streaming in (True, False):
+        payload = build_payload([{"role": "user", "content": "hi"}],
+                                stream=streaming)
+        assert "stream" in payload, "stream must never be left to the server default"
+        assert payload["stream"] is streaming
+
+
+def test_streaming_asks_for_usage():
+    """Without stream_options a streamed turn reports no tokens at all."""
+    payload = build_payload([{"role": "user", "content": "hi"}], stream=True)
+    assert payload["stream_options"] == {"include_usage": True}
+
+
+def test_non_streaming_does_not_ask_for_usage():
+    payload = build_payload([{"role": "user", "content": "hi"}], stream=False)
+    assert "stream_options" not in payload
+
+
+def test_output_limit_uses_max_completion_tokens_not_max_tokens():
+    """``max_tokens`` is accepted and ignored by this server.
+
+    Measured 9/24/2026: ``max_tokens: 10`` returned 39 tokens and
+    ``finish_reason: stop``, while ``max_completion_tokens: 40`` returned
+    exactly 40. Sending the wrong field means no length control, with no error.
+    """
+    payload = build_payload([{"role": "user", "content": "hi"}],
+                            stream=False, max_output_tokens=120)
+    assert payload["max_completion_tokens"] == 120
+    assert "max_tokens" not in payload
+
+
+def test_temperature_is_passed_through_only_when_set():
+    assert "temperature" not in build_payload([], stream=False)
+    assert build_payload([], stream=False, temperature=0.2)["temperature"] == 0.2
+
+
+def test_model_defaults_when_blank():
+    assert build_payload([], "", stream=False)["model"] == DEFAULT_MODEL
+
+
+# ---------------------------------------------------------------------------
+# The license gate
+# ---------------------------------------------------------------------------
+
+class _Result:
+    def __init__(self, stdout="", stderr="", returncode=0):
+        self.stdout, self.stderr, self.returncode = stdout, stderr, returncode
+
+
+@pytest.fixture(autouse=True)
+def _forget_license_memo(monkeypatch):
+    """Each test decides the license state for itself."""
+    monkeypatch.setattr(apple, "_license_confirmed", False, raising=False)
+
+
+def test_licensed_mac_is_recognised_despite_a_nonzero_exit(monkeypatch):
+    """The regression: ``fm models`` exits 1 whenever any model is unavailable.
+
+    ``pcc`` is unavailable to every process that is not Terminal, so a correct,
+    licensed machine reports exit code 1 on every run. Gating on the status
+    would hide the provider on exactly the machines that can use it.
+    """
+    listing = ("  Apple Foundation Models\n"
+               "  ✓ system (AFM 3 Core)\n"
+               "  ✗ pcc  (Private Cloud Compute is not available in this context.)\n")
+    monkeypatch.setattr(apple, "find_fm", lambda: "/usr/bin/fm")
+    monkeypatch.setattr(apple.subprocess, "run",
+                        lambda *a, **k: _Result(stdout=listing, returncode=1))
+    assert apple.license_accepted() is True
+
+
+def test_unaccepted_terms_are_detected(monkeypatch):
+    banner = ("YOU HAVE NOT AGREED TO THE FOUNDATION MODELS CLI LEGAL NOTICE & "
+              "TERMS.\nAgreeing ... must be run as a privileged user "
+              "(e.g. 'sudo fm license').")
+    monkeypatch.setattr(apple, "find_fm", lambda: "/usr/bin/fm")
+    monkeypatch.setattr(apple.subprocess, "run",
+                        lambda *a, **k: _Result(stderr=banner, returncode=1))
+    assert apple.license_accepted() is False
+
+
+def test_unrecognised_output_is_not_treated_as_licensed(monkeypatch):
+    """A future output format must fail closed, with a hint, not at the socket."""
+    monkeypatch.setattr(apple, "find_fm", lambda: "/usr/bin/fm")
+    monkeypatch.setattr(apple.subprocess, "run",
+                        lambda *a, **k: _Result(stdout="something else entirely"))
+    assert apple.license_accepted() is False
+
+
+def test_check_ready_names_the_command_the_user_must_run(monkeypatch):
+    monkeypatch.setattr(apple.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(apple.platform, "machine", lambda: "arm64")
+    monkeypatch.setattr(apple, "find_fm", lambda: "/usr/bin/fm")
+    monkeypatch.setattr(apple, "license_accepted", lambda *a, **k: False)
+
+    with pytest.raises(AppleFMError) as excinfo:
+        apple.check_ready()
+    assert "sudo fm license" in str(excinfo.value)
+
+
+def test_check_ready_rejects_other_platforms(monkeypatch):
+    monkeypatch.setattr(apple.platform, "system", lambda: "Windows")
+    with pytest.raises(AppleFMError) as excinfo:
+        apple.check_ready()
+    assert "macOS 27" in str(excinfo.value)
+
+
+def test_check_ready_rejects_intel_macs(monkeypatch):
+    monkeypatch.setattr(apple.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(apple.platform, "machine", lambda: "x86_64")
+    with pytest.raises(AppleFMError):
+        apple.check_ready()
+
+
+def test_is_available_is_false_off_apple_silicon(monkeypatch):
+    monkeypatch.setattr(apple.platform, "system", lambda: "Linux")
+    assert apple.is_available() is False
+
+
+# ---------------------------------------------------------------------------
+# Reading a response
+# ---------------------------------------------------------------------------
+
+def test_response_text_extracts_the_message():
+    data = {"choices": [{"message": {"content": "  a desk  "}}]}
+    assert response_text(data) == "a desk"
+
+
+def test_a_refusal_is_raised_not_returned():
+    """A refusal stored as the image's description would be indistinguishable
+    from one — the defect issue #230 is about."""
+    data = {"choices": [{"message": {"content": "", "refusal": "no"}}]}
+    with pytest.raises(AppleFMError):
+        response_text(data)
+
+
+def test_an_empty_response_is_raised_with_its_finish_reason():
+    data = {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]}
+    with pytest.raises(AppleFMError) as excinfo:
+        response_text(data)
+    assert "length" in str(excinfo.value)
+
+
+def test_usage_tokens_survive_a_response_without_usage():
+    assert usage_tokens({}) == (0, 0)
+    assert usage_tokens({"usage": {"prompt_tokens": 3, "completion_tokens": 4}}) == (3, 4)
+
+
+# ---------------------------------------------------------------------------
+# Image parts
+# ---------------------------------------------------------------------------
+
+def test_jpeg_is_sent_untouched():
+    """No downscaling: the server resizes internally, and resolution made no
+    measurable difference to prompt tokens (640×480 and 9000×6750 both ~206)."""
+    part = image_part(JPEG, "image/jpeg")
+    assert part["type"] == "image_url"
+    assert part["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+    import base64
+    encoded = part["image_url"]["url"].split(",", 1)[1]
+    assert base64.standard_b64decode(encoded) == JPEG
+
+
+def test_unverified_formats_are_re_encoded_to_jpeg():
+    """Only JPEG and PNG data URLs are verified against this endpoint."""
+    pytest.importorskip("PIL")
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (4, 4), "red").save(buf, format="GIF")
+    part = image_part(buf.getvalue(), "image/gif")
+    assert part["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+
+def test_describe_messages_put_the_prompt_and_image_in_one_user_turn():
+    messages = describe_messages(JPEG, "image/jpeg", "describe it")
+    assert [m["role"] for m in messages] == ["system", "user"]
+    parts = messages[1]["content"]
+    assert parts[0] == {"type": "text", "text": "describe it"}
+    assert parts[1]["type"] == "image_url"
+
+
+# ---------------------------------------------------------------------------
+# describe(), with the transport faked
+# ---------------------------------------------------------------------------
+
+def _provider(monkeypatch):
+    monkeypatch.setattr(apple, "check_ready", lambda *a, **k: None)
+    return AppleProvider()
+
+
+def test_describe_returns_text_and_tokens(monkeypatch):
+    captured = {}
+
+    def post_chat(payload, **_kwargs):
+        captured.update(payload)
+        return {"choices": [{"message": {"content": "a desk"}}],
+                "usage": {"prompt_tokens": 288, "completion_tokens": 97}}
+
+    monkeypatch.setattr(apple, "post_chat", post_chat)
+    result = _provider(monkeypatch).describe(JPEG, "image/jpeg", "describe it")
+
+    assert result.text == "a desk"
+    assert result.provider == "apple"
+    assert (result.input_tokens, result.output_tokens) == (288, 97)
+    assert captured["stream"] is False, "describe must not receive an event stream"
+
+
+def test_describe_uses_the_only_model_there_is(monkeypatch):
+    assert APPLE_MODELS == ["system"]
+    monkeypatch.setattr(apple, "check_ready", lambda *a, **k: None)
+    assert AppleProvider().model_name == DEFAULT_MODEL
+
+
+# ---------------------------------------------------------------------------
+# Streaming
+# ---------------------------------------------------------------------------
+
+class _FakeResponse:
+    """Yields SSE lines the way http.client's response object does."""
+
+    def __init__(self, lines):
+        self._lines = [line.encode("utf-8") for line in lines]
+
+    def __iter__(self):
+        return iter(self._lines)
+
+
+class _FakeServer:
+    def __init__(self, lines):
+        self._lines = lines
+        self.closed = False
+
+    def open_chat(self, _payload, _timeout):
+        outer = self
+
+        class _Conn:
+            def close(self):
+                outer.closed = True
+
+        return _Conn(), _FakeResponse(self._lines)
+
+
+def _sse(**event):
+    return "data: " + json.dumps(event) + "\n"
+
+
+def test_stream_yields_deltas_then_usage(monkeypatch):
+    lines = [
+        _sse(choices=[{"delta": {"role": "assistant"}}]),
+        _sse(choices=[{"delta": {"content": "a "}}]),
+        _sse(choices=[{"delta": {"content": "desk"}}]),
+        _sse(choices=[{"delta": {}, "finish_reason": "stop"}]),
+        _sse(choices=[], usage={"prompt_tokens": 5, "completion_tokens": 2}),
+        "data: [DONE]\n",
+    ]
+    server = _FakeServer(lines)
+    monkeypatch.setattr(apple, "_server", server)
+
+    events = list(apple.stream_chat({}))
+    assert [text for kind, text in events if kind == "delta"] == ["a ", "desk"]
+    kind, final = events[-1]
+    assert kind == "done"
+    assert final["usage"]["completion_tokens"] == 2
+    assert final["finish_reason"] == "stop"
+    assert server.closed, "the socket must be closed when the stream ends"
+
+
+def test_abandoning_the_stream_closes_the_socket(monkeypatch):
+    """Cancellation contract: closing the generator releases the connection.
+
+    This is what makes Stop work in chat — and a leaked socket here would hold
+    the single-threaded server open against every later request.
+    """
+    lines = [_sse(choices=[{"delta": {"content": "a "}}]),
+             _sse(choices=[{"delta": {"content": "desk"}}]),
+             "data: [DONE]\n"]
+    server = _FakeServer(lines)
+    monkeypatch.setattr(apple, "_server", server)
+
+    stream = apple.stream_chat({})
+    next(stream)
+    stream.close()
+    assert server.closed
+
+
+def test_unparseable_sse_lines_are_skipped(monkeypatch):
+    """A keep-alive or a truncated line must not end the turn."""
+    lines = ["\n", ": keep-alive\n", "data: not-json\n",
+             _sse(choices=[{"delta": {"content": "ok"}}]), "data: [DONE]\n"]
+    monkeypatch.setattr(apple, "_server", _FakeServer(lines))
+    assert [t for k, t in apple.stream_chat({}) if k == "delta"] == ["ok"]
+
+
+# ---------------------------------------------------------------------------
+# Server lifecycle
+# ---------------------------------------------------------------------------
+
+def test_health_reports_an_unavailable_model_with_its_reason():
+    """Apple Intelligence can be switched off on a Mac where `fm` runs fine."""
+    health = {"models": [{"name": "system", "available": False,
+                          "reason": "Apple Intelligence is not enabled."}]}
+    with pytest.raises(AppleFMError) as excinfo:
+        apple.FmServer._check_model_available(health)
+    message = str(excinfo.value)
+    assert "Apple Intelligence is not enabled." in message
+    assert "System Settings" in message
+
+
+def test_health_passes_when_the_model_is_available():
+    apple.FmServer._check_model_available(
+        {"models": [{"name": "system", "available": True},
+                    {"name": "pcc", "available": False, "reason": "not here"}]}
+    )
+
+
+def test_stopping_a_server_that_never_started_is_harmless():
+    apple.FmServer().stop()
+
+
+@pytest.mark.skipif(platform.system() != "Darwin", reason="Unix socket paths")
+def test_socket_path_stays_short_enough_to_bind(monkeypatch):
+    """macOS caps a Unix socket path at ~104 bytes.
+
+    The default temp directory is a long per-user path under /var/folders, which
+    leaves too little room — hence /tmp. A regression here would fail only at
+    runtime, on a real Mac, as an unexplained bind error.
+    """
+    started = {}
+
+    class _Proc:
+        def poll(self):
+            return None
+
+        def terminate(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_popen(cmd, **_kwargs):
+        started["cmd"] = cmd
+        return _Proc()
+
+    monkeypatch.setattr(apple, "check_ready", lambda *a, **k: None)
+    monkeypatch.setattr(apple.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(apple.FmServer, "_await_health_locked", lambda self: None)
+
+    server = apple.FmServer()
+    try:
+        path = server.ensure_running(fm="/usr/bin/fm")
+        assert len(path.encode()) < 100, f"socket path too long to bind: {path}"
+        assert started["cmd"][:3] == ["/usr/bin/fm", "serve", "--socket"]
+    finally:
+        server.stop()

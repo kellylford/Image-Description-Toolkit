@@ -245,6 +245,20 @@ class ProviderDialog(wx.Dialog):
             return False
         return is_available()
 
+    @staticmethod
+    def _apple_is_usable() -> bool:
+        """True on an Apple Silicon Mac with macOS 27's `fm` binary present.
+
+        Unlike MLX this costs the build nothing -- there is no package to
+        bundle, only an OS binary to call -- so the check is about the machine,
+        not about what was frozen into this app.
+        """
+        try:
+            from idt_core.providers.apple import is_available
+        except Exception:                                   # noqa: BLE001
+            return False
+        return is_available()
+
     @classmethod
     def _provider_names(cls):
         names = [p for p in list_providers() if p != "ollama cloud"]
@@ -252,6 +266,8 @@ class ProviderDialog(wx.Dialog):
             names = [p for p in names if p != "mlx"]
         if not cls._claude_code_is_usable():
             names = [p for p in names if p != "claude-code"]
+        if not cls._apple_is_usable():
+            names = [p for p in names if p != "apple"]
         return names
 
     def _on_provider(self, _event):
@@ -295,6 +311,23 @@ class ProviderDialog(wx.Dialog):
                 self.status.SetLabel(missing_key_message(provider))
             self._select_model(self._initial_model)
             self._start_catalog_refresh(provider)
+            return
+
+        if provider == "apple":
+            # One on-device model, nothing to fetch, so no background refresh.
+            try:
+                from idt_core.providers import catalog
+
+                for entry in catalog.curated_models(provider):
+                    self.model_choice.Append(entry.display(), entry.id)
+            except Exception as exc:                        # noqa: BLE001
+                self.status.SetLabel(f"Could not list models: {exc}")
+            else:
+                self.status.SetLabel(
+                    "Runs on this Mac. No API key and no account; nothing you "
+                    "type leaves the machine."
+                )
+            self._select_model(self._initial_model)
             return
 
         if provider == "claude-code":

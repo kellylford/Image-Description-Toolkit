@@ -100,7 +100,7 @@ idt update
 - **No Python required** for the pre-built app
 - **Installation**: Download `IDT-{version}-macos-arm64.dmg` from releases, open it, and drag ImageDescriber to Applications
 - **Build from Source**: See [macOS Build Guide](BuildAndRelease/MacBuilds/README_MACOS.md)
-- **AI Providers**: Same as Windows (Ollama, OpenAI, Claude), plus MLX on Apple Silicon
+- **AI Providers**: Same as Windows (Ollama, OpenAI, Claude, Claude Code), plus Apple Intelligence on macOS 27 and MLX on Apple Silicon
 
 ### Development (All Platforms)
 - **Python 3.10+** (for development only, not required for built executables)

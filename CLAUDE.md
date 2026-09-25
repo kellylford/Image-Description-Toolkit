@@ -9,7 +9,7 @@ Image Description Toolkit (IDT) is an AI-powered batch image/video description t
 - **`ImageDescriber`** — wxPython batch processing GUI (`imagedescriber/imagedescriber_wx.py`) with integrated viewer (`viewer_components.py`), chat (`chat_window_wx.py`), workspace manager (`workspace_manager.py`), prompt editor, and configuration manager
 - **`IDT Chat`** — standalone accessible chat client (`chatapp/chat_app_wx.py`). Not an image tool; a general-purpose chat client for Ollama/Claude/OpenAI built for keyboard and screen reader use.
 
-Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic API), Claude Code (Claude on the user's subscription via the `claude` CLI, provider key `claude-code`), and MLX (macOS Apple Silicon, GUI only).
+Supported AI providers: Ollama (local/cloud), OpenAI GPT-4o, Claude (Anthropic API), Claude Code (Claude on the user's subscription via the `claude` CLI, provider key `claude-code`), Apple Intelligence (on-device on macOS 27+, provider key `apple`), and MLX (macOS Apple Silicon, GUI only).
 
 ## Commands
 
@@ -79,6 +79,7 @@ All model lists live in the provider modules under `idt_core/providers/`:
 - `idt_core/providers/openai_provider.py` — OpenAI model list and metadata (sourced from OpenAI SDK)
 - `idt_core/providers/ollama.py` — Ollama models are dynamic (queries the running Ollama service at runtime)
 - `idt_core/providers/claude_code.py` — Claude Code provider: runs `claude -p` per request, billed to the user's subscription. Refuses to run unless `claude auth status` reports a claude.ai login, and strips `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_BASE_URL` from the child. Never use `--bare` there (bare mode is API-key only). Chat side: `idt_core/chat/claude_code.py`.
+- `idt_core/providers/apple.py` — Apple Intelligence provider: starts one `fm serve` per process on a Unix socket under `/tmp` and kills it at exit. The endpoint is OpenAI-shaped but diverges in three ways, two of them silent — `stream` defaults to **true** (omitting it returns an event stream a JSON caller cannot parse), `max_tokens` is ignored so length control must use `max_completion_tokens`, and requests serialize server-side so batches gain nothing from parallelism. Gated on a machine-wide `sudo fm license`, which the user must run; `fm models` exits non-zero on a licensed Mac (because `pcc` is unavailable), so never read its exit code. Chat side: `idt_core/chat/apple.py`.
 - `idt_core/providers/registry.py` — **provider capabilities** (streaming, system prompt, attachment MIME types, API key requirement). Replaced the deleted `models/provider_configs.py`.
 
 Imported by CLI, GUI, and chat features. Never duplicate model lists elsewhere.

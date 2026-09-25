@@ -217,6 +217,18 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
         attachment_mime_types=_IMAGE_MIMES + TEXT_ATTACHMENT_MIME_TYPES,
         max_image_bytes=5 * 1024 * 1024,
     ),
+    "apple": ProviderCapabilities(
+        provider="apple",
+        display_name="Apple Intelligence",
+        streaming=True,
+        system_prompt=True,
+        # Runs on the machine's own Neural Engine: no account, no key, no cost.
+        requires_api_key=False,
+        is_local=True,
+        # Images and text only. PDFs are left out because the on-device model
+        # takes no document uploads -- one would fail the turn, not degrade.
+        attachment_mime_types=_IMAGE_MIMES + TEXT_ATTACHMENT_MIME_TYPES,
+    ),
     "mlx": ProviderCapabilities(
         provider="mlx",
         display_name="MLX",
@@ -235,6 +247,9 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
 # Aliases for names the GUI and config files use for the same provider.
 _ALIASES: Dict[str, str] = {
     "anthropic": "claude",
+    "apple intelligence": "apple",
+    "apple_intelligence": "apple",
+    "foundation models": "apple",
     "claude code": "claude-code",
     "claude_code": "claude-code",
     "claudecode": "claude-code",

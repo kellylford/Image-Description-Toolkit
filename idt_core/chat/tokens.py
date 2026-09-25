@@ -33,6 +33,7 @@ DEFAULT_CONTEXT_WINDOWS = {
     "claude-code": 200_000,
     "ollama": 32_768,
     "mlx": 32_768,
+    "apple": 65_536,
 }
 
 FALLBACK_CONTEXT_WINDOW = 32_768

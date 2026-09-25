@@ -51,11 +51,41 @@ def _set_console_title(title: str) -> None:
 # Provider factory                                                     #
 # ------------------------------------------------------------------ #
 
+def _resolve_model(provider: str, model: Optional[str]) -> Optional[str]:
+    """Drop a configured default model that belongs to a different provider.
+
+    ``default_model`` is global while ``--provider`` is per-run, so on a machine
+    whose default is an Ollama model ``idt describe --provider apple`` would ask
+    Apple Intelligence for "moondream" and get an HTTP 400 per image. Apple
+    Intelligence has exactly one model, so the mismatch is knowable before the
+    request and the provider's own default is the only sensible reading of it.
+
+    Deliberately narrow: it corrects providers with a fixed, single-model list,
+    not ones where a wrong-looking model name might still be real.
+    """
+    if provider == "apple":
+        from idt_core.providers.apple import APPLE_MODELS, DEFAULT_MODEL
+
+        if model not in APPLE_MODELS:
+            return DEFAULT_MODEL
+    return model
+
+
 def _make_provider(provider: str, model: Optional[str], ollama_host: str):
     """Instantiate the requested provider with a clear error if deps are missing."""
     if provider == "anthropic":
         from idt_core.providers.claude import ClaudeProvider, DEFAULT_MODEL
         return ClaudeProvider(model=model or DEFAULT_MODEL)
+
+    if provider == "apple":
+        from idt_core.providers.apple import AppleProvider, DEFAULT_MODEL
+        try:
+            return AppleProvider(model=model or DEFAULT_MODEL)
+        except RuntimeError as exc:
+            # Wrong macOS, no /usr/bin/fm, or the terms not accepted. All three
+            # carry their own fix, so the message is printed as-is.
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     if provider == "claude-code":
         from idt_core.providers.claude_code import ClaudeCodeProvider, DEFAULT_MODEL
@@ -74,7 +104,7 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
         return OpenAIProvider(model=model or DEFAULT_MODEL)
 
     print(f"Unknown provider: {provider!r}", file=sys.stderr)
-    print("Valid providers: anthropic, claude-code, ollama, openai", file=sys.stderr)
+    print("Valid providers: anthropic, apple, claude-code, ollama, openai", file=sys.stderr)
     sys.exit(1)
 
 
@@ -113,9 +143,10 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
 def _provider_args(p: argparse.ArgumentParser) -> None:
     """Add the standard provider/model/ollama-host arguments."""
     p.add_argument(
-        "--provider", choices=["anthropic", "claude-code", "ollama", "openai"],
+        "--provider", choices=["anthropic", "apple", "claude-code", "ollama", "openai"],
         help="AI provider (default: from config, else ollama). "
-             "claude-code uses your Claude subscription via the claude CLI",
+             "claude-code uses your Claude subscription via the claude CLI; "
+             "apple runs Apple Intelligence on this Mac (macOS 27)",
     )
     p.add_argument("--model", metavar="NAME", help="Model name")
     p.add_argument(
@@ -361,7 +392,8 @@ def cmd_describe(args):
     _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
     _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
-    model         = args.model    or _ws_model    or user_cfg.default_model
+    model         = _resolve_model(provider_name,
+                                   args.model or _ws_model or user_cfg.default_model)
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
 
     # Resolve the effective copy setting: explicit --copy-originals/--no-copy-originals
@@ -657,7 +689,8 @@ def _cmd_describe_stdin(args):
     _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
     _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
-    model         = args.model    or _ws_model    or user_cfg.default_model
+    model         = _resolve_model(provider_name,
+                                   args.model or _ws_model or user_cfg.default_model)
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -813,7 +846,8 @@ def cmd_download(args):
         _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
         _ws_model = ws.defaults.model if ws.has_any_descriptions else ""
         provider_name = args.provider or _ws_provider or cfg.default_provider
-        model = args.model or _ws_model or cfg.default_model
+        model = _resolve_model(provider_name,
+                               args.model or _ws_model or cfg.default_model)
         prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -944,7 +978,8 @@ def cmd_video(args):
         _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
         _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
         provider_name = args.provider or _ws_provider or user_cfg.default_provider
-        model         = args.model    or _ws_model    or user_cfg.default_model
+        model         = _resolve_model(provider_name,
+                                   args.model or _ws_model or user_cfg.default_model)
         prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -1503,6 +1538,7 @@ def cmd_models(args):
     idt models --provider ollama    — list Ollama models
     idt models --provider anthropic — list Claude models for this account
     idt models --provider claude-code — Claude on your subscription
+    idt models --provider apple     — Apple Intelligence on this Mac
     idt models --refresh            — ignore the cache and ask the APIs now
     idt models --all                — skip the OpenAI chat-model filter
     """
@@ -1534,6 +1570,12 @@ def cmd_models(args):
     # what someone running this wants to know.
     if not args.provider or args.provider == "claude-code":
         results["claude-code"] = _claude_code_model_results()
+
+    # Apple Intelligence: one on-device model and nothing to fetch, but whether
+    # this Mac can run it -- macOS version, the license, Apple Intelligence
+    # being switched on -- is the whole question someone is asking here.
+    if not args.provider or args.provider == "apple":
+        results["apple"] = _apple_model_results()
 
     if args.json_out:
         print(json.dumps(results, indent=2))
@@ -1586,6 +1628,22 @@ def _claude_code_model_results() -> dict:
     return {"status": "ok", "models": list(CLAUDE_CODE_MODELS)}
 
 
+def _apple_model_results() -> dict:
+    """``idt models`` entry for Apple Intelligence: whether this Mac can run it."""
+    from idt_core.providers.apple import (
+        APPLE_MODELS, AppleFMError, check_ready, is_available,
+    )
+
+    if not is_available():
+        return {"status": "unavailable", "models": [],
+                "error": "Apple Intelligence needs macOS 27 on an Apple Silicon Mac"}
+    try:
+        check_ready()
+    except AppleFMError as exc:
+        return {"status": "unavailable", "models": [], "error": str(exc)}
+    return {"status": "ok", "models": list(APPLE_MODELS)}
+
+
 # ------------------------------------------------------------------ #
 # chat                                                                 #
 # ------------------------------------------------------------------ #
@@ -1601,6 +1659,10 @@ def _chat_default_model(provider: str) -> str:
     """
     if provider == "claude-code":
         from idt_core.providers.claude_code import DEFAULT_MODEL
+
+        return DEFAULT_MODEL
+    if provider == "apple":
+        from idt_core.providers.apple import DEFAULT_MODEL
 
         return DEFAULT_MODEL
     if provider in ("claude", "openai"):
@@ -1708,6 +1770,7 @@ def cmd_chat(args):
     idt chat --message "explain HEIC"          — one-shot
     idt chat --provider claude --system "Be terse."
     idt chat --provider claude-code            — Claude on your subscription
+    idt chat --provider apple                  — Apple Intelligence, on this Mac
     idt chat --list                            — saved conversations
     idt chat --resume chat_a1b2c3              — continue one
     """
@@ -1878,7 +1941,8 @@ def cmd_watch(args):
     _ws_provider = ws.defaults.provider if ws.has_any_descriptions else ""
     _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
-    model         = args.model    or _ws_model    or user_cfg.default_model
+    model         = _resolve_model(provider_name,
+                                   args.model or _ws_model or user_cfg.default_model)
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -2280,6 +2344,7 @@ Supported providers:
   anthropic  Claude (requires ANTHROPIC_API_KEY)
   openai     GPT-4o (requires OPENAI_API_KEY)
   ollama     Local models via Ollama (no API key)
+  apple      Apple Intelligence on this Mac (macOS 27, no API key)
         """,
     )
 
@@ -2511,7 +2576,8 @@ Supported providers:
         "models",
         help="Show available AI models for each provider",
     )
-    p_models.add_argument("--provider", choices=["anthropic", "claude-code", "ollama", "openai"],
+    p_models.add_argument("--provider",
+                          choices=["anthropic", "apple", "claude-code", "ollama", "openai"],
                           help="Show only this provider")
     p_models.add_argument("--ollama-host", metavar="URL",
                           default="http://localhost:11434")
@@ -2532,13 +2598,14 @@ Supported providers:
         help="Talk to an AI model from the terminal",
         description=(
             "Multi-turn chat with Ollama, Claude, Claude Code (your Claude "
-            "subscription) or OpenAI. Responses stream "
+            "subscription), Apple Intelligence (on-device) or OpenAI. Responses stream "
             "as they arrive. Ctrl+C stops a reply and keeps what arrived; "
             "Ctrl+D or /quit exits. Conversations are saved to ~/.idt/chats "
             "and share their format with ImageDescriber's chat items."
         ),
     )
-    p_chat.add_argument("--provider", choices=["ollama", "claude", "claude-code", "openai", "anthropic"],
+    p_chat.add_argument("--provider",
+                        choices=["ollama", "claude", "claude-code", "openai", "anthropic", "apple"],
                         help="Which backend to talk to (default: ollama)")
     p_chat.add_argument("--model", help="Model id (default: the provider's default)")
     p_chat.add_argument("--system", metavar="TEXT",

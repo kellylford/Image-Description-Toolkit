@@ -430,7 +430,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 models_response = ollama.list()
                 available_models = [model.model for model in models_response['models']]
                 
-            elif provider in ("openai", "claude", "claude-code"):
+            elif provider in ("openai", "claude", "claude-code", "apple"):
                 # Live-backed list from the model catalog (issue #267). Read from
                 # its cache, so the Refresh models button and the provider combo
                 # both stay instant.
@@ -476,7 +476,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             # Add models to combo box
             for model_name in available_models:
                 display_text = ""
-                if provider in ("openai", "claude", "claude-code"):
+                if provider in ("openai", "claude", "claude-code", "apple"):
                     # One source for the label, covering both providers. The old
                     # code only found friendly names in CLAUDE_MODEL_METADATA and
                     # otherwise fell through to config_data['available_models'],

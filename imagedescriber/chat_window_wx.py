@@ -246,7 +246,7 @@ class ChatDialog(wx.Dialog):
                     self.model_combo.Append('llava:latest', 'llava:latest')
                     self.model_combo.SetSelection(0)
                     
-            elif provider in ('openai', 'claude', 'claude-code'):
+            elif provider in ('openai', 'claude', 'claude-code', 'apple'):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 try:
