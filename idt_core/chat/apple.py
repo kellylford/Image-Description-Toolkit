@@ -25,37 +25,56 @@ from ..providers.base import ChatDelta, ChatProvider, ChatRequest, ChatUsage, Ch
 from .encoding import merge_text_attachments
 from .messages import Attachment, ChatMessage, conversation_turns
 
-#: Images are sent as they are. Unlike the cloud providers there is no upload
-#: limit to defend against — the server downscales before the model sees the
-#: image, and resolution made no measurable difference to prompt tokens.
 _SUPPORTED_IMAGE_MIMES = ("image/jpeg", "image/png")
+
+#: Longest edge for an attached image, matching the OpenAI chat path.
+#:
+#: The describe path deliberately sends images untouched, because the server
+#: downscales internally and one photo of any size goes through fine. Chat is
+#: different: a turn can carry several attachments, and phone photos are 8-14 MB
+#: each. Two of them closed the connection outright -- the server dropped the
+#: request and the user saw an empty reply with "Broken pipe" behind it.
+#: Measured 9/24/2026: two 8.5 MB + 14 MB photos failed; the same two at 1600px
+#: (950 KB total) answered normally, as did three.
+MAX_IMAGE_DIM = 1600
+JPEG_QUALITY = 85
 
 
 def encode_image(att: Attachment) -> dict:
-    """An ``image_url`` content part for one attachment.
+    """An ``image_url`` content part for one attachment, downscaled to fit.
 
-    GIF and WebP are re-encoded to JPEG: only JPEG and PNG data URLs are
-    verified against this endpoint, and a silent refusal mid-conversation is
-    worse than a re-encode nobody sees.
+    Two things happen here, both for the same reason -- a turn that fails is
+    worse than one that loses pixels nobody was going to see:
+
+    * Anything larger than :data:`MAX_IMAGE_DIM` on its longest edge is resized.
+      Full-size phone photos are megabytes each and several of them in one turn
+      break the request (see the note on that constant).
+    * GIF and WebP are re-encoded to JPEG, because only JPEG and PNG data URLs
+      are verified against this endpoint.
+
+    If Pillow is missing or the image will not decode, the original bytes go as
+    they are: the server refusing is a clearer failure than this function
+    raising one the user cannot act on.
     """
     raw = att.read_bytes()
-    media_type = att.media_type
-    if media_type not in _SUPPORTED_IMAGE_MIMES:
-        try:
-            import io
+    media_type = att.media_type or "image/jpeg"
+    try:
+        import io
 
-            from PIL import Image
+        from PIL import Image
 
-            img = Image.open(io.BytesIO(raw))
+        img = Image.open(io.BytesIO(raw))
+        oversized = max(img.size) > MAX_IMAGE_DIM
+        if oversized or media_type not in _SUPPORTED_IMAGE_MIMES:
             if img.mode != "RGB":
                 img = img.convert("RGB")
+            if oversized:
+                img.thumbnail((MAX_IMAGE_DIM, MAX_IMAGE_DIM), Image.Resampling.LANCZOS)
             buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=85)
+            img.save(buf, format="JPEG", quality=JPEG_QUALITY)
             raw, media_type = buf.getvalue(), "image/jpeg"
-        except Exception:                                   # noqa: BLE001
-            # Pillow missing or the image undecodable: send it as-is and let
-            # the server have the final say, rather than failing the turn here.
-            media_type = media_type or "image/jpeg"
+    except Exception:                                       # noqa: BLE001
+        pass
     payload = base64.b64encode(raw).decode("utf-8")
     return {"type": "image_url",
             "image_url": {"url": f"data:{media_type};base64,{payload}"}}

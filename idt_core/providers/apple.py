@@ -141,6 +141,29 @@ _LICENSE_MARKER = "NOT AGREED"
 #: forever, because the next attempt sends the same oversized transcript. The
 #: message is rewritten so it classifies as permanent and tells the user what to
 #: do about it.
+#: The on-device model declines some images outright. It arrives as HTTP 500
+#: like everything else, so without this it reads as a transient server fault
+#: and shows the user a JSON blob for something with a plain cause.
+#:
+#: Measured 9/24/2026 against a photo of two taxidermy mounts. Refusal is
+#: **stable for an exact prompt string** -- the same bytes give the same answer
+#: every time, across fresh servers -- and arrives in 0.3s rather than the usual
+#: 4-6s, so it is an input-side check before any generation. It does not affect
+#: later requests.
+#:
+#: Which strings land on which side is **not predictable**, and does not track
+#: meaning: truncating a working prompt below ~200 characters flips it, a single
+#: leading newline flips it (a leading space does not), and one metadata prefix
+#: flipped it while a longer one did not. Two people hit different styles on the
+#: same photo. So the message says "try another style" without promising which:
+#: naming one that then fails is worse than naming none.
+_GUARDRAIL_MARKER = "safety guardrails were triggered"
+GUARDRAIL_HINT = (
+    "Apple Intelligence declined to describe this image: its safety guardrails "
+    "were triggered. Retrying the same request will not help, but a different "
+    "prompt style often does -- which one varies by image, so try a few."
+)
+
 _CONTEXT_MARKER = "exceeded the model's context size"
 CONTEXT_HINT = (
     "This conversation is too long for the on-device model, which holds about "
@@ -535,6 +558,8 @@ class FmServer:
             conn.close()
             if _CONTEXT_MARKER in detail:
                 raise AppleFMError(CONTEXT_HINT)
+            if _GUARDRAIL_MARKER in detail:
+                raise AppleFMError(GUARDRAIL_HINT)
             raise AppleFMError(
                 f"Apple Intelligence returned HTTP {response.status}: {detail or 'no detail'}"
             )
@@ -623,6 +648,12 @@ def _transport_message(exc: BaseException) -> str:
     if isinstance(exc, TimeoutError):
         return (f"Apple Intelligence timed out after "
                 f"{int(DESCRIBE_TIMEOUT_SECONDS)}s waiting for a response")
+    if isinstance(exc, (BrokenPipeError, ConnectionResetError)):
+        # The server drops the connection rather than answering when a request
+        # is too large -- what several full-size photos in one chat turn used to
+        # produce. "Broken pipe" tells the user nothing they can act on.
+        return ("Apple Intelligence closed the connection, which usually means "
+                "the request was too large. Try fewer or smaller images.")
     return f"Apple Intelligence request failed: {exc}"
 
 
