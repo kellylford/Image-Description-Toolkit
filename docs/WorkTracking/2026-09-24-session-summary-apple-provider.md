@@ -65,6 +65,29 @@ provider on machines that cannot run it at all (wrong OS or no `fm`), which is t
    **`claude-code` has the same latent bug and was deliberately left alone** — coercing a model
    name there is a behaviour change outside this task, and Kelly may prefer a warning.
 
+## Review round (commit aa84546)
+
+An independent high-effort review of the first commit found seven issues, all confirmed and fixed.
+Full write-up in the PR comment; the ones worth remembering:
+
+1. **`context_window` was invented at 65,536; the real window is 4,096** — measured by probing the
+   server (4,060 tokens accepted, 5,060 refused). The chat budgeter trims against it, so the wrong
+   number meant conversations growing to sixteen times what the model can hold. This also broke
+   `catalog.py`'s own rule that an unknown value stays `None` rather than becoming a guess.
+2. **A too-long conversation arrives as HTTP 500**, which `chat/errors.py` classifies as a
+   retryable server error — and the retry resends the same oversized transcript. Now rewritten as a
+   permanent error naming the fix.
+3. **Socket timeouts escaped as bare `OSError`**, past every `except AppleFMError`, so
+   `describe_image` raised an unclassified exception instead of a `ProviderError`.
+4. **A force-quit orphaned `fm serve`** — reproduced with SIGKILL. `atexit` cannot run and the
+   child has its own session, so every crash left one holding the model in memory. Runs now record
+   their pid and reap dead owners' directories; only directories this user owns are trusted,
+   because `/tmp` is world-writable.
+5. **An unavailable model left its server running**, so the second image got a raw HTTP error
+   instead of "turn on Apple Intelligence".
+6. **`describe()` had no output cap** unlike every other provider; now 600 tokens.
+7. **`_resolve_model` shipped untested.**
+
 ## Files
 
 New: `idt_core/providers/apple.py`, `idt_core/chat/apple.py`,
@@ -78,7 +101,9 @@ Changed: `idt_core/providers/{registry,catalog}.py`, `idt_core/chat/{providers,t
 ## Test results
 
 - `pytest pytest_tests/` in the wx environment (`imagedescriber/.venv`, `IDT_REQUIRE_WX=1`):
-  **1805 passed, 49 skipped**. Includes the ImageDescriber launch smoke test.
+  **1821 passed, 49 skipped** after the review round (1805 before it). Includes the ImageDescriber
+  launch smoke test. The suite caught one of its own during that round:
+  `test_source_reading_hygiene` flagged three `write_text` calls with no encoding.
 - Same suite in `.venv` (no wx): 1431 passed, 303 skipped, 1 failed —
   `test_imagedescriber_launches`, which **fails identically on a clean tree** because that venv
   has no wxPython. Verified by stashing.
