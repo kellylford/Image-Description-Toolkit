@@ -72,9 +72,31 @@ def no_network(monkeypatch):
 
 def _run(args) -> str:
     buffer = io.StringIO()
+    before = sys.stdout
+    inside = None
+    raised = None
     with redirect_stdout(buffer):
-        cli_main.cmd_models(args)
-    return buffer.getvalue()
+        inside = sys.stdout is buffer
+        try:
+            cli_main.cmd_models(args)
+        except BaseException as exc:            # diagnostic only
+            raised = f"{type(exc).__name__}: {exc}"
+            raise
+        finally:
+            after = sys.stdout
+            still = after is buffer
+    value = buffer.getvalue()
+    print(
+        "DIAG _run:"
+        f" redirect_took_effect={inside}"
+        f" stdout_still_buffer_at_exit={still}"
+        f" stdout_at_exit={type(after).__name__}"
+        f" stdout_before={type(before).__name__}"
+        f" captured_len={len(value)}"
+        f" raised={raised}",
+        file=sys.stderr, flush=True,
+    )
+    return value
 
 
 # ---------------------------------------------------------------------------
