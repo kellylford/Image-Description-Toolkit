@@ -271,3 +271,36 @@ def test_other_providers_are_not_second_guessed(capsys):
 
     for provider in ("ollama", "anthropic", "openai", "claude-code"):
         assert _resolve_model(provider, "something-unfamiliar") == "something-unfamiliar"
+
+
+def test_a_foreign_model_warns_for_claude_code_but_is_still_sent(capsys):
+    """Claude Code gets a warning, not a substitution.
+
+    Its three names are tier aliases, but the CLI also accepts full model ids
+    and new ones as Anthropic ships them, so a name IDT does not recognise may
+    still be valid. Swapping it would silently run a cheaper model than the
+    user asked for. Warning once beats both that and the status quo, which was
+    the CLI refusing every image with a message about model catalogs.
+    """
+    from cli.main import _resolve_model
+
+    assert _resolve_model("claude-code", "moondream") == "moondream"
+    err = capsys.readouterr().err
+    assert "moondream" in err
+    assert "default_model" in err, "the warning must name where it came from"
+
+
+def test_a_known_claude_code_alias_is_silent(capsys):
+    from cli.main import _resolve_model
+
+    for alias in ("haiku", "sonnet", "opus"):
+        assert _resolve_model("claude-code", alias) == alias
+    assert capsys.readouterr().err == ""
+
+
+def test_no_model_for_claude_code_does_not_warn(capsys):
+    """Nothing configured is not a mismatch; the provider picks its default."""
+    from cli.main import _resolve_model
+
+    assert _resolve_model("claude-code", None) is None
+    assert capsys.readouterr().err == ""
