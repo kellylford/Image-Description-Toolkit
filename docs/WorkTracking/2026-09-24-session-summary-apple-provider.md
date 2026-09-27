@@ -130,7 +130,11 @@ Measured on this machine (macOS 27.2, Apple Silicon):
 
 ## What was NOT tested
 
-- **Frozen builds.** Nothing was built with PyInstaller. The spec entries are present and
+- ~~**Frozen builds.**~~ **Closed 9/25/2026:** Kelly ran the signed build and reported
+  it working, after a hardened-runtime test here (a copy signed with the real Developer
+  ID, `fm serve` spawning from it, a description returned). The notarized artifact from
+  the v4.6.0 release was then run successfully too, which was the last unverified link.
+- **Originally:** nothing was built with PyInstaller. The spec entries are present and
   `check_spec_completeness.py` passes, but no `.app`/`.exe` was produced or run.
 - **Windows and Intel Macs.** The gating is unit-tested by monkeypatching `platform`, not by
   running there. On those machines the provider should simply be absent.
