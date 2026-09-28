@@ -322,15 +322,24 @@ def launch_installer(path) -> bool:
         subprocess.run(["open", "-R", str(path)], check=False)
         return False
     # os.startfile has no env parameter — the child gets this process's block.
-    # Scrub it in place for the call, then put it back.
-    saved = dict(os.environ)
+    # Scrub it in place for the call, then put back only what changed.
+    saved = {k: v for k, v in os.environ.items() if _is_pyinstaller_key(k)}
+    saved_reset = os.environ.get("PYINSTALLER_RESET_ENVIRONMENT")
     try:
         _reset_pyinstaller_environment(os.environ)
         os.startfile(str(path))  # noqa: S606 - a file this process just downloaded
     finally:
-        os.environ.clear()
         os.environ.update(saved)
+        if saved_reset is None:
+            os.environ.pop("PYINSTALLER_RESET_ENVIRONMENT", None)
+        else:
+            os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = saved_reset
     return True
+
+
+def _is_pyinstaller_key(key):
+    key = key.upper()
+    return key.startswith("_PYI_") or key == "_MEIPASS2"
 
 
 def _reset_pyinstaller_environment(env):
@@ -346,7 +355,7 @@ def _reset_pyinstaller_environment(env):
     PYINSTALLER_RESET_ENVIRONMENT is PyInstaller's documented switch for this;
     dropping the stale variables as well keeps them out of the console session.
     """
-    for key in [k for k in env if k.upper().startswith("_PYI_") or k.upper() == "_MEIPASS2"]:
+    for key in [k for k in env if _is_pyinstaller_key(k)]:
         del env[key]
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     return env
