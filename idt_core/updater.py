@@ -321,5 +321,41 @@ def launch_installer(path) -> bool:
     if sys.platform == "darwin":
         subprocess.run(["open", "-R", str(path)], check=False)
         return False
-    os.startfile(str(path))  # noqa: S606 - a file this process just downloaded
+    # os.startfile has no env parameter — the child gets this process's block.
+    # Scrub it in place for the call, then put back only what changed.
+    saved = {k: v for k, v in os.environ.items() if _is_pyinstaller_key(k)}
+    saved_reset = os.environ.get("PYINSTALLER_RESET_ENVIRONMENT")
+    try:
+        _reset_pyinstaller_environment(os.environ)
+        os.startfile(str(path))  # noqa: S606 - a file this process just downloaded
+    finally:
+        os.environ.update(saved)
+        if saved_reset is None:
+            os.environ.pop("PYINSTALLER_RESET_ENVIRONMENT", None)
+        else:
+            os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = saved_reset
     return True
+
+
+def _is_pyinstaller_key(key):
+    key = key.upper()
+    return key.startswith("_PYI_") or key == "_MEIPASS2"
+
+
+def _reset_pyinstaller_environment(env):
+    """Make processes started from here look like fresh top-level launches.
+
+    A onefile PyInstaller app sets _PYI_* variables for its own bootloader, and
+    every child inherits them. Setup passes them on to the ImageDescriber it
+    launches from its finish page, whose bootloader then sees another app's
+    home directory and refuses to start: "Security validation failure:
+    unexpected name of application's home directory!". The same happens to
+    idt.exe run from the "Launch CLI" console Setup can open.
+
+    PYINSTALLER_RESET_ENVIRONMENT is PyInstaller's documented switch for this;
+    dropping the stale variables as well keeps them out of the console session.
+    """
+    for key in [k for k in env if _is_pyinstaller_key(k)]:
+        del env[key]
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env

@@ -7,6 +7,7 @@ fixture is used.
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -419,3 +420,40 @@ def test_version_file_agrees_with_package():
     from pathlib import Path
     root = Path(__file__).parent.parent
     assert (root / "VERSION").read_text(encoding="utf-8").strip() == updater.current_version()
+
+
+# ── launch_installer environment ──────────────────────────────────────────────
+
+def test_reset_pyinstaller_environment_drops_bootloader_state():
+    """Setup relaunches ImageDescriber with whatever env it inherited from us.
+
+    Stale _PYI_* variables made the new app's bootloader fail with "unexpected
+    name of application's home directory" after an in-app update.
+    """
+    env = {
+        "_PYI_APPLICATION_HOME_DIR": r"C:\Temp\_MEI1234",
+        "_PYI_PARENT_PROCESS_LEVEL": "1",
+        "_MEIPASS2": r"C:\Temp\_MEI1234",
+        "PATH": r"C:\Windows",
+    }
+    updater._reset_pyinstaller_environment(env)
+    assert env == {"PATH": r"C:\Windows", "PYINSTALLER_RESET_ENVIRONMENT": "1"}
+
+
+def test_launch_installer_passes_clean_env_and_restores_ours(monkeypatch):
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", r"C:\Temp\_MEI1234")
+    monkeypatch.delenv("PYINSTALLER_RESET_ENVIRONMENT", raising=False)
+    seen = {}
+
+    def fake_startfile(path):
+        seen.update(os.environ)
+
+    monkeypatch.setattr(updater.os, "startfile", fake_startfile, raising=False)
+    assert updater.launch_installer("setup.exe") is True
+
+    assert "_PYI_APPLICATION_HOME_DIR" not in seen
+    assert seen["PYINSTALLER_RESET_ENVIRONMENT"] == "1"
+    # The running app's own environment is untouched afterwards.
+    assert os.environ["_PYI_APPLICATION_HOME_DIR"] == r"C:\Temp\_MEI1234"
+    assert "PYINSTALLER_RESET_ENVIRONMENT" not in os.environ
