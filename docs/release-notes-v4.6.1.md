@@ -50,6 +50,12 @@ found while using them.
 - **`idt describe --provider claude-code` warns** when your configured
   `default_model` is not one Claude Code offers, instead of failing on every
   image with a message about model catalogs.
+- **ImageDescriber opens after an in-app update on Windows.** Leaving **Launch
+  ImageDescriber** checked at the end of an update could show "Security validation
+  failure: unexpected name of application's home directory!" instead of opening
+  the app. The fix lives in the version you update *from*, so updating to 4.6.1
+  may still show it once: click OK and start ImageDescriber as usual. From 4.6.1
+  on it won't happen. New installs were never affected.
 
 ---
 
