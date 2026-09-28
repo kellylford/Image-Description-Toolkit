@@ -16,6 +16,11 @@ fixes found while using them.
 - `default_model` is a single global setting while `--provider` is chosen per run, so a machine whose default is an Ollama model sent that name to Claude Code, which refused every image with a message about model catalogs.
 - It now warns once, before the run, naming the model, Claude Code's actual options, and where the value came from. The model is still sent: Claude Code accepts full model ids and new names as they ship, so substituting one could silently run a cheaper model than asked for.
 
+**ImageDescriber starts after an in-app update on Windows (#338)**
+- After updating from inside ImageDescriber, leaving **Launch ImageDescriber** checked on Setup's last page showed "Security validation failure: unexpected name of application's home directory!" and the app did not open. Starting it by hand worked.
+- The updater launched Setup with the running app's PyInstaller bootloader variables (`_PYI_*`) still in its environment, and Setup passed them on to the new ImageDescriber, whose bootloader rejected them. The optional CLI console Setup can open inherited them too.
+- The updater now drops those variables and sets `PYINSTALLER_RESET_ENVIRONMENT=1` for the launch. The fix is in the app being updated *from*, so the update to 4.6.1 itself can still show the message once; updates from 4.6.1 onward will not. Clean installs were never affected.
+
 
 ## [4.6.0] - 2026-09-25
 
