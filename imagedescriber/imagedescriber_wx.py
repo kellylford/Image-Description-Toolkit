@@ -381,6 +381,20 @@ def _format_chat_name(provider: str, model: str, dt=None) -> str:
     return f"Chat - {_display_provider(provider)} {model} - {date_str}"
 
 
+def open_with_default_app(path: Path) -> None:
+    """Open a file in whatever application the OS associates with it.
+
+    Raises when the OS cannot open it: OSError on Windows (e.g. no app is
+    associated with the file type), CalledProcessError from macOS `open`.
+    """
+    if sys.platform == 'win32':
+        os.startfile(str(path))
+    elif sys.platform == 'darwin':
+        subprocess.run(['open', str(path)], check=True, capture_output=True)
+    else:
+        subprocess.Popen(['xdg-open', str(path)])
+
+
 def format_image_metadata(metadata: dict) -> list:
     """Format image metadata (GPS, EXIF) for display
 
@@ -1640,6 +1654,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         describe_video_item = process_menu.Append(wx.ID_ANY, "Describe Video with &AI...")
         self.Bind(wx.EVT_MENU, self.on_describe_video, describe_video_item)
+
+        # No accelerator: Enter (or double-click) on a video in the image list
+        # already plays it, through on_item_activated.
+        play_video_item = process_menu.Append(
+            wx.ID_ANY, "&Play Video",
+            "Play the selected video in the system's default player")
+        self.Bind(wx.EVT_MENU, self.on_play_video, play_video_item)
 
         process_menu.AppendSeparator()
 
@@ -7459,13 +7480,51 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """Handle double-click or Enter key on a tree item.
 
         For chat items: reopen the existing saved session (resume).
+        For video items: play the video in the system's default player.
         For all other item types: pass the event through unchanged.
         """
         if (self.current_image_item is not None
                 and self.current_image_item.item_type == ImageItem.ITEM_TYPE_CHAT):
             self.on_resume_chat(self.current_image_item)
+        elif (self.current_image_item is not None
+                and self.current_image_item.item_type == "video"
+                and self._activated_item_path(event) == self.current_image_item.file_path):
+            # Compare against the activated node: on_image_selected leaves
+            # current_image_item unchanged on a folder node, so Enter on a
+            # folder would otherwise replay the last video selected.
+            self.on_play_video(event)
         else:
             event.Skip()
+
+    def _activated_item_path(self, event):
+        """File path stored on the activated tree node; None for a folder node."""
+        try:
+            node = event.GetItem()
+        except AttributeError:
+            node = self.image_list.GetSelection()
+        if not node.IsOk():
+            return None
+        return self.image_list.GetItemData(node)
+
+    def on_play_video(self, event):
+        """Hand the selected video to the operating system's default player."""
+        item = self.current_image_item
+        if item is None or item.item_type != "video":
+            show_warning(self, "Select a video in the image list first.")
+            return
+
+        video_path = Path(item.file_path)
+        if not video_path.is_file():
+            show_error(self, f"The video file could not be found:\n{video_path}")
+            return
+
+        try:
+            open_with_default_app(video_path)
+        except Exception as e:
+            logger.error(f"Could not play video {video_path}: {e}", exc_info=True)
+            show_error(self, f"Could not play the video:\n{e}")
+            return
+        self.SetStatusText(f"Playing {video_path.name}", 0)
 
     def on_resume_chat(self, chat_item: ImageItem):
         """Reopen an existing saved chat session for continuation.

@@ -176,6 +176,7 @@ Within an open menu:
 | Convert HEIC Files… | — | — | |
 | Extract Video Frames… | — | — | |
 | Describe Video with AI… | — | — | |
+| Play Video | — | — | `Enter` on a video in the image list does the same — see [Contextual keys](#contextual-keys-1) |
 | Rename Item | `F2` | `F2` | The *menu accelerator* is Windows-only, because `F2` is a hardware key on a Mac. The char hook honours the key on both. Also bare `R` |
 | **Descriptions** |
 | Add Manual Description | `M` | `M` | Bare letter |
@@ -224,7 +225,7 @@ Descriptions, `Alt+V` View, `Alt+T` Tools, `Alt+H` Help. Within an open menu:
 | --- | --- |
 | File | **N**ew, **O**pen, **S**ave, Save Workspace **A**s, **L**oad Directory, Refresh **F**older, **U**RL, **I**mport Workflow, **E**xport Descriptions, Em**b**ed, **H**TML Gallery, S**t**atistics, **W**orkflow Result, **C**lose Window *(macOS)*, E**x**it |
 | Edit | **U**ndo, **R**edo, Cu**t**, **C**opy, **P**aste, Select **A**ll |
-| Process | **C**urrent Image, Selected **F**older, Selected Fo**l**der (redescribe), **U**ndescribed, **R**edescribe All, **B**atch Progress, S**t**op All, Update **I**mage List, **M**odels, Chat **w**ith AI Model, **H**EIC, **V**ideo Frames, **A**I (describe video), Re**n**ame Item |
+| Process | **C**urrent Image, Selected **F**older, Selected Fo**l**der (redescribe), **U**ndescribed, **R**edescribe All, **B**atch Progress, S**t**op All, Update **I**mage List, **M**odels, Chat **w**ith AI Model, **H**EIC, **V**ideo Frames, **A**I (describe video), **P**lay Video, Re**n**ame Item |
 | Descriptions | **M**anual, **F**ollowup, **E**dit, **D**elete, **C**opy, **P**ath, **I**mage, Descrip**t**ion (image + description), **S**how All |
 | View | **M**ode, **A**ll Items, **D**escribed, **U**ndescribed, **V**ideos, **C**hats, **I**mage Previews, **F**ind Images |
 | Tools | **P**rompts, **C**onfigure Settings *(Windows)* / P**r**eferences *(macOS)*, **O**llama, **F**Fmpeg, E**x**port Config, **I**mport Config, AI I**n**fo |
@@ -255,6 +256,11 @@ means the workspace tree and the description list.
 | `F2` | Rename the selected item | Process ▸ Rename Item |
 | `Ctrl+S` | Save the workspace | File ▸ Save Workspace |
 | `Ctrl+V` | Paste an image from the clipboard | *no menu item* — **not** Edit ▸ Paste |
+
+`Enter` (or a double-click) on an item in the workspace tree is handled by
+`on_item_activated`, not the char hook: on a video it plays the video in the
+system's default player (Process ▸ Play Video), and on a chat it reopens the
+conversation.
 
 Three of these are worth knowing about when changing this code:
 

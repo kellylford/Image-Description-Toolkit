@@ -899,6 +899,7 @@ The application has two modes:
 | Convert HEIC Files... | Convert HEIC/HEIF images to JPEG |
 | Extract Video Frames... | Extract frames from video files |
 | Describe Video with AI... | Generate an AI description for a video |
+| Play Video | Play the selected video in your system's default player (or press Enter on the video) |
 | Rename Item | Rename the selected image or folder |
 
 #### Descriptions Menu
@@ -1493,7 +1494,7 @@ IDT extracts still frames from video files before describing them. The AI then d
 
 **In the CLI:** Video extraction happens automatically when you run `idt describe` on a folder containing videos. Opt out with `--no-video`.
 
-**In the GUI:** Videos appear in the image list as expandable nodes. Use **Process → Extract Video Frames...** to control extraction settings, or **Process → Describe Video with AI...** to run the full pipeline.
+**In the GUI:** Videos appear in the image list as expandable nodes. Use **Process → Extract Video Frames...** to control extraction settings, or **Process → Describe Video with AI...** to run the full pipeline. To watch a video, select it and press **Enter** (or use **Process → Play Video**); it opens in your system's default video player.
 
 **Extraction modes**
 

@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+### ✨ New Features
+
+**Play a video from ImageDescriber**
+- Press **Enter** (or double-click) on a video in the image list, or choose **Process → Play Video**, to open it in the system's default video player.
+- If the video file has moved or been deleted, ImageDescriber says so instead of doing nothing.
+
 ## [4.6.1] - 2026-09-25
 
 Maintenance release. The two providers added in 4.6.0 are unchanged; these are
