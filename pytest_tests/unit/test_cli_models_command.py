@@ -79,6 +79,9 @@ def _run(args, capsys) -> str:
     saying the command printed nothing, while the captured output directly
     below the failure showed the entire list. It reproduced only in CI, on two
     jobs out of three, which is the most expensive kind of test bug there is.
+
+    capsys alone did not end it: a garbage-collected wx.App from an earlier
+    test file was rebinding sys.stdout too. pytest_tests/conftest.py stops that.
     """
     cli_main.cmd_models(args)
     return capsys.readouterr().out

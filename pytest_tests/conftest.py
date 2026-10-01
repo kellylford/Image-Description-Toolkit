@@ -12,6 +12,31 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+def _stop_wx_app_restoring_stdio():
+    """Keep a garbage-collected wx.App from rebinding sys.stdout mid-test.
+
+    wx.App records ``sys.stdout`` when it is constructed and puts it back in
+    ``__del__`` (via ``RestoreStdio``), unconditionally. Under pytest the
+    recorded stream is whichever test's capture was active at the time, so
+    when the App's wrapper is collected later -- at a moment decided by the
+    garbage collector -- the *current* test's prints go to that stale stream
+    and its ``capsys`` comes back empty, while the "Captured stdout" section
+    shows everything. That was the intermittent CI failure in
+    ``test_cli_models_command.py``, which runs right after
+    ``test_claude_code_dialogs.py`` creates an App.
+
+    No test redirects wx stdio, so there is never anything to restore.
+    """
+    try:
+        import wx
+    except Exception:
+        return
+    wx.App.RestoreStdio = lambda self: None
+
+
+_stop_wx_app_restoring_stdio()
+
+
 @pytest.fixture(autouse=True)
 def isolate_model_cache(tmp_path, monkeypatch):
     """Point the provider model cache at a scratch directory, for every test.
