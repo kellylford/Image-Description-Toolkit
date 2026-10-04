@@ -651,10 +651,11 @@ def _previous_frames_rel(ws, video_wi, video: Path):
     # that has been moved still records its old location.
     parts = Path(recorded[0]).parent.parts
     lowered = [p.lower() for p in parts]
-    # The "derived" directly inside the bundle (<name>.idtw/derived), not a
-    # source folder that happens to be called "derived".
-    start = next((i + 1 for i in range(1, len(lowered))
-                  if lowered[i] == "derived" and lowered[i - 1].endswith(".idtw")),
+    # The bundle's own derived/frames/, not a source folder that happens to
+    # be called "derived" (and not depending on the bundle folder's name,
+    # which a user may have renamed without the .idtw suffix).
+    start = next((i + 1 for i in range(len(lowered) - 1)
+                  if lowered[i] == "derived" and lowered[i + 1] == "frames"),
                  None)
     if start is None:
         return None

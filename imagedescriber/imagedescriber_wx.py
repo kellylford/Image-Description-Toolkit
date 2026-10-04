@@ -4425,18 +4425,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # delivered once the outermost pump ends (see on_workflow_complete).
         # A depth, not a flag: an inner pump must not end the guard early.
         self._progress_pump_depth += 1
-        threading.Thread(target=runner, daemon=True).start()
         try:
-            while not state.get('done'):
-                wx.SafeYield(dlg, True)
-                time.sleep(0.02)
-            wx.SafeYield(dlg, True)           # drain queued progress CallAfters
+            threading.Thread(target=runner, daemon=True).start()
+            try:
+                while not state.get('done'):
+                    wx.SafeYield(dlg, True)
+                    time.sleep(0.02)
+                wx.SafeYield(dlg, True)           # drain queued progress CallAfters
+            finally:
+                if standalone:
+                    if dlg:
+                        dlg.Destroy()
+                elif owns_dialog:
+                    self._close_progress_dialog()
         finally:
-            if standalone:
-                if dlg:
-                    dlg.Destroy()
-            elif owns_dialog:
-                self._close_progress_dialog()
+            # Always, even if starting the thread or closing the dialog
+            # raised: a depth left above 0 deferred every later batch
+            # completion forever.
             self._progress_pump_depth -= 1
             if self._progress_pump_depth == 0:
                 pending, self._deferred_completions = self._deferred_completions, []

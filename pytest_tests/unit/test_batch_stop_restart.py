@@ -696,3 +696,23 @@ def test_completion_during_a_plain_save_is_deferred_too(frame, monkeypatch):
     f.on_save_workspace(None)          # File > Save, the real handler
     assert _pump_until(lambda: f.batch_worker is None, 5), "completion lost"
     assert max(depth) == 1, "a second save ran inside the first"
+
+
+
+def test_pump_depth_recovers_when_closing_the_dialog_raises(frame, monkeypatch):
+    """A depth left above 0 deferred every later batch completion forever."""
+    f = frame
+    assert f._progress_pump_depth == 0
+
+    real_close = f._close_progress_dialog
+    raised = []
+
+    def boom():
+        if not raised:            # once; the fixture's own cleanup calls it too
+            raised.append(1)
+            raise RuntimeError("dialog already gone")
+        return real_close()
+    monkeypatch.setattr(f, "_close_progress_dialog", boom)
+    with pytest.raises(RuntimeError):
+        f._run_with_progress("Saving workspace", 1, lambda cb: None)
+    assert f._progress_pump_depth == 0

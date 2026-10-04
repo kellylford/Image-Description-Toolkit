@@ -104,6 +104,35 @@ def _file_size(path) -> Optional[int]:
         return None
 
 
+def _file_fingerprint(path) -> Optional[str]:
+    """sha1 of the first and last 64 KB: tells two same-sized files apart
+    (fixed-length dashcam or security-camera clips) cheaply, and survives a
+    move or copy, which a modification time may not."""
+    import hashlib
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(65536)
+            fh.seek(0, os.SEEK_END)
+            end = fh.tell()
+            fh.seek(max(0, end - 65536))
+            tail = fh.read(65536)
+    except OSError:
+        return None
+    return hashlib.sha1(head + b"|" + tail).hexdigest()
+
+
+def _path_gone(path) -> bool:
+    """True only if ``path`` definitely doesn't exist; an unreadable location
+    (access denied, offline share) is not "gone"."""
+    try:
+        os.stat(path)
+        return False
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+
+
 def frames_dir_taken(frames_dir: Path, video) -> bool:
     """True if ``frames_dir`` belongs to a different video than ``video``.
 
@@ -133,9 +162,15 @@ def frames_dir_taken(frames_dir: Path, video) -> bool:
         # Without this every moved video was re-extracted and re-described.
         # An offline card's video with another card's same-named video still
         # differs in size, so its frames stay protected.
-        moved = (not Path(record["path"]).exists()
+        # The content fingerprint is required too: two different fixed-length
+        # clips (dashcams, security cameras reusing FILE0001 across cards)
+        # can match in name and size. A record without one is never "moved".
+        fingerprint = record.get("fingerprint")
+        moved = (_path_gone(record["path"])
                  and Path(record["path"]).name.lower() == Path(video).name.lower()
-                 and size is not None and recorded is not None and size == recorded)
+                 and size is not None and recorded is not None and size == recorded
+                 and fingerprint is not None
+                 and fingerprint == _file_fingerprint(video))
         return not moved
     return size is not None and recorded is not None and size != recorded
 
@@ -162,7 +197,8 @@ def claim_frames_dir(frames_dir: Path, video) -> None:
     frames_dir = Path(frames_dir)
     frames_dir.mkdir(parents=True, exist_ok=True)
     (frames_dir / FRAMES_OWNER_FILE).write_text(
-        json.dumps({"path": os.path.abspath(str(video)), "size": _file_size(video)}),
+        json.dumps({"path": os.path.abspath(str(video)), "size": _file_size(video),
+                    "fingerprint": _file_fingerprint(video)}),
         encoding="utf-8")
 
 

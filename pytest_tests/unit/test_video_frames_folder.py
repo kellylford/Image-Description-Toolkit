@@ -7,6 +7,7 @@ frames: "file not found", or the first video's frames described with the
 second video's pictures.
 """
 
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -205,7 +206,10 @@ def test_moved_video_keeps_its_folder(tmp_path):
     claim_frames_dir(d, new)
     # Rewrite the record as if made at the old location.
     import json
-    (d / ".video").write_text(json.dumps({"path": str(old), "size": 10}), encoding="utf-8")
+    from idt_core.workspace import _file_fingerprint
+    (d / ".video").write_text(json.dumps({"path": str(old), "size": 10,
+                                          "fingerprint": _file_fingerprint(new)}),
+                              encoding="utf-8")
     assert not frames_dir_taken(d, new)
     assert choose_frames_relpath(derived, new, "lib") == frames_relpath(new, "lib")
 
@@ -221,3 +225,58 @@ def test_source_folder_named_derived_does_not_confuse_the_cli(tmp_path):
                         item_type="video", subfolder="derived")
     vwi.extra["extracted_frames"] = [str(folder / "IMG_0001_0.00s.jpg")]
     assert _previous_frames_rel(ws, vwi, video) == "frames/derived/IMG_0001"
+
+
+
+def test_same_name_and_size_but_different_content_is_not_moved(tmp_path):
+    """Fixed-length dashcam clips: FILE0001.MOV on two cards, same byte size,
+    different pictures. The first card is offline. Its folder must not be
+    handed to the second (sixth review)."""
+    card_a = tmp_path / "E" / "DCIM" / "FILE0001.MOV"
+    card_a.parent.mkdir(parents=True)
+    card_a.write_bytes(b"A" * 1000)
+    derived = tmp_path / "derived"
+    rel_a = choose_frames_relpath(derived, card_a, "DCIM")
+    claim_frames_dir(derived / rel_a, card_a)
+    card_a.unlink()                                   # card A removed
+    card_b = tmp_path / "F" / "DCIM" / "FILE0001.MOV"
+    card_b.parent.mkdir(parents=True)
+    card_b.write_bytes(b"B" * 1000)                   # same size, other content
+    assert choose_frames_relpath(derived, card_b, "DCIM") != rel_a
+
+
+def test_unreadable_owner_path_counts_as_present(tmp_path, monkeypatch):
+    """An owner path that can't be checked (access denied) must not raise, and
+    must not be treated as gone."""
+    import json
+    import idt_core.workspace as wsmod
+    v = tmp_path / "IMG_0001.mp4"
+    v.write_bytes(b"x" * 10)
+    d = tmp_path / "frames" / "IMG_0001"
+    d.mkdir(parents=True)
+    (d / ".video").write_text(json.dumps({"path": "Z:/locked/IMG_0001.mp4", "size": 10,
+                                          "fingerprint": wsmod._file_fingerprint(v)}),
+                              encoding="utf-8")
+    real_stat = os.stat
+
+    def stat(path, *a, **k):
+        if "locked" in str(path):
+            raise PermissionError(13, "Access is denied")
+        return real_stat(path, *a, **k)
+    monkeypatch.setattr(wsmod.os, "stat", stat)
+    assert frames_dir_taken(d, v) is True
+
+
+def test_cli_finds_previous_folder_in_a_renamed_bundle(tmp_path):
+    from cli.main import _previous_frames_rel
+    from idt_core.workspace import WorkspaceItem
+    ws = Workspace.create(tmp_path / "w.idtw")
+    folder = ws.derived_dir("frames") / "IMG_0001"
+    folder.mkdir(parents=True)
+    video = tmp_path / "IMG_0001.mp4"
+    vwi = WorkspaceItem(image=video.name, source_path=str(video), storage="reference",
+                        item_type="video")
+    # Recorded when the bundle folder had been renamed without the suffix.
+    vwi.extra["extracted_frames"] = [
+        str(tmp_path / "MyPhotos" / "derived" / "frames" / "IMG_0001" / "a.jpg")]
+    assert _previous_frames_rel(ws, vwi, video) == "frames/IMG_0001"
